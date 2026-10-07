@@ -213,7 +213,7 @@ export function ResultsPanel({
                             {row.name ?? row.key}
                           </Link>
                         ) : (
-                          <Link href="/funds" className="font-medium hover:text-accent-ink hover:underline">
+                          <Link href={`/funds/${encodeURIComponent(row.key)}`} className="font-medium hover:text-accent-ink hover:underline">
                             {row.name ?? row.key}
                           </Link>
                         )}

@@ -18,6 +18,7 @@ from api.auth import Owner
 from api.budget_routes import router as budget_router
 from api.chat_routes import router as chat_router
 from api.company_routes import router as company_router
+from api.fund_research_routes import router as fund_research_router
 from api.config_history_routes import router as config_history_router
 from api.control_stake_routes import router as control_stake_router
 from api.data_context_routes import router as data_context_router
@@ -256,6 +257,7 @@ def create_app() -> FastAPI:
     app.include_router(screen_router)
     app.include_router(discover_router)
     app.include_router(company_router)
+    app.include_router(fund_research_router)
     app.include_router(insider_router)
     app.include_router(investor_router)
     app.include_router(control_stake_router)

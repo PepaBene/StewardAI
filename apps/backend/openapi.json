@@ -13173,6 +13173,789 @@
         }
       }
     },
+    "/funds/catalog": {
+      "get": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Fund Catalog",
+        "description": "Every fund with a stored factsheet or holdings snapshot: the covered fund universe, not all funds.",
+        "operationId": "fund_catalog",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CatalogRow"
+                  },
+                  "type": "array",
+                  "title": "Response Fund Catalog"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/funds/compare": {
+      "get": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Compare Funds",
+        "description": "Costs, overlap (sum of the smaller issuer weight, plus the shared holdings), geography, sector,\nconcentration, return and look-through completeness. Share classes of one portfolio are not compared with each other.",
+        "operationId": "compare_funds",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isins",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Two to five fund ISINs, comma-separated.",
+              "title": "Isins"
+            },
+            "description": "Two to five fund ISINs, comma-separated."
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Answer as of this date, using only data fetched by then.",
+              "title": "As Of"
+            },
+            "description": "Answer as of this date, using only data fetched by then."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundComparison"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/{isin}/profile": {
+      "get": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Fund Profile",
+        "operationId": "fund_profile",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Answer as of this date, using only data fetched by then.",
+              "title": "As Of"
+            },
+            "description": "Answer as of this date, using only data fetched by then."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundProfile"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/{isin}/holdings": {
+      "get": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Fund Holdings",
+        "description": "Issuer-normalised top holdings with asset-class, sector, country and currency weights; the weight\nthe published rows do not account for stays its own unknown bucket.",
+        "operationId": "fund_holdings",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Answer as of this date, using only data fetched by then.",
+              "title": "As Of"
+            },
+            "description": "Answer as of this date, using only data fetched by then."
+          },
+          {
+            "name": "top",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 5,
+              "default": 25,
+              "title": "Top"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingsView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/{isin}/holdings.csv": {
+      "get": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Fund Holdings Csv",
+        "description": "The derived exposure table with provenance on every row (not the issuer's own file).",
+        "operationId": "fund_holdings_csv",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Answer as of this date, using only data fetched by then.",
+              "title": "As Of"
+            },
+            "description": "Answer as of this date, using only data fetched by then."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/{isin}/style": {
+      "get": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Fund Style",
+        "description": "FundConcentration, size mix and weighted valuation and profitability proxies from the holdings.",
+        "operationId": "fund_style",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Answer as of this date, using only data fetched by then.",
+              "title": "As Of"
+            },
+            "description": "Answer as of this date, using only data fetched by then."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StyleView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/{isin}/performance": {
+      "get": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Fund Performance",
+        "description": "FundListing price return, total return where distributions are recorded, and tracking difference against a\nbenchmark only when both are on the same basis and currency.",
+        "operationId": "fund_performance",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin"
+            }
+          },
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The exchange listing to use; default is the first with prices.",
+              "title": "Ticker"
+            },
+            "description": "The exchange listing to use; default is the first with prices."
+          },
+          {
+            "name": "benchmark",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A benchmark symbol from the options in the response.",
+              "title": "Benchmark"
+            },
+            "description": "A benchmark symbol from the options in the response."
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Answer as of this date, using only data fetched by then.",
+              "title": "As Of"
+            },
+            "description": "Answer as of this date, using only data fetched by then."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerformanceView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/{isin}/bond": {
+      "get": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Fund Bond",
+        "description": "Maturity, duration and credit quality only where the issuer data provide them; otherwise unavailable.",
+        "operationId": "fund_bond",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Answer as of this date, using only data fetched by then.",
+              "title": "As Of"
+            },
+            "description": "Answer as of this date, using only data fetched by then."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BondView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/{isin}/checklist": {
+      "get": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Fund Checklist",
+        "description": "Each due-diligence criterion with its rule and source; no score, and no summary when a critical input is missing.",
+        "operationId": "fund_checklist",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Answer as of this date, using only data fetched by then.",
+              "title": "As Of"
+            },
+            "description": "Answer as of this date, using only data fetched by then."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Checklist"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/{isin}/facts": {
+      "get": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Fund Facts",
+        "description": "The owner's current sourced facts about the fund (newest per key).",
+        "operationId": "fund_facts",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/Fact"
+                  },
+                  "title": "Response Fund Facts"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Put Fund Fact",
+        "description": "Record a sourced fact. The record is append-only: a correction is a new entry and the newest wins.",
+        "operationId": "put_fund_fact",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FactIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Fact"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/{isin}/facts/history": {
+      "get": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Fund Fact History",
+        "operationId": "fund_fact_history",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Fact"
+                  },
+                  "title": "Response Fund Fact History"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/jobs/insider-trades": {
       "post": {
         "tags": [
@@ -17008,6 +17791,50 @@
         ],
         "title": "AliasOut"
       },
+      "Alignment": {
+        "properties": {
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "sessions": {
+            "type": "integer",
+            "title": "Sessions"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "sessions",
+          "note"
+        ],
+        "title": "Alignment"
+      },
       "AllocationSlice": {
         "properties": {
           "key": {
@@ -17945,6 +18772,51 @@
         ],
         "title": "BenchmarkBucket"
       },
+      "BenchmarkInfo": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "price",
+              "total",
+              "unknown"
+            ],
+            "title": "Basis"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "label",
+          "basis",
+          "currency",
+          "note"
+        ],
+        "title": "BenchmarkInfo"
+      },
       "BenchmarkLookThrough": {
         "properties": {
           "key": {
@@ -18051,6 +18923,50 @@
           "foreign_share"
         ],
         "title": "BenchmarkLookThrough"
+      },
+      "BenchmarkOption": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "price",
+              "total",
+              "unknown"
+            ],
+            "title": "Basis"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "has_prices": {
+            "type": "boolean",
+            "title": "Has Prices",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "label",
+          "basis"
+        ],
+        "title": "BenchmarkOption"
       },
       "BenchmarkProxy": {
         "properties": {
@@ -18373,6 +19289,115 @@
           "state"
         ],
         "title": "BoardRow"
+      },
+      "BondMix": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "weight"
+        ],
+        "title": "BondMix"
+      },
+      "BondView": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "applicable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applicable"
+          },
+          "applicability_reason": {
+            "type": "string",
+            "title": "Applicability Reason"
+          },
+          "weighted_maturity": {
+            "$ref": "#/components/schemas/AnalyticsResult"
+          },
+          "duration": {
+            "$ref": "#/components/schemas/AnalyticsResult"
+          },
+          "credit_quality": {
+            "$ref": "#/components/schemas/AnalyticsResult"
+          },
+          "stated": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileField"
+            },
+            "type": "array",
+            "title": "Stated"
+          },
+          "asset_mix": {
+            "items": {
+              "$ref": "#/components/schemas/BondMix"
+            },
+            "type": "array",
+            "title": "Asset Mix"
+          },
+          "asset_mix_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Mix Source"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version",
+            "default": "1.0.0"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "applicable",
+          "applicability_reason",
+          "weighted_maturity",
+          "duration",
+          "credit_quality",
+          "stated",
+          "asset_mix",
+          "asset_mix_source",
+          "warnings"
+        ],
+        "title": "BondView"
       },
       "Bucket": {
         "properties": {
@@ -19174,6 +20199,130 @@
         ],
         "title": "CashWeightRule"
       },
+      "CatalogRow": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "holdings_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdings As Of"
+          },
+          "expense_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expense Ratio"
+          },
+          "total_assets": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Assets"
+          },
+          "total_assets_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Assets Currency"
+          },
+          "has_holdings": {
+            "type": "boolean",
+            "title": "Has Holdings"
+          },
+          "listing_count": {
+            "type": "integer",
+            "title": "Listing Count"
+          },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "name",
+          "provider",
+          "currency",
+          "holdings_as_of",
+          "expense_ratio",
+          "total_assets",
+          "total_assets_currency",
+          "has_holdings",
+          "listing_count",
+          "tickers"
+        ],
+        "title": "CatalogRow"
+      },
       "CatalogueResponse": {
         "properties": {
           "kind": {
@@ -19951,6 +21100,60 @@
           "outcome"
         ],
         "title": "Check"
+      },
+      "Checklist": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/Criterion"
+            },
+            "type": "array",
+            "title": "Criteria"
+          },
+          "summary_available": {
+            "type": "boolean",
+            "title": "Summary Available"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "abstain_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Abstain Reason"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version",
+            "default": "1.0.0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "as_of",
+          "criteria",
+          "summary_available",
+          "summary",
+          "abstain_reason"
+        ],
+        "title": "Checklist"
       },
       "Citation": {
         "properties": {
@@ -21294,6 +22497,302 @@
           "financial"
         ],
         "title": "CompareCompany"
+      },
+      "CompareExposureRow": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weights": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Weights"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "default": "known"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "weights"
+        ],
+        "title": "CompareExposureRow"
+      },
+      "CompareFund": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "distribution_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distribution Policy"
+          },
+          "expense_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expense Ratio"
+          },
+          "total_assets": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Assets"
+          },
+          "total_assets_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Assets Currency"
+          },
+          "holdings_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdings As Of"
+          },
+          "holdings_lag_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdings Lag Days"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          },
+          "portfolio_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Id"
+          },
+          "duplicate_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Of"
+          },
+          "equity_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equity Weight"
+          },
+          "residual_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual Weight"
+          },
+          "unidentified_equity_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidentified Equity Weight"
+          },
+          "issuers": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuers"
+          },
+          "top10_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top10 Weight"
+          },
+          "effective_issuers": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Issuers"
+          },
+          "returns": {
+            "items": {
+              "$ref": "#/components/schemas/ReturnCell"
+            },
+            "type": "array",
+            "title": "Returns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "name",
+          "provider",
+          "currency",
+          "distribution_policy",
+          "expense_ratio",
+          "total_assets",
+          "total_assets_currency",
+          "holdings_as_of",
+          "holdings_lag_days",
+          "stale",
+          "portfolio_id",
+          "duplicate_of",
+          "equity_weight",
+          "residual_weight",
+          "unidentified_equity_weight",
+          "issuers",
+          "top10_weight",
+          "effective_issuers",
+          "returns"
+        ],
+        "title": "CompareFund"
       },
       "CompareRow": {
         "properties": {
@@ -23416,6 +24915,73 @@
         ],
         "title": "CreditStressRule",
         "description": "A threshold on one stored macro series. Fires once, when a genuinely new observation\n(a later period than any known before it) is beyond the threshold and the previous\nperiod was not; a revision of an old period never fires."
+      },
+      "Criterion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "good",
+              "watch",
+              "concern",
+              "info",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "observed": {
+            "type": "string",
+            "title": "Observed"
+          },
+          "rule": {
+            "type": "string",
+            "title": "Rule"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "critical": {
+            "type": "boolean",
+            "title": "Critical",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "status",
+          "observed",
+          "rule"
+        ],
+        "title": "Criterion"
       },
       "DailyFallback": {
         "properties": {
@@ -28618,6 +30184,58 @@
         ],
         "title": "ExposureView"
       },
+      "Fact": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "passage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "value",
+          "source_url",
+          "recorded_at"
+        ],
+        "title": "Fact"
+      },
       "FactCheck": {
         "properties": {
           "check": {
@@ -28640,6 +30258,57 @@
           "ok"
         ],
         "title": "FactCheck"
+      },
+      "FactIn": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Value"
+          },
+          "source_url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 8,
+            "title": "Source Url"
+          },
+          "passage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "value",
+          "source_url"
+        ],
+        "title": "FactIn"
       },
       "FactIndexEntry": {
         "properties": {
@@ -30786,6 +32455,42 @@
         ],
         "title": "FundAsOf"
       },
+      "FundBucket": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weight"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "known",
+              "unclassified",
+              "not_accounted"
+            ],
+            "title": "Kind",
+            "default": "known"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "weight"
+        ],
+        "title": "FundBucket"
+      },
       "FundChannel": {
         "properties": {
           "channel": {
@@ -30807,6 +32512,168 @@
           "positions"
         ],
         "title": "FundChannel"
+      },
+      "FundComparison": {
+        "properties": {
+          "funds": {
+            "items": {
+              "$ref": "#/components/schemas/CompareFund"
+            },
+            "type": "array",
+            "title": "Funds"
+          },
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/PairOverlap"
+            },
+            "type": "array",
+            "title": "Pairs"
+          },
+          "sectors": {
+            "items": {
+              "$ref": "#/components/schemas/CompareExposureRow"
+            },
+            "type": "array",
+            "title": "Sectors"
+          },
+          "countries": {
+            "items": {
+              "$ref": "#/components/schemas/CompareExposureRow"
+            },
+            "type": "array",
+            "title": "Countries"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version",
+            "default": "1.0.0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "funds",
+          "pairs",
+          "sectors",
+          "countries",
+          "warnings"
+        ],
+        "title": "FundComparison"
+      },
+      "FundConcentration": {
+        "properties": {
+          "equity_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Equity Weight"
+          },
+          "issuers": {
+            "type": "integer",
+            "title": "Issuers"
+          },
+          "top10_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top10 Weight",
+            "description": "Share of net assets in the ten largest issuers."
+          },
+          "top10_of_equity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top10 Of Equity"
+          },
+          "hhi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hhi"
+          },
+          "effective_issuers": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Issuers"
+          },
+          "unidentified_equity_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Unidentified Equity Weight"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "equity_weight",
+          "issuers",
+          "top10_weight",
+          "top10_of_equity",
+          "hhi",
+          "effective_issuers",
+          "unidentified_equity_weight",
+          "basis"
+        ],
+        "title": "FundConcentration"
       },
       "FundCoverage": {
         "properties": {
@@ -30992,6 +32859,68 @@
           "value_base"
         ],
         "title": "FundHolding"
+      },
+      "FundListing": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "price_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Symbol"
+          },
+          "has_prices": {
+            "type": "boolean",
+            "title": "Has Prices",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker"
+        ],
+        "title": "FundListing"
       },
       "FundLookThrough": {
         "properties": {
@@ -31631,6 +33560,108 @@
           "source_url"
         ],
         "title": "FundPosition"
+      },
+      "FundProfile": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "identity": {
+            "$ref": "#/components/schemas/Identity"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "have": {
+            "type": "integer",
+            "title": "Have"
+          },
+          "of": {
+            "type": "integer",
+            "title": "Of"
+          },
+          "charges": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Charges"
+          },
+          "factsheet_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Factsheet As Of"
+          },
+          "holdings_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdings As Of"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version",
+            "default": "1.0.0"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "name",
+          "provider",
+          "identity",
+          "fields",
+          "have",
+          "of",
+          "factsheet_as_of",
+          "holdings_as_of"
+        ],
+        "title": "FundProfile"
       },
       "FundRequest": {
         "properties": {
@@ -35704,6 +37735,214 @@
         ],
         "title": "HoldingsResponse"
       },
+      "HoldingsView": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "total_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Weight"
+          },
+          "residual_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual Weight",
+            "description": "1 - the published rows; unknown, never spread over the known rows."
+          },
+          "reconciles": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconciles"
+          },
+          "reconcile_note": {
+            "type": "string",
+            "title": "Reconcile Note"
+          },
+          "asset_classes": {
+            "items": {
+              "$ref": "#/components/schemas/FundBucket"
+            },
+            "type": "array",
+            "title": "Asset Classes"
+          },
+          "sectors": {
+            "items": {
+              "$ref": "#/components/schemas/FundBucket"
+            },
+            "type": "array",
+            "title": "Sectors"
+          },
+          "countries": {
+            "items": {
+              "$ref": "#/components/schemas/FundBucket"
+            },
+            "type": "array",
+            "title": "Countries"
+          },
+          "currencies": {
+            "items": {
+              "$ref": "#/components/schemas/FundBucket"
+            },
+            "type": "array",
+            "title": "Currencies"
+          },
+          "top": {
+            "items": {
+              "$ref": "#/components/schemas/IssuerLine"
+            },
+            "type": "array",
+            "title": "Top"
+          },
+          "issuer_count": {
+            "type": "integer",
+            "title": "Issuer Count"
+          },
+          "publisher_breakdowns": {
+            "items": {
+              "$ref": "#/components/schemas/PublisherBreakdown"
+            },
+            "type": "array",
+            "title": "Publisher Breakdowns"
+          },
+          "unidentified_equity_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Unidentified Equity Weight"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version",
+            "default": "1.0.0"
+          },
+          "input_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "as_of",
+          "fetched_at",
+          "snapshot_id",
+          "source",
+          "row_count",
+          "total_weight",
+          "residual_weight",
+          "reconciles",
+          "reconcile_note",
+          "asset_classes",
+          "sectors",
+          "countries",
+          "currencies",
+          "top",
+          "issuer_count",
+          "publisher_breakdowns",
+          "unidentified_equity_weight",
+          "warnings"
+        ],
+        "title": "HoldingsView"
+      },
       "IdentifierOut": {
         "properties": {
           "figi": {
@@ -35776,6 +38015,64 @@
           "name"
         ],
         "title": "IdentifierOut"
+      },
+      "Identity": {
+        "properties": {
+          "fund_isin": {
+            "type": "string",
+            "title": "Fund Isin"
+          },
+          "share_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Class"
+          },
+          "portfolio_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Id"
+          },
+          "listings": {
+            "items": {
+              "$ref": "#/components/schemas/FundListing"
+            },
+            "type": "array",
+            "title": "Listings"
+          },
+          "sibling_share_classes": {
+            "items": {
+              "$ref": "#/components/schemas/Sibling"
+            },
+            "type": "array",
+            "title": "Sibling Share Classes"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fund_isin",
+          "share_class",
+          "portfolio_id",
+          "listings",
+          "sibling_share_classes",
+          "note"
+        ],
+        "title": "Identity"
       },
       "IdentityGap": {
         "properties": {
@@ -37791,6 +40088,74 @@
           "release_type"
         ],
         "title": "IssuerIRSourceInput"
+      },
+      "IssuerLine": {
+        "properties": {
+          "issuer_key": {
+            "type": "string",
+            "title": "Issuer Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weight"
+          },
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          },
+          "isins": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Isins"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issuer_key",
+          "label",
+          "weight",
+          "rows",
+          "isins",
+          "sector",
+          "country"
+        ],
+        "title": "IssuerLine"
       },
       "IssuerRelationshipOut": {
         "properties": {
@@ -43598,6 +45963,52 @@
         "title": "OwnershipSettings",
         "description": "Form 13F institutional ownership from the SEC's quarterly data sets."
       },
+      "PairOverlap": {
+        "properties": {
+          "fund_a": {
+            "type": "string",
+            "title": "Fund A"
+          },
+          "fund_b": {
+            "type": "string",
+            "title": "Fund B"
+          },
+          "overlap": {
+            "$ref": "#/components/schemas/AnalyticsResult"
+          },
+          "shared_issuers": {
+            "type": "integer",
+            "title": "Shared Issuers"
+          },
+          "shared": {
+            "items": {
+              "$ref": "#/components/schemas/SharedHolding"
+            },
+            "type": "array",
+            "title": "Shared"
+          },
+          "skipped": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skipped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fund_a",
+          "fund_b",
+          "overlap",
+          "shared_issuers",
+          "shared"
+        ],
+        "title": "PairOverlap"
+      },
       "PatentFamilyInput": {
         "properties": {
           "family_key": {
@@ -44706,6 +47117,337 @@
           "stale"
         ],
         "title": "PerShareFigure"
+      },
+      "PerformancePoint": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "fund": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Fund"
+          },
+          "fund_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Total"
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "fund"
+        ],
+        "title": "PerformancePoint"
+      },
+      "PerformanceView": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "listing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FundListing"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
+          },
+          "fund_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Policy"
+          },
+          "nav_available": {
+            "type": "boolean",
+            "title": "Nav Available",
+            "default": false
+          },
+          "nav_note": {
+            "type": "string",
+            "title": "Nav Note",
+            "default": "NAV is not stored. Returns are for the exchange listing's price, which differs from NAV by the daily premium or discount."
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BenchmarkInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "benchmark_options": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkOption"
+            },
+            "type": "array",
+            "title": "Benchmark Options"
+          },
+          "suggested_benchmark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Benchmark"
+          },
+          "alignment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Alignment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/PeriodReturn"
+            },
+            "type": "array",
+            "title": "Periods"
+          },
+          "risk": {
+            "items": {
+              "$ref": "#/components/schemas/RiskStat"
+            },
+            "type": "array",
+            "title": "Risk"
+          },
+          "tracking_error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalyticsResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/PerformancePoint"
+            },
+            "type": "array",
+            "title": "Series"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "listing",
+          "price_currency",
+          "fund_policy",
+          "benchmark",
+          "benchmark_options",
+          "suggested_benchmark",
+          "alignment",
+          "periods",
+          "risk",
+          "tracking_error",
+          "series",
+          "warnings"
+        ],
+        "title": "PerformanceView"
+      },
+      "PeriodReturn": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "fund_price": {
+            "$ref": "#/components/schemas/AnalyticsResult"
+          },
+          "fund_total": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalyticsResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalyticsResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "compared_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "price",
+                  "total",
+                  "unknown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compared On",
+            "description": "Which fund return the benchmark was compared with."
+          },
+          "difference": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference",
+            "description": "Cumulative fund return minus benchmark return, same basis."
+          },
+          "difference_annualised": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference Annualised"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "start",
+          "end",
+          "fund_price",
+          "fund_total",
+          "benchmark",
+          "compared_on",
+          "difference",
+          "difference_annualised"
+        ],
+        "title": "PeriodReturn"
       },
       "PinInput": {
         "properties": {
@@ -46763,6 +49505,104 @@
         ],
         "title": "ProfileFact"
       },
+      "ProfileField": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "text",
+              "fraction",
+              "money",
+              "date"
+            ],
+            "title": "Unit",
+            "default": "text"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why there is no value, or a caveat."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "value"
+        ],
+        "title": "ProfileField"
+      },
       "PromptDefault": {
         "properties": {
           "key": {
@@ -47296,6 +50136,102 @@
           "consumer"
         ],
         "title": "PublicSdmxSeries"
+      },
+      "PublisherBreakdown": {
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "title": "Dimension"
+          },
+          "scheme": {
+            "type": "string",
+            "title": "Scheme"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PublisherRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dimension",
+          "scheme",
+          "as_of",
+          "rows"
+        ],
+        "title": "PublisherBreakdown"
+      },
+      "PublisherRow": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "fund_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Weight"
+          },
+          "benchmark_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "code",
+          "fund_weight",
+          "benchmark_weight"
+        ],
+        "title": "PublisherRow"
       },
       "QueueContradiction": {
         "properties": {
@@ -50415,6 +53351,46 @@
         ],
         "title": "ReturnBasisCoverage"
       },
+      "ReturnCell": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "ReturnCell"
+      },
       "ReviewBody": {
         "properties": {
           "month": {
@@ -51077,6 +54053,38 @@
         "type": "object",
         "title": "RiskLimits",
         "description": "Portfolio risk limits, checked after each sync. Every limit is optional (null = off).\n\nA breach here is a prompt for review, not an instruction to trade: the strategy decides\nbuys and sells on fundamentals and news, so a price-based limit only forces a thesis review."
+      },
+      "RiskStat": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "fund": {
+            "$ref": "#/components/schemas/AnalyticsResult"
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalyticsResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "fund"
+        ],
+        "title": "RiskStat"
       },
       "Role": {
         "properties": {
@@ -52783,6 +55791,58 @@
         ],
         "title": "ShareClassOut"
       },
+      "SharedHolding": {
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "title": "Issuer"
+          },
+          "weight_a": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weight A"
+          },
+          "weight_b": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weight B"
+          },
+          "overlap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Overlap"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issuer",
+          "weight_a",
+          "weight_b",
+          "overlap"
+        ],
+        "title": "SharedHolding"
+      },
       "SharesOutstandingOut": {
         "properties": {
           "shares": {
@@ -53080,6 +56140,79 @@
           "reason"
         ],
         "title": "SharpeStats"
+      },
+      "Sibling": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "name",
+          "as_of"
+        ],
+        "title": "Sibling"
+      },
+      "SizeBand": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weight"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "known",
+              "no_market_cap"
+            ],
+            "title": "Kind",
+            "default": "known"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "weight"
+        ],
+        "title": "SizeBand"
       },
       "SnapshotCreated": {
         "properties": {
@@ -54965,6 +58098,179 @@
           "body"
         ],
         "title": "StrategyConfigVersion"
+      },
+      "StyleMetric": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "covered_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Covered Weight"
+          },
+          "equity_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Equity Weight"
+          },
+          "excluded": {
+            "type": "integer",
+            "title": "Excluded"
+          },
+          "formula": {
+            "type": "string",
+            "title": "Formula"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "value",
+          "unit",
+          "covered_weight",
+          "equity_weight",
+          "excluded",
+          "formula"
+        ],
+        "title": "StyleMetric"
+      },
+      "StyleView": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "concentration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FundConcentration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "size": {
+            "items": {
+              "$ref": "#/components/schemas/SizeBand"
+            },
+            "type": "array",
+            "title": "Size"
+          },
+          "size_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Coverage"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/StyleMetric"
+            },
+            "type": "array",
+            "title": "Metrics"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version",
+            "default": "1.0.0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "as_of",
+          "concentration",
+          "size",
+          "size_coverage",
+          "metrics",
+          "note",
+          "warnings"
+        ],
+        "title": "StyleView"
       },
       "TargetBand": {
         "properties": {

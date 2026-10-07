@@ -4046,6 +4046,227 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/funds/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Catalog
+         * @description Every fund with a stored factsheet or holdings snapshot: the covered fund universe, not all funds.
+         */
+        get: operations["fund_catalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare Funds
+         * @description Costs, overlap (sum of the smaller issuer weight, plus the shared holdings), geography, sector,
+         *     concentration, return and look-through completeness. Share classes of one portfolio are not compared with each other.
+         */
+        get: operations["compare_funds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fund Profile */
+        get: operations["fund_profile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/holdings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Holdings
+         * @description Issuer-normalised top holdings with asset-class, sector, country and currency weights; the weight
+         *     the published rows do not account for stays its own unknown bucket.
+         */
+        get: operations["fund_holdings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/holdings.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Holdings Csv
+         * @description The derived exposure table with provenance on every row (not the issuer's own file).
+         */
+        get: operations["fund_holdings_csv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/style": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Style
+         * @description FundConcentration, size mix and weighted valuation and profitability proxies from the holdings.
+         */
+        get: operations["fund_style"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Performance
+         * @description FundListing price return, total return where distributions are recorded, and tracking difference against a
+         *     benchmark only when both are on the same basis and currency.
+         */
+        get: operations["fund_performance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/bond": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Bond
+         * @description Maturity, duration and credit quality only where the issuer data provide them; otherwise unavailable.
+         */
+        get: operations["fund_bond"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/checklist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Checklist
+         * @description Each due-diligence criterion with its rule and source; no score, and no summary when a critical input is missing.
+         */
+        get: operations["fund_checklist"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/facts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Facts
+         * @description The owner's current sourced facts about the fund (newest per key).
+         */
+        get: operations["fund_facts"];
+        /**
+         * Put Fund Fact
+         * @description Record a sourced fact. The record is append-only: a correction is a new entry and the newest wins.
+         */
+        put: operations["put_fund_fact"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/facts/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fund Fact History */
+        get: operations["fund_fact_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs/insider-trades": {
         parameters: {
             query?: never;
@@ -5378,6 +5599,17 @@ export interface components {
             /** Source */
             source: string;
         };
+        /** Alignment */
+        Alignment: {
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+            /** Sessions */
+            sessions: number;
+            /** Note */
+            note: string;
+        };
         /** AllocationSlice */
         AllocationSlice: {
             /**
@@ -5625,6 +5857,22 @@ export interface components {
             /** Weight */
             weight: number;
         };
+        /** BenchmarkInfo */
+        BenchmarkInfo: {
+            /** Symbol */
+            symbol: string;
+            /** Label */
+            label: string;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "price" | "total" | "unknown";
+            /** Currency */
+            currency: string | null;
+            /** Note */
+            note: string;
+        };
         /** BenchmarkLookThrough */
         BenchmarkLookThrough: {
             /** Key */
@@ -5658,6 +5906,25 @@ export interface components {
              * @description Share in currencies other than the base currency.
              */
             foreign_share: number | null;
+        };
+        /** BenchmarkOption */
+        BenchmarkOption: {
+            /** Symbol */
+            symbol: string;
+            /** Label */
+            label: string;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "price" | "total" | "unknown";
+            /** Currency */
+            currency?: string | null;
+            /**
+             * Has Prices
+             * @default true
+             */
+            has_prices: boolean;
         };
         /**
          * BenchmarkProxy
@@ -5784,6 +6051,38 @@ export interface components {
              * @enum {string}
              */
             state: "intact" | "watch" | "at_risk" | "unjudged";
+        };
+        /** BondMix */
+        BondMix: {
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number | string;
+        };
+        /** BondView */
+        BondView: {
+            /** Isin */
+            isin: string;
+            /** Applicable */
+            applicable: boolean | null;
+            /** Applicability Reason */
+            applicability_reason: string;
+            weighted_maturity: components["schemas"]["AnalyticsResult"];
+            duration: components["schemas"]["AnalyticsResult"];
+            credit_quality: components["schemas"]["AnalyticsResult"];
+            /** Stated */
+            stated: components["schemas"]["ProfileField"][];
+            /** Asset Mix */
+            asset_mix: components["schemas"]["BondMix"][];
+            /** Asset Mix Source */
+            asset_mix_source: string | null;
+            /**
+             * Method Version
+             * @default 1.0.0
+             */
+            method_version: string;
+            /** Warnings */
+            warnings: string[];
         };
         /** Bucket */
         Bucket: {
@@ -6079,6 +6378,31 @@ export interface components {
             type: "cash_weight";
             /** Value */
             value: number;
+        };
+        /** CatalogRow */
+        CatalogRow: {
+            /** Isin */
+            isin: string;
+            /** Name */
+            name: string | null;
+            /** Provider */
+            provider: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Holdings As Of */
+            holdings_as_of: string | null;
+            /** Expense Ratio */
+            expense_ratio: number | string | null;
+            /** Total Assets */
+            total_assets: number | string | null;
+            /** Total Assets Currency */
+            total_assets_currency: string | null;
+            /** Has Holdings */
+            has_holdings: boolean;
+            /** Listing Count */
+            listing_count: number;
+            /** Tickers */
+            tickers: string[];
         };
         /** CatalogueResponse */
         CatalogueResponse: {
@@ -6391,6 +6715,29 @@ export interface components {
             outcome: "pass" | "fail" | "unknown";
             /** Reason */
             reason?: string | null;
+        };
+        /** Checklist */
+        Checklist: {
+            /** Isin */
+            isin: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Criteria */
+            criteria: components["schemas"]["Criterion"][];
+            /** Summary Available */
+            summary_available: boolean;
+            /** Summary */
+            summary: string;
+            /** Abstain Reason */
+            abstain_reason: string | null;
+            /**
+             * Method Version
+             * @default 1.0.0
+             */
+            method_version: string;
         };
         /** Citation */
         Citation: {
@@ -6849,6 +7196,63 @@ export interface components {
             currency: string | null;
             /** Financial */
             financial: boolean;
+        };
+        /** CompareExposureRow */
+        CompareExposureRow: {
+            /** Label */
+            label: string;
+            /** Weights */
+            weights: {
+                [key: string]: number | string | null;
+            };
+            /**
+             * Kind
+             * @default known
+             */
+            kind: string;
+        };
+        /** CompareFund */
+        CompareFund: {
+            /** Isin */
+            isin: string;
+            /** Name */
+            name: string | null;
+            /** Provider */
+            provider: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Distribution Policy */
+            distribution_policy: string | null;
+            /** Expense Ratio */
+            expense_ratio: number | string | null;
+            /** Total Assets */
+            total_assets: number | string | null;
+            /** Total Assets Currency */
+            total_assets_currency: string | null;
+            /** Holdings As Of */
+            holdings_as_of: string | null;
+            /** Holdings Lag Days */
+            holdings_lag_days: number | null;
+            /** Stale */
+            stale: boolean;
+            /** Portfolio Id */
+            portfolio_id: string | null;
+            /** Duplicate Of */
+            duplicate_of: string | null;
+            /** Equity Weight */
+            equity_weight: number | string | null;
+            /** Residual Weight */
+            residual_weight: number | string | null;
+            /** Unidentified Equity Weight */
+            unidentified_equity_weight: number | string | null;
+            /** Issuers */
+            issuers: number | null;
+            /** Top10 Weight */
+            top10_weight: number | string | null;
+            /** Effective Issuers */
+            effective_issuers: number | string | null;
+            /** Returns */
+            returns: components["schemas"]["ReturnCell"][];
         };
         /** CompareRow */
         CompareRow: {
@@ -7599,6 +8003,31 @@ export interface components {
              * @default true
              */
             enabled: boolean;
+        };
+        /** Criterion */
+        Criterion: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "good" | "watch" | "concern" | "info" | "unknown";
+            /** Observed */
+            observed: string;
+            /** Rule */
+            rule: string;
+            /** Source */
+            source?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /**
+             * Critical
+             * @default false
+             */
+            critical: boolean;
         };
         /** DailyFallback */
         DailyFallback: {
@@ -9631,6 +10060,24 @@ export interface components {
              */
             reconciles: boolean;
         };
+        /** Fact */
+        Fact: {
+            /** Key */
+            key: string;
+            /** Value */
+            value: string;
+            /** Source Url */
+            source_url: string;
+            /** Passage */
+            passage?: string | null;
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Recorded At
+             * Format: date-time
+             */
+            recorded_at: string;
+        };
         /** FactCheck */
         FactCheck: {
             /** Check */
@@ -9642,6 +10089,19 @@ export interface components {
              * @default
              */
             detail: string;
+        };
+        /** FactIn */
+        FactIn: {
+            /** Key */
+            key: string;
+            /** Value */
+            value: string;
+            /** Source Url */
+            source_url: string;
+            /** Passage */
+            passage?: string | null;
+            /** As Of */
+            as_of?: string | null;
         };
         /**
          * FactIndexEntry
@@ -10408,6 +10868,19 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /** FundBucket */
+        FundBucket: {
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number | string;
+            /**
+             * Kind
+             * @default known
+             * @enum {string}
+             */
+            kind: "known" | "unclassified" | "not_accounted";
+        };
         /** FundChannel */
         FundChannel: {
             /**
@@ -10418,6 +10891,46 @@ export interface components {
             channel: "fund_positions_nport";
             coverage: components["schemas"]["SectionCoverage"];
             positions: components["schemas"]["HoldingFundPositions"];
+        };
+        /** FundComparison */
+        FundComparison: {
+            /** Funds */
+            funds: components["schemas"]["CompareFund"][];
+            /** Pairs */
+            pairs: components["schemas"]["PairOverlap"][];
+            /** Sectors */
+            sectors: components["schemas"]["CompareExposureRow"][];
+            /** Countries */
+            countries: components["schemas"]["CompareExposureRow"][];
+            /** Warnings */
+            warnings: string[];
+            /**
+             * Method Version
+             * @default 1.0.0
+             */
+            method_version: string;
+        };
+        /** FundConcentration */
+        FundConcentration: {
+            /** Equity Weight */
+            equity_weight: number | string;
+            /** Issuers */
+            issuers: number;
+            /**
+             * Top10 Weight
+             * @description Share of net assets in the ten largest issuers.
+             */
+            top10_weight: number | string | null;
+            /** Top10 Of Equity */
+            top10_of_equity: number | string | null;
+            /** Hhi */
+            hhi: number | string | null;
+            /** Effective Issuers */
+            effective_issuers: number | string | null;
+            /** Unidentified Equity Weight */
+            unidentified_equity_weight: number | string;
+            /** Basis */
+            basis: string;
         };
         /** FundCoverage */
         FundCoverage: {
@@ -10477,6 +10990,24 @@ export interface components {
             portfolio_weight: number;
             /** Value Base */
             value_base: number;
+        };
+        /** FundListing */
+        FundListing: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name?: string | null;
+            /** Exchange */
+            exchange?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Price Symbol */
+            price_symbol?: string | null;
+            /**
+             * Has Prices
+             * @default false
+             */
+            has_prices: boolean;
         };
         /** FundLookThrough */
         FundLookThrough: {
@@ -10661,6 +11192,37 @@ export interface components {
             form: string;
             /** Source Url */
             source_url: string;
+        };
+        /** FundProfile */
+        FundProfile: {
+            /** Isin */
+            isin: string;
+            /** Name */
+            name: string | null;
+            /** Provider */
+            provider: string | null;
+            identity: components["schemas"]["Identity"];
+            /** Fields */
+            fields: components["schemas"]["ProfileField"][];
+            /** Have */
+            have: number;
+            /** Of */
+            of: number;
+            /** Charges */
+            charges?: {
+                [key: string]: unknown;
+            };
+            /** Factsheet As Of */
+            factsheet_as_of: string | null;
+            /** Holdings As Of */
+            holdings_as_of: string | null;
+            /**
+             * Method Version
+             * @default 1.0.0
+             */
+            method_version: string;
+            /** Warnings */
+            warnings?: string[];
         };
         /** FundRequest */
         FundRequest: {
@@ -12094,6 +12656,57 @@ export interface components {
              */
             holdings: components["schemas"]["Holding"][];
         };
+        /** HoldingsView */
+        HoldingsView: {
+            /** Isin */
+            isin: string;
+            /** As Of */
+            as_of: string | null;
+            /** Fetched At */
+            fetched_at: string | null;
+            /** Snapshot Id */
+            snapshot_id: number | null;
+            /** Source */
+            source: string | null;
+            /** Row Count */
+            row_count: number;
+            /** Total Weight */
+            total_weight: number | string | null;
+            /**
+             * Residual Weight
+             * @description 1 - the published rows; unknown, never spread over the known rows.
+             */
+            residual_weight: number | string | null;
+            /** Reconciles */
+            reconciles: boolean | null;
+            /** Reconcile Note */
+            reconcile_note: string;
+            /** Asset Classes */
+            asset_classes: components["schemas"]["FundBucket"][];
+            /** Sectors */
+            sectors: components["schemas"]["FundBucket"][];
+            /** Countries */
+            countries: components["schemas"]["FundBucket"][];
+            /** Currencies */
+            currencies: components["schemas"]["FundBucket"][];
+            /** Top */
+            top: components["schemas"]["IssuerLine"][];
+            /** Issuer Count */
+            issuer_count: number;
+            /** Publisher Breakdowns */
+            publisher_breakdowns: components["schemas"]["PublisherBreakdown"][];
+            /** Unidentified Equity Weight */
+            unidentified_equity_weight: number | string;
+            /** Warnings */
+            warnings: string[];
+            /**
+             * Method Version
+             * @default 1.0.0
+             */
+            method_version: string;
+            /** Input Hash */
+            input_hash?: string | null;
+        };
         /** IdentifierOut */
         IdentifierOut: {
             /** Figi */
@@ -12108,6 +12721,21 @@ export interface components {
             security_type: string | null;
             /** Name */
             name: string | null;
+        };
+        /** Identity */
+        Identity: {
+            /** Fund Isin */
+            fund_isin: string;
+            /** Share Class */
+            share_class: string | null;
+            /** Portfolio Id */
+            portfolio_id: string | null;
+            /** Listings */
+            listings: components["schemas"]["FundListing"][];
+            /** Sibling Share Classes */
+            sibling_share_classes: components["schemas"]["Sibling"][];
+            /** Note */
+            note: string;
         };
         /** IdentityGap */
         IdentityGap: {
@@ -12746,6 +13374,23 @@ export interface components {
              * @default true
              */
             active: boolean;
+        };
+        /** IssuerLine */
+        IssuerLine: {
+            /** Issuer Key */
+            issuer_key: string;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number | string;
+            /** Rows */
+            rows: number;
+            /** Isins */
+            isins: string[];
+            /** Sector */
+            sector: string | null;
+            /** Country */
+            country: string | null;
         };
         /** IssuerRelationshipOut */
         IssuerRelationshipOut: {
@@ -14895,6 +15540,20 @@ export interface components {
              */
             top_holders: number;
         };
+        /** PairOverlap */
+        PairOverlap: {
+            /** Fund A */
+            fund_a: string;
+            /** Fund B */
+            fund_b: string;
+            overlap: components["schemas"]["AnalyticsResult"];
+            /** Shared Issuers */
+            shared_issuers: number;
+            /** Shared */
+            shared: components["schemas"]["SharedHolding"][];
+            /** Skipped */
+            skipped?: string | null;
+        };
         /** PatentFamilyInput */
         PatentFamilyInput: {
             /** Family Key */
@@ -15243,6 +15902,83 @@ export interface components {
             stale: boolean;
             /** Inputs */
             inputs?: components["schemas"]["FundamentalFactRef"][];
+        };
+        /** PerformancePoint */
+        PerformancePoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Fund */
+            fund: number | string;
+            /** Fund Total */
+            fund_total?: number | string | null;
+            /** Benchmark */
+            benchmark?: number | string | null;
+        };
+        /** PerformanceView */
+        PerformanceView: {
+            /** Isin */
+            isin: string;
+            listing: components["schemas"]["FundListing"] | null;
+            /** Price Currency */
+            price_currency: string | null;
+            /** Fund Policy */
+            fund_policy: string | null;
+            /**
+             * Nav Available
+             * @default false
+             */
+            nav_available: boolean;
+            /**
+             * Nav Note
+             * @default NAV is not stored. Returns are for the exchange listing's price, which differs from NAV by the daily premium or discount.
+             */
+            nav_note: string;
+            benchmark: components["schemas"]["BenchmarkInfo"] | null;
+            /** Benchmark Options */
+            benchmark_options: components["schemas"]["BenchmarkOption"][];
+            /** Suggested Benchmark */
+            suggested_benchmark: string | null;
+            alignment: components["schemas"]["Alignment"] | null;
+            /** Periods */
+            periods: components["schemas"]["PeriodReturn"][];
+            /** Risk */
+            risk: components["schemas"]["RiskStat"][];
+            tracking_error: components["schemas"]["AnalyticsResult"] | null;
+            /** Series */
+            series: components["schemas"]["PerformancePoint"][];
+            /** Warnings */
+            warnings: string[];
+            /** Method Version */
+            method_version?: string;
+        };
+        /** PeriodReturn */
+        PeriodReturn: {
+            /** Label */
+            label: string;
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+            fund_price: components["schemas"]["AnalyticsResult"];
+            fund_total: components["schemas"]["AnalyticsResult"] | null;
+            benchmark: components["schemas"]["AnalyticsResult"] | null;
+            /**
+             * Compared On
+             * @description Which fund return the benchmark was compared with.
+             */
+            compared_on: ("price" | "total" | "unknown") | null;
+            /**
+             * Difference
+             * @description Cumulative fund return minus benchmark return, same basis.
+             */
+            difference: number | string | null;
+            /** Difference Annualised */
+            difference_annualised: number | string | null;
+            /** Note */
+            note?: string | null;
         };
         /** PinInput */
         PinInput: {
@@ -15962,6 +16698,34 @@ export interface components {
              */
             known_at: string;
         };
+        /** ProfileField */
+        ProfileField: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: string | null;
+            /**
+             * Unit
+             * @default text
+             * @enum {string}
+             */
+            unit: "text" | "fraction" | "money" | "date";
+            /** Currency */
+            currency?: string | null;
+            /** Source */
+            source?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Reason
+             * @description Why there is no value, or a caveat.
+             */
+            reason?: string | null;
+        };
         /** PromptDefault */
         PromptDefault: {
             /**
@@ -16136,6 +16900,28 @@ export interface components {
             definition: string;
             /** Consumer */
             consumer: string;
+        };
+        /** PublisherBreakdown */
+        PublisherBreakdown: {
+            /** Dimension */
+            dimension: string;
+            /** Scheme */
+            scheme: string;
+            /** As Of */
+            as_of: string | null;
+            /** Rows */
+            rows: components["schemas"]["PublisherRow"][];
+        };
+        /** PublisherRow */
+        PublisherRow: {
+            /** Label */
+            label: string;
+            /** Code */
+            code: string | null;
+            /** Fund Weight */
+            fund_weight: number | string | null;
+            /** Benchmark Weight */
+            benchmark_weight: number | string | null;
         };
         /** QueueContradiction */
         QueueContradiction: {
@@ -17202,6 +17988,15 @@ export interface components {
             /** Missing Tickers */
             missing_tickers: string[];
         };
+        /** ReturnCell */
+        ReturnCell: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Reason */
+            reason?: string | null;
+        };
         /** ReviewBody */
         ReviewBody: {
             /** Month */
@@ -17489,6 +18284,15 @@ export interface components {
              * @enum {string}
              */
             on_breach: "severity_1" | "severity_2" | "severity_3";
+        };
+        /** RiskStat */
+        RiskStat: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            fund: components["schemas"]["AnalyticsResult"];
+            benchmark?: components["schemas"]["AnalyticsResult"] | null;
         };
         /** Role */
         Role: {
@@ -18097,6 +18901,17 @@ export interface components {
              */
             as_of?: string | null;
         };
+        /** SharedHolding */
+        SharedHolding: {
+            /** Issuer */
+            issuer: string;
+            /** Weight A */
+            weight_a: number | string;
+            /** Weight B */
+            weight_b: number | string;
+            /** Overlap */
+            overlap: number | string;
+        };
         /** SharesOutstandingOut */
         SharesOutstandingOut: {
             /**
@@ -18198,6 +19013,28 @@ export interface components {
              * @description Why `sharpe` is null, when it is.
              */
             reason: string | null;
+        };
+        /** Sibling */
+        Sibling: {
+            /** Isin */
+            isin: string;
+            /** Name */
+            name: string | null;
+            /** As Of */
+            as_of: string | null;
+        };
+        /** SizeBand */
+        SizeBand: {
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number | string;
+            /**
+             * Kind
+             * @default known
+             * @enum {string}
+             */
+            kind: "known" | "no_market_cap";
         };
         /** SnapshotCreated */
         SnapshotCreated: {
@@ -18852,6 +19689,50 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["StrategyConfig"];
+        };
+        /** StyleMetric */
+        StyleMetric: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Unit */
+            unit: string;
+            /** Covered Weight */
+            covered_weight: number | string;
+            /** Equity Weight */
+            equity_weight: number | string;
+            /** Excluded */
+            excluded: number;
+            /** Formula */
+            formula: string;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** StyleView */
+        StyleView: {
+            /** Isin */
+            isin: string;
+            /** As Of */
+            as_of: string | null;
+            concentration: components["schemas"]["FundConcentration"] | null;
+            /** Size */
+            size: components["schemas"]["SizeBand"][];
+            /** Size Coverage */
+            size_coverage: number | string | null;
+            /** Metrics */
+            metrics: components["schemas"]["StyleMetric"][];
+            /** Note */
+            note: string;
+            /** Warnings */
+            warnings: string[];
+            /**
+             * Method Version
+             * @default 1.0.0
+             */
+            method_version: string;
         };
         /** TargetBand */
         TargetBand: {
@@ -27189,6 +28070,402 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_catalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogRow"][];
+                };
+            };
+        };
+    };
+    compare_funds: {
+        parameters: {
+            query: {
+                /** @description Two to five fund ISINs, comma-separated. */
+                isins: string;
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FundComparison"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_profile: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FundProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_holdings: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+                top?: number;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_holdings_csv: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_style: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StyleView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_performance: {
+        parameters: {
+            query?: {
+                /** @description The exchange listing to use; default is the first with prices. */
+                ticker?: string | null;
+                /** @description A benchmark symbol from the options in the response. */
+                benchmark?: string | null;
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerformanceView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_bond: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BondView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_checklist: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Checklist"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_facts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: components["schemas"]["Fact"];
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_fund_fact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Fact"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_fact_history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Fact"][];
+                };
             };
             /** @description Validation Error */
             422: {
