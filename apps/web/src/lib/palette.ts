@@ -88,6 +88,8 @@ export const CONFIG_PAGES = [
 export const OTHER_PAGES = [
   { href: "/theses", label: "Thesis board", keywords: "theses kpi verdicts pass breach unknown status holdings overview" },
   { href: "/review", label: "Review queue", keywords: "held quarantined figures facts accept correct reject override validator reconciliation" },
+  { href: "/performance", label: "Performance", keywords: "returns twr xirr benchmark contribution attribution lots holding period exemption core stocks ledger" },
+  { href: "/xray", label: "X-Ray", keywords: "xray look-through exposure sector country currency issuer overlap intersection concentration hhi fundamentals fee benchmark what if proposed portfolio" },
   { href: "/transactions", label: "Transactions and dividends", keywords: "orders dividends cash deposits withdrawals history holdings" },
   { href: "/glossary", label: "Glossary", keywords: "terms definitions metrics meaning help" },
   { href: "/watchlist", label: "Watchlist", keywords: "watch list buy sell target ticker idea candidates" },

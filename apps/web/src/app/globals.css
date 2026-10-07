@@ -164,6 +164,15 @@
 }
 
 /*
+ * Unknown weight in the X-Ray composition strip: a diagonal hatch on the page surface, so weight
+ * the app cannot place never looks like a holding. Pattern, not colour, is the cue.
+ */
+.hatch-unknown {
+  background-color: var(--color-surface);
+  background-image: repeating-linear-gradient(135deg, var(--color-text-faint) 0 1.5px, transparent 1.5px 6px);
+}
+
+/*
  * Colourblind-alternate mode (toggled by ColorMode, next to the theme toggle): gain/loss
  * already never rely on hue alone (a sign, an arrow and a label always ride along), but
  * `.cvd` adds a pattern fill too, for viewers who need more than a validated hue pair —

@@ -46,6 +46,7 @@ const FULL: JobsConfig = {
   nport_holdings: { enabled: true, cron: "28 9 * * mon", timezone: "UTC" },
   fund_probes: { enabled: false, cron: "35 10 * * mon", timezone: "UTC" },
   fund_characteristics_audit: { enabled: true, cron: "42 11 * * mon", timezone: "UTC" },
+  fund_issuer_facts: { enabled: true, cron: "15 8 * * 1-5", timezone: "UTC" },
   free_source_alerts: { enabled: false, cron: "49 12 * * mon", timezone: "UTC" },
   shadow_snapshot: { enabled: true, cron: "56 13 * * mon", timezone: "UTC" },
   shadow_report: { enabled: false, cron: "3 14 * * mon", timezone: "UTC" },

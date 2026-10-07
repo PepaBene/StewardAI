@@ -151,6 +151,100 @@ Golden cases for delisted, renamed, stale-fund and Altman inputs (`M0.4`); backt
 
 **Phase 3 exit checks:** fund weights reconcile with residuals (tested); share classes of one portfolio are not double-counted (tested, subject to the detection limit above); price return is never compared with a total-return index without the stated withholding (tested).
 
+### Phase 4 (this branch)
+
+Built on stored daily snapshots and transactions, in `steward/performance/`, behind `/portfolio/performance*` and the `/performance` pages (Returns, Contribution, Lots and holding periods, Core and stocks, Ledger and settings). Owner settings are append-only in `public.performance_setting` (migration `20261013100000`). Methods are in `docs/analytics/methodology.md` section 15. **Not yet checked in a browser or against the live account.**
+
+| Item | Status | Gap |
+| --- | --- | --- |
+| `M4.1` | Built, with limits | Fills, dividends and cash movements become dated entries with one cash-effect sign convention; deposits, withdrawals and transfers are the only external flows. Reconciled two ways: the change in cash between snapshot days against the ledger, and held units rebuilt from fills against the broker's latest positions. **Only deposit, withdrawal, transfer and fee cash subtypes are read; anything else (for example interest on cash) is listed as unsupported and shows as a cash break. Rows in a currency other than the account currency are listed but not summed.** |
+| `M4.2` | Partial | Daily base-currency value is the stored daily snapshot (positions, cash, the day's reference rate), not a series rebuilt from positions and a price history; a day without a snapshot has no value. Price, income, FX and fee components are in `M4.6`. The reconciliation report is the cash and units checks above, with tolerance and a stated likely cause. **No trading-holiday or stale-price handling beyond the snapshot days that exist.** |
+| `M4.3` | Built | TWR and XIRR for 1M, YTD, 1Y, 3Y, 5Y and since the first snapshot; annualized only from 365 days; a window the history does not reach is unavailable, not shortened; a precise figure is withheld when cash moved by an amount no transaction explains. |
+| `M4.4` | Built, with limits | Lots, FIFO or average cost, realized gain, dividends, fees. Jurisdiction-neutral, no tax liability. **Splits and other non-fill corporate actions are not applied (they show as position breaks); a sale larger than the stored history is unmatched and has no gain. Withholding tax is not separated from the dividend amount Trading212 reports.** |
+| `M4.5` | Built, with limits | Benchmark per window with matched-currency and dividend-basis checks, blended benchmarks with a none, monthly, quarterly or yearly rebalance, active return with its missing share. **The benchmark must be a price series already stored; an owner-typed index series is not built. No active return is drawn when currency or basis cannot be matched.** |
+| `M4.6` | Built, with limits | Per-holding price, FX, income and fee effects reconciled to the gain with a disclosed residual; groups by currency, country and the strategy's own classifications. **Fills are taken at the closing rate of their snapshot interval; cash translation, interest and broker rounding stay in the residual. A holding whose units changed without a stored fill is unattributed and makes the bridge partial.** |
+| `M4.7` | Built, with limits | Growth of 100 against the benchmark, rolling 90 days, money in and out, dividends and fees by month, fee drag, gain by window, and the ledger-health strip on the returns page. **Charts show their data date, not a separate price or FX staleness badge.** |
+| `M4.8` | Built | Per open lot: buy date, the day it passes the test (owner years, default 3), months left; the year's gross proceeds from lots still inside the test against the owner's limit (default CZK 100,000, converted at the stored rate of each sale date); a flag when the ticker has reached its thesis sell target within the owner's warning months (default 6). Both dates are in the monthly review. Dates and owner thresholds only. |
+| `M4.9` | Built, with limits | Core versus stocks, each a rolling time-weighted return after fees (FX conversion fees included), shown in the monthly review's compliance table with the 10-point shift as the proposed review item; "too early to judge" under 365 days. **The core list is the `core_tickers` owner setting, because `Q8.0` (an `exclude` list on the single-position rule) is not built yet; move to it when `Q8.0` lands.** |
+
+**Phase 4 exit checks:** hand-worked fixtures cover mid-period deposits, dividends, cross-currency price and FX, partial sales and lots (`tests/test_performance.py`); TWR is not distorted by a deposit (tested); attribution plus residual equals the gain (tested, including an unattributable holding); a precise return is withheld when the ledger leaves cash unexplained (tested against a database); a partial sale consumes lots oldest first and leaves the remaining lot's date unchanged (tested); the sleeves' weighted returns reconcile to the invested portfolio's (tested). **Not covered by a fixture: a split, and a missing price on a held position.**
+
+#### Phase 4 open gaps
+
+Every known gap, so none is mistaken for done. Nothing below is hidden behind a zero; where a figure cannot be produced the page says why.
+
+**Verification not done**
+- No Phase 4 page has been rendered in a browser or run against the live account. Migration `20261013100000` has not been applied to the real database. The database tests use a three-day synthetic account.
+- `build_review` is not tested end to end with the new compliance rows; only `performance_review` is. Monthly reviews written before this change have no holding-period section.
+- No component or rendering tests for the new pages; only the helper and settings-form logic is unit-tested.
+- Fixtures do not cover a stock split, a missing price on a held position, a fill in a currency other than the account currency, a position bought and sold between two snapshots, or a GBX-quoted holding.
+
+**Known defect**
+- **Core-versus-stocks flows can be dropped.** `sleeve_days` looks up a fill's exchange rate in the snapshot position row of the fill's valuation day (`sleeves.py:62`). A sale that closes a position has no row that day, so its flow is skipped and that sleeve's return for the interval is distorted (the same happens to a fill of a position that is bought and sold inside one interval). Fix by falling back to the previous day's row or the account rate, then add a test with a closed position, before relying on the comparison.
+
+**Assumptions not yet checked against real Trading212 data**
+- Cash is taken as `total value - invested value` of the account snapshot; whether that includes cash in pies and reserved cash is assumed.
+- Fill prices and snapshot prices are assumed to be in the same unit (including pence for GBX), and the fill quantity sign convention is taken from the side (BUY or SELL), not the stored sign.
+- Fees reported in a currency other than the fill's are left out of the ledger. A fill's fee basis `unknown` is treated as fees excluded.
+- Cash movement subtypes known: deposit, withdraw, transfer, fee. Interest, card and any other subtype is unsupported and shows as a cash break. A dividend's withholding tax is not separated from the amount reported.
+- A sell target is compared with the position's price only when the thesis currency equals the quote currency.
+
+**Method limits**
+- Daily value is the stored snapshot, so a day without a snapshot has no value and an intraday trade pair is invisible. There is no trading-holiday or stale-price handling beyond the snapshot days that exist (`M4.2`).
+- The returns' missing-weight test uses unexplained cash only. A held-unit break does not block TWR (it does not distort it) but does affect lots and attribution.
+- Attribution values fills at the closing rate of their snapshot interval; cash translation between account and base currency, interest and rounding stay in the residual. Snapshots in a different base currency than the latest are excluded from every series.
+- Lots ignore splits, mergers and spin-offs (they appear as position breaks). Average cost and FIFO are the only methods. A sale beyond the stored history has no gain.
+- The exemption total counts only the part of a sale taken from lots still inside the holding period, converted at the stored rate of the sale date, and is a lower bound when a rate is missing. The 3-year rule, the day-after convention and the limit are owner settings from the strategy principle; they have not been checked against the current statute and are not tax advice.
+- Benchmark: the series must already be stored (from the price settings); an owner-typed series for an index with no free history is not built. A blend starts on the latest first close of its components. Investable-period coverage is reported as the share of portfolio days with no benchmark close, not as a start-date check. No benchmark-relative attribution.
+- Attribution groups: currency, country (the instrument's home country) and the strategy's own classifications; no sector or industry from data, and a holding with no label is `Unknown`.
+- Core versus stocks: stocks are every held ticker not listed as core, including any ETF the owner forgot to list; the core list is the `core_tickers` setting until `Q8.0` exists, and nothing checks the tickers against the holdings.
+- The rolling 90-day return is the only rolling window; there is no rolling-window selector and no rolling beta or correlation (those belong to `M6.1`).
+
+**Plan items only partly met**
+- `M4.2`: see above. `M4.5`: owner-entered benchmark missing. `M4.7`: no separate price or FX freshness badge on each chart (data date only), the dividend and cash-flow timeline is a table, and the ledger badge is on the returns page and the ledger tab, not on every chart.
+- No CSV or file export of the ledger, lots, realized gains or attribution (`M4.4` asks for an export). No saved performance report with its method version, and no append-only record of a result, so a figure is recomputed from current data each time it is opened.
+- Settings are append-only in their own table, not a config domain: they are not in config history, rollback, import or export, and have no entry in the config sidebar.
+- `M4.9` raises its review item only as a compliance row in the monthly review; it creates no alert and no escalation. `M4.8` raises no alert either; both appear when a review is generated.
+
+**Operational**
+- `lots_report` and `sleeves_report` are recomputed in full on every request and again for every monthly review; `_rolling` is quadratic in the number of days. Fine for a few years of daily snapshots, not cached or indexed.
+- The regenerated API contract now includes the earlier `fund_issuer_facts` job; it had been missing from `openapi.json` and the web job form.
+- Unrelated and found on the way: 17 existing web files (company, fund and discover views) use `bg-surface-sunken`, a token that does not exist, so those backgrounds have no fill; `xbrl_concepts.py:625` fails the line-length lint; `tests/test_fix_f.py` errors on a Windows temp-folder permission.
+
+### Phase 5 (this branch)
+
+Built in `steward/xray/`, behind `/portfolio/xray*` and the `/xray` pages (Exposure, Overlap, Concentration, Fundamentals, Against a benchmark, What if). Every direct holding and every published fund row becomes a weighted leaf (a share of total portfolio value); cash, a fund's own cash and derivatives, a fund not looked through, and the part of a fund its rows do not account for are leaves too. Each view is a sum of leaves, so a lens reconciles to the whole portfolio by construction. No migration.
+
+| Item | Status | Gap |
+| --- | --- | --- |
+| `M5.1` | Built, with limits | 14 lenses (asset class, sector, industry, country, region, currency, issuer, fund, style, size, fees, revenue country, commodity, trade product); each bucket lists contributors and a reported, inferred, owner or none basis. Current holdings only; industry only from the FMP profile; style and size only for the top 200 issuers. |
+| `M5.2` | Built, with limits | Stock Intersection by canonical issuer with the fund-to-underlying trail and each fund's contribution; removing a fund moves proceeds to cash and shows the concentration change. Unknown weight is its own bucket. |
+| `M5.3` | Built, with limits | Security, issuer, sector, country and fund levels via the existing concentration function, on identified weight, with unknown weight beside it. Benchmark-relative only where like-for-like. |
+| `M5.4` | Built, with limits | Earnings-yield-based P/E, harmonic P/B, dividend yield, profitability, leverage, fee drag; each with coverage, a thin flag under 50%, what was left out and a reason when withheld. |
+| `M5.5` | Partial | Revenue geography only from an owner country mapping or reported members named exactly as a country; commodity and trade lenses only from owner mappings. No supply-chain graph. Country kinds are labelled and a mix is warned about. |
+| `M5.6` | Built, with limits | Proxy is one configured fund's equity rows renormalised (today's holdings, not historical membership). Sector, country and currency compared only like-for-like, otherwise withheld with a reason. |
+| `M5.7` | Built, with limits | Edit weights or add watchlist securities; computed on an in-memory copy, never written (tested against the tables). |
+
+**Phase 5 exit checks:** leaf weights equal the existing aggregate's issuer weights (tested); each lens sums to the whole including cash and unknown (tested); the fund-to-underlying trail survives the issuer merge (tested); mixed country kinds raise a warning and withhold the benchmark country comparison (tested); a proposal never changes saved holdings and over 100% is refused with 422 (tested against a database).
+
+#### Phase 5 open gaps
+
+**Verification not done**
+- No `/xray` page has been rendered in a browser or run against the live account. The database tests use synthetic data; `_profiles`, `_revenue` and the non-empty `_facts` paths are only exercised with injected data. No fixture for a stale fund, two overlapping funds, a bond row or a GBX holding. Only helper tests plus one server-render test (the composition strip) cover the web side.
+
+**Method limits**
+- `M5.1`: current holdings only, no as-of X-Ray. Asset class is only equity, cash, derivative or other. Style and size use the app's own value/blend/growth proxy and fixed EUR thresholds for the top 200 issuers. The issuer lens shows 40 plus "all other"; contributors are the top 6. Currency is trading currency, not economic exposure. A non-fund direct holding that is not fund-like is treated as a stock. No CSV export.
+- `M5.2`: the issuer merge relies on config groups, the register and the ISIN. Removal assumes proceeds to cash and is measured on identified issuers. Share-class paths are kept by ISIN and ticker, not by MIC. Unconfigured funds are unknown.
+- `M5.3`: HHI is on identified weight. Not integrated with `portfolio/risk_limits` or the older look-through panels (`/funds`, the holdings exposure panel, `/portfolio/look-through`, `/funds/aggregate`), so two parallel UIs show related figures.
+- `M5.4`: financials are excluded from profitability and leverage by sector label only, so an unlabelled bank is not excluded. Leverage is net debt to equity, not debt to EBITDA. Facts are latest values, not as-of. Top 200 issuers only.
+- `M5.5`: revenue geography only for the top 40 issuers plus mapped companies; regions such as "Europe" are not distributed. Country of risk is unavailable for direct stocks (home market only). No separate listing-country or domicile lens.
+- `M5.6`: one configured fund as proxy. The country comparison is withheld whenever direct holdings (home market) are present, so it is often withheld. Official index weights are not used; the proxy's tracking difference is not shown; no fund-level benchmark-relative.
+- `M5.7`: weights apply at today's values (no price moves, costs, taxes or trades needed). No risk before and after (`M6.1`). Scenarios are not saved or exported. Additions must exist in the universe by exact ticker. Only six lenses are compared.
+
+**Operational**
+- Every endpoint runs `service.load`, about five loads per session, with no caching; the `stock_records` call for up to 200 issuers is untimed.
+- Carried over from Phase 4 and still open: sleeve flows for closed positions are dropped (`sleeves.py:62`).
+
 ## Phase 0 — Methods, feature inventory and shared calculation layer
 
 **Dependency:** Plan 1 complete and signed off. **Outcome:** precise formulas and a nonduplicative feature map.

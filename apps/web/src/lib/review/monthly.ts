@@ -27,6 +27,7 @@ export const COMPLIANCE_KIND: Record<ComplianceRow["kind"], string> = {
   rule: "Strategy rule",
   hard_limit: "Hard limit",
   band: "Target band",
+  performance: "Performance check",
 };
 
 /** In-page anchors: a compliance row and a KPI row. */
@@ -41,7 +42,7 @@ export function kpiAnchor(ref: string): string {
 /** Breaches first, then unknown, then pass; rules before hard limits before bands; stable. */
 export function sortCompliance(rows: readonly ComplianceRow[]): ComplianceRow[] {
   const status: Record<ComplianceStatus, number> = { breach: 0, unknown: 1, pass: 2 };
-  const kind: Record<ComplianceRow["kind"], number> = { rule: 0, hard_limit: 1, band: 2 };
+  const kind: Record<ComplianceRow["kind"], number> = { rule: 0, hard_limit: 1, band: 2, performance: 3 };
   return rows
     .map((row, i) => ({ row, i }))
     .sort((a, b) => status[a.row.status] - status[b.row.status] || kind[a.row.kind] - kind[b.row.kind] || a.i - b.i)

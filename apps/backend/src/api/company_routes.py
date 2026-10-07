@@ -515,9 +515,7 @@ async def get_governance(ticker: TickerPath, pool: Pool, _owner: Owner) -> evide
 
 
 @router.get("/{ticker}/case", response_model=autoevidence.CaseWithObserved)
-async def get_case(
-    ticker: TickerPath, pool: Pool, owner: Owner
-) -> autoevidence.CaseWithObserved:
+async def get_case(ticker: TickerPath, pool: Pool, owner: Owner) -> autoevidence.CaseWithObserved:
     """Your cited items, plus concentration and capital-allocation figures the app computed from
     filings (kept apart from your items)."""
     company = await _company(pool, ticker)

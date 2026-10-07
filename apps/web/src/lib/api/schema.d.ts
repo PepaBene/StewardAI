@@ -4830,6 +4830,261 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Performance
+         * @description Time- and money-weighted return over 1M, YTD, 1Y, 3Y, 5Y and since inception, each with
+         *     its benchmark comparison, plus the ledger health that decides whether a precise figure is
+         *     shown.
+         */
+        get: operations["get_performance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/performance/lots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Lots
+         * @description Open tax lots with their holding-period dates, realized gains, dividends, fees and the
+         *     year's exemption headroom. Facts and your own thresholds, not tax advice.
+         */
+        get: operations["get_lots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/performance/attribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Attribution
+         * @description Where the gain over the last `days` came from: price, FX, income and fees per holding and
+         *     per group, reconciled to the total with a disclosed residual.
+         */
+        get: operations["get_attribution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/performance/sleeves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Sleeves
+         * @description Stocks against the core ETFs, each as a rolling time-weighted return after fees.
+         */
+        get: operations["get_sleeves"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/performance/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Performance Settings */
+        get: operations["get_performance_settings"];
+        /**
+         * Put Performance Settings
+         * @description Save new settings as a new version; earlier versions are kept.
+         */
+        put: operations["put_performance_settings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Xray
+         * @description Selectable look-through views of the whole portfolio (asset class, sector, industry,
+         *     country, region, currency, issuer, fund, style proxy, market-cap band, fees, and country of
+         *     revenue, commodity and trade product where data exist). Each view adds up to the whole
+         *     portfolio with cash and unknown weight as their own buckets; each bucket names its
+         *     contributors and how it was classified.
+         */
+        get: operations["get_xray"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/overlap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Overlap
+         * @description Stock intersection: issuers reached through more than one channel, each fund's
+         *     contribution and the trail to the securities, and the concentration if a fund were removed.
+         */
+        get: operations["get_overlap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/concentration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Concentration
+         * @description Top-10, HHI and effective holdings at security, issuer, sector, country and fund level,
+         *     with benchmark-relative over- and underweights where the classification is like-for-like.
+         */
+        get: operations["get_concentration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/fundamentals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fundamentals
+         * @description Weighted earnings yield and P/E, price to book, dividend yield, profitability, leverage
+         *     and fee drag, each with its coverage; meaningless aggregates are withheld with the reason.
+         */
+        get: operations["get_fundamentals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/benchmark": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Benchmark
+         * @description Equity X-Ray against the configured benchmark proxy (an ETF's holdings today, not the
+         *     index's historical membership); only like-for-like classifications are compared.
+         */
+        get: operations["get_benchmark"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Candidates
+         * @description Watchlist securities, and a search of the investable universe, that can be added to a
+         *     proposed portfolio.
+         */
+        get: operations["get_candidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/proposed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Proposed
+         * @description Before and after X-Ray of hypothetical weights and added securities. Applied to a copy:
+         *     nothing is written and the saved holdings are untouched.
+         */
+        post: operations["post_proposed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/pdmr-notifications": {
         parameters: {
             query?: never;
@@ -6007,6 +6262,34 @@ export interface components {
             /** Diluted Shares */
             diluted_shares?: number | string | null;
         };
+        /** AttributionResponse */
+        AttributionResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable" | "paid_only" | "disputed";
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Days */
+            days: number;
+            /** Gap */
+            gap: string | null;
+            bridge: components["schemas"]["BridgeOut"] | null;
+            /** Holdings */
+            holdings: components["schemas"]["ContributionOut"][];
+            /** Groups */
+            groups: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            explain: components["schemas"]["PerformanceExplain"];
+        };
         /** BacktestName */
         BacktestName: {
             /** Ticker */
@@ -6204,6 +6487,28 @@ export interface components {
             /** Weight */
             weight: number;
         };
+        /** BenchmarkComponent */
+        BenchmarkComponent: {
+            /**
+             * Symbol
+             * @description Price series symbol.
+             */
+            symbol: string;
+            /** Weight */
+            weight: number | string;
+            /**
+             * Currency
+             * @description Quote currency of the series (ISO code).
+             */
+            currency: string;
+            /**
+             * Basis
+             * @description Whether the series includes dividends (total) or not.
+             * @default unknown
+             * @enum {string}
+             */
+            basis: "total" | "price" | "unknown";
+        };
         /** BenchmarkInfo */
         BenchmarkInfo: {
             /** Symbol */
@@ -6273,6 +6578,22 @@ export interface components {
              */
             has_prices: boolean;
         };
+        /** BenchmarkOut */
+        BenchmarkOut: {
+            /** Symbol */
+            symbol: string;
+            /** Label */
+            label: string;
+            /** Benchmark Return */
+            benchmark_return: number | null;
+            active_return: components["schemas"]["Figure"];
+            /** Basis */
+            basis: string;
+            /** Currency */
+            currency: string | null;
+            /** Missing Share */
+            missing_share: number | null;
+        };
         /**
          * BenchmarkProxy
          * @description Which fund's holdings stand in for a benchmark index's constituents.
@@ -6294,6 +6615,17 @@ export interface components {
              * @example S&P 500
              */
             label: string;
+        };
+        /** BenchmarkSpec */
+        BenchmarkSpec: {
+            /** Components */
+            components: components["schemas"]["BenchmarkComponent"][];
+            /**
+             * Rebalance
+             * @default none
+             * @enum {string}
+             */
+            rebalance: "none" | "monthly" | "quarterly" | "annual";
         };
         /** BenchmarkValuation */
         BenchmarkValuation: {
@@ -6466,6 +6798,26 @@ export interface components {
             /** Notes */
             notes: string[];
         };
+        /** BridgeOut */
+        BridgeOut: {
+            gain: components["schemas"]["Figure"];
+            /** Start Value */
+            start_value: number;
+            /** End Value */
+            end_value: number;
+            /** Net External Flows */
+            net_external_flows: number;
+            /** Net Trading */
+            net_trading: number;
+            /** Components */
+            components: {
+                [key: string]: number;
+            };
+            /** Residual */
+            residual: number;
+            /** Unattributed Tickers */
+            unattributed_tickers: string[];
+        };
         /** Bucket */
         Bucket: {
             /** Key */
@@ -6577,7 +6929,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -6722,6 +7074,23 @@ export interface components {
              * @default Observed figures are computed by the app from filed statements and confirmed disclosures. They are evidence to cite, not a verdict; an empty one says what is missing.
              */
             observed_note: string;
+        };
+        /** CashBreakOut */
+        CashBreakOut: {
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /** Difference */
+            difference: number;
+            /** Explanation */
+            explanation: string;
         };
         /** CashDrift */
         CashDrift: {
@@ -7771,7 +8140,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "rule" | "hard_limit" | "band";
+            kind: "rule" | "hard_limit" | "band" | "performance";
             /** Description */
             description: string;
             /**
@@ -8097,6 +8466,27 @@ export interface components {
             /** Note */
             note: string;
         };
+        /** ContributionOut */
+        ContributionOut: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Price */
+            price: number;
+            /** Fx */
+            fx: number;
+            /** Income */
+            income: number;
+            /** Fees */
+            fees: number;
+            /** Total */
+            total: number;
+            /** Pct Of Start */
+            pct_of_start: number | null;
+            /** Attributed */
+            attributed: boolean;
+        };
         /** ContributionReport */
         ContributionReport: {
             /**
@@ -8376,6 +8766,23 @@ export interface components {
             by_job_type: components["schemas"]["JobTypeCost"][];
             /** By Model */
             by_model: components["schemas"]["ModelCost"][];
+        };
+        /** CostsOut */
+        CostsOut: {
+            /** Currency */
+            currency: string | null;
+            /** Fill Fees */
+            fill_fees: number;
+            /** Cash Fees */
+            cash_fees: number;
+            /** Total */
+            total: number;
+            /** Fraction Of Average Value */
+            fraction_of_average_value: number | null;
+            /** Window Start */
+            window_start: string | null;
+            /** Note */
+            note: string;
         };
         /** Coverage */
         Coverage: {
@@ -10176,6 +10583,25 @@ export interface components {
              */
             shares: number | string;
         };
+        /** ExemptionOut */
+        ExemptionOut: {
+            /** Year */
+            year: number;
+            /** Currency */
+            currency: string;
+            /** Gross Proceeds */
+            gross_proceeds: number;
+            /** Limit */
+            limit: number;
+            /** Headroom */
+            headroom: number;
+            /** Exceeded */
+            exceeded: boolean;
+            /** Sales Counted */
+            sales_counted: number;
+            /** Sales Without Rate */
+            sales_without_rate: number;
+        };
         /**
          * ExpectedSessionsResponse
          * @description `GET /exchange-sessions/{mic}/expected`. `basis` is one of confirmed_calendar,
@@ -11043,6 +11469,34 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** Figure */
+        Figure: {
+            /**
+             * Value
+             * @description Null means unavailable, never zero.
+             */
+            value: number | null;
+            /** Unit */
+            unit: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable" | "paid_only" | "disputed";
+            /** Method Version */
+            method_version: string;
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Coverage
+             * @description Share of inputs that were usable.
+             */
+            coverage?: number | null;
+            /** Warnings */
+            warnings?: string[];
+            /** Input Hash */
+            input_hash?: string | null;
         };
         /** FiledInput */
         FiledInput: {
@@ -12792,6 +13246,32 @@ export interface components {
             /** Limitations */
             limitations: string[];
         };
+        /**
+         * HoldingPeriodRow
+         * @description An open purchase lot with both dates of the holding-period test (plan M4.8).
+         */
+        HoldingPeriodRow: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Bought On
+             * Format: date
+             */
+            bought_on: string;
+            /**
+             * Passes On
+             * Format: date
+             */
+            passes_on: string;
+            /** Months Remaining */
+            months_remaining: number;
+            /** Passed */
+            passed: boolean;
+            /** Quantity */
+            quantity: number;
+            /** Forfeits Exemption Warning */
+            forfeits_exemption_warning: boolean;
+        };
         /** HoldingPrices */
         HoldingPrices: {
             /** Ticker */
@@ -14258,6 +14738,8 @@ export interface components {
             fund_probes?: components["schemas"]["JobSchedule"];
             /** @description Check iShares/Vanguard fund valuation figures for parser drift. Default: daily 07:30. */
             fund_characteristics_audit?: components["schemas"]["JobSchedule"];
+            /** @description Read each held fund's own issuer data (iShares product-data API, WisdomTree factsheet): replication, launch date, domicile, UCITS status, benchmark index and the published NAV. Writes a fact only when it changed and never over a value you recorded from another source. Default: weekdays 08:15. */
+            fund_issuer_facts?: components["schemas"]["JobSchedule"];
             /** @description Evaluate credit, trade, patent and graph alerts. Default: daily 12:05. */
             free_source_alerts?: components["schemas"]["JobSchedule"];
             /** @description Record the daily free-source shadow-run snapshot. Default: daily 23:50. */
@@ -14448,6 +14930,43 @@ export interface components {
             historical_constituents?: boolean | null;
             /** Source Url */
             source_url?: string | null;
+        };
+        /** LedgerHealth */
+        LedgerHealth: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "clean" | "breaks" | "empty";
+            /** Entries */
+            entries: number;
+            /** First */
+            first: string | null;
+            /** Last */
+            last: string | null;
+            /** By Kind */
+            by_kind: {
+                [key: string]: number;
+            };
+            /** Unsupported */
+            unsupported: string[];
+            /** Needs Fx */
+            needs_fx: number;
+            /** Fees Not Captured */
+            fees_not_captured: number;
+            /** Position Breaks */
+            position_breaks: components["schemas"]["PositionBreakOut"][];
+            /** Cash Breaks */
+            cash_breaks: components["schemas"]["CashBreakOut"][];
+            /** Cash Breaks Total */
+            cash_breaks_total: number;
+            /**
+             * Unexplained Cash
+             * @description Sum of unexplained daily cash changes.
+             */
+            unexplained_cash: number;
+            /** Cash Tolerance */
+            cash_tolerance: number;
         };
         /** LedgerRow */
         LedgerRow: {
@@ -14891,6 +15410,78 @@ export interface components {
              * @default 12
              */
             keep_snapshots: number;
+        };
+        /** LotOut */
+        LotOut: {
+            /** Lot Id */
+            lot_id: string;
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Bought On
+             * Format: date
+             */
+            bought_on: string;
+            /** Quantity */
+            quantity: number;
+            /** Unit Cost */
+            unit_cost: number;
+            /** Cost */
+            cost: number;
+            /**
+             * Passes On
+             * Format: date
+             */
+            passes_on: string;
+            /** Months Remaining */
+            months_remaining: number;
+            /** Passed */
+            passed: boolean;
+            /** Sell Target */
+            sell_target: number | null;
+            /** Current Price */
+            current_price: number | null;
+            /** Target Reached */
+            target_reached: boolean | null;
+            /** Forfeits Exemption Warning */
+            forfeits_exemption_warning: boolean;
+        };
+        /** LotsResponse */
+        LotsResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable" | "paid_only" | "disputed";
+            /** As Of */
+            as_of: string | null;
+            /** Method */
+            method: string;
+            /** Currency */
+            currency: string | null;
+            /** Lots */
+            lots: components["schemas"]["LotOut"][];
+            /** Realized */
+            realized: components["schemas"]["RealizedOut"][];
+            /** Unmatched */
+            unmatched: components["schemas"]["UnmatchedOut"][];
+            /** Realized Gain */
+            realized_gain: number;
+            /** Dividends */
+            dividends: number;
+            /** Fees */
+            fees: number;
+            /** Exemption */
+            exemption: components["schemas"]["ExemptionOut"][];
+            /** Time Test Years */
+            time_test_years: number;
+            /** Warnings */
+            warnings: string[];
+            /** Disclaimer */
+            disclaimer: string;
+            explain: components["schemas"]["PerformanceExplain"];
         };
         /** MacroComparison */
         MacroComparison: {
@@ -16765,6 +17356,15 @@ export interface components {
             /** Inputs */
             inputs?: components["schemas"]["FundamentalFactRef"][];
         };
+        /** PerformanceExplain */
+        PerformanceExplain: {
+            /** Formula Version */
+            formula_version: string;
+            /** Formula */
+            formula: string[];
+            /** Gaps */
+            gaps?: string[];
+        };
         /** PerformancePoint */
         PerformancePoint: {
             /**
@@ -16778,6 +17378,113 @@ export interface components {
             fund_total?: number | string | null;
             /** Benchmark */
             benchmark?: number | string | null;
+        };
+        /** PerformanceResponse */
+        PerformanceResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable" | "paid_only" | "disputed";
+            /** As Of */
+            as_of: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Account Currency */
+            account_currency: string | null;
+            /** Gap */
+            gap: string | null;
+            /** Windows */
+            windows: components["schemas"]["WindowOut"][];
+            /**
+             * Index
+             * @description Portfolio value indexed to 100, flows removed (time-weighted).
+             */
+            index: components["schemas"]["PerformanceSeriesPoint"][];
+            /** Benchmark Index */
+            benchmark_index: components["schemas"]["PerformanceSeriesPoint"][];
+            /** Benchmark Label */
+            benchmark_label: string | null;
+            /** Rolling 90D */
+            rolling_90d: components["schemas"]["PerformanceSeriesPoint"][];
+            /**
+             * Values
+             * @description Total value in the base currency, flows in.
+             */
+            values: components["schemas"]["PerformanceSeriesPoint"][];
+            ledger: components["schemas"]["LedgerHealth"];
+            costs: components["schemas"]["CostsOut"];
+            /** Timeline */
+            timeline: components["schemas"]["TimelineMonth"][];
+            /** Freshness Note */
+            freshness_note: string | null;
+            explain: components["schemas"]["PerformanceExplain"];
+        };
+        /** PerformanceSeriesPoint */
+        PerformanceSeriesPoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Value */
+            value: number | null;
+        };
+        /** PerformanceSettings */
+        PerformanceSettings: {
+            /**
+             * Core Tickers
+             * @description Trading212 tickers that form the core ETF sleeve; every other holding is a stock (satellite).
+             */
+            core_tickers?: string[];
+            /**
+             * Cost Method
+             * @default fifo
+             * @enum {string}
+             */
+            cost_method: "fifo" | "average";
+            /**
+             * Time Test Years
+             * @default 3
+             */
+            time_test_years: number;
+            /**
+             * Exemption Limit
+             * @default 100000
+             */
+            exemption_limit: number | string;
+            /**
+             * Exemption Currency
+             * @default CZK
+             */
+            exemption_currency: string;
+            /**
+             * Time Test Warning Months
+             * @default 6
+             */
+            time_test_warning_months: number;
+            /**
+             * Sleeve Gap Points
+             * @default 2
+             */
+            sleeve_gap_points: number | string;
+            /**
+             * Sleeve Lookback Years
+             * @default 2
+             */
+            sleeve_lookback_years: number;
+            /**
+             * Cash Tolerance
+             * @description Largest unexplained daily cash change accepted, in the account currency.
+             * @default 1
+             */
+            cash_tolerance: number | string;
+            benchmark?: components["schemas"]["BenchmarkSpec"] | null;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** PerformanceView */
         PerformanceView: {
@@ -17196,6 +17903,19 @@ export interface components {
             holdings: components["schemas"]["ValuationContribution"][];
             /** Method */
             method: string;
+        };
+        /** PositionBreakOut */
+        PositionBreakOut: {
+            /** Ticker */
+            ticker: string;
+            /** Ledger Quantity */
+            ledger_quantity: number;
+            /** Broker Quantity */
+            broker_quantity: number;
+            /** Difference */
+            difference: number;
+            /** Reason */
+            reason: string;
         };
         /** PositionCountRule */
         PositionCountRule: {
@@ -17665,6 +18385,29 @@ export interface components {
             kpis: string[];
         };
         /**
+         * ProposedRequest
+         * @description Hypothetical weights; held positions not listed keep their weight.
+         */
+        ProposedRequest: {
+            /** Weights */
+            weights?: components["schemas"]["ProposedWeight"][];
+            /**
+             * Additions
+             * @description Securities from the investable universe or a watchlist to add.
+             */
+            additions?: components["schemas"]["ProposedWeight"][];
+        };
+        /** ProposedWeight */
+        ProposedWeight: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Weight
+             * @description Share of total portfolio value, 0 to 1.
+             */
+            weight: number;
+        };
+        /**
          * ProviderJobSettings
          * @description Limits for a free provider. There is no on/off switch: a provider is used as soon as it is
          *     available, meaning its API key is set when it needs one.
@@ -18047,6 +18790,30 @@ export interface components {
             worker_last_beat: string | null;
             /** Detail */
             detail?: string | null;
+        };
+        /** RealizedOut */
+        RealizedOut: {
+            /** Sale Id */
+            sale_id: string;
+            /** Ticker */
+            ticker: string;
+            /**
+             * Sold On
+             * Format: date
+             */
+            sold_on: string;
+            /** Quantity */
+            quantity: number;
+            /** Proceeds */
+            proceeds: number;
+            /** Cost */
+            cost: number;
+            /** Gain */
+            gain: number;
+            /** Holding Days */
+            holding_days: number | null;
+            /** Gross Within Time Test */
+            gross_within_time_test: number;
         };
         /** ReconcileRequest */
         ReconcileRequest: {
@@ -18989,6 +19756,11 @@ export interface components {
              * @default 0
              */
             dropped_actions: number;
+            /**
+             * Holding Periods
+             * @description Open lots with the date each passes the holding-period test; facts, not tax advice.
+             */
+            holding_periods?: components["schemas"]["HoldingPeriodRow"][];
             /** Sources */
             sources: components["schemas"]["Source"][];
             /** Model */
@@ -19850,6 +20622,12 @@ export interface components {
              */
             state: "observed" | "missing" | "disagrees";
         };
+        /** SettingsResponse */
+        SettingsResponse: {
+            settings: components["schemas"]["PerformanceSettings"];
+            /** Version */
+            version: number | null;
+        };
         /** SeverityDay */
         SeverityDay: {
             /**
@@ -20090,6 +20868,54 @@ export interface components {
              * @enum {string}
              */
             kind: "known" | "no_market_cap";
+        };
+        /** SleeveOut */
+        SleeveOut: {
+            /** Name */
+            name: string;
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+            /** Days */
+            days: number;
+            /** Total Return */
+            total_return: number | null;
+            /** Annualized */
+            annualized: number | null;
+            /** Reason */
+            reason: string | null;
+            /** Tickers */
+            tickers: string[];
+        };
+        /** SleevesResponse */
+        SleevesResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable" | "paid_only" | "disputed";
+            /** As Of */
+            as_of: string | null;
+            /** Gap */
+            gap: string | null;
+            core: components["schemas"]["SleeveOut"] | null;
+            stocks: components["schemas"]["SleeveOut"] | null;
+            /** History Days */
+            history_days: number;
+            /** Annual Gap Points */
+            annual_gap_points: number | null;
+            /** Gap Limit Points */
+            gap_limit_points: number;
+            /** Too Early */
+            too_early: boolean;
+            /** Review Item */
+            review_item: boolean;
+            /** Message */
+            message: string;
+            /** Reconciliation Error */
+            reconciliation_error: number | null;
+            explain: components["schemas"]["PerformanceExplain"];
         };
         /** SnapshotCreated */
         SnapshotCreated: {
@@ -21066,6 +21892,19 @@ export interface components {
              */
             ticker?: string | null;
         };
+        /** TimelineMonth */
+        TimelineMonth: {
+            /** Month */
+            month: string;
+            /** Deposits */
+            deposits: number;
+            /** Withdrawals */
+            withdrawals: number;
+            /** Dividends */
+            dividends: number;
+            /** Fees */
+            fees: number;
+        };
         /** TopHolder */
         TopHolder: {
             /** Cik */
@@ -21432,6 +22271,22 @@ export interface components {
             by_fund: {
                 [key: string]: number;
             };
+        };
+        /** UnmatchedOut */
+        UnmatchedOut: {
+            /** Sale Id */
+            sale_id: string;
+            /** Ticker */
+            ticker: string;
+            /**
+             * Sold On
+             * Format: date
+             */
+            sold_on: string;
+            /** Quantity */
+            quantity: number;
+            /** Reason */
+            reason: string;
         };
         /** UpcomingEvent */
         UpcomingEvent: {
@@ -21922,6 +22777,34 @@ export interface components {
              */
             fetched_at: string;
         };
+        /** WindowOut */
+        WindowOut: {
+            /** Label */
+            label: string;
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+            /** Calendar Days */
+            calendar_days: number | null;
+            /** Observations */
+            observations: number;
+            /** Start Value */
+            start_value: number | null;
+            /** End Value */
+            end_value: number | null;
+            /** Net Flows */
+            net_flows: number;
+            /** Gain */
+            gain: number | null;
+            twr: components["schemas"]["Figure"];
+            /** Twr Annualized */
+            twr_annualized: number | null;
+            xirr: components["schemas"]["Figure"];
+            /** Reason */
+            reason: string | null;
+            benchmark: components["schemas"]["BenchmarkOut"] | null;
+        };
         /** WorldBankIndicator */
         WorldBankIndicator: {
             /** Key */
@@ -21976,6 +22859,685 @@ export interface components {
              * @default 40
              */
             max_document_mb: number;
+        };
+        /** XrayActive */
+        XrayActive: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Portfolio Weight
+             * @description Share of the portfolio's identified equity.
+             */
+            portfolio_weight: number;
+            /** Benchmark Weight */
+            benchmark_weight: number;
+            /**
+             * Active
+             * @description Portfolio weight minus benchmark weight.
+             */
+            active: number;
+        };
+        /** XrayBenchmark */
+        XrayBenchmark: {
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Label */
+            label: string | null;
+            /** Symbol */
+            symbol: string | null;
+            /** Proxy Fund */
+            proxy_fund: string | null;
+            /** Proxy Isin */
+            proxy_isin: string | null;
+            /** As Of */
+            as_of: string | null;
+            /** Age Days */
+            age_days: number | null;
+            /** Definition */
+            definition: string;
+            /** Dimensions */
+            dimensions: components["schemas"]["XrayBenchmarkDim"][];
+            /**
+             * Overlap
+             * @description Sum of the smaller weight per shared issuer, portfolio equity against benchmark.
+             */
+            overlap: number | null;
+            /**
+             * Portfolio Only
+             * @description Portfolio issuers absent from the proxy, as a share of portfolio equity.
+             */
+            portfolio_only: components["schemas"]["XrayMissing"][];
+            /** Portfolio Only Weight */
+            portfolio_only_weight: number;
+            /**
+             * Benchmark Only
+             * @description Proxy constituents the portfolio does not hold, as a share of the proxy.
+             */
+            benchmark_only: components["schemas"]["XrayMissing"][];
+            /** Benchmark Only Weight */
+            benchmark_only_weight: number;
+            /**
+             * Proxy Rows Weight
+             * @description The proxy's published rows as a share of its net assets.
+             */
+            proxy_rows_weight: number | null;
+            /**
+             * Proxy Unidentified Weight
+             * @description Proxy equity with neither ISIN nor name: cannot be matched to an issuer.
+             */
+            proxy_unidentified_weight: number;
+            /**
+             * Equity Weight
+             * @description Portfolio equity as a share of total value.
+             */
+            equity_weight: number;
+            /**
+             * Outside Weight
+             * @description Portfolio weight outside the comparison: cash, other assets, unknown.
+             */
+            outside_weight: number;
+            /** Notes */
+            notes: string[];
+        };
+        /** XrayBenchmarkDim */
+        XrayBenchmarkDim: {
+            /**
+             * Dimension
+             * @enum {string}
+             */
+            dimension: "sector" | "country" | "currency" | "issuer";
+            /** Like For Like */
+            like_for_like: boolean;
+            /**
+             * Reason
+             * @description Why the comparison is withheld, when it is.
+             */
+            reason: string | null;
+            /** Lines */
+            lines: components["schemas"]["XrayActive"][];
+            /**
+             * Portfolio Unlabelled
+             * @description Share of the portfolio's equity with no label here.
+             */
+            portfolio_unlabelled: number;
+            /** Benchmark Unlabelled */
+            benchmark_unlabelled: number;
+            /** Notes */
+            notes: string[];
+        };
+        /** XrayBucket */
+        XrayBucket: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "classified" | "cash" | "fund_cash" | "not_looked_through" | "unknown_fund" | "unclassified" | "other";
+            /** Weight */
+            weight: number;
+            /** Value Base */
+            value_base: number;
+            /** Direct Weight */
+            direct_weight: number;
+            /** Fund Weight */
+            fund_weight: number;
+            /** Contributors */
+            contributors: components["schemas"]["XrayContributor"][];
+            /**
+             * Basis
+             * @description Weight in this bucket by how it was classified: reported, inferred, owner.
+             */
+            basis: {
+                [key: string]: number;
+            };
+        };
+        /** XrayCandidate */
+        XrayCandidate: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Isin */
+            isin: string | null;
+            /** Asset Type */
+            asset_type: string | null;
+            /** Country */
+            country: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Source */
+            source: string;
+            /** List Name */
+            list_name?: string | null;
+            /** Held */
+            held: boolean;
+            /** Looked Through */
+            looked_through: boolean | null;
+        };
+        /** XrayCandidates */
+        XrayCandidates: {
+            /** Items */
+            items: components["schemas"]["XrayCandidate"][];
+        };
+        /** XrayConcentration */
+        XrayConcentration: {
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "security" | "issuer" | "sector" | "country" | "fund";
+            /** Label */
+            label: string;
+            /** Basis */
+            basis: string;
+            /** Items */
+            items: number;
+            /**
+             * Known Weight
+             * @description Identified weight at this level.
+             */
+            known_weight: number;
+            /**
+             * Unknown Weight
+             * @description Unknown fund weight; outside the HHI, never redistributed.
+             */
+            unknown_weight: number;
+            /**
+             * Unclassified Weight
+             * @description Equity at this level with no label; outside the HHI.
+             */
+            unclassified_weight: number;
+            /** Top Items */
+            top_items: components["schemas"]["XrayItem"][];
+            largest: components["schemas"]["XrayItem"] | null;
+            /** Top10 Weight */
+            top10_weight: number | null;
+            /** Top10 Of Known */
+            top10_of_known: number | null;
+            /** Hhi */
+            hhi: number | null;
+            /** Effective N */
+            effective_n: number | null;
+            /** Overweights */
+            overweights?: components["schemas"]["XrayActive"][] | null;
+            /** Underweights */
+            underweights?: components["schemas"]["XrayActive"][] | null;
+            /** Active Note */
+            active_note?: string | null;
+            /** Warnings */
+            warnings: string[];
+        };
+        /** XrayConcentrationResponse */
+        XrayConcentrationResponse: {
+            /** As Of */
+            as_of: string;
+            /** Levels */
+            levels: components["schemas"]["XrayConcentration"][];
+            single_issuer: components["schemas"]["XrayItem"] | null;
+            /** Benchmark Label */
+            benchmark_label: string | null;
+            /** Benchmark Note */
+            benchmark_note: string | null;
+            /** Notes */
+            notes: string[];
+        };
+        /** XrayContributor */
+        XrayContributor: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Weight
+             * @description Share of total portfolio value.
+             */
+            weight: number;
+            /** Share Of Bucket */
+            share_of_bucket: number | null;
+        };
+        /** XrayDeltaRow */
+        XrayDeltaRow: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Kind */
+            kind: string;
+            /** Before */
+            before: number;
+            /** After */
+            after: number;
+            /** Delta */
+            delta: number;
+        };
+        /** XrayDeltaView */
+        XrayDeltaView: {
+            /** Dimension */
+            dimension: string;
+            /** Label */
+            label: string;
+            /** Rows */
+            rows: components["schemas"]["XrayDeltaRow"][];
+            /** Reconciles Before */
+            reconciles_before: boolean;
+            /** Reconciles After */
+            reconciles_after: boolean;
+        };
+        /** XrayDrop */
+        XrayDrop: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Before */
+            before: number;
+            /** After */
+            after: number;
+        };
+        /** XrayExclusion */
+        XrayExclusion: {
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+            /** Reason */
+            reason: string;
+        };
+        /** XrayFeeLine */
+        XrayFeeLine: {
+            /** Isin */
+            isin: string;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+            /** Expense Ratio */
+            expense_ratio: number | null;
+            /**
+             * Annual Drag
+             * @description weight x ongoing charge, share of portfolio a year.
+             */
+            annual_drag: number | null;
+        };
+        /** XrayFees */
+        XrayFees: {
+            /** Annual Drag */
+            annual_drag: number;
+            /** Annual Cost Base */
+            annual_cost_base: number;
+            /** Weighted Expense Ratio */
+            weighted_expense_ratio: number | null;
+            /** Funds With Ratio */
+            funds_with_ratio: number;
+            /** Funds Without Ratio */
+            funds_without_ratio: string[];
+            /** Unpriced Weight */
+            unpriced_weight: number;
+            /** Lines */
+            lines: components["schemas"]["XrayFeeLine"][];
+            /** Note */
+            note: string;
+        };
+        /** XrayFundamentals */
+        XrayFundamentals: {
+            /** Equity Weight */
+            equity_weight: number;
+            /** Covered Weight */
+            covered_weight: number;
+            /** Scored Issuers */
+            scored_issuers: number;
+            /** Financials Weight */
+            financials_weight: number;
+            /** Unknown Weight */
+            unknown_weight: number;
+            /** Metrics */
+            metrics: components["schemas"]["XrayMetric"][];
+            fees: components["schemas"]["XrayFees"] | null;
+            /** Notes */
+            notes: string[];
+        };
+        /** XrayHolding */
+        XrayHolding: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Weight
+             * @description Share of total portfolio value.
+             */
+            weight: number;
+            /** Is Fund */
+            is_fund: boolean;
+            /**
+             * Looked Through
+             * @description For a fund: whether its holdings are stored. None for a stock.
+             */
+            looked_through: boolean | null;
+        };
+        /** XrayIntersection */
+        XrayIntersection: {
+            /** As Of */
+            as_of: string;
+            /** Total Value */
+            total_value: number;
+            /** Issuer Count */
+            issuer_count: number;
+            /**
+             * Shared Count
+             * @description Issuers reached through two or more channels.
+             */
+            shared_count: number;
+            /**
+             * Shared Weight
+             * @description Combined weight of those issuers.
+             */
+            shared_weight: number;
+            /**
+             * Redundant Weight
+             * @description Exposure to shared issuers beyond the largest single channel.
+             */
+            redundant_weight: number;
+            /** Issuers */
+            issuers: components["schemas"]["IssuerExposure"][];
+            /** Funds */
+            funds: components["schemas"]["FundAsOf"][];
+            unknown: components["schemas"]["Unknown"] | null;
+            /** Removal */
+            removal: components["schemas"]["XrayRemoval"][];
+            /** Notes */
+            notes: string[];
+        };
+        /** XrayItem */
+        XrayItem: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Weight
+             * @description Share of total portfolio value.
+             */
+            weight: number;
+            /** Share Of Known */
+            share_of_known: number;
+        };
+        /** XrayMetric */
+        XrayMetric: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | null;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "fraction" | "multiple";
+            /**
+             * Covered Weight
+             * @description Share of total portfolio value the figure covers.
+             */
+            covered_weight: number;
+            /**
+             * Coverage
+             * @description Covered weight over identified equity weight.
+             */
+            coverage: number | null;
+            /** Excluded */
+            excluded: components["schemas"]["XrayExclusion"][];
+            /** Excluded Count */
+            excluded_count: number;
+            /** Formula */
+            formula: string;
+            /**
+             * Thin
+             * @description Covers under half of the equity weight: indicative only.
+             */
+            thin: boolean;
+            /**
+             * Reason
+             * @description Why there is no figure, when there is none.
+             */
+            reason: string | null;
+        };
+        /** XrayMissing */
+        XrayMissing: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+        };
+        /** XrayPositionChange */
+        XrayPositionChange: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "held" | "added";
+            /** Before */
+            before: number;
+            /** After */
+            after: number;
+            /** Delta */
+            delta: number;
+            /**
+             * Looked Through
+             * @description For a fund: whether its holdings are stored. None for a stock.
+             */
+            looked_through: boolean | null;
+        };
+        /** XrayProposal */
+        XrayProposal: {
+            /** Base Currency */
+            base_currency: string;
+            /** As Of */
+            as_of: string;
+            /**
+             * Saved Holdings Changed
+             * @description Always false: the proposal is applied to a copy.
+             * @default false
+             */
+            saved_holdings_changed: boolean;
+            before: components["schemas"]["XraySide"];
+            after: components["schemas"]["XraySide"];
+            /** Positions */
+            positions: components["schemas"]["XrayPositionChange"][];
+            /** Views */
+            views: components["schemas"]["XrayDeltaView"][];
+            /** Issuers */
+            issuers: components["schemas"]["XrayDeltaRow"][];
+            /**
+             * Coverage
+             * @description Where the two sides differ in how much is known.
+             */
+            coverage: string[];
+            /** Notes */
+            notes: string[];
+        };
+        /** XrayRemoval */
+        XrayRemoval: {
+            /** Isin */
+            isin: string;
+            /** Label */
+            label: string;
+            /**
+             * Weight
+             * @description The fund's share of total portfolio value.
+             */
+            weight: number;
+            /** Issuers Touched */
+            issuers_touched: number;
+            /**
+             * Unknown Removed
+             * @description Unknown weight that leaves with the fund.
+             */
+            unknown_removed: number;
+            /** Hhi Before */
+            hhi_before: number | null;
+            /** Hhi After */
+            hhi_after: number | null;
+            /** Effective Before */
+            effective_before: number | null;
+            /** Effective After */
+            effective_after: number | null;
+            /** Top10 Before */
+            top10_before: number | null;
+            /** Top10 After */
+            top10_after: number | null;
+            largest_before: components["schemas"]["XrayDrop"] | null;
+            largest_after: components["schemas"]["XrayDrop"] | null;
+            /** Biggest Drops */
+            biggest_drops: components["schemas"]["XrayDrop"][];
+            /**
+             * Shared After
+             * @description Issuers still reached through two or more channels.
+             */
+            shared_after: number;
+        };
+        /** XrayResponse */
+        XrayResponse: {
+            /** As Of */
+            as_of: string;
+            /** Snapshot Date */
+            snapshot_date: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Total Value */
+            total_value: number;
+            /** Available */
+            available: boolean;
+            /** Holdings */
+            holdings: components["schemas"]["XrayHolding"][];
+            /** Cash Weight */
+            cash_weight: number;
+            /** Views */
+            views: components["schemas"]["XrayView"][];
+            /** Funds */
+            funds: components["schemas"]["FundAsOf"][];
+            /** Stale Funds */
+            stale_funds: string[];
+            unknown: components["schemas"]["Unknown"] | null;
+            fees: components["schemas"]["XrayFees"] | null;
+            /** Scored Issuers */
+            scored_issuers: number;
+            /** Issuers Total */
+            issuers_total: number;
+            /** Method */
+            method: string;
+            /** Notes */
+            notes: string[];
+        };
+        /** XraySide */
+        XraySide: {
+            /** Total Value */
+            total_value: number;
+            /** Cash Weight */
+            cash_weight: number;
+            /** Equity Weight */
+            equity_weight: number;
+            /** Unknown Weight */
+            unknown_weight: number;
+            /** Not Looked Through Weight */
+            not_looked_through_weight: number;
+            /** Issuer Count */
+            issuer_count: number;
+            /** Shared Issuers */
+            shared_issuers: number;
+            /**
+             * Redundant Weight
+             * @description Exposure to issuers reached through 2+ channels beyond the largest channel.
+             */
+            redundant_weight: number;
+            /** Largest Issuer */
+            largest_issuer: string | null;
+            /** Largest Issuer Weight */
+            largest_issuer_weight: number | null;
+            /** Hhi */
+            hhi: number | null;
+            /** Effective Issuers */
+            effective_issuers: number | null;
+            /** Top10 Weight */
+            top10_weight: number | null;
+            /** Fee Drag */
+            fee_drag: number | null;
+            /** Fee Cost */
+            fee_cost: number | null;
+            /** Funds Without Ratio */
+            funds_without_ratio: string[];
+            /** Earnings Yield */
+            earnings_yield: number | null;
+            /** Earnings Yield Coverage */
+            earnings_yield_coverage: number | null;
+            /** Dividend Yield */
+            dividend_yield: number | null;
+            /** Dividend Yield Coverage */
+            dividend_yield_coverage: number | null;
+        };
+        /** XrayView */
+        XrayView: {
+            /**
+             * Dimension
+             * @enum {string}
+             */
+            dimension: "asset_class" | "sector" | "industry" | "country" | "region" | "currency" | "issuer" | "fund" | "style" | "size" | "fees" | "revenue_country" | "commodity" | "trade_product";
+            /** Label */
+            label: string;
+            /** Group */
+            group: string;
+            /** Description */
+            description: string;
+            /** Buckets */
+            buckets: components["schemas"]["XrayBucket"][];
+            /** Total Weight */
+            total_weight: number;
+            /**
+             * Reconciles
+             * @description Buckets add up to the whole portfolio within tolerance.
+             */
+            reconciles: boolean;
+            /**
+             * Classified Weight
+             * @description Weight in buckets that carry a real label.
+             */
+            classified_weight: number;
+            /** Equity Weight */
+            equity_weight: number;
+            /**
+             * Bases
+             * @description Classified weight by basis across the view.
+             */
+            bases: {
+                [key: string]: number;
+            };
+            /**
+             * Country Kinds
+             * @description Country view only: weight by what kind of country it is.
+             */
+            country_kinds?: {
+                [key: string]: number;
+            } | null;
+            /**
+             * Mixed Basis
+             * @default false
+             */
+            mixed_basis: boolean;
+            /** Warnings */
+            warnings: string[];
         };
         /** CoverageEntry */
         api__response_models__CoverageEntry: {
@@ -30534,6 +32096,314 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CharacteristicsAuditRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_performance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerformanceResponse"];
+                };
+            };
+        };
+    };
+    get_lots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LotsResponse"];
+                };
+            };
+        };
+    };
+    get_attribution: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttributionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sleeves: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SleevesResponse"];
+                };
+            };
+        };
+    };
+    get_performance_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+        };
+    };
+    put_performance_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PerformanceSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_xray: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XrayResponse"];
+                };
+            };
+        };
+    };
+    get_overlap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XrayIntersection"];
+                };
+            };
+        };
+    };
+    get_concentration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XrayConcentrationResponse"];
+                };
+            };
+        };
+    };
+    get_fundamentals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XrayFundamentals"];
+                };
+            };
+        };
+    };
+    get_benchmark: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XrayBenchmark"];
+                };
+            };
+        };
+    };
+    get_candidates: {
+        parameters: {
+            query?: {
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XrayCandidates"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_proposed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposedRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XrayProposal"];
                 };
             };
             /** @description Validation Error */

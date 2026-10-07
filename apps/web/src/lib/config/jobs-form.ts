@@ -173,6 +173,12 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Check the iShares and Vanguard fund valuation figures for parser drift.",
     cron: "30 7 * * *",
   },
+  fund_issuer_facts: {
+    label: "Fund issuer facts",
+    description:
+      "Read each held fund's replication, launch date, domicile, benchmark and published NAV from its issuer.",
+    cron: "15 8 * * 1-5",
+  },
   free_source_alerts: {
     label: "Free-source alerts",
     description:

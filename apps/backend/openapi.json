@@ -15787,6 +15787,447 @@
         }
       }
     },
+    "/portfolio/performance": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Performance",
+        "description": "Time- and money-weighted return over 1M, YTD, 1Y, 3Y, 5Y and since inception, each with\nits benchmark comparison, plus the ledger health that decides whether a precise figure is\nshown.",
+        "operationId": "get_performance",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerformanceResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/performance/lots": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Lots",
+        "description": "Open tax lots with their holding-period dates, realized gains, dividends, fees and the\nyear's exemption headroom. Facts and your own thresholds, not tax advice.",
+        "operationId": "get_lots",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LotsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/performance/attribution": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Attribution",
+        "description": "Where the gain over the last `days` came from: price, FX, income and fees per holding and\nper group, reconciled to the total with a disclosed residual.",
+        "operationId": "get_attribution",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3650,
+              "minimum": 7,
+              "default": 365,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttributionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/performance/sleeves": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Sleeves",
+        "description": "Stocks against the core ETFs, each as a rolling time-weighted return after fees.",
+        "operationId": "get_sleeves",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SleevesResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/performance/settings": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Performance Settings",
+        "operationId": "get_performance_settings",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Put Performance Settings",
+        "description": "Save new settings as a new version; earlier versions are kept.",
+        "operationId": "put_performance_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PerformanceSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/xray": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Xray",
+        "description": "Selectable look-through views of the whole portfolio (asset class, sector, industry,\ncountry, region, currency, issuer, fund, style proxy, market-cap band, fees, and country of\nrevenue, commodity and trade product where data exist). Each view adds up to the whole\nportfolio with cash and unknown weight as their own buckets; each bucket names its\ncontributors and how it was classified.",
+        "operationId": "get_xray",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/XrayResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/xray/overlap": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Overlap",
+        "description": "Stock intersection: issuers reached through more than one channel, each fund's\ncontribution and the trail to the securities, and the concentration if a fund were removed.",
+        "operationId": "get_overlap",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/XrayIntersection"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/xray/concentration": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Concentration",
+        "description": "Top-10, HHI and effective holdings at security, issuer, sector, country and fund level,\nwith benchmark-relative over- and underweights where the classification is like-for-like.",
+        "operationId": "get_concentration",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/XrayConcentrationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/xray/fundamentals": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Fundamentals",
+        "description": "Weighted earnings yield and P/E, price to book, dividend yield, profitability, leverage\nand fee drag, each with its coverage; meaningless aggregates are withheld with the reason.",
+        "operationId": "get_fundamentals",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/XrayFundamentals"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/xray/benchmark": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Benchmark",
+        "description": "Equity X-Ray against the configured benchmark proxy (an ETF's holdings today, not the\nindex's historical membership); only like-for-like classifications are compared.",
+        "operationId": "get_benchmark",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/XrayBenchmark"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/xray/candidates": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Candidates",
+        "description": "Watchlist securities, and a search of the investable universe, that can be added to a\nproposed portfolio.",
+        "operationId": "get_candidates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/XrayCandidates"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/xray/proposed": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Post Proposed",
+        "description": "Before and after X-Ray of hypothetical weights and added securities. Applied to a copy:\nnothing is written and the saved holdings are untouched.",
+        "operationId": "post_proposed",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/XrayProposal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/holdings/{ticker}/pdmr-notifications": {
       "get": {
         "tags": [
@@ -19412,6 +19853,115 @@
         "title": "Assumptions",
         "description": "One scenario's explicit inputs. Everything here is the owner's assumption, not a fact."
       },
+      "AttributionResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "partial",
+              "unavailable",
+              "paid_only",
+              "disputed"
+            ],
+            "title": "Status"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap"
+          },
+          "bridge": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BridgeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/ContributionOut"
+            },
+            "type": "array",
+            "title": "Holdings"
+          },
+          "groups": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Groups"
+          },
+          "explain": {
+            "$ref": "#/components/schemas/PerformanceExplain"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "start",
+          "end",
+          "base_currency",
+          "days",
+          "gap",
+          "bridge",
+          "holdings",
+          "groups",
+          "explain"
+        ],
+        "title": "AttributionResponse"
+      },
       "BacktestName": {
         "properties": {
           "ticker": {
@@ -20097,6 +20647,55 @@
         ],
         "title": "BenchmarkBucket"
       },
+      "BenchmarkComponent": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Symbol",
+            "description": "Price series symbol."
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weight"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "description": "Quote currency of the series (ISO code)."
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "total",
+              "price",
+              "unknown"
+            ],
+            "title": "Basis",
+            "description": "Whether the series includes dividends (total) or not.",
+            "default": "unknown"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "symbol",
+          "weight",
+          "currency"
+        ],
+        "title": "BenchmarkComponent"
+      },
       "BenchmarkInfo": {
         "properties": {
           "symbol": {
@@ -20293,6 +20892,69 @@
         ],
         "title": "BenchmarkOption"
       },
+      "BenchmarkOut": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "benchmark_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Return"
+          },
+          "active_return": {
+            "$ref": "#/components/schemas/Figure"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "missing_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Share"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "label",
+          "benchmark_return",
+          "active_return",
+          "basis",
+          "currency",
+          "missing_share"
+        ],
+        "title": "BenchmarkOut"
+      },
       "BenchmarkProxy": {
         "properties": {
           "symbol": {
@@ -20331,6 +20993,36 @@
         ],
         "title": "BenchmarkProxy",
         "description": "Which fund's holdings stand in for a benchmark index's constituents."
+      },
+      "BenchmarkSpec": {
+        "properties": {
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkComponent"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Components"
+          },
+          "rebalance": {
+            "type": "string",
+            "enum": [
+              "none",
+              "monthly",
+              "quarterly",
+              "annual"
+            ],
+            "title": "Rebalance",
+            "default": "none"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "components"
+        ],
+        "title": "BenchmarkSpec"
       },
       "BenchmarkValuation": {
         "properties": {
@@ -20911,6 +21603,59 @@
         ],
         "title": "Breakdown"
       },
+      "BridgeOut": {
+        "properties": {
+          "gain": {
+            "$ref": "#/components/schemas/Figure"
+          },
+          "start_value": {
+            "type": "number",
+            "title": "Start Value"
+          },
+          "end_value": {
+            "type": "number",
+            "title": "End Value"
+          },
+          "net_external_flows": {
+            "type": "number",
+            "title": "Net External Flows"
+          },
+          "net_trading": {
+            "type": "number",
+            "title": "Net Trading"
+          },
+          "components": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Components"
+          },
+          "residual": {
+            "type": "number",
+            "title": "Residual"
+          },
+          "unattributed_tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unattributed Tickers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "gain",
+          "start_value",
+          "end_value",
+          "net_external_flows",
+          "net_trading",
+          "components",
+          "residual",
+          "unattributed_tickers"
+        ],
+        "title": "BridgeOut"
+      },
       "Bucket": {
         "properties": {
           "key": {
@@ -21179,6 +21924,7 @@
                 "nport_holdings",
                 "fund_probes",
                 "fund_characteristics_audit",
+                "fund_issuer_facts",
                 "free_source_alerts",
                 "shadow_snapshot",
                 "shadow_report",
@@ -21243,6 +21989,7 @@
                 "nport_holdings",
                 "fund_probes",
                 "fund_characteristics_audit",
+                "fund_issuer_facts",
                 "free_source_alerts",
                 "shadow_snapshot",
                 "shadow_report",
@@ -21580,6 +22327,36 @@
           "note"
         ],
         "title": "CaseWithObserved"
+      },
+      "CashBreakOut": {
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "End Date"
+          },
+          "difference": {
+            "type": "number",
+            "title": "Difference"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_date",
+          "end_date",
+          "difference",
+          "explanation"
+        ],
+        "title": "CashBreakOut"
       },
       "CashDrift": {
         "properties": {
@@ -24678,7 +25455,8 @@
             "enum": [
               "rule",
               "hard_limit",
-              "band"
+              "band",
+              "performance"
             ],
             "title": "Kind"
           },
@@ -25689,6 +26467,73 @@
         ],
         "title": "ContradictionResolution"
       },
+      "ContributionOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "price": {
+            "type": "number",
+            "title": "Price"
+          },
+          "fx": {
+            "type": "number",
+            "title": "Fx"
+          },
+          "income": {
+            "type": "number",
+            "title": "Income"
+          },
+          "fees": {
+            "type": "number",
+            "title": "Fees"
+          },
+          "total": {
+            "type": "number",
+            "title": "Total"
+          },
+          "pct_of_start": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct Of Start"
+          },
+          "attributed": {
+            "type": "boolean",
+            "title": "Attributed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "price",
+          "fx",
+          "income",
+          "fees",
+          "total",
+          "pct_of_start",
+          "attributed"
+        ],
+        "title": "ContributionOut"
+      },
       "ContributionReport": {
         "properties": {
           "as_of": {
@@ -26462,6 +27307,71 @@
           "by_model"
         ],
         "title": "CostSummary"
+      },
+      "CostsOut": {
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "fill_fees": {
+            "type": "number",
+            "title": "Fill Fees"
+          },
+          "cash_fees": {
+            "type": "number",
+            "title": "Cash Fees"
+          },
+          "total": {
+            "type": "number",
+            "title": "Total"
+          },
+          "fraction_of_average_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fraction Of Average Value"
+          },
+          "window_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Start"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "fill_fees",
+          "cash_fees",
+          "total",
+          "fraction_of_average_value",
+          "window_start",
+          "note"
+        ],
+        "title": "CostsOut"
       },
       "Coverage": {
         "properties": {
@@ -31062,6 +31972,54 @@
         ],
         "title": "ExclusionOut"
       },
+      "ExemptionOut": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "gross_proceeds": {
+            "type": "number",
+            "title": "Gross Proceeds"
+          },
+          "limit": {
+            "type": "number",
+            "title": "Limit"
+          },
+          "headroom": {
+            "type": "number",
+            "title": "Headroom"
+          },
+          "exceeded": {
+            "type": "boolean",
+            "title": "Exceeded"
+          },
+          "sales_counted": {
+            "type": "integer",
+            "title": "Sales Counted"
+          },
+          "sales_without_rate": {
+            "type": "integer",
+            "title": "Sales Without Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "currency",
+          "gross_proceeds",
+          "limit",
+          "headroom",
+          "exceeded",
+          "sales_counted",
+          "sales_without_rate"
+        ],
+        "title": "ExemptionOut"
+      },
       "ExpectedSessionsResponse": {
         "properties": {
           "mic": {
@@ -33345,6 +34303,91 @@
           "created_at"
         ],
         "title": "FeedbackOut"
+      },
+      "Figure": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "Null means unavailable, never zero."
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "partial",
+              "unavailable",
+              "paid_only",
+              "disputed"
+            ],
+            "title": "Status"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage",
+            "description": "Share of inputs that were usable."
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "input_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "unit",
+          "status",
+          "method_version"
+        ],
+        "title": "Figure"
       },
       "FiledInput": {
         "properties": {
@@ -38564,6 +39607,52 @@
         ],
         "title": "HoldingPdmrOut"
       },
+      "HoldingPeriodRow": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "bought_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Bought On"
+          },
+          "passes_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Passes On"
+          },
+          "months_remaining": {
+            "type": "number",
+            "title": "Months Remaining"
+          },
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "forfeits_exemption_warning": {
+            "type": "boolean",
+            "title": "Forfeits Exemption Warning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "bought_on",
+          "passes_on",
+          "months_remaining",
+          "passed",
+          "quantity",
+          "forfeits_exemption_warning"
+        ],
+        "title": "HoldingPeriodRow",
+        "description": "An open purchase lot with both dates of the holding-period test (plan M4.8)."
+      },
       "HoldingPrices": {
         "properties": {
           "ticker": {
@@ -42976,6 +44065,10 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Check iShares/Vanguard fund valuation figures for parser drift. Default: daily 07:30."
           },
+          "fund_issuer_facts": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Read each held fund's own issuer data (iShares product-data API, WisdomTree factsheet): replication, launch date, domicile, UCITS status, benchmark index and the published NAV. Writes a fact only when it changed and never over a value you recorded from another source. Default: weekdays 08:15."
+          },
           "free_source_alerts": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Evaluate credit, trade, patent and graph alerts. Default: daily 12:05."
@@ -43544,6 +44637,113 @@
           "reason"
         ],
         "title": "LedgerEntryInput"
+      },
+      "LedgerHealth": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "clean",
+              "breaks",
+              "empty"
+            ],
+            "title": "Status"
+          },
+          "entries": {
+            "type": "integer",
+            "title": "Entries"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last"
+          },
+          "by_kind": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Kind"
+          },
+          "unsupported": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unsupported"
+          },
+          "needs_fx": {
+            "type": "integer",
+            "title": "Needs Fx"
+          },
+          "fees_not_captured": {
+            "type": "integer",
+            "title": "Fees Not Captured"
+          },
+          "position_breaks": {
+            "items": {
+              "$ref": "#/components/schemas/PositionBreakOut"
+            },
+            "type": "array",
+            "title": "Position Breaks"
+          },
+          "cash_breaks": {
+            "items": {
+              "$ref": "#/components/schemas/CashBreakOut"
+            },
+            "type": "array",
+            "title": "Cash Breaks"
+          },
+          "cash_breaks_total": {
+            "type": "integer",
+            "title": "Cash Breaks Total"
+          },
+          "unexplained_cash": {
+            "type": "number",
+            "title": "Unexplained Cash",
+            "description": "Sum of unexplained daily cash changes."
+          },
+          "cash_tolerance": {
+            "type": "number",
+            "title": "Cash Tolerance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "entries",
+          "first",
+          "last",
+          "by_kind",
+          "unsupported",
+          "needs_fx",
+          "fees_not_captured",
+          "position_breaks",
+          "cash_breaks",
+          "cash_breaks_total",
+          "unexplained_cash",
+          "cash_tolerance"
+        ],
+        "title": "LedgerHealth"
       },
       "LedgerRow": {
         "properties": {
@@ -44887,6 +46087,233 @@
         "type": "object",
         "title": "LookThroughSettings",
         "description": "ETF look-through: holdings of the funds the portfolio holds, from the issuers'\n(undocumented) data endpoints, stored weekly as dated snapshots."
+      },
+      "LotOut": {
+        "properties": {
+          "lot_id": {
+            "type": "string",
+            "title": "Lot Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "bought_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Bought On"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "unit_cost": {
+            "type": "number",
+            "title": "Unit Cost"
+          },
+          "cost": {
+            "type": "number",
+            "title": "Cost"
+          },
+          "passes_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Passes On"
+          },
+          "months_remaining": {
+            "type": "number",
+            "title": "Months Remaining"
+          },
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "sell_target": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sell Target"
+          },
+          "current_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Price"
+          },
+          "target_reached": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Reached"
+          },
+          "forfeits_exemption_warning": {
+            "type": "boolean",
+            "title": "Forfeits Exemption Warning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lot_id",
+          "ticker",
+          "name",
+          "bought_on",
+          "quantity",
+          "unit_cost",
+          "cost",
+          "passes_on",
+          "months_remaining",
+          "passed",
+          "sell_target",
+          "current_price",
+          "target_reached",
+          "forfeits_exemption_warning"
+        ],
+        "title": "LotOut"
+      },
+      "LotsResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "partial",
+              "unavailable",
+              "paid_only",
+              "disputed"
+            ],
+            "title": "Status"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "lots": {
+            "items": {
+              "$ref": "#/components/schemas/LotOut"
+            },
+            "type": "array",
+            "title": "Lots"
+          },
+          "realized": {
+            "items": {
+              "$ref": "#/components/schemas/RealizedOut"
+            },
+            "type": "array",
+            "title": "Realized"
+          },
+          "unmatched": {
+            "items": {
+              "$ref": "#/components/schemas/UnmatchedOut"
+            },
+            "type": "array",
+            "title": "Unmatched"
+          },
+          "realized_gain": {
+            "type": "number",
+            "title": "Realized Gain"
+          },
+          "dividends": {
+            "type": "number",
+            "title": "Dividends"
+          },
+          "fees": {
+            "type": "number",
+            "title": "Fees"
+          },
+          "exemption": {
+            "items": {
+              "$ref": "#/components/schemas/ExemptionOut"
+            },
+            "type": "array",
+            "title": "Exemption"
+          },
+          "time_test_years": {
+            "type": "integer",
+            "title": "Time Test Years"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer"
+          },
+          "explain": {
+            "$ref": "#/components/schemas/PerformanceExplain"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "as_of",
+          "method",
+          "currency",
+          "lots",
+          "realized",
+          "unmatched",
+          "realized_gain",
+          "dividends",
+          "fees",
+          "exemption",
+          "time_test_years",
+          "warnings",
+          "disclaimer",
+          "explain"
+        ],
+        "title": "LotsResponse"
       },
       "MacroComparison": {
         "properties": {
@@ -50210,6 +51637,34 @@
         ],
         "title": "PerShareFigure"
       },
+      "PerformanceExplain": {
+        "properties": {
+          "formula_version": {
+            "type": "string",
+            "title": "Formula Version"
+          },
+          "formula": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Formula"
+          },
+          "gaps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Gaps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "formula_version",
+          "formula"
+        ],
+        "title": "PerformanceExplain"
+      },
       "PerformancePoint": {
         "properties": {
           "date": {
@@ -50266,6 +51721,298 @@
           "fund"
         ],
         "title": "PerformancePoint"
+      },
+      "PerformanceResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "partial",
+              "unavailable",
+              "paid_only",
+              "disputed"
+            ],
+            "title": "Status"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "account_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Currency"
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/WindowOut"
+            },
+            "type": "array",
+            "title": "Windows"
+          },
+          "index": {
+            "items": {
+              "$ref": "#/components/schemas/PerformanceSeriesPoint"
+            },
+            "type": "array",
+            "title": "Index",
+            "description": "Portfolio value indexed to 100, flows removed (time-weighted)."
+          },
+          "benchmark_index": {
+            "items": {
+              "$ref": "#/components/schemas/PerformanceSeriesPoint"
+            },
+            "type": "array",
+            "title": "Benchmark Index"
+          },
+          "benchmark_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Label"
+          },
+          "rolling_90d": {
+            "items": {
+              "$ref": "#/components/schemas/PerformanceSeriesPoint"
+            },
+            "type": "array",
+            "title": "Rolling 90D"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/PerformanceSeriesPoint"
+            },
+            "type": "array",
+            "title": "Values",
+            "description": "Total value in the base currency, flows in."
+          },
+          "ledger": {
+            "$ref": "#/components/schemas/LedgerHealth"
+          },
+          "costs": {
+            "$ref": "#/components/schemas/CostsOut"
+          },
+          "timeline": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineMonth"
+            },
+            "type": "array",
+            "title": "Timeline"
+          },
+          "freshness_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freshness Note"
+          },
+          "explain": {
+            "$ref": "#/components/schemas/PerformanceExplain"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "as_of",
+          "base_currency",
+          "account_currency",
+          "gap",
+          "windows",
+          "index",
+          "benchmark_index",
+          "benchmark_label",
+          "rolling_90d",
+          "values",
+          "ledger",
+          "costs",
+          "timeline",
+          "freshness_note",
+          "explain"
+        ],
+        "title": "PerformanceResponse"
+      },
+      "PerformanceSeriesPoint": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "value"
+        ],
+        "title": "PerformanceSeriesPoint"
+      },
+      "PerformanceSettings": {
+        "properties": {
+          "core_tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Core Tickers",
+            "description": "Trading212 tickers that form the core ETF sleeve; every other holding is a stock (satellite)."
+          },
+          "cost_method": {
+            "type": "string",
+            "enum": [
+              "fifo",
+              "average"
+            ],
+            "title": "Cost Method",
+            "default": "fifo"
+          },
+          "time_test_years": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Time Test Years",
+            "default": 3
+          },
+          "exemption_limit": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Exemption Limit",
+            "default": "100000"
+          },
+          "exemption_currency": {
+            "type": "string",
+            "title": "Exemption Currency",
+            "default": "CZK"
+          },
+          "time_test_warning_months": {
+            "type": "integer",
+            "maximum": 24.0,
+            "minimum": 1.0,
+            "title": "Time Test Warning Months",
+            "default": 6
+          },
+          "sleeve_gap_points": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Sleeve Gap Points",
+            "default": "2"
+          },
+          "sleeve_lookback_years": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Sleeve Lookback Years",
+            "default": 2
+          },
+          "cash_tolerance": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Cash Tolerance",
+            "description": "Largest unexplained daily cash change accepted, in the account currency.",
+            "default": "1"
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BenchmarkSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PerformanceSettings"
       },
       "PerformanceView": {
         "properties": {
@@ -51691,6 +53438,39 @@
         ],
         "title": "PortfolioValuation"
       },
+      "PositionBreakOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "ledger_quantity": {
+            "type": "number",
+            "title": "Ledger Quantity"
+          },
+          "broker_quantity": {
+            "type": "number",
+            "title": "Broker Quantity"
+          },
+          "difference": {
+            "type": "number",
+            "title": "Difference"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "ledger_quantity",
+          "broker_quantity",
+          "difference",
+          "reason"
+        ],
+        "title": "PositionBreakOut"
+      },
       "PositionCountRule": {
         "properties": {
           "id": {
@@ -52932,6 +54712,53 @@
           "kpis"
         ],
         "title": "ProposedAction"
+      },
+      "ProposedRequest": {
+        "properties": {
+          "weights": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedWeight"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Weights"
+          },
+          "additions": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedWeight"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Additions",
+            "description": "Securities from the investable universe or a watchlist to add."
+          }
+        },
+        "type": "object",
+        "title": "ProposedRequest",
+        "description": "Hypothetical weights; held positions not listed keep their weight."
+      },
+      "ProposedWeight": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Ticker"
+          },
+          "weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Weight",
+            "description": "Share of total portfolio value, 0 to 1."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "weight"
+        ],
+        "title": "ProposedWeight"
       },
       "ProviderJobSettings": {
         "properties": {
@@ -54247,6 +56074,67 @@
           "worker_last_beat"
         ],
         "title": "ReadinessResponse"
+      },
+      "RealizedOut": {
+        "properties": {
+          "sale_id": {
+            "type": "string",
+            "title": "Sale Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "sold_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Sold On"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "proceeds": {
+            "type": "number",
+            "title": "Proceeds"
+          },
+          "cost": {
+            "type": "number",
+            "title": "Cost"
+          },
+          "gain": {
+            "type": "number",
+            "title": "Gain"
+          },
+          "holding_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holding Days"
+          },
+          "gross_within_time_test": {
+            "type": "number",
+            "title": "Gross Within Time Test"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sale_id",
+          "ticker",
+          "sold_on",
+          "quantity",
+          "proceeds",
+          "cost",
+          "gain",
+          "holding_days",
+          "gross_within_time_test"
+        ],
+        "title": "RealizedOut"
       },
       "ReconcileRequest": {
         "properties": {
@@ -56796,6 +58684,14 @@
             "description": "Proposed actions citing nothing valid.",
             "default": 0
           },
+          "holding_periods": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingPeriodRow"
+            },
+            "type": "array",
+            "title": "Holding Periods",
+            "description": "Open lots with the date each passes the holding-period test; facts, not tax advice."
+          },
           "sources": {
             "items": {
               "$ref": "#/components/schemas/Source"
@@ -59199,6 +61095,30 @@
         ],
         "title": "SessionState"
       },
+      "SettingsResponse": {
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/PerformanceSettings"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "settings",
+          "version"
+        ],
+        "title": "SettingsResponse"
+      },
       "SeverityDay": {
         "properties": {
           "date": {
@@ -59873,6 +61793,214 @@
           "weight"
         ],
         "title": "SizeBand"
+      },
+      "SleeveOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "total_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Return"
+          },
+          "annualized": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annualized"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "start",
+          "end",
+          "days",
+          "total_return",
+          "annualized",
+          "reason",
+          "tickers"
+        ],
+        "title": "SleeveOut"
+      },
+      "SleevesResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "partial",
+              "unavailable",
+              "paid_only",
+              "disputed"
+            ],
+            "title": "Status"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap"
+          },
+          "core": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SleeveOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stocks": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SleeveOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "history_days": {
+            "type": "integer",
+            "title": "History Days"
+          },
+          "annual_gap_points": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Gap Points"
+          },
+          "gap_limit_points": {
+            "type": "number",
+            "title": "Gap Limit Points"
+          },
+          "too_early": {
+            "type": "boolean",
+            "title": "Too Early"
+          },
+          "review_item": {
+            "type": "boolean",
+            "title": "Review Item"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "reconciliation_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconciliation Error"
+          },
+          "explain": {
+            "$ref": "#/components/schemas/PerformanceExplain"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "as_of",
+          "gap",
+          "core",
+          "stocks",
+          "history_days",
+          "annual_gap_points",
+          "gap_limit_points",
+          "too_early",
+          "review_item",
+          "message",
+          "reconciliation_error",
+          "explain"
+        ],
+        "title": "SleevesResponse"
       },
       "SnapshotCreated": {
         "properties": {
@@ -62610,6 +64738,39 @@
         "type": "object",
         "title": "ThesisVerdictsRequest"
       },
+      "TimelineMonth": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "deposits": {
+            "type": "number",
+            "title": "Deposits"
+          },
+          "withdrawals": {
+            "type": "number",
+            "title": "Withdrawals"
+          },
+          "dividends": {
+            "type": "number",
+            "title": "Dividends"
+          },
+          "fees": {
+            "type": "number",
+            "title": "Fees"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "deposits",
+          "withdrawals",
+          "dividends",
+          "fees"
+        ],
+        "title": "TimelineMonth"
+      },
       "TopHolder": {
         "properties": {
           "cik": {
@@ -63688,6 +65849,40 @@
           "by_fund"
         ],
         "title": "Unknown"
+      },
+      "UnmatchedOut": {
+        "properties": {
+          "sale_id": {
+            "type": "string",
+            "title": "Sale Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "sold_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Sold On"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sale_id",
+          "ticker",
+          "sold_on",
+          "quantity",
+          "reason"
+        ],
+        "title": "UnmatchedOut"
       },
       "UpcomingEvent": {
         "properties": {
@@ -65057,6 +67252,146 @@
         ],
         "title": "WikidataSummary"
       },
+      "WindowOut": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "calendar_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calendar Days"
+          },
+          "observations": {
+            "type": "integer",
+            "title": "Observations"
+          },
+          "start_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Value"
+          },
+          "end_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Value"
+          },
+          "net_flows": {
+            "type": "number",
+            "title": "Net Flows"
+          },
+          "gain": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gain"
+          },
+          "twr": {
+            "$ref": "#/components/schemas/Figure"
+          },
+          "twr_annualized": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Twr Annualized"
+          },
+          "xirr": {
+            "$ref": "#/components/schemas/Figure"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BenchmarkOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "start",
+          "end",
+          "calendar_days",
+          "observations",
+          "start_value",
+          "end_value",
+          "net_flows",
+          "gain",
+          "twr",
+          "twr_annualized",
+          "xirr",
+          "reason",
+          "benchmark"
+        ],
+        "title": "WindowOut"
+      },
       "WorldBankIndicator": {
         "properties": {
           "key": {
@@ -65153,6 +67488,2036 @@
         "type": "object",
         "title": "XbrlSettings",
         "description": "SEC XBRL fundamentals: shares outstanding and revenue by region / segment / product,\nread from each holding's latest 10-K / 10-Q / 20-F XBRL instance."
+      },
+      "XrayActive": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "portfolio_weight": {
+            "type": "number",
+            "title": "Portfolio Weight",
+            "description": "Share of the portfolio's identified equity."
+          },
+          "benchmark_weight": {
+            "type": "number",
+            "title": "Benchmark Weight"
+          },
+          "active": {
+            "type": "number",
+            "title": "Active",
+            "description": "Portfolio weight minus benchmark weight."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "portfolio_weight",
+          "benchmark_weight",
+          "active"
+        ],
+        "title": "XrayActive"
+      },
+      "XrayBenchmark": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "proxy_fund": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy Fund"
+          },
+          "proxy_isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy Isin"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "age_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Days"
+          },
+          "definition": {
+            "type": "string",
+            "title": "Definition"
+          },
+          "dimensions": {
+            "items": {
+              "$ref": "#/components/schemas/XrayBenchmarkDim"
+            },
+            "type": "array",
+            "title": "Dimensions"
+          },
+          "overlap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overlap",
+            "description": "Sum of the smaller weight per shared issuer, portfolio equity against benchmark."
+          },
+          "portfolio_only": {
+            "items": {
+              "$ref": "#/components/schemas/XrayMissing"
+            },
+            "type": "array",
+            "title": "Portfolio Only",
+            "description": "Portfolio issuers absent from the proxy, as a share of portfolio equity."
+          },
+          "portfolio_only_weight": {
+            "type": "number",
+            "title": "Portfolio Only Weight"
+          },
+          "benchmark_only": {
+            "items": {
+              "$ref": "#/components/schemas/XrayMissing"
+            },
+            "type": "array",
+            "title": "Benchmark Only",
+            "description": "Proxy constituents the portfolio does not hold, as a share of the proxy."
+          },
+          "benchmark_only_weight": {
+            "type": "number",
+            "title": "Benchmark Only Weight"
+          },
+          "proxy_rows_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy Rows Weight",
+            "description": "The proxy's published rows as a share of its net assets."
+          },
+          "proxy_unidentified_weight": {
+            "type": "number",
+            "title": "Proxy Unidentified Weight",
+            "description": "Proxy equity with neither ISIN nor name: cannot be matched to an issuer."
+          },
+          "equity_weight": {
+            "type": "number",
+            "title": "Equity Weight",
+            "description": "Portfolio equity as a share of total value."
+          },
+          "outside_weight": {
+            "type": "number",
+            "title": "Outside Weight",
+            "description": "Portfolio weight outside the comparison: cash, other assets, unknown."
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "reason",
+          "label",
+          "symbol",
+          "proxy_fund",
+          "proxy_isin",
+          "as_of",
+          "age_days",
+          "definition",
+          "dimensions",
+          "overlap",
+          "portfolio_only",
+          "portfolio_only_weight",
+          "benchmark_only",
+          "benchmark_only_weight",
+          "proxy_rows_weight",
+          "proxy_unidentified_weight",
+          "equity_weight",
+          "outside_weight",
+          "notes"
+        ],
+        "title": "XrayBenchmark"
+      },
+      "XrayBenchmarkDim": {
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "sector",
+              "country",
+              "currency",
+              "issuer"
+            ],
+            "title": "Dimension"
+          },
+          "like_for_like": {
+            "type": "boolean",
+            "title": "Like For Like"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the comparison is withheld, when it is."
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/XrayActive"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "portfolio_unlabelled": {
+            "type": "number",
+            "title": "Portfolio Unlabelled",
+            "description": "Share of the portfolio's equity with no label here."
+          },
+          "benchmark_unlabelled": {
+            "type": "number",
+            "title": "Benchmark Unlabelled"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dimension",
+          "like_for_like",
+          "reason",
+          "lines",
+          "portfolio_unlabelled",
+          "benchmark_unlabelled",
+          "notes"
+        ],
+        "title": "XrayBenchmarkDim"
+      },
+      "XrayBucket": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "classified",
+              "cash",
+              "fund_cash",
+              "not_looked_through",
+              "unknown_fund",
+              "unclassified",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          },
+          "direct_weight": {
+            "type": "number",
+            "title": "Direct Weight"
+          },
+          "fund_weight": {
+            "type": "number",
+            "title": "Fund Weight"
+          },
+          "contributors": {
+            "items": {
+              "$ref": "#/components/schemas/XrayContributor"
+            },
+            "type": "array",
+            "title": "Contributors"
+          },
+          "basis": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Basis",
+            "description": "Weight in this bucket by how it was classified: reported, inferred, owner."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "kind",
+          "weight",
+          "value_base",
+          "direct_weight",
+          "fund_weight",
+          "contributors",
+          "basis"
+        ],
+        "title": "XrayBucket"
+      },
+      "XrayCandidate": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isin"
+          },
+          "asset_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Type"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "list_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "List Name"
+          },
+          "held": {
+            "type": "boolean",
+            "title": "Held"
+          },
+          "looked_through": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Looked Through"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "isin",
+          "asset_type",
+          "country",
+          "currency",
+          "source",
+          "held",
+          "looked_through"
+        ],
+        "title": "XrayCandidate"
+      },
+      "XrayCandidates": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/XrayCandidate"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "XrayCandidates"
+      },
+      "XrayConcentration": {
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "security",
+              "issuer",
+              "sector",
+              "country",
+              "fund"
+            ],
+            "title": "Level"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          },
+          "known_weight": {
+            "type": "number",
+            "title": "Known Weight",
+            "description": "Identified weight at this level."
+          },
+          "unknown_weight": {
+            "type": "number",
+            "title": "Unknown Weight",
+            "description": "Unknown fund weight; outside the HHI, never redistributed."
+          },
+          "unclassified_weight": {
+            "type": "number",
+            "title": "Unclassified Weight",
+            "description": "Equity at this level with no label; outside the HHI."
+          },
+          "top_items": {
+            "items": {
+              "$ref": "#/components/schemas/XrayItem"
+            },
+            "type": "array",
+            "title": "Top Items"
+          },
+          "largest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/XrayItem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "top10_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top10 Weight"
+          },
+          "top10_of_known": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top10 Of Known"
+          },
+          "hhi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hhi"
+          },
+          "effective_n": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective N"
+          },
+          "overweights": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/XrayActive"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overweights"
+          },
+          "underweights": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/XrayActive"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Underweights"
+          },
+          "active_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Note"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "level",
+          "label",
+          "basis",
+          "items",
+          "known_weight",
+          "unknown_weight",
+          "unclassified_weight",
+          "top_items",
+          "largest",
+          "top10_weight",
+          "top10_of_known",
+          "hhi",
+          "effective_n",
+          "warnings"
+        ],
+        "title": "XrayConcentration"
+      },
+      "XrayConcentrationResponse": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/XrayConcentration"
+            },
+            "type": "array",
+            "title": "Levels"
+          },
+          "single_issuer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/XrayItem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "benchmark_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Label"
+          },
+          "benchmark_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Note"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "levels",
+          "single_issuer",
+          "benchmark_label",
+          "benchmark_note",
+          "notes"
+        ],
+        "title": "XrayConcentrationResponse"
+      },
+      "XrayContributor": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Share of total portfolio value."
+          },
+          "share_of_bucket": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Of Bucket"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "weight",
+          "share_of_bucket"
+        ],
+        "title": "XrayContributor"
+      },
+      "XrayDeltaRow": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "before": {
+            "type": "number",
+            "title": "Before"
+          },
+          "after": {
+            "type": "number",
+            "title": "After"
+          },
+          "delta": {
+            "type": "number",
+            "title": "Delta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "kind",
+          "before",
+          "after",
+          "delta"
+        ],
+        "title": "XrayDeltaRow"
+      },
+      "XrayDeltaView": {
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "title": "Dimension"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/XrayDeltaRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "reconciles_before": {
+            "type": "boolean",
+            "title": "Reconciles Before"
+          },
+          "reconciles_after": {
+            "type": "boolean",
+            "title": "Reconciles After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dimension",
+          "label",
+          "rows",
+          "reconciles_before",
+          "reconciles_after"
+        ],
+        "title": "XrayDeltaView"
+      },
+      "XrayDrop": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "before": {
+            "type": "number",
+            "title": "Before"
+          },
+          "after": {
+            "type": "number",
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "before",
+          "after"
+        ],
+        "title": "XrayDrop"
+      },
+      "XrayExclusion": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "weight",
+          "reason"
+        ],
+        "title": "XrayExclusion"
+      },
+      "XrayFeeLine": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "expense_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expense Ratio"
+          },
+          "annual_drag": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Drag",
+            "description": "weight x ongoing charge, share of portfolio a year."
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "label",
+          "weight",
+          "expense_ratio",
+          "annual_drag"
+        ],
+        "title": "XrayFeeLine"
+      },
+      "XrayFees": {
+        "properties": {
+          "annual_drag": {
+            "type": "number",
+            "title": "Annual Drag"
+          },
+          "annual_cost_base": {
+            "type": "number",
+            "title": "Annual Cost Base"
+          },
+          "weighted_expense_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weighted Expense Ratio"
+          },
+          "funds_with_ratio": {
+            "type": "integer",
+            "title": "Funds With Ratio"
+          },
+          "funds_without_ratio": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Funds Without Ratio"
+          },
+          "unpriced_weight": {
+            "type": "number",
+            "title": "Unpriced Weight"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/XrayFeeLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "annual_drag",
+          "annual_cost_base",
+          "weighted_expense_ratio",
+          "funds_with_ratio",
+          "funds_without_ratio",
+          "unpriced_weight",
+          "lines",
+          "note"
+        ],
+        "title": "XrayFees"
+      },
+      "XrayFundamentals": {
+        "properties": {
+          "equity_weight": {
+            "type": "number",
+            "title": "Equity Weight"
+          },
+          "covered_weight": {
+            "type": "number",
+            "title": "Covered Weight"
+          },
+          "scored_issuers": {
+            "type": "integer",
+            "title": "Scored Issuers"
+          },
+          "financials_weight": {
+            "type": "number",
+            "title": "Financials Weight"
+          },
+          "unknown_weight": {
+            "type": "number",
+            "title": "Unknown Weight"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/XrayMetric"
+            },
+            "type": "array",
+            "title": "Metrics"
+          },
+          "fees": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/XrayFees"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "equity_weight",
+          "covered_weight",
+          "scored_issuers",
+          "financials_weight",
+          "unknown_weight",
+          "metrics",
+          "fees",
+          "notes"
+        ],
+        "title": "XrayFundamentals"
+      },
+      "XrayHolding": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Share of total portfolio value."
+          },
+          "is_fund": {
+            "type": "boolean",
+            "title": "Is Fund"
+          },
+          "looked_through": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Looked Through",
+            "description": "For a fund: whether its holdings are stored. None for a stock."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "weight",
+          "is_fund",
+          "looked_through"
+        ],
+        "title": "XrayHolding"
+      },
+      "XrayIntersection": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          },
+          "total_value": {
+            "type": "number",
+            "title": "Total Value"
+          },
+          "issuer_count": {
+            "type": "integer",
+            "title": "Issuer Count"
+          },
+          "shared_count": {
+            "type": "integer",
+            "title": "Shared Count",
+            "description": "Issuers reached through two or more channels."
+          },
+          "shared_weight": {
+            "type": "number",
+            "title": "Shared Weight",
+            "description": "Combined weight of those issuers."
+          },
+          "redundant_weight": {
+            "type": "number",
+            "title": "Redundant Weight",
+            "description": "Exposure to shared issuers beyond the largest single channel."
+          },
+          "issuers": {
+            "items": {
+              "$ref": "#/components/schemas/IssuerExposure"
+            },
+            "type": "array",
+            "title": "Issuers"
+          },
+          "funds": {
+            "items": {
+              "$ref": "#/components/schemas/FundAsOf"
+            },
+            "type": "array",
+            "title": "Funds"
+          },
+          "unknown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Unknown"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "removal": {
+            "items": {
+              "$ref": "#/components/schemas/XrayRemoval"
+            },
+            "type": "array",
+            "title": "Removal"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "total_value",
+          "issuer_count",
+          "shared_count",
+          "shared_weight",
+          "redundant_weight",
+          "issuers",
+          "funds",
+          "unknown",
+          "removal",
+          "notes"
+        ],
+        "title": "XrayIntersection"
+      },
+      "XrayItem": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Share of total portfolio value."
+          },
+          "share_of_known": {
+            "type": "number",
+            "title": "Share Of Known"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "weight",
+          "share_of_known"
+        ],
+        "title": "XrayItem"
+      },
+      "XrayMetric": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "fraction",
+              "multiple"
+            ],
+            "title": "Unit"
+          },
+          "covered_weight": {
+            "type": "number",
+            "title": "Covered Weight",
+            "description": "Share of total portfolio value the figure covers."
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage",
+            "description": "Covered weight over identified equity weight."
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/XrayExclusion"
+            },
+            "type": "array",
+            "title": "Excluded"
+          },
+          "excluded_count": {
+            "type": "integer",
+            "title": "Excluded Count"
+          },
+          "formula": {
+            "type": "string",
+            "title": "Formula"
+          },
+          "thin": {
+            "type": "boolean",
+            "title": "Thin",
+            "description": "Covers under half of the equity weight: indicative only."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why there is no figure, when there is none."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "value",
+          "unit",
+          "covered_weight",
+          "coverage",
+          "excluded",
+          "excluded_count",
+          "formula",
+          "thin",
+          "reason"
+        ],
+        "title": "XrayMetric"
+      },
+      "XrayMissing": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "weight"
+        ],
+        "title": "XrayMissing"
+      },
+      "XrayPositionChange": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "held",
+              "added"
+            ],
+            "title": "Kind"
+          },
+          "before": {
+            "type": "number",
+            "title": "Before"
+          },
+          "after": {
+            "type": "number",
+            "title": "After"
+          },
+          "delta": {
+            "type": "number",
+            "title": "Delta"
+          },
+          "looked_through": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Looked Through",
+            "description": "For a fund: whether its holdings are stored. None for a stock."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "kind",
+          "before",
+          "after",
+          "delta",
+          "looked_through"
+        ],
+        "title": "XrayPositionChange"
+      },
+      "XrayProposal": {
+        "properties": {
+          "base_currency": {
+            "type": "string",
+            "title": "Base Currency"
+          },
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          },
+          "saved_holdings_changed": {
+            "type": "boolean",
+            "title": "Saved Holdings Changed",
+            "description": "Always false: the proposal is applied to a copy.",
+            "default": false
+          },
+          "before": {
+            "$ref": "#/components/schemas/XraySide"
+          },
+          "after": {
+            "$ref": "#/components/schemas/XraySide"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/XrayPositionChange"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "views": {
+            "items": {
+              "$ref": "#/components/schemas/XrayDeltaView"
+            },
+            "type": "array",
+            "title": "Views"
+          },
+          "issuers": {
+            "items": {
+              "$ref": "#/components/schemas/XrayDeltaRow"
+            },
+            "type": "array",
+            "title": "Issuers"
+          },
+          "coverage": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Coverage",
+            "description": "Where the two sides differ in how much is known."
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_currency",
+          "as_of",
+          "before",
+          "after",
+          "positions",
+          "views",
+          "issuers",
+          "coverage",
+          "notes"
+        ],
+        "title": "XrayProposal"
+      },
+      "XrayRemoval": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "The fund's share of total portfolio value."
+          },
+          "issuers_touched": {
+            "type": "integer",
+            "title": "Issuers Touched"
+          },
+          "unknown_removed": {
+            "type": "number",
+            "title": "Unknown Removed",
+            "description": "Unknown weight that leaves with the fund."
+          },
+          "hhi_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hhi Before"
+          },
+          "hhi_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hhi After"
+          },
+          "effective_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Before"
+          },
+          "effective_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective After"
+          },
+          "top10_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top10 Before"
+          },
+          "top10_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top10 After"
+          },
+          "largest_before": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/XrayDrop"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "largest_after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/XrayDrop"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "biggest_drops": {
+            "items": {
+              "$ref": "#/components/schemas/XrayDrop"
+            },
+            "type": "array",
+            "title": "Biggest Drops"
+          },
+          "shared_after": {
+            "type": "integer",
+            "title": "Shared After",
+            "description": "Issuers still reached through two or more channels."
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "label",
+          "weight",
+          "issuers_touched",
+          "unknown_removed",
+          "hhi_before",
+          "hhi_after",
+          "effective_before",
+          "effective_after",
+          "top10_before",
+          "top10_after",
+          "largest_before",
+          "largest_after",
+          "biggest_drops",
+          "shared_after"
+        ],
+        "title": "XrayRemoval"
+      },
+      "XrayResponse": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          },
+          "snapshot_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Date"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "total_value": {
+            "type": "number",
+            "title": "Total Value"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/XrayHolding"
+            },
+            "type": "array",
+            "title": "Holdings"
+          },
+          "cash_weight": {
+            "type": "number",
+            "title": "Cash Weight"
+          },
+          "views": {
+            "items": {
+              "$ref": "#/components/schemas/XrayView"
+            },
+            "type": "array",
+            "title": "Views"
+          },
+          "funds": {
+            "items": {
+              "$ref": "#/components/schemas/FundAsOf"
+            },
+            "type": "array",
+            "title": "Funds"
+          },
+          "stale_funds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stale Funds"
+          },
+          "unknown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Unknown"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fees": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/XrayFees"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scored_issuers": {
+            "type": "integer",
+            "title": "Scored Issuers"
+          },
+          "issuers_total": {
+            "type": "integer",
+            "title": "Issuers Total"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "snapshot_date",
+          "base_currency",
+          "total_value",
+          "available",
+          "holdings",
+          "cash_weight",
+          "views",
+          "funds",
+          "stale_funds",
+          "unknown",
+          "fees",
+          "scored_issuers",
+          "issuers_total",
+          "method",
+          "notes"
+        ],
+        "title": "XrayResponse"
+      },
+      "XraySide": {
+        "properties": {
+          "total_value": {
+            "type": "number",
+            "title": "Total Value"
+          },
+          "cash_weight": {
+            "type": "number",
+            "title": "Cash Weight"
+          },
+          "equity_weight": {
+            "type": "number",
+            "title": "Equity Weight"
+          },
+          "unknown_weight": {
+            "type": "number",
+            "title": "Unknown Weight"
+          },
+          "not_looked_through_weight": {
+            "type": "number",
+            "title": "Not Looked Through Weight"
+          },
+          "issuer_count": {
+            "type": "integer",
+            "title": "Issuer Count"
+          },
+          "shared_issuers": {
+            "type": "integer",
+            "title": "Shared Issuers"
+          },
+          "redundant_weight": {
+            "type": "number",
+            "title": "Redundant Weight",
+            "description": "Exposure to issuers reached through 2+ channels beyond the largest channel."
+          },
+          "largest_issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Largest Issuer"
+          },
+          "largest_issuer_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Largest Issuer Weight"
+          },
+          "hhi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hhi"
+          },
+          "effective_issuers": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Issuers"
+          },
+          "top10_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top10 Weight"
+          },
+          "fee_drag": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Drag"
+          },
+          "fee_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Cost"
+          },
+          "funds_without_ratio": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Funds Without Ratio"
+          },
+          "earnings_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earnings Yield"
+          },
+          "earnings_yield_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earnings Yield Coverage"
+          },
+          "dividend_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Yield"
+          },
+          "dividend_yield_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Yield Coverage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_value",
+          "cash_weight",
+          "equity_weight",
+          "unknown_weight",
+          "not_looked_through_weight",
+          "issuer_count",
+          "shared_issuers",
+          "redundant_weight",
+          "largest_issuer",
+          "largest_issuer_weight",
+          "hhi",
+          "effective_issuers",
+          "top10_weight",
+          "fee_drag",
+          "fee_cost",
+          "funds_without_ratio",
+          "earnings_yield",
+          "earnings_yield_coverage",
+          "dividend_yield",
+          "dividend_yield_coverage"
+        ],
+        "title": "XraySide"
+      },
+      "XrayView": {
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "asset_class",
+              "sector",
+              "industry",
+              "country",
+              "region",
+              "currency",
+              "issuer",
+              "fund",
+              "style",
+              "size",
+              "fees",
+              "revenue_country",
+              "commodity",
+              "trade_product"
+            ],
+            "title": "Dimension"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/XrayBucket"
+            },
+            "type": "array",
+            "title": "Buckets"
+          },
+          "total_weight": {
+            "type": "number",
+            "title": "Total Weight"
+          },
+          "reconciles": {
+            "type": "boolean",
+            "title": "Reconciles",
+            "description": "Buckets add up to the whole portfolio within tolerance."
+          },
+          "classified_weight": {
+            "type": "number",
+            "title": "Classified Weight",
+            "description": "Weight in buckets that carry a real label."
+          },
+          "equity_weight": {
+            "type": "number",
+            "title": "Equity Weight"
+          },
+          "bases": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Bases",
+            "description": "Classified weight by basis across the view."
+          },
+          "country_kinds": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Kinds",
+            "description": "Country view only: weight by what kind of country it is."
+          },
+          "mixed_basis": {
+            "type": "boolean",
+            "title": "Mixed Basis",
+            "default": false
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dimension",
+          "label",
+          "group",
+          "description",
+          "buckets",
+          "total_weight",
+          "reconciles",
+          "classified_weight",
+          "equity_weight",
+          "bases",
+          "warnings"
+        ],
+        "title": "XrayView"
       },
       "api__response_models__CoverageEntry": {
         "properties": {

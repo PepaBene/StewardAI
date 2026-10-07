@@ -39,6 +39,7 @@ from api.market_routes import router as market_router
 from api.news_routes import router as news_router
 from api.nport_routes import router as nport_router
 from api.pdmr_routes import router as pdmr_router
+from api.performance_routes import router as performance_router
 from api.prompts_routes import router as prompts_router
 from api.reference_routes import router as reference_router
 from api.research_context_routes import router as research_context_router
@@ -50,6 +51,7 @@ from api.valuation_routes import router as valuation_router
 from api.verify_routes import router as verify_router
 from api.watchlist_routes import router as watchlist_router
 from api.web_fact_routes import router as web_fact_router
+from api.xray_routes import router as xray_router
 from steward import __version__
 from steward.config import StrategyConfig, ThesesConfig
 from steward.heartbeat import worker_status
@@ -264,6 +266,8 @@ def create_app() -> FastAPI:
     app.include_router(insider_activity_router)
     app.include_router(nport_router)
     app.include_router(fund_router)
+    app.include_router(performance_router)
+    app.include_router(xray_router)
     app.include_router(pdmr_router)
     app.include_router(graph_router)
     app.include_router(data_context_router)
