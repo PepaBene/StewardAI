@@ -74,6 +74,7 @@ BudgetJobType = Literal[
     "disclosure_sources",
     "disclosure_ingest",
     "disclosure_identifiers",
+    "disclosure_estimates",
     "disclosure_alerts",
 ]
 

@@ -402,7 +402,7 @@ def budget_sites() -> dict[str, int]:
             continue
         count = sum(
             1
-            for node in ast.walk(ast.parse(path.read_text()))
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
             if isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
             and node.func.id == "Budget"

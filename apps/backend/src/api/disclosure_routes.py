@@ -702,7 +702,7 @@ async def holding_stake_chain(
     return StakeChainOut(**await ownership_read.stake_chain(pool, ticker.upper(), filer_cik, as_of))
 
 
-@router.get("/company/{ticker}/ownership")
+@router.get("/company/{ticker}/ownership", include_in_schema=False)
 @router.get("/holdings/{ticker}/ownership")
 async def holding_ownership(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: AsOf = None
@@ -821,7 +821,7 @@ class InsiderOverrideOut(BaseModel):
     id: int
 
 
-@router.get("/company/{ticker}/insiders")
+@router.get("/company/{ticker}/insiders", include_in_schema=False)
 @router.get("/holdings/{ticker}/insiders")
 async def holding_insiders(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: AsOf = None
@@ -875,7 +875,7 @@ class PdmrActivityOut(BaseModel):
     notes: list[str]
 
 
-@router.get("/company/{ticker}/pdmr")
+@router.get("/company/{ticker}/pdmr", include_in_schema=False)
 @router.get("/holdings/{ticker}/pdmr")
 async def holding_pdmr(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: AsOf = None
@@ -1044,7 +1044,7 @@ class DependencyViewOut(BaseModel):
     notes: list[str]
 
 
-@router.get("/company/{ticker}/dependencies")
+@router.get("/company/{ticker}/dependencies", include_in_schema=False)
 @router.get("/holdings/{ticker}/dependencies")
 async def holding_dependencies(
     ticker: TickerPath,

@@ -316,6 +316,12 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Looks up missing LEIs and FIGIs and stores them as suggestions. Nothing is confirmed until you decide it.",
     cron: "20 6 * * 6",
   },
+  disclosure_estimates: {
+    label: "Consensus files",
+    description:
+      "Fetches each issuer consensus file you have enabled and stores a new version only when it changed. A file it cannot read is reported with the reason, never stored half-read.",
+    cron: "30 6 * * 1-5",
+  },
   disclosure_alerts: {
     label: "Disclosure alerts",
     description:

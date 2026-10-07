@@ -3,9 +3,9 @@
 Retrieval reads verified claims and observations (`asof.py`, so only what was known at the date) and
 keeps those that share a word with the question. The text is a deterministic template over that
 evidence: each sentence names its source and date, and the answer states what it could not find.
-No repo LLM helper is used, so there is nothing to phrase with; if one is added later it may only
-rephrase, and `numbers_grounded` must pass on its output before it is shown. A total is never
-computed here: figures are quoted from the filing as stored.
+`phrase` may rewrite that text with a configured model, but only reword it: its output is shown
+only if `numbers_grounded` passes, otherwise the template stays. A total is never computed here:
+figures are quoted from the filing as stored.
 """
 
 from __future__ import annotations
@@ -114,6 +114,52 @@ def compose(
     dates = [f"{e['known_at'].date()} {as_of.date()}" for e in evidence]
     grounded = numbers_grounded(text, [*quoted, *dates, ticker])
     return {"text": text if grounded else None, "limits": limits, "grounded": grounded}
+
+
+PHRASE_SYSTEM = (
+    "You rewrite a short factual answer so it reads smoothly. Use only the facts, numbers, dates "
+    "and sources in the text you are given. Do not add, infer, compute or round any figure, and do "
+    "not add any fact. Keep every source and date. Reply with the rewritten text only."
+)
+
+
+async def phrase(
+    llm: Any, model: str, composed: dict[str, Any], evidence: list[dict[str, Any]]
+) -> str | None:
+    """Rephrase the templated answer with a model, or None to keep the template.
+
+    The model may only reword: its output is used only if every number in it appears in the
+    retrieved evidence or the template, and it adds no number the evidence lacks. A model that is
+    not configured, a call that fails or an answer that fails the check all fall back to the
+    template, so the shown text is never less grounded than the template."""
+    from steward.llm.types import LLMError, Message, Request
+
+    template = composed.get("text")
+    if not template or not evidence:
+        return None
+    try:
+        if not llm.configured(model):
+            return None
+        done = await llm.complete(
+            Request(
+                model=model,
+                system=PHRASE_SYSTEM,
+                messages=(Message(role="user", text=template),),
+                max_tokens=600,
+            )
+        )
+    except (LLMError, ValueError):
+        return None
+    text = (done.text or "").strip()
+    if not text:
+        return None
+    quoted = [
+        " ".join(str(e[k] or "") for k in ("value", "quote", "counterparty", "label", "source"))
+        for e in evidence
+    ]
+    if not numbers_grounded(text, [template, *quoted]):
+        return None
+    return text
 
 
 async def answer(

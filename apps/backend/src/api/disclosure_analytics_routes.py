@@ -116,6 +116,7 @@ class AnalyticsCoverageOut(BaseModel):
     as_of: dt.datetime
     snapshot_date: dt.date | None
     holdings: int
+    watchlist_only: int
     denominator_value: str
     cells: list[AnalyticsCoverageCellOut]
     by_period: list[AnalyticsPeriodOut]
@@ -130,10 +131,20 @@ class AnalyticsCoverageOut(BaseModel):
 
 
 @router.get("/data/coverage")
-async def data_coverage(pool: Pool, _owner: Owner, as_of: AsOf = None) -> AnalyticsCoverageOut:
-    """Coverage by dataset and jurisdiction over held tickers, with blind spots, collection
-    failures, sampled error rates, the free-tier cost ledger and the release order."""
-    return AnalyticsCoverageOut(**await coverage_report.coverage_view(pool, as_of))
+async def data_coverage(
+    pool: Pool,
+    _owner: Owner,
+    as_of: AsOf = None,
+    include_watchlist: Annotated[
+        bool, Query(description="Also count watchlist tickers that are not held (value zero).")
+    ] = False,
+) -> AnalyticsCoverageOut:
+    """Coverage by dataset and jurisdiction over held tickers (and optionally the watchlist), with
+    blind spots, collection failures, sampled error rates, the free-tier cost ledger and the
+    release order."""
+    return AnalyticsCoverageOut(
+        **await coverage_report.coverage_view(pool, as_of, include_watchlist=include_watchlist)
+    )
 
 
 # -------------------------------------------------------------------------------- company evidence

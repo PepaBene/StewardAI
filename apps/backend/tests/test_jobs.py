@@ -220,6 +220,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "control_stakes",
         "daily_digest",
         "disclosure_alerts",
+        "disclosure_estimates",
         "disclosure_identifiers",
         "disclosure_ingest",
         "disclosure_sources",

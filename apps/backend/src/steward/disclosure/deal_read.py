@@ -12,6 +12,7 @@ the rules as unknown, so those impacts are null with a reason rather than guesse
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -109,10 +110,68 @@ async def _rows(pool: Pool, sql: str, ids: list[int], when: dt.datetime) -> dict
     return out
 
 
+def _group(rows: Sequence[Any]) -> dict[int, list[Any]]:
+    out: dict[int, list[Any]] = {}
+    for r in rows:
+        out.setdefault(int(r["deal_id"]), []).append(r)
+    return out
+
+
+FACT_METRICS = ("shares_outstanding", "total_debt", "cash")
+
+FACTS_SQL = """
+select x.deal_id, x.who, lower(o.metric) as metric, o.value, o.scale, o.known_at, o.id
+  from (
+    select p.deal_id, p.role as who, p.issuer_id
+      from public.deal_participant p
+     where p.deal_id = any($1::bigint[]) and p.known_at <= $2 and p.issuer_id is not null
+    union all
+    select e.id, 'held', i.id
+      from public.deal_event e
+      join public.instrument n on n.t212_ticker = e.ticker
+      join public.issuer i on i.cik = n.cik
+     where e.id = any($1::bigint[])
+  ) x
+  join public.disclosure_observation o on o.issuer_id = x.issuer_id
+ where o.known_at <= $2 and o.value_state = 'reported' and o.value is not null
+   and o.review_state <> 'rejected' and lower(o.metric) = any($3::text[])
+ order by o.known_at, o.id
+"""
+
+
+def context_from_facts(rows: Sequence[Any], announced_on: dt.date | None) -> dl.DealContext:
+    """Share counts and net debt from stored observations known by the as-of date. The latest value
+    per participant and metric wins. A value that is not stored stays None, so the impact that needs
+    it says why it is missing instead of using zero. Enterprise value and segment revenue are not
+    read here: they need a market price and a segment mapping that are not stored."""
+    latest: dict[tuple[str, str], Decimal] = {}
+    for r in rows:
+        value = Decimal(r["value"]) * (Decimal(10) ** int(r["scale"] or 0))
+        latest[(r["who"], r["metric"])] = value
+
+    def pick(roles: Sequence[str], metric: str) -> Decimal | None:
+        for role in roles:
+            if (role, metric) in latest:
+                return latest[(role, metric)]
+        return None
+
+    acquirer = ("acquirer", "bidder", "buyer")
+    debt = pick(("held",), "total_debt")
+    cash = pick(("held",), "cash")
+    return dl.DealContext(
+        announced_on=announced_on,
+        acquirer_shares=pick(acquirer, "shares_outstanding"),
+        target_shares=pick(("target",), "shares_outstanding"),
+        parent_shares=pick(("issuer", "held"), "shares_outstanding"),
+        net_debt_before=None if debt is None or cash is None else debt - cash,
+    )
+
+
 async def _children(
     pool: Pool, ids: list[int], when: dt.datetime
 ) -> dict[str, dict[int, list[Any]]]:
     return {
+        "facts": _group(await pool.fetch(FACTS_SQL, ids, when, list(FACT_METRICS))),
         "participants": await _rows(
             pool,
             """select deal_id, role, name, issuer_id, ticker, share_class from
@@ -177,7 +236,9 @@ def _deal_json(
     v_rows = kids["versions"].get(did, [])
     versions = [_term_version(r) for r in v_rows]
     announced = deal["announced_at"]
-    ctx = dl.DealContext(announced_on=announced.date() if announced else None)
+    ctx = context_from_facts(
+        kids.get("facts", {}).get(did, []), announced.date() if announced else None
+    )
     snap = dl.snapshot(
         deal["deal_type"],
         [_transition(r) for r in t_rows],

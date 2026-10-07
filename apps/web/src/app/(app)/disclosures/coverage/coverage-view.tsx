@@ -30,13 +30,14 @@ type Load = { kind: "loading" } | { kind: "ready"; report: CoverageReport } | { 
 export function CoveragePageView() {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [sample, setSample] = useState(false);
+  const [watchlist, setWatchlist] = useState(false);
 
   useEffect(() => {
     if (sample) return;
     let cancelled = false;
     (async () => {
       try {
-        const r = await getBrowserApiClient().GET("/disclosures/data/coverage", {});
+        const r = await getBrowserApiClient().GET("/disclosures/data/coverage", { params: { query: { include_watchlist: watchlist } } });
         if (cancelled) return;
         if (r.data) setLoad({ kind: "ready", report: r.data });
         else setLoad({ kind: "error", text: r.response.status === 401 || r.response.status === 403 ? "Sign in again (with MFA) and retry." : `The coverage read failed (HTTP ${r.response.status}).` });
@@ -47,7 +48,7 @@ export function CoveragePageView() {
     return () => {
       cancelled = true;
     };
-  }, [sample]);
+  }, [sample, watchlist]);
 
   const report = sample ? SAMPLE_COVERAGE : load.kind === "ready" ? load.report : null;
 
@@ -59,6 +60,12 @@ export function CoveragePageView() {
         description="Per dataset and jurisdiction, how much of what you hold has a stored record, how old it is, where it is blind and how accurate it was when sampled."
         aside={report ? <span>As known on {dayLabel(report.as_of)} · {report.holdings} holdings · value {money(report.denominator_value)}</span> : undefined}
       />
+      {sample ? null : (
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={watchlist} onChange={(e) => { setLoad({ kind: "loading" }); setWatchlist(e.target.checked); }} className="size-4" />
+          Include watchlist tickers I do not hold{report && report.watchlist_only > 0 ? ` (${report.watchlist_only} added; they carry no value in any share)` : ""}
+        </label>
+      )}
       {sample ? (
         <p role="note" className="border border-dashed border-border bg-surface-muted px-3 py-2 text-sm">
           <strong>Sample data.</strong> An invented portfolio to demonstrate the page. Nothing here is real.{" "}

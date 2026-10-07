@@ -4,6 +4,7 @@ that fired it, and the per-ticker throttle holds. Skipped without STEWARD_TEST_D
 
 import datetime as dt
 import json
+from decimal import Decimal
 
 import asyncpg
 import pytest
@@ -86,6 +87,72 @@ async def test_the_throttle_stops_a_sixth_alert_for_one_ticker_and_kind(
         detail={},
         known_at=NOW,
     )
+
+
+async def seed_stake(pool: asyncpg.Pool, acc: str, pct: str | None, prior: str | None) -> None:
+    await pool.execute(
+        """insert into public.control_stake_filing
+             (accession, form, schedule, is_amendment, filed, issuer_cik, issuer_cusip, filer_cik,
+              stake_shares, stake_percent, prior_accession, source_url, known_at)
+           values ($1,'SC 13D','13D',$2,'2026-08-10','0000011111','037833100','0000022222',
+                   1000,$3,$4,'https://sec.example/'||$1,$5)""",
+        acc,
+        prior is not None,
+        None if pct is None else Decimal(pct),
+        prior,
+        at(8, 11),
+    )
+    await pool.execute(
+        """insert into public.control_stake_issuer_link
+             (accession, ticker, match_basis, class_status, percent_check)
+           values ($1,'AAA','cusip','cusip_match','not_checkable')""",
+        acc,
+    )
+
+
+async def test_a_stake_crossing_the_control_threshold_alerts_once(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    await seed_stake(backend_pool, "0000022222-26-000001", "20.0", None)
+    await seed_stake(backend_pool, "0000022222-26-000002", "27.5", "0000022222-26-000001")
+    got = await alerts.scan_controlling_stakes(backend_pool, "AAA", SINCE, NOW)
+    # the first filing is below the threshold; the amendment crosses it
+    assert got == 1
+    assert await alerts.scan_controlling_stakes(backend_pool, "AAA", SINCE, NOW) == 0
+    (alert,) = await rows(backend_pool, "controlling_stake")
+    inputs = json.loads(alert["why_fired"])["inputs"]
+    assert inputs["stake_percent"] == "27.5" and inputs["prior_percent"] == "20.0"
+
+
+async def test_a_stake_with_no_stated_percentage_never_alerts(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    await seed_stake(backend_pool, "0000022222-26-000003", None, None)
+    assert await alerts.scan_controlling_stakes(backend_pool, "AAA", SINCE, NOW) == 0
+
+
+async def test_three_different_insiders_buying_raise_one_cluster_alert(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    from tests.test_disclosure_gap_closure_db import buy, filing
+
+    for i, owner in enumerate(("1", "2", "3")):
+        acc = f"0000099999-26-00000{i + 1}"
+        await filing(backend_pool, acc, dt.date(2026, 8, 5 + i))
+        await buy(backend_pool, acc, 0, "100", "50", dt.date(2026, 8, 3 + i), owner=owner)
+    first = await alerts.scan_insider_clusters(backend_pool, "AAA", NOW, since=SINCE)
+    assert first == 1
+    assert await alerts.scan_insider_clusters(backend_pool, "AAA", NOW, since=SINCE) == 0
+
+
+async def test_two_insiders_are_not_a_cluster(backend_pool: asyncpg.Pool) -> None:
+    from tests.test_disclosure_gap_closure_db import buy, filing
+
+    for i, owner in enumerate(("1", "2")):
+        acc = f"0000099999-26-00000{i + 1}"
+        await filing(backend_pool, acc, dt.date(2026, 8, 5 + i))
+        await buy(backend_pool, acc, 0, "100", "50", dt.date(2026, 8, 3 + i), owner=owner)
+    assert await alerts.scan_insider_clusters(backend_pool, "AAA", NOW, since=SINCE) == 0
 
 
 async def test_the_same_dedupe_key_is_stored_once(backend_pool: asyncpg.Pool) -> None:

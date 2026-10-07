@@ -10,6 +10,7 @@ from steward.approvals.ai import ai_approvals_handler
 from steward.chat.assistant import chat_handler
 from steward.disclosure.jobs import (
     disclosure_alerts_handler,
+    disclosure_estimates_handler,
     disclosure_identifiers_handler,
     disclosure_ingest_handler,
     disclosure_sources_handler,
@@ -125,6 +126,7 @@ JobType = Literal[
     "disclosure_sources",
     "disclosure_ingest",
     "disclosure_identifiers",
+    "disclosure_estimates",
     "disclosure_alerts",
 ]
 
@@ -184,5 +186,6 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "disclosure_sources": disclosure_sources_handler,
     "disclosure_ingest": disclosure_ingest_handler,
     "disclosure_identifiers": disclosure_identifiers_handler,
+    "disclosure_estimates": disclosure_estimates_handler,
     "disclosure_alerts": disclosure_alerts_handler,
 }

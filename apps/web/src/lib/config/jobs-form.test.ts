@@ -70,6 +70,7 @@ const FULL: JobsConfig = {
   disclosure_sources: { enabled: true, cron: "0 6 * * *", timezone: "UTC" },
   disclosure_ingest: { enabled: true, cron: "40 6 * * 1-5", timezone: "UTC" },
   disclosure_identifiers: { enabled: true, cron: "20 6 * * 6", timezone: "UTC" },
+  disclosure_estimates: { enabled: true, cron: "30 6 * * 1-5", timezone: "UTC" },
   disclosure_alerts: { enabled: true, cron: "15 13 * * *", timezone: "UTC" },
   earnings_check: {
     extraction_model: "claude-opus-5-5",

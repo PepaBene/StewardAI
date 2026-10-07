@@ -18,6 +18,7 @@ import httpx
 
 from steward import __version__
 from steward.disclosure import alerts
+from steward.disclosure.estimate_store import collect_consensus
 from steward.disclosure.fetch import DisclosureFetcher, FetchFailure
 from steward.disclosure.identifier_job import (
     gleif_lei_lookup,
@@ -267,6 +268,26 @@ async def mail_alert_digest(
         now,
     )
     return len(ids)
+
+
+async def disclosure_estimates_handler(ctx: JobContext) -> None:
+    settings = get_settings()
+    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, read=120.0)) as http:
+        async with ctx.step("consensus") as step:
+            fetcher = DisclosureFetcher(
+                ctx.pool,
+                http,
+                user_agent=settings.sec_user_agent or "",
+                store=evidence_store(settings, http),
+            )
+
+            async def fetch(url: str) -> Any:
+                return await fetcher.fetch("issuer_ir.consensus", url)
+
+            try:
+                step.detail.update(await collect_consensus(ctx.pool, fetch))
+            except SourceNotEnabled as exc:
+                step.detail["skipped"] = str(exc)
 
 
 async def disclosure_alerts_handler(ctx: JobContext) -> None:

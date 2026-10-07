@@ -503,6 +503,15 @@ select ticker, sum(n)::int as n, min(first_known) as first_known, max(last_known
            min(f.report_period_end)::text, max(f.report_period_end)::text
       from public.nport_holding h join public.nport_filing f on f.accession = h.accession
      where h.held_ticker = any($1::text[]) and f.known_at <= $2 group by 1
+    union all
+    -- A 13F carries only a filing date, so it is known at the end of that day (UTC) at the
+    -- earliest.
+    select ih.ticker, count(*), min(k.known), max(k.known), min(f13.period)::text,
+           max(f13.period)::text
+      from public.institutional_holding ih
+      join public.form13f_filing f13 on f13.accession = ih.accession
+      cross join lateral (select ((f13.filed + 1)::timestamp at time zone 'UTC') as known) k
+     where ih.ticker = any($1::text[]) and k.known <= $2 group by 1
   ) u group by 1""",
     "insiders": """
 select f.ticker, count(*)::int as n, min(f.known_at) as first_known, max(f.known_at) as last_known,
@@ -531,7 +540,20 @@ select n.t212_ticker as ticker, count(*)::int as n, min(s.known_at) as first_kno
 }
 
 
-async def load_holdings(pool: Pool, when: dt.datetime) -> tuple[list[Holding], dt.date | None]:
+WATCHLIST_SQL = """
+select distinct upper(w.ticker) as ticker, n.t212_ticker, n.isin, i.country, i.id as issuer_id
+  from public.watchlist_item w
+  left join public.instrument n on upper(n.t212_ticker) = upper(w.ticker)
+  left join public.issuer i on i.cik = n.cik
+"""
+
+
+async def load_holdings(
+    pool: Pool, when: dt.datetime, *, include_watchlist: bool = False
+) -> tuple[list[Holding], dt.date | None]:
+    """Held positions at the snapshot. With `include_watchlist`, watchlist tickers that are not held
+    are added with a value of zero: they count toward holdings covered and uncovered, never toward
+    the value denominator."""
     rows = await pool.fetch(HOLDINGS_SQL, when)
     holdings = [
         Holding(
@@ -542,6 +564,20 @@ async def load_holdings(pool: Pool, when: dt.datetime) -> tuple[list[Holding], d
         )
         for r in rows
     ]
+    if include_watchlist:
+        held = {h.ticker.upper() for h in holdings}
+        for w in await pool.fetch(WATCHLIST_SQL):
+            if w["ticker"] in held:
+                continue
+            held.add(w["ticker"])
+            holdings.append(
+                Holding(
+                    w["t212_ticker"] or w["ticker"],
+                    Decimal(0),
+                    jurisdiction_of(w["isin"], w["country"]),
+                    None if w["issuer_id"] is None else int(w["issuer_id"]),
+                )
+            )
     return holdings, (rows[0]["snapshot_date"] if rows else None)
 
 
@@ -597,9 +633,12 @@ async def company_evidence_view(
     )
 
 
-async def coverage_view(pool: Pool, as_of: dt.datetime | None = None) -> dict[str, Any]:
+async def coverage_view(
+    pool: Pool, as_of: dt.datetime | None = None, *, include_watchlist: bool = False
+) -> dict[str, Any]:
     when = _aware(as_of)
-    holdings, snapshot = await load_holdings(pool, when)
+    holdings, snapshot = await load_holdings(pool, when, include_watchlist=include_watchlist)
+    watch_only = sum(1 for h in holdings if h.value == 0) if include_watchlist else 0
     tickers = sorted(h.ticker for h in holdings)
     evidence = await load_evidence(pool, tickers, when)
     states = await load_coverage_states(pool, holdings)
@@ -666,6 +705,7 @@ async def coverage_view(pool: Pool, as_of: dt.datetime | None = None) -> dict[st
         "as_of": when,
         "snapshot_date": snapshot,
         "holdings": len(holdings),
+        "watchlist_only": watch_only,
         "denominator_value": str(sum((h.value for h in holdings), Decimal(0))),
         "cells": cells,
         "by_period": period_rows(holdings, [(int(r["issuer_id"]), r["yr"]) for r in years]),
@@ -686,5 +726,13 @@ async def coverage_view(pool: Pool, as_of: dt.datetime | None = None) -> dict[st
             "Covered means a record known by the date is stored; "
             "uncovered is not proof none exists.",
             "A rate or share with no denominator is null, never zero.",
+            *(
+                [
+                    f"{watch_only} watchlist-only tickers are counted as holdings but add no "
+                    "value to any denominator."
+                ]
+                if watch_only
+                else []
+            ),
         ],
     }

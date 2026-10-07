@@ -4442,49 +4442,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/disclosures/company/{ticker}/ownership": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Holding Ownership
-         * @description Ownership as separate dated lanes known by `as_of`. The lanes overlap, so no combined
-         *     total is returned; each carries its own remainder against the stated share denominator.
-         */
-        get: operations["holding_ownership"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/disclosures/holdings/{ticker}/insiders": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Holding Insiders
-         * @description Insider transactions as filed and known by `as_of`: discretionary net by role and window,
-         *     with plan trades, exercise-and-sell bundles and unknown plan status shown apart.
-         */
-        get: operations["holding_insiders"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/disclosures/company/{ticker}/insiders": {
         parameters: {
             query?: never;
             header?: never;
@@ -4525,26 +4483,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/disclosures/company/{ticker}/pdmr": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Holding Pdmr
-         * @description UK PDMR notifications for a holding, kept apart from Form 4 and totalled per currency.
-         */
-        get: operations["holding_pdmr"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/disclosures/insiders/override": {
         parameters: {
             query?: never;
@@ -4566,27 +4504,6 @@ export interface paths {
         trace?: never;
     };
     "/disclosures/holdings/{ticker}/dependencies": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Holding Dependencies
-         * @description Customer and supplier claims known by `as_of`, with concentration (unknown remainder shown),
-         *     and a bounded one-to-two-hop scenario over confirmed numeric edges only.
-         */
-        get: operations["holding_dependencies"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/disclosures/company/{ticker}/dependencies": {
         parameters: {
             query?: never;
             header?: never;
@@ -5051,27 +4968,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/disclosures/company/{ticker}/deals": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Holding Public Deals
-         * @description Deals linked to a holding, as known at `as_of`: lifecycle, term versions, impacts, documents
-         *     and missing fields. A size filter leaves out (and counts) deals whose size is not stated.
-         */
-        get: operations["holding_public_deals"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/disclosures/portfolio/deals": {
         parameters: {
             query?: never;
@@ -5093,29 +4989,6 @@ export interface paths {
         trace?: never;
     };
     "/disclosures/holdings/{ticker}/estimates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Holding Estimates
-         * @description Published estimates known by `as_of`, as five separate lanes. Guidance, consensus, named
-         *     estimates, event-calendar estimates and owner scenarios are never merged or averaged; a
-         *     revision pair across a panel, basis, currency or period break carries its reason and no number;
-         *     a surprise uses only a snapshot known strictly before the release.
-         */
-        get: operations["holding_estimates"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/disclosures/company/{ticker}/estimates": {
         parameters: {
             query?: never;
             header?: never;
@@ -5172,8 +5045,9 @@ export interface paths {
         };
         /**
          * Data Coverage
-         * @description Coverage by dataset and jurisdiction over held tickers, with blind spots, collection
-         *     failures, sampled error rates, the free-tier cost ledger and the release order.
+         * @description Coverage by dataset and jurisdiction over held tickers (and optionally the watchlist), with
+         *     blind spots, collection failures, sampled error rates, the free-tier cost ledger and the
+         *     release order.
          */
         get: operations["data_coverage"];
         put?: never;
@@ -6140,6 +6014,8 @@ export interface components {
             snapshot_date: string | null;
             /** Holdings */
             holdings: number;
+            /** Watchlist Only */
+            watchlist_only: number;
             /** Denominator Value */
             denominator_value: string;
             /** Cells */
@@ -6998,7 +6874,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_estimates" | "disclosure_alerts")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -14923,6 +14799,8 @@ export interface components {
             disclosure_ingest?: components["schemas"]["JobSchedule"];
             /** @description Suggest missing LEIs (GLEIF) and FIGIs (OpenFIGI); you confirm each. Default: Saturdays 06:20. */
             disclosure_identifiers?: components["schemas"]["JobSchedule"];
+            /** @description Fetch each enabled issuer consensus file once and store a new version only when its bytes changed. Default: weekdays 06:30. */
+            disclosure_estimates?: components["schemas"]["JobSchedule"];
             /** @description Scan verified disclosures for new alerts and e-mail them, grouped by ticker, when e-mail is configured. Default: daily 13:15. */
             disclosure_alerts?: components["schemas"]["JobSchedule"];
             earnings_check?: components["schemas"]["EarningsCheckSettings"];
@@ -29832,40 +29710,6 @@ export interface operations {
             };
         };
     };
-    holding_ownership: {
-        parameters: {
-            query?: {
-                /** @description Show only what was known by this time. */
-                as_of?: string | null;
-            };
-            header?: never;
-            path: {
-                ticker: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OwnershipOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     holding_insiders: {
         parameters: {
             query?: {
@@ -29887,74 +29731,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DisclosureInsiderActivityOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    holding_insiders: {
-        parameters: {
-            query?: {
-                /** @description Show only what was known by this time. */
-                as_of?: string | null;
-            };
-            header?: never;
-            path: {
-                ticker: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DisclosureInsiderActivityOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    holding_pdmr: {
-        parameters: {
-            query?: {
-                /** @description Show only what was known by this time. */
-                as_of?: string | null;
-            };
-            header?: never;
-            path: {
-                ticker: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PdmrActivityOut"];
                 };
             };
             /** @description Validation Error */
@@ -30022,41 +29798,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InsiderOverrideOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    holding_dependencies: {
-        parameters: {
-            query?: {
-                /** @description Show only what was known by this time. */
-                as_of?: string | null;
-                shock?: number | string;
-            };
-            header?: never;
-            path: {
-                ticker: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DependencyViewOut"];
                 };
             };
             /** @description Validation Error */
@@ -30813,47 +30554,6 @@ export interface operations {
             };
         };
     };
-    holding_public_deals: {
-        parameters: {
-            query?: {
-                /** @description Show only what was known by this time. */
-                as_of?: string | null;
-                deal_type?: ("acquisition" | "merger" | "divestiture" | "ipo" | "follow_on" | "debt_issuance" | "spin_off" | "joint_venture" | "strategic_investment" | "buyback" | "tender_offer" | "material_agreement") | null;
-                state?: ("rumored" | "announced" | "definitive" | "approved" | "closed" | "terminated" | "contested") | null;
-                currency?: string | null;
-                min_size?: number | string | null;
-                max_size?: number | string | null;
-                /** @description Your scenario: a per-share offer price, shown as your scenario. */
-                offer_price?: number | string | null;
-            };
-            header?: never;
-            path: {
-                ticker: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HoldingDealsOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     portfolio_public_deals: {
         parameters: {
             query?: {
@@ -30873,40 +30573,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortfolioDealsOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    holding_estimates: {
-        parameters: {
-            query?: {
-                /** @description Show only what was known by this time. */
-                as_of?: string | null;
-            };
-            header?: never;
-            path: {
-                ticker: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EstimatesOut"];
                 };
             };
             /** @description Validation Error */
@@ -31023,6 +30689,8 @@ export interface operations {
             query?: {
                 /** @description Show only what was known by this time. */
                 as_of?: string | null;
+                /** @description Also count watchlist tickers that are not held (value zero). */
+                include_watchlist?: boolean;
             };
             header?: never;
             path?: never;

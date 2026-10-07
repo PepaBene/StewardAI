@@ -1909,6 +1909,11 @@ class JobsConfig(ConfigModel):
         description="Suggest missing LEIs (GLEIF) and FIGIs (OpenFIGI); you confirm each. "
         "Default: Saturdays 06:20.",
     )
+    disclosure_estimates: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="30 6 * * 1-5"),
+        description="Fetch each enabled issuer consensus file once and store a new version only "
+        "when its bytes changed. Default: weekdays 06:30.",
+    )
     disclosure_alerts: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="15 13 * * *"),
         description="Scan verified disclosures for new alerts and e-mail them, grouped by "
@@ -1985,6 +1990,7 @@ class JobsConfig(ConfigModel):
             "disclosure_sources": self.disclosure_sources,
             "disclosure_ingest": self.disclosure_ingest,
             "disclosure_identifiers": self.disclosure_identifiers,
+            "disclosure_estimates": self.disclosure_estimates,
             "disclosure_alerts": self.disclosure_alerts,
             "twelve_data_corporate_actions": self.twelve_data_corporate_actions,
             "etf_look_through": self.etf_look_through,

@@ -9,6 +9,7 @@ import asyncpg
 import pytest
 
 from steward.disclosure import coverage_report, screening
+from tests.conftest import MigratedDatabase
 
 pytestmark = pytest.mark.db
 
@@ -63,6 +64,60 @@ async def seed(pool: asyncpg.Pool) -> None:
                    'https://x', $1)""",
         dt.datetime(2026, 6, 21, tzinfo=UTC),
     )
+
+
+async def test_a_13f_counts_toward_ownership_only_once_its_filing_day_has_ended(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    await seed(backend_pool)
+    await backend_pool.execute(
+        """insert into public.form13f_filing (accession, cik, manager_name, period, filed,
+                                              submission_type)
+           values ('0000033333-26-000001','0000033333','Fund LP','2026-03-31','2026-07-01',
+                   '13F-HR')"""
+    )
+    await backend_pool.execute(
+        """insert into public.institutional_holding (accession, infotable_sk, cusip, ticker,
+                                                     value_usd, shares)
+           values ('0000033333-26-000001', 1, '037833100', 'AAA', 1000, 10)"""
+    )
+
+    def owner_cell(out: dict) -> dict:
+        return next(
+            c for c in out["cells"] if c["dataset"] == "ownership" and c["jurisdiction"] == "US"
+        )
+
+    same_day = await coverage_report.coverage_view(
+        backend_pool, dt.datetime(2026, 7, 1, 12, tzinfo=UTC)
+    )
+    assert owner_cell(same_day)["covered"] == 0
+    next_day = await coverage_report.coverage_view(
+        backend_pool, dt.datetime(2026, 7, 2, 1, tzinfo=UTC)
+    )
+    assert owner_cell(next_day)["covered"] == 1
+
+
+async def test_watchlist_tickers_count_as_uncovered_holdings_but_add_no_value(
+    backend_pool: asyncpg.Pool, migrated_db: MigratedDatabase
+) -> None:
+    await seed(backend_pool)
+    admin = await asyncpg.connect(migrated_db.admin_url)
+    try:
+        user = await admin.fetchval(
+            "insert into auth.users(id, email) values (gen_random_uuid(), 'o@example.com')"
+            " returning id"
+        )
+    finally:
+        await admin.close()
+    await backend_pool.execute(
+        "insert into public.watchlist_item(owner_id, ticker) values ($1, 'ZZZ')", user
+    )
+    plain = await coverage_report.coverage_view(backend_pool, AFTER)
+    assert plain["holdings"] == 2 and plain["watchlist_only"] == 0
+    wide = await coverage_report.coverage_view(backend_pool, AFTER, include_watchlist=True)
+    assert wide["holdings"] == 3 and wide["watchlist_only"] == 1
+    assert wide["denominator_value"] == plain["denominator_value"] == "1000"
+    assert any("watchlist-only" in n for n in wide["notes"])
 
 
 async def test_coverage_counts_known_filings_and_never_zero_fills_the_rest(

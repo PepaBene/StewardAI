@@ -26,6 +26,7 @@ export const SAMPLE_COVERAGE: CoverageReport = {
   as_of: SAMPLE_AS_OF,
   snapshot_date: "2026-10-06",
   holdings: 5,
+  watchlist_only: 0,
   denominator_value: "10000",
   cells: [
     cell("filings", "Filings", "US", { tickers: 3, covered: 3, denominator_value: "7000", covered_value: "7000", first_known_at: "2024-02-20T00:00:00Z", last_known_at: "2026-09-30T00:00:00Z", states: { available: 3 } }),

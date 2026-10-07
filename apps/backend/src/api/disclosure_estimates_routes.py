@@ -203,7 +203,7 @@ class EstimatesOut(BaseModel):
     notes: list[str]
 
 
-@router.get("/company/{ticker}/estimates")
+@router.get("/company/{ticker}/estimates", include_in_schema=False)
 @router.get("/holdings/{ticker}/estimates")
 async def holding_estimates(
     ticker: TickerPath, pool: Pool, _owner: Owner, as_of: AsOf = None
