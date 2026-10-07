@@ -389,6 +389,82 @@ The gap tables above were written before this round. Where a row below is marked
 - [ ] `P7.8` Test fiscal-calendar roll, company restatement, changed adjusted definition, currency restatement, panel replacement, segment recast, missing analyst count and corrected IR file. Review at least 20 snapshot pairs before enabling revision alerts or factor-like screens.
 
 
+### Implementation status and open gaps after P6–P7 (updated 2026-10-07)
+
+**Built and tested offline** (migrations `20261007160000_deal_events.sql`, `20261007170000_public_estimates.sql`, `20261007180000_deal_state_alerts.sql` + rollbacks; backend `deals.py`, `deal_extract.py`, `deal_read.py`, `estimates.py`, `estimate_extract.py`, `estimate_read.py`; routes `GET /disclosures/holdings/{ticker}/deals`, `GET /disclosures/portfolio/deals`, `GET /disclosures/holdings/{ticker}/estimates`; UI at `/disclosures/deals` and `/disclosures/estimates`; tests `test_disclosure_deals.py`, `test_disclosure_estimates.py` (pure, passing), `test_disclosure_deals_db.py`, `test_disclosure_estimates_db.py` (written, **not run**), web `deals.test.ts`, `estimates.test.ts`):
+
+- P6.1 taxonomy and P6.4 state machine (every transition needs a dated document and `known_at`; a rumoured state needs a stated source; illegal transitions are rejected with a reason; terminated deals stay in history). P6.3 extractor with offsets and typed "not stated" terms; negated and hypothetical wording skipped. P6.2 document clustering (pure). P6.5 legal closing, first reporting period and broker posting kept as three dates. P6.6 premium against a correctly dated unaffected price, dilution from a stated exchange ratio, consideration bridge (unstated terms stay open, never zero), debt/EV change, segment mix, spin-off, buyback; management projections and owner scenarios carry their own origin. P6.7 `deal_state` alerts for a documented transition on a held name (never for a rumour), shown on `/disclosures/alerts`.
+- P7.1 consensus-source registry. P7.2 offline HTML, spreadsheet-row and PDF-text extractor with version-hash dedupe. P7.3 five series kept apart by constraints (a guidance row cannot be stored as consensus). P7.4 revisions only between comparable snapshots; a break (basis, currency, panel method, period, unit, restatement) carries its reason and no number. P7.5 segment bridge with recasts and non-additive lines kept. P7.6 named-estimate coverage gap, never derived from a mean or range. P7.7 surprise against the latest snapshot known strictly before the release. P7.8 pure tests for the listed cases. Revision-alert gate: 20 reviewed pairs at a 90% bar (`estimate_pair_review`); nothing is registered with alerts.
+
+**Gaps** (not done; later phases must not assume them):
+
+| Gap | Task | What closes it |
+|---|---|---|
+| DB tests for deals and estimates never ran, so the migrations and read SQL are untested against Postgres | P6, P7 | Run both `*_db.py` files against a disposable database in CI |
+| No discovery or ingest job writes `deal_*` rows (8-K/6-K/S-4/proxy discovery); extractor and clustering are pure functions | P6.2 | Wire discovery through the fetch governor, then store transitions, term versions and documents |
+| Share counts, enterprise value and segment revenue are not read from stored observations, so dilution, debt/EV and segment-mix impacts are null with a reason in live mode | P6.6 | Read P2 observations at the as-of date |
+| Party-to-issuer matching is manual (`issuer_id` stays null until reviewed); extractor is English and US-format only; no non-US adapters | P6.5, P6.2 | Reviewed match through entity resolution; add adapters after the P0 gate |
+| Deals page filters only by type and state (size and currency exist in the API); the TypeScript sample omits segment mix, spin-off and tender impacts | P6.7 | Add the filters; keep sample and backend rules in step |
+| No collector wires the fetch governor to the estimate extractor, so no snapshot, evidence row or corrected-file link is stored | P7.2 | Scheduled job and a test over the stored fixture |
+| No real pilot: two issuers with retrievable historical versions are not seeded | P7.1 | Register and capture two issuers' files |
+| The 20 snapshot-pair reviews are not done and no screen records them | P7.8 | Review UI over `estimate_pair_review`, then enable revision alerts |
+| No named-individual-estimate source exists; the lane states the gap | P7.6 | A free source or owner-provided access |
+| Estimates page shows only the first period of a segment bridge; the restated flag is not in the sample logic | P7.5 | Period switcher; carry the flag into the TypeScript copy |
+| Actuals are read from `disclosure_observation` only; otherwise "actual not loaded" | P7.7 | Statement facts for the pilot issuers (P2 ingest) |
+| New pages not viewed in a browser | P6, P7 frontend | Sign-in needs MFA; logic and types are tested, layout is unseen. Screenshot pass at desktop and phone width; keyboard pass on timeline, filters and lanes |
+| Python and TypeScript copies of the same rules | P6, P7 | Keep both suites in step; remove the copies once live data exists |
+
+### Consolidated open-gap register, P0–P7 (updated 2026-10-07)
+
+One place to read what is not done. The per-phase status sections above hold the detail; where they disagree with this register, trust this register (it was written last). Each row says what kind of work closes it.
+
+**A. Nothing has run against real data or a real service** (cannot be closed from code)
+
+| Gap | Tasks | Close it by |
+|---|---|---|
+| 0 of 110 P0.3 samples captured; release thresholds (P0.6) unmeasured | P0.3, P0.6 | Pull 10 per category through the fetch governor, hand-check, then sample against `public-disclosure-release-thresholds.md` |
+| Deployed-database baseline and false-positive rate not measured | P0.5 | Run `python -m steward.disclosure.baseline` on the deployed database |
+| Live routes unproven: SEC FSN dataset URL, FCA request shape, EDINET key, SEDAR+ session, TED field names (`classification-cpv`, `identifier-lot`) | P0.4, P5.5 | Record each as tested or failed in the source registry |
+| Ingest, identifier-resolution and TR-1 collection never ran against sec.gov, GLEIF, OpenFIGI or RNS; wording and response shapes are assumed | P1.3, P1.5, P3.4 | Run each once on the deployed host and fix what differs |
+| Every accuracy gate coded but not run: 100 relationship claims, 50 ownership matches, 50 insider classes, 30 deal states, 20 revision pairs, 30 note values | P3.7, P4.3, P5.1, P5.6, P6.8, P7.8, P9.3 | Human labelling through `/disclosures/adjudication`; record numerator and denominator |
+| Insider aggregation never run on production tickers | P4.5 | Compare a handful of tickers to the filings |
+| No migration (14 files since `20261007100000`) or rollback ever rehearsed on a database with data | P1.1 to P7 | Rehearse the full up/down chain on a copy |
+| **No new page has been viewed in a browser**: `/disclosures`, `/ownership`, `/insiders`, `/network`, `/alerts`, `/adjudication`, `/deals`, `/estimates` | all frontend | Sign in with MFA, one screenshot at desktop and phone width per page, keyboard pass on each date control, toggle, form, timeline and lane |
+
+**B. Written but never executed here**
+
+| Gap | Tasks | Close it by |
+|---|---|---|
+| Database test files skip without `STEWARD_TEST_DATABASE_URL`: `test_disclosure_db.py`, `_statements_db`, `_ownership_db`, `_insiders_db`, `_gap_closure_db`, `_nport_lane_db`, `_deals_db`, `_estimates_db` | P1.1 to P7 | Run them in CI against a disposable Postgres |
+| The `deal_state` alert scan (`alerts.scan_deals`) and its migration have no test of their own; the alert-kind constraint name `disclosure_alert_kind_check` is the Postgres default and was not confirmed | P6.7 | Add a DB test: a documented transition raises one alert, a rumour none, a rerun none; confirm the constraint name on a real database |
+| `pyright` was not run on any P6 or P7 module | P6, P7 | Run it in `apps/backend` |
+| eslint warning: unused `versionSummary` in `components/disclosure/deals.tsx` | P6 frontend | Remove it or use it |
+| Passing as of this update: `tsc --noEmit`, `lint:colors`, ruff on `steward/disclosure`, `api` and the disclosure tests, and 316 offline backend tests (`-k "disclosure and not db"`). Not run after the `deal_state` alert change: the web test suite outside `lib/disclosure`, and any test for `alerts.scan_all` totals | P6, P7 | Re-run the full web and backend suites before merging |
+
+**C. Buildable but not built**
+
+| Area | Gap | Tasks |
+|---|---|---|
+| Scheduling | No scheduler runs ingest, identifier resolution, TR-1 collection, deal discovery or estimate collection; the routes are manual | P1.3, P2.2, P3.4, P6.2, P7.2 |
+| Discovery | ESEF, EDINET and SEDAR+ are parsers for assumed response shapes; nothing stores or fetches with them. No 8-K/6-K/S-4/proxy discovery for deals. No collector connects the fetch governor to the consensus extractor | P1.3, P2.5, P2.6, P6.2, P7.2 |
+| Identity | Corpus has no LEI/ISIN/FIGI until a person confirms matches; deal parties stay unmatched (`issuer_id` null) until reviewed; no reviewed-match gate on counterparties | P0.2, P1.5, P5.4, P6.5 |
+| Ownership | Companies House PSC and GLEIF hierarchy not collected; national voting-rights lane `not_covered` everywhere until 20 reviewed UK examples; group members not structured | P3.2, P3.4, P3.5 |
+| Insiders | Footnote and derivative-term backfill not run; no jurisdiction beyond UK PDMR; buyback and earnings-window context missing | P4.1, P4.2, P4.4, P4.5 |
+| Dependencies | Passages not yet audited for existing suggestions; `claim_shape`, denominator and period coarse for old rows; two-sided reconciliation limited to identical relationships | P5.1, P5.3, P5.4 |
+| Financials | ESEF not reconciled to 20-F; valuation, screener and ROIC consumers do not yet read the valuation gate; statement checks cover gross profit and free cash flow only | P2.5, P2.7, P2.8 |
+| Deals | Dilution, debt/EV and segment-mix impacts are null in live mode (share counts, enterprise value and segment revenue not read from observations); extractor is English and US-format only; page filters by type and state only (size and currency are API-only) | P6.3, P6.6, P6.7 |
+| Estimates | No pilot with two issuers' historical files; no UI to record the 20 pair reviews, so revision alerts and screens stay off; segment bridge shows the first period only; actuals come only from `disclosure_observation` | P7.1, P7.5, P7.7, P7.8 |
+| Alerts | Alerts are stored and shown but not pushed; revision alerts deliberately not registered | P4.6, P7.8 |
+| Coverage | No documented coverage report by dataset, jurisdiction and period; coverage states are shown per page only | P9.7 |
+
+**D. Structural risks to carry forward**
+
+| Risk | What to do |
+|---|---|
+| Python and TypeScript hold copies of the same rules for every phase (sample mode, in-browser recompute) | Keep paired test suites in step; delete the TypeScript copies once live data exists everywhere |
+| OpenAPI model names must be unique across route files: a second `SegmentBridgeOut` made the generator qualify both names and broke the existing financials types (fixed by renaming the estimates model to `EstimateSegmentBridgeOut`) | Prefix new response models with their dataset; check `schema.d.ts` after adding routes |
+| A source with no free route is a coverage gap, not a licensing block (named analyst estimates, SEDAR+ bulk, EDINET) | Keep each as a stated gap on its page until an access test passes |
+
 ## Phase P8 — Product integration and cross-dataset analytics
 
 **Dependency:** Published outputs from P2–P7. **Exit:** each dataset changes a decision or explicitly records why it cannot.

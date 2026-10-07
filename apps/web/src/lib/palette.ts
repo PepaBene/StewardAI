@@ -96,6 +96,8 @@ export const OTHER_PAGES = [
   { href: "/disclosures/alerts", label: "Disclosure alerts", keywords: "alerts new insider trade large holder 13D 13G filing customer supplier change unread" },
   { href: "/disclosures/adjudication", label: "Accuracy checks", keywords: "adjudication sample label precision gate accuracy review machine read" },
   { href: "/disclosures/network", label: "Customers and suppliers", keywords: "customer concentration supplier dependency revenue share Customer A scenario network contract award" },
+  { href: "/disclosures/deals", label: "Deals and financing", keywords: "acquisition merger divestiture spin-off tender offer buyback debt issuance deal state announced closed terminated premium dilution exchange ratio consideration" },
+  { href: "/disclosures/estimates", label: "Published estimates", keywords: "consensus analyst estimates revisions guidance surprise segment estimates issuer published fan range actual versus estimate" },
   { href: "/config", label: "Config: Export or import", keywords: "backup json file git" },
   { href: "/status#reference-gaps", label: "Reference data gaps", keywords: "identity unresolved figi isin lei stooq prices missing symbol coverage" },
   { href: "/news/disputed", label: "Disputed stories", keywords: "news contradicted conflicting sources resolve confirm false side by side" },

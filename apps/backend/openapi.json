@@ -15619,6 +15619,337 @@
         }
       }
     },
+    "/disclosures/holdings/{ticker}/deals": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Holding Public Deals",
+        "description": "Deals linked to a holding, as known at `as_of`: lifecycle, term versions, impacts, documents\nand missing fields. A size filter leaves out (and counts) deals whose size is not stated.",
+        "operationId": "holding_public_deals",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          },
+          {
+            "name": "deal_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "acquisition",
+                    "merger",
+                    "divestiture",
+                    "ipo",
+                    "follow_on",
+                    "debt_issuance",
+                    "spin_off",
+                    "joint_venture",
+                    "strategic_investment",
+                    "buyback",
+                    "tender_offer",
+                    "material_agreement"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Deal Type"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "rumored",
+                    "announced",
+                    "definitive",
+                    "approved",
+                    "closed",
+                    "terminated",
+                    "contested"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Currency"
+            }
+          },
+          {
+            "name": "min_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Size"
+            }
+          },
+          {
+            "name": "max_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Size"
+            }
+          },
+          {
+            "name": "offer_price",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Your scenario: a per-share offer price, shown as your scenario.",
+              "title": "Offer Price"
+            },
+            "description": "Your scenario: a per-share offer price, shown as your scenario."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingDealsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/portfolio/deals": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Portfolio Public Deals",
+        "description": "Portfolio weight sitting in holdings with an active deal, by state and type.",
+        "operationId": "portfolio_public_deals",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioDealsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/holdings/{ticker}/estimates": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Holding Estimates",
+        "description": "Published estimates known by `as_of`, as five separate lanes. Guidance, consensus, named\nestimates, event-calendar estimates and owner scenarios are never merged or averaged; a\nrevision pair across a panel, basis, currency or period break carries its reason and no number;\na surprise uses only a snapshot known strictly before the release.",
+        "operationId": "holding_estimates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstimatesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/holdings/{ticker}/data-context": {
       "get": {
         "tags": [
@@ -17368,6 +17699,10 @@
             "type": "integer",
             "title": "Relationship Change"
           },
+          "deal_state": {
+            "type": "integer",
+            "title": "Deal State"
+          },
           "failed": {
             "type": "integer",
             "title": "Failed"
@@ -17378,6 +17713,7 @@
           "insider_trade",
           "major_holder",
           "relationship_change",
+          "deal_state",
           "failed"
         ],
         "title": "AlertScanOut"
@@ -21321,6 +21657,91 @@
         ],
         "title": "ConsensusSeries"
       },
+      "ConsensusSourceOut": {
+        "properties": {
+          "source_key": {
+            "type": "string",
+            "title": "Source Key"
+          },
+          "publisher": {
+            "type": "string",
+            "title": "Publisher"
+          },
+          "origin": {
+            "type": "string",
+            "title": "Origin"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format"
+          },
+          "access_state": {
+            "type": "string",
+            "title": "Access State"
+          },
+          "gap_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap Reason"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "cadence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cadence"
+          },
+          "tested_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tested On"
+          },
+          "selected_metrics_only": {
+            "type": "boolean",
+            "title": "Selected Metrics Only"
+          },
+          "selected_brokers_only": {
+            "type": "boolean",
+            "title": "Selected Brokers Only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_key",
+          "publisher",
+          "origin",
+          "format",
+          "access_state",
+          "gap_reason",
+          "url",
+          "cadence",
+          "tested_on",
+          "selected_metrics_only",
+          "selected_brokers_only"
+        ],
+        "title": "ConsensusSourceOut"
+      },
       "ConsensusVintage": {
         "properties": {
           "observation_id": {
@@ -22528,6 +22949,29 @@
         ],
         "title": "Coverage"
       },
+      "CoverageGapOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "state",
+          "detail"
+        ],
+        "title": "CoverageGapOut"
+      },
       "CoverageGroup": {
         "properties": {
           "group_by": {
@@ -23080,6 +23524,276 @@
         ],
         "title": "DayCount"
       },
+      "DealBridgeOut": {
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/DealBridgeSegmentOut"
+            },
+            "type": "array",
+            "title": "Segments"
+          },
+          "known_total": {
+            "type": "string",
+            "title": "Known Total"
+          },
+          "unstated": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unstated"
+          },
+          "total_is_lower_bound": {
+            "type": "boolean",
+            "title": "Total Is Lower Bound"
+          },
+          "cash_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Pct"
+          },
+          "stock_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Pct"
+          },
+          "term_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Term Version Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "segments",
+          "known_total",
+          "unstated",
+          "total_is_lower_bound",
+          "cash_pct",
+          "stock_pct",
+          "term_version_id"
+        ],
+        "title": "DealBridgeOut"
+      },
+      "DealBridgeSegmentOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "stock",
+              "debt",
+              "earnout"
+            ],
+            "title": "Kind"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "stated",
+              "not_stated"
+            ],
+            "title": "State"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "state",
+          "amount"
+        ],
+        "title": "DealBridgeSegmentOut"
+      },
+      "DealClosingOut": {
+        "properties": {
+          "legal_closing_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legal Closing Date"
+          },
+          "first_reporting_period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Reporting Period End"
+          },
+          "broker_posting_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broker Posting Date"
+          },
+          "successor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Successor Name"
+          },
+          "successor_ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Successor Ticker"
+          },
+          "successor_issuer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Successor Issuer Id"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "legal_closing_date",
+          "first_reporting_period_end",
+          "broker_posting_date",
+          "successor_name",
+          "successor_ticker",
+          "successor_issuer_id",
+          "missing",
+          "problems"
+        ],
+        "title": "DealClosingOut"
+      },
+      "DealDocumentOut": {
+        "properties": {
+          "document_version_id": {
+            "type": "integer",
+            "title": "Document Version Id"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "filed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_version_id",
+          "role",
+          "source_url",
+          "known_at",
+          "filed_at"
+        ],
+        "title": "DealDocumentOut"
+      },
       "DealEvent": {
         "properties": {
           "event_id": {
@@ -23192,6 +23906,436 @@
         ],
         "title": "DealEvent"
       },
+      "DealImpactOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "announced",
+              "management_projection",
+              "owner_scenario"
+            ],
+            "title": "Origin"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "fraction",
+              "currency",
+              "shares",
+              "ratio"
+            ],
+            "title": "Unit"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the value is null."
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "inputs": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Inputs"
+          },
+          "detail": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Detail"
+          },
+          "formula": {
+            "type": "string",
+            "title": "Formula"
+          },
+          "formula_version": {
+            "type": "string",
+            "title": "Formula Version"
+          },
+          "term_version_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Term Version Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "label",
+          "origin",
+          "value",
+          "unit",
+          "currency",
+          "reason",
+          "flags",
+          "inputs",
+          "detail",
+          "formula",
+          "formula_version",
+          "term_version_ids"
+        ],
+        "title": "DealImpactOut"
+      },
+      "DealMissingOut": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "label"
+        ],
+        "title": "DealMissingOut"
+      },
+      "DealOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "transaction_key": {
+            "type": "string",
+            "title": "Transaction Key"
+          },
+          "deal_type": {
+            "type": "string",
+            "enum": [
+              "acquisition",
+              "merger",
+              "divestiture",
+              "ipo",
+              "follow_on",
+              "debt_issuance",
+              "spin_off",
+              "joint_venture",
+              "strategic_investment",
+              "buyback",
+              "tender_offer",
+              "material_agreement"
+            ],
+            "title": "Deal Type"
+          },
+          "type_label": {
+            "type": "string",
+            "title": "Type Label"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "announced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Announced At"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "rumored",
+                  "announced",
+                  "definitive",
+                  "approved",
+                  "closed",
+                  "terminated",
+                  "contested"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size",
+            "description": "Stated consideration (a lower bound) or financing."
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/DealParticipantOut"
+            },
+            "type": "array",
+            "title": "Participants"
+          },
+          "transitions": {
+            "items": {
+              "$ref": "#/components/schemas/DealTransitionOut"
+            },
+            "type": "array",
+            "title": "Transitions"
+          },
+          "rejected_transitions": {
+            "items": {
+              "$ref": "#/components/schemas/DealRejectedOut"
+            },
+            "type": "array",
+            "title": "Rejected Transitions"
+          },
+          "term_versions": {
+            "items": {
+              "$ref": "#/components/schemas/DealTermVersionOut"
+            },
+            "type": "array",
+            "title": "Term Versions"
+          },
+          "latest_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version Id"
+          },
+          "bridge": {
+            "$ref": "#/components/schemas/DealBridgeOut"
+          },
+          "impacts": {
+            "items": {
+              "$ref": "#/components/schemas/DealImpactOut"
+            },
+            "type": "array",
+            "title": "Impacts"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DealDocumentOut"
+            },
+            "type": "array",
+            "title": "Documents"
+          },
+          "missing_fields": {
+            "items": {
+              "$ref": "#/components/schemas/DealMissingOut"
+            },
+            "type": "array",
+            "title": "Missing Fields"
+          },
+          "closing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DealClosingOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "transaction_key",
+          "deal_type",
+          "type_label",
+          "title",
+          "ticker",
+          "announced_at",
+          "known_at",
+          "state",
+          "confidence",
+          "currency",
+          "size",
+          "participants",
+          "transitions",
+          "rejected_transitions",
+          "term_versions",
+          "latest_version_id",
+          "bridge",
+          "impacts",
+          "documents",
+          "missing_fields",
+          "closing"
+        ],
+        "title": "DealOut"
+      },
+      "DealParticipantOut": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "issuer_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Id"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "share_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Class"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "name",
+          "issuer_id",
+          "ticker",
+          "share_class"
+        ],
+        "title": "DealParticipantOut"
+      },
+      "DealRejectedOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "state",
+          "reason"
+        ],
+        "title": "DealRejectedOut"
+      },
       "DealState": {
         "properties": {
           "deal_key": {
@@ -23242,6 +24386,399 @@
           "events"
         ],
         "title": "DealState"
+      },
+      "DealTermChangeOut": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "old": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old"
+          },
+          "new": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "label",
+          "old",
+          "new"
+        ],
+        "title": "DealTermChangeOut"
+      },
+      "DealTermOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "stated",
+              "not_stated"
+            ],
+            "title": "State"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "Whole units of the currency, or a fraction for a share."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "state",
+          "value"
+        ],
+        "title": "DealTermOut"
+      },
+      "DealTermVersionOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "version_no": {
+            "type": "integer",
+            "title": "Version No"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "announced",
+              "management_projection"
+            ],
+            "title": "Origin"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "event_effective_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Effective At"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "document_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Version Id"
+          },
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/DealTermOut"
+            },
+            "type": "array",
+            "title": "Terms"
+          },
+          "closing_conditions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closing Conditions"
+          },
+          "closing_conditions_state": {
+            "type": "string",
+            "enum": [
+              "stated",
+              "not_stated"
+            ],
+            "title": "Closing Conditions State"
+          },
+          "unaffected_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unaffected Date"
+          },
+          "unaffected_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unaffected Source"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/DealTermChangeOut"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version_no",
+          "supersedes_id",
+          "origin",
+          "known_at",
+          "event_effective_at",
+          "currency",
+          "document_version_id",
+          "evidence_id",
+          "source_url",
+          "quote",
+          "terms",
+          "closing_conditions",
+          "closing_conditions_state",
+          "unaffected_date",
+          "unaffected_source",
+          "changes",
+          "problems"
+        ],
+        "title": "DealTermVersionOut"
+      },
+      "DealTransitionOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "rumored",
+              "announced",
+              "definitive",
+              "approved",
+              "closed",
+              "terminated",
+              "contested"
+            ],
+            "title": "State"
+          },
+          "effective_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Effective At",
+            "description": "When it took effect in the world."
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At",
+            "description": "When it became known; never earlier than the record."
+          },
+          "evidence_id": {
+            "type": "integer",
+            "title": "Evidence Id"
+          },
+          "document_version_id": {
+            "type": "integer",
+            "title": "Document Version Id"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "span_start": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Span Start"
+          },
+          "span_end": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Span End"
+          },
+          "rumor_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rumor Source"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "state",
+          "effective_at",
+          "known_at",
+          "evidence_id",
+          "document_version_id",
+          "source_url",
+          "quote",
+          "span_start",
+          "span_end",
+          "rumor_source",
+          "note"
+        ],
+        "title": "DealTransitionOut"
       },
       "Deals": {
         "properties": {
@@ -24717,7 +26254,8 @@
             "enum": [
               "insider_trade",
               "major_holder",
-              "relationship_change"
+              "relationship_change",
+              "deal_state"
             ],
             "title": "Kind"
           },
@@ -26418,6 +27956,593 @@
         ],
         "title": "EscalationStatusUpdate"
       },
+      "EstimateIssuerOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "EstimateIssuerOut"
+      },
+      "EstimateLanesOut": {
+        "properties": {
+          "published_analyst_consensus": {
+            "items": {
+              "$ref": "#/components/schemas/EstimateLineOut"
+            },
+            "type": "array",
+            "title": "Published Analyst Consensus"
+          },
+          "named_individual_estimate": {
+            "items": {
+              "$ref": "#/components/schemas/EstimateLineOut"
+            },
+            "type": "array",
+            "title": "Named Individual Estimate"
+          },
+          "company_guidance": {
+            "items": {
+              "$ref": "#/components/schemas/EstimateLineOut"
+            },
+            "type": "array",
+            "title": "Company Guidance"
+          },
+          "event_calendar_estimate": {
+            "items": {
+              "$ref": "#/components/schemas/EstimateLineOut"
+            },
+            "type": "array",
+            "title": "Event Calendar Estimate"
+          },
+          "owner_scenario": {
+            "items": {
+              "$ref": "#/components/schemas/EstimateLineOut"
+            },
+            "type": "array",
+            "title": "Owner Scenario"
+          }
+        },
+        "type": "object",
+        "required": [
+          "published_analyst_consensus",
+          "named_individual_estimate",
+          "company_guidance",
+          "event_calendar_estimate",
+          "owner_scenario"
+        ],
+        "title": "EstimateLanesOut"
+      },
+      "EstimateLineOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "snapshot_id": {
+            "type": "integer",
+            "title": "Snapshot Id"
+          },
+          "series": {
+            "type": "string",
+            "title": "Series"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "segment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segment"
+          },
+          "segment_taxonomy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segment Taxonomy"
+          },
+          "non_additive": {
+            "type": "boolean",
+            "title": "Non Additive"
+          },
+          "fiscal_period": {
+            "type": "string",
+            "title": "Fiscal Period"
+          },
+          "fiscal_calendar": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Calendar"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "scale": {
+            "type": "integer",
+            "title": "Scale"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "basis_definition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis Definition"
+          },
+          "mean": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean"
+          },
+          "median": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "analyst_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Count"
+          },
+          "panel_analyst_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panel Analyst Count"
+          },
+          "panel_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panel Description"
+          },
+          "panel_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panel Method"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "broker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broker"
+          },
+          "analyst": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "supersedes_snapshot_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Snapshot Id"
+          },
+          "corrected": {
+            "type": "boolean",
+            "title": "Corrected"
+          },
+          "document_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Url"
+          },
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id"
+          },
+          "original_string": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original String"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "snapshot_id",
+          "series",
+          "metric",
+          "segment",
+          "segment_taxonomy",
+          "non_additive",
+          "fiscal_period",
+          "fiscal_calendar",
+          "period_start",
+          "period_end",
+          "currency",
+          "unit",
+          "scale",
+          "basis",
+          "basis_definition",
+          "mean",
+          "median",
+          "high",
+          "low",
+          "analyst_count",
+          "panel_analyst_count",
+          "panel_description",
+          "panel_method",
+          "source",
+          "broker",
+          "analyst",
+          "published_at",
+          "known_at",
+          "supersedes_snapshot_id",
+          "corrected",
+          "document_url",
+          "evidence_id",
+          "original_string",
+          "problems"
+        ],
+        "title": "EstimateLineOut"
+      },
+      "EstimateSegmentBridgeOut": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "fiscal_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Period"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentLineOut"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "additive_estimate_total": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Additive Estimate Total"
+          },
+          "additive_actual_total": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Additive Actual Total"
+          },
+          "unmapped_estimates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unmapped Estimates"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "inputs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Inputs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "fiscal_period",
+          "period_end",
+          "lines",
+          "additive_estimate_total",
+          "additive_actual_total",
+          "unmapped_estimates",
+          "notes",
+          "inputs"
+        ],
+        "title": "EstimateSegmentBridgeOut"
+      },
+      "EstimatesOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EstimateIssuerOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lanes": {
+            "$ref": "#/components/schemas/EstimateLanesOut"
+          },
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/RevisionPairOut"
+            },
+            "type": "array",
+            "title": "Pairs"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventComparisonOut"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "segment_bridges": {
+            "items": {
+              "$ref": "#/components/schemas/EstimateSegmentBridgeOut"
+            },
+            "type": "array",
+            "title": "Segment Bridges"
+          },
+          "coverage": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageGapOut"
+            },
+            "type": "array",
+            "title": "Coverage"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/ConsensusSourceOut"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "revision_gate": {
+            "$ref": "#/components/schemas/RevisionGateOut"
+          },
+          "formula": {
+            "$ref": "#/components/schemas/SurpriseFormulaOut"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "as_of",
+          "issuer",
+          "lanes",
+          "pairs",
+          "events",
+          "segment_bridges",
+          "coverage",
+          "sources",
+          "revision_gate",
+          "formula",
+          "notes"
+        ],
+        "title": "EstimatesOut"
+      },
       "EurostatSeries": {
         "properties": {
           "key": {
@@ -26554,6 +28679,254 @@
           "exported_to"
         ],
         "title": "EvalCandidateOut"
+      },
+      "EventComparisonOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "segment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segment"
+          },
+          "fiscal_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Period"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "release_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release At"
+          },
+          "estimate_value_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Value Id"
+          },
+          "estimate_known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Known At"
+          },
+          "statistic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statistic"
+          },
+          "estimate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate"
+          },
+          "actual": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual"
+          },
+          "surprise": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Surprise"
+          },
+          "surprise_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Surprise Pct"
+          },
+          "pct_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct Note"
+          },
+          "analyst_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Count"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "later_files_only": {
+            "type": "boolean",
+            "title": "Later Files Only"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "actual_observation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Observation Id"
+          },
+          "formula_version": {
+            "type": "string",
+            "title": "Formula Version"
+          },
+          "formula": {
+            "type": "string",
+            "title": "Formula"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "metric",
+          "segment",
+          "fiscal_period",
+          "period_end",
+          "release_at",
+          "estimate_value_id",
+          "estimate_known_at",
+          "statistic",
+          "estimate",
+          "actual",
+          "surprise",
+          "surprise_pct",
+          "pct_note",
+          "analyst_count",
+          "basis",
+          "currency",
+          "unit",
+          "later_files_only",
+          "warnings",
+          "actual_observation_id",
+          "formula_version",
+          "formula"
+        ],
+        "title": "EventComparisonOut"
       },
       "EventRulesConfig": {
         "properties": {
@@ -33176,6 +35549,52 @@
           "gaps"
         ],
         "title": "HoldingDataContext"
+      },
+      "HoldingDealsOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "deals": {
+            "items": {
+              "$ref": "#/components/schemas/DealOut"
+            },
+            "type": "array",
+            "title": "Deals"
+          },
+          "total_known": {
+            "type": "integer",
+            "title": "Total Known",
+            "description": "Deals known at the date before filters."
+          },
+          "excluded_unknown_size": {
+            "type": "integer",
+            "title": "Excluded Unknown Size"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "as_of",
+          "deals",
+          "total_known",
+          "excluded_unknown_size",
+          "notes"
+        ],
+        "title": "HoldingDealsOut"
       },
       "HoldingDetail": {
         "properties": {
@@ -45577,6 +47996,154 @@
         ],
         "title": "PortfolioDataContext"
       },
+      "PortfolioDealRowOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "deal_id": {
+            "type": "integer",
+            "title": "Deal Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "deal_type": {
+            "type": "string",
+            "enum": [
+              "acquisition",
+              "merger",
+              "divestiture",
+              "ipo",
+              "follow_on",
+              "debt_issuance",
+              "spin_off",
+              "joint_venture",
+              "strategic_investment",
+              "buyback",
+              "tender_offer",
+              "material_agreement"
+            ],
+            "title": "Deal Type"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "rumored",
+                  "announced",
+                  "definitive",
+                  "approved",
+                  "closed",
+                  "terminated",
+                  "contested"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "weight": {
+            "type": "string",
+            "title": "Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "deal_id",
+          "title",
+          "deal_type",
+          "state",
+          "weight"
+        ],
+        "title": "PortfolioDealRowOut"
+      },
+      "PortfolioDealsOut": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "holdings": {
+            "type": "integer",
+            "title": "Holdings"
+          },
+          "denominator": {
+            "type": "string",
+            "title": "Denominator",
+            "description": "Total portfolio weight the figures are shares of."
+          },
+          "covered_weight": {
+            "type": "string",
+            "title": "Covered Weight",
+            "description": "Weight in holdings with an active deal known at the date."
+          },
+          "none_known": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "None Known",
+            "description": "Holdings with no deal known: not proof that none exists."
+          },
+          "unknown_state": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown State"
+          },
+          "by_state": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "By State"
+          },
+          "by_type": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "By Type"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioDealRowOut"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "holdings",
+          "denominator",
+          "covered_weight",
+          "none_known",
+          "unknown_state",
+          "by_state",
+          "by_type",
+          "rows",
+          "notes"
+        ],
+        "title": "PortfolioDealsOut"
+      },
       "PortfolioDependenciesOut": {
         "properties": {
           "as_of": {
@@ -51112,6 +53679,256 @@
         ],
         "title": "ReviewStats"
       },
+      "RevisionGateOut": {
+        "properties": {
+          "reviewed": {
+            "type": "integer",
+            "title": "Reviewed"
+          },
+          "needed": {
+            "type": "integer",
+            "title": "Needed"
+          },
+          "correct": {
+            "type": "integer",
+            "title": "Correct"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate"
+          },
+          "bar": {
+            "type": "string",
+            "title": "Bar"
+          },
+          "met": {
+            "type": "boolean",
+            "title": "Met"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reviewed",
+          "needed",
+          "correct",
+          "rate",
+          "bar",
+          "met",
+          "reason"
+        ],
+        "title": "RevisionGateOut"
+      },
+      "RevisionPairOut": {
+        "properties": {
+          "earlier_id": {
+            "type": "integer",
+            "title": "Earlier Id"
+          },
+          "later_id": {
+            "type": "integer",
+            "title": "Later Id"
+          },
+          "series": {
+            "type": "string",
+            "title": "Series"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "segment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segment"
+          },
+          "fiscal_period": {
+            "type": "string",
+            "title": "Fiscal Period"
+          },
+          "earlier_known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Earlier Known At"
+          },
+          "later_known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Later Known At"
+          },
+          "comparable": {
+            "type": "boolean",
+            "title": "Comparable"
+          },
+          "break_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Break Reasons"
+          },
+          "statistic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statistic"
+          },
+          "earlier_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earlier Value"
+          },
+          "later_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Later Value"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "pct_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct Note"
+          },
+          "elapsed_days": {
+            "type": "integer",
+            "title": "Elapsed Days"
+          },
+          "analyst_count_change": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Count Change"
+          },
+          "analyst_count_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Count Note"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "formula_version": {
+            "type": "string",
+            "title": "Formula Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "earlier_id",
+          "later_id",
+          "series",
+          "metric",
+          "segment",
+          "fiscal_period",
+          "earlier_known_at",
+          "later_known_at",
+          "comparable",
+          "break_reasons",
+          "statistic",
+          "earlier_value",
+          "later_value",
+          "change",
+          "change_pct",
+          "pct_note",
+          "elapsed_days",
+          "analyst_count_change",
+          "analyst_count_note",
+          "direction",
+          "note",
+          "formula_version"
+        ],
+        "title": "RevisionPairOut"
+      },
       "RiskCard": {
         "properties": {
           "returns": {
@@ -51973,6 +54790,133 @@
           "rows"
         ],
         "title": "SegmentHistoryPoint"
+      },
+      "SegmentLineOut": {
+        "properties": {
+          "segment": {
+            "type": "string",
+            "title": "Segment"
+          },
+          "estimate_value_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Value Id"
+          },
+          "actual_observation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Observation Id"
+          },
+          "estimate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate"
+          },
+          "actual": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "delta_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Pct"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "non_additive": {
+            "type": "boolean",
+            "title": "Non Additive"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "estimate_evidence_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Evidence Id"
+          },
+          "actual_evidence_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Evidence Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "segment",
+          "estimate_value_id",
+          "actual_observation_id",
+          "estimate",
+          "actual",
+          "delta",
+          "delta_pct",
+          "status",
+          "non_additive",
+          "flags",
+          "estimate_evidence_id",
+          "actual_evidence_id"
+        ],
+        "title": "SegmentLineOut"
       },
       "SegmentPeriod": {
         "properties": {
@@ -55104,6 +58048,24 @@
           "body"
         ],
         "title": "StrategyConfigVersion"
+      },
+      "SurpriseFormulaOut": {
+        "properties": {
+          "surprise": {
+            "type": "string",
+            "title": "Surprise"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "surprise",
+          "version"
+        ],
+        "title": "SurpriseFormulaOut"
       },
       "TargetBand": {
         "properties": {

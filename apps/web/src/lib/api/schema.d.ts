@@ -4947,6 +4947,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/disclosures/holdings/{ticker}/deals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holding Public Deals
+         * @description Deals linked to a holding, as known at `as_of`: lifecycle, term versions, impacts, documents
+         *     and missing fields. A size filter leaves out (and counts) deals whose size is not stated.
+         */
+        get: operations["holding_public_deals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/portfolio/deals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Portfolio Public Deals
+         * @description Portfolio weight sitting in holdings with an active deal, by state and type.
+         */
+        get: operations["portfolio_public_deals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/holdings/{ticker}/estimates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holding Estimates
+         * @description Published estimates known by `as_of`, as five separate lanes. Guidance, consensus, named
+         *     estimates, event-calendar estimates and owner scenarios are never merged or averaged; a
+         *     revision pair across a panel, basis, currency or period break carries its reason and no number;
+         *     a surprise uses only a snapshot known strictly before the release.
+         */
+        get: operations["holding_estimates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/data-context": {
         parameters: {
             query?: never;
@@ -5609,6 +5673,8 @@ export interface components {
             major_holder: number;
             /** Relationship Change */
             relationship_change: number;
+            /** Deal State */
+            deal_state: number;
             /** Failed */
             failed: number;
         };
@@ -7059,6 +7125,31 @@ export interface components {
             /** Revision Inputs */
             revision_inputs: number[];
         };
+        /** ConsensusSourceOut */
+        ConsensusSourceOut: {
+            /** Source Key */
+            source_key: string;
+            /** Publisher */
+            publisher: string;
+            /** Origin */
+            origin: string;
+            /** Format */
+            format: string;
+            /** Access State */
+            access_state: string;
+            /** Gap Reason */
+            gap_reason: string | null;
+            /** Url */
+            url: string;
+            /** Cadence */
+            cadence: string | null;
+            /** Tested On */
+            tested_on: string | null;
+            /** Selected Metrics Only */
+            selected_metrics_only: boolean;
+            /** Selected Brokers Only */
+            selected_brokers_only: boolean;
+        };
         /** ConsensusVintage */
         ConsensusVintage: {
             /** Observation Id */
@@ -7454,6 +7545,15 @@ export interface components {
              */
             portfolio_share_looked_through: number | null;
         };
+        /** CoverageGapOut */
+        CoverageGapOut: {
+            /** Kind */
+            kind: string;
+            /** State */
+            state: string;
+            /** Detail */
+            detail: string;
+        };
         /** CoverageGroup */
         CoverageGroup: {
             /** Group By */
@@ -7658,6 +7758,75 @@ export interface components {
             /** Count */
             count: number;
         };
+        /** DealBridgeOut */
+        DealBridgeOut: {
+            /** Currency */
+            currency: string | null;
+            /** Segments */
+            segments: components["schemas"]["DealBridgeSegmentOut"][];
+            /** Known Total */
+            known_total: string;
+            /** Unstated */
+            unstated: string[];
+            /** Total Is Lower Bound */
+            total_is_lower_bound: boolean;
+            /** Cash Pct */
+            cash_pct: string | null;
+            /** Stock Pct */
+            stock_pct: string | null;
+            /** Term Version Id */
+            term_version_id: number | null;
+        };
+        /** DealBridgeSegmentOut */
+        DealBridgeSegmentOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "cash" | "stock" | "debt" | "earnout";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "stated" | "not_stated";
+            /** Amount */
+            amount: string | null;
+        };
+        /** DealClosingOut */
+        DealClosingOut: {
+            /** Legal Closing Date */
+            legal_closing_date: string | null;
+            /** First Reporting Period End */
+            first_reporting_period_end: string | null;
+            /** Broker Posting Date */
+            broker_posting_date: string | null;
+            /** Successor Name */
+            successor_name: string | null;
+            /** Successor Ticker */
+            successor_ticker: string | null;
+            /** Successor Issuer Id */
+            successor_issuer_id: number | null;
+            /** Missing */
+            missing: string[];
+            /** Problems */
+            problems: string[];
+        };
+        /** DealDocumentOut */
+        DealDocumentOut: {
+            /** Document Version Id */
+            document_version_id: number;
+            /** Role */
+            role: string;
+            /** Source Url */
+            source_url: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Filed At */
+            filed_at: string | null;
+        };
         /** DealEvent */
         DealEvent: {
             /** Event Id */
@@ -7692,6 +7861,134 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** DealImpactOut */
+        DealImpactOut: {
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "announced" | "management_projection" | "owner_scenario";
+            /** Value */
+            value: string | null;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "fraction" | "currency" | "shares" | "ratio";
+            /** Currency */
+            currency: string | null;
+            /**
+             * Reason
+             * @description Why the value is null.
+             */
+            reason: string | null;
+            /** Flags */
+            flags: string[];
+            /** Inputs */
+            inputs: {
+                [key: string]: string;
+            };
+            /** Detail */
+            detail: {
+                [key: string]: string;
+            };
+            /** Formula */
+            formula: string;
+            /** Formula Version */
+            formula_version: string;
+            /** Term Version Ids */
+            term_version_ids: number[];
+        };
+        /** DealMissingOut */
+        DealMissingOut: {
+            /** Field */
+            field: string;
+            /** Label */
+            label: string;
+        };
+        /** DealOut */
+        DealOut: {
+            /** Id */
+            id: number;
+            /** Transaction Key */
+            transaction_key: string;
+            /**
+             * Deal Type
+             * @enum {string}
+             */
+            deal_type: "acquisition" | "merger" | "divestiture" | "ipo" | "follow_on" | "debt_issuance" | "spin_off" | "joint_venture" | "strategic_investment" | "buyback" | "tender_offer" | "material_agreement";
+            /** Type Label */
+            type_label: string;
+            /** Title */
+            title: string;
+            /** Ticker */
+            ticker: string | null;
+            /** Announced At */
+            announced_at: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** State */
+            state: ("rumored" | "announced" | "definitive" | "approved" | "closed" | "terminated" | "contested") | null;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /** Currency */
+            currency: string | null;
+            /**
+             * Size
+             * @description Stated consideration (a lower bound) or financing.
+             */
+            size: string | null;
+            /** Participants */
+            participants: components["schemas"]["DealParticipantOut"][];
+            /** Transitions */
+            transitions: components["schemas"]["DealTransitionOut"][];
+            /** Rejected Transitions */
+            rejected_transitions: components["schemas"]["DealRejectedOut"][];
+            /** Term Versions */
+            term_versions: components["schemas"]["DealTermVersionOut"][];
+            /** Latest Version Id */
+            latest_version_id: number | null;
+            bridge: components["schemas"]["DealBridgeOut"];
+            /** Impacts */
+            impacts: components["schemas"]["DealImpactOut"][];
+            /** Documents */
+            documents: components["schemas"]["DealDocumentOut"][];
+            /** Missing Fields */
+            missing_fields: components["schemas"]["DealMissingOut"][];
+            closing: components["schemas"]["DealClosingOut"] | null;
+        };
+        /** DealParticipantOut */
+        DealParticipantOut: {
+            /** Role */
+            role: string;
+            /** Name */
+            name: string;
+            /** Issuer Id */
+            issuer_id: number | null;
+            /** Ticker */
+            ticker: string | null;
+            /** Share Class */
+            share_class: string | null;
+        };
+        /** DealRejectedOut */
+        DealRejectedOut: {
+            /** Id */
+            id: number;
+            /** State */
+            state: string;
+            /** Reason */
+            reason: string;
+        };
         /** DealState */
         DealState: {
             /** Deal Key */
@@ -7707,6 +8004,120 @@ export interface components {
             state_basis: string;
             /** Events */
             events: components["schemas"]["DealEvent"][];
+        };
+        /** DealTermChangeOut */
+        DealTermChangeOut: {
+            /** Field */
+            field: string;
+            /** Label */
+            label: string;
+            /** Old */
+            old: string | null;
+            /** New */
+            new: string | null;
+        };
+        /** DealTermOut */
+        DealTermOut: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "stated" | "not_stated";
+            /**
+             * Value
+             * @description Whole units of the currency, or a fraction for a share.
+             */
+            value: string | null;
+        };
+        /** DealTermVersionOut */
+        DealTermVersionOut: {
+            /** Id */
+            id: number;
+            /** Version No */
+            version_no: number;
+            /** Supersedes Id */
+            supersedes_id: number | null;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "announced" | "management_projection";
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Event Effective At */
+            event_effective_at: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Document Version Id */
+            document_version_id: number | null;
+            /** Evidence Id */
+            evidence_id: number | null;
+            /** Source Url */
+            source_url: string | null;
+            /** Quote */
+            quote: string | null;
+            /** Terms */
+            terms: components["schemas"]["DealTermOut"][];
+            /** Closing Conditions */
+            closing_conditions: string | null;
+            /**
+             * Closing Conditions State
+             * @enum {string}
+             */
+            closing_conditions_state: "stated" | "not_stated";
+            /** Unaffected Date */
+            unaffected_date: string | null;
+            /** Unaffected Source */
+            unaffected_source: string | null;
+            /** Changes */
+            changes: components["schemas"]["DealTermChangeOut"][];
+            /** Problems */
+            problems: string[];
+        };
+        /** DealTransitionOut */
+        DealTransitionOut: {
+            /** Id */
+            id: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "rumored" | "announced" | "definitive" | "approved" | "closed" | "terminated" | "contested";
+            /**
+             * Effective At
+             * Format: date-time
+             * @description When it took effect in the world.
+             */
+            effective_at: string;
+            /**
+             * Known At
+             * Format: date-time
+             * @description When it became known; never earlier than the record.
+             */
+            known_at: string;
+            /** Evidence Id */
+            evidence_id: number;
+            /** Document Version Id */
+            document_version_id: number;
+            /** Source Url */
+            source_url: string | null;
+            /** Quote */
+            quote: string | null;
+            /** Span Start */
+            span_start: number | null;
+            /** Span End */
+            span_end: number | null;
+            /** Rumor Source */
+            rumor_source: string | null;
+            /** Note */
+            note: string | null;
         };
         /** Deals */
         Deals: {
@@ -8263,7 +8674,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "insider_trade" | "major_holder" | "relationship_change";
+            kind: "insider_trade" | "major_holder" | "relationship_change" | "deal_state";
             /** Ticker */
             ticker: string;
             /** Headline */
@@ -8952,6 +9363,155 @@ export interface components {
              */
             status: "open" | "acknowledged" | "resolved";
         };
+        /** EstimateIssuerOut */
+        EstimateIssuerOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** EstimateLanesOut */
+        EstimateLanesOut: {
+            /** Published Analyst Consensus */
+            published_analyst_consensus: components["schemas"]["EstimateLineOut"][];
+            /** Named Individual Estimate */
+            named_individual_estimate: components["schemas"]["EstimateLineOut"][];
+            /** Company Guidance */
+            company_guidance: components["schemas"]["EstimateLineOut"][];
+            /** Event Calendar Estimate */
+            event_calendar_estimate: components["schemas"]["EstimateLineOut"][];
+            /** Owner Scenario */
+            owner_scenario: components["schemas"]["EstimateLineOut"][];
+        };
+        /** EstimateLineOut */
+        EstimateLineOut: {
+            /** Id */
+            id: number;
+            /** Snapshot Id */
+            snapshot_id: number;
+            /** Series */
+            series: string;
+            /** Metric */
+            metric: string;
+            /** Segment */
+            segment: string | null;
+            /** Segment Taxonomy */
+            segment_taxonomy: string | null;
+            /** Non Additive */
+            non_additive: boolean;
+            /** Fiscal Period */
+            fiscal_period: string;
+            /** Fiscal Calendar */
+            fiscal_calendar: string | null;
+            /** Period Start */
+            period_start: string | null;
+            /** Period End */
+            period_end: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Unit */
+            unit: string;
+            /** Scale */
+            scale: number;
+            /** Basis */
+            basis: string;
+            /** Basis Definition */
+            basis_definition: string | null;
+            /** Mean */
+            mean: string | null;
+            /** Median */
+            median: string | null;
+            /** High */
+            high: string | null;
+            /** Low */
+            low: string | null;
+            /** Analyst Count */
+            analyst_count: number | null;
+            /** Panel Analyst Count */
+            panel_analyst_count: number | null;
+            /** Panel Description */
+            panel_description: string | null;
+            /** Panel Method */
+            panel_method: string | null;
+            /** Source */
+            source: string | null;
+            /** Broker */
+            broker: string | null;
+            /** Analyst */
+            analyst: string | null;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Supersedes Snapshot Id */
+            supersedes_snapshot_id: number | null;
+            /** Corrected */
+            corrected: boolean;
+            /** Document Url */
+            document_url: string | null;
+            /** Evidence Id */
+            evidence_id: number | null;
+            /** Original String */
+            original_string: string | null;
+            /** Problems */
+            problems: string[];
+        };
+        /** EstimateSegmentBridgeOut */
+        EstimateSegmentBridgeOut: {
+            /** Metric */
+            metric: string;
+            /** Fiscal Period */
+            fiscal_period: string | null;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Lines */
+            lines: components["schemas"]["SegmentLineOut"][];
+            /** Additive Estimate Total */
+            additive_estimate_total: string | null;
+            /** Additive Actual Total */
+            additive_actual_total: string | null;
+            /** Unmapped Estimates */
+            unmapped_estimates: string[];
+            /** Notes */
+            notes: string[];
+            /** Inputs */
+            inputs: string[];
+        };
+        /** EstimatesOut */
+        EstimatesOut: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            issuer: components["schemas"]["EstimateIssuerOut"] | null;
+            lanes: components["schemas"]["EstimateLanesOut"];
+            /** Pairs */
+            pairs: components["schemas"]["RevisionPairOut"][];
+            /** Events */
+            events: components["schemas"]["EventComparisonOut"][];
+            /** Segment Bridges */
+            segment_bridges: components["schemas"]["EstimateSegmentBridgeOut"][];
+            /** Coverage */
+            coverage: components["schemas"]["CoverageGapOut"][];
+            /** Sources */
+            sources: components["schemas"]["ConsensusSourceOut"][];
+            revision_gate: components["schemas"]["RevisionGateOut"];
+            formula: components["schemas"]["SurpriseFormulaOut"];
+            /** Notes */
+            notes: string[];
+        };
         /** EurostatSeries */
         EurostatSeries: {
             /** Key */
@@ -9001,6 +9561,55 @@ export interface components {
             exported_at: string | null;
             /** Exported To */
             exported_to: string | null;
+        };
+        /** EventComparisonOut */
+        EventComparisonOut: {
+            /** Status */
+            status: string;
+            /** Metric */
+            metric: string;
+            /** Segment */
+            segment: string | null;
+            /** Fiscal Period */
+            fiscal_period: string | null;
+            /** Period End */
+            period_end: string | null;
+            /** Release At */
+            release_at: string | null;
+            /** Estimate Value Id */
+            estimate_value_id: number | null;
+            /** Estimate Known At */
+            estimate_known_at: string | null;
+            /** Statistic */
+            statistic: string | null;
+            /** Estimate */
+            estimate: string | null;
+            /** Actual */
+            actual: string | null;
+            /** Surprise */
+            surprise: string | null;
+            /** Surprise Pct */
+            surprise_pct: string | null;
+            /** Pct Note */
+            pct_note: string | null;
+            /** Analyst Count */
+            analyst_count: number | null;
+            /** Basis */
+            basis: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Unit */
+            unit: string | null;
+            /** Later Files Only */
+            later_files_only: boolean;
+            /** Warnings */
+            warnings: string[];
+            /** Actual Observation Id */
+            actual_observation_id: number | null;
+            /** Formula Version */
+            formula_version: string;
+            /** Formula */
+            formula: string;
         };
         /**
          * EventRulesConfig
@@ -11428,6 +12037,27 @@ export interface components {
              * @default primary = regulator, central bank, statistics office or issuer; vendor = commercial aggregator. A vendor value never replaces a primary value; disagreements are listed.
              */
             provenance_note: string;
+        };
+        /** HoldingDealsOut */
+        HoldingDealsOut: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Deals */
+            deals: components["schemas"]["DealOut"][];
+            /**
+             * Total Known
+             * @description Deals known at the date before filters.
+             */
+            total_known: number;
+            /** Excluded Unknown Size */
+            excluded_unknown_size: number;
+            /** Notes */
+            notes: string[];
         };
         /** HoldingDetail */
         HoldingDetail: {
@@ -15719,6 +16349,63 @@ export interface components {
             /** Gaps */
             gaps: components["schemas"]["Gap"][];
         };
+        /** PortfolioDealRowOut */
+        PortfolioDealRowOut: {
+            /** Ticker */
+            ticker: string;
+            /** Deal Id */
+            deal_id: number;
+            /** Title */
+            title: string;
+            /**
+             * Deal Type
+             * @enum {string}
+             */
+            deal_type: "acquisition" | "merger" | "divestiture" | "ipo" | "follow_on" | "debt_issuance" | "spin_off" | "joint_venture" | "strategic_investment" | "buyback" | "tender_offer" | "material_agreement";
+            /** State */
+            state: ("rumored" | "announced" | "definitive" | "approved" | "closed" | "terminated" | "contested") | null;
+            /** Weight */
+            weight: string;
+        };
+        /** PortfolioDealsOut */
+        PortfolioDealsOut: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Holdings */
+            holdings: number;
+            /**
+             * Denominator
+             * @description Total portfolio weight the figures are shares of.
+             */
+            denominator: string;
+            /**
+             * Covered Weight
+             * @description Weight in holdings with an active deal known at the date.
+             */
+            covered_weight: string;
+            /**
+             * None Known
+             * @description Holdings with no deal known: not proof that none exists.
+             */
+            none_known: string[];
+            /** Unknown State */
+            unknown_state: string[];
+            /** By State */
+            by_state: {
+                [key: string]: string;
+            };
+            /** By Type */
+            by_type: {
+                [key: string]: string;
+            };
+            /** Rows */
+            rows: components["schemas"]["PortfolioDealRowOut"][];
+            /** Notes */
+            notes: string[];
+        };
         /** PortfolioDependenciesOut */
         PortfolioDependenciesOut: {
             /**
@@ -17739,6 +18426,76 @@ export interface components {
             /** @description The last recorded live golden-set run of the earnings extraction; null when none is recorded. */
             golden_accuracy: components["schemas"]["GoldenAccuracy"] | null;
         };
+        /** RevisionGateOut */
+        RevisionGateOut: {
+            /** Reviewed */
+            reviewed: number;
+            /** Needed */
+            needed: number;
+            /** Correct */
+            correct: number;
+            /** Rate */
+            rate: string | null;
+            /** Bar */
+            bar: string;
+            /** Met */
+            met: boolean;
+            /** Reason */
+            reason: string;
+        };
+        /** RevisionPairOut */
+        RevisionPairOut: {
+            /** Earlier Id */
+            earlier_id: number;
+            /** Later Id */
+            later_id: number;
+            /** Series */
+            series: string;
+            /** Metric */
+            metric: string;
+            /** Segment */
+            segment: string | null;
+            /** Fiscal Period */
+            fiscal_period: string;
+            /**
+             * Earlier Known At
+             * Format: date-time
+             */
+            earlier_known_at: string;
+            /**
+             * Later Known At
+             * Format: date-time
+             */
+            later_known_at: string;
+            /** Comparable */
+            comparable: boolean;
+            /** Break Reasons */
+            break_reasons: string[];
+            /** Statistic */
+            statistic: string | null;
+            /** Earlier Value */
+            earlier_value: string | null;
+            /** Later Value */
+            later_value: string | null;
+            /** Change */
+            change: string | null;
+            /** Change Pct */
+            change_pct: string | null;
+            /** Pct Note */
+            pct_note: string | null;
+            /** Elapsed Days */
+            elapsed_days: number;
+            /** Analyst Count Change */
+            analyst_count_change: number | null;
+            /** Analyst Count Note */
+            analyst_count_note: string | null;
+            /** Direction */
+            direction: string | null;
+            /** Note */
+            note: string | null;
+            /** Formula Version */
+            formula_version: string;
+        };
         /** RiskCard */
         RiskCard: {
             /**
@@ -18080,6 +18837,33 @@ export interface components {
             period: components["schemas"]["SegmentPeriod"];
             /** Rows */
             rows: components["schemas"]["SegmentRow"][];
+        };
+        /** SegmentLineOut */
+        SegmentLineOut: {
+            /** Segment */
+            segment: string;
+            /** Estimate Value Id */
+            estimate_value_id: number | null;
+            /** Actual Observation Id */
+            actual_observation_id: number | null;
+            /** Estimate */
+            estimate: string | null;
+            /** Actual */
+            actual: string | null;
+            /** Delta */
+            delta: string | null;
+            /** Delta Pct */
+            delta_pct: string | null;
+            /** Status */
+            status: string;
+            /** Non Additive */
+            non_additive: boolean;
+            /** Flags */
+            flags: string[];
+            /** Estimate Evidence Id */
+            estimate_evidence_id: number | null;
+            /** Actual Evidence Id */
+            actual_evidence_id: number | null;
         };
         /** SegmentPeriod */
         SegmentPeriod: {
@@ -19171,6 +19955,13 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["StrategyConfig"];
+        };
+        /** SurpriseFormulaOut */
+        SurpriseFormulaOut: {
+            /** Surprise */
+            surprise: string;
+            /** Version */
+            version: string;
         };
         /** TargetBand */
         TargetBand: {
@@ -28776,6 +29567,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdentifierJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    holding_public_deals: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+                deal_type?: ("acquisition" | "merger" | "divestiture" | "ipo" | "follow_on" | "debt_issuance" | "spin_off" | "joint_venture" | "strategic_investment" | "buyback" | "tender_offer" | "material_agreement") | null;
+                state?: ("rumored" | "announced" | "definitive" | "approved" | "closed" | "terminated" | "contested") | null;
+                currency?: string | null;
+                min_size?: number | string | null;
+                max_size?: number | string | null;
+                /** @description Your scenario: a per-share offer price, shown as your scenario. */
+                offer_price?: number | string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingDealsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portfolio_public_deals: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioDealsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    holding_estimates: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstimatesOut"];
                 };
             };
             /** @description Validation Error */

@@ -65,7 +65,7 @@ export function AlertsPageView() {
       const r = await getBrowserApiClient().POST("/disclosures/alerts/scan");
       if (r.data) {
         const d = r.data;
-        const total = d.insider_trade + d.major_holder + d.relationship_change;
+        const total = d.insider_trade + d.major_holder + d.relationship_change + d.deal_state;
         setMessage({ ok: d.failed === 0, text: `${total} new ${total === 1 ? "alert" : "alerts"}${d.failed ? `, and ${d.failed} ${d.failed === 1 ? "check" : "checks"} could not run` : ""}.` });
         await Promise.all([load(), loadDigest()]);
       } else setMessage({ ok: false, text: `The check failed (HTTP ${r.response.status}).` });

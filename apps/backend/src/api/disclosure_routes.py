@@ -1143,7 +1143,7 @@ async def retire_owner_weight(
 
 class DisclosureAlertOut(BaseModel):
     id: int
-    kind: Literal["insider_trade", "major_holder", "relationship_change"]
+    kind: Literal["insider_trade", "major_holder", "relationship_change", "deal_state"]
     ticker: str
     headline: str
     detail: dict[str, Any]
@@ -1157,6 +1157,7 @@ class AlertScanOut(BaseModel):
     insider_trade: int
     major_holder: int
     relationship_change: int
+    deal_state: int
     failed: int
 
 

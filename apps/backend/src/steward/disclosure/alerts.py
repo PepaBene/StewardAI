@@ -186,6 +186,36 @@ async def scan_relationships(
     return raised
 
 
+async def scan_deals(pool: Pool, ticker: str, since: dt.datetime, now: dt.datetime) -> int:
+    """One alert per documented state transition that became known in the window. A rumoured
+    state is unverified and never alerts; the alert states the new state and its source, no more."""
+    rows = await pool.fetch(
+        """select t.id, t.state, t.known_at, e.title, e.deal_type, v.source_url
+             from public.deal_state_transition t
+             join public.deal_event e on e.id = t.deal_id
+             left join public.source_document_version v on v.id = t.document_version_id
+            where e.ticker = $1 and t.state <> 'rumored'
+              and t.known_at > $2 and t.known_at <= $3
+            order by t.known_at, t.id""",
+        ticker,
+        since,
+        now,
+    )
+    raised = 0
+    for r in rows:
+        raised += await record(
+            pool,
+            kind="deal_state",
+            ticker=ticker,
+            dedupe_key=f"deal:{r['id']}",
+            headline=f"{ticker}: {r['title']} is now {r['state']}",
+            detail={"transition_id": r["id"], "state": r["state"], "deal_type": r["deal_type"]},
+            known_at=r["known_at"],
+            source_url=r["source_url"],
+        )
+    return raised
+
+
 async def held_tickers(pool: Pool) -> list[str]:
     rows = await pool.fetch(
         """select distinct p.ticker from public.position_snapshot p
@@ -201,12 +231,19 @@ async def scan_all(
     """Run every scan for every held ticker. A failure in one ticker is counted, never fatal."""
     end = now or dt.datetime.now(dt.UTC)
     start = end - dt.timedelta(days=lookback_days)
-    totals = {"insider_trade": 0, "major_holder": 0, "relationship_change": 0, "failed": 0}
+    totals = {
+        "insider_trade": 0,
+        "major_holder": 0,
+        "relationship_change": 0,
+        "deal_state": 0,
+        "failed": 0,
+    }
     for ticker in await held_tickers(pool):
         try:
             totals["insider_trade"] += await scan_insiders(pool, ticker, end)
             totals["major_holder"] += await scan_major_holders(pool, ticker, start, end)
             totals["relationship_change"] += await scan_relationships(pool, ticker, start, end)
+            totals["deal_state"] += await scan_deals(pool, ticker, start, end)
         except (asyncpg.PostgresError, ValueError):
             totals["failed"] += 1
     return totals

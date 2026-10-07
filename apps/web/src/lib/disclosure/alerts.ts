@@ -13,6 +13,7 @@ export const ALERT_KIND_LABEL: Record<AlertKind, string> = {
   insider_trade: "Insider trade",
   major_holder: "Large holder filing",
   relationship_change: "Customer or supplier change",
+  deal_state: "Deal moved to a new stage",
 };
 
 /** Where to read more about an alert, by kind. */
@@ -20,6 +21,7 @@ export const ALERT_HREF: Record<AlertKind, string> = {
   insider_trade: "/disclosures/insiders",
   major_holder: "/disclosures/ownership",
   relationship_change: "/disclosures/network",
+  deal_state: "/disclosures/deals",
 };
 
 export function splitByState(alerts: readonly DisclosureAlert[]): { open: DisclosureAlert[]; done: DisclosureAlert[] } {
