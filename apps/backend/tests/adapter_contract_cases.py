@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import re
 import zipfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -68,7 +69,9 @@ from steward.sources.gleif import GleifClient, GleifError, parse_record
 from steward.sources.nport import NportError, parse_nport
 from steward.sources.pdmr_uk import parse_pdmr_notification
 from steward.sources.schedule13 import Schedule13Error, parse_schedule13_xml
+from steward.sources.tr1_uk import parse_tr1_notice
 from steward.sources.yahoo import YahooError, parse_chart, yahoo_intraday
+from tests.test_tr1_uk import DISPOSAL
 
 FIX = Path(__file__).parent / "fixtures"
 CON = FIX / "contracts"
@@ -540,6 +543,19 @@ PARSER_CASES: list[ParserCase] = [
         empty="",
         drift=lambda t: t.replace("Details of the person", "Particulars of someone"),
         partial=half_text,
+    ),
+    ParserCase(
+        "tr1_uk",
+        "steward.sources.tr1_uk",
+        lambda text: parse_tr1_notice(text, TS),
+        lambda: DISPOSAL,
+        (),
+        empty="",
+        drift=lambda t: re.sub(
+            r"(?i)resulting situation on the date", "Position after the event", t
+        ),
+        partial=half_text,
+        rows=lambda notice: 0 if notice is None else 1,
     ),
     # --- ETF / fund issuers -----------------------------------------------------------
     ParserCase(
