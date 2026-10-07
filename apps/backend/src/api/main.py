@@ -21,6 +21,7 @@ from api.config_history_routes import router as config_history_router
 from api.control_stake_routes import router as control_stake_router
 from api.data_context_routes import router as data_context_router
 from api.db import close_pool, get_pool_or_error
+from api.discover_routes import router as discover_router
 from api.escalation_routes import router as escalation_router
 from api.free_sources_routes import router as free_sources_router
 from api.fund_routes import router as fund_router
@@ -252,6 +253,7 @@ def create_app() -> FastAPI:
     app.include_router(free_sources_router)
     app.include_router(watchlist_router)
     app.include_router(screen_router)
+    app.include_router(discover_router)
     app.include_router(insider_router)
     app.include_router(investor_router)
     app.include_router(control_stake_router)

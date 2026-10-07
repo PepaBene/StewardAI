@@ -10963,6 +10963,892 @@
         ]
       }
     },
+    "/discover/catalogue": {
+      "get": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "Catalogue",
+        "description": "Every metric with its definition, whether a filter on it is enabled, and how many members\nof the universe have a value, so coverage is visible before a filter is applied.",
+        "operationId": "catalogue",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "stock",
+                "fund"
+              ],
+              "type": "string",
+              "default": "stock",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogueResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/discover/stocks": {
+      "post": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "Discover Stocks",
+        "operationId": "discover_stocks",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/discover/funds": {
+      "post": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "Discover Funds",
+        "operationId": "discover_funds",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/discover/export": {
+      "post": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "Export Csv",
+        "description": "CSV of the whole result (up to 200 rows per call; a `# truncated` line says if more match),\nwith method version, hashes, data date and filters as header comments.",
+        "operationId": "export_csv",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/discover/baselines": {
+      "get": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "Peer Baselines",
+        "description": "Median and range of covered securities for each metric, with count, geographic scope and\nevery exclusion (stale, other accounting basis, no value).",
+        "operationId": "peer_baselines",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "home_market",
+                "global",
+                "saved_set"
+              ],
+              "type": "string",
+              "default": "global",
+              "title": "Scope"
+            }
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z]{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country"
+            }
+          },
+          {
+            "name": "tickers",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated tickers for saved_set.",
+              "title": "Tickers"
+            },
+            "description": "Comma-separated tickers for saved_set."
+          },
+          {
+            "name": "peers_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Use the confirmed peers of this ticker as the saved set.",
+              "title": "Peers Of"
+            },
+            "description": "Use the confirmed peers of this ticker as the saved set."
+          },
+          {
+            "name": "metrics",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Comma-separated metric ids.",
+              "default": "gross_margin,operating_margin,roic,net_debt_to_equity",
+              "title": "Metrics"
+            },
+            "description": "Comma-separated metric ids."
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "US_GAAP",
+                    "IFRS"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Basis"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Baseline"
+                  },
+                  "title": "Response Peer Baselines"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/discover/universe/snapshots": {
+      "post": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "Freeze Universe",
+        "description": "Freeze today's covered universe (delisted members stay in later reads of past dates).",
+        "operationId": "freeze_universe",
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotCreated"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/discover/screens": {
+      "get": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "List Screens",
+        "operationId": "list_screens",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "stock",
+                    "fund"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScreenSummary"
+                  },
+                  "title": "Response List Screens"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "Save Screen",
+        "operationId": "save_screen",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreenBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/discover/screens/{screen_id}": {
+      "put": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "Save Screen Version",
+        "description": "A changed definition becomes a new immutable version; an unchanged one is a no-op.",
+        "operationId": "save_screen_version",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreenBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "Screen Detail",
+        "operationId": "screen_detail",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "Archive Screen",
+        "description": "Archive, never delete: saved runs keep their definition.",
+        "operationId": "archive_screen",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/discover/screens/{screen_id}/run": {
+      "post": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "Run Saved Screen",
+        "description": "Run a saved version (default: latest) and record what the run saw.",
+        "operationId": "run_saved_screen",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Screen Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/discover/column-sets": {
+      "get": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "List Column Sets",
+        "operationId": "list_column_sets",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "stock",
+                    "fund"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ColumnSet"
+                  },
+                  "title": "Response List Column Sets"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "Save Column Set",
+        "operationId": "save_column_set",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ColumnSet"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ColumnSet"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/discover/column-sets/{set_id}": {
+      "delete": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "Delete Column Set",
+        "operationId": "delete_column_set",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "set_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Set Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/jobs/insider-trades": {
       "post": {
         "tags": [
@@ -15015,6 +15901,157 @@
         ],
         "title": "BaseTotals"
       },
+      "Baseline": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "home_market",
+              "global",
+              "saved_set"
+            ],
+            "title": "Scope"
+          },
+          "scope_detail": {
+            "type": "string",
+            "title": "Scope Detail"
+          },
+          "members": {
+            "type": "integer",
+            "title": "Members"
+          },
+          "comparable": {
+            "type": "integer",
+            "title": "Comparable"
+          },
+          "median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median"
+          },
+          "p25": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P25"
+          },
+          "p75": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P75"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "median_withheld_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Withheld Reason"
+          },
+          "countries": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Countries"
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/Excluded"
+            },
+            "type": "array",
+            "title": "Excluded"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "label",
+          "scope",
+          "scope_detail",
+          "members",
+          "comparable",
+          "median",
+          "p25",
+          "p75",
+          "low",
+          "high",
+          "median_withheld_reason",
+          "countries",
+          "excluded"
+        ],
+        "title": "Baseline"
+      },
       "BenchmarkBucket": {
         "properties": {
           "key": {
@@ -16070,6 +17107,70 @@
         ],
         "title": "CashWeightRule"
       },
+      "CatalogueResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stock",
+              "fund"
+            ],
+            "title": "Kind"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "universe": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Universe"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/MetricInfo"
+            },
+            "type": "array",
+            "title": "Metrics"
+          },
+          "snapshots": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Snapshots"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "keyless_note": {
+            "type": "string",
+            "title": "Keyless Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "as_of",
+          "universe",
+          "metrics",
+          "snapshots",
+          "warnings",
+          "method_version",
+          "keyless_note"
+        ],
+        "title": "CatalogueResponse"
+      },
       "CategoryTarget": {
         "properties": {
           "target_weight": {
@@ -16557,6 +17658,83 @@
         "type": "object",
         "title": "ChatSettings",
         "description": "The chat panel's assistant: DB tools, web search on tiered outlets, cited answers."
+      },
+      "Check": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "op": {
+            "type": "string",
+            "title": "Op"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "actual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "unknown"
+            ],
+            "title": "Outcome"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "op",
+          "threshold",
+          "actual",
+          "outcome"
+        ],
+        "title": "Check"
       },
       "CitedSentence": {
         "properties": {
@@ -17061,6 +18239,51 @@
         ],
         "title": "CnbSeries",
         "description": "A Czech National Bank rate from its keyless text files."
+      },
+      "ColumnSet": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stock",
+              "fund"
+            ],
+            "title": "Kind",
+            "default": "stock"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 40,
+            "minItems": 1,
+            "title": "Columns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "columns"
+        ],
+        "title": "ColumnSet"
       },
       "CompanyEdgeInput": {
         "properties": {
@@ -20975,6 +22198,268 @@
         ],
         "title": "Disagreement"
       },
+      "DiscoverExcluded": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keys"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "count",
+          "keys"
+        ],
+        "title": "DiscoverExcluded"
+      },
+      "DiscoverFilter": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "gte",
+              "lte",
+              "in"
+            ],
+            "title": "Op"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Value",
+            "description": "Threshold, or the allowed categories for `in`."
+          },
+          "definition_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition Version",
+            "description": "Pin the definition; a mismatch is rejected."
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period",
+            "description": "Pin the period rule; a mismatch is rejected."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "metric",
+          "op",
+          "value"
+        ],
+        "title": "DiscoverFilter"
+      },
+      "DiscoveryResult": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stock",
+              "fund"
+            ],
+            "title": "Kind"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "definition_hash": {
+            "type": "string",
+            "title": "Definition Hash"
+          },
+          "result_hash": {
+            "type": "string",
+            "title": "Result Hash"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "universe_key": {
+            "type": "string",
+            "title": "Universe Key"
+          },
+          "universe_label": {
+            "type": "string",
+            "title": "Universe Label"
+          },
+          "universe_definition": {
+            "type": "string",
+            "title": "Universe Definition"
+          },
+          "universe_size": {
+            "type": "integer",
+            "title": "Universe Size"
+          },
+          "evaluated": {
+            "type": "integer",
+            "title": "Evaluated",
+            "description": "Records with at least one metric value."
+          },
+          "matched": {
+            "type": "integer",
+            "title": "Matched"
+          },
+          "failed_filter": {
+            "type": "integer",
+            "title": "Failed Filter"
+          },
+          "unknown_excluded": {
+            "type": "integer",
+            "title": "Unknown Excluded",
+            "description": "Left out because a filtered metric had no value."
+          },
+          "no_data": {
+            "type": "integer",
+            "title": "No Data",
+            "description": "Records with no data to test at all."
+          },
+          "kept_unknown": {
+            "type": "integer",
+            "title": "Kept Unknown"
+          },
+          "missing_treatment": {
+            "type": "string",
+            "enum": [
+              "exclude",
+              "keep_unknown"
+            ],
+            "title": "Missing Treatment"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/DiscoverFilter"
+            },
+            "type": "array",
+            "title": "Filters"
+          },
+          "filter_coverage": {
+            "items": {
+              "$ref": "#/components/schemas/FilterCoverage"
+            },
+            "type": "array",
+            "title": "Filter Coverage"
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/DiscoverExcluded"
+            },
+            "type": "array",
+            "title": "Excluded"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ResultRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "formula_definitions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Formula Definitions"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "caveats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Caveats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "method_version",
+          "definition_hash",
+          "result_hash",
+          "as_of",
+          "universe_key",
+          "universe_label",
+          "universe_definition",
+          "universe_size",
+          "evaluated",
+          "matched",
+          "failed_filter",
+          "unknown_excluded",
+          "no_data",
+          "kept_unknown",
+          "missing_treatment",
+          "filters",
+          "filter_coverage",
+          "excluded",
+          "rows",
+          "next_cursor",
+          "formula_definitions",
+          "warnings",
+          "caveats"
+        ],
+        "title": "DiscoveryResult"
+      },
       "DisputedStory": {
         "properties": {
           "id": {
@@ -23022,6 +24507,24 @@
         "title": "ExchangeSessionRow",
         "description": "One stored `exchange_session` row."
       },
+      "Excluded": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "reason"
+        ],
+        "title": "Excluded"
+      },
       "ExcludedGroup": {
         "properties": {
           "reason": {
@@ -23130,6 +24633,53 @@
         ],
         "title": "ExpectedSessionsResponse",
         "description": "`GET /exchange-sessions/{mic}/expected`. `basis` is one of confirmed_calendar,\npartial_confirmed_calendar, weekdays_minus_configured_closures."
+      },
+      "ExportRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stock",
+              "fund"
+            ],
+            "title": "Kind",
+            "default": "stock"
+          },
+          "stock": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StockRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fund": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FundRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 40,
+            "minItems": 1,
+            "title": "Columns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "columns"
+        ],
+        "title": "ExportRequest"
       },
       "ExportedDomain": {
         "properties": {
@@ -25298,6 +26848,50 @@
         ],
         "title": "FiledNotes"
       },
+      "FilterCoverage": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "known": {
+            "type": "integer",
+            "title": "Known"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "fraction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fraction"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "label",
+          "known",
+          "total",
+          "fraction"
+        ],
+        "title": "FilterCoverage"
+      },
       "FinancialFactOut": {
         "properties": {
           "id": {
@@ -26900,6 +28494,82 @@
           "source_url"
         ],
         "title": "FundPosition"
+      },
+      "FundRequest": {
+        "properties": {
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/DiscoverFilter"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Filters"
+          },
+          "missing": {
+            "type": "string",
+            "enum": [
+              "exclude",
+              "keep_unknown"
+            ],
+            "title": "Missing",
+            "default": "exclude"
+          },
+          "sort_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort By"
+          },
+          "descending": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descending"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 50
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FundRequest"
       },
       "FundValuation": {
         "properties": {
@@ -36330,6 +38000,151 @@
         ],
         "title": "MessageOut"
       },
+      "MetricInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "formula": {
+            "type": "string",
+            "title": "Formula"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "definition_version": {
+            "type": "string",
+            "title": "Definition Version"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "disabled_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled Reason"
+          },
+          "known": {
+            "type": "integer",
+            "title": "Known"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "group",
+          "kind",
+          "unit",
+          "formula",
+          "period",
+          "definition_version",
+          "enabled",
+          "disabled_reason",
+          "known",
+          "total"
+        ],
+        "title": "MetricInfo"
+      },
+      "MetricValue": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the value is unknown or not meaningful."
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "title": "MetricValue"
+      },
       "MissingActions": {
         "properties": {
           "price_raw": {
@@ -43662,6 +45477,78 @@
         ],
         "title": "ResearchSummary"
       },
+      "ResultRow": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "identity": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Identity"
+          },
+          "values": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MetricValue"
+            },
+            "type": "object",
+            "title": "Values"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/Check"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "unknown": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes",
+            "description": "Extra why-it-passed lines, e.g. the idea-pipeline gate."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "identity",
+          "values",
+          "checks",
+          "unknown"
+        ],
+        "title": "ResultRow"
+      },
       "ReturnBasisCoverage": {
         "properties": {
           "adjustment_basis": {
@@ -44482,6 +46369,113 @@
         ],
         "title": "ScorePoint"
       },
+      "ScreenBody": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stock",
+              "fund"
+            ],
+            "title": "Kind",
+            "default": "stock"
+          },
+          "stock": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StockRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fund": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FundRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ScreenBody"
+      },
+      "ScreenDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "latest_version": {
+            "type": "integer",
+            "title": "Latest Version"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "definition_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition Hash"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenVersion"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "runs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "latest_version",
+          "updated_at",
+          "versions",
+          "runs"
+        ],
+        "title": "ScreenDetail"
+      },
       "ScreenFilter": {
         "properties": {
           "metric": {
@@ -44769,6 +46763,86 @@
           "unknown"
         ],
         "title": "ScreenRow"
+      },
+      "ScreenSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "latest_version": {
+            "type": "integer",
+            "title": "Latest Version"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "definition_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "latest_version",
+          "updated_at"
+        ],
+        "title": "ScreenSummary"
+      },
+      "ScreenVersion": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "definition": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Definition"
+          },
+          "definition_hash": {
+            "type": "string",
+            "title": "Definition Hash"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "definition",
+          "definition_hash",
+          "method_version",
+          "created_at"
+        ],
+        "title": "ScreenVersion"
       },
       "SectionCoverage": {
         "properties": {
@@ -45873,6 +47947,35 @@
         ],
         "title": "SharpeStats"
       },
+      "SnapshotCreated": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "members": {
+            "type": "integer",
+            "title": "Members"
+          },
+          "active": {
+            "type": "integer",
+            "title": "Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "as_of",
+          "members",
+          "active"
+        ],
+        "title": "SnapshotCreated"
+      },
       "SnapshotValues": {
         "properties": {
           "date": {
@@ -46891,6 +48994,136 @@
           "note"
         ],
         "title": "StakeReconciliationOut"
+      },
+      "StockRequest": {
+        "properties": {
+          "universe": {
+            "type": "string",
+            "enum": [
+              "covered",
+              "watchlist",
+              "holdings",
+              "snapshot"
+            ],
+            "title": "Universe",
+            "default": "covered"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/DiscoverFilter"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Filters"
+          },
+          "missing": {
+            "type": "string",
+            "enum": [
+              "exclude",
+              "keep_unknown"
+            ],
+            "title": "Missing",
+            "default": "exclude"
+          },
+          "sort_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort By"
+          },
+          "descending": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descending"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 50
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "Data date. Past dates use interval membership and facts known by then."
+          },
+          "known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known At",
+            "description": "Only facts known by this time are used."
+          },
+          "reconciled_only": {
+            "type": "boolean",
+            "title": "Reconciled Only",
+            "default": false
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "idea_pipeline"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset",
+            "description": "Apply the saved idea-pipeline rule on top of the filters."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "StockRequest"
       },
       "StoryOut": {
         "properties": {

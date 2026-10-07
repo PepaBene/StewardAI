@@ -3514,6 +3514,221 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/discover/catalogue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Catalogue
+         * @description Every metric with its definition, whether a filter on it is enabled, and how many members
+         *     of the universe have a value, so coverage is visible before a filter is applied.
+         */
+        get: operations["catalogue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/stocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discover Stocks */
+        post: operations["discover_stocks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/funds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discover Funds */
+        post: operations["discover_funds"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Csv
+         * @description CSV of the whole result (up to 200 rows per call; a `# truncated` line says if more match),
+         *     with method version, hashes, data date and filters as header comments.
+         */
+        post: operations["export_csv"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/baselines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Peer Baselines
+         * @description Median and range of covered securities for each metric, with count, geographic scope and
+         *     every exclusion (stale, other accounting basis, no value).
+         */
+        get: operations["peer_baselines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/universe/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Freeze Universe
+         * @description Freeze today's covered universe (delisted members stay in later reads of past dates).
+         */
+        post: operations["freeze_universe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/screens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Screens */
+        get: operations["list_screens"];
+        put?: never;
+        /** Save Screen */
+        post: operations["save_screen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/screens/{screen_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Screen Detail */
+        get: operations["screen_detail"];
+        /**
+         * Save Screen Version
+         * @description A changed definition becomes a new immutable version; an unchanged one is a no-op.
+         */
+        put: operations["save_screen_version"];
+        post?: never;
+        /**
+         * Archive Screen
+         * @description Archive, never delete: saved runs keep their definition.
+         */
+        delete: operations["archive_screen"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/screens/{screen_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Saved Screen
+         * @description Run a saved version (default: latest) and record what the run saw.
+         */
+        post: operations["run_saved_screen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/column-sets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Column Sets */
+        get: operations["list_column_sets"];
+        put?: never;
+        /** Save Column Set */
+        post: operations["save_column_set"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/column-sets/{set_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Column Set */
+        delete: operations["delete_column_set"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs/insider-trades": {
         parameters: {
             query?: never;
@@ -4921,6 +5136,42 @@ export interface components {
             /** Invested */
             invested: number;
         };
+        /** Baseline */
+        Baseline: {
+            /** Metric */
+            metric: string;
+            /** Label */
+            label: string;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "home_market" | "global" | "saved_set";
+            /** Scope Detail */
+            scope_detail: string;
+            /** Members */
+            members: number;
+            /** Comparable */
+            comparable: number;
+            /** Median */
+            median: number | string | null;
+            /** P25 */
+            p25: number | string | null;
+            /** P75 */
+            p75: number | string | null;
+            /** Low */
+            low: number | string | null;
+            /** High */
+            high: number | string | null;
+            /** Median Withheld Reason */
+            median_withheld_reason: string | null;
+            /** Countries */
+            countries: {
+                [key: string]: number;
+            };
+            /** Excluded */
+            excluded: components["schemas"]["Excluded"][];
+        };
         /** BenchmarkBucket */
         BenchmarkBucket: {
             /** Key */
@@ -5303,6 +5554,35 @@ export interface components {
             /** Value */
             value: number;
         };
+        /** CatalogueResponse */
+        CatalogueResponse: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stock" | "fund";
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Universe */
+            universe: {
+                [key: string]: unknown;
+            };
+            /** Metrics */
+            metrics: components["schemas"]["MetricInfo"][];
+            /** Snapshots */
+            snapshots: {
+                [key: string]: unknown;
+            }[];
+            /** Warnings */
+            warnings: string[];
+            /** Method Version */
+            method_version: string;
+            /** Keyless Note */
+            keyless_note: string;
+        };
         /** CategoryTarget */
         CategoryTarget: {
             /** Target Weight */
@@ -5526,6 +5806,24 @@ export interface components {
              */
             source_tiers?: (1 | 2 | 3)[];
         };
+        /** Check */
+        Check: {
+            /** Metric */
+            metric: string;
+            /** Op */
+            op: string;
+            /** Threshold */
+            threshold: number | string | string[];
+            /** Actual */
+            actual: number | string | null;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "pass" | "fail" | "unknown";
+            /** Reason */
+            reason?: string | null;
+        };
         /** CitedSentence */
         CitedSentence: {
             /** Text */
@@ -5739,6 +6037,21 @@ export interface components {
              * @default false
              */
             policy_rate: boolean;
+        };
+        /** ColumnSet */
+        ColumnSet: {
+            /** Id */
+            id?: number | null;
+            /**
+             * Kind
+             * @default stock
+             * @enum {string}
+             */
+            kind: "stock" | "fund";
+            /** Name */
+            name: string;
+            /** Columns */
+            columns: string[];
         };
         /** CompanyEdgeInput */
         CompanyEdgeInput: {
@@ -7144,6 +7457,111 @@ export interface components {
             /** Resolution */
             resolution: string | null;
         };
+        /** DiscoverExcluded */
+        DiscoverExcluded: {
+            /** Reason */
+            reason: string;
+            /** Count */
+            count: number;
+            /** Keys */
+            keys: string[];
+        };
+        /** DiscoverFilter */
+        DiscoverFilter: {
+            /** Metric */
+            metric: string;
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "gte" | "lte" | "in";
+            /**
+             * Value
+             * @description Threshold, or the allowed categories for `in`.
+             */
+            value: number | string | string[];
+            /**
+             * Definition Version
+             * @description Pin the definition; a mismatch is rejected.
+             */
+            definition_version?: string | null;
+            /**
+             * Period
+             * @description Pin the period rule; a mismatch is rejected.
+             */
+            period?: string | null;
+        };
+        /** DiscoveryResult */
+        DiscoveryResult: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stock" | "fund";
+            /** Method Version */
+            method_version: string;
+            /** Definition Hash */
+            definition_hash: string;
+            /** Result Hash */
+            result_hash: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Universe Key */
+            universe_key: string;
+            /** Universe Label */
+            universe_label: string;
+            /** Universe Definition */
+            universe_definition: string;
+            /** Universe Size */
+            universe_size: number;
+            /**
+             * Evaluated
+             * @description Records with at least one metric value.
+             */
+            evaluated: number;
+            /** Matched */
+            matched: number;
+            /** Failed Filter */
+            failed_filter: number;
+            /**
+             * Unknown Excluded
+             * @description Left out because a filtered metric had no value.
+             */
+            unknown_excluded: number;
+            /**
+             * No Data
+             * @description Records with no data to test at all.
+             */
+            no_data: number;
+            /** Kept Unknown */
+            kept_unknown: number;
+            /**
+             * Missing Treatment
+             * @enum {string}
+             */
+            missing_treatment: "exclude" | "keep_unknown";
+            /** Filters */
+            filters: components["schemas"]["DiscoverFilter"][];
+            /** Filter Coverage */
+            filter_coverage: components["schemas"]["FilterCoverage"][];
+            /** Excluded */
+            excluded: components["schemas"]["DiscoverExcluded"][];
+            /** Rows */
+            rows: components["schemas"]["ResultRow"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Formula Definitions */
+            formula_definitions: {
+                [key: string]: string;
+            };
+            /** Warnings */
+            warnings: string[];
+            /** Caveats */
+            caveats: string[];
+        };
         /** DisputedStory */
         DisputedStory: {
             /** Id */
@@ -8010,6 +8428,13 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** Excluded */
+        Excluded: {
+            /** Key */
+            key: string;
+            /** Reason */
+            reason: string;
+        };
         /** ExcludedGroup */
         ExcludedGroup: {
             /** Reason */
@@ -8059,6 +8484,19 @@ export interface components {
             days: string[];
         } & {
             [key: string]: unknown;
+        };
+        /** ExportRequest */
+        ExportRequest: {
+            /**
+             * Kind
+             * @default stock
+             * @enum {string}
+             */
+            kind: "stock" | "fund";
+            stock?: components["schemas"]["StockRequest"] | null;
+            fund?: components["schemas"]["FundRequest"] | null;
+            /** Columns */
+            columns: string[];
         };
         /** ExportedDomain */
         ExportedDomain: {
@@ -8875,6 +9313,19 @@ export interface components {
             /** Notes */
             notes: components["schemas"]["FiledNote"][];
         };
+        /** FilterCoverage */
+        FilterCoverage: {
+            /** Metric */
+            metric: string;
+            /** Label */
+            label: string;
+            /** Known */
+            known: number;
+            /** Total */
+            total: number;
+            /** Fraction */
+            fraction: number | string | null;
+        };
         /** FinancialFactOut */
         FinancialFactOut: {
             /** Id */
@@ -9400,6 +9851,30 @@ export interface components {
             form: string;
             /** Source Url */
             source_url: string;
+        };
+        /** FundRequest */
+        FundRequest: {
+            /** Filters */
+            filters?: components["schemas"]["DiscoverFilter"][];
+            /**
+             * Missing
+             * @default exclude
+             * @enum {string}
+             */
+            missing: "exclude" | "keep_unknown";
+            /** Sort By */
+            sort_by?: string | null;
+            /** Descending */
+            descending?: boolean | null;
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /** Cursor */
+            cursor?: string | null;
+            /** As Of */
+            as_of?: string | null;
         };
         /** FundValuation */
         FundValuation: {
@@ -12685,6 +13160,49 @@ export interface components {
              */
             created_at: string;
         };
+        /** MetricInfo */
+        MetricInfo: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Group */
+            group: string;
+            /** Kind */
+            kind: string;
+            /** Unit */
+            unit: string;
+            /** Formula */
+            formula: string;
+            /** Period */
+            period: string;
+            /** Definition Version */
+            definition_version: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Disabled Reason */
+            disabled_reason: string | null;
+            /** Known */
+            known: number;
+            /** Total */
+            total: number;
+        };
+        /** MetricValue */
+        MetricValue: {
+            /** Value */
+            value?: number | string | null;
+            /**
+             * Reason
+             * @description Why the value is unknown or not meaningful.
+             */
+            reason?: string | null;
+            /** Period End */
+            period_end?: string | null;
+            /** Basis */
+            basis?: string | null;
+            /** Source */
+            source?: string | null;
+        };
         /** MissingActions */
         MissingActions: {
             /**
@@ -15367,6 +15885,30 @@ export interface components {
             /** Job Id */
             job_id: number | null;
         };
+        /** ResultRow */
+        ResultRow: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string | null;
+            /** Identity */
+            identity: {
+                [key: string]: string | null;
+            };
+            /** Values */
+            values: {
+                [key: string]: components["schemas"]["MetricValue"];
+            };
+            /** Checks */
+            checks: components["schemas"]["Check"][];
+            /** Unknown */
+            unknown: string[];
+            /**
+             * Notes
+             * @description Extra why-it-passed lines, e.g. the idea-pipeline gate.
+             */
+            notes?: string[];
+        };
         /** ReturnBasisCoverage */
         ReturnBasisCoverage: {
             /** Adjustment Basis */
@@ -15701,6 +16243,43 @@ export interface components {
             /** Score */
             score: number;
         };
+        /** ScreenBody */
+        ScreenBody: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @default stock
+             * @enum {string}
+             */
+            kind: "stock" | "fund";
+            stock?: components["schemas"]["StockRequest"] | null;
+            fund?: components["schemas"]["FundRequest"] | null;
+        };
+        /** ScreenDetail */
+        ScreenDetail: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+            /** Latest Version */
+            latest_version: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Definition Hash */
+            definition_hash?: string | null;
+            /** Versions */
+            versions: components["schemas"]["ScreenVersion"][];
+            /** Runs */
+            runs: {
+                [key: string]: unknown;
+            }[];
+        };
         /** ScreenFilter */
         ScreenFilter: {
             /**
@@ -15820,6 +16399,42 @@ export interface components {
              * @description Filtered metrics with no value for this issuer (only with keep_unknown).
              */
             unknown: string[];
+        };
+        /** ScreenSummary */
+        ScreenSummary: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+            /** Latest Version */
+            latest_version: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Definition Hash */
+            definition_hash?: string | null;
+        };
+        /** ScreenVersion */
+        ScreenVersion: {
+            /** Version */
+            version: number;
+            /** Definition */
+            definition: {
+                [key: string]: unknown;
+            };
+            /** Definition Hash */
+            definition_hash: string;
+            /** Method Version */
+            method_version: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** SectionCoverage */
         SectionCoverage: {
@@ -16223,6 +16838,20 @@ export interface components {
              */
             reason: string | null;
         };
+        /** SnapshotCreated */
+        SnapshotCreated: {
+            /** Id */
+            id: number;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Members */
+            members: number;
+            /** Active */
+            active: number;
+        };
         /** SnapshotValues */
         SnapshotValues: {
             /**
@@ -16555,6 +17184,56 @@ export interface components {
             percent_check: "consistent" | "inconsistent" | "not_checkable";
             /** Note */
             note: string | null;
+        };
+        /** StockRequest */
+        StockRequest: {
+            /**
+             * Universe
+             * @default covered
+             * @enum {string}
+             */
+            universe: "covered" | "watchlist" | "holdings" | "snapshot";
+            /** Snapshot Id */
+            snapshot_id?: number | null;
+            /** Filters */
+            filters?: components["schemas"]["DiscoverFilter"][];
+            /**
+             * Missing
+             * @default exclude
+             * @enum {string}
+             */
+            missing: "exclude" | "keep_unknown";
+            /** Sort By */
+            sort_by?: string | null;
+            /** Descending */
+            descending?: boolean | null;
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /** Cursor */
+            cursor?: string | null;
+            /**
+             * As Of
+             * @description Data date. Past dates use interval membership and facts known by then.
+             */
+            as_of?: string | null;
+            /**
+             * Known At
+             * @description Only facts known by this time are used.
+             */
+            known_at?: string | null;
+            /**
+             * Reconciled Only
+             * @default false
+             */
+            reconciled_only: boolean;
+            /**
+             * Preset
+             * @description Apply the saved idea-pipeline rule on top of the filters.
+             */
+            preset?: "idea_pipeline" | null;
         };
         /** StoryOut */
         StoryOut: {
@@ -23875,6 +24554,482 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ScreenResult"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalogue: {
+        parameters: {
+            query?: {
+                kind?: "stock" | "fund";
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogueResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discover_stocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveryResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discover_funds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FundRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveryResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_csv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    peer_baselines: {
+        parameters: {
+            query?: {
+                scope?: "home_market" | "global" | "saved_set";
+                country?: string | null;
+                /** @description Comma-separated tickers for saved_set. */
+                tickers?: string | null;
+                /** @description Use the confirmed peers of this ticker as the saved set. */
+                peers_of?: string | null;
+                /** @description Comma-separated metric ids. */
+                metrics?: string;
+                basis?: ("US_GAAP" | "IFRS") | null;
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Baseline"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    freeze_universe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotCreated"];
+                };
+            };
+        };
+    };
+    list_screens: {
+        parameters: {
+            query?: {
+                kind?: ("stock" | "fund") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_screen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    screen_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_screen_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_screen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_saved_screen: {
+        parameters: {
+            query?: {
+                version?: number | null;
+                as_of?: string | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveryResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_column_sets: {
+        parameters: {
+            query?: {
+                kind?: ("stock" | "fund") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColumnSet"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_column_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ColumnSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColumnSet"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_column_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                set_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
