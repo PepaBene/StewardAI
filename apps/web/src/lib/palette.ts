@@ -90,6 +90,8 @@ export const OTHER_PAGES = [
   { href: "/glossary", label: "Glossary", keywords: "terms definitions metrics meaning help" },
   { href: "/watchlist", label: "Watchlist", keywords: "watch list buy sell target ticker idea candidates" },
   { href: "/investors", label: "Investors", keywords: "institutional managers tracked holders funds ownership filings" },
+  { href: "/disclosures", label: "Public disclosures", keywords: "filings 10-K amendment restatement as known on date evidence statements segments coverage sources" },
+  { href: "/disclosures/ownership", label: "Ownership", keywords: "13F 13D 13G stakes holders managers funds N-PORT voting rights control remainder" },
   { href: "/config", label: "Config: Export or import", keywords: "backup json file git" },
   { href: "/status#reference-gaps", label: "Reference data gaps", keywords: "identity unresolved figi isin lei stooq prices missing symbol coverage" },
   { href: "/news/disputed", label: "Disputed stories", keywords: "news contradicted conflicting sources resolve confirm false side by side" },

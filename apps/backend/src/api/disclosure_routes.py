@@ -16,8 +16,8 @@ from pydantic import AwareDatetime, BaseModel, Field
 
 from api.auth import Owner
 from api.db import IdPath, Pool
-from api.routes import Storage
-from steward.disclosure import asof, review
+from api.routes import Storage, TickerPath
+from steward.disclosure import asof, ownership_read, review, statement_read
 from steward.disclosure.parse import ParseError, parse_html
 from steward.storage import StorageError
 
@@ -410,6 +410,144 @@ async def issuer_claims(
 @router.get("/issuers/{issuer_id}/coverage")
 async def issuer_coverage(issuer_id: IdPath, pool: Pool, _owner: Owner) -> list[CoverageRow]:
     return [CoverageRow(**r) for r in await asof.coverage_for(pool, issuer_id)]
+
+
+class HistoryPointOut(BaseModel):
+    metric: str
+    period_end: dt.date
+    value: str | None = Field(description="Null is not disclosed or not reported, never zero.")
+    accession: str
+    known_at: dt.datetime
+    restated: bool
+    original_value: str | None = Field(description="What the first filing said, when restated.")
+
+
+class DerivedOut(BaseModel):
+    metric: str
+    period_end: dt.date
+    value: str
+    formula: str
+    formula_version: str
+    inputs: list[str]
+
+
+class CheckOut(BaseModel):
+    name: str
+    status: Literal["pass", "fail", "needs_review"]
+    detail: str
+    expected: str | None
+    actual: str | None
+    tolerance: str
+
+
+class StatementsOut(BaseModel):
+    issuer_id: int
+    as_of: dt.datetime
+    taxonomy_version: str
+    formula_version: str
+    history: list[HistoryPointOut]
+    derived: list[DerivedOut]
+    checks: dict[str, list[CheckOut]]
+    usable_for_valuation: dict[str, bool]
+    unmapped_concepts: int = Field(description="Facts with a concept the taxonomy does not map.")
+
+
+class BridgeMemberOut(BaseModel):
+    member: str
+    value: str
+    eliminations: bool
+
+
+class BridgeAxisOut(BaseModel):
+    axis: str
+    members: list[BridgeMemberOut]
+    members_sum: str
+    eliminations: str
+    unallocated: str
+    reconciles: bool
+
+
+class SegmentBridgeOut(BaseModel):
+    period_end: dt.date
+    total: str | None
+    axes: list[BridgeAxisOut]
+    notes: list[str]
+
+
+@router.get("/issuers/{issuer_id}/statements")
+async def issuer_statements(
+    issuer_id: IdPath, pool: Pool, _owner: Owner, as_of: AsOf = None
+) -> StatementsOut:
+    """As-filed annual history known by `as_of`, with restatements, derived figures and checks."""
+    return StatementsOut(**await statement_read.statements(pool, issuer_id, as_of))
+
+
+@router.get("/issuers/{issuer_id}/segment-bridge")
+async def issuer_segment_bridge(
+    issuer_id: IdPath, period_end: dt.date, pool: Pool, _owner: Owner, as_of: AsOf = None
+) -> SegmentBridgeOut:
+    """Each segment axis bridged to reported revenue on its own; axes are never added together."""
+    return SegmentBridgeOut(
+        **await statement_read.segment_bridge(pool, issuer_id, period_end, as_of)
+    )
+
+
+class LaneEntryOut(BaseModel):
+    holder: str
+    shares: str | None = Field(description="Null when the filing gives no share count; not zero.")
+    reported_percent: str | None
+    report_date: dt.date | None = Field(description="The date the figure is measured on.")
+    filed: dt.date | None
+    known_at: dt.datetime
+    lag_days: int | None
+    amended: bool
+
+
+class LaneOut(BaseModel):
+    key: Literal["institutional_13f", "control_13dg", "fund_nport", "national_voting"]
+    title: str
+    basis: str
+    status: Literal["covered", "no_data", "not_covered"]
+    entries: list[LaneEntryOut]
+    total_shares: str | None
+    percent_of_denominator: str | None
+    remainder_shares: str | None
+    remainder_percent: str | None
+    overlaps_with: list[str]
+    notes: list[str]
+
+
+class ManagerRename(BaseModel):
+    cik: str
+    names: list[dict[str, str]]
+
+
+class TrendOut(BaseModel):
+    prev_period: dt.date
+    cur_period: dt.date
+    prev: dict[str, str] = Field(description="Manager to shares at the earlier quarter.")
+    cur: dict[str, str] = Field(description="Manager to shares at the later quarter.")
+
+
+class OwnershipOut(BaseModel):
+    ticker: str
+    as_of: dt.datetime
+    denominator: str | None
+    denominator_as_of: dt.date | None
+    denominator_method: str | None
+    lanes: list[LaneOut]
+    warnings: list[str]
+    trend: TrendOut | None = Field(description="Null when fewer than two quarters are known.")
+    manager_renames: list[ManagerRename]
+
+
+@router.get("/holdings/{ticker}/ownership")
+async def holding_ownership(
+    ticker: TickerPath, pool: Pool, _owner: Owner, as_of: AsOf = None
+) -> OwnershipOut:
+    """Ownership as separate dated lanes known by `as_of`. The lanes overlap, so no combined
+    total is returned; each carries its own remainder against the stated share denominator."""
+    return OwnershipOut(**await ownership_read.ownership(pool, ticker.upper(), as_of))
 
 
 @router.get("/provenance/{kind}/{row_id}")

@@ -4359,6 +4359,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/disclosures/issuers/{issuer_id}/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Issuer Statements
+         * @description As-filed annual history known by `as_of`, with restatements, derived figures and checks.
+         */
+        get: operations["issuer_statements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/issuers/{issuer_id}/segment-bridge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Issuer Segment Bridge
+         * @description Each segment axis bridged to reported revenue on its own; axes are never added together.
+         */
+        get: operations["issuer_segment_bridge"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/holdings/{ticker}/ownership": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holding Ownership
+         * @description Ownership as separate dated lanes known by `as_of`. The lanes overlap, so no combined
+         *     total is returned; each carries its own remainder against the stated share denominator.
+         */
+        get: operations["holding_ownership"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/disclosures/provenance/{kind}/{row_id}": {
         parameters: {
             query?: never;
@@ -5299,6 +5360,30 @@ export interface components {
              */
             state: "intact" | "watch" | "at_risk" | "unjudged";
         };
+        /** BridgeAxisOut */
+        BridgeAxisOut: {
+            /** Axis */
+            axis: string;
+            /** Members */
+            members: components["schemas"]["BridgeMemberOut"][];
+            /** Members Sum */
+            members_sum: string;
+            /** Eliminations */
+            eliminations: string;
+            /** Unallocated */
+            unallocated: string;
+            /** Reconciles */
+            reconciles: boolean;
+        };
+        /** BridgeMemberOut */
+        BridgeMemberOut: {
+            /** Member */
+            member: string;
+            /** Value */
+            value: string;
+            /** Eliminations */
+            eliminations: boolean;
+        };
         /** Bucket */
         Bucket: {
             /** Key */
@@ -5734,6 +5819,24 @@ export interface components {
              * @description Outlet tiers web search may use and an answer may cite (News sources config).
              */
             source_tiers?: (1 | 2 | 3)[];
+        };
+        /** CheckOut */
+        CheckOut: {
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "fail" | "needs_review";
+            /** Detail */
+            detail: string;
+            /** Expected */
+            expected: string | null;
+            /** Actual */
+            actual: string | null;
+            /** Tolerance */
+            tolerance: string;
         };
         /** CitedSentence */
         CitedSentence: {
@@ -7102,6 +7205,24 @@ export interface components {
             score?: number | null;
         } & {
             [key: string]: unknown;
+        };
+        /** DerivedOut */
+        DerivedOut: {
+            /** Metric */
+            metric: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Value */
+            value: string;
+            /** Formula */
+            formula: string;
+            /** Formula Version */
+            formula_version: string;
+            /** Inputs */
+            inputs: string[];
         };
         /** DiffChange */
         DiffChange: {
@@ -10257,6 +10378,35 @@ export interface components {
             /** Decided By */
             decided_by?: string | null;
         };
+        /** HistoryPointOut */
+        HistoryPointOut: {
+            /** Metric */
+            metric: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /**
+             * Value
+             * @description Null is not disclosed or not reported, never zero.
+             */
+            value: string | null;
+            /** Accession */
+            accession: string;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Restated */
+            restated: boolean;
+            /**
+             * Original Value
+             * @description What the first filing said, when restated.
+             */
+            original_value: string | null;
+        };
         /** Holding */
         Holding: {
             /** Ticker */
@@ -12195,6 +12345,65 @@ export interface components {
              */
             history: components["schemas"]["VerdictOut"][];
         };
+        /** LaneEntryOut */
+        LaneEntryOut: {
+            /** Holder */
+            holder: string;
+            /**
+             * Shares
+             * @description Null when the filing gives no share count; not zero.
+             */
+            shares: string | null;
+            /** Reported Percent */
+            reported_percent: string | null;
+            /**
+             * Report Date
+             * @description The date the figure is measured on.
+             */
+            report_date: string | null;
+            /** Filed */
+            filed: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Lag Days */
+            lag_days: number | null;
+            /** Amended */
+            amended: boolean;
+        };
+        /** LaneOut */
+        LaneOut: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "institutional_13f" | "control_13dg" | "fund_nport" | "national_voting";
+            /** Title */
+            title: string;
+            /** Basis */
+            basis: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "covered" | "no_data" | "not_covered";
+            /** Entries */
+            entries: components["schemas"]["LaneEntryOut"][];
+            /** Total Shares */
+            total_shares: string | null;
+            /** Percent Of Denominator */
+            percent_of_denominator: string | null;
+            /** Remainder Shares */
+            remainder_shares: string | null;
+            /** Remainder Percent */
+            remainder_percent: string | null;
+            /** Overlaps With */
+            overlaps_with: string[];
+            /** Notes */
+            notes: string[];
+        };
         /** LastAttempt */
         LastAttempt: {
             /**
@@ -12869,6 +13078,15 @@ export interface components {
             shares: number | string | null;
             /** Shares Type */
             shares_type: string;
+        };
+        /** ManagerRename */
+        ManagerRename: {
+            /** Cik */
+            cik: string;
+            /** Names */
+            names: {
+                [key: string]: string;
+            }[];
         };
         /** ManagerSummary */
         ManagerSummary: {
@@ -13727,6 +13945,30 @@ export interface components {
             document_version_id: number;
             evidence: components["schemas"]["EvidenceSpan"];
             envelope: components["schemas"]["Envelope"];
+        };
+        /** OwnershipOut */
+        OwnershipOut: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Denominator */
+            denominator: string | null;
+            /** Denominator As Of */
+            denominator_as_of: string | null;
+            /** Denominator Method */
+            denominator_method: string | null;
+            /** Lanes */
+            lanes: components["schemas"]["LaneOut"][];
+            /** Warnings */
+            warnings: string[];
+            /** @description Null when fewer than two quarters are known. */
+            trend: components["schemas"]["TrendOut"] | null;
+            /** Manager Renames */
+            manager_renames: components["schemas"]["ManagerRename"][];
         };
         /** OwnershipPeriod */
         OwnershipPeriod: {
@@ -16364,6 +16606,20 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** SegmentBridgeOut */
+        SegmentBridgeOut: {
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Total */
+            total: string | null;
+            /** Axes */
+            axes: components["schemas"]["BridgeAxisOut"][];
+            /** Notes */
+            notes: string[];
+        };
         /** SegmentHistoryPoint */
         SegmentHistoryPoint: {
             period: components["schemas"]["SegmentPeriod"];
@@ -17153,6 +17409,37 @@ export interface components {
             /** Note */
             note: string | null;
         };
+        /** StatementsOut */
+        StatementsOut: {
+            /** Issuer Id */
+            issuer_id: number;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Taxonomy Version */
+            taxonomy_version: string;
+            /** Formula Version */
+            formula_version: string;
+            /** History */
+            history: components["schemas"]["HistoryPointOut"][];
+            /** Derived */
+            derived: components["schemas"]["DerivedOut"][];
+            /** Checks */
+            checks: {
+                [key: string]: components["schemas"]["CheckOut"][];
+            };
+            /** Usable For Valuation */
+            usable_for_valuation: {
+                [key: string]: boolean;
+            };
+            /**
+             * Unmapped Concepts
+             * @description Facts with a concept the taxonomy does not map.
+             */
+            unmapped_concepts: number;
+        };
         /** StoryOut */
         StoryOut: {
             /** Id */
@@ -17832,6 +18119,33 @@ export interface components {
             next_cursor: string | null;
             /** @description Fees and taxes over every matching row, converted to the base currency. */
             fees: components["schemas"]["FeeTotals"];
+        };
+        /** TrendOut */
+        TrendOut: {
+            /**
+             * Prev Period
+             * Format: date
+             */
+            prev_period: string;
+            /**
+             * Cur Period
+             * Format: date
+             */
+            cur_period: string;
+            /**
+             * Prev
+             * @description Manager to shares at the earlier quarter.
+             */
+            prev: {
+                [key: string]: string;
+            };
+            /**
+             * Cur
+             * @description Manager to shares at the later quarter.
+             */
+            cur: {
+                [key: string]: string;
+            };
         };
         /**
          * TrustSettings
@@ -25901,6 +26215,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoverageRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issuer_statements: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                issuer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issuer_segment_bridge: {
+        parameters: {
+            query: {
+                period_end: string;
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                issuer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentBridgeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    holding_ownership: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnershipOut"];
                 };
             };
             /** @description Validation Error */

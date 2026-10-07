@@ -136,6 +136,23 @@ Every owner-only read API returns `source`, `published_at`, `known_at`, `as_of`,
 - [ ] `P1.7` Add a reviewer queue for low-confidence parsing, entity ambiguity, contradictions and source-format changes. Decisions record the original candidate, reviewer and reason; a denied or superseded claim is auditable and excluded from authoritative calculations.
 
 
+### Implementation status and open gaps after P0–P1 (updated 2026-10-07)
+
+Built and tested: migration `20261007100000_disclosure_foundation.sql` (+ rollbacks), source registry and fetch governor, SEC discovery, deterministic parser with evidence offsets, `as_of` repository and provenance endpoints, reviewer queue, identity rules, offline fixtures, and the evidence browser at `/disclosures` (typed sample mode). Evidence: `tests/test_disclosure_*.py`, `apps/web/src/lib/disclosure/model.test.ts`. The gaps below are **not** done; later phases must not assume them.
+
+| Gap | Task | Why it is open | What closes it |
+|---|---|---|---|
+| 0 of 110 P0.3 samples captured | P0.3 | Manifest and expected fields exist, but no real documents were pulled and hand-checked | Capture 10 per category through the fetch governor, record manual ground truth |
+| Release thresholds unmeasured | P0.6 | Thresholds are defined in `docs/data/public-disclosure-release-thresholds.md`; nothing has been sampled against them | Run adjudication samples per dataset before its first release |
+| No coverage baseline | P0.5 | Row counts and current false-positive rate need the deployed database | Run the inventory queries against the deployed DB and record results in the migration map |
+| Corpus has no LEI/ISIN/FIGI | P0.2, P1.5 | Identifiers are filled only after a reviewed match; `resolve_via` is set for every non-CIK issuer | Run GLEIF/OpenFIGI resolution, reviewer confirms |
+| ESEF / issuer-IR discovery not implemented | P1.3 | Only SEC discovery exists | Build ESEF filing-index discovery (needed by P2.5) |
+| No scheduled discovery job | P1.3 | Discovery runs on demand, not from the collector | Wire a job after the SEC access record is confirmed on the deployed host |
+| Four source routes unresolved | P0.4 | SEC FSN dataset URL, FCA request shape, EDINET key, SEDAR+ portal session not proven | Record each as tested/failed in the registry; failures are integration gaps, not licensing blocks |
+| DB tests need a database URL | P1.1 | Suite needs `STEWARD_TEST_DATABASE_URL`; not re-run after the final refactor in the session that built it | Run `pytest tests/test_disclosure_db.py` against a disposable Postgres in CI |
+| UI not visually checked | P1 frontend | Logic is unit-tested; no browser pass was done | One screenshot pass at desktop and phone width; keyboard pass on the cutoff slider |
+| Live endpoints not exercised from the UI | P1 frontend | UI was built against typed fixtures; live mode compiles but has no data to show yet | Verify once an issuer has stored disclosures |
+
 ## Phase P2 — Point-in-time financial statements and notes
 
 **Dependency:** P1; free data plan D4.1/D4.8/D4.9. **Exit:** reconciled US statements and a smaller ESEF pilot support historical valuation without restatement leakage.
@@ -176,6 +193,38 @@ Every owner-only read API returns `source`, `published_at`, `known_at`, `as_of`,
 - [ ] `P3.6` Add company ownership view: 13F manager trends, reported 13D/G control stakes, fund holdings, sources/as-of dates, top changes and an unknown remainder. Add watchlist alerts for a verified major-holder filing or material stake amendment; avoid interpreting quarter-to-quarter 13F movement as trading intent.
 - [ ] `P3.7` Test 13F amendment replacement, same-manager name changes, CUSIP reuse, ADR/ordinary class, group aggregation, conflicting share denominators, N-PORT lag and non-US threshold differences. Sample manually before publishing any “top owners” or control alert.
 
+
+### Implementation status and open gaps after P2–P3 (updated 2026-10-07)
+
+**Built and tested** (backend `steward/disclosure/financials.py`, `statement_read.py`, `ownership.py`, `ownership_read.py`; migration `20261007110000_ownership_known_at.sql` + rollback; UI at `/disclosures` (statements) and `/disclosures/ownership`; tests `test_disclosure_financials.py`, `test_disclosure_statements_db.py`, `test_disclosure_ownership.py`, `test_disclosure_ownership_db.py`, web `financials.test.ts`, `ownership.test.ts`):
+
+- P2.1 versioned metric taxonomy (`metrics-1`) and period classification; P2.3 segment bridge (axes never added, eliminations kept, remainder shown) and recast detection; P2.4 validators for debt maturities, leases, repurchases, customer shares; P2.6 adapter contract and the "no global label until measured" rule; P2.7 as-filed history with restatement overlay, derived free cash flow with inputs and formula version, valuation gate; P2.8 tests for restatement, changed taxonomy, negative cash flow, unit multiplier, fiscal-year change, missing note.
+- P3.1 13F amendment replacement as of a date (RESTATEMENT replaces, NEW HOLDINGS adds, untyped amendment flagged), options kept out of share totals, exits visible, rename keyed by CIK; P3.2 reported-stake delta only for the same class; P3.4 national adapter contracts and the 20-example, 98% enablement gate; P3.5 registry-versus-filing conflict rule; P3.6 ownership lanes with a stated denominator, per-lane remainder and no combined total; P3.7 tests for amendment replacement, rename, CUSIP reuse, group floor, conflicting denominators, fund lag, non-US thresholds.
+- `known_at` added to 13F, 13D/G and N-PORT filings (end of filing day UTC, never earlier). `confidential_treatment` on 13F filings is `unknown` until a source says otherwise.
+
+**Gaps** (not done; later phases must not assume them):
+
+| Gap | Task | Why it is open | What closes it |
+|---|---|---|---|
+| Statement checks cover only gross profit and free cash flow | P2.8 | `statement_read` runs two arithmetic checks; maturity, lease and repurchase validators exist but no stored data feeds them | Extract note tables into structured buckets (below), then call the validators from `statement_read` |
+| Debt maturities, leases and repurchases are not extracted | P2.4 | Notes are stored as text blocks only; the UI shows sample maturities and an empty state for live data | Table extraction from note text blocks with evidence offsets, sent to review when ambiguous |
+| Evidence has no span offsets for statement facts | P2.2 | `financial_statement_fact` keeps a document-level quote; it is not mirrored into `disclosure_observation` | Mirror facts into the foundation tables with `legacy_table`/`legacy_key` and offsets from the iXBRL parser |
+| ESEF statements are partial and not reconciled to 20-F | P2.5 | Existing ESEF path stores some facts; no cross-listing comparison or conversion-source record | Pilot on the European corpus after ESEF discovery exists (P1 gap) |
+| Segments use single-member contexts only | P2.3 | The existing `segment_revenue` skips cross-tabs; the new bridge skips them too and says so | Cross-axis tables as their own breakdown, never placed on one axis |
+| No segment assets/profit/capex, geography overlap not tested on real filings | P2.3 | Only revenue is bridged | Extend the bridge to the other segment metrics |
+| Valuation, screener and ROIC consumers do not use the gate | P2.7 | `usable_for_valuation` is returned; no consumer reads it yet; margins/ROIC recompute with citations is not built | Wire `/holdings/{ticker}/financial-history` and screens to the gate; add the formula table |
+| EDINET, SEDAR+ adapters are contracts only | P2.6 | No discovery or fact extraction; access is unproven (see P0 gaps) | Implement after P0.4 access results |
+| 13F reconciliation of totals not done | P3.1 | Only portfolio CUSIPs and tracked managers are stored, so a report total cannot be reconciled; a manager's report with none of the ticker may not be stored at all, in which case an exit is invisible | Store a per-filing row count and reported total; keep filings that list none of the held CUSIPs |
+| Confidential-treatment flag never populated | P3.1 | Collector does not read it | Parse cover page flag and omitted-holdings notices |
+| Manager lane is the latest report per manager, not a single quarter | P3.1 | The lane note says when entries mix report dates; no completeness rule picks one common quarter | Choose the latest quarter with enough managers reported and show earlier ones as "not yet filed" |
+| 13D/G filing history per holder is not on the ownership page | P3.2 | The page shows the latest filing per holder; the chain view is sample-only because no endpoint returns the chain | Add a chain endpoint from `control_stake_filing.prior_accession` |
+| Group members, purpose of transaction and exhibits not structured | P3.2 | Only the largest reporting person and Item 4 text are stored | Parse group members and agreement exhibits |
+| N-PORT lane untested end to end | P3.3 | `ownership_read` reads confirmed N-PORT filings; the DB test covers 13F only (needs the instrument table seeded) | Add a DB test with a confirmed fund; compare against issuer fund files |
+| National voting-rights lane is `not_covered` for every issuer | P3.4 | Contracts exist for UK, DE, FR, JP, CA, AU; no collector, and no jurisdiction has the 20 reviewed examples | Build UK TR-1 first, collect 20 examples, review, then enable |
+| Companies House PSC / GLEIF control corroboration not collected | P3.5 | Only the conflict rule exists | Collect PSC and GLEIF hierarchy as separate control data |
+| No ownership alerts and no manual sample before "top owners" | P3.6, P3.7 | Alerts for a verified major-holder filing are not built; the 50-match adjudication sample from the release thresholds is not taken | Build alerts after the sample passes |
+| Python and TypeScript copies of the same rules | P2.8, P3.7 | Sample mode replays in TypeScript so the screen works offline; the Python module is the reference | Keep both suites in step; remove the TypeScript copy once live data exists everywhere |
+| New pages not viewed in a browser | P2, P3 frontend | Sign-in needs MFA; logic and types are tested, layout is unseen | Screenshot pass at desktop and phone width; keyboard pass on the date control |
 
 ## Phase P4 — Insider economic activity
 

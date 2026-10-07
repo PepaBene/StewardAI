@@ -13740,6 +13740,222 @@
         }
       }
     },
+    "/disclosures/issuers/{issuer_id}/statements": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Issuer Statements",
+        "description": "As-filed annual history known by `as_of`, with restatements, derived figures and checks.",
+        "operationId": "issuer_statements",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issuer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Issuer Id"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/issuers/{issuer_id}/segment-bridge": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Issuer Segment Bridge",
+        "description": "Each segment axis bridged to reported revenue on its own; axes are never added together.",
+        "operationId": "issuer_segment_bridge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issuer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Issuer Id"
+            }
+          },
+          {
+            "name": "period_end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Period End"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentBridgeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/holdings/{ticker}/ownership": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Holding Ownership",
+        "description": "Ownership as separate dated lanes known by `as_of`. The lanes overlap, so no combined\ntotal is returned; each carries its own remainder against the stated share denominator.",
+        "operationId": "holding_ownership",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnershipOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/disclosures/provenance/{kind}/{row_id}": {
       "get": {
         "tags": [
@@ -16334,6 +16550,70 @@
         ],
         "title": "BoardRow"
       },
+      "BridgeAxisOut": {
+        "properties": {
+          "axis": {
+            "type": "string",
+            "title": "Axis"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/BridgeMemberOut"
+            },
+            "type": "array",
+            "title": "Members"
+          },
+          "members_sum": {
+            "type": "string",
+            "title": "Members Sum"
+          },
+          "eliminations": {
+            "type": "string",
+            "title": "Eliminations"
+          },
+          "unallocated": {
+            "type": "string",
+            "title": "Unallocated"
+          },
+          "reconciles": {
+            "type": "boolean",
+            "title": "Reconciles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "axis",
+          "members",
+          "members_sum",
+          "eliminations",
+          "unallocated",
+          "reconciles"
+        ],
+        "title": "BridgeAxisOut"
+      },
+      "BridgeMemberOut": {
+        "properties": {
+          "member": {
+            "type": "string",
+            "title": "Member"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "eliminations": {
+            "type": "boolean",
+            "title": "Eliminations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "member",
+          "value",
+          "eliminations"
+        ],
+        "title": "BridgeMemberOut"
+      },
       "Bucket": {
         "properties": {
           "key": {
@@ -17424,6 +17704,63 @@
         "type": "object",
         "title": "ChatSettings",
         "description": "The chat panel's assistant: DB tools, web search on tiered outlets, cited answers."
+      },
+      "CheckOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "needs_review"
+            ],
+            "title": "Status"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "expected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected"
+          },
+          "actual": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual"
+          },
+          "tolerance": {
+            "type": "string",
+            "title": "Tolerance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "status",
+          "detail",
+          "expected",
+          "actual",
+          "tolerance"
+        ],
+        "title": "CheckOut"
       },
       "CitedSentence": {
         "properties": {
@@ -21337,6 +21674,48 @@
           "status"
         ],
         "title": "DerivedListingResponse"
+      },
+      "DerivedOut": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "formula": {
+            "type": "string",
+            "title": "Formula"
+          },
+          "formula_version": {
+            "type": "string",
+            "title": "Formula Version"
+          },
+          "inputs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Inputs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "period_end",
+          "value",
+          "formula",
+          "formula_version",
+          "inputs"
+        ],
+        "title": "DerivedOut"
       },
       "DiffChange": {
         "properties": {
@@ -29640,6 +30019,67 @@
         ],
         "title": "HistoryEntry"
       },
+      "HistoryPointOut": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "Null is not disclosed or not reported, never zero."
+          },
+          "accession": {
+            "type": "string",
+            "title": "Accession"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "restated": {
+            "type": "boolean",
+            "title": "Restated"
+          },
+          "original_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Value",
+            "description": "What the first filing said, when restated."
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "period_end",
+          "value",
+          "accession",
+          "known_at",
+          "restated",
+          "original_value"
+        ],
+        "title": "HistoryPointOut"
+      },
       "Holding": {
         "properties": {
           "ticker": {
@@ -35302,6 +35742,205 @@
         ],
         "title": "KpiStatus"
       },
+      "LaneEntryOut": {
+        "properties": {
+          "holder": {
+            "type": "string",
+            "title": "Holder"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares",
+            "description": "Null when the filing gives no share count; not zero."
+          },
+          "reported_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Percent"
+          },
+          "report_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Date",
+            "description": "The date the figure is measured on."
+          },
+          "filed": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filed"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "lag_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lag Days"
+          },
+          "amended": {
+            "type": "boolean",
+            "title": "Amended"
+          }
+        },
+        "type": "object",
+        "required": [
+          "holder",
+          "shares",
+          "reported_percent",
+          "report_date",
+          "filed",
+          "known_at",
+          "lag_days",
+          "amended"
+        ],
+        "title": "LaneEntryOut"
+      },
+      "LaneOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "institutional_13f",
+              "control_13dg",
+              "fund_nport",
+              "national_voting"
+            ],
+            "title": "Key"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "covered",
+              "no_data",
+              "not_covered"
+            ],
+            "title": "Status"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/LaneEntryOut"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "total_shares": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Shares"
+          },
+          "percent_of_denominator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent Of Denominator"
+          },
+          "remainder_shares": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remainder Shares"
+          },
+          "remainder_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remainder Percent"
+          },
+          "overlaps_with": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Overlaps With"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "title",
+          "basis",
+          "status",
+          "entries",
+          "total_shares",
+          "percent_of_denominator",
+          "remainder_shares",
+          "remainder_percent",
+          "overlaps_with",
+          "notes"
+        ],
+        "title": "LaneOut"
+      },
       "LastAttempt": {
         "properties": {
           "checked_at": {
@@ -37327,6 +37966,30 @@
           "shares_type"
         ],
         "title": "ManagerPosition"
+      },
+      "ManagerRename": {
+        "properties": {
+          "cik": {
+            "type": "string",
+            "title": "Cik"
+          },
+          "names": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Names"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cik",
+          "names"
+        ],
+        "title": "ManagerRename"
       },
       "ManagerSummary": {
         "properties": {
@@ -39439,6 +40102,98 @@
           "envelope"
         ],
         "title": "ObservationRow"
+      },
+      "OwnershipOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "denominator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Denominator"
+          },
+          "denominator_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Denominator As Of"
+          },
+          "denominator_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Denominator Method"
+          },
+          "lanes": {
+            "items": {
+              "$ref": "#/components/schemas/LaneOut"
+            },
+            "type": "array",
+            "title": "Lanes"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "trend": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrendOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when fewer than two quarters are known."
+          },
+          "manager_renames": {
+            "items": {
+              "$ref": "#/components/schemas/ManagerRename"
+            },
+            "type": "array",
+            "title": "Manager Renames"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "as_of",
+          "denominator",
+          "denominator_as_of",
+          "denominator_method",
+          "lanes",
+          "warnings",
+          "trend",
+          "manager_renames"
+        ],
+        "title": "OwnershipOut"
       },
       "OwnershipPeriod": {
         "properties": {
@@ -46788,6 +47543,48 @@
         ],
         "title": "SectionCoverage"
       },
+      "SegmentBridgeOut": {
+        "properties": {
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "axes": {
+            "items": {
+              "$ref": "#/components/schemas/BridgeAxisOut"
+            },
+            "type": "array",
+            "title": "Axes"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period_end",
+          "total",
+          "axes",
+          "notes"
+        ],
+        "title": "SegmentBridgeOut"
+      },
       "SegmentHistoryPoint": {
         "properties": {
           "period": {
@@ -49087,6 +49884,76 @@
         ],
         "title": "StakeReconciliationOut"
       },
+      "StatementsOut": {
+        "properties": {
+          "issuer_id": {
+            "type": "integer",
+            "title": "Issuer Id"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "taxonomy_version": {
+            "type": "string",
+            "title": "Taxonomy Version"
+          },
+          "formula_version": {
+            "type": "string",
+            "title": "Formula Version"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryPointOut"
+            },
+            "type": "array",
+            "title": "History"
+          },
+          "derived": {
+            "items": {
+              "$ref": "#/components/schemas/DerivedOut"
+            },
+            "type": "array",
+            "title": "Derived"
+          },
+          "checks": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/CheckOut"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Checks"
+          },
+          "usable_for_valuation": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "Usable For Valuation"
+          },
+          "unmapped_concepts": {
+            "type": "integer",
+            "title": "Unmapped Concepts",
+            "description": "Facts with a concept the taxonomy does not map."
+          }
+        },
+        "type": "object",
+        "required": [
+          "issuer_id",
+          "as_of",
+          "taxonomy_version",
+          "formula_version",
+          "history",
+          "derived",
+          "checks",
+          "usable_for_valuation",
+          "unmapped_concepts"
+        ],
+        "title": "StatementsOut"
+      },
       "StoryOut": {
         "properties": {
           "id": {
@@ -50933,6 +51800,44 @@
           "fees"
         ],
         "title": "TransactionsPage"
+      },
+      "TrendOut": {
+        "properties": {
+          "prev_period": {
+            "type": "string",
+            "format": "date",
+            "title": "Prev Period"
+          },
+          "cur_period": {
+            "type": "string",
+            "format": "date",
+            "title": "Cur Period"
+          },
+          "prev": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Prev",
+            "description": "Manager to shares at the earlier quarter."
+          },
+          "cur": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Cur",
+            "description": "Manager to shares at the later quarter."
+          }
+        },
+        "type": "object",
+        "required": [
+          "prev_period",
+          "cur_period",
+          "prev",
+          "cur"
+        ],
+        "title": "TrendOut"
       },
       "TrustSettings": {
         "properties": {

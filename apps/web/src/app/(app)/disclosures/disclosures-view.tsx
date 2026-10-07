@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { CashConversion, DebtMaturities, SegmentBridgePanel, StatementHistory, ValuationGates } from "@/components/disclosure/statements";
+import { SAMPLE_MATURITIES, sampleBridge, sampleStatements } from "@/lib/disclosure/fixtures-financials";
+import type { SegmentBridge, StatementsOut } from "@/lib/disclosure/financials";
 import { CoverageRibbon, DatesTable, EvidencePanel, FilingsTable, ReviewPanel, SourcesPanel, ValuesTable } from "@/components/disclosure/panels";
 import { KnownAtRail } from "@/components/disclosure/known-at-rail";
 import { dataOf, Panel, ResourceNotice, SectionNav } from "@/components/oversight/panel";
@@ -35,6 +38,7 @@ import { useApiResource } from "@/lib/hooks/use-api-resource";
 const SECTIONS = [
   { id: "rail", label: "Known-at timeline" },
   { id: "values", label: "Values and relationships" },
+  { id: "statements", label: "Financial statements" },
   { id: "coverage", label: "Coverage" },
   { id: "review", label: "Review queue" },
   { id: "sources", label: "Sources" },
@@ -110,6 +114,39 @@ export function DisclosuresView() {
       clearTimeout(timer);
     };
   }, [issuer, sample, cutoff]);
+
+  const [liveStatements, setLiveStatements] = useState<StatementsOut | null>(null);
+  const [liveBridge, setLiveBridge] = useState<SegmentBridge | null>(null);
+
+  // Statements as known at the cutoff, and the segment bridge for the latest annual period shown.
+  useEffect(() => {
+    if (!issuer || sample) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const client = getBrowserApiClient();
+        const asOf = new Date(cutoff).toISOString();
+        const s = await client.GET("/disclosures/issuers/{issuer_id}/statements", { params: { path: { issuer_id: issuer.issuer_id }, query: { as_of: asOf } } });
+        if (cancelled) return;
+        if (!s.data) return setLoadError("Could not load the financial statements.");
+        setLiveStatements(s.data);
+        const end = s.data.history.map((p) => p.period_end).sort().at(-1);
+        if (!end) return setLiveBridge(null);
+        const b = await client.GET("/disclosures/issuers/{issuer_id}/segment-bridge", { params: { path: { issuer_id: issuer.issuer_id }, query: { period_end: end, as_of: asOf } } });
+        if (!cancelled) setLiveBridge(b.data ?? null);
+      } catch (e) {
+        if (!cancelled) setLoadError(String(e));
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [issuer, sample, cutoff]);
+
+  const statements = sample ? sampleStatements(cutoff) : liveStatements;
+  const statementEnd = statements?.history.map((p) => p.period_end).sort().at(-1) ?? null;
+  const bridge = sample ? sampleBridge(cutoff) : liveBridge;
 
   const view: View = useMemo(
     () =>
@@ -221,6 +258,36 @@ export function DisclosuresView() {
       <Panel id="values" title="Values and relationships" description="Machine readings show as under review until a person confirms them. A value that is not disclosed is shown as such, never as zero.">
         <ValuesTable observations={view.observations} claims={view.claims} onEvidence={openEvidence} />
         {evidence ? <EvidencePanel provenance={evidence.provenance} span={evidence.span} onClose={() => setEvidence(null)} /> : null}
+      </Panel>
+
+      <Panel
+        id="statements"
+        title="Financial statements"
+        description="Figures as each filing first reported them, with later restatements marked. A period whose arithmetic does not check is kept out of valuations, and says why."
+      >
+        {statements ? (
+          <div className="space-y-7">
+            <StatementHistory out={statements} />
+            <section className="space-y-2" aria-labelledby="cash-heading">
+              <h3 id="cash-heading" className="text-base font-semibold">Cash conversion</h3>
+              <CashConversion out={statements} end={statementEnd} />
+            </section>
+            <section className="space-y-2" aria-labelledby="gates-heading">
+              <h3 id="gates-heading" className="text-base font-semibold">Can these figures feed a valuation?</h3>
+              <ValuationGates out={statements} />
+            </section>
+            <section className="space-y-2" aria-labelledby="seg-heading">
+              <h3 id="seg-heading" className="text-base font-semibold">Segments against the reported total</h3>
+              {bridge ? <SegmentBridgePanel bridge={bridge} /> : <p className="text-sm text-text-muted">No segment breakdown is known for the latest period.</p>}
+            </section>
+            <section className="space-y-2" aria-labelledby="debt-heading">
+              <h3 id="debt-heading" className="text-base font-semibold">Debt due by year</h3>
+              <DebtMaturities items={sample ? SAMPLE_MATURITIES : []} sample={sample} />
+            </section>
+          </div>
+        ) : settled ? (
+          <p className="text-sm text-text-muted">Loading statements…</p>
+        ) : null}
       </Panel>
 
       <Panel id="coverage" title="Coverage" description={`What we could and could not read, as of ${formatDay(new Date(cutoff).toISOString())}. A gap is named, not hidden.`}>

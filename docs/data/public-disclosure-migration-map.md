@@ -26,6 +26,10 @@ The shared evidence tables (migration `20261007100000_disclosure_foundation.sql`
 
 `disclosure_source`, `disclosure_observation`, `extracted_claim`, `disclosure_coverage`, `quality_review`, `quality_review_event`, `disclosure_entity_mapping`. Phase-specific tables (ownership disclosure, insider enrichment, relationship claim detail, deals, estimates) land with their own phases.
 
+## Extended in P3 (`20261007110000_ownership_known_at.sql`)
+
+`form13f_filing`, `control_stake_filing` and `nport_filing` gain `known_at` (end of the filing day, UTC, filled by trigger when not given; never earlier than the filing). `form13f_filing` also gains `confidential_treatment` (`unknown` until a source says otherwise). No existing column, key or row is rewritten; the rollback drops only what was added. P2 reads `financial_statement_fact` and the ownership tables where they are; it adds no table.
+
 ## API consumers to keep working
 
 Existing owner routes read the extended tables with explicit column lists (for example `api/graph_routes.py`, `api/control_stake_routes.py`, `api/insider_routes.py`); added nullable columns do not change them. The new surface is the `/disclosures/*` router only.
