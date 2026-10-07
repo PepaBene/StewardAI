@@ -1893,14 +1893,19 @@ class JobsConfig(ConfigModel):
         "SEC XBRL filing (reported basis). Your own exposure entries are never changed. "
         "Default: Tuesdays 05:50.",
     )
+    disclosure_sources: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 6 * * *"),
+        description="Re-test every disclosure source, store the result, switch a failing one off "
+        "and the SEC sources on when they pass. Default: daily 06:00.",
+    )
     disclosure_ingest: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(cron="40 6 * * 1-5", enabled=False),
+        default_factory=lambda: JobSchedule(cron="40 6 * * 1-5"),
         description="Fetch, store and parse the newest SEC annual and quarterly filings of held "
-        "issuers. Off by default: switch on after the SEC sources pass their access test. "
+        "issuers. Skips itself until the SEC sources pass their access test. "
         "Default: weekdays 06:40.",
     )
     disclosure_identifiers: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(cron="20 6 * * 6", enabled=False),
+        default_factory=lambda: JobSchedule(cron="20 6 * * 6"),
         description="Suggest missing LEIs (GLEIF) and FIGIs (OpenFIGI); you confirm each. "
         "Default: Saturdays 06:20.",
     )
@@ -1977,6 +1982,7 @@ class JobsConfig(ConfigModel):
             "ir_discovery": self.ir_discovery,
             "gap_research": self.gap_research,
             "exposure_build": self.exposure_build,
+            "disclosure_sources": self.disclosure_sources,
             "disclosure_ingest": self.disclosure_ingest,
             "disclosure_identifiers": self.disclosure_identifiers,
             "disclosure_alerts": self.disclosure_alerts,

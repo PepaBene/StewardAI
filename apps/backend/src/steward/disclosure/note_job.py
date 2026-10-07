@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 import asyncpg
@@ -77,6 +77,27 @@ def _blocks(doc: ParsedDocument) -> list[tuple[str, TextBlock]]:
     return [(k, b) for b in doc.text_blocks if (k := _kind(b.name)) is not None]
 
 
+def block_text(doc: ParsedDocument, block: TextBlock) -> tuple[str, Callable[[int], int]]:
+    """The block's text, joined from its tagged span and its `continuedAt` spans (one newline
+    between spans), and a function that maps a position in that text back to the document."""
+    pieces: list[tuple[int, int, int]] = []  # joined start, document start, length
+    parts: list[str] = []
+    cursor = 0
+    for start, end in block.segments:
+        pieces.append((cursor, start, end - start))
+        parts.append(doc.text[start:end])
+        cursor += end - start + 1  # the joining newline
+    joined = "\n".join(parts)
+
+    def to_document(position: int) -> int:
+        for joined_start, doc_start, length in reversed(pieces):
+            if position >= joined_start:
+                return doc_start + min(position - joined_start, length)
+        return pieces[0][1] + position
+
+    return joined, to_document
+
+
 async def extract_notes_for_document(
     pool: Pool,
     *,
@@ -100,7 +121,7 @@ async def extract_notes_for_document(
     blocks = _blocks(doc)
     stored = 0
     for kind, block in blocks:
-        text = doc.text[block.start : block.end]
+        text, to_document = block_text(doc, block)
         debt: Schedule | None = None
         lease: Schedule | None = None
         repurchases: RepurchaseTable | None = None
@@ -127,7 +148,7 @@ async def extract_notes_for_document(
             lease=lease,
             repurchases=repurchases,
             evidence_id=evidence_id,
-            offset=block.start,
+            offset=to_document,
         )
     return NoteJobResult(len(blocks), stored, tuple(skipped))
 

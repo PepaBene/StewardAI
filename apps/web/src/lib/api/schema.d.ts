@@ -6023,7 +6023,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_alerts")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -13375,7 +13375,9 @@ export interface components {
             gap_research?: components["schemas"]["JobSchedule"];
             /** @description Builds each holding's revenue-by-country exposure from its latest annual SEC XBRL filing (reported basis). Your own exposure entries are never changed. Default: Tuesdays 05:50. */
             exposure_build?: components["schemas"]["JobSchedule"];
-            /** @description Fetch, store and parse the newest SEC annual and quarterly filings of held issuers. Off by default: switch on after the SEC sources pass their access test. Default: weekdays 06:40. */
+            /** @description Re-test every disclosure source, store the result, switch a failing one off and the SEC sources on when they pass. Default: daily 06:00. */
+            disclosure_sources?: components["schemas"]["JobSchedule"];
+            /** @description Fetch, store and parse the newest SEC annual and quarterly filings of held issuers. Skips itself until the SEC sources pass their access test. Default: weekdays 06:40. */
             disclosure_ingest?: components["schemas"]["JobSchedule"];
             /** @description Suggest missing LEIs (GLEIF) and FIGIs (OpenFIGI); you confirm each. Default: Saturdays 06:20. */
             disclosure_identifiers?: components["schemas"]["JobSchedule"];

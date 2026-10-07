@@ -15,6 +15,7 @@ import dataclasses
 import datetime as dt
 import json
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
@@ -32,6 +33,9 @@ from steward.disclosure.financials import (
 from steward.disclosure.note_tables import RepurchaseTable, Schedule
 
 type Pool = asyncpg.Pool | asyncpg.Connection
+# A fixed shift, or a function from a block-relative position to a document position (for a block
+# whose text is joined from several spans).
+type Offset = int | Callable[[int], int]
 
 NOTE_SOURCE = "note_extract"
 EXTRACTOR_VERSION = "note_tables-1"
@@ -48,11 +52,15 @@ def build_note_fact_rows(
     debt: Schedule | None = None,
     lease: Schedule | None = None,
     repurchases: RepurchaseTable | None = None,
-    offset: int = 0,
+    offset: Offset = 0,
 ) -> list[dict[str, Any]]:
     """The rows to store, as plain dicts: schedule, value, value_text and the `note` dimension.
     `offset` moves the extractor's block-relative offsets to offsets in the whole document."""
     out: list[dict[str, Any]] = []
+
+    def shift(position: int) -> int:
+        return offset(position) if callable(offset) else position + offset
+
     for sched in (debt, lease):
         if sched is None:
             continue
@@ -69,8 +77,8 @@ def build_note_fact_rows(
                         "label": r.label,
                         "status": r.status,
                         "reasons": list(r.reasons),
-                        "start": r.start + offset,
-                        "end": r.end + offset,
+                        "start": shift(r.start),
+                        "end": shift(r.end),
                         "raw": r.raw,
                         "columns": list(r.columns),
                         "dash": r.dash,
@@ -92,8 +100,8 @@ def build_note_fact_rows(
                         "label": p.period_label,
                         "status": p.status,
                         "reasons": list(p.reasons),
-                        "start": p.start + offset,
-                        "end": p.end + offset,
+                        "start": shift(p.start),
+                        "end": shift(p.end),
                         "raw": ", ".join(p.columns),
                         "columns": list(p.columns),
                         "shares": _s(p.shares),
@@ -125,7 +133,7 @@ async def store_note_tables(
     lease: Schedule | None = None,
     repurchases: RepurchaseTable | None = None,
     evidence_id: int | None = None,
-    offset: int = 0,
+    offset: Offset = 0,
 ) -> int:
     """Insert the extracted buckets once; returns the number of new rows. `known_at` is the
     filing's public time. The currency is required because note text does not carry one."""

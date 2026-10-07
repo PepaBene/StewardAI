@@ -99,6 +99,13 @@ class TextBlock:
     context_ref: str | None
     start: int
     end: int
+    # Later spans of the same block: a filing often tags only the heading and carries the rest in
+    # `ix:continuation` elements chained by `continuedAt`. In chain order after `start:end`.
+    continuations: tuple[tuple[int, int], ...] = ()
+
+    @property
+    def segments(self) -> tuple[tuple[int, int], ...]:
+        return ((self.start, self.end), *self.continuations)
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,7 +185,10 @@ class _Parser(HTMLParser):
         self.facts: list[IxFact] = []
         self._fact_stack: list[tuple[dict[str, str], int, list[str]]] = []
         self.blocks: list[TextBlock] = []
-        self._block_stack: list[tuple[str, str | None, int]] = []
+        self._block_stack: list[tuple[str, str | None, int, str]] = []
+        self._cont_stack: list[tuple[str, str, int]] = []  # id, continuedAt, start
+        self.conts: dict[str, tuple[str, int, int]] = {}  # id -> continuedAt, start, end
+        self.block_links: list[str] = []  # continuedAt of each block, parallel to self.blocks
         self.contexts: dict[str, IxContext] = {}
         self.units: dict[str, str] = {}
         self.footnotes: list[Footnote] = []
@@ -301,7 +311,11 @@ class _Parser(HTMLParser):
         if tag == "ix:nonfraction":
             self._fact_stack.append((a, self.pos, []))
         elif tag == "ix:nonnumeric":
-            self._block_stack.append((a.get("name", ""), a.get("contextref"), self.pos))
+            self._block_stack.append(
+                (a.get("name", ""), a.get("contextref"), self.pos, a.get("continuedat", ""))
+            )
+        elif tag == "ix:continuation":
+            self._cont_stack.append((a.get("id", ""), a.get("continuedat", ""), self.pos))
         elif tag == "table":
             self._newline()
             self._table_stack.append((self.pos, []))
@@ -389,8 +403,13 @@ class _Parser(HTMLParser):
         if tag == "ix:nonfraction" and self._fact_stack:
             self._close_fact()
         elif tag == "ix:nonnumeric" and self._block_stack:
-            name, ctx, start = self._block_stack.pop()
+            name, ctx, start, link = self._block_stack.pop()
             self.blocks.append(TextBlock(name, ctx, start, self.pos))
+            self.block_links.append(link)
+        elif tag == "ix:continuation" and self._cont_stack:
+            cid, link, start = self._cont_stack.pop()
+            if cid:
+                self.conts[cid] = (link, start, self.pos)
         elif tag in ("td", "th") and self._row is not None and self._cell_start is not None:
             self._row[1].append("".join(self._cell_parts or ()).strip())
             self._cell_start = None
@@ -440,6 +459,22 @@ def _sections(text: str, headings: list[tuple[str, int, int]]) -> list[Section]:
     return out
 
 
+def _with_continuations(
+    blocks: list[TextBlock], links: list[str], conts: dict[str, tuple[str, int, int]]
+) -> list[TextBlock]:
+    """Attach each block's `continuedAt` chain. An unknown id or a cycle ends the chain there."""
+    out: list[TextBlock] = []
+    for block, link in zip(blocks, links, strict=True):
+        spans: list[tuple[int, int]] = []
+        seen: set[str] = set()
+        while link and link not in seen and link in conts:
+            seen.add(link)
+            link, start, end = conts[link]
+            spans.append((start, end))
+        out.append(replace(block, continuations=tuple(spans)) if spans else block)
+    return out
+
+
 def parse_html(data: bytes) -> ParsedDocument:
     """Parse an (inline-XBRL) HTML filing. Raises ParseError when nothing readable remains."""
     if not data or not data.strip():
@@ -466,7 +501,7 @@ def parse_html(data: bytes) -> ParsedDocument:
         sections=_sections(text, parser.headings),
         tables=parser.tables,
         facts=facts,
-        text_blocks=parser.blocks,
+        text_blocks=_with_continuations(parser.blocks, parser.block_links, parser.conts),
         footnotes=parser.footnotes,
         contexts=parser.contexts,
         units=parser.units,

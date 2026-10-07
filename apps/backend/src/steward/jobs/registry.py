@@ -12,6 +12,7 @@ from steward.disclosure.jobs import (
     disclosure_alerts_handler,
     disclosure_identifiers_handler,
     disclosure_ingest_handler,
+    disclosure_sources_handler,
 )
 from steward.earnings.calendar import (
     earnings_calendar_full_handler,
@@ -121,6 +122,7 @@ JobType = Literal[
     "ir_discovery",
     "gap_research",
     "exposure_build",
+    "disclosure_sources",
     "disclosure_ingest",
     "disclosure_identifiers",
     "disclosure_alerts",
@@ -179,6 +181,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "ir_discovery": ir_discovery_handler,
     "gap_research": gap_research_handler,
     "exposure_build": exposure_build_handler,
+    "disclosure_sources": disclosure_sources_handler,
     "disclosure_ingest": disclosure_ingest_handler,
     "disclosure_identifiers": disclosure_identifiers_handler,
     "disclosure_alerts": disclosure_alerts_handler,

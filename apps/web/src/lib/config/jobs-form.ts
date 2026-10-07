@@ -298,6 +298,12 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Builds each holding's revenue-by-country exposure from its latest annual SEC filing. Only single countries are mapped; your own exposure entries are never changed, and a row you delete is not rebuilt.",
     cron: "50 5 * * 2",
   },
+  disclosure_sources: {
+    label: "Disclosure source tests",
+    description:
+      "Re-tests every disclosure source each day and stores what it answered. A source that stops answering is switched off; the SEC sources are switched on again when they pass.",
+    cron: "0 6 * * *",
+  },
   disclosure_ingest: {
     label: "Filing ingestion",
     description:
@@ -320,7 +326,7 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
 
 /** Schedules that start off: they spend a provider's free allowance or need a key, so you switch them on yourself. */
-const OFF_BY_DEFAULT: readonly ScheduleKey[] = ["fmp_company", "alpha_vantage_statements", "epo_patents", "companies_house_filings", "edinet_filings", "twelve_data_corporate_actions", "disclosure_ingest", "disclosure_identifiers"];
+const OFF_BY_DEFAULT: readonly ScheduleKey[] = ["fmp_company", "alpha_vantage_statements", "epo_patents", "companies_house_filings", "edinet_filings", "twelve_data_corporate_actions"];
 export const DEFAULT_TIMEZONE = "Europe/Prague";
 
 /** The backend's defaults, for when nothing is saved yet (a 404). */

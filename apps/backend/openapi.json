@@ -18540,6 +18540,7 @@
                 "ir_discovery",
                 "gap_research",
                 "exposure_build",
+                "disclosure_sources",
                 "disclosure_ingest",
                 "disclosure_identifiers",
                 "disclosure_alerts"
@@ -18607,6 +18608,7 @@
                 "ir_discovery",
                 "gap_research",
                 "exposure_build",
+                "disclosure_sources",
                 "disclosure_ingest",
                 "disclosure_identifiers",
                 "disclosure_alerts"
@@ -38911,9 +38913,13 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Builds each holding's revenue-by-country exposure from its latest annual SEC XBRL filing (reported basis). Your own exposure entries are never changed. Default: Tuesdays 05:50."
           },
+          "disclosure_sources": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Re-test every disclosure source, store the result, switch a failing one off and the SEC sources on when they pass. Default: daily 06:00."
+          },
           "disclosure_ingest": {
             "$ref": "#/components/schemas/JobSchedule",
-            "description": "Fetch, store and parse the newest SEC annual and quarterly filings of held issuers. Off by default: switch on after the SEC sources pass their access test. Default: weekdays 06:40."
+            "description": "Fetch, store and parse the newest SEC annual and quarterly filings of held issuers. Skips itself until the SEC sources pass their access test. Default: weekdays 06:40."
           },
           "disclosure_identifiers": {
             "$ref": "#/components/schemas/JobSchedule",

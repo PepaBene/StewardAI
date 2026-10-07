@@ -24,8 +24,17 @@ from steward.disclosure.identifier_job import (
     openfigi_figi_lookup,
     resolve_identifiers,
 )
-from steward.disclosure.ingest_job import ingest_filings
-from steward.disclosure.registry import SourceNotEnabled
+from steward.disclosure.ingest_job import ingest_filings, mirror_stored_facts
+from steward.disclosure.note_job import extract_notes_for_document
+from steward.disclosure.parse import parse_html
+from steward.disclosure.probe import run_probes
+from steward.disclosure.registry import (
+    SPEC_BY_KEY,
+    SourceNotEnabled,
+    record_access_test,
+    seed_sources,
+    set_enabled,
+)
 from steward.disclosure.sec_discovery import discover_filings
 from steward.jobs.runner import JobContext
 from steward.notify.channels import ChannelError, EmailChannel
@@ -113,6 +122,86 @@ async def disclosure_ingest_handler(ctx: JobContext) -> None:
                 totals["failed"] += outcome.failed
             step.detail.update(totals)
             step.detail["errors"] = errors
+        async with ctx.step("backfill") as step:
+            if store is None:
+                step.detail["skipped"] = "no evidence store configured"
+            else:
+                step.detail.update(await backfill_stored(ctx.pool, store))
+
+
+BACKFILL_PER_RUN = 5
+BACKFILL_WINDOW = dt.timedelta(days=30)
+
+
+async def backfill_stored(pool: Pool, store: EvidenceStore) -> dict[str, Any]:
+    """Finish the work on recently archived filings that have no linked facts yet: link the
+    stored statement facts to their place in the document and read the note tables. Both are
+    safe to repeat. A filing that still yields nothing is retried only while it is recent."""
+    rows = await pool.fetch(
+        """select v.id version_id, v.archive_path, v.known_at, d.issuer_id, d.external_id,
+                  d.form, d.stable_url,
+                  (select l.ticker from public.security_listing l
+                     join public.security s on s.id = l.security_id
+                    where s.issuer_id = d.issuer_id and l.status = 'active'
+                    order by l.id limit 1) ticker
+             from public.source_document_version v
+             join public.source_document d on d.id = v.document_id
+            where v.archive_path is not null and not v.quarantined and d.issuer_id is not null
+              and d.regulator = 'SEC' and v.first_seen_at > now() - $1::interval
+              and not exists (select 1 from public.disclosure_observation o
+                               where o.document_version_id = v.id)
+            order by v.id desc limit $2""",
+        BACKFILL_WINDOW,
+        BACKFILL_PER_RUN,
+    )
+    done: dict[str, Any] = {"checked": len(rows), "mirrored": 0, "note_rows": 0, "errors": []}
+    errors: list[str] = []
+    for row in rows:
+        try:
+            doc = parse_html(await store.get(row["archive_path"]))
+            done["mirrored"] += await mirror_stored_facts(
+                pool, row["issuer_id"], row["external_id"], row["version_id"], doc
+            )
+            notes = await extract_notes_for_document(
+                pool,
+                issuer_id=row["issuer_id"],
+                ticker=row["ticker"],
+                accession=row["external_id"],
+                form=row["form"],
+                known_at=row["known_at"],
+                source_url=row["stable_url"],
+                doc=doc,
+            )
+            done["note_rows"] += notes.stored
+        except Exception as exc:  # one filing must not stop the rest
+            errors.append(f"version {row['version_id']}: {type(exc).__name__}")
+    done["errors"] = errors
+    return done
+
+
+# Sources a job in this module reads. They are switched on after a recorded passing access test
+# and off again, by `record_access_test`, the day a test fails.
+AUTO_ENABLED = ("sec.submissions", "sec.archive")
+
+
+async def disclosure_sources_handler(ctx: JobContext) -> None:
+    """Re-test every disclosure source and store the verdicts. A source that stops passing is
+    switched off; the SEC sources the other jobs need are switched on when they pass."""
+    settings = get_settings()
+    async with ctx.step("seed") as step:
+        step.detail["new_sources"] = await seed_sources(ctx.pool)
+    async with ctx.step("probe") as step:
+        results = await run_probes(settings)
+        verdicts: dict[str, str] = {}
+        for r in results:
+            if r.source_key not in SPEC_BY_KEY or r.source_key == "issuer_ir.consensus":
+                continue
+            await record_access_test(ctx.pool, r.source_key, r.verdict, r.detail[:500])
+            verdicts[r.source_key] = r.verdict.value
+        for key in AUTO_ENABLED:
+            if verdicts.get(key) == "available":
+                await set_enabled(ctx.pool, key, True)
+        step.detail["verdicts"] = verdicts
 
 
 async def disclosure_identifiers_handler(ctx: JobContext) -> None:
