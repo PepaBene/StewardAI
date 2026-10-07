@@ -293,6 +293,49 @@ export function GovernanceView({ ticker }: { ticker: string }) {
                 </div>
               )}
             </Blueprint>
+            <Blueprint aria-labelledby="gov-pay" className="space-y-3 px-[22px] py-5">
+              <PanelHeading kicker="Named executives, from the proxy statement" title={<span id="gov-pay">Compensation</span>} />
+              <p className="text-sm text-text-muted">{d.compensation_note}</p>
+              {(d.compensation ?? []).length > 0 ? (
+                <div className="overflow-x-auto border border-border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-surface-sunken text-left">
+                        <th scope="col" className="px-2 py-1.5 font-medium">Executive</th>
+                        <th scope="col" className="px-2 py-1.5 text-right font-medium">Year</th>
+                        <th scope="col" className="px-2 py-1.5 text-right font-medium">Salary</th>
+                        <th scope="col" className="px-2 py-1.5 text-right font-medium">Bonus</th>
+                        <th scope="col" className="px-2 py-1.5 text-right font-medium">Stock awards</th>
+                        <th scope="col" className="px-2 py-1.5 text-right font-medium">Other</th>
+                        <th scope="col" className="px-2 py-1.5 text-right font-medium">Total ({(d.compensation ?? [])[0]?.currency})</th>
+                        <th scope="col" className="px-2 py-1.5 font-medium">Source</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(d.compensation ?? []).map((c) => {
+                        const cell = (key: string) => {
+                          const v = toNumber(c.components[key]);
+                          return v === null ? <Absent reason="not reported" /> : formatFigure(v, "money");
+                        };
+                        const other = ["option_award", "incentive_plan", "all_other"].map((k) => toNumber(c.components[k])).filter((v): v is number => v !== null);
+                        return (
+                          <tr key={`${c.person}-${c.fiscal_year}`} className="border-t border-border-soft align-top">
+                            <th scope="row" className="px-2 py-1 text-left font-normal">{c.person}</th>
+                            <td className="num px-2 py-1 text-right">{c.fiscal_year}</td>
+                            <td className="num px-2 py-1 text-right">{cell("salary")}</td>
+                            <td className="num px-2 py-1 text-right">{cell("bonus")}</td>
+                            <td className="num px-2 py-1 text-right">{cell("stock_award")}</td>
+                            <td className="num px-2 py-1 text-right">{other.length > 0 ? formatFigure(other.reduce((a, b) => a + b, 0), "money") : <Absent reason="not reported" />}</td>
+                            <td className="num px-2 py-1 text-right font-semibold">{formatFigure(c.total, "money")}</td>
+                            <td className="px-2 py-1"><SourceLink href={c.source_url}>{c.filed ? `filed ${formatDate(c.filed)}` : "filing"}</SourceLink></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </Blueprint>
             <Blueprint aria-labelledby="gov-rel" className="space-y-3 px-[22px] py-5">
               <PanelHeading kicker="Disclosed customers and suppliers" title={<span id="gov-rel">Relationship disclosures</span>} />
               {d.related_party.length === 0 ? (

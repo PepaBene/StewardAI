@@ -7709,6 +7709,36 @@ export interface components {
             /** Percentile */
             percentile: number | string | null;
         };
+        /** Compensation */
+        Compensation: {
+            /**
+             * Person
+             * @description Name and position as the proxy statement gives them.
+             */
+            person: string;
+            /** Fiscal Year */
+            fiscal_year: number;
+            /** Total */
+            total: number | string;
+            /**
+             * Currency
+             * @default USD
+             */
+            currency: string;
+            /**
+             * Components
+             * @description Only the components the provider sent; an absent one is not zero.
+             */
+            components: {
+                [key: string]: number | string;
+            };
+            /** Filed */
+            filed: string | null;
+            /** Source Url */
+            source_url: string;
+            /** Provider */
+            provider: string;
+        };
         /** ComplianceRow */
         ComplianceRow: {
             /**
@@ -12108,6 +12138,10 @@ export interface components {
             related_party: {
                 [key: string]: unknown;
             }[];
+            /** Compensation */
+            compensation?: components["schemas"]["Compensation"][];
+            /** Compensation Note */
+            compensation_note: string;
             /** Caveats */
             caveats: string[];
             /** Method Version */
