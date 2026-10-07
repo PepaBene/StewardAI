@@ -14,7 +14,7 @@ import datetime as dt
 import itertools
 import json
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -111,7 +111,12 @@ class StatementsView(BaseModel):
     units: int
     transform: Transform
     per_share: bool
-    currency: str | None
+    currency: str | None = Field(
+        description="The currency of the figures shown (the converted one when a base currency was chosen)."
+    )
+    native_currency: str | None = Field(
+        default=None, description="The currency the facts were filed in."
+    )
     columns: list[Column]
     statements: list[StatementTable]
     checks: list[StatementCheck]
@@ -627,7 +632,12 @@ def build_view(
     units: int = 1_000_000,
     transform: Transform = "none",
     per_share: bool = False,
+    convert: tuple[str, Callable[[list[StatementTable], list[Column], str], list[str]]]
+    | None = None,
 ) -> StatementsView:
+    """`convert` is (target currency, a function that translates the money cells in place and
+    returns notes); it runs before units and transforms so growth and common-size use converted
+    figures. Only a single-currency company is converted."""
     standardized = basis == "standardized"
     plain, dimensional = to_obs(rows, key="line_item" if standardized else "concept")
     by_key: dict[str, list[Obs]] = defaultdict(list)
@@ -642,6 +652,20 @@ def build_view(
         tables, checks = _as_reported(plain, dimensional, columns, view), []
     if not columns:
         warnings.append("No filed annual or quarterly statement facts are stored for this company.")
+    native_set = {o.currency for o in plain if o.currency and o.unit.upper() == o.currency.upper()}
+    native_currency = next(iter(sorted(native_set)), None)
+    converted_to: str | None = None
+    if convert is not None:
+        target, translate = convert
+        if len(native_set) == 1 and native_currency and native_currency != target:
+            warnings.extend(translate(tables, columns, native_currency))
+            converted_to = target
+        elif native_currency == target:
+            warnings.append(f"The statements are already in {target}; no conversion was needed.")
+        else:
+            warnings.append(
+                "Facts are in more than one currency or none is stated, so no conversion was applied."
+            )
     if transform != "none" or per_share or units != 1:
         warnings.extend(
             apply_transform(
@@ -687,7 +711,8 @@ def build_view(
         units=units,
         transform=transform,
         per_share=per_share,
-        currency=next(iter(sorted(currencies)), None),
+        currency=converted_to or next(iter(sorted(currencies)), None),
+        native_currency=native_currency,
         columns=columns,
         statements=tables,
         checks=checks,
@@ -703,6 +728,7 @@ def build_view(
                 "facts": sorted(o.fact_id for o in plain),
                 "basis": basis,
                 "view": view,
+                "converted_to": converted_to,
             }
         ),
         note=(

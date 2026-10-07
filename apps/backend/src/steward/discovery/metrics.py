@@ -39,6 +39,16 @@ class MetricDef:
     requires_access: tuple[str, str] | None = None
     # Fixed text for a metric no free source can currently fill (disabled in the UI).
     no_source_reason: str | None = None
+    # An optional provider whose key unlocks more of this metric's data. Set by hand where a
+    # provider fills the metric without being a hard gate (`requires_access` is the hard gate).
+    optional_provider: str | None = None
+
+    @property
+    def needs_provider(self) -> str | None:
+        """The provider a user must connect for this metric, or None when it works key-free."""
+        if self.requires_access is not None:
+            return self.requires_access[0]
+        return self.optional_provider
 
 
 _RATIO_PERIOD = {
@@ -114,6 +124,7 @@ _STOCK: tuple[MetricDef, ...] = (
         "text",
         "provider profile sector (FMP), where fetched",
         period="n/a",
+        optional_provider="fmp",
     ),
     MetricDef(
         "industry",
@@ -123,6 +134,7 @@ _STOCK: tuple[MetricDef, ...] = (
         "text",
         "provider profile industry (FMP), where fetched",
         period="n/a",
+        optional_provider="fmp",
     ),
     MetricDef(
         "market_cap",
@@ -414,8 +426,8 @@ _FUND: tuple[MetricDef, ...] = (
         "performance",
         "numeric",
         "fraction",
-        "fund total return - benchmark total return, same currency and dates",
-        no_source_reason="needs fund NAV or total-return history and a benchmark total-return series; neither is stored yet",
+        "annualised fund return - benchmark return over the longest period both cover, on the same basis and currency; "
+        "only for funds where you recorded a benchmark",
     ),
 )
 

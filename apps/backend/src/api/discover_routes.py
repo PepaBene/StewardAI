@@ -8,7 +8,8 @@ limited to saved screens, column sets and universe snapshots; broker data is nev
 
 import datetime as dt
 import json
-from typing import Annotated, Literal
+from decimal import Decimal
+from typing import Annotated, Any, Literal
 
 import asyncpg
 from fastapi import APIRouter, HTTPException, Path, Query, Response, status
@@ -16,10 +17,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from api.auth import Owner
 from api.db import Pool
-from steward.analytics.contract import input_hash
+from steward.analytics.contract import input_hash, rounded
 from steward.analytics.versions import version
 from steward.discovery import baselines as bl
 from steward.discovery import build, composite, read
+from steward.discovery.backtest import run_backtest
 from steward.discovery.engine import DiscoveryResult, Missing, Record, run_discovery
 from steward.discovery.export import to_csv
 from steward.discovery.metrics import (
@@ -27,16 +29,21 @@ from steward.discovery.metrics import (
     STOCK_CATALOGUE,
     DiscoverFilter,
     MetricDef,
+    MetricValue,
     metric_state,
     validate_filters,
 )
 from steward.discovery.universe import (
+    FrozenBacktestPlan,
     UniverseMember,
     UniverseSnapshot,
     describe_universe,
     freeze,
     scope_for_date,
 )
+from steward.fundresearch import service as fund_service
+from steward.fundresearch.data import load_fund
+from steward.fundresearch.performance import tracking_headline
 
 router = APIRouter(prefix="/discover", tags=["discover"])
 MAX_FILTERS = 12
@@ -116,6 +123,16 @@ class MetricInfo(BaseModel):
     disabled_reason: str | None
     known: int
     total: int
+    needs_provider: str | None = Field(
+        default=None,
+        description="Optional provider whose key this metric depends on; null = key-free.",
+    )
+
+
+class ProviderNeed(BaseModel):
+    provider: str
+    state: str = Field(description="Worst access state among the endpoints the metrics use.")
+    unlocks: list[str] = Field(description="Metric labels that depend on this provider.")
 
 
 class CatalogueResponse(BaseModel):
@@ -127,6 +144,8 @@ class CatalogueResponse(BaseModel):
     warnings: list[str]
     method_version: str
     keyless_note: str
+    providers: list[ProviderNeed] = Field(default_factory=list)
+    keyless_count: int = 0
 
 
 def _today() -> dt.date:
@@ -191,6 +210,14 @@ async def _stock_records(
     return records, scores
 
 
+def _provider_state(provider: str, access: dict[tuple[str, str], str]) -> str:
+    """'available' only when every recorded endpoint of the provider is; unknown when none is."""
+    states = {s for (p, _), s in access.items() if p == provider}
+    if not states:
+        return "access_unverified"
+    return "available" if states == {"available"} else sorted(states - {"available"})[0]
+
+
 @router.get("/catalogue", response_model=CatalogueResponse)
 async def catalogue(
     pool: Pool,
@@ -248,9 +275,24 @@ async def catalogue(
                 disabled_reason=why,
                 known=cover[m.id],
                 total=len(records),
+                needs_provider=m.needs_provider,
             )
         )
+    providers: dict[str, list[str]] = {}
+    for m in cat.values():
+        if m.needs_provider:
+            providers.setdefault(m.needs_provider, []).append(m.label)
+    needs = [
+        ProviderNeed(
+            provider=p,
+            state=_provider_state(p, access),
+            unlocks=labels,
+        )
+        for p, labels in sorted(providers.items())
+    ]
     return CatalogueResponse(
+        providers=needs,
+        keyless_count=sum(1 for i in items if i.needs_provider is None and i.enabled),
         kind=kind,
         as_of=day,
         universe=info,
@@ -332,13 +374,45 @@ async def _run_stock(pool: asyncpg.Pool, owner_id: object, body: StockRequest) -
 
 @router.post("/funds", response_model=DiscoveryResult)
 async def discover_funds(body: FundRequest, pool: Pool, owner: Owner) -> DiscoveryResult:
-    return await _run_fund(pool, body)
+    return await _run_fund(pool, body, owner.user_id)
 
 
-async def _run_fund(pool: asyncpg.Pool, body: FundRequest) -> DiscoveryResult:
+TRACKING_FUNDS_MAX = 40
+
+
+async def _add_tracking(
+    pool: asyncpg.Pool, records: list[Record], owner_id: Any, as_of: dt.date
+) -> int:
+    """Fill the tracking difference for funds whose owner recorded a benchmark. The figure is the same
+    one the fund's performance page shows; others keep the reason it is missing. Returns how many were
+    left uncomputed because of the per-run cap."""
+    rows = await pool.fetch(
+        "select distinct fund_isin from public.fund_owner_fact where owner_id=$1 and key='benchmark_symbol'",
+        owner_id,
+    )
+    wanted = {r["fund_isin"] for r in rows}
+    todo = [r for r in records if r.key in wanted]
+    for rec in todo[:TRACKING_FUNDS_MAX]:
+        data = await load_fund(pool, rec.key, owner_id, as_of)
+        if data is None:
+            continue
+        view = await fund_service.performance_view(pool, data, None, None, as_of)
+        diff, note = tracking_headline(view)
+        rec.values["tracking_difference"] = MetricValue(
+            value=diff,
+            reason=None if diff is not None else note,
+            period_end=as_of,
+            basis="annualised, same basis",
+            source="listing prices and your recorded benchmark",
+        )
+    return max(0, len(todo) - TRACKING_FUNDS_MAX)
+
+
+async def _run_fund(pool: asyncpg.Pool, body: FundRequest, owner_id: Any = None) -> DiscoveryResult:
     as_of = body.as_of or _today()
     funds = await read.fund_inputs(pool, as_of)
     records = [build.fund_record(f, as_of) for f in funds]
+    skipped = await _add_tracking(pool, records, owner_id, as_of) if owner_id else 0
     access = await read.provider_states(pool)
     problems = validate_filters(
         body.filters,
@@ -349,7 +423,7 @@ async def _run_fund(pool: asyncpg.Pool, body: FundRequest) -> DiscoveryResult:
     )
     if problems:
         raise _422([f"{p.metric}: {p.message}" for p in problems])
-    return run_discovery(
+    result = run_discovery(
         records,
         FUND_CATALOGUE,
         body.filters,
@@ -365,6 +439,11 @@ async def _run_fund(pool: asyncpg.Pool, body: FundRequest) -> DiscoveryResult:
         cursor=body.cursor,
         caveats=FUND_CAVEATS,
     )
+    if skipped:
+        result.warnings.append(
+            f"Tracking difference was computed for the first {TRACKING_FUNDS_MAX} funds with a recorded benchmark; {skipped} more were left out of that column."
+        )
+    return result
 
 
 class ExportRequest(BaseModel):
@@ -380,7 +459,7 @@ async def export_csv(body: ExportRequest, pool: Pool, owner: Owner) -> Response:
     with method version, hashes, data date and filters as header comments."""
     stamp = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
     if body.kind == "fund":
-        result = await _run_fund(pool, body.fund or FundRequest(limit=200))
+        result = await _run_fund(pool, body.fund or FundRequest(limit=200), owner.user_id)
         cat: dict[str, MetricDef] = FUND_CATALOGUE
     else:
         req = (body.stock or StockRequest()).model_copy(update={"limit": 200, "cursor": None})
@@ -475,6 +554,197 @@ async def freeze_universe(pool: Pool, owner: Owner) -> SnapshotCreated:
         as_of=today,
         members=len(snap.members),
         active=sum(1 for m in snap.members if m.status == "active"),
+    )
+
+
+# --------------------------------------------------------------------------------------
+# Historical screen test (plan M1.7)
+# --------------------------------------------------------------------------------------
+
+MAX_REBALANCES = 24
+FREQUENCY_MONTHS = {"quarterly": 3, "semiannual": 6, "annual": 12}
+
+
+def _add_months(day: dt.date, months: int) -> dt.date:
+    index = day.year * 12 + day.month - 1 + months
+    year, month = divmod(index, 12)
+    month += 1
+    last = (dt.date(year + (month == 12), month % 12 + 1, 1) - dt.timedelta(days=1)).day
+    return dt.date(year, month, min(day.day, last))
+
+
+class BacktestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    filters: Annotated[list[DiscoverFilter], Field(max_length=MAX_FILTERS)] = Field(
+        default_factory=list
+    )
+    sort_by: str | None = None
+    descending: bool | None = None
+    missing: Missing = "exclude"
+    start: dt.date
+    end: dt.date
+    frequency: Literal["quarterly", "semiannual", "annual"] = "annual"
+    max_names: Annotated[int, Field(ge=1, le=50)] = 10
+    cost_bps: Annotated[int, Field(ge=0, le=500)] = 10
+    benchmark_ticker: str | None = None
+
+
+class BacktestName(BaseModel):
+    ticker: str
+    entry: Decimal
+    exit: Decimal
+    period_return: Decimal | None
+    weight: Decimal
+    ended_early: bool
+
+
+class BacktestPeriod(BaseModel):
+    start: dt.date
+    end: dt.date
+    universe_size: int
+    matched: int
+    picked: list[str]
+    held: list[BacktestName]
+    dropped_no_price: list[str]
+    gross_return: Decimal | None
+    turnover: Decimal
+    cost: Decimal
+    net_return: Decimal | None
+    benchmark_return: Decimal | None
+    note: str | None
+
+
+class BacktestResponse(BaseModel):
+    method_version: str
+    fingerprint: str
+    definition_hash: str
+    start: dt.date
+    end: dt.date
+    frequency: str
+    max_names: int
+    cost_bps: int
+    periods: list[BacktestPeriod]
+    cumulative_net: Decimal | None
+    cumulative_gross: Decimal | None
+    cost_drag: Decimal | None
+    annualised_net: Decimal | None
+    benchmark_ticker: str | None
+    benchmark_cumulative: Decimal | None
+    warnings: list[str]
+    caveats: list[str]
+
+
+BACKTEST_CAVEATS = [
+    "A description of what this rule would have done with the data the app stored, not a forecast.",
+    "Each rebalance uses the members listed on that date (delisted names included) and only facts known by then.",
+    "Equal weight; the stated cost applies to the traded share of the portfolio at every rebalance.",
+    "Coverage is limited to instruments the app tracked; names it never covered cannot appear.",
+]
+
+
+@router.post("/backtest", response_model=BacktestResponse)
+async def backtest_screen(body: BacktestRequest, pool: Pool, owner: Owner) -> BacktestResponse:
+    today = _today()
+    if body.end <= body.start or body.end > today:
+        raise _422(["the end date must be after the start date and not in the future"])
+    step = FREQUENCY_MONTHS[body.frequency]
+    dates: list[dt.date] = []
+    d = body.start
+    while d < body.end:
+        dates.append(d)
+        d = _add_months(d, step)
+    if len(dates) > MAX_REBALANCES:
+        raise _422(
+            [
+                f"at most {MAX_REBALANCES} rebalance dates; use a coarser frequency or a shorter window"
+            ]
+        )
+    members = await read.load_universe(pool)
+    plan = FrozenBacktestPlan(transaction_cost_bps=body.cost_bps)
+    picks: dict[dt.date, list[str]] = {}
+    sizes: dict[dt.date, tuple[int, int]] = {}
+    for r in dates:
+        cutoff = dt.datetime(r.year, r.month, r.day, 23, 59, 59, tzinfo=dt.UTC)
+        scoped, _ = scope_for_date(members, r, today)
+        plan.add(r, freeze(scoped, r, cutoff), cutoff)
+        req = StockRequest(
+            filters=body.filters,
+            missing=body.missing,
+            sort_by=body.sort_by,
+            descending=body.descending,
+            limit=body.max_names,
+            as_of=r,
+            known_at=cutoff,
+        )
+        result = await _run_stock(pool, owner.user_id, req)
+        picks[r] = [row.key for row in result.rows]
+        sizes[r] = (result.universe_size, result.matched)
+    held_members = [m for m in members if any(m.ticker in p for p in picks.values())]
+    bench_member = next((m for m in members if m.ticker == body.benchmark_ticker), None)
+    if body.benchmark_ticker and bench_member is None:
+        raise _422([f"benchmark {body.benchmark_ticker} is not a covered instrument"])
+    wanted = held_members + ([bench_member] if bench_member else [])
+    closes = await read.closes_between(pool, wanted, body.start - dt.timedelta(days=12), body.end)
+    outcome = run_backtest(
+        plan,
+        picks,
+        closes,
+        body.end,
+        benchmark=closes.get(body.benchmark_ticker) if body.benchmark_ticker else None,
+        current_members=members,
+    )
+    warnings = list(outcome.warnings)
+    if body.benchmark_ticker and body.benchmark_ticker not in closes:
+        warnings.append(
+            f"benchmark {body.benchmark_ticker} has no stored prices: no benchmark line"
+        )
+    by_start = {p.start: p for p in outcome.periods}
+    periods = [
+        BacktestPeriod(
+            start=p.start,
+            end=p.end,
+            universe_size=sizes[p.start][0],
+            matched=sizes[p.start][1],
+            picked=p.picked,
+            held=[
+                BacktestName(
+                    ticker=h.ticker,
+                    entry=h.entry,
+                    exit=h.exit,
+                    period_return=rounded(h.return_, "fraction"),
+                    weight=h.weight,
+                    ended_early=h.ended_early,
+                )
+                for h in p.held
+            ],
+            dropped_no_price=p.dropped_no_price,
+            gross_return=rounded(p.gross_return, "fraction"),
+            turnover=rounded(p.turnover, "fraction") or Decimal(0),
+            cost=rounded(p.cost, "fraction") or Decimal(0),
+            net_return=rounded(p.net_return, "fraction"),
+            benchmark_return=rounded(p.benchmark_return, "fraction"),
+            note=p.note,
+        )
+        for p in by_start.values()
+    ]
+    return BacktestResponse(
+        method_version=outcome.method_version,
+        fingerprint=outcome.fingerprint,
+        definition_hash=input_hash(body.model_dump(mode="json", exclude={"start", "end"})),
+        start=body.start,
+        end=body.end,
+        frequency=body.frequency,
+        max_names=body.max_names,
+        cost_bps=body.cost_bps,
+        periods=periods,
+        cumulative_net=outcome.cumulative_net,
+        cumulative_gross=outcome.cumulative_gross,
+        cost_drag=outcome.cost_drag,
+        annualised_net=outcome.annualised_net,
+        benchmark_ticker=body.benchmark_ticker,
+        benchmark_cumulative=outcome.benchmark_cumulative,
+        warnings=warnings,
+        caveats=BACKTEST_CAVEATS,
     )
 
 
@@ -706,7 +976,7 @@ async def run_saved_screen(
             f"saved under method {row['method_version']}; running under {version('screen')}"
         )
     if head["kind"] == "fund":
-        result = await _run_fund(pool, FundRequest.model_validate(raw))
+        result = await _run_fund(pool, FundRequest.model_validate(raw), owner.user_id)
         sid = None
     else:
         req = StockRequest.model_validate(raw)

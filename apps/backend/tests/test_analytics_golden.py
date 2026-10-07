@@ -305,3 +305,79 @@ def test_screen_ratio_rules() -> None:
     mom = momentum_12_1(closes, dt.date(2024, 10, 31))
     assert mom.value is not None and mom.value > 0
     assert momentum_12_1(closes[-100:], dt.date(2024, 10, 31)).value is None
+
+
+@pytest.mark.parametrize(
+    "case", CASES["delisted_universe"]["expectations"], ids=lambda c: c["as_of"]
+)
+def test_delisted_names_stay_in_past_universes(case: dict) -> None:
+    from steward.discovery.universe import UniverseMember, scope_for_date
+
+    members = [
+        UniverseMember(
+            ticker=m["ticker"],
+            status=m["status"],
+            active_from=None if m["active_from"] is None else day(m["active_from"]),
+            active_to=None if m["active_to"] is None else day(m["active_to"]),
+        )
+        for m in CASES["delisted_universe"]["members"]
+    ]
+    kept, warnings = scope_for_date(members, day(case["as_of"]), day(case["today"]))
+    assert sorted(m.ticker for m in kept) == case["tickers"]
+    if case["unknown_end_warning"]:
+        assert any("no known end date" in w for w in warnings)
+
+
+def test_renamed_fund_keeps_one_identity_with_dated_names() -> None:
+    from steward.reference.lifecycle import firds_name_history
+    from steward.sources.esma import FirdsRecord
+
+    records = [
+        FirdsRecord(
+            isin="IE00TEST0001",
+            mic="XETR",
+            full_name=r["full_name"],
+            short_name=None,
+            cfi=None,
+            currency=None,
+            issuer_lei=None,
+            admitted_at=None,
+            first_trade_at=None,
+            terminated_at=None,
+            status=r["status"],
+            raw={"publication_date": r["publication_date"]},
+        )
+        for r in CASES["renamed_fund"]["records"]
+    ]
+    spans = firds_name_history(records)
+    expected = [
+        (n, None if a is None else day(a), None if b is None else day(b))
+        for n, a, b in CASES["renamed_fund"]["spans"]
+    ]
+    assert spans == expected
+
+
+def test_altman_z_from_stored_retained_earnings() -> None:
+    from steward.analytics.ratio_set import COMPANY_RATIOS, Period
+
+    case = CASES["altman"]
+    figures = {k: D(v) for k, v in case["figures"].items()}
+    period = Period(end=day("2025-12-31"), f=figures, market_cap=D(case["market_cap"]))
+    value = COMPANY_RATIOS["altman_z"].fn(period)
+    assert value.value == D(case["expected"])
+    no_re = {k: v for k, v in figures.items() if k != "retained_earnings"}
+    gap = Period(end=day("2025-12-31"), f=no_re, market_cap=D(800))
+    missing = COMPANY_RATIOS["altman_z"].fn(gap)
+    assert missing.value is None and "retained earnings" in (missing.reason or "")
+    bank = COMPANY_RATIOS["altman_z"].fn(Period(end=day("2025-12-31"), f=figures, financial=True))
+    assert bank.value is None and "not meaningful" in (bank.reason or "")
+
+
+def test_stale_fund_holdings_lag() -> None:
+    from steward.fundresearch.compare import STALE_DAYS
+
+    case = CASES["stale_fund"]
+    lag = (day(case["today"]) - day(case["holdings_as_of"])).days
+    assert lag == case["lag_days"]
+    assert case["stale_after_days"] == STALE_DAYS
+    assert lag > STALE_DAYS

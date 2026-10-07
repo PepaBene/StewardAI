@@ -3,7 +3,8 @@
 A fund's exchange-listing price is not its NAV, and an index's price series is not its total-return
 series. The tracking difference is therefore computed only when both sides are on the same basis
 (price against price, total against total, same currency); otherwise both returns are shown and
-the difference is withheld with the reason. NAV is not stored, so only listing prices are used.
+the difference is withheld with the reason. No provider supplies NAV, so returns use listing prices;
+NAV points the owner enters (with a source) add a premium or discount, never replace the returns.
 """
 
 # ruff: noqa: E501
@@ -92,13 +93,103 @@ class Alignment(BaseModel):
     note: str
 
 
+class NavRow(BaseModel):
+    as_of: dt.date
+    nav: Decimal
+    currency: str
+    source_url: str
+    listing_close: Decimal | None
+    listing_date: dt.date | None
+    premium: Decimal | None = Field(description="Listing close / NAV - 1; positive is a premium.")
+    reason: str | None = None
+
+
+class NavView(BaseModel):
+    points: list[NavRow]
+    count: int
+    latest_premium: Decimal | None
+    mean_abs_premium: Decimal | None
+    max_abs_premium: Decimal | None
+    nav_change: Decimal | None = Field(
+        description="Last NAV / first NAV - 1 between your entered dates; excludes distributions."
+    )
+    nav_change_start: dt.date | None
+    nav_change_end: dt.date | None
+    warnings: list[str]
+
+
+NAV_LISTING_GAP_DAYS = 4
+NAV_ROWS_SHOWN = 60
+
+
+def build_nav(points: Sequence[Any], closes: Closes, listing_currency: str | None) -> NavView:
+    """Premium or discount of the listing close to the NAV you entered, on the same date.
+    A different currency, or no close within a few days, gives no premium rather than a guess."""
+    rows: list[NavRow] = []
+    warnings: list[str] = []
+    for p in points:
+        close = _at_or_before(closes, p.as_of)
+        listing = close if close and (p.as_of - close[0]).days <= NAV_LISTING_GAP_DAYS else None
+        reason = None
+        premium = None
+        if listing is None:
+            reason = "no listing close within a few days before this date"
+        elif listing_currency and p.currency != listing_currency:
+            reason = f"NAV is in {p.currency} and the listing in {listing_currency}"
+        elif p.nav <= 0:
+            reason = "non-positive NAV"
+        else:
+            premium = listing[1] / p.nav - ONE
+        rows.append(
+            NavRow(
+                as_of=p.as_of,
+                nav=p.nav,
+                currency=p.currency,
+                source_url=p.source_url,
+                listing_close=listing[1] if listing else None,
+                listing_date=listing[0] if listing else None,
+                premium=premium,
+                reason=reason,
+            )
+        )
+    known = [r.premium for r in rows if r.premium is not None]
+    same_ccy = [p for p in points if p.currency == (points[0].currency if points else None)]
+    change = start = end = None
+    if len(same_ccy) >= 2:
+        start, end = same_ccy[0].as_of, same_ccy[-1].as_of
+        change = same_ccy[-1].nav / same_ccy[0].nav - ONE
+    if len({p.currency for p in points}) > 1:
+        warnings.append(
+            "NAV points are in more than one currency; the NAV change uses the first currency only."
+        )
+    if len(known) < len(rows):
+        warnings.append(
+            f"{len(rows) - len(known)} NAV point(s) have no premium: see the reason on the row."
+        )
+    warnings.append(
+        "Listing closes are the stored adjusted closes; a share split after a NAV date would distort an old premium."
+    )
+    return NavView(
+        points=rows[-NAV_ROWS_SHOWN:],
+        count=len(rows),
+        latest_premium=known[-1] if known else None,
+        mean_abs_premium=(sum((abs(k) for k in known), ZERO) / len(known)) if known else None,
+        max_abs_premium=max((abs(k) for k in known), default=None),
+        nav_change=change,
+        nav_change_start=start,
+        nav_change_end=end,
+        warnings=warnings,
+    )
+
+
 class PerformanceView(BaseModel):
     isin: str
     listing: FundListing | None
     price_currency: str | None
     fund_policy: str | None
     nav_available: bool = False
-    nav_note: str = "NAV is not stored. Returns are for the exchange listing's price, which differs from NAV by the daily premium or discount."
+    nav: NavView | None = None
+    nav_note: str = "NAV is not provider data here. Returns are for the exchange listing's price, which differs from NAV by the daily premium or discount; enter the issuer's published NAV below to see the premium."
     benchmark: BenchmarkInfo | None
     benchmark_options: list[BenchmarkOption]
     suggested_benchmark: str | None

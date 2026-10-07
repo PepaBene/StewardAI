@@ -209,6 +209,15 @@ _ENTRIES: tuple[tuple[str, Statement, str, tuple[str, ...]], ...] = (
     (
         "balance",
         "balance_sheet",
+        "retained_earnings",
+        (
+            "us-gaap:RetainedEarningsAccumulatedDeficit",
+            "ifrs-full:RetainedEarnings",
+        ),
+    ),
+    (
+        "balance",
+        "balance_sheet",
         "noncontrolling_interest",
         ("us-gaap:MinorityInterest", "ifrs-full:NoncontrollingInterests"),
     ),

@@ -5,19 +5,23 @@ the only writes are the owner's saved peer groups, valuation scenarios and cited
 """
 
 import datetime as dt
-from typing import Annotated, Literal
+from functools import partial
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Path, Query, Response, status
+from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
-from steward.company import evidence, ratios, service, valuation
+from steward.company import currency as fxview
+from steward.company import evidence, ratios, report, rubric, segments, service, valuation
 from steward.company.statements import (
     StatementsView,
     build_view,
     csv_text,
     load_rows,
 )
+from steward.fx.history import load_fx_history
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
@@ -56,6 +60,15 @@ async def get_statements(
     known_by: Annotated[
         dt.date | None, Query(description="Point-in-time cutoff on the filing date.")
     ] = None,
+    currency: Annotated[
+        str | None,
+        Query(
+            pattern=r"^[A-Z]{3}$",
+            description="Show the figures in this base currency at stated reference rates; omit for the filed currency.",
+        ),
+    ] = None,
+    fx_rates: Literal["period_end", "average"] = "period_end",
+    fx_source: Literal["ecb", "cnb"] = "ecb",
 ) -> StatementsView:
     """Income statement, balance sheet and cash-flow statement, built from stored filed facts.
     Every cell names its filing and concept or how it was derived; restated figures keep the original."""
@@ -70,7 +83,26 @@ async def get_statements(
         units=int(units),
         transform=transform,
         per_share=per_share,
+        convert=await _convert(pool, rows, currency, fx_rates, fx_source),
     )
+
+
+async def _convert(
+    pool: Pool,
+    rows: list[dict[str, Any]],
+    target: str | None,
+    basis: fxview.RateBasis,
+    source: Literal["ecb", "cnb"],
+) -> tuple[str, Any] | None:
+    """The translator for a base-currency view, built from the stored reference rates."""
+    if not target:
+        return None
+    natives = {r["currency"] for r in rows if r.get("currency")}
+    today = dt.datetime.now(dt.UTC).date()
+    start = min((r["period_end"] for r in rows), default=today)
+    history = await load_fx_history(pool, source, [*natives, target], start, today)
+    translator = fxview.Translator(target, basis, source, history)
+    return target, partial(fxview.translate, translator=translator)
 
 
 @router.get("/{ticker}/statements.csv")
@@ -82,9 +114,20 @@ async def get_statements_csv(
     frequency: Literal["annual", "quarterly"] = "annual",
     view: Literal["restated", "original"] = "restated",
     units: Literal["1", "1000", "1000000"] = "1000000",
+    currency: Annotated[str | None, Query(pattern=r"^[A-Z]{3}$")] = None,
+    fx_rates: Literal["period_end", "average"] = "period_end",
+    fx_source: Literal["ecb", "cnb"] = "ecb",
 ) -> Response:
     rows = await load_rows(pool, ticker)
-    built = build_view(ticker, rows, basis=basis, frequency=frequency, view=view, units=int(units))
+    built = build_view(
+        ticker,
+        rows,
+        basis=basis,
+        frequency=frequency,
+        view=view,
+        units=int(units),
+        convert=await _convert(pool, rows, currency, fx_rates, fx_source),
+    )
     return Response(
         csv_text(built),
         media_type="text/csv",
@@ -103,12 +146,19 @@ async def get_ratios(
     """Every ratio from the shared library per fiscal year and TTM, with the company's own
     medians, the peer median and percentile (withheld below five comparable peers) and the inputs."""
     company = await _company(pool, ticker)
+    return await _ratios_view(pool, company, owner.user_id, peers, group_id)
+
+
+async def _ratios_view(
+    pool: Pool, company: service.Company, owner_id: object, peers: Scope, group_id: int | None
+) -> ratios.RatiosView:
+    ticker = company.ticker
     peer_values = None
     scope_label = None
     excluded: list[ratios.PeerExcluded] = []
     if peers != "none":
         peer_values, scope_label, excluded = await service.peer_values_for(
-            pool, company, peers, owner.user_id, group_id
+            pool, company, peers, owner_id, group_id
         )
     fwd = await evidence.forward_eps(pool, ticker)
     out = ratios.build_ratios(
@@ -142,6 +192,127 @@ async def get_ratios(
     return out
 
 
+async def _rubric(
+    pool: Pool,
+    company: service.Company,
+    owner_id: object,
+    view: ratios.RatiosView | None = None,
+    case: evidence.CaseView | None = None,
+) -> rubric.Rubric:
+    view = view or await _ratios_view(pool, company, owner_id, "none", None)
+    cited = None
+    case = case or await evidence.case_view(pool, owner_id, company.ticker)
+    if case.items:
+        cited = (sum(1 for i in case.items if i.evidence), len(case.items))
+    implied = next(
+        (
+            r.latest.value
+            for g in view.groups
+            for r in g.ratios
+            if r.id == "reverse_dcf_growth" and r.latest is not None
+        ),
+        None,
+    )
+    return rubric.build_rubric(
+        company.ticker,
+        view,
+        company.annual,
+        cited,
+        implied,
+        dt.datetime.now(dt.UTC).date(),
+    )
+
+
+@router.get("/{ticker}/segments", response_model=segments.SegmentAnalysis)
+async def get_segments(
+    ticker: TickerPath,
+    pool: Pool,
+    owner: Owner,
+    basis: Literal["annual", "quarter"] = "annual",
+) -> segments.SegmentAnalysis:
+    """Reported segments, geography and products with eliminations and unallocated revenue kept
+    visible, changed definitions flagged, and your own estimate mapping to other contexts."""
+    await _company(pool, ticker)
+    return await segments.analysis(pool, owner.user_id, ticker, basis)
+
+
+@router.put("/{ticker}/segment-map", response_model=segments.SegmentAnalysis)
+async def save_segment_map(
+    ticker: TickerPath, body: segments.MapIn, pool: Pool, owner: Owner
+) -> segments.SegmentAnalysis:
+    """Records one mapping of a reported member to a country, commodity, patent technology or
+    trade product as a new row (a share of 0 removes it). It is an estimate, labelled as one."""
+    await _company(pool, ticker)
+    await segments.save_mapping(pool, owner.user_id, ticker, body)
+    return await segments.analysis(pool, owner.user_id, ticker, "annual")
+
+
+@router.get("/{ticker}/assessment", response_model=rubric.Rubric)
+async def get_assessment(ticker: TickerPath, pool: Pool, owner: Owner) -> rubric.Rubric:
+    """StewardAI's own compact rubric: four component scores from published indicators, thresholds
+    and weights, a stated missing-data penalty, abstention when evidence is thin, and no rating."""
+    company = await _company(pool, ticker)
+    return await _rubric(pool, company, owner.user_id)
+
+
+class ReportIn(BaseModel):
+    conclusion: str = Field(default="", max_length=8000)
+
+
+async def _report(pool: Pool, company: service.Company, owner_id: object) -> report.CompanyReport:
+    view = await _ratios_view(pool, company, owner_id, "none", None)
+    case = await evidence.case_view(pool, owner_id, company.ticker)
+    return report.assemble(
+        ticker=company.ticker,
+        overview=await evidence.overview(pool, company.ticker),
+        ratios=view,
+        rubric=await _rubric(pool, company, owner_id, view, case),
+        segments=await segments.analysis(pool, owner_id, company.ticker, "annual"),
+        annual=company.annual,
+        case=case,
+        research=await report.latest_research(pool, company.ticker),
+        disputed_edges=await report.disputed_edge_count(pool, company.ticker),
+        today=dt.datetime.now(dt.UTC).date(),
+    )
+
+
+@router.get("/{ticker}/report", response_model=report.CompanyReport)
+async def get_report(ticker: TickerPath, pool: Pool, owner: Owner) -> report.CompanyReport:
+    """The report as it stands now: code-computed tables, the assessment rubric, the latest verified
+    research prose with its citations, your cited case items and the conflicts between them."""
+    company = await _company(pool, ticker)
+    return await _report(pool, company, owner.user_id)
+
+
+@router.post(
+    "/{ticker}/report", response_model=report.ReportVersion, status_code=status.HTTP_201_CREATED
+)
+async def save_report(
+    ticker: TickerPath, body: ReportIn, pool: Pool, owner: Owner
+) -> report.ReportVersion:
+    """Stores the report as it stands with your conclusion as a new version; nothing is overwritten."""
+    company = await _company(pool, ticker)
+    built = await _report(pool, company, owner.user_id)
+    return await report.save_version(pool, owner.user_id, built, body.conclusion.strip())
+
+
+@router.get("/{ticker}/report/versions", response_model=list[report.ReportVersionSummary])
+async def list_report_versions(
+    ticker: TickerPath, pool: Pool, owner: Owner
+) -> list[report.ReportVersionSummary]:
+    return await report.list_versions(pool, owner.user_id, ticker)
+
+
+@router.get("/{ticker}/report/versions/{number}", response_model=report.ReportVersion)
+async def get_report_version(
+    ticker: TickerPath, number: int, pool: Pool, owner: Owner
+) -> report.ReportVersion:
+    found = await report.load_version(pool, owner.user_id, ticker, number)
+    if found is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such report version")
+    return found
+
+
 @router.get("/{ticker}/peers", response_model=service.PeerCompare)
 async def get_peer_compare(
     ticker: TickerPath,
@@ -152,13 +323,36 @@ async def get_peer_compare(
     metrics: Annotated[str | None, Query(description="Comma-separated ratio ids.")] = None,
     index_metric: Literal["revenue", "operating_income", "net_income", "fcf"] = "revenue",
     years: Annotated[int, Query(ge=2, le=10)] = 5,
+    base_currency: Annotated[
+        str | None,
+        Query(
+            pattern=r"^[A-Z]{3}$",
+            description="Convert size figures and the index chart to this currency; omit for native currencies.",
+        ),
+    ] = None,
+    fx_rates: Literal["period_end", "average"] = "period_end",
+    fx_source: Literal["ecb", "cnb"] = "ecb",
 ) -> service.PeerCompare:
     """The company beside its peers on the same ratios and fiscal basis, with median and range,
     fiscal-date distance, comparability warnings and an indexed history relative to each first year."""
     company = await _company(pool, ticker)
     ids = tuple(m for m in (metrics or "").split(",") if m) or service.COMPARE_DEFAULT
+    translator = None
+    if base_currency:
+        today = dt.datetime.now(dt.UTC).date()
+        stored = await pool.fetch(
+            "select distinct currency from public.fx_rate where source=$1", fx_source
+        )
+        history = await load_fx_history(
+            pool,
+            fx_source,
+            [base_currency, *(r["currency"] for r in stored)],
+            today - dt.timedelta(days=365 * 12),
+            today,
+        )
+        translator = fxview.Translator(base_currency, fx_rates, fx_source, history)
     return await service.compare(
-        pool, company, scope, owner.user_id, group_id, ids, index_metric, years
+        pool, company, scope, owner.user_id, group_id, ids, index_metric, years, translator
     )
 
 

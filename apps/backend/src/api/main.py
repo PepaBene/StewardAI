@@ -18,7 +18,6 @@ from api.auth import Owner
 from api.budget_routes import router as budget_router
 from api.chat_routes import router as chat_router
 from api.company_routes import router as company_router
-from api.fund_research_routes import router as fund_research_router
 from api.config_history_routes import router as config_history_router
 from api.control_stake_routes import router as control_stake_router
 from api.data_context_routes import router as data_context_router
@@ -26,6 +25,7 @@ from api.db import close_pool, get_pool_or_error
 from api.discover_routes import router as discover_router
 from api.escalation_routes import router as escalation_router
 from api.free_sources_routes import router as free_sources_router
+from api.fund_research_routes import router as fund_research_router
 from api.fund_routes import router as fund_router
 from api.fundamentals_routes import router as fundamentals_router
 from api.gate_routes import router as gate_router

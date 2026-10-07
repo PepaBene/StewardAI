@@ -25,6 +25,9 @@ METHOD_VERSIONS: dict[str, str] = {
     "peer_compare": "1.0.0",
     "valuation_scenarios": "1.0.0",
     "capital_allocation": "1.0.0",
+    "segments": "1.0.0",
+    "company_report": "1.0.0",
+    "backtest": "1.0.0",
 }
 
 

@@ -197,9 +197,43 @@ def _invested_capital(f: Figures) -> Decimal | None:
 
 
 def _altman(p: Period) -> RatioValue:
+    """Z = 1.2 WC/TA + 1.4 RE/TA + 3.3 EBIT/TA + 0.6 MVE/TL + 1.0 S/TA (original manufacturing
+    model, applied to any non-financial issuer: read it as a distress screen, not a forecast)."""
     if (v := _financial(p, "Altman Z")) is not None:
         return v
-    return _missing("retained earnings (the statement store does not keep it)")
+    assets, liabilities = _num(p, "total_assets"), _num(p, "total_liabilities")
+    current_a, current_l = _num(p, "current_assets"), _num(p, "current_liabilities")
+    retained, ebit, sales = (
+        _num(p, "retained_earnings"),
+        _num(p, "operating_income"),
+        _num(p, "revenue"),
+    )
+    needed = {
+        "total assets": assets,
+        "total liabilities": liabilities,
+        "current assets": current_a,
+        "current liabilities": current_l,
+        "retained earnings": retained,
+        "operating income": ebit,
+        "revenue": sales,
+        "market cap": p.market_cap,
+    }
+    gaps = [name for name, value in needed.items() if value is None]
+    if gaps:
+        return _missing(*gaps)
+    assert assets is not None and liabilities is not None and current_a is not None
+    assert current_l is not None and retained is not None and ebit is not None
+    assert sales is not None and p.market_cap is not None
+    if assets <= 0 or liabilities <= 0:
+        return _nm("non-positive total assets or liabilities")
+    z = (
+        Decimal("1.2") * (current_a - current_l) / assets
+        + Decimal("1.4") * retained / assets
+        + Decimal("3.3") * ebit / assets
+        + Decimal("0.6") * p.market_cap / liabilities
+        + sales / assets
+    )
+    return RatioValue(z)
 
 
 def _days(num_key: str, den_key: str, what: str) -> Callable[[Period], RatioValue]:
@@ -840,9 +874,9 @@ _add(
     "multiple",
     "1.2 WC/TA + 1.4 RE/TA + 3.3 EBIT/TA + 0.6 MVE/TL + 1.0 S/TA",
     BAL,
-    "Non-financials only; needs retained earnings, which the statement store does not keep",
+    "Non-financials only; periods collected before retained earnings were stored show as missing until re-collected",
     True,
-    ("retained_earnings",),
+    ("retained_earnings", "current_assets", "current_liabilities", "operating_income", "revenue"),
     _altman,
 )
 

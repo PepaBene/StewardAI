@@ -20,7 +20,15 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from steward.analytics.contract import AnalyticsResult, input_hash, unavailable
+from steward.analytics.contract import (
+    AnalyticsResult,
+    SourceRef,
+    input_hash,
+    unavailable,
+)
+from steward.analytics.contract import (
+    Status as ResultStatus,
+)
 from steward.analytics.exposure import (
     YieldInput,
     concentration,
@@ -836,6 +844,19 @@ class BondMix(BaseModel):
     weight: Decimal
 
 
+class RateBucket(BaseModel):
+    """Duration contributed by one key-rate bucket: DV01 x 10,000 / net assets, as reported."""
+
+    label: str
+    years: Decimal
+
+
+class SpreadBucket(BaseModel):
+    label: str
+    investment_grade: Decimal | None
+    non_investment_grade: Decimal | None
+
+
 class BondView(BaseModel):
     isin: str
     applicable: bool | None
@@ -846,12 +867,106 @@ class BondView(BaseModel):
     stated: list[ProfileField]
     asset_mix: list[BondMix]
     asset_mix_source: str | None
+    rate_buckets: list[RateBucket] = Field(default_factory=list)
+    credit_spread: list[SpreadBucket] = Field(default_factory=list)
+    credit_note: str | None = None
     method_version: str = FUND_METHOD
     warnings: list[str]
 
 
+@dataclass
+class NportRisk:
+    """The risk metrics a regulatory filing reports, with the net assets they scale against."""
+
+    source: str
+    period_end: dt.date
+    net_assets: Decimal | None
+    metrics: Mapping[str, Any]
+
+
+RATE_KEYS = (
+    ("period3Mon", "3 months"),
+    ("period1Yr", "1 year"),
+    ("period5Yr", "5 years"),
+    ("period10Yr", "10 years"),
+    ("period30Yr", "30 years"),
+)
+
+
+def _num(x: Any) -> Decimal | None:
+    try:
+        return Decimal(str(x)) if x is not None and str(x).strip() != "" else None
+    except ArithmeticError:
+        return None
+
+
+def dv01_duration(
+    risk: NportRisk | None,
+) -> tuple[list[RateBucket], Decimal | None, list[str]]:
+    """Duration implied by the filing's USD DV01 at each key rate. Buckets the filing leaves out are not
+    guessed; if any is missing the total is withheld rather than understated."""
+    if risk is None:
+        return [], None, []
+    notes: list[str] = []
+    table = risk.metrics.get("interest_rate_dv01")
+    if not isinstance(table, dict) or not table:
+        return [], None, ["The filing reports no interest-rate DV01."]
+    if not risk.net_assets or risk.net_assets <= 0:
+        return [], None, ["The filing reports no net assets to scale the DV01 against."]
+    usd = table.get("USD")
+    others = sorted(k for k in table if k != "USD")
+    if others:
+        notes.append(
+            f"DV01 in {', '.join(others)} is not included: converting it needs a dated rate the filing does not give."
+        )
+    if not isinstance(usd, dict):
+        return [], None, [*notes, "The filing reports no USD DV01."]
+    buckets: list[RateBucket] = []
+    missing: list[str] = []
+    for key, label in RATE_KEYS:
+        v = _num(usd.get(key))
+        if v is None:
+            missing.append(label)
+        else:
+            buckets.append(RateBucket(label=label, years=v * 10000 / risk.net_assets))
+    if missing:
+        notes.append(f"No DV01 reported for {', '.join(missing)}; the total is withheld.")
+        return buckets, None, notes
+    return buckets, sum((b.years for b in buckets), ZERO), notes
+
+
+def credit_spread_split(risk: NportRisk | None) -> list[SpreadBucket]:
+    if risk is None:
+        return []
+    ig = risk.metrics.get("credit_spread_investment_grade")
+    nig = risk.metrics.get("credit_spread_non_investment_grade")
+    if not isinstance(ig, dict) and not isinstance(nig, dict):
+        return []
+    out = []
+    for key, label in RATE_KEYS:
+        a = _num(ig.get(key)) if isinstance(ig, dict) else None
+        b = _num(nig.get(key)) if isinstance(nig, dict) else None
+        if a is None and b is None:
+            continue
+        out.append(
+            SpreadBucket(
+                label=label,
+                investment_grade=a * 10000 / risk.net_assets
+                if a is not None and risk.net_assets
+                else None,
+                non_investment_grade=b * 10000 / risk.net_assets
+                if b is not None and risk.net_assets
+                else None,
+            )
+        )
+    return out
+
+
 def build_bond(
-    data: FundData, nport_mix: Sequence[tuple[str, Decimal]], nport_source: str | None
+    data: FundData,
+    nport_mix: Sequence[tuple[str, Decimal]],
+    nport_source: str | None,
+    risk: NportRisk | None = None,
 ) -> BondView:
     f = data.factsheet or {}
     eq = D(f.get("equity_weight"))
@@ -891,21 +1006,76 @@ def build_bond(
             as_of=f.get("as_of"),
         ),
     ]
+    buckets, dv01_total, dv01_notes = dv01_duration(risk)
+    spreads = credit_spread_split(risk)
+    warnings = [
+        "The instrument category mix and rate sensitivities come from a regulatory N-PORT filing, which only US-registered funds file."
+        if nport_mix or risk
+        else "No regulatory filing is stored for this fund."
+    ]
+    warnings.extend(dv01_notes)
+
+    def owner_years(key: str, label: str) -> AnalyticsResult | None:
+        fact = data.facts.get(key)
+        v = _num(fact.value) if fact else None
+        if fact is None or v is None or v < 0:
+            return None
+        return AnalyticsResult(
+            value=v.quantize(Decimal("0.01")),
+            unit="years",
+            as_of=fact.as_of,
+            method_version=method,
+            status=ResultStatus.COMPLETE,
+            sources=[SourceRef(kind="owner_input", ref=label, url=fact.source_url)],
+            warnings=["Recorded by you from the issuer's document, not computed from holdings."],
+            input_hash=input_hash({"key": key, "value": str(v), "url": fact.source_url}),
+        )
+
+    maturity = owner_years("average_maturity_years", "Average maturity")
+    duration = owner_years("effective_duration_years", "Effective duration")
+    if duration is None and dv01_total is not None and risk is not None:
+        duration = AnalyticsResult(
+            value=dv01_total.quantize(Decimal("0.01")),
+            unit="years",
+            as_of=risk.period_end,
+            method_version=method,
+            status=ResultStatus.PARTIAL,
+            sources=[SourceRef(kind="filing", ref=risk.source)],
+            warnings=[
+                "DV01-implied: the filing's USD DV01 across key rates times 10,000, over net assets. It is a rate sensitivity as reported, not an issuer-stated duration, and assumes net assets are in US dollars."
+            ],
+            input_hash=input_hash(
+                {
+                    "accession": risk.source,
+                    "dv01": risk.metrics.get("interest_rate_dv01"),
+                    "net_assets": risk.net_assets,
+                }
+            ),
+        )
+    credit_note = data.facts.get("credit_quality_note")
     return BondView(
         isin=data.isin,
         applicable=applicable,
         applicability_reason=why,
-        weighted_maturity=unavailable("years", method, reason),
-        duration=unavailable("years", method, reason),
-        credit_quality=unavailable("ratio", method, reason),
+        weighted_maturity=maturity or unavailable("years", method, reason),
+        duration=duration or unavailable("years", method, reason),
+        credit_quality=unavailable(
+            "ratio",
+            method,
+            "No rating breakdown is stored, and a rating is never inferred from an issuer's name."
+            + (
+                " The credit-spread sensitivity below is not a share of holdings."
+                if spreads
+                else ""
+            ),
+        ),
         stated=stated,
         asset_mix=[BondMix(label=k, weight=v) for k, v in nport_mix],
         asset_mix_source=nport_source,
-        warnings=[
-            "Only the instrument category mix from a regulatory N-PORT filing is available, and only for US-registered funds."
-            if nport_mix
-            else "No regulatory filing with instrument categories is stored for this fund."
-        ],
+        rate_buckets=buckets,
+        credit_spread=spreads,
+        credit_note=credit_note.value if credit_note else None,
+        warnings=warnings,
     )
 
 

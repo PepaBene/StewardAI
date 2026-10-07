@@ -5,6 +5,8 @@ sourced due-diligence checklist. Reads stored issuer data; the only write is the
 fund facts. Wiring: `app.include_router` of `router` in api/main.py."""
 
 import datetime as dt
+import re
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Path, Query, Response, status
@@ -14,14 +16,23 @@ from api.db import Pool
 from steward.fundresearch import analysis, compare, performance, service
 from steward.fundresearch.data import (
     FACT_KEYS,
+    NUMERIC_FACTS,
     CatalogRow,
     Fact,
     FactIn,
     FundData,
+    NavIn,
+    NavPoint,
+    SavedComparison,
+    SavedComparisonIn,
+    archive_comparison,
+    list_comparisons,
     list_funds,
     load_fact_history,
     load_fund,
+    save_comparison,
     save_fact,
+    save_nav,
 )
 
 router = APIRouter(tags=["fund research"])
@@ -163,7 +174,7 @@ async def fund_bond(
     """Maturity, duration and credit quality only where the issuer data provide them; otherwise unavailable."""
     data = await _fund(pool, isin, owner, as_of)
     mix, source = await service.nport_mix(pool, data)
-    return analysis.build_bond(data, mix, source)
+    return analysis.build_bond(data, mix, source, await service.nport_risk(pool, data))
 
 
 @router.get("/funds/{isin}/checklist", response_model=analysis.Checklist)
@@ -204,4 +215,70 @@ async def put_fund_fact(isin: IsinPath, body: FactIn, pool: Pool, owner: Owner) 
         raise HTTPException(
             422, "replication_method must be physical_full, physical_sampled or synthetic"
         )
+    if body.key in NUMERIC_FACTS:
+        try:
+            number = Decimal(body.value)
+        except ArithmeticError:
+            number = None
+        if number is None or not number.is_finite() or number < 0:
+            raise HTTPException(422, f"{body.key} must be a non-negative number")
+        if body.key == "lending_revenue_share" and number > 1:
+            raise HTTPException(422, "lending_revenue_share is a fraction between 0 and 1")
+    if body.key == "benchmark_basis" and body.value not in ("price", "total"):
+        raise HTTPException(422, "benchmark_basis must be price or total")
+    if body.key == "benchmark_currency" and not re.fullmatch(r"[A-Z]{3}", body.value):
+        raise HTTPException(422, "benchmark_currency must be a three-letter currency code")
     return await save_fact(pool, owner.user_id, isin, body)
+
+
+@router.get("/funds/{isin}/nav", response_model=list[NavPoint])
+async def fund_nav(isin: IsinPath, pool: Pool, owner: Owner, as_of: AsOf = None) -> list[NavPoint]:
+    """The net asset values you entered, newest entry per date."""
+    data = await _fund(pool, isin, owner, as_of)
+    return data.nav
+
+
+@router.put("/funds/{isin}/nav", response_model=int, status_code=status.HTTP_201_CREATED)
+async def put_fund_nav(isin: IsinPath, body: list[NavIn], pool: Pool, owner: Owner) -> int:
+    """Record NAV points from the issuer's own page. No provider supplies NAV, so these are the only source; the
+    count saved is returned. Append-only: re-entering a date replaces it as the newest."""
+    await _fund(pool, isin, owner, None)
+    if not 1 <= len(body) <= 400:
+        raise HTTPException(422, "send between 1 and 400 NAV points")
+    today = dt.datetime.now(dt.UTC).date()
+    for p in body:
+        if p.as_of > today:
+            raise HTTPException(422, "a NAV date cannot be in the future")
+        if not p.source_url.startswith(("http://", "https://")):
+            raise HTTPException(422, "source_url must be a web address")
+    return await save_nav(pool, owner.user_id, isin, body)
+
+
+@router.get("/fund-comparisons", response_model=list[SavedComparison])
+async def saved_comparisons(pool: Pool, owner: Owner) -> list[SavedComparison]:
+    return await list_comparisons(pool, owner.user_id)
+
+
+@router.post(
+    "/fund-comparisons", response_model=SavedComparison, status_code=status.HTTP_201_CREATED
+)
+async def create_saved_comparison(
+    body: SavedComparisonIn, pool: Pool, owner: Owner
+) -> SavedComparison:
+    """Keep a set of two to five funds to reopen later; the figures are recomputed each time, not stored."""
+    isins = list(dict.fromkeys(i.strip().upper() for i in body.isins))
+    if not 2 <= len(isins) <= 5:
+        raise HTTPException(422, "choose two to five different funds")
+    for isin in isins:
+        if not re.fullmatch(r"[A-Z]{2}[A-Z0-9]{9}[0-9]", isin):
+            raise HTTPException(422, f"{isin} is not an ISIN")
+    return await save_comparison(
+        pool, owner.user_id, SavedComparisonIn(name=body.name, isins=isins, note=body.note)
+    )
+
+
+@router.delete("/fund-comparisons/{comparison_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def archive_saved_comparison(comparison_id: int, pool: Pool, owner: Owner) -> Response:
+    if not await archive_comparison(pool, owner.user_id, comparison_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such saved comparison")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

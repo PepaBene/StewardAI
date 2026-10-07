@@ -14,7 +14,7 @@ import json
 from collections import Counter
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 import asyncpg
 from pydantic import BaseModel, Field
@@ -514,6 +514,7 @@ class PatentTech(BaseModel):
 class Network(BaseModel):
     ticker: str
     since: dt.date
+    since_basis: Literal["chosen", "last_review", "default_90_days"] = "chosen"
     edges: list[GraphEdge]
     suggested_count: int
     events: list[GraphEvent]
@@ -528,7 +529,16 @@ class Network(BaseModel):
 
 
 async def network(pool: asyncpg.Pool, ticker: str, since: dt.date | None = None) -> Network:
-    since = since or dt.date.today() - dt.timedelta(days=90)
+    basis = "chosen"
+    if since is None:
+        reviewed = await pool.fetchval(
+            "select max(created_at)::date from public.report where type='review' and ticker=$1",
+            ticker,
+        )
+        if reviewed is not None:
+            since, basis = reviewed, "last_review"
+        else:
+            since, basis = dt.date.today() - dt.timedelta(days=90), "default_90_days"
     cutoff = dt.datetime.combine(since, dt.time.min, tzinfo=dt.UTC)
     edges = await pool.fetch(
         """select edge_type, object_name as counterparty, direction, status, evidence_tier, valid_from, valid_to,
@@ -570,6 +580,7 @@ async def network(pool: asyncpg.Pool, ticker: str, since: dt.date | None = None)
     return Network(
         ticker=ticker,
         since=since,
+        since_basis=basis,
         edges=shown,
         suggested_count=suggested,
         events=[
@@ -584,7 +595,8 @@ async def network(pool: asyncpg.Pool, ticker: str, since: dt.date | None = None)
         patent_status=dict(status),
         caveats=[
             "Only confirmed and disputed relationships are listed; suggested ones are counted, not shown as fact.",
-            "'New' marks rows first seen on or after the chosen date, not a thesis-review date.",
+            "'New' marks rows first seen on or after the date shown: the last review report for this "
+            "company when one exists, otherwise 90 days back, unless you pick a date.",
         ],
         method_version=version("peer_compare"),
     )

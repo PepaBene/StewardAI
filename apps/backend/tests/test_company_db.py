@@ -218,7 +218,9 @@ async def test_case_items_need_a_citation_to_be_confirmed(api: httpx.AsyncClient
     assert (await api.get(f"/companies/{TICKER}/case")).json()["items"] == []
 
 
-async def test_peer_groups_and_evidence_tabs_run(api: httpx.AsyncClient) -> None:
+async def test_peer_groups_and_evidence_tabs_run(
+    api: httpx.AsyncClient, backend_pool: asyncpg.Pool
+) -> None:
     saved = (
         await api.post(
             f"/companies/{TICKER}/peer-groups",
@@ -246,9 +248,48 @@ async def test_peer_groups_and_evidence_tabs_run(api: httpx.AsyncClient) -> None
     assert any(c["area"] == "Filed statements" and c["present"] for c in overview["coverage"])
     est = (await api.get(f"/companies/{TICKER}/estimates")).json()
     assert est["points"] == [] and any("No forward consensus" in n for n in est["notes"])
-    assert (await api.get(f"/companies/{TICKER}/network")).status_code == 200
+    net = (await api.get(f"/companies/{TICKER}/network")).json()
+    assert net["since_basis"] == "default_90_days"
+    await backend_pool.execute(
+        "insert into public.report (type, ticker, title, body, body_md)"
+        " values ('review', $1, 'Review', '{}'::jsonb, 'x')",
+        TICKER,
+    )
+    net = (await api.get(f"/companies/{TICKER}/network")).json()
+    assert net["since_basis"] == "last_review" and net["since"] == TODAY.isoformat()
+    picked = (await api.get(f"/companies/{TICKER}/network", params={"since": "2026-01-01"})).json()
+    assert picked["since_basis"] == "chosen"
     alloc = (await api.get(f"/companies/{TICKER}/capital-allocation")).json()
     assert len(alloc["years"]) == 3 and alloc["years"][-1]["fcf"] is not None
     assert (await api.get(f"/companies/{TICKER}/governance")).status_code == 200
     assert (await api.get("/companies/NOPE_US_EQ/overview")).status_code == 404
     assert (await api.get("/companies/NOPE_US_EQ/statements")).json()["columns"] == []
+
+
+async def test_assessment_segments_and_versioned_report(api: httpx.AsyncClient) -> None:
+    rubric = (await api.get(f"/companies/{TICKER}/assessment")).json()
+    assert rubric["calibration"]["status"] == "uncalibrated" and len(rubric["components"]) == 4
+    assert all(c["coverage"] is not None for c in rubric["components"])
+    # No segment breakdown is seeded: the analysis says so, and a mapping is stored as an estimate.
+    seg = (await api.get(f"/companies/{TICKER}/segments")).json()
+    assert seg["breakdowns"] == [] and any("No revenue breakdown" in n for n in seg["notes"])
+    mapping = {"breakdown": "segment", "member_label": "Cloud", "context": "country", "value": "US"}
+    saved = await api.put(f"/companies/{TICKER}/segment-map", json={**mapping, "share": "0.5"})
+    assert saved.status_code == 200 and saved.json()["mappings"][0]["value"] == "US"
+    removed = await api.put(f"/companies/{TICKER}/segment-map", json={**mapping, "share": "0"})
+    assert removed.json()["mappings"] == []
+    bad = await api.put(f"/companies/{TICKER}/segment-map", json={**mapping, "share": "1.5"})
+    assert bad.status_code == 422
+    live = (await api.get(f"/companies/{TICKER}/report")).json()
+    assert live["research"] is None and any(c["area"] == "Research" for c in live["conflicts"])
+    assert live["key_figures"] and live["rubric"]["version"] == "1.0.0"
+    v1 = (
+        await api.post(f"/companies/{TICKER}/report", json={"conclusion": "Hold the thesis."})
+    ).json()
+    v2 = (await api.post(f"/companies/{TICKER}/report", json={"conclusion": "Revised."})).json()
+    assert (v1["version"], v2["version"]) == (1, 2)
+    listed = (await api.get(f"/companies/{TICKER}/report/versions")).json()
+    assert [x["version"] for x in listed] == [2, 1]
+    reread = (await api.get(f"/companies/{TICKER}/report/versions/1")).json()
+    assert reread["report"]["conclusion"] == "Hold the thesis."
+    assert (await api.get(f"/companies/{TICKER}/report/versions/9")).status_code == 404

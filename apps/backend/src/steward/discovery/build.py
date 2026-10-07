@@ -16,7 +16,7 @@ from typing import Any
 from steward.analytics import ratios
 from steward.analytics.returns import to_major_unit
 from steward.discovery.engine import Record
-from steward.discovery.metrics import FUND_CATALOGUE, STOCK_CATALOGUE, MetricValue
+from steward.discovery.metrics import STOCK_CATALOGUE, MetricValue
 from steward.discovery.universe import UniverseMember
 from steward.peer_metrics import latest_period
 from steward.reference.risk import volatility as _volatility
@@ -46,6 +46,12 @@ class StockInputs:
     insider_buyers_90d: int | None = None
     forward_eps: Decimal | None = None
     statement_currency: str | None = None
+
+
+TRACKING_UNSET = (
+    "no benchmark recorded for this fund; record one on the fund's performance page "
+    "(it is the only way to compare on the same basis)"
+)
 
 
 def _mv(
@@ -477,9 +483,7 @@ def fund_record(data: FundInputs, as_of: dt.date) -> Record:
     else:
         for k in ("top10_weight", "effective_holdings", "top_sector_weight", "top_country_weight"):
             values[k] = _mv(None, reason="no equity holdings stored")
-    values["tracking_difference"] = _mv(
-        None, reason=FUND_CATALOGUE["tracking_difference"].no_source_reason
-    )
+    values["tracking_difference"] = _mv(None, reason=TRACKING_UNSET)
     return Record(
         key=data.isin,
         name=data.name or f.get("fund_name"),

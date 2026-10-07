@@ -210,6 +210,7 @@ BALANCE: tuple[Row, ...] = (
     ),
     Row("total_liabilities", "Total liabilities", "total", fallback=_liabilities),
     Row("equity", "Shareholders' equity"),
+    Row("retained_earnings", "Retained earnings (accumulated deficit)"),
     Row("noncontrolling_interest", "Non-controlling interest"),
     Row("total_liabilities_and_equity", "Total liabilities and equity", "total"),
 )

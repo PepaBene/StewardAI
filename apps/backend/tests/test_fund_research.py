@@ -442,3 +442,69 @@ def test_issuer_register_groups_two_isins_into_one_issuer():
     rows = analysis.holding_rows(data, {}, register)
     view = analysis.build_holdings(data, rows)
     assert view.issuer_count == 1 and view.top[0].weight == D("0.5") and view.top[0].rows == 2
+
+
+# --------------------------------------------------------------------------- bond risk and NAV
+
+
+def test_dv01_duration_sums_key_rates_over_net_assets():
+    risk = analysis.NportRisk(
+        source="N-PORT x",
+        period_end=DAY,
+        net_assets=D(1_000_000),
+        metrics={
+            "interest_rate_dv01": {
+                "USD": {
+                    "period3Mon": "10",
+                    "period1Yr": "20",
+                    "period5Yr": "30",
+                    "period10Yr": "20",
+                    "period30Yr": "20",
+                }
+            }
+        },
+    )
+    buckets, total, notes = analysis.dv01_duration(risk)
+    assert total == D(1) and len(buckets) == 5 and notes == []
+
+
+def test_dv01_withheld_when_a_bucket_is_missing_and_other_currency_said():
+    risk = analysis.NportRisk(
+        source="N-PORT x",
+        period_end=DAY,
+        net_assets=D(1_000_000),
+        metrics={"interest_rate_dv01": {"USD": {"period1Yr": "5"}, "EUR": {"period1Yr": "5"}}},
+    )
+    buckets, total, notes = analysis.dv01_duration(risk)
+    assert total is None and len(buckets) == 1
+    assert any("EUR" in n for n in notes) and any("withheld" in n for n in notes)
+
+
+def test_bond_prefers_owner_duration_and_never_invents_credit_quality():
+    sheet = {"equity_weight": D("0.0"), "other_weight": D("0.9")}
+    f = Fact(
+        key="effective_duration_years",
+        value="6.4",
+        source_url="https://x.test/kid",
+        recorded_at=dt.datetime(2026, 10, 1, tzinfo=dt.UTC),
+    )
+    view = analysis.build_bond(fund(sheet=sheet, facts={f.key: f}), [], None, None)
+    assert view.duration.value == D("6.40") and view.duration.sources[0].kind == "owner_input"
+    assert view.credit_quality.value is None
+
+
+def test_nav_premium_needs_matching_currency_and_a_near_close():
+    from steward.fundresearch.data import NavPoint
+
+    closes = [(dt.date(2026, 9, 28), D("101")), (dt.date(2026, 9, 29), D("102"))]
+    url = "https://x.test/n"
+    pts = [
+        NavPoint(as_of=dt.date(2026, 1, 5), nav=D("90"), currency="USD", source_url=url),
+        NavPoint(as_of=dt.date(2026, 9, 29), nav=D("100"), currency="USD", source_url=url),
+        NavPoint(as_of=dt.date(2026, 9, 30), nav=D("100"), currency="EUR", source_url=url),
+    ]
+    view = performance.build_nav(pts, closes, "USD")
+    by = {p.as_of: p for p in view.points}
+    assert by[dt.date(2026, 9, 29)].premium == D("0.02")
+    assert "EUR" in by[dt.date(2026, 9, 30)].reason
+    assert "no listing close" in by[dt.date(2026, 1, 5)].reason

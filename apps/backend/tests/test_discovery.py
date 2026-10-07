@@ -571,10 +571,9 @@ def test_fund_unknown_fee_is_never_zero_and_filters_exclude_it() -> None:
     )
     assert [r.key for r in out.rows] == ["IE00B4L5Y983"]
     assert (out.matched, out.unknown_excluded, out.no_data) == (1, 1, 1)
-    problems = validate_filters(
-        [gte("tracking_difference", "0")], FUND_CATALOGUE, access={}, coverage={}, total=3
-    )
-    assert "needs fund NAV" in problems[0].message
+    # Tracking difference is no longer a refused metric: it is filled per fund from a recorded benchmark.
+    assert "no benchmark recorded" in (cheap.values["tracking_difference"].reason or "")
+    assert FUND_CATALOGUE["tracking_difference"].no_source_reason is None
 
 
 def test_csv_export_carries_provenance_and_unknown_is_blank_with_reason() -> None:

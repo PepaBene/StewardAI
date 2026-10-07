@@ -5,6 +5,7 @@ pure modules."""
 from __future__ import annotations
 
 import datetime as dt
+import json
 from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
@@ -167,6 +168,30 @@ async def nport_mix(
     ], f"N-PORT {filing['accession']}, period ending {filing['report_period_end']}"
 
 
+async def nport_risk(pool: asyncpg.Pool, data: FundData) -> analysis.NportRisk | None:
+    tickers = [x.ticker for x in data.listings]
+    row = await pool.fetchrow(
+        """select accession, report_period_end, net_assets, risk_metrics from public.nport_filing
+           where reconcile_status='confirmed' and (fund_isin=$1 or matched_ticker = any($2::text[]))
+           order by report_period_end desc, filed desc limit 1""",
+        data.isin,
+        tickers,
+    )
+    if row is None:
+        return None
+    metrics = row["risk_metrics"]
+    if isinstance(metrics, str):
+        metrics = json.loads(metrics)
+    if not isinstance(metrics, dict) or not metrics:
+        return None
+    return analysis.NportRisk(
+        source=f"N-PORT {row['accession']}, period ending {row['report_period_end']}",
+        period_end=row["report_period_end"],
+        net_assets=row["net_assets"],
+        metrics=metrics,
+    )
+
+
 async def performance_view(
     pool: asyncpg.Pool,
     data: FundData,
@@ -194,21 +219,50 @@ async def performance_view(
     info = None
     bench: performance.Closes = []
     chosen = benchmark_symbol
+    recorded = data.facts.get("benchmark_symbol")
+    if chosen is None and recorded is not None:
+        chosen = recorded.value
     if chosen:
         opt = next((o for o in options if o.symbol == chosen), None)
+        fact_basis = data.facts.get("benchmark_basis")
+        fact_ccy = data.facts.get("benchmark_currency")
+        from_ledger = opt is not None and opt.basis != "unknown"
+        basis: performance.Basis = (
+            opt.basis
+            if from_ledger and opt
+            else (
+                fact_basis.value
+                if fact_basis and fact_basis.value in ("price", "total")
+                else "unknown"
+            )  # type: ignore[assignment]
+        )
+        currency = opt.currency if opt and opt.currency else (fact_ccy.value if fact_ccy else None)
+        notes = []
+        notes.append(
+            "Basis from the index coverage ledger."
+            if from_ledger
+            else "Basis you recorded for this benchmark."
+            if basis != "unknown"
+            else "The series' return basis (price or total) is not recorded."
+        )
+        if recorded is not None and benchmark_symbol is None:
+            notes.append("The benchmark is the one you recorded for this fund.")
         info = performance.BenchmarkInfo(
             symbol=chosen,
             label=opt.label if opt else chosen,
-            basis=opt.basis if opt else "unknown",
-            currency=opt.currency if opt else None,
-            note="Basis from the index coverage ledger."
-            if opt and opt.basis != "unknown"
-            else "The series' return basis (price or total) is not recorded.",
+            basis=basis,
+            currency=currency,
+            note=" ".join(notes),
         )
         bench = await performance.load_prices(pool, chosen, since, day)
-    return performance.build_performance(
+    view = performance.build_performance(
         data, listing, closes, divs, ok, info, bench, options, suggested, day
     )
+    if data.nav:
+        ccy = normalise_currency(listing.currency)[0] if listing and listing.currency else None
+        view.nav = performance.build_nav(data.nav, closes, ccy)
+        view.nav_available = True
+    return view
 
 
 async def checklist(
@@ -218,7 +272,7 @@ async def checklist(
     st = await style(pool, data, rows, hv, as_of)
     perf = await performance_view(pool, data, None, None, as_of)
     suggested = perf.suggested_benchmark
-    if suggested:
+    if suggested and perf.benchmark is None:
         perf = await performance_view(pool, data, None, suggested, as_of)
     diff, note = performance.tracking_headline(perf)
     return analysis.build_checklist(

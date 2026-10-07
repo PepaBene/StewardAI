@@ -19,6 +19,7 @@ from steward.analytics.ratio_set import COMPANY_RATIOS
 from steward.analytics.ratios import RatioValue
 from steward.analytics.thresholds import THRESHOLDS
 from steward.analytics.versions import version
+from steward.company.currency import Translator, translate
 from steward.company.ratios import (
     Market,
     PeerExcluded,
@@ -294,14 +295,67 @@ class PeerCompare(BaseModel):
     ticker: str
     scope: str
     scope_label: str
+    base_currency: str | None = None
     companies: list[CompareCompany]
     rows: list[CompareRow]
+    size_rows: list[CompareRow] = Field(
+        default_factory=list,
+        description="Latest annual size figures converted to the base currency; empty without one.",
+    )
     index_metric: str
     index_series: list[IndexSeries]
     excluded: list[PeerExcluded]
     warnings: list[str]
     method_version: str
     input_hash: str
+
+
+SIZE_ITEMS = (
+    ("revenue", "Revenue"),
+    ("operating_income", "Operating income"),
+    ("net_income", "Net income"),
+    ("total_assets", "Total assets"),
+)
+
+
+def _size_rows(
+    views: Mapping[str, StatementsView], subject: str, scope: str, target: str
+) -> list[CompareRow]:
+    """Latest annual size figures in the base currency, with peer statistics under the same
+    minimum-count rule as the ratio rows."""
+    rows: list[CompareRow] = []
+    for key, label in SIZE_ITEMS:
+        cells: dict[str, CompareCell] = {}
+        vals: dict[str, Decimal | None] = {}
+        for t, v in views.items():
+            annual = [c for c in v.columns if c.kind == "annual"]
+            if not annual:
+                cells[t] = CompareCell(value=None, reason="no annual period")
+                continue
+            value = figures_by_column(v)[annual[-1].id].get(key)
+            vals[t] = value
+            cells[t] = CompareCell(
+                value=rounded(value, "money") if value is not None else None,
+                reason=None if value is not None else "not filed, or no rate for the period",
+            )
+        stat = peer_stat(vals.get(subject), {t: x for t, x in vals.items() if t != subject}, scope)
+        rows.append(
+            CompareRow(
+                id=f"{key}_base",
+                label=f"{label} ({target})",
+                group="size",
+                unit="money",
+                cells=cells,
+                median=stat.median,
+                low=stat.low,
+                high=stat.high,
+                count=stat.count,
+                members=stat.members,
+                withheld_reason=stat.withheld_reason,
+                percentile=stat.percentile,
+            )
+        )
+    return rows
 
 
 def _index(view: StatementsView, key: str, years: int) -> list[dict[str, Any]]:
@@ -334,6 +388,7 @@ async def compare(
     ratio_ids: Sequence[str] = COMPARE_DEFAULT,
     index_metric: str = "revenue",
     years: int = 5,
+    base: Translator | None = None,
 ) -> PeerCompare:
     tickers, label, pre_excluded = await resolve_peers(pool, company, scope, owner_id, group_id)
     peer_views, names, dropped = await load_peer_views(pool, tickers)
@@ -427,7 +482,7 @@ async def compare(
             f"Fiscal year-ends differ by more than {THRESHOLDS.peer_period_distance_days} days for: {', '.join(far)}. Ratios use each company's own latest fiscal year."
         )
     currencies = {c.currency for c in companies if c.currency}
-    if len(currencies) > 1:
+    if len(currencies) > 1 and base is None:
         warnings.append(
             f"Statements are in {', '.join(sorted(currencies))}. Ratios are currency-free, and the index chart compares each company with its own first year, so no conversion is applied."
         )
@@ -435,16 +490,45 @@ async def compare(
         warnings.append(
             f"{len(values)} comparable peers: a median needs {THRESHOLDS.min_peers_for_median}, so none is shown."
         )
+    views: dict[str, StatementsView] = {company.ticker: company.annual}
+    views.update({t: peer_views[t][0] for t in values})
+    size_rows: list[CompareRow] = []
+    if base is not None:
+        converted: dict[str, StatementsView] = {}
+        for t, v in views.items():
+            copy = v.model_copy(deep=True)
+            if v.currency and v.currency != base.target:
+                translate(copy.statements, copy.columns, v.currency, base)
+                copy.currency = base.target
+            elif not v.currency:
+                warnings.append(
+                    f"{t} has no stated currency, so it is left out of the base-currency view."
+                )
+                continue
+            converted[t] = copy
+        views = converted
+        size_rows = _size_rows(views, company.ticker, scope, base.target)
+        warnings.append(
+            f"Size figures and the index chart are in {base.target} at {base.source.upper()} reference rates "
+            f"({'period-end' if base.basis == 'period_end' else 'average for flows, period-end for balances'}). "
+            "A currency move shows up in the index line as well as business growth. Ratios are unchanged."
+        )
     series = [
-        IndexSeries(ticker=company.ticker, points=_index(company.annual, index_metric, years))
+        IndexSeries(ticker=t, points=_index(v, index_metric, years))
+        for t, v in views.items()
+        if t == company.ticker
     ]
     series += [
-        IndexSeries(ticker=t, points=_index(peer_views[t][0], index_metric, years)) for t in values
+        IndexSeries(ticker=t, points=_index(v, index_metric, years))
+        for t, v in views.items()
+        if t != company.ticker
     ]
     return PeerCompare(
         ticker=company.ticker,
         scope=scope,
         scope_label=label,
+        base_currency=base.target if base else None,
+        size_rows=size_rows,
         companies=companies,
         rows=rows,
         index_metric=index_metric,

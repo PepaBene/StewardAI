@@ -11352,6 +11352,52 @@
         ]
       }
     },
+    "/discover/backtest": {
+      "post": {
+        "tags": [
+          "discover"
+        ],
+        "summary": "Backtest Screen",
+        "operationId": "backtest_screen",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BacktestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/discover/screens": {
       "get": {
         "tags": [
@@ -12022,6 +12068,53 @@
               "title": "Known By"
             },
             "description": "Point-in-time cutoff on the filing date."
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show the figures in this base currency at stated reference rates; omit for the filed currency.",
+              "title": "Currency"
+            },
+            "description": "Show the figures in this base currency at stated reference rates; omit for the filed currency."
+          },
+          {
+            "name": "fx_rates",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "period_end",
+                "average"
+              ],
+              "type": "string",
+              "default": "period_end",
+              "title": "Fx Rates"
+            }
+          },
+          {
+            "name": "fx_source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ecb",
+                "cnb"
+              ],
+              "type": "string",
+              "default": "ecb",
+              "title": "Fx Source"
+            }
           }
         ],
         "responses": {
@@ -12127,6 +12220,51 @@
               "default": "1000000",
               "title": "Units"
             }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Currency"
+            }
+          },
+          {
+            "name": "fx_rates",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "period_end",
+                "average"
+              ],
+              "type": "string",
+              "default": "period_end",
+              "title": "Fx Rates"
+            }
+          },
+          {
+            "name": "fx_source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ecb",
+                "cnb"
+              ],
+              "type": "string",
+              "default": "ecb",
+              "title": "Fx Source"
+            }
           }
         ],
         "responses": {
@@ -12216,6 +12354,392 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RatiosView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/segments": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Segments",
+        "description": "Reported segments, geography and products with eliminations and unallocated revenue kept\nvisible, changed definitions flagged, and your own estimate mapping to other contexts.",
+        "operationId": "get_segments",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "annual",
+                "quarter"
+              ],
+              "type": "string",
+              "default": "annual",
+              "title": "Basis"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentAnalysis"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/segment-map": {
+      "put": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Save Segment Map",
+        "description": "Records one mapping of a reported member to a country, commodity, patent technology or\ntrade product as a new row (a share of 0 removes it). It is an estimate, labelled as one.",
+        "operationId": "save_segment_map",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MapIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentAnalysis"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/assessment": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Assessment",
+        "description": "StewardAI's own compact rubric: four component scores from published indicators, thresholds\nand weights, a stated missing-data penalty, abstention when evidence is thin, and no rating.",
+        "operationId": "get_assessment",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rubric"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/report": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Report",
+        "description": "The report as it stands now: code-computed tables, the assessment rubric, the latest verified\nresearch prose with its citations, your cited case items and the conflicts between them.",
+        "operationId": "get_report",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Save Report",
+        "description": "Stores the report as it stands with your conclusion as a new version; nothing is overwritten.",
+        "operationId": "save_report",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/report/versions": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "List Report Versions",
+        "operationId": "list_report_versions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReportVersionSummary"
+                  },
+                  "title": "Response List Report Versions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/report/versions/{number}": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Report Version",
+        "operationId": "get_report_version",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportVersion"
                 }
               }
             }
@@ -12333,6 +12857,53 @@
               "minimum": 2,
               "default": 5,
               "title": "Years"
+            }
+          },
+          {
+            "name": "base_currency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Convert size figures and the index chart to this currency; omit for native currencies.",
+              "title": "Base Currency"
+            },
+            "description": "Convert size figures and the index chart to this currency; omit for native currencies."
+          },
+          {
+            "name": "fx_rates",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "period_end",
+                "average"
+              ],
+              "type": "string",
+              "default": "period_end",
+              "title": "Fx Rates"
+            }
+          },
+          {
+            "name": "fx_source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ecb",
+                "cnb"
+              ],
+              "type": "string",
+              "default": "ecb",
+              "title": "Fx Source"
             }
           }
         ],
@@ -13942,6 +14513,255 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/funds/{isin}/nav": {
+      "get": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Fund Nav",
+        "description": "The net asset values you entered, newest entry per date.",
+        "operationId": "fund_nav",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Answer as of this date, using only data fetched by then.",
+              "title": "As Of"
+            },
+            "description": "Answer as of this date, using only data fetched by then."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NavPoint"
+                  },
+                  "title": "Response Fund Nav"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Put Fund Nav",
+        "description": "Record NAV points from the issuer's own page. No provider supplies NAV, so these are the only source; the\ncount saved is returned. Append-only: re-entering a date replaces it as the newest.",
+        "operationId": "put_fund_nav",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "isin",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+              "title": "Isin"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/NavIn"
+                },
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "integer",
+                  "title": "Response Put Fund Nav"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fund-comparisons": {
+      "get": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Saved Comparisons",
+        "operationId": "saved_comparisons",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SavedComparison"
+                  },
+                  "type": "array",
+                  "title": "Response Saved Comparisons"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Create Saved Comparison",
+        "description": "Keep a set of two to five funds to reopen later; the figures are recomputed each time, not stored.",
+        "operationId": "create_saved_comparison",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedComparisonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedComparison"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/fund-comparisons/{comparison_id}": {
+      "delete": {
+        "tags": [
+          "fund research"
+        ],
+        "summary": "Archive Saved Comparison",
+        "operationId": "archive_saved_comparison",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "comparison_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Comparison Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -18561,6 +19381,480 @@
         "title": "Assumptions",
         "description": "One scenario's explicit inputs. Everything here is the owner's assumption, not a fact."
       },
+      "BacktestName": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "entry": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Entry"
+          },
+          "exit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Exit"
+          },
+          "period_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Return"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weight"
+          },
+          "ended_early": {
+            "type": "boolean",
+            "title": "Ended Early"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "entry",
+          "exit",
+          "period_return",
+          "weight",
+          "ended_early"
+        ],
+        "title": "BacktestName"
+      },
+      "BacktestPeriod": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "universe_size": {
+            "type": "integer",
+            "title": "Universe Size"
+          },
+          "matched": {
+            "type": "integer",
+            "title": "Matched"
+          },
+          "picked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Picked"
+          },
+          "held": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestName"
+            },
+            "type": "array",
+            "title": "Held"
+          },
+          "dropped_no_price": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dropped No Price"
+          },
+          "gross_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Return"
+          },
+          "turnover": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Turnover"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Cost"
+          },
+          "net_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Return"
+          },
+          "benchmark_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Return"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "universe_size",
+          "matched",
+          "picked",
+          "held",
+          "dropped_no_price",
+          "gross_return",
+          "turnover",
+          "cost",
+          "net_return",
+          "benchmark_return",
+          "note"
+        ],
+        "title": "BacktestPeriod"
+      },
+      "BacktestRequest": {
+        "properties": {
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/DiscoverFilter"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Filters"
+          },
+          "sort_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort By"
+          },
+          "descending": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descending"
+          },
+          "missing": {
+            "type": "string",
+            "enum": [
+              "exclude",
+              "keep_unknown"
+            ],
+            "title": "Missing",
+            "default": "exclude"
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "quarterly",
+              "semiannual",
+              "annual"
+            ],
+            "title": "Frequency",
+            "default": "annual"
+          },
+          "max_names": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Max Names",
+            "default": 10
+          },
+          "cost_bps": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Cost Bps",
+            "default": 10
+          },
+          "benchmark_ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Ticker"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "BacktestRequest"
+      },
+      "BacktestResponse": {
+        "properties": {
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "fingerprint": {
+            "type": "string",
+            "title": "Fingerprint"
+          },
+          "definition_hash": {
+            "type": "string",
+            "title": "Definition Hash"
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "frequency": {
+            "type": "string",
+            "title": "Frequency"
+          },
+          "max_names": {
+            "type": "integer",
+            "title": "Max Names"
+          },
+          "cost_bps": {
+            "type": "integer",
+            "title": "Cost Bps"
+          },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestPeriod"
+            },
+            "type": "array",
+            "title": "Periods"
+          },
+          "cumulative_net": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cumulative Net"
+          },
+          "cumulative_gross": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cumulative Gross"
+          },
+          "cost_drag": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Drag"
+          },
+          "annualised_net": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annualised Net"
+          },
+          "benchmark_ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Ticker"
+          },
+          "benchmark_cumulative": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Cumulative"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "caveats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Caveats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method_version",
+          "fingerprint",
+          "definition_hash",
+          "start",
+          "end",
+          "frequency",
+          "max_names",
+          "cost_bps",
+          "periods",
+          "cumulative_net",
+          "cumulative_gross",
+          "cost_drag",
+          "annualised_net",
+          "benchmark_ticker",
+          "benchmark_cumulative",
+          "warnings",
+          "caveats"
+        ],
+        "title": "BacktestResponse"
+      },
       "BaseTotals": {
         "properties": {
           "base_currency": {
@@ -19371,6 +20665,31 @@
             ],
             "title": "Asset Mix Source"
           },
+          "rate_buckets": {
+            "items": {
+              "$ref": "#/components/schemas/RateBucket"
+            },
+            "type": "array",
+            "title": "Rate Buckets"
+          },
+          "credit_spread": {
+            "items": {
+              "$ref": "#/components/schemas/SpreadBucket"
+            },
+            "type": "array",
+            "title": "Credit Spread"
+          },
+          "credit_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credit Note"
+          },
           "method_version": {
             "type": "string",
             "title": "Method Version",
@@ -19398,6 +20717,168 @@
           "warnings"
         ],
         "title": "BondView"
+      },
+      "Breakdown": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "periods": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Periods"
+          },
+          "latest_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Period"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/MemberLine"
+            },
+            "type": "array",
+            "title": "Members"
+          },
+          "operating_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operating Total"
+          },
+          "eliminations": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eliminations"
+          },
+          "unallocated": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unallocated"
+          },
+          "after_eliminations": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Eliminations"
+          },
+          "reported_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Total"
+          },
+          "difference": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference"
+          },
+          "difference_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference Note"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "label",
+          "periods",
+          "latest_period",
+          "members",
+          "operating_total",
+          "eliminations",
+          "unallocated",
+          "after_eliminations",
+          "reported_total",
+          "difference",
+          "difference_note",
+          "notes"
+        ],
+        "title": "Breakdown"
       },
       "Bucket": {
         "properties": {
@@ -19839,6 +21320,25 @@
         "type": "object",
         "title": "CalendarSettings",
         "description": "The expected-gap calendar: days when a source has nothing to publish or collect."
+      },
+      "Calibration": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "uncalibrated",
+            "title": "Status",
+            "default": "uncalibrated"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "title": "Calibration"
       },
       "CapitalAllocation": {
         "properties": {
@@ -20372,6 +21872,18 @@
           "keyless_note": {
             "type": "string",
             "title": "Keyless Note"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderNeed"
+            },
+            "type": "array",
+            "title": "Providers"
+          },
+          "keyless_count": {
+            "type": "integer",
+            "title": "Keyless Count",
+            "default": 0
           }
         },
         "type": "object",
@@ -22054,6 +23566,108 @@
         ],
         "title": "CompanyEventInput"
       },
+      "CompanyReport": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "key_figures": {
+            "items": {
+              "$ref": "#/components/schemas/KeyFigure"
+            },
+            "type": "array",
+            "title": "Key Figures"
+          },
+          "key_figure_warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Key Figure Warnings"
+          },
+          "rubric": {
+            "$ref": "#/components/schemas/Rubric"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentMix"
+            },
+            "type": "array",
+            "title": "Segments"
+          },
+          "case_items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Case Items"
+          },
+          "research": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchExcerpt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/Conflict"
+            },
+            "type": "array",
+            "title": "Conflicts"
+          },
+          "conclusion": {
+            "type": "string",
+            "title": "Conclusion",
+            "default": ""
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "input_hash": {
+            "type": "string",
+            "title": "Input Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "as_of",
+          "key_figures",
+          "key_figure_warnings",
+          "rubric",
+          "segments",
+          "case_items",
+          "research",
+          "conflicts",
+          "method_version",
+          "input_hash"
+        ],
+        "title": "CompanyReport"
+      },
       "CompanyResearchObservation": {
         "properties": {
           "id": {
@@ -22967,6 +24581,111 @@
         ],
         "title": "ComplianceRow"
       },
+      "Component": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weight"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "raw_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Score"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "abstained": {
+            "type": "boolean",
+            "title": "Abstained"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "indicators": {
+            "items": {
+              "$ref": "#/components/schemas/Indicator"
+            },
+            "type": "array",
+            "title": "Indicators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "weight",
+          "description",
+          "score",
+          "raw_score",
+          "coverage",
+          "abstained",
+          "indicators"
+        ],
+        "title": "Component"
+      },
       "ComtradeSlice": {
         "properties": {
           "reporter": {
@@ -23329,6 +25048,33 @@
           "status"
         ],
         "title": "ConfirmedListingResponse"
+      },
+      "Conflict": {
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": [
+              "review",
+              "note"
+            ],
+            "title": "Severity"
+          },
+          "area": {
+            "type": "string",
+            "title": "Area"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "severity",
+          "area",
+          "text"
+        ],
+        "title": "Conflict"
       },
       "Consensus": {
         "properties": {
@@ -29780,6 +31526,48 @@
           "valid_from"
         ],
         "title": "ExposureInput"
+      },
+      "ExposureLine": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "revenue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Revenue"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "revenue",
+          "share"
+        ],
+        "title": "ExposureLine"
       },
       "ExposureObservation": {
         "properties": {
@@ -38361,6 +40149,137 @@
         ],
         "title": "IndexSeries"
       },
+      "Indicator": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "component": {
+            "type": "string",
+            "title": "Component"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Weight"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "direction": {
+            "type": "string",
+            "title": "Direction"
+          },
+          "good": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Good"
+          },
+          "ok": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Ok"
+          },
+          "band": {
+            "type": "string",
+            "enum": [
+              "good",
+              "ok",
+              "weak",
+              "missing"
+            ],
+            "title": "Band"
+          },
+          "points": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Points"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "component",
+          "weight",
+          "value",
+          "unit",
+          "direction",
+          "good",
+          "ok",
+          "band",
+          "points",
+          "source"
+        ],
+        "title": "Indicator"
+      },
       "Insider": {
         "properties": {
           "coverage": {
@@ -41134,6 +43053,89 @@
         ],
         "title": "JurisdictionCoverage"
       },
+      "KeyFigure": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "own_median_5y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own Median 5Y"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "formula": {
+            "type": "string",
+            "title": "Formula"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "unit",
+          "period",
+          "value",
+          "own_median_5y",
+          "formula"
+        ],
+        "title": "KeyFigure"
+      },
       "KpiRow": {
         "properties": {
           "ticker": {
@@ -43733,6 +45735,235 @@
         "title": "ManualSegmentRow",
         "description": "Revenue for one region, segment or product, entered by hand from an annual report\n(for issuers whose filings carry no machine-readable breakdown, e.g. CEZ and KB)."
       },
+      "MapIn": {
+        "properties": {
+          "breakdown": {
+            "type": "string",
+            "enum": [
+              "geographic",
+              "segment",
+              "product"
+            ],
+            "title": "Breakdown"
+          },
+          "member_label": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Member Label"
+          },
+          "context": {
+            "type": "string",
+            "enum": [
+              "country",
+              "commodity",
+              "patent_tech",
+              "trade_hs"
+            ],
+            "title": "Context"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Value"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Share",
+            "default": "1"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "breakdown",
+          "member_label",
+          "context",
+          "value"
+        ],
+        "title": "MapIn"
+      },
+      "MapLine": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "breakdown": {
+            "type": "string",
+            "title": "Breakdown"
+          },
+          "member_label": {
+            "type": "string",
+            "title": "Member Label"
+          },
+          "context": {
+            "type": "string",
+            "title": "Context"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Share"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "breakdown",
+          "member_label",
+          "context",
+          "value",
+          "share",
+          "note",
+          "created_at"
+        ],
+        "title": "MapLine"
+      },
+      "MappedExposure": {
+        "properties": {
+          "breakdown": {
+            "type": "string",
+            "title": "Breakdown"
+          },
+          "context": {
+            "type": "string",
+            "title": "Context"
+          },
+          "context_label": {
+            "type": "string",
+            "title": "Context Label"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ExposureLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "mapped": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Mapped"
+          },
+          "unmapped": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Unmapped"
+          },
+          "unallocated": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Unallocated"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "default": "Estimate from your mapping, not a reported figure"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "breakdown",
+          "context",
+          "context_label",
+          "period",
+          "lines",
+          "mapped",
+          "unmapped",
+          "unallocated",
+          "warnings"
+        ],
+        "title": "MappedExposure"
+      },
       "MarketHoliday": {
         "properties": {
           "calendar": {
@@ -43840,6 +46071,116 @@
           "label"
         ],
         "title": "MarketStripItem"
+      },
+      "MemberLine": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "operating",
+              "elimination",
+              "unallocated",
+              "subtotal"
+            ],
+            "title": "Role"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Values",
+            "description": "Revenue per period label; null = not reported that period."
+          },
+          "latest_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Value"
+          },
+          "latest_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Share",
+            "description": "Share of operating revenue before eliminations."
+          },
+          "change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change",
+            "description": "Latest against the previous period, only when both are reported."
+          },
+          "definition_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "role",
+          "values",
+          "latest_value",
+          "latest_share",
+          "change"
+        ],
+        "title": "MemberLine"
       },
       "MessageOut": {
         "properties": {
@@ -43964,6 +46305,18 @@
           "total": {
             "type": "integer",
             "title": "Total"
+          },
+          "needs_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Needs Provider",
+            "description": "Optional provider whose key this metric depends on; null = key-free."
           }
         },
         "type": "object",
@@ -44225,6 +46578,298 @@
         "title": "MonitorSettings",
         "description": "Monitoring: failed jobs, missed scheduled runs and per-holding coverage gaps alert."
       },
+      "NavIn": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "nav": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Nav"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency"
+          },
+          "source_url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 8,
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "nav",
+          "currency",
+          "source_url"
+        ],
+        "title": "NavIn"
+      },
+      "NavPoint": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "nav": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Nav"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "nav",
+          "currency",
+          "source_url"
+        ],
+        "title": "NavPoint"
+      },
+      "NavRow": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "nav": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Nav"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "listing_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Listing Close"
+          },
+          "listing_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Listing Date"
+          },
+          "premium": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Premium",
+            "description": "Listing close / NAV - 1; positive is a premium."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "nav",
+          "currency",
+          "source_url",
+          "listing_close",
+          "listing_date",
+          "premium"
+        ],
+        "title": "NavRow"
+      },
+      "NavView": {
+        "properties": {
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/NavRow"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "latest_premium": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Premium"
+          },
+          "mean_abs_premium": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Abs Premium"
+          },
+          "max_abs_premium": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Abs Premium"
+          },
+          "nav_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nav Change",
+            "description": "Last NAV / first NAV - 1 between your entered dates; excludes distributions."
+          },
+          "nav_change_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nav Change Start"
+          },
+          "nav_change_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nav Change End"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "points",
+          "count",
+          "latest_premium",
+          "mean_abs_premium",
+          "max_abs_premium",
+          "nav_change",
+          "nav_change_start",
+          "nav_change_end",
+          "warnings"
+        ],
+        "title": "NavView"
+      },
       "NetDiscretionary": {
         "properties": {
           "since": {
@@ -44429,6 +47074,16 @@
             "type": "string",
             "format": "date",
             "title": "Since"
+          },
+          "since_basis": {
+            "type": "string",
+            "enum": [
+              "chosen",
+              "last_review",
+              "default_90_days"
+            ],
+            "title": "Since Basis",
+            "default": "chosen"
           },
           "edges": {
             "items": {
@@ -46575,6 +49230,17 @@
             "type": "string",
             "title": "Scope Label"
           },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
           "companies": {
             "items": {
               "$ref": "#/components/schemas/CompareCompany"
@@ -46588,6 +49254,14 @@
             },
             "type": "array",
             "title": "Rows"
+          },
+          "size_rows": {
+            "items": {
+              "$ref": "#/components/schemas/CompareRow"
+            },
+            "type": "array",
+            "title": "Size Rows",
+            "description": "Latest annual size figures converted to the base currency; empty without one."
           },
           "index_metric": {
             "type": "string",
@@ -47218,10 +49892,20 @@
             "title": "Nav Available",
             "default": false
           },
+          "nav": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NavView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "nav_note": {
             "type": "string",
             "title": "Nav Note",
-            "default": "NAV is not stored. Returns are for the exchange listing's price, which differs from NAV by the daily premium or discount."
+            "default": "NAV is not provider data here. Returns are for the exchange listing's price, which differs from NAV by the daily premium or discount; enter the issuer's published NAV below to see the premium."
           },
           "benchmark": {
             "anyOf": [
@@ -49876,6 +52560,34 @@
         "title": "ProviderJobSettings",
         "description": "Limits for a free provider. There is no on/off switch: a provider is used as soon as it is\navailable, meaning its API key is set when it needs one."
       },
+      "ProviderNeed": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "state": {
+            "type": "string",
+            "title": "State",
+            "description": "Worst access state among the endpoints the metrics use."
+          },
+          "unlocks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unlocks",
+            "description": "Metric labels that depend on this provider."
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "state",
+          "unlocks"
+        ],
+        "title": "ProviderNeed"
+      },
       "ProviderStatus": {
         "properties": {
           "provider": {
@@ -50576,6 +53288,33 @@
         "additionalProperties": false,
         "type": "object",
         "title": "QuietHours"
+      },
+      "RateBucket": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "years": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Years"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "years"
+        ],
+        "title": "RateBucket",
+        "description": "Duration contributed by one key-rate bucket: DV01 x 10,000 / net assets, as reported."
       },
       "RatioGroup": {
         "properties": {
@@ -52351,6 +55090,18 @@
         ],
         "title": "ReportHit"
       },
+      "ReportIn": {
+        "properties": {
+          "conclusion": {
+            "type": "string",
+            "maxLength": 8000,
+            "title": "Conclusion",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "ReportIn"
+      },
       "ReportOut": {
         "properties": {
           "id": {
@@ -52576,6 +55327,78 @@
         ],
         "title": "ReportSummary"
       },
+      "ReportVersion": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "conclusion_excerpt": {
+            "type": "string",
+            "title": "Conclusion Excerpt"
+          },
+          "input_hash": {
+            "type": "string",
+            "title": "Input Hash"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "report": {
+            "$ref": "#/components/schemas/CompanyReport"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "created_at",
+          "conclusion_excerpt",
+          "input_hash",
+          "method_version",
+          "report"
+        ],
+        "title": "ReportVersion"
+      },
+      "ReportVersionSummary": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "conclusion_excerpt": {
+            "type": "string",
+            "title": "Conclusion Excerpt"
+          },
+          "input_hash": {
+            "type": "string",
+            "title": "Input Hash"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "created_at",
+          "conclusion_excerpt",
+          "input_hash",
+          "method_version"
+        ],
+        "title": "ReportVersionSummary"
+      },
       "ReportingExceptionOut": {
         "properties": {
           "category": {
@@ -52753,6 +55576,34 @@
           "gaps"
         ],
         "title": "ResearchContext"
+      },
+      "ResearchExcerpt": {
+        "properties": {
+          "report_id": {
+            "type": "integer",
+            "title": "Report Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "body": {
+            "$ref": "#/components/schemas/ResearchBody"
+          },
+          "older_than_latest_filing": {
+            "type": "boolean",
+            "title": "Older Than Latest Filing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "report_id",
+          "created_at",
+          "body",
+          "older_than_latest_filing"
+        ],
+        "title": "ResearchExcerpt"
       },
       "ResearchProfile": {
         "properties": {
@@ -54152,6 +57003,106 @@
         ],
         "title": "Role"
       },
+      "Rubric": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "overall": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall"
+          },
+          "overall_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Overall Coverage"
+          },
+          "abstained": {
+            "type": "boolean",
+            "title": "Abstained"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/Component"
+            },
+            "type": "array",
+            "title": "Components"
+          },
+          "penalty_rule": {
+            "type": "string",
+            "title": "Penalty Rule"
+          },
+          "calibration": {
+            "$ref": "#/components/schemas/Calibration"
+          },
+          "caveats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Caveats"
+          },
+          "input_hash": {
+            "type": "string",
+            "title": "Input Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "as_of",
+          "version",
+          "overall",
+          "overall_coverage",
+          "abstained",
+          "reason",
+          "components",
+          "penalty_rule",
+          "calibration",
+          "caveats",
+          "input_hash"
+        ],
+        "title": "Rubric"
+      },
       "RuleMatch": {
         "properties": {
           "severities": {
@@ -54253,6 +57204,87 @@
           "request"
         ],
         "title": "SaveScenarioIn"
+      },
+      "SavedComparison": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "isins": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Isins"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "isins",
+          "note",
+          "created_at"
+        ],
+        "title": "SavedComparison"
+      },
+      "SavedComparisonIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "isins": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "minItems": 2,
+            "title": "Isins"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "isins"
+        ],
+        "title": "SavedComparisonIn"
       },
       "SavedScenario": {
         "properties": {
@@ -54940,6 +57972,100 @@
         ],
         "title": "SectionCoverage"
       },
+      "SegmentAnalysis": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "available_bases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Bases"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "source_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Note"
+          },
+          "breakdowns": {
+            "items": {
+              "$ref": "#/components/schemas/Breakdown"
+            },
+            "type": "array",
+            "title": "Breakdowns"
+          },
+          "mappings": {
+            "items": {
+              "$ref": "#/components/schemas/MapLine"
+            },
+            "type": "array",
+            "title": "Mappings"
+          },
+          "exposures": {
+            "items": {
+              "$ref": "#/components/schemas/MappedExposure"
+            },
+            "type": "array",
+            "title": "Exposures"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "basis",
+          "available_bases",
+          "currency",
+          "source_note",
+          "breakdowns",
+          "mappings",
+          "exposures",
+          "notes",
+          "method_version"
+        ],
+        "title": "SegmentAnalysis"
+      },
       "SegmentHistoryPoint": {
         "properties": {
           "period": {
@@ -55028,6 +58154,72 @@
           "period_end"
         ],
         "title": "SegmentLine"
+      },
+      "SegmentMix": {
+        "properties": {
+          "breakdown": {
+            "type": "string",
+            "title": "Breakdown"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "lines": {
+            "items": {
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "array",
+            "title": "Lines",
+            "description": "(label, share of operating revenue)"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "breakdown",
+          "period",
+          "lines"
+        ],
+        "title": "SegmentMix"
       },
       "SegmentPeriod": {
         "properties": {
@@ -56926,6 +60118,51 @@
         ],
         "title": "SourcesHealth"
       },
+      "SpreadBucket": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "investment_grade": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Investment Grade"
+          },
+          "non_investment_grade": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Non Investment Grade"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "investment_grade",
+          "non_investment_grade"
+        ],
+        "title": "SpreadBucket"
+      },
       "StakeChangeOut": {
         "properties": {
           "change_type": {
@@ -57463,7 +60700,20 @@
                 "type": "null"
               }
             ],
-            "title": "Currency"
+            "title": "Currency",
+            "description": "The currency of the figures shown (the converted one when a base currency was chosen)."
+          },
+          "native_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Native Currency",
+            "description": "The currency the facts were filed in."
           },
           "columns": {
             "items": {

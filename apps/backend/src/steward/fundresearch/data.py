@@ -25,7 +25,43 @@ FACT_KEYS = (
     "liquidity_note",
     "tracking_index",
     "ucits",
+    "benchmark_symbol",
+    "benchmark_currency",
+    "benchmark_basis",
+    "average_maturity_years",
+    "effective_duration_years",
+    "credit_quality_note",
 )
+
+NUMERIC_FACTS = ("lending_revenue_share", "average_maturity_years", "effective_duration_years")
+
+
+class NavPoint(BaseModel):
+    as_of: dt.date
+    nav: Decimal
+    currency: str
+    source_url: str
+
+
+class NavIn(BaseModel):
+    as_of: dt.date
+    nav: Decimal = Field(gt=0)
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    source_url: str = Field(min_length=8, max_length=2000)
+
+
+class SavedComparison(BaseModel):
+    id: int
+    name: str
+    isins: list[str]
+    note: str | None
+    created_at: dt.datetime
+
+
+class SavedComparisonIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    isins: list[str] = Field(min_length=2, max_length=5)
+    note: str | None = Field(default=None, max_length=500)
 
 
 class FundListing(BaseModel):
@@ -63,6 +99,7 @@ class FundData:
     listings: list[FundListing] = field(default_factory=list)
     siblings: list[dict[str, Any]] = field(default_factory=list)
     facts: dict[str, Fact] = field(default_factory=dict)
+    nav: list[NavPoint] = field(default_factory=list)
 
     @property
     def name(self) -> str | None:
@@ -132,6 +169,7 @@ async def load_fund(
             isin,
         )
     facts = await load_facts(pool, owner_id, isin)
+    nav = await load_nav(pool, owner_id, isin, as_of)
     return FundData(
         isin=isin,
         factsheet=_row(sheet),
@@ -150,7 +188,69 @@ async def load_fund(
         ],
         siblings=[dict(r) for r in siblings],
         facts=facts,
+        nav=nav,
     )
+
+
+async def load_nav(
+    pool: asyncpg.Pool, owner_id: Any, isin: str, as_of: dt.date | None = None
+) -> list[NavPoint]:
+    """The newest entry per date, oldest first, up to `as_of`."""
+    rows = await pool.fetch(
+        """select distinct on (as_of) as_of, nav, currency, source_url from public.fund_nav_point
+           where owner_id=$1 and fund_isin=$2 and ($3::date is null or as_of <= $3)
+           order by as_of, id desc""",
+        owner_id,
+        isin,
+        as_of,
+    )
+    return [
+        NavPoint(as_of=r["as_of"], nav=r["nav"], currency=r["currency"], source_url=r["source_url"])
+        for r in rows
+    ]
+
+
+async def save_nav(pool: asyncpg.Pool, owner_id: Any, isin: str, points: list[NavIn]) -> int:
+    async with pool.acquire() as conn, conn.transaction():
+        await conn.executemany(
+            "insert into public.fund_nav_point (owner_id, fund_isin, as_of, nav, currency, source_url)"
+            " values ($1,$2,$3,$4,$5,$6)",
+            [(owner_id, isin, p.as_of, p.nav, p.currency, p.source_url.strip()) for p in points],
+        )
+    return len(points)
+
+
+async def list_comparisons(pool: asyncpg.Pool, owner_id: Any) -> list[SavedComparison]:
+    rows = await pool.fetch(
+        "select id, name, isins, note, created_at from public.fund_comparison_saved"
+        " where owner_id=$1 and not archived order by created_at desc, id desc",
+        owner_id,
+    )
+    return [SavedComparison(**dict(r)) for r in rows]
+
+
+async def save_comparison(
+    pool: asyncpg.Pool, owner_id: Any, body: SavedComparisonIn
+) -> SavedComparison:
+    row = await pool.fetchrow(
+        "insert into public.fund_comparison_saved (owner_id, name, isins, note)"
+        " values ($1,$2,$3,$4) returning id, name, isins, note, created_at",
+        owner_id,
+        body.name.strip(),
+        [i.upper() for i in body.isins],
+        body.note,
+    )
+    assert row is not None
+    return SavedComparison(**dict(row))
+
+
+async def archive_comparison(pool: asyncpg.Pool, owner_id: Any, comparison_id: int) -> bool:
+    done = await pool.execute(
+        "update public.fund_comparison_saved set archived=true where id=$1 and owner_id=$2 and not archived",
+        comparison_id,
+        owner_id,
+    )
+    return str(done).endswith("1")
 
 
 async def load_facts(pool: asyncpg.Pool, owner_id: Any, isin: str) -> dict[str, Fact]:

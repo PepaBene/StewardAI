@@ -224,8 +224,19 @@ def _annual_series(
     return out
 
 
+async def closes_between(
+    pool: asyncpg.Pool, members: list[UniverseMember], start: dt.date, end: dt.date
+) -> dict[str, list[tuple[dt.date, Decimal]]]:
+    """Stored adjusted closes per ticker between two dates (the same source rules as screens)."""
+    return await _closes(pool, members, end, start=start)
+
+
 async def _closes(
-    pool: asyncpg.Pool, members: list[UniverseMember], as_of: dt.date
+    pool: asyncpg.Pool,
+    members: list[UniverseMember],
+    as_of: dt.date,
+    *,
+    start: dt.date | None = None,
 ) -> dict[str, list[tuple[dt.date, Decimal]]]:
     symbols: dict[str, list[str]] = {}
     for m in members:
@@ -240,7 +251,7 @@ async def _closes(
            where symbol=any($1::text[]) and bar_type='adjusted' and access_state='available'
              and date between $2 and $3 order by symbol, source, date""",
         wanted,
-        as_of - dt.timedelta(days=365 * HISTORY_YEARS),
+        start or as_of - dt.timedelta(days=365 * HISTORY_YEARS),
         as_of,
     )
     series: dict[tuple[str, str], list[tuple[dt.date, Decimal]]] = defaultdict(list)

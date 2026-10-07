@@ -254,3 +254,106 @@ async def test_compare_overlap_and_share_classes(api: httpx.AsyncClient) -> None
         ]
     )
     assert (await api.get(f"/funds/compare?isins={six}")).status_code == 422
+
+
+def _weekday(back: int) -> dt.date:
+    d = TODAY - dt.timedelta(days=back)
+    while d.weekday() >= 5:
+        d -= dt.timedelta(days=1)
+    return d
+
+
+async def test_benchmark_facts_nav_and_saved_comparisons(
+    api: httpx.AsyncClient, migrated_db: MigratedDatabase
+) -> None:
+    src = "https://x.test/doc"
+
+    async def put(key: str, value: str) -> int:
+        r = await api.put(f"/funds/{A}/facts", json={"key": key, "value": value, "source_url": src})
+        return r.status_code
+
+    assert await put("benchmark_basis", "gross") == 422
+    assert await put("benchmark_currency", "usd") == 422
+    assert await put("average_maturity_years", "-1") == 422
+    assert await put("lending_revenue_share", "1.5") == 422
+    assert await put("effective_duration_years", "abc") == 422
+
+    # An owner-recorded benchmark is used when none is passed, with its recorded basis.
+    assert await put("benchmark_symbol", "^idx") == 201
+    p = (await api.get(f"/funds/{A}/performance")).json()
+    assert p["benchmark"]["symbol"] == "^idx" and "recorded" in p["benchmark"]["note"]
+    assert p["nav"] is None
+
+    # The fund screen fills tracking difference only for funds with a recorded benchmark.
+    screen = (
+        await api.post(
+            "/discover/funds",
+            json={"filters": [{"metric": "tracking_difference", "op": "lte", "value": "1"}]},
+        )
+    ).json()
+    assert [r["key"] for r in screen["rows"]] == [A]
+
+    # NAV is owner-entered only; premium is the listing close over the NAV on the same date.
+    day = _weekday(30)
+    assert (
+        await api.put(
+            f"/funds/{A}/nav",
+            json=[
+                {
+                    "as_of": str(TODAY + dt.timedelta(days=2)),
+                    "nav": "100",
+                    "currency": "USD",
+                    "source_url": src,
+                }
+            ],
+        )
+    ).status_code == 422
+    ok = await api.put(
+        f"/funds/{A}/nav",
+        json=[{"as_of": str(day), "nav": "100", "currency": "USD", "source_url": src}],
+    )
+    assert ok.status_code == 201 and ok.json() == 1
+    await api.put(
+        f"/funds/{A}/nav",
+        json=[{"as_of": str(day), "nav": "110", "currency": "USD", "source_url": src}],
+    )
+    nav = (await api.get(f"/funds/{A}/nav")).json()
+    assert len(nav) == 1 and Decimal(nav[0]["nav"]) == Decimal(110)  # newest entry per date wins
+    p = (await api.get(f"/funds/{A}/performance")).json()
+    assert p["nav_available"] is True and p["nav"]["count"] == 1
+    assert p["nav"]["points"][0]["premium"] is not None
+
+    # Bond statistics: a regulatory DV01 gives a labelled implied duration.
+    admin = await asyncpg.connect(migrated_db.admin_url)
+    try:
+        await admin.execute(
+            "insert into public.nport_filing (accession, form, registrant_cik, series_id, report_period_end, filed,"
+            " net_assets, risk_metrics, reconcile_status, matched_ticker, fund_isin, source_url)"
+            " values ('0000000001-26-000001','NPORT-P','0000000001','S000000001',$1,$1,1000000,$2::jsonb,'confirmed','FNDA_EQ',$3,'https://sec.test/x')",
+            TODAY - dt.timedelta(days=40),
+            '{"interest_rate_dv01":{"USD":{"period3Mon":"10","period1Yr":"20","period5Yr":"30","period10Yr":"20","period30Yr":"20"}},'
+            '"credit_spread_investment_grade":{"period5Yr":"40"},"credit_spread_non_investment_grade":{"period5Yr":"10"}}',
+            A,
+        )
+    finally:
+        await admin.close()
+    bond = (await api.get(f"/funds/{A}/bond")).json()
+    assert Decimal(bond["duration"]["value"]) == Decimal("1.00")
+    assert "DV01-implied" in bond["duration"]["warnings"][0]
+    assert len(bond["rate_buckets"]) == 5 and bond["credit_spread"][0]["label"] == "5 years"
+    assert bond["credit_quality"]["value"] is None
+    assert await put("effective_duration_years", "6.4") == 201
+    bond = (await api.get(f"/funds/{A}/bond")).json()
+    assert Decimal(bond["duration"]["value"]) == Decimal("6.40")  # the issuer-stated figure wins
+
+    # Saved comparisons are kept, listed and archived; the figures are not stored.
+    assert (
+        await api.post("/fund-comparisons", json={"name": "x", "isins": [A, A]})
+    ).status_code == 422
+    made = await api.post("/fund-comparisons", json={"name": "Core pair", "isins": [A, C]})
+    assert made.status_code == 201
+    listed = (await api.get("/fund-comparisons")).json()
+    assert [c["name"] for c in listed] == ["Core pair"] and listed[0]["isins"] == [A, C]
+    assert (await api.delete(f"/fund-comparisons/{made.json()['id']}")).status_code == 204
+    assert (await api.get("/fund-comparisons")).json() == []
+    assert (await api.delete("/fund-comparisons/999999")).status_code == 404
