@@ -50,6 +50,7 @@ BudgetJobType = Literal[
     "nport_holdings",
     "fund_probes",
     "fund_characteristics_audit",
+    "fund_issuer_facts",
     "free_source_alerts",
     "shadow_snapshot",
     "shadow_report",

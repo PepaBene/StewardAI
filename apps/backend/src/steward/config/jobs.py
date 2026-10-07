@@ -1738,6 +1738,15 @@ class JobsConfig(ConfigModel):
         description="Check iShares/Vanguard fund valuation figures for parser drift. "
         "Default: daily 07:30.",
     )
+    fund_issuer_facts: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="15 8 * * 1-5"),
+        description=(
+            "Read each held fund's own issuer data (iShares product-data API, WisdomTree "
+            "factsheet): replication, launch date, domicile, UCITS status, benchmark index and "
+            "the published NAV. Writes a fact only when it changed and never over a value you "
+            "recorded from another source. Default: weekdays 08:15."
+        ),
+    )
     free_source_alerts: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="5 12 * * *"),
         description="Evaluate credit, trade, patent and graph alerts. Default: daily 12:05.",
@@ -1941,6 +1950,7 @@ class JobsConfig(ConfigModel):
             "nport_holdings": self.nport_holdings,
             "fund_probes": self.fund_probes,
             "fund_characteristics_audit": self.fund_characteristics_audit,
+            "fund_issuer_facts": self.fund_issuer_facts,
             "free_source_alerts": self.free_source_alerts,
             "shadow_snapshot": self.shadow_snapshot,
             "shadow_report": self.shadow_report,
