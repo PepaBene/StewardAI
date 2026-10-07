@@ -55,7 +55,7 @@ class SourceRef(BaseModel):
     url: str | None = None
 
 
-class Coverage(BaseModel):
+class ResultCoverage(BaseModel):
     """`numerator` of `denominator` inputs were usable. The denominator is always stated."""
 
     model_config = ConfigDict(frozen=True)
@@ -66,6 +66,10 @@ class Coverage(BaseModel):
     @property
     def fraction(self) -> Decimal | None:
         return None if self.denominator == 0 else self.numerator / self.denominator
+
+
+# The schema name must not collide with the look-through API's own `Coverage`.
+Coverage = ResultCoverage
 
 
 class Exclusion(BaseModel):

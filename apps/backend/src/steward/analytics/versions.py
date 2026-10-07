@@ -20,6 +20,11 @@ METHOD_VERSIONS: dict[str, str] = {
     "composite_qvm": "1.0.0",
     "universe_membership": "1.0.0",
     "screen": "2.0.0",
+    "statements": "1.0.0",
+    "company_ratios": "1.0.0",
+    "peer_compare": "1.0.0",
+    "valuation_scenarios": "1.0.0",
+    "capital_allocation": "1.0.0",
 }
 
 

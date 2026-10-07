@@ -11849,6 +11849,1330 @@
         }
       }
     },
+    "/companies/{ticker}/overview": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Overview",
+        "description": "Issuer facts, the other listings of the same issuer, provider profile, latest segments,\nconfirmed competitors and peers, upcoming events and a coverage score that says what is missing.",
+        "operationId": "get_overview",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/statements": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Statements",
+        "description": "Income statement, balance sheet and cash-flow statement, built from stored filed facts.\nEvery cell names its filing and concept or how it was derived; restated figures keep the original.",
+        "operationId": "get_statements",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "standardized",
+                "reported"
+              ],
+              "type": "string",
+              "default": "standardized",
+              "title": "Basis"
+            }
+          },
+          {
+            "name": "frequency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "annual",
+                "quarterly"
+              ],
+              "type": "string",
+              "default": "annual",
+              "title": "Frequency"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "restated",
+                "original"
+              ],
+              "type": "string",
+              "default": "restated",
+              "title": "View"
+            }
+          },
+          {
+            "name": "units",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "1",
+                "1000",
+                "1000000"
+              ],
+              "type": "string",
+              "default": "1000000",
+              "title": "Units"
+            }
+          },
+          {
+            "name": "transform",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "none",
+                "common_size",
+                "yoy"
+              ],
+              "type": "string",
+              "default": "none",
+              "title": "Transform"
+            }
+          },
+          {
+            "name": "per_share",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Per Share"
+            }
+          },
+          {
+            "name": "known_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Point-in-time cutoff on the filing date.",
+              "title": "Known By"
+            },
+            "description": "Point-in-time cutoff on the filing date."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementsView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/statements.csv": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Statements Csv",
+        "operationId": "get_statements_csv",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "standardized",
+                "reported"
+              ],
+              "type": "string",
+              "default": "standardized",
+              "title": "Basis"
+            }
+          },
+          {
+            "name": "frequency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "annual",
+                "quarterly"
+              ],
+              "type": "string",
+              "default": "annual",
+              "title": "Frequency"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "restated",
+                "original"
+              ],
+              "type": "string",
+              "default": "restated",
+              "title": "View"
+            }
+          },
+          {
+            "name": "units",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "1",
+                "1000",
+                "1000000"
+              ],
+              "type": "string",
+              "default": "1000000",
+              "title": "Units"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/ratios": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Ratios",
+        "description": "Every ratio from the shared library per fiscal year and TTM, with the company's own\nmedians, the peer median and percentile (withheld below five comparable peers) and the inputs.",
+        "operationId": "get_ratios",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "peers",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "none",
+                "confirmed",
+                "group",
+                "home_market",
+                "global"
+              ],
+              "type": "string",
+              "default": "none",
+              "title": "Peers"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Group Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RatiosView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/peers": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Peer Compare",
+        "description": "The company beside its peers on the same ratios and fiscal basis, with median and range,\nfiscal-date distance, comparability warnings and an indexed history relative to each first year.",
+        "operationId": "get_peer_compare",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "confirmed",
+                "group",
+                "home_market",
+                "global"
+              ],
+              "type": "string",
+              "default": "global",
+              "title": "Scope"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "metrics",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated ratio ids.",
+              "title": "Metrics"
+            },
+            "description": "Comma-separated ratio ids."
+          },
+          {
+            "name": "index_metric",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "revenue",
+                "operating_income",
+                "net_income",
+                "fcf"
+              ],
+              "type": "string",
+              "default": "revenue",
+              "title": "Index Metric"
+            }
+          },
+          {
+            "name": "years",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10,
+              "minimum": 2,
+              "default": 5,
+              "title": "Years"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeerCompare"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/peer-groups": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "List Peer Groups",
+        "operationId": "list_peer_groups",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PeerGroup"
+                  },
+                  "title": "Response List Peer Groups"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Save Peer Group",
+        "operationId": "save_peer_group",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeerGroupIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeerGroup"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/peer-groups/{group_id}": {
+      "delete": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Delete Peer Group",
+        "operationId": "delete_peer_group",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Group Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/valuation/defaults": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Valuation Defaults",
+        "description": "Starting scenarios built from the company's own filed growth. They are assumptions to edit.",
+        "operationId": "valuation_defaults",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Assumptions"
+                  },
+                  "title": "Response Valuation Defaults"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/valuation": {
+      "post": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Run Valuation",
+        "description": "Scenario DCF with an explicit discount-rate build-up, a sensitivity grid, a reverse DCF and\nreference multiples. No single value: a margin of safety is computed only for `selected`.",
+        "operationId": "run_valuation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValuationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyValuation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/valuation/saved": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "List Saved Scenarios",
+        "operationId": "list_saved_scenarios",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SavedScenario"
+                  },
+                  "title": "Response List Saved Scenarios"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Save Scenarios",
+        "description": "Saves an immutable version of the scenario set with the method version it was valued under.",
+        "operationId": "save_scenarios",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveScenarioIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedScenario"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/estimates": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Estimates",
+        "description": "Forward consensus (only with provider access and a full metadata record), event-calendar\nestimates and company guidance, kept apart; a surprise only when the basis matches the actual.",
+        "operationId": "get_estimates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Estimates"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/network": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Network",
+        "description": "Confirmed relationships and deal events, and the patent-family mix, with ownership-mapping caveats.",
+        "operationId": "get_network",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Mark rows first seen on or after this date.",
+              "title": "Since"
+            },
+            "description": "Mark rows first seen on or after this date."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Network"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/capital-allocation": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Capital Allocation",
+        "description": "Observed free cash flow, dividends, buybacks, debt and share count per fiscal year, with\nper-share growth beside aggregate growth, and the company's stated actions listed separately.",
+        "operationId": "get_capital_allocation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapitalAllocation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/governance": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Governance",
+        "description": "Dated executive and board roles from confirmed graph edges and disclosed concentration.\nInsider transactions and 13F holders are served by their own endpoints and linked in the tab.",
+        "operationId": "get_governance",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Governance"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/case": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Case",
+        "operationId": "get_case",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Add Case Item",
+        "operationId": "add_case_item",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseItemIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/case/{item_id}": {
+      "put": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Update Case Item",
+        "operationId": "update_case_item",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseItemIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Archive Case",
+        "operationId": "archive_case",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/jobs/insider-trades": {
       "post": {
         "tags": [
@@ -15720,6 +17044,243 @@
         ],
         "title": "AllocationSlice"
       },
+      "AllocationYear": {
+        "properties": {
+          "column": {
+            "type": "string",
+            "title": "Column"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "fcf": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fcf"
+          },
+          "capex": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capex"
+          },
+          "dividends": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividends"
+          },
+          "buybacks": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buybacks"
+          },
+          "debt_issued": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Debt Issued"
+          },
+          "debt_repaid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Debt Repaid"
+          },
+          "net_debt_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Debt Change"
+          },
+          "returned_share_of_fcf": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned Share Of Fcf"
+          },
+          "share_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Count"
+          },
+          "share_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Change"
+          },
+          "fcf_per_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fcf Per Share"
+          },
+          "fcf_per_share_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fcf Per Share Growth"
+          },
+          "fcf_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fcf Growth"
+          },
+          "reconciliation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconciliation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "column",
+          "label",
+          "fcf",
+          "capex",
+          "dividends",
+          "buybacks",
+          "debt_issued",
+          "debt_repaid",
+          "net_debt_change",
+          "returned_share_of_fcf",
+          "share_count",
+          "share_change",
+          "fcf_per_share",
+          "fcf_per_share_growth",
+          "fcf_growth"
+        ],
+        "title": "AllocationYear"
+      },
       "AlphaExposureRefreshResponse": {
         "properties": {
           "ticker": {
@@ -15800,6 +17361,114 @@
         ],
         "title": "AlphaExposureRequest"
       },
+      "AnalyticsResult": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known At"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResultCoverage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "input_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Hash",
+            "description": "Immutable hash of the inputs the figure was computed from."
+          },
+          "explain": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Explain"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "unit",
+          "method_version",
+          "status"
+        ],
+        "title": "AnalyticsResult"
+      },
       "AnnouncementRule": {
         "properties": {
           "service": {
@@ -15863,6 +17532,207 @@
         ],
         "title": "AnnouncementRule",
         "description": "Maps a regulatory announcement's type (the RNS headline or the EQS category) to an\nevent type. First match wins; `classify` leaves the item to the classifier."
+      },
+      "Assumptions": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "years": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 3.0,
+            "title": "Years",
+            "description": "Explicit forecast years.",
+            "default": 5
+          },
+          "base_fcf": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Fcf",
+            "description": "Starting free cash flow; null uses the trailing twelve months."
+          },
+          "growth": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                }
+              ]
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Growth",
+            "description": "Free-cash-flow growth for each explicit year, as fractions."
+          },
+          "terminal_growth": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.06,
+                "minimum": -0.05
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Terminal Growth",
+            "default": "0.02"
+          },
+          "risk_free": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.2,
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Risk Free",
+            "default": "0.04"
+          },
+          "equity_risk_premium": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.2,
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Equity Risk Premium",
+            "default": "0.05"
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 3.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Beta",
+            "default": "1"
+          },
+          "extra_premium": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.2,
+                "minimum": -0.05
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Extra Premium",
+            "description": "Size, country or company-specific.",
+            "default": "0"
+          },
+          "discount_rate": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.4,
+                "minimum": 0.01
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discount Rate",
+            "description": "Overrides the build-up."
+          },
+          "net_debt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Debt",
+            "description": "Overrides the filed debt − cash."
+          },
+          "minorities": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minorities",
+            "description": "Overrides the filed non-controlling interest."
+          },
+          "diluted_shares": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diluted Shares"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "growth"
+        ],
+        "title": "Assumptions",
+        "description": "One scenario's explicit inputs. Everything here is the owner's assumption, not a fact."
       },
       "BaseTotals": {
         "properties": {
@@ -16945,6 +18815,203 @@
         "title": "CalendarSettings",
         "description": "The expected-gap calendar: days when a source has nothing to publish or collect."
       },
+      "CapitalAllocation": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "years": {
+            "items": {
+              "$ref": "#/components/schemas/AllocationYear"
+            },
+            "type": "array",
+            "title": "Years"
+          },
+          "stated": {
+            "items": {
+              "$ref": "#/components/schemas/StatedAction"
+            },
+            "type": "array",
+            "title": "Stated"
+          },
+          "observed_note": {
+            "type": "string",
+            "title": "Observed Note"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "years",
+          "stated",
+          "observed_note",
+          "method_version",
+          "warnings"
+        ],
+        "title": "CapitalAllocation"
+      },
+      "CaseItem": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "moat_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moat Type"
+          },
+          "statement": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "Statement"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Evidence"
+          },
+          "confidence": {
+            "type": "string",
+            "title": "Confidence",
+            "default": "low"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "draft"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "statement",
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CaseItem"
+      },
+      "CaseItemIn": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "moat_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moat Type"
+          },
+          "statement": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "Statement"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Evidence"
+          },
+          "confidence": {
+            "type": "string",
+            "title": "Confidence",
+            "default": "low"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "draft"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "statement"
+        ],
+        "title": "CaseItemIn"
+      },
+      "CaseView": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CaseItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "concentration": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Concentration"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "items",
+          "concentration",
+          "note"
+        ],
+        "title": "CaseView"
+      },
       "CashDrift": {
         "properties": {
           "value_base": {
@@ -17304,6 +19371,155 @@
         ],
         "title": "CategoryWeightRule",
         "description": "Limit on a category's weight; with no bucket it applies to every bucket of the dimension."
+      },
+      "Cell": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why there is no value, or a note."
+          },
+          "concept": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept"
+          },
+          "accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accession"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
+          },
+          "filing_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filing Url"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known At"
+          },
+          "derived": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derived",
+            "description": "How the value was computed, if not filed."
+          },
+          "restated": {
+            "type": "boolean",
+            "title": "Restated",
+            "default": false
+          },
+          "original_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Value"
+          },
+          "reconciled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconciled"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "description": "money, per_share, shares or fraction (after a transform).",
+            "default": "money"
+          }
+        },
+        "type": "object",
+        "title": "Cell"
       },
       "ChannelWeight": {
         "properties": {
@@ -17735,6 +19951,33 @@
           "outcome"
         ],
         "title": "Check"
+      },
+      "Citation": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 8,
+            "title": "Url"
+          },
+          "passage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "Citation"
       },
       "CitedSentence": {
         "properties": {
@@ -18240,6 +20483,47 @@
         "title": "CnbSeries",
         "description": "A Czech National Bank rate from its keyless text files."
       },
+      "Column": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "annual",
+              "quarter",
+              "ttm"
+            ],
+            "title": "Kind"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "end",
+          "label"
+        ],
+        "title": "Column"
+      },
       "ColumnSet": {
         "properties": {
           "id": {
@@ -18724,6 +21008,414 @@
         ],
         "title": "CompanyResearchObservationsResponse",
         "description": "`GET /holdings/{ticker}/company-research-observations`."
+      },
+      "CompanyValuation": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "price_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Date"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/FiledInput"
+            },
+            "type": "array",
+            "title": "Inputs"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioResult"
+            },
+            "type": "array",
+            "title": "Scenarios"
+          },
+          "range_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Range Low"
+          },
+          "range_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Range High"
+          },
+          "sensitivity": {
+            "items": {
+              "$ref": "#/components/schemas/GridCell"
+            },
+            "type": "array",
+            "title": "Sensitivity"
+          },
+          "reverse_dcf": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalyticsResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reverse_dcf_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reverse Dcf Rate"
+          },
+          "reference": {
+            "items": {
+              "$ref": "#/components/schemas/ReferenceValue"
+            },
+            "type": "array",
+            "title": "Reference"
+          },
+          "normalized": {
+            "items": {
+              "$ref": "#/components/schemas/FiledInput"
+            },
+            "type": "array",
+            "title": "Normalized"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": "Scenarios are assumptions you set, not forecasts the app makes. The range spans your scenarios; no single value is offered, and a margin of safety is shown only against the scenario you select."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "currency",
+          "price",
+          "price_date",
+          "inputs",
+          "scenarios",
+          "range_low",
+          "range_high",
+          "sensitivity",
+          "reverse_dcf",
+          "reverse_dcf_rate",
+          "reference",
+          "normalized",
+          "warnings",
+          "method_version",
+          "sources"
+        ],
+        "title": "CompanyValuation"
+      },
+      "CompareCell": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "CompareCell"
+      },
+      "CompareCompany": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "is_subject": {
+            "type": "boolean",
+            "title": "Is Subject"
+          },
+          "fiscal_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal End"
+          },
+          "fiscal_distance_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Distance Days"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "financial": {
+            "type": "boolean",
+            "title": "Financial"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "is_subject",
+          "fiscal_end",
+          "fiscal_distance_days",
+          "currency",
+          "financial"
+        ],
+        "title": "CompareCompany"
+      },
+      "CompareRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "cells": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CompareCell"
+            },
+            "type": "object",
+            "title": "Cells"
+          },
+          "median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "members": {
+            "type": "integer",
+            "title": "Members"
+          },
+          "withheld_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withheld Reason"
+          },
+          "percentile": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentile"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "group",
+          "unit",
+          "cells",
+          "median",
+          "low",
+          "high",
+          "count",
+          "members",
+          "withheld_reason",
+          "percentile"
+        ],
+        "title": "CompareRow"
       },
       "ComplianceRow": {
         "properties": {
@@ -20545,6 +23237,29 @@
         ],
         "title": "CoverageGroup"
       },
+      "CoverageItem": {
+        "properties": {
+          "area": {
+            "type": "string",
+            "title": "Area"
+          },
+          "present": {
+            "type": "boolean",
+            "title": "Present"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "area",
+          "present",
+          "detail"
+        ],
+        "title": "CoverageItem"
+      },
       "CoverageLedger": {
         "properties": {
           "entries": {
@@ -20576,6 +23291,24 @@
           "flagged_benchmarks"
         ],
         "title": "CoverageLedger"
+      },
+      "CoverageScore": {
+        "properties": {
+          "have": {
+            "type": "integer",
+            "title": "Have"
+          },
+          "of": {
+            "type": "integer",
+            "title": "Of"
+          }
+        },
+        "type": "object",
+        "required": [
+          "have",
+          "of"
+        ],
+        "title": "CoverageScore"
       },
       "CoverageSummary": {
         "properties": {
@@ -22032,6 +24765,51 @@
           "buckets"
         ],
         "title": "DimensionAllocation"
+      },
+      "DimensionDetail": {
+        "properties": {
+          "column": {
+            "type": "string",
+            "title": "Column"
+          },
+          "members": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Members"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Value"
+          },
+          "accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accession"
+          }
+        },
+        "type": "object",
+        "required": [
+          "column",
+          "members",
+          "value"
+        ],
+        "title": "DimensionDetail"
       },
       "Disagreement": {
         "properties": {
@@ -23680,6 +26458,241 @@
         ],
         "title": "EscalationStatusUpdate"
       },
+      "EstimatePoint": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "kind_label": {
+            "type": "string",
+            "title": "Kind Label"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "fiscal_period": {
+            "type": "string",
+            "title": "Fiscal Period"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "analyst_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Count"
+          },
+          "vintage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vintage"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "metadata_complete": {
+            "type": "boolean",
+            "title": "Metadata Complete"
+          },
+          "surprise": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Surprise"
+          },
+          "surprise_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Surprise Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "kind_label",
+          "metric",
+          "fiscal_period",
+          "period_end",
+          "provider",
+          "basis",
+          "currency",
+          "value",
+          "low",
+          "high",
+          "analyst_count",
+          "vintage",
+          "known_at",
+          "source_url",
+          "metadata_complete"
+        ],
+        "title": "EstimatePoint"
+      },
+      "Estimates": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "access": {
+            "type": "string",
+            "title": "Access"
+          },
+          "access_note": {
+            "type": "string",
+            "title": "Access Note"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/EstimatePoint"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "access",
+          "access_note",
+          "points",
+          "notes",
+          "method_version"
+        ],
+        "title": "Estimates"
+      },
       "EurostatSeries": {
         "properties": {
           "key": {
@@ -24551,6 +27564,24 @@
         ],
         "title": "ExcludedGroup"
       },
+      "Exclusion": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject",
+          "reason"
+        ],
+        "title": "Exclusion"
+      },
       "ExclusionOut": {
         "properties": {
           "reason": {
@@ -24633,6 +27664,45 @@
         ],
         "title": "ExpectedSessionsResponse",
         "description": "`GET /exchange-sessions/{mic}/expected`. `basis` is one of confirmed_calendar,\npartial_confirmed_calendar, weekdays_minus_configured_closures."
+      },
+      "Explain": {
+        "properties": {
+          "exclusions": {
+            "items": {
+              "$ref": "#/components/schemas/Exclusion"
+            },
+            "type": "array",
+            "title": "Exclusions"
+          },
+          "formula_version": {
+            "type": "string",
+            "title": "Formula Version"
+          },
+          "formula": {
+            "type": "string",
+            "title": "Formula",
+            "default": ""
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "type": "array",
+            "title": "Citations"
+          },
+          "gaps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Gaps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "formula_version"
+        ],
+        "title": "Explain"
       },
       "ExportRequest": {
         "properties": {
@@ -26682,6 +29752,73 @@
           "created_at"
         ],
         "title": "FeedbackOut"
+      },
+      "FiledInput": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accession"
+          },
+          "filing_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filing Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "value"
+        ],
+        "title": "FiledInput"
       },
       "FiledNote": {
         "properties": {
@@ -29495,6 +32632,224 @@
         "title": "GoogleNewsLocale",
         "description": "The edition a Google News query searches (its hl, gl and ceid parameters)."
       },
+      "Governance": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "related_party": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Related Party"
+          },
+          "caveats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Caveats"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "roles",
+          "related_party",
+          "caveats",
+          "method_version"
+        ],
+        "title": "Governance"
+      },
+      "GraphEdge": {
+        "properties": {
+          "edge_type": {
+            "type": "string",
+            "title": "Edge Type"
+          },
+          "counterparty": {
+            "type": "string",
+            "title": "Counterparty"
+          },
+          "direction": {
+            "type": "string",
+            "title": "Direction"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "evidence_tier": {
+            "type": "string",
+            "title": "Evidence Tier"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "passage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage"
+          },
+          "new_since": {
+            "type": "boolean",
+            "title": "New Since",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "edge_type",
+          "counterparty",
+          "direction",
+          "status",
+          "evidence_tier",
+          "valid_from",
+          "valid_to",
+          "known_at",
+          "source",
+          "source_url",
+          "passage"
+        ],
+        "title": "GraphEdge"
+      },
+      "GraphEvent": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "event_state": {
+            "type": "string",
+            "title": "Event State"
+          },
+          "counterparty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty"
+          },
+          "announced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Announced At"
+          },
+          "effective_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective At"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "terms": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Terms"
+          },
+          "new_since": {
+            "type": "boolean",
+            "title": "New Since",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_state",
+          "counterparty",
+          "announced_at",
+          "effective_at",
+          "status",
+          "source_url",
+          "known_at",
+          "terms"
+        ],
+        "title": "GraphEvent"
+      },
       "GraphRow": {
         "properties": {
           "id": {
@@ -29751,6 +33106,56 @@
           "rows"
         ],
         "title": "GraphRowsPage"
+      },
+      "GridCell": {
+        "properties": {
+          "growth_shift": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Growth Shift"
+          },
+          "rate_shift": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Rate Shift"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "growth_shift",
+          "rate_shift",
+          "value"
+        ],
+        "title": "GridCell"
       },
       "HTTPValidationError": {
         "properties": {
@@ -32636,6 +36041,28 @@
           "change_pct"
         ],
         "title": "IndexQuote"
+      },
+      "IndexSeries": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "points": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Points"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "points"
+        ],
+        "title": "IndexSeries"
       },
       "Insider": {
         "properties": {
@@ -35953,6 +39380,56 @@
         ],
         "title": "LegalEntitySnapshot"
       },
+      "Line": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "concepts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Concepts",
+            "description": "Source concepts that map here."
+          },
+          "cells": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Cell"
+            },
+            "type": "object",
+            "title": "Cells"
+          },
+          "dimensions": {
+            "items": {
+              "$ref": "#/components/schemas/DimensionDetail"
+            },
+            "type": "array",
+            "title": "Dimensions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "kind",
+          "unit"
+        ],
+        "title": "Line"
+      },
       "LiquidityOut": {
         "properties": {
           "liquid": {
@@ -36033,6 +39510,72 @@
           "period_to"
         ],
         "title": "LiquidityOut"
+      },
+      "Listing": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "mic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mic"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "selected": {
+            "type": "boolean",
+            "title": "Selected",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "mic",
+          "currency",
+          "status"
+        ],
+        "title": "Listing"
       },
       "ListingDecision": {
         "properties": {
@@ -38511,6 +42054,109 @@
         ],
         "title": "NetDiscretionary"
       },
+      "Network": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "since": {
+            "type": "string",
+            "format": "date",
+            "title": "Since"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "suggested_count": {
+            "type": "integer",
+            "title": "Suggested Count"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/GraphEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "patent_total": {
+            "type": "integer",
+            "title": "Patent Total"
+          },
+          "patent_by_year": {
+            "items": {
+              "$ref": "#/components/schemas/PatentYear"
+            },
+            "type": "array",
+            "title": "Patent By Year"
+          },
+          "patent_by_tech": {
+            "items": {
+              "$ref": "#/components/schemas/PatentTech"
+            },
+            "type": "array",
+            "title": "Patent By Tech"
+          },
+          "ownership_confidence_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ownership Confidence Min"
+          },
+          "ownership_note": {
+            "type": "string",
+            "title": "Ownership Note"
+          },
+          "patent_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Patent Status"
+          },
+          "caveats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Caveats"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "since",
+          "edges",
+          "suggested_count",
+          "events",
+          "patent_total",
+          "patent_by_year",
+          "patent_by_tech",
+          "ownership_confidence_min",
+          "ownership_note",
+          "patent_status",
+          "caveats",
+          "method_version"
+        ],
+        "title": "Network"
+      },
       "NewConversation": {
         "properties": {
           "title": {
@@ -39532,6 +43178,253 @@
         ],
         "title": "NportCoverage"
       },
+      "Overview": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "legal_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legal Name"
+          },
+          "isin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isin"
+          },
+          "cik": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cik"
+          },
+          "lei": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lei"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "asset_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Type"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "listing_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Listing Currency"
+          },
+          "listings": {
+            "items": {
+              "$ref": "#/components/schemas/Listing"
+            },
+            "type": "array",
+            "title": "Listings"
+          },
+          "profile": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileFact"
+            },
+            "type": "array",
+            "title": "Profile"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentLine"
+            },
+            "type": "array",
+            "title": "Segments"
+          },
+          "competitors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Competitors"
+          },
+          "peers_confirmed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Peers Confirmed"
+          },
+          "upcoming": {
+            "items": {
+              "$ref": "#/components/schemas/UpcomingEvent"
+            },
+            "type": "array",
+            "title": "Upcoming"
+          },
+          "last_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Close"
+          },
+          "last_close_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Close Date"
+          },
+          "coverage": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageItem"
+            },
+            "type": "array",
+            "title": "Coverage"
+          },
+          "coverage_score": {
+            "$ref": "#/components/schemas/CoverageScore"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "legal_name",
+          "isin",
+          "cik",
+          "lei",
+          "website",
+          "country",
+          "asset_type",
+          "status",
+          "currency",
+          "listing_currency",
+          "listings",
+          "profile",
+          "segments",
+          "competitors",
+          "peers_confirmed",
+          "upcoming",
+          "last_close",
+          "last_close_date",
+          "coverage",
+          "coverage_score",
+          "sources",
+          "method_version"
+        ],
+        "title": "Overview"
+      },
       "OwnershipPeriod": {
         "properties": {
           "period": {
@@ -39857,6 +43750,42 @@
           "ownership_confidence"
         ],
         "title": "PatentFamilyInput"
+      },
+      "PatentTech": {
+        "properties": {
+          "cpc": {
+            "type": "string",
+            "title": "Cpc"
+          },
+          "families": {
+            "type": "integer",
+            "title": "Families"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cpc",
+          "families"
+        ],
+        "title": "PatentTech"
+      },
+      "PatentYear": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "families": {
+            "type": "integer",
+            "title": "Families"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "families"
+        ],
+        "title": "PatentYear"
       },
       "PdlRefreshResponse": {
         "properties": {
@@ -40221,6 +44150,158 @@
         ],
         "title": "PePoint"
       },
+      "PeerCompare": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "scope_label": {
+            "type": "string",
+            "title": "Scope Label"
+          },
+          "companies": {
+            "items": {
+              "$ref": "#/components/schemas/CompareCompany"
+            },
+            "type": "array",
+            "title": "Companies"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/CompareRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "index_metric": {
+            "type": "string",
+            "title": "Index Metric"
+          },
+          "index_series": {
+            "items": {
+              "$ref": "#/components/schemas/IndexSeries"
+            },
+            "type": "array",
+            "title": "Index Series"
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/PeerExcluded"
+            },
+            "type": "array",
+            "title": "Excluded"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "input_hash": {
+            "type": "string",
+            "title": "Input Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "scope",
+          "scope_label",
+          "companies",
+          "rows",
+          "index_metric",
+          "index_series",
+          "excluded",
+          "warnings",
+          "method_version",
+          "input_hash"
+        ],
+        "title": "PeerCompare"
+      },
+      "PeerExcluded": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "reason"
+        ],
+        "title": "PeerExcluded"
+      },
+      "PeerGroup": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "peers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Peers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "name",
+          "peers"
+        ],
+        "title": "PeerGroup"
+      },
+      "PeerGroupIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "peers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 40,
+            "minItems": 1,
+            "title": "Peers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "peers"
+        ],
+        "title": "PeerGroupIn"
+      },
       "PeerInput": {
         "properties": {
           "peer_ticker": {
@@ -40415,6 +44496,107 @@
         ],
         "title": "PeerSetResponse",
         "description": "`GET /holdings/{ticker}/peer-set`."
+      },
+      "PeerStat": {
+        "properties": {
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "Comparable peers with a value."
+          },
+          "members": {
+            "type": "integer",
+            "title": "Members",
+            "description": "Peers considered."
+          },
+          "median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "percentile": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentile",
+            "description": "Share of peers at or below the company, 0–1."
+          },
+          "withheld_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withheld Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scope",
+          "count",
+          "members",
+          "median",
+          "low",
+          "high",
+          "percentile"
+        ],
+        "title": "PeerStat"
       },
       "PeerStatusInput": {
         "properties": {
@@ -42540,6 +46722,47 @@
         "title": "PriceSettings",
         "description": "Daily price history (Stooq, Yahoo as the fallback), intraday prices (Yahoo) and the\nrisk figures computed from the daily closes."
       },
+      "ProfileFact": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "value",
+          "provider",
+          "source_url",
+          "known_at"
+        ],
+        "title": "ProfileFact"
+      },
       "PromptDefault": {
         "properties": {
           "key": {
@@ -43418,6 +47641,464 @@
         "type": "object",
         "title": "QuietHours"
       },
+      "RatioGroup": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "ratios": {
+            "items": {
+              "$ref": "#/components/schemas/RatioRow"
+            },
+            "type": "array",
+            "title": "Ratios"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "ratios"
+        ],
+        "title": "RatioGroup"
+      },
+      "RatioInput": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "column": {
+            "type": "string",
+            "title": "Column"
+          },
+          "concept": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept"
+          },
+          "accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accession"
+          },
+          "filing_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filing Url"
+          },
+          "derived": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derived"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "value",
+          "column"
+        ],
+        "title": "RatioInput"
+      },
+      "RatioPoint": {
+        "properties": {
+          "column": {
+            "type": "string",
+            "title": "Column"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "column",
+          "label",
+          "value"
+        ],
+        "title": "RatioPoint"
+      },
+      "RatioRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "formula": {
+            "type": "string",
+            "title": "Formula"
+          },
+          "period_rule": {
+            "type": "string",
+            "title": "Period Rule"
+          },
+          "exclusions": {
+            "type": "string",
+            "title": "Exclusions"
+          },
+          "higher_is_better": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Higher Is Better"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/RatioPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RatioPoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "own_median_5y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own Median 5Y"
+          },
+          "own_median_10y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own Median 10Y"
+          },
+          "own_median_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own Median Note"
+          },
+          "peer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeerStat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/RatioInput"
+            },
+            "type": "array",
+            "title": "Inputs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "group",
+          "unit",
+          "formula",
+          "period_rule",
+          "exclusions",
+          "higher_is_better",
+          "points",
+          "latest",
+          "own_median_5y",
+          "own_median_10y"
+        ],
+        "title": "RatioRow"
+      },
+      "RatiosView": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "price_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Date"
+          },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
+          },
+          "statement_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statement Currency"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "is_financial": {
+            "type": "boolean",
+            "title": "Is Financial"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/Column"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/RatioGroup"
+            },
+            "type": "array",
+            "title": "Groups"
+          },
+          "peer_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peer Scope"
+          },
+          "peer_excluded": {
+            "items": {
+              "$ref": "#/components/schemas/PeerExcluded"
+            },
+            "type": "array",
+            "title": "Peer Excluded"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "input_hash": {
+            "type": "string",
+            "title": "Input Hash"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "type": "array",
+            "title": "Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "as_of",
+          "price",
+          "price_date",
+          "price_currency",
+          "statement_currency",
+          "sector",
+          "industry",
+          "is_financial",
+          "columns",
+          "groups",
+          "peer_scope",
+          "peer_excluded",
+          "warnings",
+          "method_version",
+          "input_hash",
+          "sources"
+        ],
+        "title": "RatiosView"
+      },
       "ReadinessResponse": {
         "properties": {
           "status": {
@@ -44046,6 +48727,83 @@
         "type": "object",
         "title": "ReferenceSettings",
         "description": "Identity and reference data: OpenFIGI, ESMA FIRDS/FITRS, GLEIF, Wikidata."
+      },
+      "ReferenceValue": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "mid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mid"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "basis",
+          "low",
+          "mid",
+          "high"
+        ],
+        "title": "ReferenceValue"
       },
       "RelationshipDecision": {
         "properties": {
@@ -45477,6 +50235,47 @@
         ],
         "title": "ResearchSummary"
       },
+      "ResultCoverage": {
+        "properties": {
+          "numerator": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Numerator"
+          },
+          "denominator": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Denominator"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis",
+            "description": "count, weight or market_value",
+            "default": "count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numerator",
+          "denominator"
+        ],
+        "title": "ResultCoverage",
+        "description": "`numerator` of `denominator` inputs were usable. The denominator is always stated."
+      },
       "ResultRow": {
         "properties": {
           "key": {
@@ -46279,6 +51078,72 @@
         "title": "RiskLimits",
         "description": "Portfolio risk limits, checked after each sync. Every limit is optional (null = off).\n\nA breach here is a prompt for review, not an instruction to trade: the strategy decides\nbuys and sells on fundamentals and news, so a price-based limit only forces a thesis review."
       },
+      "Role": {
+        "properties": {
+          "person": {
+            "type": "string",
+            "title": "Person"
+          },
+          "edge_type": {
+            "type": "string",
+            "title": "Edge Type"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "passage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "person",
+          "edge_type",
+          "valid_from",
+          "valid_to",
+          "status",
+          "source_url",
+          "passage"
+        ],
+        "title": "Role"
+      },
       "RuleMatch": {
         "properties": {
           "severities": {
@@ -46349,6 +51214,206 @@
           "severities"
         ],
         "title": "RuleMatch"
+      },
+      "SaveScenarioIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "request": {
+            "$ref": "#/components/schemas/ValuationRequest"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "request"
+        ],
+        "title": "SaveScenarioIn"
+      },
+      "SavedScenario": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "assumptions": {
+            "items": {
+              "$ref": "#/components/schemas/Assumptions"
+            },
+            "type": "array",
+            "title": "Assumptions"
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "input_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Hash"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "version",
+          "assumptions",
+          "selected",
+          "method_version",
+          "input_hash",
+          "note",
+          "created_at"
+        ],
+        "title": "SavedScenario"
+      },
+      "ScenarioResult": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "assumptions": {
+            "$ref": "#/components/schemas/Assumptions"
+          },
+          "discount_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Discount Rate"
+          },
+          "discount_rate_build": {
+            "type": "string",
+            "title": "Discount Rate Build"
+          },
+          "forecast_fcf": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Forecast Fcf"
+          },
+          "enterprise_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enterprise Value"
+          },
+          "value_per_share": {
+            "$ref": "#/components/schemas/AnalyticsResult"
+          },
+          "margin_of_safety": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Of Safety"
+          },
+          "selected": {
+            "type": "boolean",
+            "title": "Selected",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "assumptions",
+          "discount_rate",
+          "discount_rate_build",
+          "forecast_fcf",
+          "enterprise_value",
+          "value_per_share"
+        ],
+        "title": "ScenarioResult"
       },
       "ScorePoint": {
         "properties": {
@@ -46886,6 +51951,75 @@
           "rows"
         ],
         "title": "SegmentHistoryPoint"
+      },
+      "SegmentLine": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "value",
+          "share",
+          "period_end"
+        ],
+        "title": "SegmentLine"
       },
       "SegmentPeriod": {
         "properties": {
@@ -48507,6 +53641,37 @@
         ],
         "title": "SourceHealth"
       },
+      "SourceRef": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "e.g. filing, price_bar, etf_snapshot, owner_input"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "Identifier a reader can chase: accession, symbol, snapshot id."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "ref"
+        ],
+        "title": "SourceRef"
+      },
       "SourceTrustOut": {
         "properties": {
           "host": {
@@ -48994,6 +54159,292 @@
           "note"
         ],
         "title": "StakeReconciliationOut"
+      },
+      "StatedAction": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "date",
+          "detail",
+          "state",
+          "source_url"
+        ],
+        "title": "StatedAction"
+      },
+      "StatementCheck": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "statement": {
+            "type": "string",
+            "title": "Statement"
+          },
+          "column": {
+            "type": "string",
+            "title": "Column"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "statement",
+          "column",
+          "passed",
+          "detail"
+        ],
+        "title": "StatementCheck"
+      },
+      "StatementTable": {
+        "properties": {
+          "statement": {
+            "type": "string",
+            "title": "Statement"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/Line"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "statement",
+          "label",
+          "lines"
+        ],
+        "title": "StatementTable"
+      },
+      "StatementsView": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "standardized",
+              "reported"
+            ],
+            "title": "Basis"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "annual",
+              "quarterly"
+            ],
+            "title": "Frequency"
+          },
+          "version_view": {
+            "type": "string",
+            "enum": [
+              "restated",
+              "original"
+            ],
+            "title": "Version View"
+          },
+          "units": {
+            "type": "integer",
+            "title": "Units"
+          },
+          "transform": {
+            "type": "string",
+            "enum": [
+              "none",
+              "common_size",
+              "yoy"
+            ],
+            "title": "Transform"
+          },
+          "per_share": {
+            "type": "boolean",
+            "title": "Per Share"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/Column"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "statements": {
+            "items": {
+              "$ref": "#/components/schemas/StatementTable"
+            },
+            "type": "array",
+            "title": "Statements"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/StatementCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "missing_periods": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Periods"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known At"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "input_hash": {
+            "type": "string",
+            "title": "Input Hash"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "basis",
+          "frequency",
+          "version_view",
+          "units",
+          "transform",
+          "per_share",
+          "currency",
+          "columns",
+          "statements",
+          "checks",
+          "missing_periods",
+          "warnings",
+          "method_version",
+          "as_of",
+          "known_at",
+          "sources",
+          "input_hash",
+          "note"
+        ],
+        "title": "StatementsView"
+      },
+      "Status": {
+        "type": "string",
+        "enum": [
+          "complete",
+          "partial",
+          "unavailable",
+          "paid_only",
+          "disputed"
+        ],
+        "title": "Status"
       },
       "StockRequest": {
         "properties": {
@@ -51163,6 +56614,41 @@
         ],
         "title": "Unknown"
       },
+      "UpcomingEvent": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "date",
+          "detail"
+        ],
+        "title": "UpcomingEvent"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -51771,6 +57257,32 @@
         },
         "type": "object",
         "title": "ValuationRefreshRequest"
+      },
+      "ValuationRequest": {
+        "properties": {
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/Assumptions"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Scenarios"
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected",
+            "description": "Scenario the margin of safety is measured against."
+          }
+        },
+        "type": "object",
+        "title": "ValuationRequest"
       },
       "ValuationSettings": {
         "properties": {
