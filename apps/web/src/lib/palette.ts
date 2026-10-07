@@ -92,6 +92,8 @@ export const OTHER_PAGES = [
   { href: "/investors", label: "Investors", keywords: "institutional managers tracked holders funds ownership filings" },
   { href: "/disclosures", label: "Public disclosures", keywords: "filings 10-K amendment restatement as known on date evidence statements segments coverage sources" },
   { href: "/disclosures/ownership", label: "Ownership", keywords: "13F 13D 13G stakes holders managers funds N-PORT voting rights control remainder" },
+  { href: "/disclosures/insiders", label: "Insider activity", keywords: "Form 4 insider buying selling officers directors 10b5-1 plan open market purchase sale exercise" },
+  { href: "/disclosures/network", label: "Customers and suppliers", keywords: "customer concentration supplier dependency revenue share Customer A scenario network contract award" },
   { href: "/config", label: "Config: Export or import", keywords: "backup json file git" },
   { href: "/status#reference-gaps", label: "Reference data gaps", keywords: "identity unresolved figi isin lei stooq prices missing symbol coverage" },
   { href: "/news/disputed", label: "Disputed stories", keywords: "news contradicted conflicting sources resolve confirm false side by side" },

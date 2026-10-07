@@ -4420,6 +4420,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/disclosures/holdings/{ticker}/insiders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holding Insiders
+         * @description Insider transactions as filed and known by `as_of`: discretionary net by role and window,
+         *     with plan trades, exercise-and-sell bundles and unknown plan status shown apart.
+         */
+        get: operations["holding_insiders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/insiders/override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Override Insider Class
+         * @description Record a reviewer's reclassification. Overrides are appended, never edited.
+         */
+        post: operations["override_insider_class"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/holdings/{ticker}/dependencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Holding Dependencies
+         * @description Customer and supplier claims known by `as_of`, with concentration (unknown remainder shown),
+         *     and a bounded one-to-two-hop scenario over confirmed numeric edges only.
+         */
+        get: operations["holding_dependencies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/disclosures/provenance/{kind}/{row_id}": {
         parameters: {
             query?: never;
@@ -6311,6 +6373,62 @@ export interface components {
             /** Basis */
             basis: string;
         };
+        /** ConcentrationEntryOut */
+        ConcentrationEntryOut: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /** Shape */
+            shape: string;
+            /** Share */
+            share: string;
+            /** Evidence Id */
+            evidence_id: number | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+        };
+        /** ConcentrationGroupOut */
+        ConcentrationGroupOut: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+            /** Share */
+            share: string;
+        };
+        /** ConcentrationOut */
+        ConcentrationOut: {
+            /** Relationship */
+            relationship: string;
+            /** Denominator */
+            denominator: string;
+            /** Period */
+            period: string;
+            /** Entries */
+            entries: components["schemas"]["ConcentrationEntryOut"][];
+            /** Groups */
+            groups: components["schemas"]["ConcentrationGroupOut"][];
+            /** Lower Bound */
+            lower_bound: string;
+            /** Reported Floor */
+            reported_floor: string;
+            /** Unknown Remainder */
+            unknown_remainder: string;
+            /** Largest */
+            largest: string | null;
+            /** Exceeds Whole */
+            exceeds_whole: boolean;
+            /** Suggested Not Counted */
+            suggested_not_counted: number;
+            /** Notes */
+            notes: string[];
+        };
         /** ConfigDiff */
         ConfigDiff: {
             /** Domain */
@@ -7191,6 +7309,77 @@ export interface components {
             /** Known At */
             known_at: string | null;
         };
+        /** DependencyClaimOut */
+        DependencyClaimOut: {
+            /** Id */
+            id: number;
+            /** Relationship */
+            relationship: string;
+            /**
+             * Shape
+             * @description named, anonymous, group or segment_only.
+             */
+            shape: string;
+            /**
+             * Status
+             * @description Review state as of the requested date.
+             */
+            status: string;
+            /** Counterparty */
+            counterparty: string | null;
+            /** Counterparty Key */
+            counterparty_key: string | null;
+            /** Counterparty Count */
+            counterparty_count: number | null;
+            /** Share */
+            share: string | null;
+            /** Denominator */
+            denominator: string | null;
+            /** Period End */
+            period_end: string | null;
+            /** Valid From */
+            valid_from: string | null;
+            /** Valid To */
+            valid_to: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Passage */
+            passage: string;
+            /** Source Url */
+            source_url: string | null;
+            /** Evidence Id */
+            evidence_id: number | null;
+            /** Problems */
+            problems: string[];
+            /**
+             * Screen
+             * @description Hints that the passage is not a current relationship.
+             */
+            screen: string[];
+            /** Stale */
+            stale: boolean;
+        };
+        /** DependencyViewOut */
+        DependencyViewOut: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Claims */
+            claims: components["schemas"]["DependencyClaimOut"][];
+            /** Concentration */
+            concentration: components["schemas"]["ConcentrationOut"][];
+            /** Scenarios */
+            scenarios: components["schemas"]["ScenarioOut"][];
+            /** Notes */
+            notes: string[];
+        };
         /** DerivedListingResponse */
         DerivedListingResponse: {
             /** Ticker */
@@ -7547,6 +7736,30 @@ export interface components {
             period_end: string;
             /** Resolution */
             resolution: string | null;
+        };
+        /** DisclosureInsiderActivityOut */
+        DisclosureInsiderActivityOut: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Net */
+            net: components["schemas"]["InsiderNetOut"][];
+            /** Clusters */
+            clusters: components["schemas"]["InsiderClusterOut"][];
+            /** Bundles */
+            bundles: components["schemas"]["InsiderBundleOut"][];
+            /** Class Counts */
+            class_counts: {
+                [key: string]: number;
+            };
+            /** Notes */
+            notes: string[];
+            /** Transactions */
+            transactions: components["schemas"]["InsiderTxOut"][];
         };
         /** DisputedStory */
         DisputedStory: {
@@ -11374,6 +11587,41 @@ export interface components {
             /** Limitations */
             limitations: string[];
         };
+        /** InsiderBundleOut */
+        InsiderBundleOut: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Exercised */
+            exercised: string;
+            /** Sold */
+            sold: string;
+            /** Proceeds */
+            proceeds: string;
+            /** Retained */
+            retained: string;
+        };
+        /** InsiderClusterOut */
+        InsiderClusterOut: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Insiders */
+            insiders: number;
+            /** Shares */
+            shares: string;
+            /** Value */
+            value: string;
+        };
         /** InsiderNetBreakdown */
         InsiderNetBreakdown: {
             /** Owner Name */
@@ -11393,6 +11641,60 @@ export interface components {
             sold_shares: number | string;
             /** Net Shares */
             net_shares: number | string;
+        };
+        /** InsiderNetOut */
+        InsiderNetOut: {
+            /** Window Days */
+            window_days: number;
+            /** Role */
+            role: string;
+            /** Buy Shares */
+            buy_shares: string;
+            /** Sell Shares */
+            sell_shares: string;
+            /** Net Shares */
+            net_shares: string;
+            /** Buy Value */
+            buy_value: string;
+            /** Sell Value */
+            sell_value: string;
+            /** Net Value */
+            net_value: string;
+            /** Trades */
+            trades: number;
+            /** Insiders */
+            insiders: number;
+            /**
+             * Plan Trades Excluded
+             * @description Rule 10b5-1 plan trades, kept out of the net.
+             */
+            plan_trades_excluded: number;
+            /**
+             * Plan Unknown Trades
+             * @description In the net, but the filing has no plan flag.
+             */
+            plan_unknown_trades: number;
+            /**
+             * Bundled Sales Excluded
+             * @description Sales bundled with a same-day exercise.
+             */
+            bundled_sales_excluded: number;
+        };
+        /** InsiderOverrideIn */
+        InsiderOverrideIn: {
+            /** Accession */
+            accession: string;
+            /** Row Index */
+            row_index: number;
+            /** New Class */
+            new_class: string;
+            /** Reason */
+            reason: string;
+        };
+        /** InsiderOverrideOut */
+        InsiderOverrideOut: {
+            /** Id */
+            id: number;
         };
         /** InsiderSource */
         InsiderSource: {
@@ -11541,6 +11843,59 @@ export interface components {
             exclusion_reason: string | null;
             /** Source Url */
             source_url: string;
+        };
+        /** InsiderTxOut */
+        InsiderTxOut: {
+            /** Accession */
+            accession: string;
+            /** Row Index */
+            row_index: number;
+            /** Insider */
+            insider: string;
+            /** Role */
+            role: string;
+            /** Tx Date */
+            tx_date: string | null;
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Economic Class */
+            economic_class: string;
+            /** Classifier Class */
+            classifier_class: string | null;
+            /** Override Reason */
+            override_reason: string | null;
+            /** Countable */
+            countable: boolean;
+            /** Bundled */
+            bundled: boolean;
+            /** Plan */
+            plan: string;
+            /** Derivative */
+            derivative: boolean;
+            /** Direct Indirect */
+            direct_indirect: string | null;
+            /** Shares */
+            shares: string | null;
+            /** Price */
+            price: string | null;
+            /** Value */
+            value: string | null;
+            /** Shares After */
+            shares_after: string | null;
+            /** Position Change Percent */
+            position_change_percent: string | null;
+            /** Caveats */
+            caveats: string[];
+            /** Source Url */
+            source_url: string | null;
         };
         /** InstitutionalChannel */
         InstitutionalChannel: {
@@ -13758,6 +14113,17 @@ export interface components {
              * @description Stories in the window whose sources contradict each other (status disputed, including ones the owner has since marked false).
              */
             disputed_count: number;
+        };
+        /** NonQuantifiedOut */
+        NonQuantifiedOut: {
+            /** Supplier */
+            supplier: string;
+            /** Customer */
+            customer: string;
+            /** Edge Id */
+            edge_id: number;
+            /** Note */
+            note: string;
         };
         /** NoteSentence */
         NoteSentence: {
@@ -16465,6 +16831,36 @@ export interface components {
              * @description Empty: any holding.
              */
             tickers?: string[];
+        };
+        /** ScenarioImpactOut */
+        ScenarioImpactOut: {
+            /** Entity */
+            entity: string;
+            /** Hop */
+            hop: number;
+            /** Lower */
+            lower: string;
+            /** Upper */
+            upper: string;
+            /** Coverage */
+            coverage: string;
+            /** Via */
+            via: number[];
+            /** Source Age Days */
+            source_age_days: number;
+        };
+        /** ScenarioOut */
+        ScenarioOut: {
+            /** Origin */
+            origin: string;
+            /** Shock */
+            shock: string;
+            /** Impacts */
+            impacts: components["schemas"]["ScenarioImpactOut"][];
+            /** Non Quantified */
+            non_quantified: components["schemas"]["NonQuantifiedOut"][];
+            /** Notes */
+            notes: string[];
         };
         /** ScorePoint */
         ScorePoint: {
@@ -26318,6 +26714,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OwnershipOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    holding_insiders: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisclosureInsiderActivityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    override_insider_class: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InsiderOverrideIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsiderOverrideOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    holding_dependencies: {
+        parameters: {
+            query?: {
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
+                shock?: number | string;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DependencyViewOut"];
                 };
             };
             /** @description Validation Error */

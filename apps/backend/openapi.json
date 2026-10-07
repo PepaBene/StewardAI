@@ -13956,6 +13956,209 @@
         }
       }
     },
+    "/disclosures/holdings/{ticker}/insiders": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Holding Insiders",
+        "description": "Insider transactions as filed and known by `as_of`: discretionary net by role and window,\nwith plan trades, exercise-and-sell bundles and unknown plan status shown apart.",
+        "operationId": "holding_insiders",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisclosureInsiderActivityOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/insiders/override": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Override Insider Class",
+        "description": "Record a reviewer's reclassification. Overrides are appended, never edited.",
+        "operationId": "override_insider_class",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsiderOverrideIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsiderOverrideOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/disclosures/holdings/{ticker}/dependencies": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Holding Dependencies",
+        "description": "Customer and supplier claims known by `as_of`, with concentration (unknown remainder shown),\nand a bounded one-to-two-hop scenario over confirmed numeric edges only.",
+        "operationId": "holding_dependencies",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          },
+          {
+            "name": "shock",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 1.0,
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                }
+              ],
+              "default": "0.2",
+              "title": "Shock"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DependencyViewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/disclosures/provenance/{kind}/{row_id}": {
       "get": {
         "tags": [
@@ -19034,6 +19237,164 @@
         ],
         "title": "Concentration"
       },
+      "ConcentrationEntryOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "shape": {
+            "type": "string",
+            "title": "Shape"
+          },
+          "share": {
+            "type": "string",
+            "title": "Share"
+          },
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "shape",
+          "share",
+          "evidence_id",
+          "known_at"
+        ],
+        "title": "ConcentrationEntryOut"
+      },
+      "ConcentrationGroupOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "share": {
+            "type": "string",
+            "title": "Share"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "count",
+          "share"
+        ],
+        "title": "ConcentrationGroupOut"
+      },
+      "ConcentrationOut": {
+        "properties": {
+          "relationship": {
+            "type": "string",
+            "title": "Relationship"
+          },
+          "denominator": {
+            "type": "string",
+            "title": "Denominator"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ConcentrationEntryOut"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/ConcentrationGroupOut"
+            },
+            "type": "array",
+            "title": "Groups"
+          },
+          "lower_bound": {
+            "type": "string",
+            "title": "Lower Bound"
+          },
+          "reported_floor": {
+            "type": "string",
+            "title": "Reported Floor"
+          },
+          "unknown_remainder": {
+            "type": "string",
+            "title": "Unknown Remainder"
+          },
+          "largest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Largest"
+          },
+          "exceeds_whole": {
+            "type": "boolean",
+            "title": "Exceeds Whole"
+          },
+          "suggested_not_counted": {
+            "type": "integer",
+            "title": "Suggested Not Counted"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "relationship",
+          "denominator",
+          "period",
+          "entries",
+          "groups",
+          "lower_bound",
+          "reported_floor",
+          "unknown_remainder",
+          "largest",
+          "exceeds_whole",
+          "suggested_not_counted",
+          "notes"
+        ],
+        "title": "ConcentrationOut"
+      },
       "ConfigDiff": {
         "properties": {
           "domain": {
@@ -21623,6 +21984,243 @@
         ],
         "title": "Dependency"
       },
+      "DependencyClaimOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "relationship": {
+            "type": "string",
+            "title": "Relationship"
+          },
+          "shape": {
+            "type": "string",
+            "title": "Shape",
+            "description": "named, anonymous, group or segment_only."
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Review state as of the requested date."
+          },
+          "counterparty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty"
+          },
+          "counterparty_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty Key"
+          },
+          "counterparty_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty Count"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share"
+          },
+          "denominator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Denominator"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "passage": {
+            "type": "string",
+            "title": "Passage"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Problems"
+          },
+          "screen": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Screen",
+            "description": "Hints that the passage is not a current relationship."
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "relationship",
+          "shape",
+          "status",
+          "counterparty",
+          "counterparty_key",
+          "counterparty_count",
+          "share",
+          "denominator",
+          "period_end",
+          "valid_from",
+          "valid_to",
+          "known_at",
+          "passage",
+          "source_url",
+          "evidence_id",
+          "problems",
+          "screen",
+          "stale"
+        ],
+        "title": "DependencyClaimOut"
+      },
+      "DependencyViewOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/DependencyClaimOut"
+            },
+            "type": "array",
+            "title": "Claims"
+          },
+          "concentration": {
+            "items": {
+              "$ref": "#/components/schemas/ConcentrationOut"
+            },
+            "type": "array",
+            "title": "Concentration"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioOut"
+            },
+            "type": "array",
+            "title": "Scenarios"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "as_of",
+          "claims",
+          "concentration",
+          "scenarios",
+          "notes"
+        ],
+        "title": "DependencyViewOut"
+      },
       "DerivedListingResponse": {
         "properties": {
           "ticker": {
@@ -22483,6 +23081,73 @@
           "resolution"
         ],
         "title": "Disagreement"
+      },
+      "DisclosureInsiderActivityOut": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "net": {
+            "items": {
+              "$ref": "#/components/schemas/InsiderNetOut"
+            },
+            "type": "array",
+            "title": "Net"
+          },
+          "clusters": {
+            "items": {
+              "$ref": "#/components/schemas/InsiderClusterOut"
+            },
+            "type": "array",
+            "title": "Clusters"
+          },
+          "bundles": {
+            "items": {
+              "$ref": "#/components/schemas/InsiderBundleOut"
+            },
+            "type": "array",
+            "title": "Bundles"
+          },
+          "class_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Class Counts"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "transactions": {
+            "items": {
+              "$ref": "#/components/schemas/InsiderTxOut"
+            },
+            "type": "array",
+            "title": "Transactions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "as_of",
+          "net",
+          "clusters",
+          "bundles",
+          "class_counts",
+          "notes",
+          "transactions"
+        ],
+        "title": "DisclosureInsiderActivityOut"
       },
       "DisputedStory": {
         "properties": {
@@ -32952,6 +33617,75 @@
         ],
         "title": "InsiderActivityOut"
       },
+      "InsiderBundleOut": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "exercised": {
+            "type": "string",
+            "title": "Exercised"
+          },
+          "sold": {
+            "type": "string",
+            "title": "Sold"
+          },
+          "proceeds": {
+            "type": "string",
+            "title": "Proceeds"
+          },
+          "retained": {
+            "type": "string",
+            "title": "Retained"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "exercised",
+          "sold",
+          "proceeds",
+          "retained"
+        ],
+        "title": "InsiderBundleOut"
+      },
+      "InsiderClusterOut": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "insiders": {
+            "type": "integer",
+            "title": "Insiders"
+          },
+          "shares": {
+            "type": "string",
+            "title": "Shares"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "insiders",
+          "shares",
+          "value"
+        ],
+        "title": "InsiderClusterOut"
+      },
       "InsiderNetBreakdown": {
         "properties": {
           "owner_name": {
@@ -33030,6 +33764,129 @@
           "net_shares"
         ],
         "title": "InsiderNetBreakdown"
+      },
+      "InsiderNetOut": {
+        "properties": {
+          "window_days": {
+            "type": "integer",
+            "title": "Window Days"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "buy_shares": {
+            "type": "string",
+            "title": "Buy Shares"
+          },
+          "sell_shares": {
+            "type": "string",
+            "title": "Sell Shares"
+          },
+          "net_shares": {
+            "type": "string",
+            "title": "Net Shares"
+          },
+          "buy_value": {
+            "type": "string",
+            "title": "Buy Value"
+          },
+          "sell_value": {
+            "type": "string",
+            "title": "Sell Value"
+          },
+          "net_value": {
+            "type": "string",
+            "title": "Net Value"
+          },
+          "trades": {
+            "type": "integer",
+            "title": "Trades"
+          },
+          "insiders": {
+            "type": "integer",
+            "title": "Insiders"
+          },
+          "plan_trades_excluded": {
+            "type": "integer",
+            "title": "Plan Trades Excluded",
+            "description": "Rule 10b5-1 plan trades, kept out of the net."
+          },
+          "plan_unknown_trades": {
+            "type": "integer",
+            "title": "Plan Unknown Trades",
+            "description": "In the net, but the filing has no plan flag."
+          },
+          "bundled_sales_excluded": {
+            "type": "integer",
+            "title": "Bundled Sales Excluded",
+            "description": "Sales bundled with a same-day exercise."
+          }
+        },
+        "type": "object",
+        "required": [
+          "window_days",
+          "role",
+          "buy_shares",
+          "sell_shares",
+          "net_shares",
+          "buy_value",
+          "sell_value",
+          "net_value",
+          "trades",
+          "insiders",
+          "plan_trades_excluded",
+          "plan_unknown_trades",
+          "bundled_sales_excluded"
+        ],
+        "title": "InsiderNetOut"
+      },
+      "InsiderOverrideIn": {
+        "properties": {
+          "accession": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 10,
+            "title": "Accession"
+          },
+          "row_index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Row Index"
+          },
+          "new_class": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "New Class"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accession",
+          "row_index",
+          "new_class",
+          "reason"
+        ],
+        "title": "InsiderOverrideIn"
+      },
+      "InsiderOverrideOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "InsiderOverrideOut"
       },
       "InsiderSource": {
         "properties": {
@@ -33670,6 +34527,200 @@
           "source_url"
         ],
         "title": "InsiderTransactionRow"
+      },
+      "InsiderTxOut": {
+        "properties": {
+          "accession": {
+            "type": "string",
+            "title": "Accession"
+          },
+          "row_index": {
+            "type": "integer",
+            "title": "Row Index"
+          },
+          "insider": {
+            "type": "string",
+            "title": "Insider"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "tx_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tx Date"
+          },
+          "filed": {
+            "type": "string",
+            "format": "date",
+            "title": "Filed"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "economic_class": {
+            "type": "string",
+            "title": "Economic Class"
+          },
+          "classifier_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Classifier Class"
+          },
+          "override_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override Reason"
+          },
+          "countable": {
+            "type": "boolean",
+            "title": "Countable"
+          },
+          "bundled": {
+            "type": "boolean",
+            "title": "Bundled"
+          },
+          "plan": {
+            "type": "string",
+            "title": "Plan"
+          },
+          "derivative": {
+            "type": "boolean",
+            "title": "Derivative"
+          },
+          "direct_indirect": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direct Indirect"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "shares_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares After"
+          },
+          "position_change_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Change Percent"
+          },
+          "caveats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Caveats"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accession",
+          "row_index",
+          "insider",
+          "role",
+          "tx_date",
+          "filed",
+          "known_at",
+          "economic_class",
+          "classifier_class",
+          "override_reason",
+          "countable",
+          "bundled",
+          "plan",
+          "derivative",
+          "direct_indirect",
+          "shares",
+          "price",
+          "value",
+          "shares_after",
+          "position_change_percent",
+          "caveats",
+          "source_url"
+        ],
+        "title": "InsiderTxOut"
       },
       "InstitutionalChannel": {
         "properties": {
@@ -39584,6 +40635,34 @@
           "disputed_count"
         ],
         "title": "NewsStats"
+      },
+      "NonQuantifiedOut": {
+        "properties": {
+          "supplier": {
+            "type": "string",
+            "title": "Supplier"
+          },
+          "customer": {
+            "type": "string",
+            "title": "Customer"
+          },
+          "edge_id": {
+            "type": "integer",
+            "title": "Edge Id"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "supplier",
+          "customer",
+          "edge_id",
+          "note"
+        ],
+        "title": "NonQuantifiedOut"
       },
       "NoteSentence": {
         "properties": {
@@ -47212,6 +48291,94 @@
           "severities"
         ],
         "title": "RuleMatch"
+      },
+      "ScenarioImpactOut": {
+        "properties": {
+          "entity": {
+            "type": "string",
+            "title": "Entity"
+          },
+          "hop": {
+            "type": "integer",
+            "title": "Hop"
+          },
+          "lower": {
+            "type": "string",
+            "title": "Lower"
+          },
+          "upper": {
+            "type": "string",
+            "title": "Upper"
+          },
+          "coverage": {
+            "type": "string",
+            "title": "Coverage"
+          },
+          "via": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Via"
+          },
+          "source_age_days": {
+            "type": "integer",
+            "title": "Source Age Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity",
+          "hop",
+          "lower",
+          "upper",
+          "coverage",
+          "via",
+          "source_age_days"
+        ],
+        "title": "ScenarioImpactOut"
+      },
+      "ScenarioOut": {
+        "properties": {
+          "origin": {
+            "type": "string",
+            "title": "Origin"
+          },
+          "shock": {
+            "type": "string",
+            "title": "Shock"
+          },
+          "impacts": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioImpactOut"
+            },
+            "type": "array",
+            "title": "Impacts"
+          },
+          "non_quantified": {
+            "items": {
+              "$ref": "#/components/schemas/NonQuantifiedOut"
+            },
+            "type": "array",
+            "title": "Non Quantified"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "origin",
+          "shock",
+          "impacts",
+          "non_quantified",
+          "notes"
+        ],
+        "title": "ScenarioOut"
       },
       "ScorePoint": {
         "properties": {

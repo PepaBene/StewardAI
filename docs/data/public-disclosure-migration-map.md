@@ -30,6 +30,10 @@ The shared evidence tables (migration `20261007100000_disclosure_foundation.sql`
 
 `form13f_filing`, `control_stake_filing` and `nport_filing` gain `known_at` (end of the filing day, UTC, filled by trigger when not given; never earlier than the filing). `form13f_filing` also gains `confidential_treatment` (`unknown` until a source says otherwise). No existing column, key or row is rewritten; the rollback drops only what was added. P2 reads `financial_statement_fact` and the ownership tables where they are; it adds no table.
 
+## Extended in P4 and P5 (`20261007120000_insider_and_dependency_shapes.sql`)
+
+`insider_filing` gains `known_at` (same rule as above). One new table, `insider_classification_override`: append-only, a reason of at least 10 characters, the original class kept beside the new one. `relationship_disclosure` gains `claim_shape`, `counterparty_count`, `denominator_kind` and `period_end`, backfilled only from the existing anonymous flag; denominator and period stay null until set, so old claims are left out of concentration rather than guessed. The two new constraints are `NOT VALID`, so old rows are not rewritten. The rollback drops the override ledger (data loss, stated in its header) and the added columns.
+
 ## API consumers to keep working
 
 Existing owner routes read the extended tables with explicit column lists (for example `api/graph_routes.py`, `api/control_stake_routes.py`, `api/insider_routes.py`); added nullable columns do not change them. The new surface is the `/disclosures/*` router only.

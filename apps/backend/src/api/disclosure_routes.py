@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -17,7 +18,14 @@ from pydantic import AwareDatetime, BaseModel, Field
 from api.auth import Owner
 from api.db import IdPath, Pool
 from api.routes import Storage, TickerPath
-from steward.disclosure import asof, ownership_read, review, statement_read
+from steward.disclosure import (
+    asof,
+    dependency_read,
+    insider_analysis,
+    ownership_read,
+    review,
+    statement_read,
+)
 from steward.disclosure.parse import ParseError, parse_html
 from steward.storage import StorageError
 
@@ -548,6 +556,222 @@ async def holding_ownership(
     """Ownership as separate dated lanes known by `as_of`. The lanes overlap, so no combined
     total is returned; each carries its own remainder against the stated share denominator."""
     return OwnershipOut(**await ownership_read.ownership(pool, ticker.upper(), as_of))
+
+
+class InsiderNetOut(BaseModel):
+    window_days: int
+    role: str
+    buy_shares: str
+    sell_shares: str
+    net_shares: str
+    buy_value: str
+    sell_value: str
+    net_value: str
+    trades: int
+    insiders: int
+    plan_trades_excluded: int = Field(description="Rule 10b5-1 plan trades, kept out of the net.")
+    plan_unknown_trades: int = Field(description="In the net, but the filing has no plan flag.")
+    bundled_sales_excluded: int = Field(description="Sales bundled with a same-day exercise.")
+
+
+class InsiderClusterOut(BaseModel):
+    start: dt.date
+    end: dt.date
+    insiders: int
+    shares: str
+    value: str
+
+
+class InsiderBundleOut(BaseModel):
+    day: dt.date
+    exercised: str
+    sold: str
+    proceeds: str
+    retained: str
+
+
+class InsiderTxOut(BaseModel):
+    accession: str
+    row_index: int
+    insider: str
+    role: str
+    tx_date: dt.date | None
+    filed: dt.date
+    known_at: dt.datetime
+    economic_class: str
+    classifier_class: str | None
+    override_reason: str | None
+    countable: bool
+    bundled: bool
+    plan: str
+    derivative: bool
+    direct_indirect: str | None
+    shares: str | None
+    price: str | None
+    value: str | None
+    shares_after: str | None
+    position_change_percent: str | None
+    caveats: list[str]
+    source_url: str | None
+
+
+class DisclosureInsiderActivityOut(BaseModel):
+    ticker: str
+    as_of: dt.datetime
+    net: list[InsiderNetOut]
+    clusters: list[InsiderClusterOut]
+    bundles: list[InsiderBundleOut]
+    class_counts: dict[str, int]
+    notes: list[str]
+    transactions: list[InsiderTxOut]
+
+
+class InsiderOverrideIn(BaseModel):
+    accession: Annotated[str, Field(min_length=10, max_length=30)]
+    row_index: Annotated[int, Field(ge=0)]
+    new_class: Annotated[str, Field(max_length=40)]
+    reason: Annotated[str, Field(min_length=10, max_length=2000)]
+
+
+class InsiderOverrideOut(BaseModel):
+    id: int
+
+
+@router.get("/holdings/{ticker}/insiders")
+async def holding_insiders(
+    ticker: TickerPath, pool: Pool, _owner: Owner, as_of: AsOf = None
+) -> DisclosureInsiderActivityOut:
+    """Insider transactions as filed and known by `as_of`: discretionary net by role and window,
+    with plan trades, exercise-and-sell bundles and unknown plan status shown apart."""
+    return DisclosureInsiderActivityOut(
+        **await insider_analysis.insider_activity(pool, ticker.upper(), as_of)
+    )
+
+
+@router.post("/insiders/override", status_code=status.HTTP_201_CREATED)
+async def override_insider_class(
+    body: InsiderOverrideIn, pool: Pool, owner: Owner
+) -> InsiderOverrideOut:
+    """Record a reviewer's reclassification. Overrides are appended, never edited."""
+    try:
+        new_id = await insider_analysis.record_override(
+            pool,
+            body.accession,
+            body.row_index,
+            body.new_class,
+            body.reason,
+            f"owner:{owner.user_id}",
+        )
+    except insider_analysis.OverrideError as exc:
+        code = (
+            status.HTTP_404_NOT_FOUND
+            if "does not exist" in str(exc)
+            else status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+        raise HTTPException(code, str(exc)) from exc
+    return InsiderOverrideOut(id=new_id)
+
+
+class DependencyClaimOut(BaseModel):
+    id: int
+    relationship: str
+    shape: str = Field(description="named, anonymous, group or segment_only.")
+    status: str = Field(description="Review state as of the requested date.")
+    counterparty: str | None
+    counterparty_key: str | None
+    counterparty_count: int | None
+    share: str | None
+    denominator: str | None
+    period_end: dt.date | None
+    valid_from: dt.date | None
+    valid_to: dt.date | None
+    known_at: dt.datetime
+    passage: str
+    source_url: str | None
+    evidence_id: int | None
+    problems: list[str]
+    screen: list[str] = Field(description="Hints that the passage is not a current relationship.")
+    stale: bool
+
+
+class ConcentrationEntryOut(BaseModel):
+    id: int
+    label: str
+    shape: str
+    share: str
+    evidence_id: int | None
+    known_at: dt.datetime
+
+
+class ConcentrationGroupOut(BaseModel):
+    id: int
+    label: str
+    count: int
+    share: str
+
+
+class ConcentrationOut(BaseModel):
+    relationship: str
+    denominator: str
+    period: str
+    entries: list[ConcentrationEntryOut]
+    groups: list[ConcentrationGroupOut]
+    lower_bound: str
+    reported_floor: str
+    unknown_remainder: str
+    largest: str | None
+    exceeds_whole: bool
+    suggested_not_counted: int
+    notes: list[str]
+
+
+class ScenarioImpactOut(BaseModel):
+    entity: str
+    hop: int
+    lower: str
+    upper: str
+    coverage: str
+    via: list[int]
+    source_age_days: int
+
+
+class NonQuantifiedOut(BaseModel):
+    supplier: str
+    customer: str
+    edge_id: int
+    note: str
+
+
+class ScenarioOut(BaseModel):
+    origin: str
+    shock: str
+    impacts: list[ScenarioImpactOut]
+    non_quantified: list[NonQuantifiedOut]
+    notes: list[str]
+
+
+class DependencyViewOut(BaseModel):
+    ticker: str
+    as_of: dt.datetime
+    claims: list[DependencyClaimOut]
+    concentration: list[ConcentrationOut]
+    scenarios: list[ScenarioOut]
+    notes: list[str]
+
+
+@router.get("/holdings/{ticker}/dependencies")
+async def holding_dependencies(
+    ticker: TickerPath,
+    pool: Pool,
+    _owner: Owner,
+    as_of: AsOf = None,
+    shock: Annotated[Decimal, Query(ge=0, le=1)] = Decimal("0.2"),
+) -> DependencyViewOut:
+    """Customer and supplier claims known by `as_of`, with concentration (unknown remainder shown),
+    and a bounded one-to-two-hop scenario over confirmed numeric edges only."""
+    return DependencyViewOut(
+        **await dependency_read.dependency_view(pool, ticker.upper(), as_of, shock=shock)
+    )
 
 
 @router.get("/provenance/{kind}/{row_id}")
