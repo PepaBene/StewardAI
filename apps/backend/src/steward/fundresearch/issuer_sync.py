@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import datetime as dt
 import io
+import json
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -78,6 +79,17 @@ class NavReading:
     currency: str
 
 
+@dataclass(frozen=True)
+class BenchmarkSeries:
+    """The issuer's benchmark, as the 'growth of 10,000' series on its performance chart."""
+
+    symbol: str
+    name: str
+    currency: str
+    basis: Literal["price", "total"] | None  # only when the benchmark's name states it
+    points: tuple[tuple[dt.date, Decimal], ...]
+
+
 @dataclass
 class IssuerReading:
     isin: str
@@ -85,6 +97,7 @@ class IssuerReading:
     as_of: dt.date
     facts: dict[str, Candidate] = field(default_factory=dict)
     nav: NavReading | None = None
+    benchmark: BenchmarkSeries | None = None
     skipped: dict[str, str] = field(default_factory=dict)
 
 
@@ -224,6 +237,104 @@ def parse_ishares(
             f"no usable published NAV (value {amount_text!r}, date {as_of_text!r}, currency {currency!r})"
         )
     return out
+
+
+LENDING_STALE_DAYS = 400  # a lending table older than this no longer says what the fund does now
+_REVENUE_SHARE = re.compile(
+    r"(\d{1,3}(?:\.\d+)?)\s*%\s+of\s+all\s+securities\s+lending\s+income\s+is\s+paid\s+directly"
+    r"\s+into\s+the\s+fund",
+    flags=re.IGNORECASE,
+)
+
+
+def parse_ishares_lending(sec_lending: Any, today: dt.date) -> IssuerReading:
+    """Securities-lending facts from the `secLending` component, in a scratch reading.
+
+    `securities_lending` is recorded as yes only when the latest one-year table is recent and
+    shows shares on loan; zero or an old table is unknown, never `no`. The fund's share of the
+    income is the issuer's own sentence."""
+    out = IssuerReading(isin="", source_url="", as_of=today)
+    points = _points(sec_lending, "secLending")
+    as_of_text = _shown(points, "download.secLendingAsOfDate")
+    as_of = parse_issuer_date(as_of_text)
+    if as_of is None or (today - as_of).days > LENDING_STALE_DAYS or as_of > today:
+        out.skipped["securities_lending"] = (
+            f"the issuer's lending statistics are dated {as_of_text!r}: not current"
+        )
+    else:
+        row: Any = (points.get("summary.oneYear") or {}).get("value")
+        kinds: Any = (points.get("summary.returnTypes") or {}).get("value")
+        on_loan: Decimal | None
+        try:
+            on_loan = Decimal(str(row[list(kinds).index("avgOnLoan")]).replace(",", ""))
+        except (TypeError, ValueError, IndexError, InvalidOperation):
+            on_loan = None
+        if on_loan is None or on_loan <= 0:
+            out.skipped["securities_lending"] = (
+                "the one-year table shows no average amount on loan: not recorded as yes or no"
+            )
+        else:
+            out.facts["securities_lending"] = Candidate(
+                "yes",
+                f"Securities lending statistics as of {as_of_text}: average on loan over one year {on_loan}%",
+            )
+    m = _REVENUE_SHARE.search(json.dumps(sec_lending))
+    share = Decimal(m.group(1)) / 100 if m else None
+    if share is None or not (0 < share <= 1):
+        out.skipped["lending_revenue_share"] = "no stated share of the lending income"
+    else:
+        out.facts["lending_revenue_share"] = Candidate(
+            format(share.normalize(), "f"),
+            f"{m.group(0) if m else ''} (fraction of the lending income paid into the fund)",
+        )
+    return out
+
+
+_BASIS = (
+    ("total", re.compile(r"\b(total|net|gross)\s+return\b", re.IGNORECASE)),
+    ("price", re.compile(r"\bprice\s+(return|index)\b", re.IGNORECASE)),
+)
+
+
+def parse_ishares_benchmark(performance: Any, portfolio_id: str) -> BenchmarkSeries | None:
+    """The benchmark's 'growth of 10,000' series with its dates, or None when absent."""
+    chart = _points(performance, "performance")
+    data = chart.get("chart.benchmarkData") or {}
+    values, dates = data.get("value"), data.get("asOfDate")
+    name = _shown(chart, "chart.benchmarkName")
+    currency = _shown(chart, "chart.benchmarkCurrencySymbol")
+    if (
+        not isinstance(values, list)
+        or not isinstance(dates, list)
+        or len(values) != len(dates)
+        or len(values) < 2
+        or not name
+        or not currency
+        or not re.fullmatch(r"[A-Z]{3}", currency)
+    ):
+        return None
+    points: list[tuple[dt.date, Decimal]] = []
+    for d, v in zip(dates, values, strict=True):
+        try:
+            day = dt.datetime.strptime(str(d), "%Y%m%d").date()
+            level = Decimal(str(v))
+        except (ValueError, InvalidOperation):
+            return None  # a malformed series is not stored partly
+        if level <= 0 or (points and day <= points[-1][0]):
+            return None
+        points.append((day, level))
+    basis: Literal["price", "total"] | None = None
+    for kind, pattern in _BASIS:
+        if pattern.search(name):
+            basis = kind  # type: ignore[assignment]
+            break
+    return BenchmarkSeries(
+        symbol=f"ishares-bm-{portfolio_id}",
+        name=name,
+        currency=currency,
+        basis=basis,
+        points=tuple(points),
+    )
 
 
 # --------------------------------------------------------------------------- WisdomTree
@@ -379,6 +490,43 @@ def plan_nav_write(
 # ------------------------------------------------------------------------ fetch and store
 
 
+def add_ishares_extras(
+    reading: IssuerReading, source: IssuerSource, sec_lending: Any, performance: Any, today: dt.date
+) -> None:
+    """Fold securities lending and the benchmark series into a reading. Each part that cannot
+    be read is left out with its reason; the rest of the reading stands."""
+    assert source.portfolio_id
+    try:
+        if isinstance(sec_lending, Exception):
+            raise sec_lending
+        lending = parse_ishares_lending(sec_lending, today)
+        reading.facts.update(lending.facts)
+        reading.skipped.update(lending.skipped)
+    except (IssuerError, IssuerReadError, httpx.HTTPError) as exc:
+        reading.skipped["securities_lending"] = f"{type(exc).__name__}: {exc}"[:200]
+    try:
+        if isinstance(performance, Exception):
+            raise performance
+        series = parse_ishares_benchmark(performance, source.portfolio_id)
+    except (IssuerError, IssuerReadError, httpx.HTTPError) as exc:
+        reading.skipped["benchmark"] = f"{type(exc).__name__}: {exc}"[:200]
+        return
+    if series is None:
+        reading.skipped["benchmark"] = "no usable benchmark series on the issuer's chart"
+        return
+    reading.benchmark = series
+    first, last = series.points[0][0], series.points[-1][0]
+    passage = f"Benchmark {series.name}: {len(series.points)} daily points {first} to {last}"
+    reading.facts["benchmark_symbol"] = Candidate(series.symbol, passage)
+    reading.facts["benchmark_currency"] = Candidate(series.currency, passage)
+    if series.basis is not None:
+        reading.facts["benchmark_basis"] = Candidate(series.basis, f"Benchmark name: {series.name}")
+    else:
+        reading.skipped["benchmark_basis"] = (
+            f"the benchmark's name {series.name!r} does not say whether it is a price or total return index"
+        )
+
+
 async def fetch_reading(
     http: httpx.AsyncClient, source: IssuerSource, today: dt.date
 ) -> IssuerReading:
@@ -386,7 +534,15 @@ async def fetch_reading(
         assert source.portfolio_id
         key_facts = await fetch_ishares_component(http, source.portfolio_id, "keyFundFacts")
         header = await fetch_ishares_component(http, source.portfolio_id, "fundHeader")
-        return parse_ishares(key_facts, header, source, today)
+        reading = parse_ishares(key_facts, header, source, today)
+        extras: list[Any] = []
+        for component in ("secLending", "performance"):
+            try:
+                extras.append(await fetch_ishares_component(http, source.portfolio_id, component))
+            except (IssuerError, httpx.HTTPError) as exc:
+                extras.append(exc)
+        add_ishares_extras(reading, source, extras[0], extras[1], today)
+        return reading
     response = await http.get(source.url)
     if response.status_code != 200:
         raise IssuerReadError(f"WisdomTree factsheet answered HTTP {response.status_code}")
@@ -398,12 +554,28 @@ async def extra_sources(pool: asyncpg.Pool, known: set[str]) -> list[IssuerSourc
     rows = await pool.fetch(
         "select distinct fund_isin, portfolio_id from public.etf_snapshot where provider='ishares'"
     )
-    return [
+    found = [
         IssuerSource(r["fund_isin"], "ishares", r["portfolio_id"])
         for r in rows
         if r["fund_isin"] not in known
         and ISIN.match(r["fund_isin"] or "")
         and (r["portfolio_id"] or "").isdigit()
+    ]
+    return [*found, *await held_wisdomtree_sources(pool, known | {s.isin for s in found})]
+
+
+async def held_wisdomtree_sources(pool: asyncpg.Pool, known: set[str]) -> list[IssuerSource]:
+    """WisdomTree products the account has held, found by the instrument's name; the
+    factsheet URL needs only the ISIN. The reader checks the ISIN inside the document."""
+    rows = await pool.fetch(
+        """select distinct i.isin from public.instrument i
+           join public.position_snapshot p on p.ticker = i.t212_ticker
+           where i.name ilike 'wisdomtree%' and i.isin is not null"""
+    )
+    return [
+        IssuerSource(r["isin"], "wisdomtree")
+        for r in rows
+        if r["isin"] not in known and ISIN.match(r["isin"])
     ]
 
 
@@ -459,13 +631,55 @@ async def store_reading(
                     reading.nav.currency,
                     reading.source_url,
                 )
+        bench = await store_benchmark(conn, reading) if reading.benchmark else None
     return {
         "written": sorted(plan.writes),
         "unchanged": len(plan.unchanged),
         "conflicts": plan.conflicts,
         "skipped": reading.skipped,
         "nav": nav_state,
+        "benchmark_points": bench,
     }
+
+
+async def store_benchmark(conn: asyncpg.Connection, reading: IssuerReading) -> int:
+    """Upsert the benchmark series (only changed or new days are written) and its coverage row.
+    The row says the series is the issuer's, rebased, and whether it is a total-return index
+    only when the issuer's own name for it says so."""
+    series = reading.benchmark
+    assert series is not None
+    days = [d for d, _ in series.points]
+    levels = [v for _, v in series.points]
+    result = await conn.execute(
+        """insert into public.price_bar (symbol, date, close, source, bar_type, currency, quote_unit)
+           select $1, d, c, 'issuer', 'adjusted', $4, $4 from unnest($2::date[], $3::numeric[]) as t(d, c)
+           on conflict (symbol, date, source, bar_type) do update set close = excluded.close, fetched_at = now()
+           where public.price_bar.close is distinct from excluded.close""",
+        series.symbol,
+        days,
+        levels,
+        series.currency,
+    )
+    reason = (
+        f"The issuer's published benchmark series ({series.name}), rebased to 10,000 on "
+        f"{days[0]}; an index level, not a quote."
+    )
+    await conn.execute(
+        """insert into public.fund_index_coverage (subject_kind, subject_key, label, tier, origin,
+             total_return_available, reason, source_url, evidence, checked_at)
+           values ('index', $1, $2, 'issuer_downloadable', 'derived', $3, $4, $5, $6::jsonb, now())
+           on conflict (subject_kind, subject_key) do update set label = excluded.label,
+             total_return_available = excluded.total_return_available, reason = excluded.reason,
+             source_url = excluded.source_url, evidence = excluded.evidence, checked_at = now()
+           where public.fund_index_coverage.origin = 'derived'""",
+        series.symbol,
+        series.name,
+        None if series.basis is None else series.basis == "total",
+        reason,
+        reading.source_url,
+        json.dumps({"first": str(days[0]), "last": str(days[-1]), "points": len(days)}),
+    )
+    return int(result.rsplit(" ", 1)[-1]) if result.startswith("INSERT") else 0
 
 
 async def fund_issuer_facts_handler(ctx: JobContext) -> None:
