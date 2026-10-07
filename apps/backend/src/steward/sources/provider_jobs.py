@@ -124,6 +124,18 @@ async def fmp_company_handler(ctx: JobContext) -> None:
             list(mapped),
         )
         seen = {r["ticker"]: r["seen"] for r in rows}
+        # A holding whose compensation was never checked is due whatever its profile's age, or a
+        # dataset added later would wait for every profile to go stale first.
+        compensation_checked = {
+            r["entity_key"]
+            for r in await ctx.pool.fetch(
+                "select entity_key from public.coverage_status"
+                " where provider='fmp' and dataset='executive_compensation'"
+                " and entity_key = any($1::text[])",
+                list(mapped),
+            )
+        }
+        seen = {t: s for t, s in seen.items() if t in compensation_checked}
         due = stalest_first(
             list(mapped),
             seen.get,
