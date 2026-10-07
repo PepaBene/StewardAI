@@ -36,6 +36,10 @@ class Filing13F:
     manager_name: str | None = None
     # "unknown" until the source says otherwise; never assumed to be "none".
     confidential_treatment: Literal["none_indicated", "requested", "unknown"] = "unknown"
+    # From the filing's summary page; None when never read, not zero.
+    reported_line_count: int | None = None
+    reported_total_value_usd: Decimal | None = None
+    omitted_holdings_notice: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -81,6 +85,54 @@ def effective_reports(
             cik, period, tuple(accessions), known, amended, tuple(flags)
         )
     return out
+
+
+@dataclass(frozen=True)
+class QuarterChoice:
+    """Which reporting quarter the manager lane shows, and who has not filed it yet."""
+
+    period: dt.date | None
+    filed: tuple[str, ...]  # managers with a report for that quarter
+    not_yet_filed: tuple[str, ...]  # managers known to hold the name whose report is not known yet
+    share_filed: Decimal  # of all managers, the share that filed the chosen quarter
+    fell_back: bool  # no quarter had enough filers: the best-covered one is shown, and said so
+
+
+def choose_common_quarter(
+    reports: Mapping[tuple[str, dt.date], EffectiveReport],
+    *,
+    min_share: Decimal = Decimal("0.8"),
+) -> QuarterChoice:
+    """The latest quarter that at least `min_share` of the managers have filed (13F filings arrive
+    over 45 days, so the newest quarter is often only partly in). A manager that has not filed that
+    quarter is named, not silently carried forward from an older one, so the lane never mixes
+    report dates without saying so."""
+    managers = sorted({cik for cik, _ in reports})
+    if not managers:
+        return QuarterChoice(None, (), (), ZERO, False)
+    by_period: dict[dt.date, set[str]] = defaultdict(set)
+    for cik, period in reports:
+        by_period[period].add(cik)
+    for period in sorted(by_period, reverse=True):
+        share = Decimal(len(by_period[period])) / Decimal(len(managers))
+        if share >= min_share:
+            filed = tuple(sorted(by_period[period]))
+            return QuarterChoice(
+                period,
+                filed,
+                tuple(m for m in managers if m not in by_period[period]),
+                share,
+                False,
+            )
+    # No quarter reached the bar: show the best-covered one (the latest among ties) and say so.
+    best = max(by_period, key=lambda p: (len(by_period[p]), p))
+    return QuarterChoice(
+        best,
+        tuple(sorted(by_period[best])),
+        tuple(m for m in managers if m not in by_period[best]),
+        Decimal(len(by_period[best])) / Decimal(len(managers)),
+        True,
+    )
 
 
 @dataclass(frozen=True)

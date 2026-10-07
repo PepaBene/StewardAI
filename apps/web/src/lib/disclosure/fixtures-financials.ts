@@ -82,6 +82,8 @@ export function sampleStatements(cutoffMs: number): StatementsOut {
     derived,
     checks,
     usable_for_valuation: usable,
+    valuation_gate: Object.fromEntries(Object.entries(usable).map(([end, ok]) => [end, { usable_for_valuation: ok, reasons: ok ? [] : ["A statement check failed or needs review."] }])),
+    formulas: [],
     unmapped_concepts: 0,
   };
 }
@@ -120,6 +122,8 @@ export function sampleBridge(cutoffMs: number): SegmentBridge {
       ...(within(total, sum(prodMembers) + prod[2] * 1_000_000) ? [] : ["ProductOrServiceAxis: members and eliminations are short of the reported total"]),
       "axes describe the same total from different angles and are not added together",
     ],
+    metrics: [],
+    cross_axis: [],
   };
 }
 

@@ -16,6 +16,7 @@ import {
   type HolderBook,
   type Lane,
   type OwnershipView,
+  type StakeChainView,
   type StakeEvent,
 } from "@/lib/disclosure/ownership";
 import { cn } from "@/lib/utils";
@@ -126,6 +127,137 @@ export function OwnershipLanes({ view }: { view: OwnershipView }) {
         </ul>
       ) : null}
     </div>
+  );
+}
+
+// ------------------------------------------------------------------------------- common quarter
+const CONFIDENTIAL_LABEL: Record<string, string> = {
+  none_indicated: "No confidential treatment indicated",
+  requested: "Confidential treatment requested: some holdings may be left out",
+  unknown: "Confidential treatment not stated",
+};
+
+/**
+ * Which quarter the manager lane shows and why, and what each manager’s own report says about its
+ * size. A manager who has not filed that quarter is named, never carried forward from an older one.
+ */
+export function QuarterNote({ view }: { view: OwnershipView }) {
+  const q = view.quarter;
+  if (q.period == null) return <p className="text-sm text-text-muted">No manager report is known at this date.</p>;
+  return (
+    <div className="space-y-3 text-sm">
+      <p className="max-w-[72ch]">
+        The manager lane shows the quarter ending <strong className="num">{formatDay(q.period)}</strong>: <span className="num">{q.managers_filed}</span> managers ({(Number(q.share_filed) * 100).toFixed(0)}% of those we follow) had filed it.
+        {q.fell_back ? " No quarter reached 80%, so the best-covered one is shown and the lane is incomplete." : ""}
+      </p>
+      {q.not_yet_filed.length ? (
+        <p className="max-w-[72ch]">
+          <strong>Not in this quarter:</strong> {q.not_yet_filed.join(", ")}. {q.not_yet_filed.length === 1 ? "Its" : "Their"} older holdings are not used to fill the gap.
+        </p>
+      ) : null}
+      {q.reports.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] border-collapse">
+            <caption className="sr-only">What each manager’s own report says about its size, against the lines kept for this company</caption>
+            <thead>
+              <tr className="border-b border-border text-left">
+                <th scope="col" className="py-1.5 pr-3 font-medium">Manager</th>
+                <th scope="col" className="py-1.5 pr-3 text-right font-medium">Lines for this company</th>
+                <th scope="col" className="py-1.5 pr-3 text-right font-medium">Lines in the whole report</th>
+                <th scope="col" className="py-1.5 pr-3 text-right font-medium">Reported total value</th>
+                <th scope="col" className="py-1.5 font-medium">Confidential treatment</th>
+              </tr>
+            </thead>
+            <tbody>
+              {q.reports.map((r) => (
+                <tr key={`${r.manager}-${r.report_date}`} className="border-b border-border-soft align-top">
+                  <th scope="row" className="py-1.5 pr-3 text-left font-medium">{r.manager}</th>
+                  <td className="num py-1.5 pr-3 text-right">{r.lines_stored_for_ticker}</td>
+                  <td className="num py-1.5 pr-3 text-right">{r.lines_reported == null ? "Not stated" : r.lines_reported.toLocaleString("en-GB")}</td>
+                  <td className="num py-1.5 pr-3 text-right">{r.total_value_reported_usd == null ? "Not stated" : `$${Number(r.total_value_reported_usd).toLocaleString("en-GB")}`}</td>
+                  <td className="py-1.5">{CONFIDENTIAL_LABEL[r.confidential_treatment] ?? r.confidential_treatment}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      <p className="max-w-[72ch] text-xs text-text-muted">“Not stated” means the report gave no figure. It is not zero.</p>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------------------------ filing chain
+const SCHEDULE_NAME = { "13D": "Schedule 13D", "13G": "Schedule 13G" } as const;
+
+/** One filer’s 13D/G filings about a company, oldest first, with what changed at each step. */
+export function StakeChain({ chain }: { chain: StakeChainView }) {
+  if (chain.steps.length === 0) return <p className="text-sm text-text-muted">This filer has no 13D or 13G filing about the company known at this date.</p>;
+  return (
+    <ol className="space-y-4">
+      {chain.steps.map((s) => (
+        <li key={s.accession} className="space-y-1.5 border border-border bg-surface-raised p-3 text-sm">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="font-medium">
+              {SCHEDULE_NAME[s.schedule]}
+              {s.is_amendment ? `, amendment${s.amendment_no ? ` ${s.amendment_no}` : ""}` : ", first filing"}
+              <span className="num font-normal text-text-muted"> · filed {formatDay(s.filed)}</span>
+            </p>
+            <p className="num text-base font-semibold">{s.stake_percent == null ? "No percent reported" : `${Number(s.stake_percent).toFixed(2)}%`}</p>
+          </div>
+          <p className="text-xs text-text-muted">
+            {s.class_title ?? "Class not stated"}
+            {s.event_date ? <> · event on <span className="num">{formatDay(s.event_date)}</span></> : null}
+            {!s.linked_to_previous && s.prior_accession == null && chain.steps[0] !== s ? " · not linked to the filing before it" : ""}
+          </p>
+          <p className="text-xs">
+            {s.reported_delta_points != null ? <>Moved <span className="num">{Number(s.reported_delta_points) >= 0 ? "+" : "−"}{Math.abs(Number(s.reported_delta_points)).toFixed(2)}</span> points from the filing before.</> : null}
+            {s.delta_note ? <span className="text-text-muted"> {s.delta_note}</span> : null}
+          </p>
+          {s.purpose ? (
+            <blockquote className="max-w-[72ch] border-l-2 border-border pl-3">
+              {s.purpose_changed === true ? <span className="mb-0.5 block text-xs font-medium">The stated purpose changed from the filing before.</span> : null}
+              {s.purpose}
+            </blockquote>
+          ) : null}
+          {s.holders.length ? (
+            <details>
+              <summary className="cursor-pointer text-xs text-accent-ink">{s.holders.length} reporting {s.holders.length === 1 ? "person" : "people"}</summary>
+              <ul className="mt-1 space-y-0.5 text-xs">
+                {s.holders.map((h) => (
+                  <li key={h.name}>
+                    {h.name}{h.member_of_group ? " (group member)" : ""}: <span className="num">{h.percent == null ? "no percent" : `${Number(h.percent).toFixed(2)}%`}</span>
+                  </li>
+                ))}
+                <li className="text-text-muted">Group members report overlapping shares, so these are not added.</li>
+              </ul>
+            </details>
+          ) : null}
+          {s.changes.length ? (
+            <ul className="space-y-0.5 text-xs">
+              {s.changes.map((c) => (
+                <li key={`${c.change_type}-${c.person}-${c.old}-${c.new}`}>
+                  {c.change_type.replaceAll("_", " ")}{c.person ? ` (${c.person})` : ""}: {c.old ?? "none"} → {c.new ?? "none"}{c.detail ? `. ${c.detail}` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {s.exhibits.length ? (
+            <ul className="space-y-0.5 text-xs text-text-muted">
+              {s.exhibits.map((x) => (
+                <li key={x.label}>
+                  {x.url ? <a href={x.url} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">{x.label}</a> : x.label}
+                  {x.description ? `: ${x.description}` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <p className="text-xs">
+            <a href={s.source_url} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">Open the filing</a>
+          </p>
+        </li>
+      ))}
+    </ol>
   );
 }
 

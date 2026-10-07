@@ -12,6 +12,7 @@ type S = components["schemas"];
 export type InsiderActivity = S["DisclosureInsiderActivityOut"];
 export type InsiderTx = S["InsiderTxOut"];
 export type InsiderNet = S["InsiderNetOut"];
+export type PdmrActivity = S["PdmrActivityOut"];
 
 export const WINDOWS = [30, 90, 365] as const;
 export type Window = (typeof WINDOWS)[number];

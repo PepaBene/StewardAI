@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { BundleList, EventStrip, InsiderTable, NetPanel } from "@/components/disclosure/insiders";
+import { BundleList, ContextPanel, EventStrip, InsiderTable, NetPanel, PdmrPanel } from "@/components/disclosure/insiders";
 import { Panel, SectionNav } from "@/components/oversight/panel";
 import { PageHeader } from "@/components/page-header";
 import { Field } from "@/components/reference/form-bits";
@@ -10,13 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { SAMPLE_INSIDER_DAY, SAMPLE_INSIDER_TICKER, sampleInsiders } from "@/lib/disclosure/fixtures-insiders";
-import type { InsiderActivity } from "@/lib/disclosure/insiders";
+import type { InsiderActivity, PdmrActivity } from "@/lib/disclosure/insiders";
 import { dayOf, endOfDayMs, formatDay } from "@/lib/disclosure/model";
 
 const SECTIONS = [
   { id: "strip", label: "Filings over time" },
   { id: "net", label: "Net buying and selling" },
   { id: "detail", label: "Every transaction" },
+  { id: "context", label: "Around the trades" },
   { id: "bundles", label: "Exercise and sale on one day" },
 ] as const;
 
@@ -39,6 +40,27 @@ export function InsidersPageView() {
   const [nonce, setNonce] = useState(0);
 
   const sample = ticker === null;
+
+  // keyed by the inputs that produced it, so a stale result is never shown for new ones
+  const [pdmrResult, setPdmrResult] = useState<{ key: string; data: PdmrActivity | "none" } | null>(null);
+  const pdmrKey = ticker ? `${ticker}:${cutoff}:${nonce}` : null;
+  const pdmr = pdmrResult && pdmrResult.key === pdmrKey ? pdmrResult.data : null;
+
+  useEffect(() => {
+    if (!ticker || !pdmrKey) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await getBrowserApiClient().GET("/disclosures/holdings/{ticker}/pdmr", { params: { path: { ticker }, query: { as_of: new Date(cutoff).toISOString() } } });
+        if (!cancelled) setPdmrResult({ key: pdmrKey, data: r.data ?? "none" });
+      } catch {
+        if (!cancelled) setPdmrResult({ key: pdmrKey, data: "none" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ticker, cutoff, pdmrKey]);
 
   useEffect(() => {
     if (!ticker) return;
@@ -142,6 +164,16 @@ export function InsidersPageView() {
           <p className="text-sm text-text-muted">Loading…</p>
         )}
       </Panel>
+
+      <Panel id="context" title="Around the trades" description="The share count at the date and confirmed company events from the year before.">
+        {view ? <ContextPanel view={view} /> : <p className="text-sm text-text-muted">Loading…</p>}
+      </Panel>
+
+      {sample ? null : (
+        <Panel id="uk" title="UK manager dealings" description="Notices UK companies must publish when a director or senior manager trades. A separate regime from Form 4, never added to it.">
+          <PdmrPanel data={pdmr} />
+        </Panel>
+      )}
 
       <Panel id="bundles" title="Exercise and sale on one day" description="An option exercise with a same-day sale is one event, so the sale is not read as a choice to sell.">
         {view ? <BundleList view={view} /> : <p className="text-sm text-text-muted">Loading…</p>}

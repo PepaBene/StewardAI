@@ -36,6 +36,7 @@ from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfi
 from steward.config.jobs import JobsConfig
 from steward.config.store import ConfigConflictError, StoredConfig, load_active, save_config
 from steward.db_json import decode_rows, decode_structured_rows
+from steward.disclosure.statement_read import with_valuation_gate
 from steward.free_source_reads import (
     business_network_payload,
     company_research_rows,
@@ -1290,10 +1291,12 @@ async def financial_history(
         bool, Query(description="Only facts a reconciliation check passed.")
     ] = False,
 ) -> list[dict[str, Any]]:
-    """Stored statement facts as known at `as_of`; every row says whether it was reconciled."""
-    return await financial_history_rows(
+    """Stored statement facts as known at `as_of`; every row says whether it was reconciled and
+    carries `valuation_gate` (usable_for_valuation and reasons) for its period."""
+    rows = await financial_history_rows(
         pool, ticker, as_of, statement, reconciled_only=reconciled_only, line_item=line_item
     )
+    return await with_valuation_gate(pool, rows, as_of)
 
 
 @router.post(

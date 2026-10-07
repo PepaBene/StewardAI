@@ -89,10 +89,23 @@ async def store_dataset(
             job_id,
             sorted(set(searched if searched is not None else tickers.values())),
         )
+        # An already stored filing keeps its identity; a re-read only fills what was unknown (the
+        # summary-page totals and the confidential-treatment flag), never overwriting a value.
         await conn.executemany(
             "insert into public.form13f_filing (accession, cik, manager_name, period, filed,"
-            " submission_type, amendment_type, dataset_url) values ($1, $2, $3, $4, $5, $6,"
-            " $7, $8) on conflict (accession) do nothing",
+            " submission_type, amendment_type, dataset_url, reported_line_count,"
+            " reported_total_value_usd, omitted_holdings_notice, confidential_treatment)"
+            " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)"
+            " on conflict (accession) do update set"
+            " reported_line_count = coalesce(public.form13f_filing.reported_line_count,"
+            "   excluded.reported_line_count),"
+            " reported_total_value_usd = coalesce(public.form13f_filing.reported_total_value_usd,"
+            "   excluded.reported_total_value_usd),"
+            " omitted_holdings_notice = coalesce(public.form13f_filing.omitted_holdings_notice,"
+            "   excluded.omitted_holdings_notice),"
+            " confidential_treatment = case when public.form13f_filing.confidential_treatment"
+            "   = 'unknown' then excluded.confidential_treatment"
+            "   else public.form13f_filing.confidential_treatment end",
             [
                 (
                     f.accession,
@@ -103,6 +116,14 @@ async def store_dataset(
                     f.submission_type,
                     f.amendment_type,
                     url,
+                    f.reported_line_count,
+                    f.reported_total_value_usd,
+                    f.omitted_holdings_notice,
+                    "unknown"
+                    if f.omitted_holdings_notice is None
+                    else "requested"
+                    if f.omitted_holdings_notice
+                    else "none_indicated",
                 )
                 for f in data.filings
             ],

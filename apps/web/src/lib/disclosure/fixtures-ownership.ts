@@ -133,6 +133,17 @@ export function sampleOwnership(cutoffMs: number): OwnershipView {
     lanes,
     warnings,
     trend: sampleTrend(cutoffMs),
+    quarter: {
+      period: "2026-03-31",
+      managers_filed: 4,
+      share_filed: "0.8",
+      fell_back: false,
+      not_yet_filed: ["Harbor Lane Capital"],
+      reports: [
+        { manager: "Northgate Advisors", report_date: "2026-03-31", lines_stored_for_ticker: 1, lines_reported: 1204, total_value_reported_usd: "98000000000", confidential_treatment: "none_indicated" },
+        { manager: "Ridgeway Partners", report_date: "2026-03-31", lines_stored_for_ticker: 1, lines_reported: null, total_value_reported_usd: null, confidential_treatment: "unknown" },
+      ],
+    },
     manager_renames: [],
   };
 }

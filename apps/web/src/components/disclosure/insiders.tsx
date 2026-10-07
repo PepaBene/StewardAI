@@ -22,6 +22,7 @@ import {
   type ClassKey,
   type InsiderActivity,
   type InsiderTx,
+  type PdmrActivity,
   type Mark,
   type Window,
 } from "@/lib/disclosure/insiders";
@@ -227,11 +228,16 @@ export function InsiderTable({ txs, editable, onChanged }: { txs: readonly Insid
                 <td className="py-1.5 pr-3">
                   <ClassCell t={t} />
                   {t.override_reason ? <span className="block text-xs text-text-muted">Reviewer changed this from “{t.classifier_class ?? "no class"}”: {t.override_reason}</span> : null}
+                  <DerivativeTerms t={t} />
+                  {t.footnote ? <span className="mt-1 block max-w-[44ch] border-l-2 border-border pl-2 text-xs text-text-muted">{t.footnote}</span> : null}
                   {editable ? (
                     <OverrideForm t={t} onChanged={onChanged} />
                   ) : null}
                 </td>
-                <td className="num py-1.5 pr-3 text-right">{formatQty(t.shares)}</td>
+                <td className="num py-1.5 pr-3 text-right">
+                  {formatQty(t.shares)}
+                  {t.percent_of_outstanding != null ? <span className="block text-xs text-text-muted">{formatPercentOfClass(t.percent_of_outstanding)} of shares outstanding</span> : null}
+                </td>
                 <td className="num py-1.5 pr-3 text-right">{t.price == null ? "—" : `$${formatQty(t.price)}`}</td>
                 <td className="num py-1.5 pr-3 text-right">
                   {formatQty(t.shares_after)}
@@ -239,7 +245,11 @@ export function InsiderTable({ txs, editable, onChanged }: { txs: readonly Insid
                 </td>
                 <td className="py-1.5">
                   <span className={cn(out ? "text-text-muted" : "font-medium")}>{out ?? "Counted"}</span>
-                  <span className="block text-xs text-text-muted">{PLAN_LABEL[t.plan] ?? t.plan}</span>
+                  <span className="block text-xs text-text-muted">
+                    {PLAN_LABEL[t.plan] ?? t.plan}
+                    {t.plan_adopted ? `, adopted ${formatDay(t.plan_adopted)}` : ""}
+                    {t.plan_basis ? ` (read from ${t.plan_basis.replaceAll("_", " ")})` : ""}
+                  </span>
                   {t.caveats.filter((c) => c !== "Reported under a Rule 10b5-1 trading plan.").map((c) => (
                     <span key={c} className="block text-xs text-text-muted">{c}</span>
                   ))}
@@ -252,6 +262,125 @@ export function InsiderTable({ txs, editable, onChanged }: { txs: readonly Insid
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** UK PDMR notices for the holding. A separate regime from Form 4: never added to the US figures. */
+export function PdmrPanel({ data }: { data: PdmrActivity | null | "none" }) {
+  if (data === null) return <p className="text-sm text-text-muted">Loading UK notices…</p>;
+  if (data === "none") return <p className="text-sm text-text-muted">No UK manager-dealing notice has been read for this company.</p>;
+  const all = data.net.filter((n) => n.role === "all" && n.window_days === 90);
+  return (
+    <div className="space-y-3 text-sm">
+      {all.map((n) => (
+        <p key={n.currency}>
+          Last 90 days, in <strong>{n.currency}</strong>: bought <span className="num">{formatQty(n.buy_value)}</span>, sold <span className="num">{formatQty(n.sell_value)}</span>, by <span className="num">{n.insiders}</span> {n.insiders === 1 ? "person" : "people"}.
+        </p>
+      ))}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] border-collapse">
+          <caption className="sr-only">UK manager-dealing notices with dates, amounts and the day each was announced</caption>
+          <thead>
+            <tr className="border-b border-border text-left">
+              <th scope="col" className="py-1.5 pr-3 font-medium">Traded / announced</th>
+              <th scope="col" className="py-1.5 pr-3 font-medium">Person</th>
+              <th scope="col" className="py-1.5 pr-3 font-medium">What was reported</th>
+              <th scope="col" className="py-1.5 pr-3 text-right font-medium">Volume</th>
+              <th scope="col" className="py-1.5 text-right font-medium">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.transactions.map((t) => (
+              <tr key={`${t.notice}-${t.tx_date}-${t.shares}-${t.price}`} className="border-b border-border-soft align-top">
+                <td className="num py-1.5 pr-3 whitespace-nowrap">
+                  {t.tx_date ? formatDay(t.tx_date) : "No trade date"}
+                  <span className="block text-xs text-text-muted">announced {formatDay(t.announced)}</span>
+                </td>
+                <th scope="row" className="py-1.5 pr-3 text-left font-medium">
+                  {t.person ?? "Not named"}
+                  <span className="block text-xs font-normal text-text-muted">{t.role.replaceAll("_", " ")}</span>
+                </th>
+                <td className="py-1.5 pr-3">
+                  {t.economic_class.replaceAll("_", " ")}
+                  {t.amendment ? <span className="block text-xs text-text-muted">An amendment</span> : null}
+                  {t.source_url ? <a href={t.source_url} target="_blank" rel="noreferrer" className="block text-xs text-accent-ink hover:underline">Open the notice</a> : null}
+                </td>
+                <td className="num py-1.5 pr-3 text-right">{formatQty(t.shares)}</td>
+                <td className="num py-1.5 text-right">{t.price == null ? "—" : `${formatQty(t.price)} ${t.currency ?? ""}`}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <ul className="max-w-[72ch] space-y-0.5 text-xs text-text-muted">
+        {data.notes.map((n) => (
+          <li key={n}>{n}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** A tiny percent: below 0.01 it reads “under 0.01%”, never a rounded zero. */
+export function formatPercentOfClass(v: string): string {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return n > 0 && n < 0.01 ? "under 0.01%" : `${n.toFixed(2)}%`;
+}
+
+function DerivativeTerms({ t }: { t: InsiderTx }) {
+  if (!t.derivative && t.exercise_price == null && !t.expiration_date) return null;
+  const rows: [string, string][] = [];
+  if (t.exercise_price != null) rows.push(["Exercise price", `$${formatQty(t.exercise_price)}`]);
+  if (t.exercisable_date) rows.push(["Exercisable", formatDay(t.exercisable_date)]);
+  if (t.expiration_date) rows.push(["Expires", formatDay(t.expiration_date)]);
+  if (t.underlying_security) rows.push(["Underlying", `${t.underlying_security}${t.underlying_shares ? `, ${formatQty(t.underlying_shares)} shares` : ""}`]);
+  if (rows.length === 0) return <span className="block text-xs text-text-muted">The filing gives no terms for this derivative.</span>;
+  return (
+    <dl className="mt-1 grid max-w-[44ch] grid-cols-[auto_1fr] gap-x-3 text-xs">
+      {rows.map(([k, v]) => (
+        <div key={k} className="contents">
+          <dt className="text-text-muted">{k}</dt>
+          <dd className="num">{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Facts that sit beside the trades. They are labelled context, not a reason for any trade. */
+export function ContextPanel({ view }: { view: InsiderActivity }) {
+  const c = view.context;
+  const change = num(c.reported_share_count_change);
+  return (
+    <div className="space-y-3 text-sm">
+      {c.shares_outstanding == null ? (
+        <p className="text-text-muted">No share count was known at this date, so trades are not shown as a percent of the company.</p>
+      ) : (
+        <p>
+          <strong className="num">{formatQty(c.shares_outstanding)}</strong> shares outstanding as of {c.shares_outstanding_as_of ? formatDay(c.shares_outstanding_as_of) : "an unknown date"}
+          {c.shares_outstanding_method ? <span className="text-text-muted"> (from the {c.shares_outstanding_method.replaceAll("_", " ")})</span> : null}.
+          {change != null ? <> The reported count changed by <span className="num">{change >= 0 ? "+" : "−"}{Math.abs(change * 100).toFixed(1)}%</span> since the report before.</> : null}
+        </p>
+      )}
+      {view.splits_applied > 0 ? <p className="text-text-muted">{view.splits_applied} confirmed stock {view.splits_applied === 1 ? "split is" : "splits are"} applied: all share counts are in today’s shares.</p> : null}
+      {c.events.length === 0 ? (
+        <p className="text-text-muted">No confirmed company event was announced in the year before this date.</p>
+      ) : (
+        <ul className="max-w-[60ch] divide-y divide-border-soft border-y border-border-soft">
+          {c.events.map((e) => (
+            <li key={`${e.event_type}-${e.announced_at}`} className="flex flex-wrap items-baseline justify-between gap-2 py-1.5">
+              <span>{e.event_type.replaceAll("_", " ")} <span className="text-text-muted">({e.event_state.replaceAll("_", " ")})</span></span>
+              <span className="num text-xs text-text-muted">
+                {formatDay(e.announced_at)}
+                {e.source_url ? <> · <a href={e.source_url} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">source</a></> : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="max-w-[72ch] text-xs text-text-muted">Events are listed beside the trades so they can be read together. A trade near an event is not evidence of why it was made.</p>
     </div>
   );
 }

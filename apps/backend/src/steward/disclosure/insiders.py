@@ -20,7 +20,7 @@ from __future__ import annotations
 import datetime as dt
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Literal
 
@@ -138,6 +138,22 @@ def adjust_for_splits(
         None if shares is None else shares * ratio,
         None if price is None else price / ratio,
     )
+
+
+def restate_for_splits(
+    txs: Iterable[InsiderTx],
+    splits: Sequence[tuple[dt.date, Decimal]],
+    as_of: dt.date,
+) -> list[InsiderTx]:
+    """Every row restated to the share count at `as_of`. Holdings after the trade scale with the
+    shares; the price is divided so value is unchanged. `splits` must already be limited to splits
+    known by the replay moment."""
+    out: list[InsiderTx] = []
+    for t in txs:
+        shares, price = adjust_for_splits(t.shares, t.price, t.tx_date, splits, as_of)
+        after, _ = adjust_for_splits(t.shares_after, None, t.tx_date, splits, as_of)
+        out.append(replace(t, shares=shares, price=price, shares_after=after))
+    return out
 
 
 # ------------------------------------------------------------------------------- classification

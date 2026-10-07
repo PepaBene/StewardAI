@@ -70,6 +70,74 @@ async def _rows(pool: Pool, ticker: str) -> tuple[list[ins.InsiderTx], dict[tupl
     return out, urls
 
 
+async def _splits(pool: Pool, ticker: str, when: dt.datetime) -> list[tuple[dt.date, Decimal]]:
+    """Confirmed splits already known at `when`, so a replay cannot know a later split."""
+    rows = await pool.fetch(
+        """select ex_date, ratio from public.corporate_action
+            where symbol = $1 and action_type = 'split' and status = 'confirmed'
+              and ratio is not null and ratio > 0 and known_at <= $2
+            order by ex_date""",
+        ticker,
+        when,
+    )
+    return [(r["ex_date"], Decimal(r["ratio"])) for r in rows]
+
+
+async def _detail_extras(pool: Pool, txs: list[ins.InsiderTx]) -> dict[tuple[str, int], Any]:
+    """Footnote text and derivative terms exactly as parsed from the form (P4.2)."""
+    if not txs:
+        return {}
+    rows = await pool.fetch(
+        """select accession, row_index, footnote_text, exercise_price, exercisable_date,
+                  expiration_date, underlying_security_title, underlying_shares,
+                  rule_10b5_1_basis, rule_10b5_1_adopted
+             from public.insider_transaction where accession = any($1::text[])""",
+        sorted({t.accession for t in txs}),
+    )
+    return {(r["accession"], r["row_index"]): r for r in rows}
+
+
+async def context_for(pool: Pool, ticker: str, when: dt.datetime) -> dict[str, Any]:
+    """Share count and nearby company events as labelled context. No motive is implied: these are
+    facts that sit beside the trades, and a missing share count is said to be missing."""
+    shares = await pool.fetch(
+        """select shares, as_of, method from public.shares_outstanding
+            where ticker = $1 and as_of <= $2 and (filed is null or filed <= $2::date)
+            order by as_of desc limit 2""",
+        ticker,
+        when.date(),
+    )
+    events = await pool.fetch(
+        """select event_type, event_state, announced_at, source_url from public.company_event
+            where ticker = $1 and status = 'confirmed' and known_at <= $2
+              and announced_at is not null and announced_at >= $3
+            order by announced_at desc limit 20""",
+        ticker,
+        when,
+        when.date() - dt.timedelta(days=365),
+    )
+    latest = shares[0] if shares else None
+    prior = shares[1] if len(shares) > 1 else None
+    change = None
+    if latest and prior and prior["shares"] > 0:
+        change = (Decimal(latest["shares"]) - Decimal(prior["shares"])) / Decimal(prior["shares"])
+    return {
+        "shares_outstanding": _s(Decimal(latest["shares"])) if latest else None,
+        "shares_outstanding_as_of": latest["as_of"] if latest else None,
+        "shares_outstanding_method": latest["method"] if latest else None,
+        "reported_share_count_change": _s(change),
+        "events": [
+            {
+                "event_type": e["event_type"],
+                "event_state": e["event_state"],
+                "announced_at": e["announced_at"],
+                "source_url": e["source_url"],
+            }
+            for e in events
+        ],
+    }
+
+
 async def _overrides(pool: Pool, txs: list[ins.InsiderTx]) -> list[ins.Override]:
     if not txs:
         return []
@@ -83,16 +151,22 @@ async def _overrides(pool: Pool, txs: list[ins.InsiderTx]) -> list[ins.Override]
 
 
 def _s(v: Decimal | None) -> str | None:
-    return None if v is None else str(v)
+    """Plain decimal text: Postgres numerics such as 1.10E+6 are shown as 1100000."""
+    return None if v is None else format(v.normalize(), "f")
 
 
 async def insider_activity(
     pool: Pool, ticker: str, as_of: dt.datetime | None = None
 ) -> dict[str, Any]:
     when = _aware(as_of)
-    txs, urls = await _rows(pool, ticker)
+    raw_txs, urls = await _rows(pool, ticker)
+    splits = await _splits(pool, ticker, when)
+    txs = ins.restate_for_splits(raw_txs, splits, when.date()) if splits else raw_txs
+    extras = await _detail_extras(pool, txs)
+    context = await context_for(pool, ticker, when)
     overrides = await _overrides(pool, txs)
     view = ins.build_view(txs, when, overrides=overrides)
+    outstanding = Decimal(context["shares_outstanding"]) if context["shares_outstanding"] else None
     shown = sorted(
         ins.visible(txs, when),
         key=lambda t: (t.tx_date or t.filed, t.accession, t.row_index),
@@ -104,8 +178,20 @@ async def insider_activity(
     for t in shown:
         cls = ins.effective_class(t, overrides, when)
         o = made.get(t.key)
+        extra = extras.get(t.key)
         detail.append(
             {
+                "footnote": extra["footnote_text"] if extra else None,
+                "exercise_price": _s(extra["exercise_price"]) if extra else None,
+                "exercisable_date": extra["exercisable_date"] if extra else None,
+                "expiration_date": extra["expiration_date"] if extra else None,
+                "underlying_security": extra["underlying_security_title"] if extra else None,
+                "underlying_shares": _s(extra["underlying_shares"]) if extra else None,
+                "plan_basis": extra["rule_10b5_1_basis"] if extra else None,
+                "plan_adopted": extra["rule_10b5_1_adopted"] if extra else None,
+                "percent_of_outstanding": _s(
+                    t.shares / outstanding * 100 if t.shares is not None and outstanding else None
+                ),
                 "accession": t.accession,
                 "row_index": t.row_index,
                 "insider": t.name or t.insider,
@@ -172,9 +258,36 @@ async def insider_activity(
             for b in view.bundles
         ],
         "class_counts": dict(ins.by_class(txs, overrides, when)),
-        "notes": list(view.notes),
+        "notes": [
+            *view.notes,
+            *(
+                [f"{len(splits)} confirmed split(s) applied: shares are in today's count."]
+                if splits
+                else []
+            ),
+            *(
+                []
+                if outstanding
+                else ["No share count was known at this date, so no trade is shown as a percent."]
+            ),
+        ],
+        "context": context,
+        "splits_applied": len(splits),
         "transactions": detail,
     }
+
+
+async def pending_alerts(
+    pool: Pool, ticker: str, min_value: Decimal, as_of: dt.datetime | None = None
+) -> list[ins.AlertCandidate]:
+    """Material verified open-market trades visible at `as_of`, split-adjusted. Raising each one
+    once is the alert store's job (`alerts.record` deduplicates by trade), so running this twice,
+    or reading an amendment that repeats a trade, cannot alert twice."""
+    when = _aware(as_of)
+    raw_txs, _ = await _rows(pool, ticker)
+    splits = await _splits(pool, ticker, when)
+    txs = ins.restate_for_splits(raw_txs, splits, when.date()) if splits else raw_txs
+    return ins.alerts(txs, when, min_value=min_value, overrides=await _overrides(pool, txs))
 
 
 async def record_override(

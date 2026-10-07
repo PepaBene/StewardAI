@@ -34,6 +34,14 @@ The shared evidence tables (migration `20261007100000_disclosure_foundation.sql`
 
 `insider_filing` gains `known_at` (same rule as above). One new table, `insider_classification_override`: append-only, a reason of at least 10 characters, the original class kept beside the new one. `relationship_disclosure` gains `claim_shape`, `counterparty_count`, `denominator_kind` and `period_end`, backfilled only from the existing anonymous flag; denominator and period stay null until set, so old claims are left out of concentration rather than guessed. The two new constraints are `NOT VALID`, so old rows are not rewritten. The rollback drops the override ledger (data loss, stated in its header) and the added columns.
 
+## Added in the P0–P5 gap-closure round (`20261007130000_disclosure_gap_closure.sql`)
+
+New owner-read tables with backend write: `disclosure_alert` (unique `dedupe_key`, so a repeat scan cannot alert twice), `owner_dependency_weight` (owner-assigned, note of 10+ characters, retired rather than deleted), `procurement_award_detail` (one row per notice and lot), `control_stake_exhibit` (Item 7 exhibits, one per filing line) and `disclosure_adjudication` (one label per dataset, sample, item and reviewer). Added nullable columns: `relationship_disclosure.claim_label` (backfilled from the passage for anonymous claims only) and `denominator_kind` (backfilled from `share_basis` where it maps); `form13f_filing.reported_line_count`, `reported_total_value_usd` and `omitted_holdings_notice` (null until a source says, never zero). `form13f_filing.confidential_treatment` is now filled from the cover page. The rollback drops the new tables and columns (data loss, stated in its header). Existing routes keep their explicit column lists, so none changes.
+
+## Added for UK TR-1 notices (`20261007140000_uk_tr1_notice.sql`)
+
+One new owner-read table, `uk_tr1_notice`, one row per announcement (keyed by its URL). Every figure is nullable: a field the form did not state is null, never zero, and `gap` records why a notice has no usable percent. `known_at` is the announcement time. Storing a notice does not enable the national voting-rights lane. The rollback drops the table (data loss, stated in its header).
+
 ## API consumers to keep working
 
 Existing owner routes read the extended tables with explicit column lists (for example `api/graph_routes.py`, `api/control_stake_routes.py`, `api/insider_routes.py`); added nullable columns do not change them. The new surface is the `/disclosures/*` router only.

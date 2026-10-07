@@ -12,17 +12,21 @@ import json
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Path, Query, status
 from pydantic import AwareDatetime, BaseModel, Field
 
 from api.auth import Owner
 from api.db import IdPath, Pool
 from api.routes import Storage, TickerPath
 from steward.disclosure import (
+    adjudication,
+    alerts,
     asof,
     dependency_read,
     insider_analysis,
+    note_job,
     ownership_read,
+    pdmr_activity,
     review,
     statement_read,
 )
@@ -428,6 +432,7 @@ class HistoryPointOut(BaseModel):
     known_at: dt.datetime
     restated: bool
     original_value: str | None = Field(description="What the first filing said, when restated.")
+    fact_id: int | None = None
 
 
 class DerivedOut(BaseModel):
@@ -448,6 +453,39 @@ class CheckOut(BaseModel):
     tolerance: str
 
 
+class StatementGateOut(BaseModel):
+    usable_for_valuation: bool | None = Field(
+        description="Null when no gate could be computed: never read as a pass."
+    )
+    reasons: list[str]
+
+
+class FormulaInputOut(BaseModel):
+    metric: str
+    value: str | None
+    accession: str | None
+    fact_id: int | None
+    source: Literal["statement", "note"]
+
+
+class FormulaCoverageOut(BaseModel):
+    present: int
+    required: int
+
+
+class FormulaOut(BaseModel):
+    formula: str
+    version: str
+    table_version: str
+    expression: str
+    rule: str
+    period_end: dt.date
+    value: str | None = Field(description="Null when an input is missing; the reason says which.")
+    reason: str | None
+    coverage: FormulaCoverageOut
+    inputs: list[FormulaInputOut]
+
+
 class StatementsOut(BaseModel):
     issuer_id: int
     as_of: dt.datetime
@@ -457,6 +495,8 @@ class StatementsOut(BaseModel):
     derived: list[DerivedOut]
     checks: dict[str, list[CheckOut]]
     usable_for_valuation: dict[str, bool]
+    valuation_gate: dict[str, StatementGateOut]
+    formulas: list[FormulaOut]
     unmapped_concepts: int = Field(description="Facts with a concept the taxonomy does not map.")
 
 
@@ -475,11 +515,36 @@ class BridgeAxisOut(BaseModel):
     reconciles: bool
 
 
+class UnbridgedAxisOut(BaseModel):
+    axis: str
+    members: list[BridgeMemberOut]
+    members_sum: str
+    eliminations: str
+
+
+class CrossAxisOut(BaseModel):
+    metric: str | None = None
+    axes: list[str]
+    members: list[str]
+    value: str
+
+
+class MetricBridgeOut(BaseModel):
+    metric: str
+    total: str | None
+    axes: list[BridgeAxisOut]
+    unbridged: list[UnbridgedAxisOut]
+    cross_axis: list[CrossAxisOut]
+    notes: list[str]
+
+
 class SegmentBridgeOut(BaseModel):
     period_end: dt.date
     total: str | None
     axes: list[BridgeAxisOut]
     notes: list[str]
+    metrics: list[MetricBridgeOut]
+    cross_axis: list[CrossAxisOut]
 
 
 @router.get("/issuers/{issuer_id}/statements")
@@ -537,6 +602,24 @@ class TrendOut(BaseModel):
     cur: dict[str, str] = Field(description="Manager to shares at the later quarter.")
 
 
+class ReportCheckOut(BaseModel):
+    manager: str
+    report_date: dt.date
+    lines_stored_for_ticker: int = Field(description="Lines of this name kept from the report.")
+    lines_reported: int | None = Field(description="Lines the manager's summary page states.")
+    total_value_reported_usd: str | None
+    confidential_treatment: Literal["none_indicated", "requested", "unknown"]
+
+
+class QuarterOut(BaseModel):
+    period: dt.date | None = Field(description="The one quarter the manager lane shows.")
+    managers_filed: int
+    share_filed: str = Field(description="Share of known managers that filed that quarter.")
+    fell_back: bool = Field(description="No quarter reached the bar; the best-covered is shown.")
+    not_yet_filed: list[str] = Field(description="Managers named, not carried forward.")
+    reports: list[ReportCheckOut]
+
+
 class OwnershipOut(BaseModel):
     ticker: str
     as_of: dt.datetime
@@ -546,7 +629,77 @@ class OwnershipOut(BaseModel):
     lanes: list[LaneOut]
     warnings: list[str]
     trend: TrendOut | None = Field(description="Null when fewer than two quarters are known.")
+    quarter: QuarterOut
     manager_renames: list[ManagerRename]
+
+
+class ChainHolderOut(BaseModel):
+    name: str
+    member_of_group: bool | None
+    shares: str | None
+    percent: str | None
+    sole_voting: str | None
+    shared_voting: str | None
+    sole_dispositive: str | None
+    shared_dispositive: str | None
+
+
+class StakeChangeOut(BaseModel):
+    change_type: str
+    person: str | None
+    old: str | None
+    new: str | None
+    detail: str | None
+
+
+class StakeExhibitOut(BaseModel):
+    label: str
+    description: str | None
+    url: str | None
+
+
+class StakeStepOut(BaseModel):
+    accession: str
+    form: str
+    schedule: Literal["13D", "13G"]
+    is_amendment: bool
+    amendment_no: int | None
+    filed: dt.date
+    event_date: dt.date | None
+    known_at: dt.datetime
+    class_title: str | None
+    stake_percent: str | None
+    stake_shares: str | None
+    reported_delta_points: str | None = Field(description="Only for the same class, both reported.")
+    delta_note: str | None
+    purpose: str | None = Field(description="Item 4 as filed (13D only).")
+    purpose_changed: bool | None
+    prior_accession: str | None
+    linked_to_previous: bool
+    source_url: str
+    holders: list[ChainHolderOut]
+    changes: list[StakeChangeOut]
+    exhibits: list[StakeExhibitOut]
+
+
+class StakeChainOut(BaseModel):
+    ticker: str
+    filer_cik: str
+    as_of: dt.datetime
+    steps: list[StakeStepOut]
+
+
+@router.get("/holdings/{ticker}/control-stakes/{filer_cik}/chain")
+async def holding_stake_chain(
+    ticker: TickerPath,
+    filer_cik: Annotated[str, Path(pattern=r"^[0-9]{1,10}$")],
+    pool: Pool,
+    _owner: Owner,
+    as_of: AsOf = None,
+) -> StakeChainOut:
+    """Every 13D/G filing one filer made about this holding, oldest first, with the reported
+    change between steps shown only where the class and percentages are comparable."""
+    return StakeChainOut(**await ownership_read.stake_chain(pool, ticker.upper(), filer_cik, as_of))
 
 
 @router.get("/holdings/{ticker}/ownership")
@@ -613,6 +766,34 @@ class InsiderTxOut(BaseModel):
     position_change_percent: str | None
     caveats: list[str]
     source_url: str | None
+    footnote: str | None = Field(description="Footnote text the form attached to this line.")
+    exercise_price: str | None
+    exercisable_date: dt.date | None
+    expiration_date: dt.date | None
+    underlying_security: str | None
+    underlying_shares: str | None
+    plan_basis: str | None = Field(description="Where the Rule 10b5-1 flag was read from.")
+    plan_adopted: dt.date | None
+    percent_of_outstanding: str | None = Field(
+        description="Shares as a percent of the share count known at the date; null if unknown."
+    )
+
+
+class InsiderEventOut(BaseModel):
+    event_type: str
+    event_state: str
+    announced_at: dt.date
+    source_url: str | None
+
+
+class InsiderContextOut(BaseModel):
+    shares_outstanding: str | None
+    shares_outstanding_as_of: dt.date | None
+    shares_outstanding_method: str | None
+    reported_share_count_change: str | None = Field(
+        description="Fractional change between the two latest reported share counts; not a motive."
+    )
+    events: list[InsiderEventOut]
 
 
 class DisclosureInsiderActivityOut(BaseModel):
@@ -623,6 +804,8 @@ class DisclosureInsiderActivityOut(BaseModel):
     bundles: list[InsiderBundleOut]
     class_counts: dict[str, int]
     notes: list[str]
+    context: InsiderContextOut
+    splits_applied: int
     transactions: list[InsiderTxOut]
 
 
@@ -646,6 +829,59 @@ async def holding_insiders(
     return DisclosureInsiderActivityOut(
         **await insider_analysis.insider_activity(pool, ticker.upper(), as_of)
     )
+
+
+class PdmrNetOut(BaseModel):
+    currency: str
+    window_days: int
+    role: str
+    buy_shares: str
+    sell_shares: str
+    net_shares: str
+    buy_value: str
+    sell_value: str
+    net_value: str
+    trades: int
+    insiders: int
+
+
+class PdmrTxOut(BaseModel):
+    notice: str
+    person: str | None
+    role: str
+    tx_date: dt.date | None
+    announced: dt.datetime
+    economic_class: str
+    countable: bool
+    instrument: str | None
+    nature: str | None
+    venue: str | None
+    shares: str | None
+    price: str | None
+    currency: str | None
+    amendment: bool
+    source_url: str
+
+
+class PdmrActivityOut(BaseModel):
+    jurisdiction: str
+    regime: str
+    notices: int
+    currencies: list[str]
+    net: list[PdmrNetOut]
+    transactions: list[PdmrTxOut]
+    notes: list[str]
+
+
+@router.get("/holdings/{ticker}/pdmr")
+async def holding_pdmr(
+    ticker: TickerPath, pool: Pool, _owner: Owner, as_of: AsOf = None
+) -> PdmrActivityOut:
+    """UK PDMR notifications for a holding, kept apart from Form 4 and totalled per currency."""
+    result = await pdmr_activity.pdmr_activity(pool, ticker.upper(), as_of)
+    if result is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no parsed PDMR notice for this holding")
+    return PdmrActivityOut(**result)
 
 
 @router.post("/insiders/override", status_code=status.HTTP_201_CREATED)
@@ -672,6 +908,27 @@ async def override_insider_class(
     return InsiderOverrideOut(id=new_id)
 
 
+class EntityMatchOut(BaseModel):
+    status: str = Field(description="matched, candidate, ambiguous, none or anonymous.")
+    basis: str | None
+    needs_review: bool
+    candidates: list[int]
+    note: str
+
+
+class AwardDetailOut(BaseModel):
+    notice_number: str
+    lot_id: str | None
+    notice_type: str | None
+    cpv_codes: list[str]
+    value: str | None
+    currency: str | None
+    start_date: dt.date | None
+    end_date: dt.date | None
+    status: str
+    published: dt.date | None
+
+
 class DependencyClaimOut(BaseModel):
     id: int
     relationship: str
@@ -692,6 +949,10 @@ class DependencyClaimOut(BaseModel):
     problems: list[str]
     screen: list[str] = Field(description="Hints that the passage is not a current relationship.")
     stale: bool
+    entity: EntityMatchOut | None = Field(
+        description="Who a name may refer to. Only an identifier match is automatic."
+    )
+    awards: list[AwardDetailOut] = Field(description="Procurement notice fields; no revenue share.")
 
 
 class ConcentrationEntryOut(BaseModel):
@@ -733,6 +994,7 @@ class ScenarioImpactOut(BaseModel):
     coverage: str
     via: list[int]
     source_age_days: int
+    uses_owner_assigned: bool = Field(description="A hop on this path is an owner-assigned weight.")
 
 
 class NonQuantifiedOut(BaseModel):
@@ -750,12 +1012,32 @@ class ScenarioOut(BaseModel):
     notes: list[str]
 
 
+class SideConflictOut(BaseModel):
+    kind: Literal["opposite_direction", "share_mismatch"]
+    claim_ids: list[int]
+    note: str
+
+
+class OwnerWeightOut(BaseModel):
+    id: int
+    counterparty: str | None
+    counterparty_key: str
+    share: str
+    denominator: str
+    as_of: dt.date
+    note: str
+    assigned_by: str
+
+
 class DependencyViewOut(BaseModel):
     ticker: str
     as_of: dt.datetime
     claims: list[DependencyClaimOut]
     concentration: list[ConcentrationOut]
     scenarios: list[ScenarioOut]
+    conflicts: list[SideConflictOut] = Field(description="Two reporters disagreeing; both kept.")
+    owner_weights: list[OwnerWeightOut] = Field(description="Owner-assigned, not reported.")
+    inbound_claims: int = Field(description="Claims other reporters made about this holding.")
     notes: list[str]
 
 
@@ -771,6 +1053,251 @@ async def holding_dependencies(
     and a bounded one-to-two-hop scenario over confirmed numeric edges only."""
     return DependencyViewOut(
         **await dependency_read.dependency_view(pool, ticker.upper(), as_of, shock=shock)
+    )
+
+
+class PortfolioFlowOut(BaseModel):
+    holding: str
+    counterparty: str
+    weight: str
+    share: str
+    exposure: str
+    period: str
+    claim_id: int
+
+
+class PortfolioDependenciesOut(BaseModel):
+    as_of: dt.datetime
+    holdings: int
+    covered_weight: str = Field(description="Portfolio weight that has a confirmed numeric claim.")
+    uncovered: list[str] = Field(description="Holdings with none: unknown, not zero.")
+    flows: list[PortfolioFlowOut]
+    by_counterparty: dict[str, str]
+    notes: list[str]
+
+
+@router.get("/portfolio/dependencies")
+async def portfolio_dependencies(
+    pool: Pool, _owner: Owner, as_of: AsOf = None
+) -> PortfolioDependenciesOut:
+    """Portfolio-weighted dependency on named customers, from confirmed claims only."""
+    return PortfolioDependenciesOut(**await dependency_read.portfolio_view(pool, as_of))
+
+
+class OwnerWeightIn(BaseModel):
+    counterparty_key: Annotated[str, Field(min_length=1, max_length=80)]
+    counterparty_name: Annotated[str | None, Field(max_length=200)] = None
+    share: Annotated[Decimal, Field(ge=0, le=1)]
+    denominator: Literal[
+        "total_revenue", "segment_revenue", "cost_of_sales", "purchases", "receivables", "other"
+    ] = "total_revenue"
+    as_of: dt.date
+    note: Annotated[str, Field(min_length=10, max_length=1000)]
+
+
+class DisclosureCreatedOut(BaseModel):
+    id: int
+
+
+@router.post(
+    "/holdings/{ticker}/dependency-weights",
+    status_code=status.HTTP_201_CREATED,
+    tags=["disclosures"],
+)
+async def add_owner_weight(
+    ticker: TickerPath, body: OwnerWeightIn, pool: Pool, owner: Owner
+) -> DisclosureCreatedOut:
+    """Record a weight YOU assigned. It is shown as owner-assigned wherever it is used and is never
+    mixed into reported concentration."""
+    new_id = await pool.fetchval(
+        """insert into public.owner_dependency_weight
+             (ticker, relationship, counterparty_key, counterparty_name, share, denominator_kind,
+              as_of, note, assigned_by)
+           values ($1,'customer',$2,$3,$4,$5,$6,$7,$8) returning id""",
+        ticker.upper(),
+        body.counterparty_key.strip(),
+        body.counterparty_name,
+        body.share,
+        body.denominator,
+        body.as_of,
+        body.note.strip(),
+        f"owner:{owner.user_id}",
+    )
+    return DisclosureCreatedOut(id=int(new_id))
+
+
+@router.delete("/holdings/{ticker}/dependency-weights/{weight_id}", status_code=204)
+async def retire_owner_weight(
+    ticker: TickerPath, weight_id: IdPath, pool: Pool, _owner: Owner
+) -> None:
+    """Retire a weight. It stops applying from now; replays before now still see it."""
+    done = await pool.fetchval(
+        """update public.owner_dependency_weight set retired_at = now()
+            where id = $1 and ticker = $2 and retired_at is null returning id""",
+        weight_id,
+        ticker.upper(),
+    )
+    if done is None:
+        raise HTTPException(404, "no active weight with that id for this holding")
+
+
+class DisclosureAlertOut(BaseModel):
+    id: int
+    kind: Literal["insider_trade", "major_holder", "relationship_change"]
+    ticker: str
+    headline: str
+    detail: dict[str, Any]
+    source_url: str | None
+    known_at: dt.datetime
+    created_at: dt.datetime
+    acknowledged_at: dt.datetime | None
+
+
+class AlertScanOut(BaseModel):
+    insider_trade: int
+    major_holder: int
+    relationship_change: int
+    failed: int
+
+
+@router.get("/alerts")
+async def list_disclosure_alerts(
+    pool: Pool,
+    _owner: Owner,
+    ticker: Annotated[str | None, Query(max_length=30)] = None,
+    include_acknowledged: bool = False,
+    limit: Limit = 100,
+) -> list[DisclosureAlertOut]:
+    """Alerts raised from verified disclosures. An alert states what was filed, not why."""
+    rows = await alerts.list_alerts(
+        pool,
+        ticker=ticker.upper() if ticker else None,
+        include_acknowledged=include_acknowledged,
+        limit=limit,
+    )
+    return [DisclosureAlertOut(**r) for r in rows]
+
+
+@router.post("/alerts/scan")
+async def scan_disclosure_alerts(pool: Pool, _owner: Owner) -> AlertScanOut:
+    """Run the alert scans now for every held ticker (the insider job also runs them)."""
+    return AlertScanOut(**await alerts.scan_all(pool))
+
+
+@router.post("/alerts/{alert_id}/acknowledge", status_code=204)
+async def acknowledge_disclosure_alert(alert_id: IdPath, pool: Pool, owner: Owner) -> None:
+    if not await alerts.acknowledge(pool, alert_id, f"owner:{owner.user_id}"):
+        raise HTTPException(404, "no open alert with that id")
+
+
+Dataset = Literal[
+    "relationship_claim", "insider_class", "ownership_match", "statement_note", "document_sample"
+]
+
+
+class AdjudicationItemOut(BaseModel):
+    item_ref: str
+    text: str
+    machine_value: str | None
+    hints: list[str]
+
+
+class AdjudicationSampleOut(BaseModel):
+    dataset: Dataset
+    sample_key: str
+    items: list[AdjudicationItemOut]
+
+
+class LabelIn(BaseModel):
+    sample_key: Annotated[str, Field(min_length=1, max_length=80)]
+    item_ref: Annotated[str, Field(min_length=1, max_length=120)]
+    machine_value: Annotated[str | None, Field(max_length=80)] = None
+    human_value: Annotated[str, Field(min_length=1, max_length=80)]
+    note: Annotated[str | None, Field(max_length=1000)] = None
+
+
+class AdjudicationGateOut(BaseModel):
+    dataset: Dataset
+    sample_key: str
+    labelled: int
+    needed: int
+    correct: int
+    rate: str | None
+    bar: str
+    planted: int
+    planted_caught: int
+    met: bool
+    reason: str
+
+
+@router.get("/adjudication/{dataset}/sample")
+async def adjudication_sample(
+    dataset: Dataset,
+    pool: Pool,
+    _owner: Owner,
+    size: Annotated[int, Query(ge=10, le=200)] = 50,
+    seed: Annotated[str, Query(min_length=1, max_length=40)] = "owner",
+) -> AdjudicationSampleOut:
+    """A reproducible sample to label. Relationship samples include unmarked deliberate false
+    positives: a reviewer who calls one a true relationship fails the gate."""
+    if dataset == "relationship_claim":
+        items = await adjudication.relationship_sample(pool, size, seed)
+    elif dataset == "insider_class":
+        items = await adjudication.insider_sample(pool, size, seed)
+    elif dataset == "ownership_match":
+        items = await adjudication.ownership_sample(pool, size, seed)
+    else:
+        raise HTTPException(422, f"no sampler exists yet for {dataset}")
+    return AdjudicationSampleOut(
+        dataset=dataset,
+        sample_key=f"{dataset}:{seed}:{size}",
+        items=[
+            AdjudicationItemOut(
+                item_ref=i.item_ref, text=i.text, machine_value=i.machine_value, hints=list(i.hints)
+            )
+            for i in items
+        ],
+    )
+
+
+@router.post("/adjudication/{dataset}/label", status_code=status.HTTP_201_CREATED)
+async def adjudication_label(
+    dataset: Dataset, body: LabelIn, pool: Pool, owner: Owner
+) -> DisclosureCreatedOut:
+    try:
+        new_id = await adjudication.record(
+            pool,
+            dataset=dataset,
+            sample_key=body.sample_key,
+            item_ref=body.item_ref,
+            machine_value=body.machine_value,
+            human_value=body.human_value,
+            by=f"owner:{owner.user_id}",
+            note=body.note,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return DisclosureCreatedOut(id=new_id)
+
+
+@router.get("/adjudication/{dataset}/gate")
+async def adjudication_gate(
+    dataset: Dataset, pool: Pool, _owner: Owner, sample_key: Annotated[str, Query(min_length=1)]
+) -> AdjudicationGateOut:
+    """Whether the labelled sample meets the release bar for this dataset."""
+    g = await adjudication.measure(pool, dataset, sample_key)
+    return AdjudicationGateOut(
+        dataset=dataset,
+        sample_key=sample_key,
+        labelled=g.labelled,
+        needed=g.needed,
+        correct=g.correct,
+        rate=None if g.rate is None else str(round(g.rate, 4)),
+        bar=str(g.bar),
+        planted=g.planted,
+        planted_caught=g.planted_caught,
+        met=g.met,
+        reason=g.reason,
     )
 
 
@@ -848,6 +1375,58 @@ async def version_span(
         span=doc.text[start:end],
         after=doc.text[end : end + context],
         signed_url=url,
+    )
+
+
+class NoteExtractOut(BaseModel):
+    version_id: int
+    blocks_read: int
+    rows_stored: int = Field(description="New rows only: running it twice stores nothing new.")
+    skipped: list[str] = Field(description="Why a block or the whole filing stored nothing.")
+
+
+@router.post("/versions/{version_id}/extract-notes")
+async def extract_version_notes(
+    version_id: IdPath, pool: Pool, storage: Storage, _owner: Owner
+) -> NoteExtractOut:
+    """Read the debt, lease and repurchase notes of one archived filing and store the tables.
+    Ambiguous tables are stored as needing review and never count as checked."""
+    row = await pool.fetchrow(
+        """select v.archive_path, v.known_at, d.issuer_id, d.external_id, d.form, d.stable_url
+             from public.source_document_version v
+             join public.source_document d on d.id = v.document_id
+            where v.id = $1""",
+        version_id,
+    )
+    if row is None or not row["archive_path"]:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No archived copy of that version")
+    if row["issuer_id"] is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "The document is not linked to an issuer yet"
+        )
+    try:
+        data = await storage.get(row["archive_path"])
+    except StorageError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+    try:
+        doc = parse_html(data)
+    except ParseError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"Unreadable: {exc}") from exc
+    result = await note_job.extract_notes_for_document(
+        pool,
+        issuer_id=row["issuer_id"],
+        ticker=None,
+        accession=row["external_id"],
+        form=row["form"],
+        known_at=row["known_at"],
+        source_url=row["stable_url"],
+        doc=doc,
+    )
+    return NoteExtractOut(
+        version_id=version_id,
+        blocks_read=result.blocks_read,
+        rows_stored=result.stored,
+        skipped=list(result.skipped),
     )
 
 

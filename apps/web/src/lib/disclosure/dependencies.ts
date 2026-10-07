@@ -169,6 +169,31 @@ export function portfolioSankey(holdings: readonly PortfolioHolding[]): { nodes:
   return { nodes, links, rows };
 }
 
+/** The portfolio read from the backend: weights come from the holdings, shares from confirmed claims. */
+export type PortfolioDependencies = S["PortfolioDependenciesOut"];
+export type OwnerWeight = S["OwnerWeightOut"];
+export type SideConflict = S["SideConflictOut"];
+
+/**
+ * Holding to customer flows from `/portfolio/dependencies`. Each flow is weight times reported
+ * share. A holding with no confirmed numeric claim has no flow and is listed as unknown elsewhere,
+ * never drawn as a zero.
+ */
+export function liveSankey(p: PortfolioDependencies): { nodes: SankeyNodeInput[]; links: SankeyLinkInput[] } {
+  const nodes: SankeyNodeInput[] = [];
+  const links: SankeyLinkInput[] = [];
+  for (const f of p.flows) {
+    const value = Number(f.exposure);
+    if (!Number.isFinite(value) || value <= 0) continue;
+    const from = `h:${f.holding}`;
+    const to = `c:${f.counterparty}`;
+    if (!nodes.some((n) => n.id === from)) nodes.push({ id: from, label: f.holding, column: 0 });
+    if (!nodes.some((n) => n.id === to)) nodes.push({ id: to, label: f.counterparty, column: 1 });
+    links.push({ source: from, target: to, value, emphasis: true });
+  }
+  return { nodes, links };
+}
+
 // --------------------------------------------------------------------------------- the scenario
 export type SEdge = { id: number; supplier: string; customer: string; share: number | null; status: string; knownMs: number };
 

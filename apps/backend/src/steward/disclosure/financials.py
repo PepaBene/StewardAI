@@ -89,6 +89,15 @@ METRICS: tuple[Metric, ...] = (
         "ifrs-full:IncomeTaxExpenseContinuingOperations",
     ),
     _m(
+        "pretax_income",
+        "Income before tax",
+        "income",
+        False,
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments",
+        "ifrs-full:ProfitLossBeforeTax",
+    ),
+    _m(
         "operating_cash_flow",
         "Operating cash flow",
         "cash_flow",
@@ -137,6 +146,15 @@ METRICS: tuple[Metric, ...] = (
         "OperatingLeaseLiability",
         "FinanceLeaseLiability",
         "ifrs-full:LeaseLiabilities",
+    ),
+    _m(
+        "total_equity",
+        "Total equity",
+        "balance_sheet",
+        True,
+        "StockholdersEquity",
+        "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+        "ifrs-full:Equity",
     ),
     _m("working_capital", "Working capital", "balance_sheet", True),
     _m(
@@ -453,7 +471,173 @@ def build_segment_bridge(
         notes.append(
             "axes describe the same total from different angles and are not added together"
         )
+    notes.extend(detect_axis_overlap(a.axis for a in axes))
     return SegmentBridge(total, tuple(axes), tuple(notes))
+
+
+def _is_geography(axis: str) -> bool:
+    low = axis.lower()
+    return any(w in low for w in ("geograph", "country", "region", "area"))
+
+
+def _is_product(axis: str) -> bool:
+    low = axis.lower()
+    return any(w in low for w in ("product", "service"))
+
+
+def detect_axis_overlap(axes: Iterable[str]) -> list[str]:
+    """Say so when a geography axis and a product axis both describe the same total."""
+    names = sorted(set(axes))
+    geo = [a for a in names if _is_geography(a)]
+    prod = [a for a in names if _is_product(a)]
+    if geo and prod:
+        return [
+            f"geography ({', '.join(geo)}) and product ({', '.join(prod)}) axes overlap: "
+            "each splits the same total and they are never added"
+        ]
+    return []
+
+
+def is_reconciling_member(label: str) -> bool:
+    """Eliminations and reconciling items are kept visible and are not segments."""
+    low = label.lower()
+    return any(
+        w in low
+        for w in ("elimination", "reconcil", "intersegment", "inter-segment", "unallocated")
+    )
+
+
+# --------------------------------------------------------------------------- segment metrics
+# Each segment metric has its own consolidated total and its own bridge. They are never mixed:
+# a segment's operating profit is not a revenue member and assets are not flows.
+SEGMENT_METRICS: dict[str, tuple[str, ...]] = {
+    "revenue": (
+        "Revenues",
+        "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "SalesRevenueNet",
+        "ifrs-full:Revenue",
+    ),
+    "operating_profit": ("OperatingIncomeLoss", "ifrs-full:ProfitLossFromOperatingActivities"),
+    "assets": ("Assets", "ifrs-full:Assets"),
+    "capex": ("PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"),
+}
+
+
+def segment_metric_for(concept: str) -> str | None:
+    bare = concept.removeprefix("us-gaap:")
+    return next((k for k, cs in SEGMENT_METRICS.items() if bare in cs), None)
+
+
+@dataclass(frozen=True)
+class SegmentFact:
+    """One segment value: its metric and the full axis/member tuple of its context."""
+
+    metric: str
+    axes: tuple[str, ...]
+    members: tuple[str, ...]
+    value: Decimal
+
+
+@dataclass(frozen=True)
+class CrossRow:
+    """A value defined by two or more axes at once (a cross-tab cell). It is its own breakdown."""
+
+    axes: tuple[str, ...]
+    members: tuple[str, ...]
+    value: Decimal
+
+
+@dataclass(frozen=True)
+class UnbridgedAxis:
+    axis: str
+    members: tuple[SegmentMember, ...]
+    members_sum: Decimal
+    eliminations: Decimal
+
+
+@dataclass(frozen=True)
+class MetricBridge:
+    metric: str
+    total: Decimal | None
+    bridge: SegmentBridge | None  # None when no consolidated total is known
+    unbridged: tuple[UnbridgedAxis, ...]  # members shown without a total to bridge to
+    cross_axis: tuple[CrossRow, ...]
+    notes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SegmentReport:
+    metrics: tuple[MetricBridge, ...]
+
+
+def build_segment_report(
+    totals: Mapping[str, Decimal | None],
+    facts: Iterable[SegmentFact],
+    *,
+    unit: Decimal = Decimal(1),
+    tol: Decimal = DEFAULT_TOLERANCE,
+) -> SegmentReport:
+    """Bridge every segment metric on its own. Single-axis members go to the per-axis bridge;
+    a fact with two or more axes is returned as a cross-axis row and is never placed on one axis
+    nor summed with single-axis members. A missing consolidated total is named, not invented."""
+    by_metric: dict[str, list[SegmentFact]] = defaultdict(list)
+    for f in facts:
+        by_metric[f.metric].append(f)
+    out: list[MetricBridge] = []
+    for metric in SEGMENT_METRICS:
+        rows = by_metric.get(metric, [])
+        if not rows and totals.get(metric) is None:
+            continue
+        single = [f for f in rows if len(f.axes) == 1 and len(f.members) == 1]
+        cross = tuple(
+            CrossRow(f.axes, f.members, f.value)
+            for f in sorted(rows, key=lambda f: (f.axes, f.members))
+            if len(f.axes) > 1
+        )
+        members = [
+            SegmentMember(
+                f.axes[0], f.members[0], f.value, eliminations=is_reconciling_member(f.members[0])
+            )
+            for f in single
+        ]
+        notes: list[str] = []
+        total = totals.get(metric)
+        bridge: SegmentBridge | None = None
+        unbridged: list[UnbridgedAxis] = []
+        if total is None:
+            notes.append(
+                f"no consolidated {metric.replace('_', ' ')} is known for this period: "
+                "members are shown without a bridge"
+            )
+            for axis in sorted({m.axis for m in members}):
+                ms = tuple(m for m in members if m.axis == axis)
+                unbridged.append(
+                    UnbridgedAxis(
+                        axis,
+                        ms,
+                        sum((m.value for m in ms if not m.eliminations), Decimal(0)),
+                        sum((m.value for m in ms if m.eliminations), Decimal(0)),
+                    )
+                )
+            notes.extend(detect_axis_overlap(a.axis for a in unbridged))
+        else:
+            bridge = build_segment_bridge(total, members, unit=unit, tol=tol)
+            notes.extend(bridge.notes)
+        if cross:
+            notes.append(
+                "cross-axis rows are a separate breakdown: never placed on one axis and never "
+                "summed with single-axis members"
+            )
+            cross_axes = {a for c in cross for a in c.axes}
+            notes.extend(detect_axis_overlap(cross_axes))
+        if metric == "assets":
+            notes.append("assets are a balance at period end, not a flow")
+        out.append(
+            MetricBridge(
+                metric, total, bridge, tuple(unbridged), cross, tuple(dict.fromkeys(notes))
+            )
+        )
+    return SegmentReport(tuple(out))
 
 
 @dataclass(frozen=True)
@@ -497,6 +681,7 @@ class FiledFact:
     known_at: dt.datetime
     accession: str
     amends: str | None = None  # accession of the filing this one restates
+    fact_id: int | None = None  # financial_statement_fact.id, for citations
 
 
 @dataclass(frozen=True)
@@ -509,6 +694,7 @@ class HistoryPoint:
     known_at: dt.datetime
     restated: bool
     original_value: Decimal | None  # what the first-known filing said; set only when restated
+    fact_id: int | None = None
 
 
 def statement_history(
@@ -539,6 +725,7 @@ def statement_history(
                 last.known_at,
                 changed,
                 first.value if changed else None,
+                last.fact_id,
             )
         )
     return sorted(out, key=lambda p: (p.metric, p.period_end))

@@ -18,9 +18,11 @@ from steward.disclosure.ownership import (
     LaneEntry,
     OwnershipView,
     build_view,
+    choose_common_quarter,
     effective_positions,
     effective_reports,
     manager_name_changes,
+    reported_stake_delta,
 )
 
 type Pool = asyncpg.Pool | asyncpg.Connection
@@ -33,10 +35,16 @@ def _aware(value: dt.datetime | None) -> dt.datetime:
 
 async def _lane_13f(
     pool: Pool, ticker: str, when: dt.datetime
-) -> tuple[list[LaneEntry], dict[str, list[tuple[dt.date, str]]], dict[str, Any] | None]:
+) -> tuple[
+    list[LaneEntry],
+    dict[str, list[tuple[dt.date, str]]],
+    dict[str, Any] | None,
+    dict[str, Any],
+]:
     rows = await pool.fetch(
         """select f.accession, f.cik, f.period, f.filed, f.known_at, f.submission_type,
-                  f.amendment_type, f.manager_name, f.confidential_treatment
+                  f.amendment_type, f.manager_name, f.confidential_treatment,
+                  f.reported_line_count, f.reported_total_value_usd, f.omitted_holdings_notice
              from public.form13f_filing f
             where f.known_at <= $2
               and f.cik in (select g.cik from public.form13f_filing g
@@ -49,10 +57,12 @@ async def _lane_13f(
     # longer lists it (an exit) is seen and replaces the older holding instead of hiding behind it.
     filings = [Filing13F(**dict(r)) for r in rows]
     reports = effective_reports(filings, when)
-    latest: dict[str, Any] = {}
-    for (cik, period), rep in reports.items():
-        if cik not in latest or period > latest[cik].period:
-            latest[cik] = rep
+    # One common quarter for the whole lane: the latest that enough managers have filed. A manager
+    # that has not filed it yet is named, never carried forward from an older quarter.
+    choice = choose_common_quarter(reports)
+    latest: dict[str, Any] = {
+        cik: rep for (cik, period), rep in reports.items() if period == choice.period
+    }
     periods = sorted({p for (_, p) in reports})
     trend_periods = periods[-2:]
     accessions = sorted(
@@ -68,15 +78,31 @@ async def _lane_13f(
     holdings = [Holding13F(**dict(r)) for r in held]
     by_filing = {f.accession: f for f in filings}
     entries: list[LaneEntry] = []
+    checks: list[dict[str, Any]] = []
     for cik, rep in sorted(latest.items()):
-        lines = [p for p in effective_positions(rep, holdings) if not p.is_option]
-        if not lines:
-            continue  # the effective report holds none of this ticker (e.g. restated without it)
-        known = [p.shares for p in lines if p.shares is not None]
+        all_lines = effective_positions(rep, holdings)
+        lines = [p for p in all_lines if not p.is_option]
+        base = by_filing[rep.accessions[0]]
         name = next(
             (by_filing[a].manager_name for a in rep.accessions if by_filing[a].manager_name), cik
         )
-        base = by_filing[rep.accessions[0]]
+        checks.append(
+            {
+                "manager": name or cik,
+                "report_date": rep.period,
+                "lines_stored_for_ticker": len(all_lines),
+                "lines_reported": base.reported_line_count,
+                "total_value_reported_usd": (
+                    None
+                    if base.reported_total_value_usd is None
+                    else str(base.reported_total_value_usd)
+                ),
+                "confidential_treatment": base.confidential_treatment,
+            }
+        )
+        if not lines:
+            continue  # the effective report holds none of this ticker (e.g. restated without it)
+        known = [p.shares for p in lines if p.shares is not None]
         entries.append(
             LaneEntry(
                 name or cik,
@@ -116,7 +142,16 @@ async def _lane_13f(
             "prev": books[trend_periods[0]],
             "cur": books[trend_periods[1]],
         }
-    return entries, manager_name_changes(filings), trend
+    names = {f.cik: f.manager_name or f.cik for f in filings}
+    info = {
+        "period": choice.period,
+        "managers_filed": len(choice.filed),
+        "share_filed": str(round(choice.share_filed, 4)),
+        "fell_back": choice.fell_back,
+        "not_yet_filed": [names[c] for c in choice.not_yet_filed],
+        "reports": checks,
+    }
+    return entries, manager_name_changes(filings), trend, info
 
 
 async def _lane_13dg(pool: Pool, ticker: str, when: dt.datetime) -> list[LaneEntry]:
@@ -184,6 +219,131 @@ async def _lane_nport(pool: Pool, ticker: str, when: dt.datetime) -> list[LaneEn
     )
 
 
+async def stake_chain(
+    pool: Pool, ticker: str, filer_cik: str, as_of: dt.datetime | None = None
+) -> dict[str, Any]:
+    """Every 13D/G filing one filer made about a held share class, oldest first, as known at
+    `as_of`. Each step states its reported change from the previous one only when both report a
+    percentage for the same class; otherwise it says why there is no delta."""
+    when = _aware(as_of)
+    rows = await pool.fetch(
+        """select f.accession, f.form, f.schedule, f.is_amendment, f.amendment_no, f.filed,
+                  f.event_date, f.known_at, f.stake_percent, f.stake_shares, f.class_title,
+                  f.intent_text, f.intent_hash, f.prior_accession, f.source_url
+             from public.control_stake_filing f
+             join public.control_stake_issuer_link l on l.accession = f.accession
+            where l.ticker = $1 and l.class_status = 'cusip_match' and f.filer_cik = $2
+              and f.known_at <= $3
+            order by f.filed, f.known_at, f.accession""",
+        ticker,
+        filer_cik.zfill(10),
+        when,
+    )
+    accessions = [r["accession"] for r in rows]
+    holders = await pool.fetch(
+        """select accession, person_name, member_of_group, aggregate_shares, percent_of_class,
+                  sole_voting, shared_voting, sole_dispositive, shared_dispositive
+             from public.control_stake_holder where accession = any($1::text[])
+            order by accession, row_index""",
+        accessions,
+    )
+    changes = await pool.fetch(
+        """select accession, change_type, person_name, old_value, new_value, detail
+             from public.control_stake_change where accession = any($1::text[])
+            order by accession, id""",
+        accessions,
+    )
+    exhibits = await pool.fetch(
+        """select accession, exhibit_label, description, document_url
+             from public.control_stake_exhibit where accession = any($1::text[])
+            order by accession, row_index""",
+        accessions,
+    )
+    steps: list[dict[str, Any]] = []
+    prev: Any = None
+    for r in rows:
+        delta: Any = None
+        why: str | None = "first filing in the chain"
+        if prev is not None:
+            delta, why = reported_stake_delta(
+                prev["stake_percent"], prev["class_title"], r["stake_percent"], r["class_title"]
+            )
+        intent_changed = (
+            None
+            if prev is None or not prev["intent_hash"] or not r["intent_hash"]
+            else prev["intent_hash"] != r["intent_hash"]
+        )
+        steps.append(
+            {
+                "accession": r["accession"],
+                "form": r["form"],
+                "schedule": r["schedule"],
+                "is_amendment": r["is_amendment"],
+                "amendment_no": r["amendment_no"],
+                "filed": r["filed"],
+                "event_date": r["event_date"],
+                "known_at": r["known_at"],
+                "class_title": r["class_title"],
+                "stake_percent": None if r["stake_percent"] is None else str(r["stake_percent"]),
+                "stake_shares": None if r["stake_shares"] is None else str(r["stake_shares"]),
+                "reported_delta_points": None if delta is None else str(delta),
+                "delta_note": why,
+                "purpose": r["intent_text"],
+                "purpose_changed": intent_changed,
+                "prior_accession": r["prior_accession"],
+                "linked_to_previous": prev is not None
+                and r["prior_accession"] == prev["accession"],
+                "source_url": r["source_url"],
+                "holders": [
+                    {
+                        "name": h["person_name"],
+                        "member_of_group": h["member_of_group"],
+                        "shares": None
+                        if h["aggregate_shares"] is None
+                        else str(h["aggregate_shares"]),
+                        "percent": None
+                        if h["percent_of_class"] is None
+                        else str(h["percent_of_class"]),
+                        "sole_voting": None if h["sole_voting"] is None else str(h["sole_voting"]),
+                        "shared_voting": None
+                        if h["shared_voting"] is None
+                        else str(h["shared_voting"]),
+                        "sole_dispositive": None
+                        if h["sole_dispositive"] is None
+                        else str(h["sole_dispositive"]),
+                        "shared_dispositive": None
+                        if h["shared_dispositive"] is None
+                        else str(h["shared_dispositive"]),
+                    }
+                    for h in holders
+                    if h["accession"] == r["accession"]
+                ],
+                "changes": [
+                    {
+                        "change_type": c["change_type"],
+                        "person": c["person_name"],
+                        "old": c["old_value"],
+                        "new": c["new_value"],
+                        "detail": c["detail"],
+                    }
+                    for c in changes
+                    if c["accession"] == r["accession"]
+                ],
+                "exhibits": [
+                    {
+                        "label": e["exhibit_label"],
+                        "description": e["description"],
+                        "url": e["document_url"],
+                    }
+                    for e in exhibits
+                    if e["accession"] == r["accession"]
+                ],
+            }
+        )
+        prev = r
+    return {"ticker": ticker, "filer_cik": filer_cik.zfill(10), "as_of": when, "steps": steps}
+
+
 async def ownership(pool: Pool, ticker: str, as_of: dt.datetime | None = None) -> dict[str, Any]:
     when = _aware(as_of)
     den = await pool.fetchrow(
@@ -193,7 +353,7 @@ async def ownership(pool: Pool, ticker: str, as_of: dt.datetime | None = None) -
         ticker,
         when,
     )
-    f13, renames, trend = await _lane_13f(pool, ticker, when)
+    f13, renames, trend, quarter = await _lane_13f(pool, ticker, when)
     view: OwnershipView = build_view(
         {
             "institutional_13f": f13,
@@ -248,6 +408,7 @@ async def ownership(pool: Pool, ticker: str, as_of: dt.datetime | None = None) -
         ],
         "warnings": list(view.warnings),
         "trend": trend,
+        "quarter": quarter,
         "manager_renames": [
             {"cik": cik, "names": [{"from": str(p), "name": n} for p, n in names]}
             for cik, names in renames.items()

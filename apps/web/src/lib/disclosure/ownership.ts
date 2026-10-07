@@ -13,6 +13,7 @@ export type OwnershipView = S["OwnershipOut"];
 export type Lane = S["LaneOut"];
 export type LaneEntry = S["LaneEntryOut"];
 export type LaneKey = Lane["key"];
+export type StakeChainView = S["StakeChainOut"];
 
 export const LANE_ORDER: readonly LaneKey[] = ["institutional_13f", "control_13dg", "fund_nport", "national_voting"];
 

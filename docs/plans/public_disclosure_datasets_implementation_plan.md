@@ -298,6 +298,55 @@ Built and tested: migration `20261007100000_disclosure_foundation.sql` (+ rollba
 | New pages not viewed in a browser | P4, P5 frontend | Sign-in needs MFA; logic and types are tested, layout is unseen | Screenshot pass at desktop and phone width, keyboard pass on the window toggle and override form |
 | Rollback not run against a database with data | P4, P5 | The rollback drops the override ledger and new columns by design | Rehearse on a copy before applying to production |
 
+### Gap-closure round for P0–P5 (updated 2026-10-07)
+
+The gap tables above were written before this round. Where a row below is marked **closed**, trust this section over the row above. Migration `20261007130000_disclosure_gap_closure.sql` (+ rollback) adds `disclosure_alert`, `owner_dependency_weight`, `procurement_award_detail`, `control_stake_exhibit`, `disclosure_adjudication`, and columns on `relationship_disclosure` and `form13f_filing`.
+
+**Closed in code** (tests: `test_disclosure_gap_closure.py` 38 pure, `test_disclosure_gap_closure_db.py` 21 DB, `test_disclosure_ownership_gaps.py`, `test_disclosure_note_tables.py`, `test_disclosure_pdmr_activity.py`, web `dependencies.test.ts`, `alerts.test.ts`):
+
+| Gap | Task | How it is closed |
+|---|---|---|
+| Splits applied in the pure module only | P4.6 | `insider_activity` and `pending_alerts` restate shares for confirmed splits known by the as-of date |
+| Footnotes, derivative terms, plan basis not shown; no share-count context | P4.2, P4.5 | Detail rows carry footnote, exercise price, dates, underlying, plan basis and percent of outstanding; a context block shows the share count and confirmed events, with no motive implied |
+| Insider, large-holder and relationship alerts not stored | P4.6, P3.6, P5.8 | `disclosure_alert` with a unique `dedupe_key`; scans run after the insider collection; list and acknowledge routes; page at `/disclosures/alerts` |
+| `side_conflict` a stub; no alias or entity resolution | P5.4 | `entities.py` (only a CIK or LEI match is automatic; names are candidates); real opposite-direction conflicts; other reporters’ claims used as inbound edges |
+| Anonymous label not stored | P5.3 | `claim_label` column, backfilled from the passage |
+| Denominator backfill | P5.3 | `denominator_kind` backfilled from `share_basis` where it maps |
+| TED awards not in the view | P5.5 | `procurement_award_detail` (lot, CPV, value, currency, status) shown on the claim |
+| Owner-assigned weights | P5.7 | `owner_dependency_weight`, labelled in scenarios, never mixed into reported concentration |
+| No change diff, no inline review | P5.8 | `changes()` between two dates feeds the relationship alerts; decision form on each suggestion |
+| Portfolio exposure uses sample data | P5.7, P5.8 | `GET /disclosures/portfolio/dependencies` (latest period per holding; holdings without a claim listed as unknown) and a live Sankey |
+| No structured extractor | P5.2 | `concentration_extract.py` (sentence and table, offsets, negations to `skipped`) and `concentration_store.py` (stores as suggested) |
+| Gates coded, not run | P5.1, P5.6, P4.3, P3.7 | `adjudication.py` plus routes and the page `/disclosures/adjudication` let a person label a sample and read the gate; the run itself has not been done |
+| 13F report totals and confidential flag | P3.1 | Summary page line count, total and omitted-holdings flag stored; the confidential flag is read from the cover |
+| Manager lane mixes quarters | P3.1 | One common quarter (the newest with 80% of managers filed); non-filers named; a fallback flag when none qualifies |
+| No 13D/G chain; exhibits not parsed | P3.2 | Chain route and view per filer; Item 7 exhibits parsed to `control_stake_exhibit` |
+| Note tables not extracted | P2.4, P2.8 | `note_tables.py` extracts debt, lease and repurchase tables with offsets; `note_store.py` stores buckets; validators run from `statement_read` |
+| Segments: assets, profit, capex, cross-axis | P2.3 | Segment report per metric; cross-axis facts as their own breakdown; geography/product overlap noted |
+| Formula table | P2.7 | Versioned `formula-table-1` (margins, ROIC, debt-maturity coverage, cash conversion), null with a reason when an input is missing |
+| Valuation gate not exposed | P2.7 | `valuation_gate` on statements and on `/holdings/{ticker}/financial-history` rows |
+| UK PDMR rules | P4.4 | `pdmr_activity.py`: known at the announcement time, role from position text, amendments counted once, no plan flag, totals per currency; route `GET /disclosures/holdings/{ticker}/pdmr`; a "UK manager dealings" panel on the insiders page |
+| N-PORT lane untested end to end | P3.3 | DB test seeds a confirmed and an unmatched fund filing and checks the lane, the lag, and that the 13F lane is not added to it |
+| Screener ignores the gate | P2.7 | Each screen row carries `valuation_gate`; a row with no issuer link or no gate for its period says so (null), never a pass. Filters are unchanged |
+| Note tables never extracted from a filing | P2.4 | `note_job.py` reads a parsed filing's debt, lease and repurchase text blocks, takes the currency and period from the filing, and stores buckets at document offsets; `POST /disclosures/versions/{id}/extract-notes` runs it on an archived version. Nothing runs it on a schedule (see below) |
+| `ownership_match` sampler | P3.7 | `ownership_sample` lists each CUSIP and ticker pair once; labels are same / different / cannot tell; added to the accuracy-check page |
+| Baseline inventory | P0.5 | `python -m steward.disclosure.baseline` prints row counts, documents by regulator, suggestion states and the confirmed-link share. It only reads and has not been run against the deployed database |
+
+**Still open — can be built:**
+
+| Gap | Task | What is missing |
+|---|---|---|
+| Ingestion job is not scheduled or exposed | P1.3, P2.2, P2.4 | `ingest_job.ingest_filings` fetches discovered SEC filings into `source_document`, parses them, extracts notes and mirrors facts, and refuses to run unless the `sec.archive` source is enabled with a recorded access test. No collector job or route calls it, and the real fetcher wiring has not been exercised against sec.gov |
+| Identifier resolution is not scheduled | P0.2, P1.5 | `identifier_job.resolve_identifiers` stores GLEIF and OpenFIGI matches as suggestions only (exact ISIN or CIK agreement up to 0.95; name-only capped at 0.6 and flagged; ambiguous candidates each stored with a note). The GLEIF adapter resolves by ISIN only; a person still has to confirm each match |
+| ESEF, EDINET and SEDAR+ are parsers only | P1.3, P2.5, P2.6 | `esef_discovery.py` and `jurisdiction_adapters.py` turn index and list responses into dated discovered filings (known_at never earlier than the stated time; skipped entries reported with reasons). They are written against assumed response shapes, unverified against the live services, and nothing stores or fetches with them |
+| TR-1 notices are stored but not collected | P3.4 | `sources/tr1_uk.py` parses the standard form and `tr1_store.py` writes it to `uk_tr1_notice` (migration `20261007140000`). The template wording is unverified against live RNS, nothing fetches RNS bodies, and the national lane stays `not_covered` until 20 reviewed examples reach the bar |
+| PSC and GLEIF corroboration has no data or route | P3.5 | `control_corroboration.py` compares PSC bands and a GLEIF parent with a reported stake (agree, conflict kept for review, not comparable). Nothing collects PSC or GLEIF hierarchy into it, and no route shows it; the PSC strings and band edges are unverified |
+| No other-jurisdiction PDMR collector | P4.4 | UK only, and only the notices already parsed |
+| TED field names | P5.5 | `classification-cpv` and `identifier-lot` are not verified against the live TED API |
+| Alerts not sent to the digest | P4.6 | Alerts are stored and shown on a page; no push or digest line yet |
+
+**Still open — cannot be closed from code:** real sample capture (P0.3), measuring any threshold on production data (P0.6, P3.7, P4.3, P5.6), the deployed-database baseline (P0.5), live checks of the FCA, EDINET, SEDAR+ and TED routes (P0.4), running the aggregation against real tickers (P4.5), the human adjudication runs, rehearsing the rollbacks on a database with data, and the browser pass over every new page (sign-in needs MFA; layout is unseen).
+
 ## Phase P6 — Public deal, financing and corporate-action terms
 
 **Dependency:** P1/P2/P5. **Exit:** material public transactions have an evidence-linked lifecycle and quantified portfolio implications where terms permit.

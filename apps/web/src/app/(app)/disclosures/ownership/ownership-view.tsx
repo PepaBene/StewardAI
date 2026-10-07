@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { OwnershipLanes, RankFlow, StakeTimeline } from "@/components/disclosure/ownership";
+import { OwnershipLanes, QuarterNote, RankFlow, StakeChain, StakeTimeline } from "@/components/disclosure/ownership";
 import { Panel, SectionNav } from "@/components/oversight/panel";
 import { PageHeader } from "@/components/page-header";
 import { Field } from "@/components/reference/form-bits";
@@ -11,10 +11,11 @@ import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { SAMPLE_STAKES, SAMPLE_TICKER, sampleOwnership } from "@/lib/disclosure/fixtures-ownership";
 import { dayOf, endOfDayMs, formatDay } from "@/lib/disclosure/model";
-import type { OwnershipView } from "@/lib/disclosure/ownership";
+import type { OwnershipView, StakeChainView } from "@/lib/disclosure/ownership";
 
 const SECTIONS = [
   { id: "lanes", label: "Who reports owning shares" },
+  { id: "quarter", label: "Which quarter" },
   { id: "movement", label: "Manager movement" },
   { id: "control", label: "Control stakes over time" },
 ] as const;
@@ -35,8 +36,34 @@ export function OwnershipPageView() {
   const [error, setError] = useState<string | undefined>();
   const [live, setLive] = useState<OwnershipView | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [cikInput, setCikInput] = useState("");
+  const [cikError, setCikError] = useState<string | undefined>();
+  const [filerCik, setFilerCik] = useState<string | null>(null);
+  // The result is keyed by the inputs that produced it, so a stale result is never shown for new ones.
+  const [chainResult, setChainResult] = useState<{ key: string; data: StakeChainView | null; failure: string | null } | null>(null);
 
   const sample = ticker === null;
+  const chainKey = ticker && filerCik ? `${ticker}:${filerCik}:${cutoff}` : null;
+  const chain = chainResult && chainResult.key === chainKey ? chainResult.data : null;
+  const chainFailure = chainResult && chainResult.key === chainKey ? chainResult.failure : null;
+
+  useEffect(() => {
+    if (!ticker || !filerCik || !chainKey) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await getBrowserApiClient().GET("/disclosures/holdings/{ticker}/control-stakes/{filer_cik}/chain", { params: { path: { ticker, filer_cik: filerCik }, query: { as_of: new Date(cutoff).toISOString() } } });
+        if (cancelled) return;
+        if (r.data) setChainResult({ key: chainKey, data: r.data, failure: null });
+        else setChainResult({ key: chainKey, data: null, failure: r.response.status === 401 || r.response.status === 403 ? "Sign in again (with MFA) and retry." : `The filing history failed to load (HTTP ${r.response.status}).` });
+      } catch (e) {
+        if (!cancelled) setChainResult({ key: chainKey, data: null, failure: `Backend unreachable: ${e instanceof Error ? e.message : String(e)}` });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ticker, filerCik, cutoff, chainKey]);
 
   useEffect(() => {
     if (!ticker) return;
@@ -124,6 +151,10 @@ export function OwnershipPageView() {
         {view ? <OwnershipLanes view={view} /> : <p className="text-sm text-text-muted">Loading ownership…</p>}
       </Panel>
 
+      <Panel id="quarter" title="Which quarter, and who is missing" description="The quarter the manager lane uses, and what each manager’s own report says about its size.">
+        {view ? <QuarterNote view={view} /> : <p className="text-sm text-text-muted">Loading…</p>}
+      </Panel>
+
       <Panel id="movement" title="Manager movement" description="The largest managers' reported holdings, quarter to quarter.">
         {trend ? (
           <RankFlow prev={book(trend.prev)} cur={book(trend.cur)} prevLabel={formatDay(trend.prev_period)} curLabel={formatDay(trend.cur_period)} />
@@ -136,9 +167,26 @@ export function OwnershipPageView() {
         {sample ? (
           <StakeTimeline events={SAMPLE_STAKES} cutoffMs={cutoff} />
         ) : (
-          <p className="text-sm text-text-muted">
-            The latest filing per holder is in the 13D/G table above. Each holder&apos;s full filing history is not connected to this page yet.
-          </p>
+          <div className="space-y-3">
+            <form
+              noValidate
+              onSubmit={(e) => {
+                e.preventDefault();
+                const v = cikInput.trim();
+                if (!/^[0-9]{1,10}$/.test(v)) return setCikError("A filer id is 1 to 10 digits.");
+                setCikError(undefined);
+                setFilerCik(v);
+              }}
+              className="flex flex-wrap items-end gap-3"
+            >
+              <Field label="Filer id (CIK)" hint="Shown on the filing. One filer’s filings are followed from first to latest." error={cikError}>
+                <Input value={cikInput} onChange={(e) => setCikInput(e.target.value)} inputMode="numeric" className="num w-44" />
+              </Field>
+              <Button type="submit" size="sm">Show this filer’s filings</Button>
+            </form>
+            {chainFailure ? <p role="alert" className="border border-warning-signal/40 bg-warning-signal-subtle px-3 py-2 text-sm">{chainFailure}</p> : null}
+            {chain ? <StakeChain chain={chain} /> : filerCik ? <p className="text-sm text-text-muted">Loading filings…</p> : null}
+          </div>
         )}
       </Panel>
     </div>

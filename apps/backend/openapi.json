@@ -9550,7 +9550,7 @@
           "holdings"
         ],
         "summary": "Financial History",
-        "description": "Stored statement facts as known at `as_of`; every row says whether it was reconciled.",
+        "description": "Stored statement facts as known at `as_of`; every row says whether it was reconciled and\ncarries `valuation_gate` (usable_for_valuation and reasons) for its period.",
         "operationId": "financial_history",
         "security": [
           {
@@ -13888,6 +13888,84 @@
         }
       }
     },
+    "/disclosures/holdings/{ticker}/control-stakes/{filer_cik}/chain": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Holding Stake Chain",
+        "description": "Every 13D/G filing one filer made about this holding, oldest first, with the reported\nchange between steps shown only where the class and percentages are comparable.",
+        "operationId": "holding_stake_chain",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "filer_cik",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{1,10}$",
+              "title": "Filer Cik"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StakeChainOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/disclosures/holdings/{ticker}/ownership": {
       "get": {
         "tags": [
@@ -14024,6 +14102,74 @@
         }
       }
     },
+    "/disclosures/holdings/{ticker}/pdmr": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Holding Pdmr",
+        "description": "UK PDMR notifications for a holding, kept apart from Form 4 and totalled per currency.",
+        "operationId": "holding_pdmr",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PdmrActivityOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/disclosures/insiders/override": {
       "post": {
         "tags": [
@@ -14142,6 +14288,536 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DependencyViewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/portfolio/dependencies": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Portfolio Dependencies",
+        "description": "Portfolio-weighted dependency on named customers, from confirmed claims only.",
+        "operationId": "portfolio_dependencies",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioDependenciesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/holdings/{ticker}/dependency-weights": {
+      "post": {
+        "tags": [
+          "disclosures",
+          "disclosures"
+        ],
+        "summary": "Add Owner Weight",
+        "description": "Record a weight YOU assigned. It is shown as owner-assigned wherever it is used and is never\nmixed into reported concentration.",
+        "operationId": "add_owner_weight",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerWeightIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisclosureCreatedOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/holdings/{ticker}/dependency-weights/{weight_id}": {
+      "delete": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Retire Owner Weight",
+        "description": "Retire a weight. It stops applying from now; replays before now still see it.",
+        "operationId": "retire_owner_weight",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "weight_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Weight Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/alerts": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "List Disclosure Alerts",
+        "description": "Alerts raised from verified disclosures. An alert states what was filed, not why.",
+        "operationId": "list_disclosure_alerts",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 30
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "include_acknowledged",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Acknowledged"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DisclosureAlertOut"
+                  },
+                  "title": "Response List Disclosure Alerts"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/alerts/scan": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Scan Disclosure Alerts",
+        "description": "Run the alert scans now for every held ticker (the insider job also runs them).",
+        "operationId": "scan_disclosure_alerts",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertScanOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/disclosures/alerts/{alert_id}/acknowledge": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Acknowledge Disclosure Alert",
+        "operationId": "acknowledge_disclosure_alert",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Alert Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/adjudication/{dataset}/sample": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Adjudication Sample",
+        "description": "A reproducible sample to label. Relationship samples include unmarked deliberate false\npositives: a reviewer who calls one a true relationship fails the gate.",
+        "operationId": "adjudication_sample",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dataset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "relationship_claim",
+                "insider_class",
+                "ownership_match",
+                "statement_note",
+                "document_sample"
+              ],
+              "type": "string",
+              "title": "Dataset"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 10,
+              "default": 50,
+              "title": "Size"
+            }
+          },
+          {
+            "name": "seed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "default": "owner",
+              "title": "Seed"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjudicationSampleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/adjudication/{dataset}/label": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Adjudication Label",
+        "operationId": "adjudication_label",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dataset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "relationship_claim",
+                "insider_class",
+                "ownership_match",
+                "statement_note",
+                "document_sample"
+              ],
+              "type": "string",
+              "title": "Dataset"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisclosureCreatedOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/adjudication/{dataset}/gate": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Adjudication Gate",
+        "description": "Whether the labelled sample meets the release bar for this dataset.",
+        "operationId": "adjudication_gate",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dataset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "relationship_claim",
+                "insider_class",
+                "ownership_match",
+                "statement_note",
+                "document_sample"
+              ],
+              "type": "string",
+              "title": "Dataset"
+            }
+          },
+          {
+            "name": "sample_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Sample Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjudicationGateOut"
                 }
               }
             }
@@ -14306,6 +14982,56 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SpanText"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/versions/{version_id}/extract-notes": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Extract Version Notes",
+        "description": "Read the debt, lease and repurchase notes of one archived filing and store the tables.\nAmbiguous tables are stored as needing review and never count as checked.",
+        "operationId": "extract_version_notes",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteExtractOut"
                 }
               }
             }
@@ -15645,6 +16371,154 @@
         ],
         "title": "ActivityCoverage"
       },
+      "AdjudicationGateOut": {
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "enum": [
+              "relationship_claim",
+              "insider_class",
+              "ownership_match",
+              "statement_note",
+              "document_sample"
+            ],
+            "title": "Dataset"
+          },
+          "sample_key": {
+            "type": "string",
+            "title": "Sample Key"
+          },
+          "labelled": {
+            "type": "integer",
+            "title": "Labelled"
+          },
+          "needed": {
+            "type": "integer",
+            "title": "Needed"
+          },
+          "correct": {
+            "type": "integer",
+            "title": "Correct"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate"
+          },
+          "bar": {
+            "type": "string",
+            "title": "Bar"
+          },
+          "planted": {
+            "type": "integer",
+            "title": "Planted"
+          },
+          "planted_caught": {
+            "type": "integer",
+            "title": "Planted Caught"
+          },
+          "met": {
+            "type": "boolean",
+            "title": "Met"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset",
+          "sample_key",
+          "labelled",
+          "needed",
+          "correct",
+          "rate",
+          "bar",
+          "planted",
+          "planted_caught",
+          "met",
+          "reason"
+        ],
+        "title": "AdjudicationGateOut"
+      },
+      "AdjudicationItemOut": {
+        "properties": {
+          "item_ref": {
+            "type": "string",
+            "title": "Item Ref"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "machine_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Machine Value"
+          },
+          "hints": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Hints"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_ref",
+          "text",
+          "machine_value",
+          "hints"
+        ],
+        "title": "AdjudicationItemOut"
+      },
+      "AdjudicationSampleOut": {
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "enum": [
+              "relationship_claim",
+              "insider_class",
+              "ownership_match",
+              "statement_note",
+              "document_sample"
+            ],
+            "title": "Dataset"
+          },
+          "sample_key": {
+            "type": "string",
+            "title": "Sample Key"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdjudicationItemOut"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset",
+          "sample_key",
+          "items"
+        ],
+        "title": "AdjudicationSampleOut"
+      },
       "AdjustedReturnCoverage": {
         "properties": {
           "bases": {
@@ -16061,6 +16935,34 @@
         ],
         "title": "AlertOut"
       },
+      "AlertScanOut": {
+        "properties": {
+          "insider_trade": {
+            "type": "integer",
+            "title": "Insider Trade"
+          },
+          "major_holder": {
+            "type": "integer",
+            "title": "Major Holder"
+          },
+          "relationship_change": {
+            "type": "integer",
+            "title": "Relationship Change"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "insider_trade",
+          "major_holder",
+          "relationship_change",
+          "failed"
+        ],
+        "title": "AlertScanOut"
+      },
       "AliasOut": {
         "properties": {
           "alias": {
@@ -16263,6 +17165,119 @@
         ],
         "title": "AnnouncementRule",
         "description": "Maps a regulatory announcement's type (the RNS headline or the EQS category) to an\nevent type. First match wins; `classify` leaves the item to the classifier."
+      },
+      "AwardDetailOut": {
+        "properties": {
+          "notice_number": {
+            "type": "string",
+            "title": "Notice Number"
+          },
+          "lot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Id"
+          },
+          "notice_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice Type"
+          },
+          "cpv_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cpv Codes"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "published": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published"
+          }
+        },
+        "type": "object",
+        "required": [
+          "notice_number",
+          "lot_id",
+          "notice_type",
+          "cpv_codes",
+          "value",
+          "currency",
+          "start_date",
+          "end_date",
+          "status",
+          "published"
+        ],
+        "title": "AwardDetailOut"
       },
       "BaseTotals": {
         "properties": {
@@ -17553,6 +18568,103 @@
         ],
         "title": "CategoryWeightRule",
         "description": "Limit on a category's weight; with no bucket it applies to every bucket of the dimension."
+      },
+      "ChainHolderOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "member_of_group": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Member Of Group"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares"
+          },
+          "percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent"
+          },
+          "sole_voting": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sole Voting"
+          },
+          "shared_voting": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shared Voting"
+          },
+          "sole_dispositive": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sole Dispositive"
+          },
+          "shared_dispositive": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shared Dispositive"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "member_of_group",
+          "shares",
+          "percent",
+          "sole_voting",
+          "shared_voting",
+          "sole_dispositive",
+          "shared_dispositive"
+        ],
+        "title": "ChainHolderOut"
       },
       "ChannelWeight": {
         "properties": {
@@ -20397,7 +21509,7 @@
           },
           "changes": {
             "items": {
-              "$ref": "#/components/schemas/StakeChangeOut"
+              "$ref": "#/components/schemas/steward__ownership__control_stakes_read__StakeChangeOut"
             },
             "type": "array",
             "title": "Changes"
@@ -21289,6 +22401,46 @@
         "title": "CreditStressRule",
         "description": "A threshold on one stored macro series. Fires once, when a genuinely new observation\n(a later period than any known before it) is beyond the threshold and the previous\nperiod was not; a revision of an old period never fires."
       },
+      "CrossAxisOut": {
+        "properties": {
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "axes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Axes"
+          },
+          "members": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Members"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "axes",
+          "members",
+          "value"
+        ],
+        "title": "CrossAxisOut"
+      },
       "DailyFallback": {
         "properties": {
           "date": {
@@ -22144,6 +23296,25 @@
           "stale": {
             "type": "boolean",
             "title": "Stale"
+          },
+          "entity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityMatchOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who a name may refer to. Only an identifier match is automatic."
+          },
+          "awards": {
+            "items": {
+              "$ref": "#/components/schemas/AwardDetailOut"
+            },
+            "type": "array",
+            "title": "Awards",
+            "description": "Procurement notice fields; no revenue share."
           }
         },
         "type": "object",
@@ -22166,7 +23337,9 @@
           "evidence_id",
           "problems",
           "screen",
-          "stale"
+          "stale",
+          "entity",
+          "awards"
         ],
         "title": "DependencyClaimOut"
       },
@@ -22202,6 +23375,27 @@
             "type": "array",
             "title": "Scenarios"
           },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/SideConflictOut"
+            },
+            "type": "array",
+            "title": "Conflicts",
+            "description": "Two reporters disagreeing; both kept."
+          },
+          "owner_weights": {
+            "items": {
+              "$ref": "#/components/schemas/OwnerWeightOut"
+            },
+            "type": "array",
+            "title": "Owner Weights",
+            "description": "Owner-assigned, not reported."
+          },
+          "inbound_claims": {
+            "type": "integer",
+            "title": "Inbound Claims",
+            "description": "Claims other reporters made about this holding."
+          },
           "notes": {
             "items": {
               "type": "string"
@@ -22217,6 +23411,9 @@
           "claims",
           "concentration",
           "scenarios",
+          "conflicts",
+          "owner_weights",
+          "inbound_claims",
           "notes"
         ],
         "title": "DependencyViewOut"
@@ -23082,6 +24279,95 @@
         ],
         "title": "Disagreement"
       },
+      "DisclosureAlertOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "insider_trade",
+              "major_holder",
+              "relationship_change"
+            ],
+            "title": "Kind"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Detail"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "ticker",
+          "headline",
+          "detail",
+          "source_url",
+          "known_at",
+          "created_at",
+          "acknowledged_at"
+        ],
+        "title": "DisclosureAlertOut"
+      },
+      "DisclosureCreatedOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "DisclosureCreatedOut"
+      },
       "DisclosureInsiderActivityOut": {
         "properties": {
           "ticker": {
@@ -23128,6 +24414,13 @@
             "type": "array",
             "title": "Notes"
           },
+          "context": {
+            "$ref": "#/components/schemas/InsiderContextOut"
+          },
+          "splits_applied": {
+            "type": "integer",
+            "title": "Splits Applied"
+          },
           "transactions": {
             "items": {
               "$ref": "#/components/schemas/InsiderTxOut"
@@ -23145,6 +24438,8 @@
           "bundles",
           "class_counts",
           "notes",
+          "context",
+          "splits_applied",
           "transactions"
         ],
         "title": "DisclosureInsiderActivityOut"
@@ -24014,6 +25309,50 @@
           "flow_key"
         ],
         "title": "EcbSeries"
+      },
+      "EntityMatchOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "matched, candidate, ambiguous, none or anonymous."
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "needs_review": {
+            "type": "boolean",
+            "title": "Needs Review"
+          },
+          "candidates": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "basis",
+          "needs_review",
+          "candidates",
+          "note"
+        ],
+        "title": "EntityMatchOut"
       },
       "Envelope": {
         "properties": {
@@ -28042,6 +29381,158 @@
         ],
         "title": "FinancialHistory"
       },
+      "FormulaCoverageOut": {
+        "properties": {
+          "present": {
+            "type": "integer",
+            "title": "Present"
+          },
+          "required": {
+            "type": "integer",
+            "title": "Required"
+          }
+        },
+        "type": "object",
+        "required": [
+          "present",
+          "required"
+        ],
+        "title": "FormulaCoverageOut"
+      },
+      "FormulaInputOut": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accession"
+          },
+          "fact_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Id"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "statement",
+              "note"
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "value",
+          "accession",
+          "fact_id",
+          "source"
+        ],
+        "title": "FormulaInputOut"
+      },
+      "FormulaOut": {
+        "properties": {
+          "formula": {
+            "type": "string",
+            "title": "Formula"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "table_version": {
+            "type": "string",
+            "title": "Table Version"
+          },
+          "expression": {
+            "type": "string",
+            "title": "Expression"
+          },
+          "rule": {
+            "type": "string",
+            "title": "Rule"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "Null when an input is missing; the reason says which."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/FormulaCoverageOut"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/FormulaInputOut"
+            },
+            "type": "array",
+            "title": "Inputs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "formula",
+          "version",
+          "table_version",
+          "expression",
+          "rule",
+          "period_end",
+          "value",
+          "reason",
+          "coverage",
+          "inputs"
+        ],
+        "title": "FormulaOut"
+      },
       "ForwardObservationInput": {
         "properties": {
           "kind": {
@@ -30731,6 +32222,17 @@
             ],
             "title": "Original Value",
             "description": "What the first filing said, when restated."
+          },
+          "fact_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Id"
           }
         },
         "type": "object",
@@ -33686,6 +35188,108 @@
         ],
         "title": "InsiderClusterOut"
       },
+      "InsiderContextOut": {
+        "properties": {
+          "shares_outstanding": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Outstanding"
+          },
+          "shares_outstanding_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Outstanding As Of"
+          },
+          "shares_outstanding_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Outstanding Method"
+          },
+          "reported_share_count_change": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Share Count Change",
+            "description": "Fractional change between the two latest reported share counts; not a motive."
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/InsiderEventOut"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "shares_outstanding",
+          "shares_outstanding_as_of",
+          "shares_outstanding_method",
+          "reported_share_count_change",
+          "events"
+        ],
+        "title": "InsiderContextOut"
+      },
+      "InsiderEventOut": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "event_state": {
+            "type": "string",
+            "title": "Event State"
+          },
+          "announced_at": {
+            "type": "string",
+            "format": "date",
+            "title": "Announced At"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "event_state",
+          "announced_at",
+          "source_url"
+        ],
+        "title": "InsiderEventOut"
+      },
       "InsiderNetBreakdown": {
         "properties": {
           "owner_name": {
@@ -34693,6 +36297,111 @@
               }
             ],
             "title": "Source Url"
+          },
+          "footnote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footnote",
+            "description": "Footnote text the form attached to this line."
+          },
+          "exercise_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exercise Price"
+          },
+          "exercisable_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exercisable Date"
+          },
+          "expiration_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiration Date"
+          },
+          "underlying_security": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Underlying Security"
+          },
+          "underlying_shares": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Underlying Shares"
+          },
+          "plan_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Basis",
+            "description": "Where the Rule 10b5-1 flag was read from."
+          },
+          "plan_adopted": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Adopted"
+          },
+          "percent_of_outstanding": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent Of Outstanding",
+            "description": "Shares as a percent of the share count known at the date; null if unknown."
           }
         },
         "type": "object",
@@ -34718,7 +36427,16 @@
           "shares_after",
           "position_change_percent",
           "caveats",
-          "source_url"
+          "source_url",
+          "footnote",
+          "exercise_price",
+          "exercisable_date",
+          "expiration_date",
+          "underlying_security",
+          "underlying_shares",
+          "plan_basis",
+          "plan_adopted",
+          "percent_of_outstanding"
         ],
         "title": "InsiderTxOut"
       },
@@ -36792,6 +38510,59 @@
           "history"
         ],
         "title": "KpiStatus"
+      },
+      "LabelIn": {
+        "properties": {
+          "sample_key": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Sample Key"
+          },
+          "item_ref": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Item Ref"
+          },
+          "machine_value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Machine Value"
+          },
+          "human_value": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Human Value"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sample_key",
+          "item_ref",
+          "human_value"
+        ],
+        "title": "LabelIn"
       },
       "LaneEntryOut": {
         "properties": {
@@ -39571,6 +41342,63 @@
         ],
         "title": "MessageOut"
       },
+      "MetricBridgeOut": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "axes": {
+            "items": {
+              "$ref": "#/components/schemas/BridgeAxisOut"
+            },
+            "type": "array",
+            "title": "Axes"
+          },
+          "unbridged": {
+            "items": {
+              "$ref": "#/components/schemas/UnbridgedAxisOut"
+            },
+            "type": "array",
+            "title": "Unbridged"
+          },
+          "cross_axis": {
+            "items": {
+              "$ref": "#/components/schemas/CrossAxisOut"
+            },
+            "type": "array",
+            "title": "Cross Axis"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "total",
+          "axes",
+          "unbridged",
+          "cross_axis",
+          "notes"
+        ],
+        "title": "MetricBridgeOut"
+      },
       "MissingActions": {
         "properties": {
           "price_raw": {
@@ -40664,6 +42492,39 @@
         ],
         "title": "NonQuantifiedOut"
       },
+      "NoteExtractOut": {
+        "properties": {
+          "version_id": {
+            "type": "integer",
+            "title": "Version Id"
+          },
+          "blocks_read": {
+            "type": "integer",
+            "title": "Blocks Read"
+          },
+          "rows_stored": {
+            "type": "integer",
+            "title": "Rows Stored",
+            "description": "New rows only: running it twice stores nothing new."
+          },
+          "skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped",
+            "description": "Why a block or the whole filing stored nothing."
+          }
+        },
+        "type": "object",
+        "required": [
+          "version_id",
+          "blocks_read",
+          "rows_stored",
+          "skipped"
+        ],
+        "title": "NoteExtractOut"
+      },
       "NoteSentence": {
         "properties": {
           "text": {
@@ -41182,6 +43043,130 @@
         ],
         "title": "ObservationRow"
       },
+      "OwnerWeightIn": {
+        "properties": {
+          "counterparty_key": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Counterparty Key"
+          },
+          "counterparty_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty Name"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Share"
+          },
+          "denominator": {
+            "type": "string",
+            "enum": [
+              "total_revenue",
+              "segment_revenue",
+              "cost_of_sales",
+              "purchases",
+              "receivables",
+              "other"
+            ],
+            "title": "Denominator",
+            "default": "total_revenue"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 10,
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "counterparty_key",
+          "share",
+          "as_of",
+          "note"
+        ],
+        "title": "OwnerWeightIn"
+      },
+      "OwnerWeightOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "counterparty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterparty"
+          },
+          "counterparty_key": {
+            "type": "string",
+            "title": "Counterparty Key"
+          },
+          "share": {
+            "type": "string",
+            "title": "Share"
+          },
+          "denominator": {
+            "type": "string",
+            "title": "Denominator"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "assigned_by": {
+            "type": "string",
+            "title": "Assigned By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "counterparty",
+          "counterparty_key",
+          "share",
+          "denominator",
+          "as_of",
+          "note",
+          "assigned_by"
+        ],
+        "title": "OwnerWeightOut"
+      },
       "OwnershipOut": {
         "properties": {
           "ticker": {
@@ -41252,6 +43237,9 @@
             ],
             "description": "Null when fewer than two quarters are known."
           },
+          "quarter": {
+            "$ref": "#/components/schemas/QuarterOut"
+          },
           "manager_renames": {
             "items": {
               "$ref": "#/components/schemas/ManagerRename"
@@ -41270,6 +43258,7 @@
           "lanes",
           "warnings",
           "trend",
+          "quarter",
           "manager_renames"
         ],
         "title": "OwnershipOut"
@@ -41631,6 +43620,124 @@
         "title": "PdlRefreshResponse",
         "description": "`skipped` is present only when the refresh was skipped (use exclude_unset)."
       },
+      "PdmrActivityOut": {
+        "properties": {
+          "jurisdiction": {
+            "type": "string",
+            "title": "Jurisdiction"
+          },
+          "regime": {
+            "type": "string",
+            "title": "Regime"
+          },
+          "notices": {
+            "type": "integer",
+            "title": "Notices"
+          },
+          "currencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Currencies"
+          },
+          "net": {
+            "items": {
+              "$ref": "#/components/schemas/PdmrNetOut"
+            },
+            "type": "array",
+            "title": "Net"
+          },
+          "transactions": {
+            "items": {
+              "$ref": "#/components/schemas/PdmrTxOut"
+            },
+            "type": "array",
+            "title": "Transactions"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jurisdiction",
+          "regime",
+          "notices",
+          "currencies",
+          "net",
+          "transactions",
+          "notes"
+        ],
+        "title": "PdmrActivityOut"
+      },
+      "PdmrNetOut": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "window_days": {
+            "type": "integer",
+            "title": "Window Days"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "buy_shares": {
+            "type": "string",
+            "title": "Buy Shares"
+          },
+          "sell_shares": {
+            "type": "string",
+            "title": "Sell Shares"
+          },
+          "net_shares": {
+            "type": "string",
+            "title": "Net Shares"
+          },
+          "buy_value": {
+            "type": "string",
+            "title": "Buy Value"
+          },
+          "sell_value": {
+            "type": "string",
+            "title": "Sell Value"
+          },
+          "net_value": {
+            "type": "string",
+            "title": "Net Value"
+          },
+          "trades": {
+            "type": "integer",
+            "title": "Trades"
+          },
+          "insiders": {
+            "type": "integer",
+            "title": "Insiders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "window_days",
+          "role",
+          "buy_shares",
+          "sell_shares",
+          "net_shares",
+          "buy_value",
+          "sell_value",
+          "net_value",
+          "trades",
+          "insiders"
+        ],
+        "title": "PdmrNetOut"
+      },
       "PdmrNotificationOut": {
         "properties": {
           "id": {
@@ -41938,6 +44045,147 @@
           "classification_basis"
         ],
         "title": "PdmrTransactionOut"
+      },
+      "PdmrTxOut": {
+        "properties": {
+          "notice": {
+            "type": "string",
+            "title": "Notice"
+          },
+          "person": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Person"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "tx_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tx Date"
+          },
+          "announced": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Announced"
+          },
+          "economic_class": {
+            "type": "string",
+            "title": "Economic Class"
+          },
+          "countable": {
+            "type": "boolean",
+            "title": "Countable"
+          },
+          "instrument": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument"
+          },
+          "nature": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nature"
+          },
+          "venue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "amendment": {
+            "type": "boolean",
+            "title": "Amendment"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "notice",
+          "person",
+          "role",
+          "tx_date",
+          "announced",
+          "economic_class",
+          "countable",
+          "instrument",
+          "nature",
+          "venue",
+          "shares",
+          "price",
+          "currency",
+          "amendment",
+          "source_url"
+        ],
+        "title": "PdmrTxOut"
       },
       "PePoint": {
         "properties": {
@@ -42654,6 +44902,64 @@
         ],
         "title": "PortfolioDataContext"
       },
+      "PortfolioDependenciesOut": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "holdings": {
+            "type": "integer",
+            "title": "Holdings"
+          },
+          "covered_weight": {
+            "type": "string",
+            "title": "Covered Weight",
+            "description": "Portfolio weight that has a confirmed numeric claim."
+          },
+          "uncovered": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Uncovered",
+            "description": "Holdings with none: unknown, not zero."
+          },
+          "flows": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioFlowOut"
+            },
+            "type": "array",
+            "title": "Flows"
+          },
+          "by_counterparty": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "By Counterparty"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "holdings",
+          "covered_weight",
+          "uncovered",
+          "flows",
+          "by_counterparty",
+          "notes"
+        ],
+        "title": "PortfolioDependenciesOut"
+      },
       "PortfolioFlag": {
         "properties": {
           "kind": {
@@ -42717,6 +45023,49 @@
           "cleared_at"
         ],
         "title": "PortfolioFlag"
+      },
+      "PortfolioFlowOut": {
+        "properties": {
+          "holding": {
+            "type": "string",
+            "title": "Holding"
+          },
+          "counterparty": {
+            "type": "string",
+            "title": "Counterparty"
+          },
+          "weight": {
+            "type": "string",
+            "title": "Weight"
+          },
+          "share": {
+            "type": "string",
+            "title": "Share"
+          },
+          "exposure": {
+            "type": "string",
+            "title": "Exposure"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "claim_id": {
+            "type": "integer",
+            "title": "Claim Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "holding",
+          "counterparty",
+          "weight",
+          "share",
+          "exposure",
+          "period",
+          "claim_id"
+        ],
+        "title": "PortfolioFlowOut"
       },
       "PortfolioHistory": {
         "properties": {
@@ -44968,6 +47317,62 @@
         ],
         "title": "PublicSdmxSeries"
       },
+      "QuarterOut": {
+        "properties": {
+          "period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period",
+            "description": "The one quarter the manager lane shows."
+          },
+          "managers_filed": {
+            "type": "integer",
+            "title": "Managers Filed"
+          },
+          "share_filed": {
+            "type": "string",
+            "title": "Share Filed",
+            "description": "Share of known managers that filed that quarter."
+          },
+          "fell_back": {
+            "type": "boolean",
+            "title": "Fell Back",
+            "description": "No quarter reached the bar; the best-covered is shown."
+          },
+          "not_yet_filed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not Yet Filed",
+            "description": "Managers named, not carried forward."
+          },
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/ReportCheckOut"
+            },
+            "type": "array",
+            "title": "Reports"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "managers_filed",
+          "share_filed",
+          "fell_back",
+          "not_yet_filed",
+          "reports"
+        ],
+        "title": "QuarterOut"
+      },
       "QueueContradiction": {
         "properties": {
           "id": {
@@ -46473,6 +48878,66 @@
           "elapsed_ms"
         ],
         "title": "ReplayPreview"
+      },
+      "ReportCheckOut": {
+        "properties": {
+          "manager": {
+            "type": "string",
+            "title": "Manager"
+          },
+          "report_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Report Date"
+          },
+          "lines_stored_for_ticker": {
+            "type": "integer",
+            "title": "Lines Stored For Ticker",
+            "description": "Lines of this name kept from the report."
+          },
+          "lines_reported": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lines Reported",
+            "description": "Lines the manager's summary page states."
+          },
+          "total_value_reported_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Value Reported Usd"
+          },
+          "confidential_treatment": {
+            "type": "string",
+            "enum": [
+              "none_indicated",
+              "requested",
+              "unknown"
+            ],
+            "title": "Confidential Treatment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "manager",
+          "report_date",
+          "lines_stored_for_ticker",
+          "lines_reported",
+          "total_value_reported_usd",
+          "confidential_treatment"
+        ],
+        "title": "ReportCheckOut"
       },
       "ReportHit": {
         "properties": {
@@ -48221,6 +50686,35 @@
         "title": "RiskLimits",
         "description": "Portfolio risk limits, checked after each sync. Every limit is optional (null = off).\n\nA breach here is a prompt for review, not an instruction to trade: the strategy decides\nbuys and sells on fundamentals and news, so a price-based limit only forces a thesis review."
       },
+      "RowGate": {
+        "properties": {
+          "usable_for_valuation": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usable For Valuation",
+            "description": "Null when no gate could be computed for this period: never read as a pass."
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "usable_for_valuation",
+          "reasons"
+        ],
+        "title": "RowGate"
+      },
       "RuleMatch": {
         "properties": {
           "severities": {
@@ -48324,6 +50818,11 @@
           "source_age_days": {
             "type": "integer",
             "title": "Source Age Days"
+          },
+          "uses_owner_assigned": {
+            "type": "boolean",
+            "title": "Uses Owner Assigned",
+            "description": "A hop on this path is an owner-assigned weight."
           }
         },
         "type": "object",
@@ -48334,7 +50833,8 @@
           "upper",
           "coverage",
           "via",
-          "source_age_days"
+          "source_age_days",
+          "uses_owner_assigned"
         ],
         "title": "ScenarioImpactOut"
       },
@@ -48631,6 +51131,17 @@
             "type": "string",
             "title": "Ticker"
           },
+          "valuation_gate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RowGate"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether this period's statements passed the valuation checks."
+          },
           "name": {
             "anyOf": [
               {
@@ -48741,6 +51252,20 @@
             },
             "type": "array",
             "title": "Notes"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/MetricBridgeOut"
+            },
+            "type": "array",
+            "title": "Metrics"
+          },
+          "cross_axis": {
+            "items": {
+              "$ref": "#/components/schemas/CrossAxisOut"
+            },
+            "type": "array",
+            "title": "Cross Axis"
           }
         },
         "type": "object",
@@ -48748,7 +51273,9 @@
           "period_end",
           "total",
           "axes",
-          "notes"
+          "notes",
+          "metrics",
+          "cross_axis"
         ],
         "title": "SegmentBridgeOut"
       },
@@ -49832,6 +52359,36 @@
         ],
         "title": "SharpeStats"
       },
+      "SideConflictOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "opposite_direction",
+              "share_mismatch"
+            ],
+            "title": "Kind"
+          },
+          "claim_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Claim Ids"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "claim_ids",
+          "note"
+        ],
+        "title": "SideConflictOut"
+      },
       "Snapshot": {
         "properties": {
           "issuer_id": {
@@ -50684,66 +53241,74 @@
         ],
         "title": "SpanText"
       },
-      "StakeChangeOut": {
+      "StakeChainOut": {
         "properties": {
-          "change_type": {
+          "ticker": {
             "type": "string",
-            "title": "Change Type"
+            "title": "Ticker"
           },
-          "person_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Person Name"
+          "filer_cik": {
+            "type": "string",
+            "title": "Filer Cik"
           },
-          "old_value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Old Value"
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
           },
-          "new_value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "New Value"
-          },
-          "detail": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Detail"
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/StakeStepOut"
+            },
+            "type": "array",
+            "title": "Steps"
           }
         },
         "type": "object",
         "required": [
-          "change_type",
-          "person_name",
-          "old_value",
-          "new_value",
-          "detail"
+          "ticker",
+          "filer_cik",
+          "as_of",
+          "steps"
         ],
-        "title": "StakeChangeOut"
+        "title": "StakeChainOut"
+      },
+      "StakeExhibitOut": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "description",
+          "url"
+        ],
+        "title": "StakeExhibitOut"
       },
       "StakeHolderOut": {
         "properties": {
@@ -51051,6 +53616,236 @@
         ],
         "title": "StakeReconciliationOut"
       },
+      "StakeStepOut": {
+        "properties": {
+          "accession": {
+            "type": "string",
+            "title": "Accession"
+          },
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "schedule": {
+            "type": "string",
+            "enum": [
+              "13D",
+              "13G"
+            ],
+            "title": "Schedule"
+          },
+          "is_amendment": {
+            "type": "boolean",
+            "title": "Is Amendment"
+          },
+          "amendment_no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amendment No"
+          },
+          "filed": {
+            "type": "string",
+            "format": "date",
+            "title": "Filed"
+          },
+          "event_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Date"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          },
+          "class_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Title"
+          },
+          "stake_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stake Percent"
+          },
+          "stake_shares": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stake Shares"
+          },
+          "reported_delta_points": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Delta Points",
+            "description": "Only for the same class, both reported."
+          },
+          "delta_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Note"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose",
+            "description": "Item 4 as filed (13D only)."
+          },
+          "purpose_changed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose Changed"
+          },
+          "prior_accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prior Accession"
+          },
+          "linked_to_previous": {
+            "type": "boolean",
+            "title": "Linked To Previous"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "holders": {
+            "items": {
+              "$ref": "#/components/schemas/ChainHolderOut"
+            },
+            "type": "array",
+            "title": "Holders"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/api__disclosure_routes__StakeChangeOut"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "exhibits": {
+            "items": {
+              "$ref": "#/components/schemas/StakeExhibitOut"
+            },
+            "type": "array",
+            "title": "Exhibits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accession",
+          "form",
+          "schedule",
+          "is_amendment",
+          "amendment_no",
+          "filed",
+          "event_date",
+          "known_at",
+          "class_title",
+          "stake_percent",
+          "stake_shares",
+          "reported_delta_points",
+          "delta_note",
+          "purpose",
+          "purpose_changed",
+          "prior_accession",
+          "linked_to_previous",
+          "source_url",
+          "holders",
+          "changes",
+          "exhibits"
+        ],
+        "title": "StakeStepOut"
+      },
+      "StatementGateOut": {
+        "properties": {
+          "usable_for_valuation": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usable For Valuation",
+            "description": "Null when no gate could be computed: never read as a pass."
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "usable_for_valuation",
+          "reasons"
+        ],
+        "title": "StatementGateOut"
+      },
       "StatementsOut": {
         "properties": {
           "issuer_id": {
@@ -51101,6 +53896,20 @@
             "type": "object",
             "title": "Usable For Valuation"
           },
+          "valuation_gate": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/StatementGateOut"
+            },
+            "type": "object",
+            "title": "Valuation Gate"
+          },
+          "formulas": {
+            "items": {
+              "$ref": "#/components/schemas/FormulaOut"
+            },
+            "type": "array",
+            "title": "Formulas"
+          },
           "unmapped_concepts": {
             "type": "integer",
             "title": "Unmapped Concepts",
@@ -51117,6 +53926,8 @@
           "derived",
           "checks",
           "usable_for_valuation",
+          "valuation_gate",
+          "formulas",
           "unmapped_concepts"
         ],
         "title": "StatementsOut"
@@ -53038,6 +55849,37 @@
         "title": "TrustSettings",
         "description": "Source trust (layer 1): owner feedback moves a source's score between 0 and 1."
       },
+      "UnbridgedAxisOut": {
+        "properties": {
+          "axis": {
+            "type": "string",
+            "title": "Axis"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/BridgeMemberOut"
+            },
+            "type": "array",
+            "title": "Members"
+          },
+          "members_sum": {
+            "type": "string",
+            "title": "Members Sum"
+          },
+          "eliminations": {
+            "type": "string",
+            "title": "Eliminations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "axis",
+          "members",
+          "members_sum",
+          "eliminations"
+        ],
+        "title": "UnbridgedAxisOut"
+      },
       "UnderlyingHolding": {
         "properties": {
           "key": {
@@ -54668,6 +57510,67 @@
         "title": "XbrlSettings",
         "description": "SEC XBRL fundamentals: shares outstanding and revenue by region / segment / product,\nread from each holding's latest 10-K / 10-Q / 20-F XBRL instance."
       },
+      "api__disclosure_routes__StakeChangeOut": {
+        "properties": {
+          "change_type": {
+            "type": "string",
+            "title": "Change Type"
+          },
+          "person": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Person"
+          },
+          "old": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old"
+          },
+          "new": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "change_type",
+          "person",
+          "old",
+          "new",
+          "detail"
+        ],
+        "title": "StakeChangeOut"
+      },
       "api__response_models__CoverageEntry": {
         "properties": {
           "provider": {
@@ -54803,6 +57706,67 @@
           "reason"
         ],
         "title": "CoverageEntry"
+      },
+      "steward__ownership__control_stakes_read__StakeChangeOut": {
+        "properties": {
+          "change_type": {
+            "type": "string",
+            "title": "Change Type"
+          },
+          "person_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Person Name"
+          },
+          "old_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Value"
+          },
+          "new_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Value"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "change_type",
+          "person_name",
+          "old_value",
+          "new_value",
+          "detail"
+        ],
+        "title": "StakeChangeOut"
       }
     },
     "securitySchemes": {

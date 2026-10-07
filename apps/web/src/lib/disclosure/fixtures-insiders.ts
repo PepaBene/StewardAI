@@ -10,6 +10,8 @@ export const SAMPLE_INSIDER_TICKER = "ACME";
 /** The sample's “today”: the date control opens here so the 30, 90 and 365-day windows are populated. */
 export const SAMPLE_INSIDER_DAY = "2026-06-30";
 
+const SAMPLE_OUTSTANDING = 25_000_000;
+
 type Row = Partial<InsiderTx> & Pick<InsiderTx, "accession" | "insider" | "role" | "economic_class" | "tx_date" | "filed">;
 
 const tx = (r: Row, i: number): InsiderTx => {
@@ -38,6 +40,15 @@ const tx = (r: Row, i: number): InsiderTx => {
     position_change_percent: r.position_change_percent ?? null,
     caveats: r.caveats ?? [],
     source_url: `https://www.sec.gov/Archives/edgar/data/acme/${r.accession}.txt`,
+    footnote: r.footnote ?? null,
+    exercise_price: r.exercise_price ?? null,
+    exercisable_date: r.exercisable_date ?? null,
+    expiration_date: r.expiration_date ?? null,
+    underlying_security: r.underlying_security ?? null,
+    underlying_shares: r.underlying_shares ?? null,
+    plan_basis: r.plan_basis ?? null,
+    plan_adopted: r.plan_adopted ?? null,
+    percent_of_outstanding: shares != null ? String((Number(shares) / SAMPLE_OUTSTANDING) * 100) : null,
   };
 };
 
@@ -45,8 +56,8 @@ const ROWS: Row[] = [
   { accession: "0000100001-26-000011", insider: "Dana Reyes (CEO)", role: "officer", economic_class: "open_market_buy", tx_date: "2026-06-04", filed: "2026-06-06", shares: "20000", price: "18.5", shares_after: "260000", position_change_percent: "8.3", countable: true },
   { accession: "0000100002-26-000012", insider: "Sam Okafor (director)", role: "director", economic_class: "open_market_buy", tx_date: "2026-06-09", filed: "2026-06-11", shares: "8000", price: "18.9", shares_after: "58000", position_change_percent: "16", countable: true, direct_indirect: "I", caveats: ["Held indirectly, through a trust."] },
   { accession: "0000100003-26-000013", insider: "Lee Chen (director)", role: "director", economic_class: "open_market_buy", tx_date: "2026-06-12", filed: "2026-06-16", shares: "5000", price: "19.2", shares_after: "30000", position_change_percent: "20", countable: true },
-  { accession: "0000100004-26-000014", insider: "Priya Nair (CFO)", role: "officer", economic_class: "open_market_sell", tx_date: "2026-05-20", filed: "2026-05-22", shares: "12000", price: "20.1", shares_after: "88000", position_change_percent: "-12", countable: false, plan: "plan", caveats: ["Reported under a Rule 10b5-1 trading plan."] },
-  { accession: "0000100005-26-000015", insider: "Mo Alvarez (COO)", role: "officer", economic_class: "option_exercise", tx_date: "2026-05-28", filed: "2026-05-30", shares: "15000", price: "6", derivative: true, bundled: true, caveats: ["A derivative line: shares are not yet held."] },
+  { accession: "0000100004-26-000014", insider: "Priya Nair (CFO)", role: "officer", economic_class: "open_market_sell", tx_date: "2026-05-20", filed: "2026-05-22", shares: "12000", price: "20.1", shares_after: "88000", position_change_percent: "-12", countable: false, plan: "plan", plan_basis: "form_checkbox", plan_adopted: "2025-11-12", caveats: ["Reported under a Rule 10b5-1 trading plan."] },
+  { accession: "0000100005-26-000015", insider: "Mo Alvarez (COO)", role: "officer", economic_class: "option_exercise", tx_date: "2026-05-28", filed: "2026-05-30", shares: "15000", price: "6", derivative: true, bundled: true, exercise_price: "6", exercisable_date: "2024-05-28", expiration_date: "2031-05-28", underlying_security: "Common stock", underlying_shares: "15000", footnote: "Options granted 28 May 2021; they vest over three years.", caveats: ["A derivative line: shares are not yet held."] },
   { accession: "0000100005-26-000015", insider: "Mo Alvarez (COO)", role: "officer", economic_class: "open_market_sell", tx_date: "2026-05-28", filed: "2026-05-30", shares: "15000", price: "20.4", shares_after: "41000", position_change_percent: "-26.8", bundled: true, plan: "unknown", caveats: ["The filing carries no plan indicator."] },
   { accession: "0000100006-26-000016", insider: "Dana Reyes (CEO)", role: "officer", economic_class: "grant_award", tx_date: "2026-03-02", filed: "2026-03-04", shares: "50000", price: "0", shares_after: "240000", caveats: ["Reported at a price of zero."] },
   { accession: "0000100006-26-000017", insider: "Dana Reyes (CEO)", role: "officer", economic_class: "tax_withholding", tx_date: "2026-03-15", filed: "2026-03-17", shares: "9000", price: "17.8", shares_after: "231000" },
@@ -85,6 +96,14 @@ export function sampleInsiders(cutoffMs: number): InsiderActivity {
     bundles: known.some((t) => t.bundled) ? [{ day: "2026-05-28", exercised: "15000", sold: "15000", proceeds: "306000", retained: "0" }] : [],
     class_counts: counts,
     notes: [],
+    splits_applied: 0,
+    context: {
+      shares_outstanding: String(SAMPLE_OUTSTANDING),
+      shares_outstanding_as_of: "2026-03-31",
+      shares_outstanding_method: "cover_page",
+      reported_share_count_change: "-0.012",
+      events: [{ event_type: "earnings", event_state: "reported", announced_at: "2026-05-07", source_url: null }],
+    },
     transactions: [...known].sort((a, b) => (b.tx_date ?? b.filed).localeCompare(a.tx_date ?? a.filed)),
   };
 }

@@ -349,6 +349,7 @@ class Edge:
     status: State
     known_at: dt.datetime
     valid_to: dt.date | None = None
+    owner_assigned: bool = False  # a weight the owner set, not a reported figure
 
 
 @dataclass(frozen=True)
@@ -360,6 +361,7 @@ class Impact:
     coverage: Decimal  # share of the entity's revenue its disclosed edges account for
     via: tuple[int, ...]  # edge ids, origin first
     source_age_days: int
+    uses_owner_assigned: bool = False  # some hop on the path is an owner-assigned weight
 
 
 @dataclass(frozen=True)
@@ -414,6 +416,7 @@ def shock_scenario(
     def coverage(entity: str) -> Decimal:
         return min(ONE, sum((e.share or ZERO for e in by_supplier.get(entity, [])), ZERO))
 
+    owner_ids = {e.id for e in numeric if e.owner_assigned}
     impacts: list[Impact] = []
     frontier: list[tuple[str, Decimal, Decimal, tuple[int, ...]]] = [(origin, shock, shock, ())]
     seen = {origin}
@@ -428,8 +431,20 @@ def shock_scenario(
                 cov = coverage(e.supplier)
                 upper = min(ONE, lower + (ONE - cov) * shock)
                 age = max(0, (as_of - e.known_at).days)
-                impacts.append(Impact(e.supplier, hop, lower, upper, cov, (*path, e.id), age))
-                nxt.append((e.supplier, lower, upper, (*path, e.id)))
+                via = (*path, e.id)
+                impacts.append(
+                    Impact(
+                        e.supplier,
+                        hop,
+                        lower,
+                        upper,
+                        cov,
+                        via,
+                        age,
+                        any(i in owner_ids for i in via),
+                    )
+                )
+                nxt.append((e.supplier, lower, upper, via))
         seen.update(p for p, *_ in nxt)
         frontier = nxt
     reached = {i.entity for i in impacts} | {origin}
@@ -450,23 +465,197 @@ def shock_scenario(
     return Scenario(origin, shock, tuple(impacts), non_q, tuple(notes))
 
 
+# ------------------------------------------------------------------------ portfolio exposure
+@dataclass(frozen=True)
+class Flow:
+    holding: str
+    counterparty: str
+    weight: Decimal  # the holding's weight in the portfolio
+    share: Decimal  # the counterparty's reported share of the holding's total revenue
+    exposure: Decimal  # weight x share: portfolio value that depends on this counterparty
+    period: str
+    claim_id: int
+
+
+@dataclass(frozen=True)
+class PortfolioExposure:
+    flows: tuple[Flow, ...]
+    by_counterparty: Mapping[str, Decimal]
+    covered_weight: Decimal  # weight of holdings that have at least one confirmed numeric claim
+    uncovered: tuple[str, ...]  # holdings with none: an unknown, not a zero
+    notes: tuple[str, ...]
+
+
+def portfolio_exposure(
+    weights: Mapping[str, Decimal],
+    deps: Iterable[Dependency],
+    keys: Mapping[int, str],
+    as_of: dt.datetime,
+) -> PortfolioExposure:
+    """Weight each holding's confirmed customer shares by the holding's portfolio weight.
+
+    Only confirmed, named, keyed customer claims whose share is a share of TOTAL revenue count, and
+    each holding contributes its LATEST period only, so periods are never added. A holding with no
+    such claim is `uncovered`: its dependency is unknown, never reported as zero. Owner-assigned
+    weights are not included; they appear only in the scenario view, labelled."""
+    by_holding: dict[str, list[Dependency]] = defaultdict(list)
+    for d in visible(deps, as_of):
+        if (
+            d.relationship == "customer"
+            and d.shape == "named"
+            and d.status == "confirmed"
+            and d.share is not None
+            and d.denominator == "total_revenue"
+            and d.id in keys
+            and not problems(d)
+            and d.reporter in weights
+        ):
+            by_holding[d.reporter].append(d)
+    flows: list[Flow] = []
+    for holding, rows in sorted(by_holding.items()):
+        latest = max(
+            r.period_end.isoformat() if r.period_end else r.fiscal_period or "" for r in rows
+        )
+        for r in sorted(rows, key=lambda x: x.id):
+            period = r.period_end.isoformat() if r.period_end else r.fiscal_period or ""
+            if period != latest:
+                continue
+            share = r.share or ZERO
+            flows.append(
+                Flow(
+                    holding,
+                    keys[r.id],
+                    weights[holding],
+                    share,
+                    weights[holding] * share,
+                    period,
+                    r.id,
+                )
+            )
+    totals: dict[str, Decimal] = defaultdict(lambda: ZERO)
+    for f in flows:
+        totals[f.counterparty] += f.exposure
+    covered = sum((weights[h] for h in by_holding), ZERO)
+    uncovered = tuple(sorted(h for h in weights if h not in by_holding))
+    notes = [
+        "Each holding shows its latest reported period only; periods are never added.",
+        "Exposure is portfolio weight times the counterparty's reported share of that holding's "
+        "total revenue. It is not a loss estimate.",
+    ]
+    if uncovered:
+        notes.append(
+            f"{len(uncovered)} holding(s) have no confirmed numeric customer claim: unknown."
+        )
+    return PortfolioExposure(
+        tuple(flows),
+        dict(sorted(totals.items(), key=lambda kv: -kv[1])),
+        covered,
+        uncovered,
+        tuple(notes),
+    )
+
+
 # ----------------------------------------------------------------------------- both sides
-def side_conflict(a: Dependency, b: Dependency, a_party: str, b_party: str) -> str | None:
-    """Do two disclosures about the same pair contradict each other? Different denominators are not
-    compared (a share of revenue and a share of purchases are different numbers)."""
-    if a.reporter != a_party or b.reporter != b_party:
-        return None
-    if a.relationship == "customer" and b.relationship == "customer":
-        return "each company says the other is its customer"
-    if a.relationship == "supplier" and b.relationship == "supplier":
-        return "each company says the other is its supplier"
-    if (
-        a.denominator is not None
-        and a.denominator == b.denominator
-        and a.share is not None
-        and b.share is not None
-        and a.period_end == b.period_end
-        and a.relationship == b.relationship
-    ):
-        return None
+def _direction(d: Dependency, counterparty: str) -> tuple[str, str] | None:
+    """(seller, buyer) a claim describes, or None for a non customer/supplier claim."""
+    if d.relationship == "customer":
+        return (d.reporter, counterparty)
+    if d.relationship == "supplier":
+        return (counterparty, d.reporter)
     return None
+
+
+def _overlap(a: Dependency, b: Dependency) -> bool:
+    """Both claims could describe the same period. An undated claim overlaps anything."""
+    if a.valid_to is not None and b.valid_from is not None and a.valid_to < b.valid_from:
+        return False
+    return not (b.valid_to is not None and a.valid_from is not None and b.valid_to < a.valid_from)
+
+
+@dataclass(frozen=True)
+class SideConflict:
+    kind: Literal["opposite_direction", "share_mismatch"]
+    a_id: int
+    b_id: int
+    note: str
+
+
+def side_conflict(
+    a: Dependency, b: Dependency, a_counterparty: str, b_counterparty: str
+) -> SideConflict | None:
+    """Do two disclosures about the same pair, one from each side, contradict each other?
+
+    `a_counterparty` is who a names, `b_counterparty` who b names (the entity keys the resolver
+    gave them). Disagreement on direction is a contradiction. A share is compared only when both
+    sides state the same thing (same period, and the figure is the SAME flow: a's customer share
+    of revenue against b's purchases from a are different denominators and are never compared)."""
+    if a.reporter != b_counterparty or b.reporter != a_counterparty or not _overlap(a, b):
+        return None
+    da, db = _direction(a, a_counterparty), _direction(b, b_counterparty)
+    if da is None or db is None:
+        return None
+    if da == db:
+        return None
+
+    def verb(d: tuple[str, str], reporter: str) -> str:
+        return "sells to" if d[0] == reporter else "buys from"
+
+    return SideConflict(
+        "opposite_direction",
+        a.id,
+        b.id,
+        f"{a.reporter} says it {verb(da, a.reporter)} {a_counterparty}; "
+        f"{b.reporter} says it {verb(db, b.reporter)} {b_counterparty}",
+    )
+
+
+def reconcile(deps: Iterable[Dependency], key_of: Mapping[int, str]) -> list[SideConflict]:
+    """Every contradiction between two reporters' claims about each other. `key_of` maps a claim id
+    to the entity key of its counterparty (a held ticker where known); claims without a key are
+    skipped, never guessed. Contradictions are reported, not resolved: both claims stay."""
+    keyed = [d for d in deps if d.id in key_of and d.shape == "named"]
+    out: list[SideConflict] = []
+    for i, a in enumerate(keyed):
+        for b in keyed[i + 1 :]:
+            found = side_conflict(a, b, key_of[a.id], key_of[b.id])
+            if found:
+                out.append(found)
+    return out
+
+
+# ------------------------------------------------------------------------------------- changes
+@dataclass(frozen=True)
+class Change:
+    kind: Literal["new", "ended"]
+    dep: Dependency
+
+
+def changes(
+    at_since: Sequence[Dependency],
+    at_now: Sequence[Dependency],
+    since: dt.datetime,
+    now: dt.datetime,
+    *,
+    min_share: Decimal,
+) -> list[Change]:
+    """Material relationships that appeared or ended between `since` and `now`.
+
+    `at_since` and `at_now` are the same claims with their review state resolved at each moment,
+    so a claim confirmed after `since` is new and one rejected since is ended. A relationship is
+    live when it is confirmed, well formed and `visible`; it is material when its reported share is
+    at least `min_share`, or when it has no share but names a customer or supplier."""
+
+    def live(deps: Sequence[Dependency], at: dt.datetime) -> dict[int, Dependency]:
+        return {
+            d.id: d
+            for d in visible(deps, at)
+            if d.status == "confirmed" and d.relationship != "procurement_award" and not problems(d)
+        }
+
+    def material(d: Dependency) -> bool:
+        return d.share is None or d.share >= min_share
+
+    before, after = live(at_since, since), live(at_now, now)
+    out = [Change("new", d) for i, d in after.items() if i not in before and material(d)]
+    out += [Change("ended", d) for i, d in before.items() if i not in after and material(d)]
+    return sorted(out, key=lambda c: (c.dep.known_at, c.dep.id, c.kind))

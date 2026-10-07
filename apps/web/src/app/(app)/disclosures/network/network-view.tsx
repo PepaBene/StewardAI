@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { ConcentrationBars, DependencyGraph, PortfolioExposure, ScenarioView, SuggestedEdges } from "@/components/disclosure/network";
+import { ConcentrationBars, ConflictList, DependencyGraph, LivePortfolio, OwnerWeights, PortfolioExposure, ScenarioView, SuggestedEdges } from "@/components/disclosure/network";
 import { Panel, SectionNav } from "@/components/oversight/panel";
 import { PageHeader } from "@/components/page-header";
 import { Field } from "@/components/reference/form-bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
-import type { DependencyView } from "@/lib/disclosure/dependencies";
+import type { DependencyView, PortfolioDependencies } from "@/lib/disclosure/dependencies";
 import { SAMPLE_DEP_DAY, SAMPLE_DEP_TICKER, SAMPLE_NAMES, sampleDependencies, samplePortfolio } from "@/lib/disclosure/fixtures-dependencies";
 import { dayOf, endOfDayMs, formatDay } from "@/lib/disclosure/model";
 
@@ -18,6 +18,8 @@ const SECTIONS = [
   { id: "concentration", label: "Concentration" },
   { id: "scenario", label: "If a customer shrinks" },
   { id: "review", label: "Waiting for review" },
+  { id: "conflicts", label: "Where reporters disagree" },
+  { id: "weights", label: "Your own estimates" },
   { id: "portfolio", label: "Across the portfolio" },
 ] as const;
 
@@ -38,8 +40,26 @@ export function NetworkPageView() {
   const [error, setError] = useState<string | undefined>();
   const [live, setLive] = useState<DependencyView | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [nonce, setNonce] = useState(0);
+  const [portfolio, setPortfolio] = useState<PortfolioDependencies | null>(null);
 
   const sample = ticker === null;
+
+  useEffect(() => {
+    if (sample) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await getBrowserApiClient().GET("/disclosures/portfolio/dependencies", { params: { query: { as_of: new Date(cutoff).toISOString() } } });
+        if (!cancelled) setPortfolio(r.data ?? null);
+      } catch {
+        if (!cancelled) setPortfolio(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sample, cutoff, nonce]);
 
   useEffect(() => {
     if (!ticker) return;
@@ -60,7 +80,7 @@ export function NetworkPageView() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [ticker, cutoff, shock]);
+  }, [ticker, cutoff, shock, nonce]);
 
   const view = useMemo(() => (sample ? sampleDependencies(cutoff, shock) : live), [sample, cutoff, shock, live]);
   const holdings = useMemo(() => (sample ? samplePortfolio(cutoff) : view ? [{ ticker: view.ticker, weight: 1, claims: view.claims }] : []), [sample, cutoff, view]);
@@ -140,12 +160,25 @@ export function NetworkPageView() {
       </Panel>
 
       <Panel id="review" title="Waiting for review" description="Claims a machine found that nobody has confirmed. Each shows the passage it came from.">
-        {view ? <SuggestedEdges claims={view.claims} /> : <p className="text-sm text-text-muted">Loading…</p>}
+        {view ? <SuggestedEdges ticker={view.ticker} claims={view.claims} editable={!sample} onChanged={() => setNonce((n) => n + 1)} /> : <p className="text-sm text-text-muted">Loading…</p>}
+      </Panel>
+
+      <Panel id="conflicts" title="Where reporters disagree" description="When the company and one of its counterparties tell different stories, both are kept.">
+        {view ? <ConflictList conflicts={view.conflicts} claims={view.claims} inbound={view.inbound_claims} /> : <p className="text-sm text-text-muted">Loading…</p>}
+      </Panel>
+
+      <Panel id="weights" title="Your own estimates" description="Weights you assign where no filing gives one. Kept apart from reported figures.">
+        {view ? <OwnerWeights ticker={view.ticker} weights={view.owner_weights} editable={!sample} onChanged={() => setNonce((n) => n + 1)} /> : <p className="text-sm text-text-muted">Loading…</p>}
       </Panel>
 
       <Panel id="portfolio" title="Across the portfolio" description="Where portfolio weight reaches a confirmed customer.">
-        {sample ? null : <p className="mb-2 text-sm text-text-muted">Only this holding is drawn, at full weight. Your whole portfolio is not connected to this page yet.</p>}
-        {view ? <PortfolioExposure holdings={holdings} /> : <p className="text-sm text-text-muted">Loading…</p>}
+        {sample ? (
+          view ? <PortfolioExposure holdings={holdings} /> : null
+        ) : portfolio ? (
+          <LivePortfolio data={portfolio} />
+        ) : (
+          <p className="text-sm text-text-muted">Loading the portfolio…</p>
+        )}
       </Panel>
     </div>
   );

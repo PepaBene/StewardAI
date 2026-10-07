@@ -28,6 +28,8 @@ const claim = (s: Seed): Claim => ({
   problems: [],
   screen: [],
   stale: false,
+  entity: null,
+  awards: [],
   ...s,
 });
 
@@ -36,11 +38,11 @@ const SEEDS: Seed[] = [
   { id: 2, relationship: "customer", shape: "named", counterparty: "Cinder Retail", counterparty_key: "CNDR", share: "0.14", denominator: "total_revenue", period_end: "2025-12-31", known_at: "2026-02-20T00:00:00Z", passage: "Sales to Cinder Retail represented 14% of total revenue.", evidence_id: 9002 },
   { id: 3, relationship: "customer", shape: "anonymous", counterparty: null, share: "0.11", denominator: "total_revenue", period_end: "2025-12-31", known_at: "2026-02-20T00:00:00Z", passage: "Customer A accounted for 11% of total revenue.", evidence_id: 9003 },
   { id: 4, relationship: "customer", shape: "group", counterparty: null, counterparty_count: 3, share: "0.38", denominator: "total_revenue", period_end: "2025-12-31", known_at: "2026-02-20T00:00:00Z", passage: "Our three largest customers together accounted for 38% of total revenue.", evidence_id: 9004 },
-  { id: 5, relationship: "customer", shape: "named", counterparty: "Dune Mobility", counterparty_key: "DUNE", share: "0.30", denominator: "total_revenue", period_end: "2025-12-31", status: "suggested", known_at: "2026-05-10T00:00:00Z", passage: "If we were to lose Dune Mobility, which we expect could account for 30% of revenue, our results would suffer.", screen: ["hypothetical"], evidence_id: 9005 },
+  { id: 5, relationship: "customer", shape: "named", counterparty: "Dune Mobility", counterparty_key: "DUNE", entity: { status: "candidate", basis: "name", needs_review: true, candidates: [412], note: "A name match only: confirm it before it is linked." }, share: "0.30", denominator: "total_revenue", period_end: "2025-12-31", status: "suggested", known_at: "2026-05-10T00:00:00Z", passage: "If we were to lose Dune Mobility, which we expect could account for 30% of revenue, our results would suffer.", screen: ["hypothetical"], evidence_id: 9005 },
   { id: 6, relationship: "customer", shape: "named", counterparty: "Eland Cloud", counterparty_key: "ELND", share: "0.09", denominator: "segment_revenue", period_end: "2025-12-31", known_at: "2026-02-20T00:00:00Z", passage: "Eland Cloud accounted for 9% of Services segment revenue.", evidence_id: 9006 },
   { id: 7, relationship: "supplier", shape: "named", counterparty: "Corvid Components", counterparty_key: "CRVD", share: "0.41", denominator: "purchases", period_end: "2025-12-31", known_at: "2026-02-20T00:00:00Z", passage: "Corvid Components supplied 41% of our component purchases.", evidence_id: 9007 },
   { id: 8, relationship: "supplier", shape: "named", counterparty: "Fathom Foundry", counterparty_key: "FTHM", known_at: "2026-02-20T00:00:00Z", passage: "We depend on Fathom Foundry as the sole source of one assembly.", evidence_id: 9008, stale: true },
-  { id: 9, relationship: "procurement_award", shape: "named", counterparty: "Ministry of Transport (CZ)", known_at: "2026-03-12T00:00:00Z", passage: "Contract award notice 2026/S 051: supply of fleet sensors to ACME Corp.", source_url: "https://ted.europa.eu/notice/2026-051", evidence_id: null },
+  { id: 9, relationship: "procurement_award", shape: "named", awards: [{ notice_number: "2026/S 051-123456", lot_id: "LOT-1", notice_type: "can-standard", cpv_codes: ["34144900"], value: "2400000", currency: "EUR", start_date: "2026-04-01", end_date: null, status: "awarded", published: "2026-03-12" }], counterparty: "Ministry of Transport (CZ)", known_at: "2026-03-12T00:00:00Z", passage: "Contract award notice 2026/S 051: supply of fleet sensors to ACME Corp.", source_url: "https://ted.europa.eu/notice/2026-051", evidence_id: null },
   { id: 10, relationship: "customer", shape: "named", counterparty: "Gantry Freight", counterparty_key: "GNTR", share: "0.05", denominator: "total_revenue", period_end: "2025-12-31", status: "suggested", known_at: "2026-06-01T00:00:00Z", passage: "No customer other than Gantry Freight exceeded 5% of revenue.", screen: ["negated"], evidence_id: 9010 },
 ];
 
@@ -76,11 +78,16 @@ export function sampleDependencies(cutoffMs: number, shock = 0.2): DependencyVie
       {
         origin: "BORE",
         shock: String(shock),
-        impacts: s.impacts.map((i) => ({ entity: i.entity, hop: i.hop, lower: String(i.lower), upper: String(i.upper), coverage: String(i.coverage), via: i.via, source_age_days: 0 })),
+        impacts: s.impacts.map((i) => ({ entity: i.entity, hop: i.hop, lower: String(i.lower), upper: String(i.upper), coverage: String(i.coverage), via: i.via, source_age_days: 0, uses_owner_assigned: false })),
         non_quantified: s.nonQuantified.map((e) => ({ supplier: e.supplier, customer: e.customer, edge_id: e.id, note: "A confirmed relationship with no reported share: not quantified" })),
         notes: ["Only confirmed, dated edges with a reported share carry numbers.", "The upper bound treats every undisclosed customer as hit as hard as the origin."],
       },
     ],
+    conflicts: claims.some((c) => c.id === 1)
+      ? [{ kind: "share_mismatch", claim_ids: [1], note: "Borealis Systems says it bought 18% of its supply from Acme; Acme reports 22% of its revenue. Both are kept." }]
+      : [],
+    owner_weights: [{ id: 1, counterparty: "Nordlicht GmbH", counterparty_key: "NORD", share: "0.06", denominator: "total_revenue", as_of: "2026-05-02", note: "Estimated from a call with management; not in any filing.", assigned_by: "owner" }],
+    inbound_claims: 1,
     notes: claims.length === 0 ? ["No relationship claims are known for this holding by that date."] : [],
   };
 }

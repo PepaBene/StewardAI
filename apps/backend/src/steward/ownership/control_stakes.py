@@ -600,6 +600,15 @@ async def store_filing(
             ],
         )
         await conn.execute(
+            "delete from public.control_stake_exhibit where accession = $1", filing.accession
+        )
+        await conn.executemany(
+            """insert into public.control_stake_exhibit
+                 (accession, row_index, exhibit_label, description)
+               values ($1,$2,$3,$4)""",
+            [(filing.accession, i, label, desc) for i, (label, desc) in enumerate(parsed.exhibits)],
+        )
+        await conn.execute(
             "delete from public.control_stake_issuer_link where accession = $1", filing.accession
         )
         for ticker, cusip_matched in matches:

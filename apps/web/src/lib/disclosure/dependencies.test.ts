@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { concentrationOf, concentrationParts, graphLayout, portfolioSankey, shockScenario, type SEdge } from "@/lib/disclosure/dependencies";
+import { concentrationOf, concentrationParts, graphLayout, liveSankey, portfolioSankey, shockScenario, type PortfolioDependencies, type SEdge } from "@/lib/disclosure/dependencies";
 import { sampleClaims, sampleDependencies, samplePortfolio } from "@/lib/disclosure/fixtures-dependencies";
 
 const END = Date.parse("2026-06-30T23:59:59Z");
@@ -86,5 +86,28 @@ describe("scenario", () => {
     const v = sampleDependencies(END, 0.2);
     expect(v.scenarios[0].impacts.map((i) => i.entity)).toEqual(["ACME", "CNDR_SUP"]);
     expect(v.scenarios[0].non_quantified).toHaveLength(1);
+  });
+});
+
+describe("live portfolio flows", () => {
+  const p: PortfolioDependencies = {
+    as_of: "2026-06-30T00:00:00Z",
+    holdings: 3,
+    covered_weight: "0.5",
+    uncovered: ["NOCLAIM"],
+    flows: [
+      { holding: "ACME", counterparty: "Borealis", weight: "0.3", share: "0.22", exposure: "0.066", period: "2025-12-31", claim_id: 1 },
+      { holding: "ORBT", counterparty: "Borealis", weight: "0.2", share: "0.35", exposure: "0.07", period: "2025-12-31", claim_id: 2 },
+    ],
+    by_counterparty: { Borealis: "0.136" },
+    notes: [],
+  };
+  it("joins the same named customer across holdings into one node", () => {
+    const g = liveSankey(p);
+    expect(g.nodes.filter((n) => n.label === "Borealis")).toHaveLength(1);
+    expect(g.links).toHaveLength(2);
+  });
+  it("draws nothing for a holding with no flow: unknown is not zero", () => {
+    expect(liveSankey(p).nodes.some((n) => n.label === "NOCLAIM")).toBe(false);
   });
 });
