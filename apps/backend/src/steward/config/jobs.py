@@ -1893,6 +1893,22 @@ class JobsConfig(ConfigModel):
         "SEC XBRL filing (reported basis). Your own exposure entries are never changed. "
         "Default: Tuesdays 05:50.",
     )
+    disclosure_ingest: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="40 6 * * 1-5", enabled=False),
+        description="Fetch, store and parse the newest SEC annual and quarterly filings of held "
+        "issuers. Off by default: switch on after the SEC sources pass their access test. "
+        "Default: weekdays 06:40.",
+    )
+    disclosure_identifiers: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="20 6 * * 6", enabled=False),
+        description="Suggest missing LEIs (GLEIF) and FIGIs (OpenFIGI); you confirm each. "
+        "Default: Saturdays 06:20.",
+    )
+    disclosure_alerts: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="15 13 * * *"),
+        description="Scan verified disclosures for new alerts and e-mail them, grouped by "
+        "ticker, when e-mail is configured. Default: daily 13:15.",
+    )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
     exposure_build_settings: ExposureBuildSettings = Field(default_factory=ExposureBuildSettings)
     ir_discovery_settings: IrDiscoverySettings = Field(default_factory=IrDiscoverySettings)
@@ -1961,6 +1977,9 @@ class JobsConfig(ConfigModel):
             "ir_discovery": self.ir_discovery,
             "gap_research": self.gap_research,
             "exposure_build": self.exposure_build,
+            "disclosure_ingest": self.disclosure_ingest,
+            "disclosure_identifiers": self.disclosure_identifiers,
+            "disclosure_alerts": self.disclosure_alerts,
             "twelve_data_corporate_actions": self.twelve_data_corporate_actions,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,

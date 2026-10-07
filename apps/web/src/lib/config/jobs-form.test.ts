@@ -67,6 +67,9 @@ const FULL: JobsConfig = {
   ir_discovery: { enabled: true, cron: "30 7 * * 1", timezone: "UTC" },
   gap_research: { enabled: true, cron: "0 8 * * 3", timezone: "UTC" },
   exposure_build: { enabled: true, cron: "50 5 * * 2", timezone: "UTC" },
+  disclosure_ingest: { enabled: false, cron: "40 6 * * 1-5", timezone: "UTC" },
+  disclosure_identifiers: { enabled: false, cron: "20 6 * * 6", timezone: "UTC" },
+  disclosure_alerts: { enabled: true, cron: "15 13 * * *", timezone: "UTC" },
   earnings_check: {
     extraction_model: "claude-opus-5-5",
     locate_model: "claude-sonnet-5",

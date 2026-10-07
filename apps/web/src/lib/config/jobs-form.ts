@@ -298,11 +298,29 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Builds each holding's revenue-by-country exposure from its latest annual SEC filing. Only single countries are mapped; your own exposure entries are never changed, and a row you delete is not rebuilt.",
     cron: "50 5 * * 2",
   },
+  disclosure_ingest: {
+    label: "Filing ingestion",
+    description:
+      "Fetches, stores and parses the newest annual and quarterly SEC filings of your holdings. Switch it on after the SEC sources pass their access test; a filing that fails is reported, not skipped silently.",
+    cron: "40 6 * * 1-5",
+  },
+  disclosure_identifiers: {
+    label: "Identifier suggestions",
+    description:
+      "Looks up missing LEIs and FIGIs and stores them as suggestions. Nothing is confirmed until you decide it.",
+    cron: "20 6 * * 6",
+  },
+  disclosure_alerts: {
+    label: "Disclosure alerts",
+    description:
+      "Scans verified filings for new insider trades, major-holder changes and relationship changes, and e-mails the new ones grouped by ticker when e-mail is configured.",
+    cron: "15 13 * * *",
+  },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
 
 /** Schedules that start off: they spend a provider's free allowance or need a key, so you switch them on yourself. */
-const OFF_BY_DEFAULT: readonly ScheduleKey[] = ["fmp_company", "alpha_vantage_statements", "epo_patents", "companies_house_filings", "edinet_filings", "twelve_data_corporate_actions"];
+const OFF_BY_DEFAULT: readonly ScheduleKey[] = ["fmp_company", "alpha_vantage_statements", "epo_patents", "companies_house_filings", "edinet_filings", "twelve_data_corporate_actions", "disclosure_ingest", "disclosure_identifiers"];
 export const DEFAULT_TIMEZONE = "Europe/Prague";
 
 /** The backend's defaults, for when nothing is saved yet (a 404). */

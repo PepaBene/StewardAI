@@ -219,6 +219,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "companies_house_filings",
         "control_stakes",
         "daily_digest",
+        "disclosure_alerts",
         "earnings_calendar",
         "earnings_calendar_full",
         "earnings_due",

@@ -131,7 +131,7 @@ class Recorder:
         monkeypatch.setattr(ingest_job, "ingest_document_version", ingest)
         monkeypatch.setattr(ingest_job, "quarantine_review", review)
         monkeypatch.setattr(ingest_job, "extract_notes_for_document", notes)
-        monkeypatch.setattr(ingest_job, "_mirror_facts", mirror)
+        monkeypatch.setattr(ingest_job, "mirror_stored_facts", mirror)
 
 
 async def run(pool: Pool, fetch: Any, store: Store | None = None, filings: Any = FILINGS) -> Any:

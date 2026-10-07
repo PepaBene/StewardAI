@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { callApi } from "@/app/(app)/relationships/decision-form";
 import { getBrowserApiClient } from "@/lib/api/client";
-import { ALERT_HREF, ALERT_KIND_LABEL, byKnown, splitByState, type DisclosureAlert } from "@/lib/disclosure/alerts";
+import { ALERT_HREF, ALERT_KIND_LABEL, byKnown, digestKindLabel, digestOrder, forTicker, splitByState, type DigestGroup, type DisclosureAlert } from "@/lib/disclosure/alerts";
 import { formatDay } from "@/lib/disclosure/model";
 
 /**
@@ -21,6 +21,9 @@ export function AlertsPageView() {
   const [showDone, setShowDone] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [digest, setDigest] = useState<DigestGroup[] | null>(null);
+  const [digestError, setDigestError] = useState<string | null>(null);
+  const [ticker, setTicker] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -31,6 +34,24 @@ export function AlertsPageView() {
       setMessage({ ok: false, text: `Backend unreachable: ${e instanceof Error ? e.message : String(e)}` });
     }
   }, []);
+
+  const loadDigest = useCallback(async () => {
+    try {
+      const r = await getBrowserApiClient().GET("/disclosures/alerts/digest");
+      if (r.data) {
+        setDigest(r.data);
+        setDigestError(null);
+      } else setDigestError(`The digest failed to load (HTTP ${r.response.status}). The list below is unaffected.`);
+    } catch (e) {
+      setDigestError(`Backend unreachable: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, []);
+
+  useEffect(() => {
+    // The loaders set state only after the request returns, not during this effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadDigest();
+  }, [loadDigest]);
 
   useEffect(() => {
     // The loader sets state only after the request returns, not during this effect.
@@ -46,7 +67,7 @@ export function AlertsPageView() {
         const d = r.data;
         const total = d.insider_trade + d.major_holder + d.relationship_change;
         setMessage({ ok: d.failed === 0, text: `${total} new ${total === 1 ? "alert" : "alerts"}${d.failed ? `, and ${d.failed} ${d.failed === 1 ? "check" : "checks"} could not run` : ""}.` });
-        await load();
+        await Promise.all([load(), loadDigest()]);
       } else setMessage({ ok: false, text: `The check failed (HTTP ${r.response.status}).` });
     } catch (e) {
       setMessage({ ok: false, text: `Backend unreachable: ${e instanceof Error ? e.message : String(e)}` });
@@ -58,10 +79,11 @@ export function AlertsPageView() {
   async function acknowledge(id: number) {
     const r = await callApi(() => getBrowserApiClient().POST("/disclosures/alerts/{alert_id}/acknowledge", { params: { path: { alert_id: id } } }), "Marked as read.");
     setMessage({ ok: r.ok, text: r.text });
-    if (r.ok) await load();
+    if (r.ok) await Promise.all([load(), loadDigest()]);
   }
 
   const { open, done } = splitByState(alerts ?? []);
+  const shownOpen = forTicker(open, ticker);
 
   return (
     <div className="flex flex-col gap-5">
@@ -82,13 +104,58 @@ export function AlertsPageView() {
         </p>
       ) : null}
 
-      <Panel id="open" title="To read" description="Newest first by the date each became known to us.">
+      <Panel id="digest" title="Read first" description="Unread alerts grouped by ticker, most alerts first. Choose a ticker to show only its alerts below.">
+        {digestError ? (
+          <p role="alert" className="border border-warning-signal/40 bg-warning-signal-subtle px-3 py-2 text-sm">{digestError}</p>
+        ) : digest === null ? (
+          <p className="text-sm text-text-muted">Loading the digest…</p>
+        ) : digest.length === 0 ? (
+          <p className="text-sm text-text-muted">No unread alerts to group. Press “Check for new filings” to look for new ones.</p>
+        ) : (
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {digestOrder(digest).map((g) => {
+              const active = g.ticker === ticker;
+              return (
+                <li key={g.ticker}>
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => {
+                      setTicker(active ? null : g.ticker);
+                      document.getElementById("open")?.scrollIntoView({ block: "start" });
+                    }}
+                    className={`block w-full border p-3 text-left text-sm focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none ${active ? "border-accent bg-accent text-accent-contrast" : "border-border bg-surface-raised hover:bg-surface-muted"}`}
+                  >
+                    <span className="flex items-baseline justify-between gap-2">
+                      <span className="num font-semibold">{g.ticker}</span>
+                      <span className="num">{g.count} unread</span>
+                    </span>
+                    <span className="mt-0.5 block text-xs">{g.kinds.map(digestKindLabel).join(", ")} · latest known <span className="num">{formatDay(g.latest_known_at)}</span></span>
+                    <span className="mt-1 block">{g.headlines[0]}</span>
+                    {g.headlines.length > 1 ? <span className="block text-xs">and {g.headlines.length - 1} more</span> : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel id="open" title={ticker ? `To read: ${ticker}` : "To read"} description="Newest first by the date each became known to us.">
+        {ticker ? (
+          <p className="mb-2 text-sm">
+            Showing <span className="num">{ticker}</span> only.{" "}
+            <button type="button" onClick={() => setTicker(null)} className="text-accent-ink hover:underline">Show all tickers</button>
+          </p>
+        ) : null}
         {alerts === null ? (
           <p className="text-sm text-text-muted">Loading alerts…</p>
         ) : open.length === 0 ? (
           <p className="text-sm text-text-muted">Nothing is waiting. New filings for your holdings appear here after the next collection, or press “Check for new filings”.</p>
+        ) : shownOpen.length === 0 ? (
+          <p className="text-sm text-text-muted">No unread alerts for {ticker}. Choose “Show all tickers” to see the rest.</p>
         ) : (
-          <AlertList alerts={byKnown(open)} onAcknowledge={acknowledge} />
+          <AlertList alerts={byKnown(shownOpen)} onAcknowledge={acknowledge} />
         )}
       </Panel>
 

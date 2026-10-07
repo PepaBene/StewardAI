@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { IdentifierSuggestions } from "@/components/disclosure/identifiers";
 import { Panel } from "@/components/oversight/panel";
 import { PageHeader } from "@/components/page-header";
 import { SELECT_CLASS } from "@/components/reference/form-bits";
@@ -86,6 +87,10 @@ export function AdjudicationPageView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader kicker="Research & Verification" title="Accuracy checks" description="Label a sample of what the machine read and see whether it is accurate enough to rely on." />
+
+      <Panel id="identifiers" title="Suggested identifiers" description="Company and share-class identifiers found for companies that lack them. Each is a suggestion until a person confirms it.">
+        <IdentifierSuggestions />
+      </Panel>
 
       <div role="group" aria-label="What to check" className="flex flex-wrap gap-1">
         {DATASETS.map((d) => (

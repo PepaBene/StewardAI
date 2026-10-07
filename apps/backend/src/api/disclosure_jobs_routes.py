@@ -23,11 +23,13 @@ from steward.disclosure.identifier_job import (
     openfigi_figi_lookup,
     resolve_identifiers,
 )
-from steward.disclosure.ingest_job import ingest_filings
+from steward.disclosure.ingest_job import ingest_filings, mirror_stored_facts
+from steward.disclosure.parse import ParseError, parse_html
 from steward.disclosure.registry import SourceNotEnabled
 from steward.disclosure.sec_discovery import DiscoveredFiling, discover_filings
 from steward.settings import get_settings
 from steward.sources.gleif import GleifClient
+from steward.storage import StorageError
 
 router = APIRouter(prefix="/disclosures", tags=["disclosures"])
 
@@ -121,6 +123,44 @@ async def ingest_issuer_filings(
             for r in outcome.results
         ],
     )
+
+
+class MirrorOut(BaseModel):
+    version_id: int
+    facts_mirrored: int
+
+
+@router.post("/versions/{version_id}/mirror-facts")
+async def mirror_version_facts(
+    version_id: IdPath, pool: Pool, storage: Storage, _owner: Owner
+) -> MirrorOut:
+    """Link the stored statement facts of an archived filing to the exact place in the document
+    that prints them. A fact with no single exact match stays unlinked; re-running adds nothing
+    twice."""
+    row = await pool.fetchrow(
+        """select v.archive_path, d.issuer_id, d.external_id
+             from public.source_document_version v
+             join public.source_document d on d.id = v.document_id
+            where v.id = $1""",
+        version_id,
+    )
+    if row is None or not row["archive_path"]:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No archived copy of that version")
+    if row["issuer_id"] is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "The document is not linked to an issuer yet"
+        )
+    try:
+        data = await storage.get(row["archive_path"])
+        doc = parse_html(data)
+    except StorageError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+    except ParseError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    mirrored = await mirror_stored_facts(
+        pool, row["issuer_id"], row["external_id"], version_id, doc
+    )
+    return MirrorOut(version_id=version_id, facts_mirrored=mirrored)
 
 
 class IdentifierSuggestionOut(BaseModel):

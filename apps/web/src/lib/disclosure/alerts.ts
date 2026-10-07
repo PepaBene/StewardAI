@@ -31,6 +31,18 @@ export function splitByState(alerts: readonly DisclosureAlert[]): { open: Disclo
 /** Newest known first: what the owner learned most recently is read first. */
 export const byKnown = (alerts: readonly DisclosureAlert[]): DisclosureAlert[] => [...alerts].sort((a, b) => Date.parse(b.known_at) - Date.parse(a.known_at));
 
+export type DigestGroup = S["AlertDigestGroupOut"];
+
+/** Readable kind names for the digest; an unknown kind is shown as filed rather than dropped. */
+export const digestKindLabel = (kind: string): string => ALERT_KIND_LABEL[kind as AlertKind] ?? kind.replaceAll("_", " ");
+
+/** Most alerts first, then the most recently known, then ticker, so the order is stable. */
+export const digestOrder = (groups: readonly DigestGroup[]): DigestGroup[] =>
+  [...groups].sort((a, b) => b.count - a.count || Date.parse(b.latest_known_at) - Date.parse(a.latest_known_at) || a.ticker.localeCompare(b.ticker));
+
+/** Alerts for the chosen ticker; null means no filter. */
+export const forTicker = <T extends { ticker: string }>(alerts: readonly T[], ticker: string | null): T[] => (ticker == null ? [...alerts] : alerts.filter((a) => a.ticker === ticker));
+
 /** Adjudication labels a person may give, per dataset. */
 export const RELATIONSHIP_LABELS = [
   { value: "true_relationship", label: "A current relationship" },

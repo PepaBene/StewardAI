@@ -6,6 +6,7 @@ import { CashConversion, DebtMaturities, SegmentBridgePanel, StatementHistory, V
 import { SAMPLE_MATURITIES, sampleBridge, sampleStatements } from "@/lib/disclosure/fixtures-financials";
 import type { SegmentBridge, StatementsOut } from "@/lib/disclosure/financials";
 import { CoverageRibbon, DatesTable, EvidencePanel, FilingsTable, ReviewPanel, SourcesPanel, ValuesTable } from "@/components/disclosure/panels";
+import { IngestFilings } from "@/components/disclosure/ingest";
 import { KnownAtRail } from "@/components/disclosure/known-at-rail";
 import { dataOf, Panel, ResourceNotice, SectionNav } from "@/components/oversight/panel";
 import { PageHeader } from "@/components/page-header";
@@ -239,6 +240,12 @@ export function DisclosuresView() {
             ))}
           </select>
         </label>
+      ) : null}
+
+      {!sample && issuer ? (
+        <Panel id="ingest" title="Ingest filings" description="Fetch this company’s newest annual and quarterly filings now. Each filing’s result, including gaps and failures, is listed.">
+          <IngestFilings key={issuer.issuer_id} issuerId={issuer.issuer_id} issuerName={issuer.legal_name} onDone={() => issuers.reload()} />
+        </Panel>
       ) : null}
 
       <SectionNav sections={SECTIONS} />

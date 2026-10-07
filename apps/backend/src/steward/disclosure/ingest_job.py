@@ -133,7 +133,7 @@ def _fact_row(row: Mapping[str, Any]) -> dict[str, Any]:
     return out
 
 
-async def _mirror_facts(
+async def mirror_stored_facts(
     pool: Pool, issuer_id: int, accession: str, version_id: int, doc: ParsedDocument
 ) -> int:
     """Mirror the stored statement facts of this filing that match a parsed iXBRL fact exactly.
@@ -234,7 +234,7 @@ async def ingest_filing(
     except Exception as exc:
         gaps.append(f"notes not extracted ({type(exc).__name__})")
     try:
-        mirrored = await _mirror_facts(pool, issuer_id, acc, stored.version_id, doc)
+        mirrored = await mirror_stored_facts(pool, issuer_id, acc, stored.version_id, doc)
     except Exception as exc:
         gaps.append(f"facts not mirrored ({type(exc).__name__})")
     return FilingResult(

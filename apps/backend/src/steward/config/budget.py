@@ -71,6 +71,9 @@ BudgetJobType = Literal[
     "ir_discovery",
     "gap_research",
     "exposure_build",
+    "disclosure_ingest",
+    "disclosure_identifiers",
+    "disclosure_alerts",
 ]
 
 AtCap = Literal["alert_only", "pause_noncritical", "downgrade_noncritical"]

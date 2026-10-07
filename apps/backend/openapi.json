@@ -15383,6 +15383,56 @@
         }
       }
     },
+    "/disclosures/versions/{version_id}/mirror-facts": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Mirror Version Facts",
+        "description": "Link the stored statement facts of an archived filing to the exact place in the document\nthat prints them. A fact with no single exact match stays unlinked; re-running adds nothing\ntwice.",
+        "operationId": "mirror_version_facts",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MirrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/disclosures/identifiers/resolve": {
       "post": {
         "tags": [
@@ -18359,7 +18409,10 @@
                 "ai_approvals",
                 "ir_discovery",
                 "gap_research",
-                "exposure_build"
+                "exposure_build",
+                "disclosure_ingest",
+                "disclosure_identifiers",
+                "disclosure_alerts"
               ]
             },
             "type": "array",
@@ -18423,7 +18476,10 @@
                 "ai_approvals",
                 "ir_discovery",
                 "gap_research",
-                "exposure_build"
+                "exposure_build",
+                "disclosure_ingest",
+                "disclosure_identifiers",
+                "disclosure_alerts"
               ]
             },
             "type": "object",
@@ -38697,6 +38753,18 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Builds each holding's revenue-by-country exposure from its latest annual SEC XBRL filing (reported basis). Your own exposure entries are never changed. Default: Tuesdays 05:50."
           },
+          "disclosure_ingest": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Fetch, store and parse the newest SEC annual and quarterly filings of held issuers. Off by default: switch on after the SEC sources pass their access test. Default: weekdays 06:40."
+          },
+          "disclosure_identifiers": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Suggest missing LEIs (GLEIF) and FIGIs (OpenFIGI); you confirm each. Default: Saturdays 06:20."
+          },
+          "disclosure_alerts": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Scan verified disclosures for new alerts and e-mail them, grouped by ticker, when e-mail is configured. Default: daily 13:15."
+          },
           "earnings_check": {
             "$ref": "#/components/schemas/EarningsCheckSettings"
           },
@@ -41823,6 +41891,24 @@
           "notes"
         ],
         "title": "MetricBridgeOut"
+      },
+      "MirrorOut": {
+        "properties": {
+          "version_id": {
+            "type": "integer",
+            "title": "Version Id"
+          },
+          "facts_mirrored": {
+            "type": "integer",
+            "title": "Facts Mirrored"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version_id",
+          "facts_mirrored"
+        ],
+        "title": "MirrorOut"
       },
       "MissingActions": {
         "properties": {
