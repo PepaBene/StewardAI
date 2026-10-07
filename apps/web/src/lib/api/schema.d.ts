@@ -17528,6 +17528,8 @@ export interface components {
              */
             alert_severity: number;
             benchmark?: components["schemas"]["BenchmarkSpec"] | null;
+            /** Splits */
+            splits?: components["schemas"]["SplitEntry"][];
             /**
              * Note
              * @default
@@ -21245,6 +21247,31 @@ export interface components {
              * @description Every configured source, in config order.
              */
             sources: components["schemas"]["SourceHealth"][];
+        };
+        /**
+         * SplitEntry
+         * @description A split or reverse split you entered. The broker's fills are not restated for it, so
+         *     without this a split shows up as a position the fills cannot explain.
+         */
+        SplitEntry: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Day
+             * Format: date
+             * @description First day the new share count applies.
+             */
+            day: string;
+            /**
+             * Ratio
+             * @description New shares per old share: 2 for a 2-for-1 split, 0.1 for a 1-for-10 reverse split.
+             */
+            ratio: number | string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** SpreadBucket */
         SpreadBucket: {

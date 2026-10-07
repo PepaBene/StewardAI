@@ -5,6 +5,7 @@ advice. Stored as `config_version` rows, so history, diff, rollback, export and 
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 from decimal import Decimal
 
@@ -48,6 +49,28 @@ class BenchmarkSpec(BaseModel):
         return self
 
 
+class SplitEntry(BaseModel):
+    """A split or reverse split you entered. The broker's fills are not restated for it, so
+    without this a split shows up as a position the fills cannot explain."""
+
+    model_config = ConfigDict(extra="forbid")
+    ticker: Ticker = Field(min_length=1, max_length=40)
+    day: dt.date = Field(description="First day the new share count applies.")
+    ratio: Decimal = Field(
+        gt=0,
+        description="New shares per old share: 2 for a 2-for-1 split, 0.1 for a 1-for-10 "
+        "reverse split.",
+    )
+    note: str = Field(default="", max_length=200)
+
+    @field_validator("ratio")
+    @classmethod
+    def _not_one(cls, value: Decimal) -> Decimal:
+        if value == 1:
+            raise ValueError("a split ratio of 1 changes nothing")
+        return value
+
+
 class PerformanceSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     core_tickers: list[Ticker] = Field(
@@ -78,6 +101,7 @@ class PerformanceSettings(BaseModel):
         "the digest). 0 turns these alerts off.",
     )
     benchmark: BenchmarkSpec | None = None
+    splits: list[SplitEntry] = Field(default_factory=list, max_length=200)
     note: str = Field(default="", max_length=500)
 
     @field_validator("exemption_currency")

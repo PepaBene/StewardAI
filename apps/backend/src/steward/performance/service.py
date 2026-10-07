@@ -39,6 +39,8 @@ from steward.performance.ledger import (
     Kind,
     LedgerEntry,
     RawTransaction,
+    Split,
+    apply_splits,
     build_ledger,
     position_breaks,
     reconcile_cash,
@@ -93,6 +95,14 @@ async def _raw_transactions(pool: asyncpg.Pool) -> list[RawTransaction]:
         )
         for x in rows
     ]  # fmt: skip
+
+
+async def _ledger(
+    pool: asyncpg.Pool, account_currency: str | None, settings: PerformanceSettings
+) -> list[LedgerEntry]:
+    """The classified ledger with the owner's entered splits applied to earlier fills."""
+    entries = build_ledger(await _raw_transactions(pool), account_currency)
+    return apply_splits(entries, [Split(s.ticker, s.day, s.ratio) for s in settings.splits])
 
 
 def _day_values(snapshots: list[asyncpg.Record], ledger: list[LedgerEntry]) -> list[DayValue]:
@@ -297,7 +307,7 @@ async def performance_report(
         )  # fmt: skip
     latest = snapshots[-1]
     account_currency = latest["account_currency"]
-    ledger = build_ledger(await _raw_transactions(pool), account_currency)
+    ledger = await _ledger(pool, account_currency, settings)
     days = _day_values(snapshots, ledger)
     checks = _cash_checks(snapshots, ledger, settings.cash_tolerance)
     jobs_cfg = await load_active(pool, "jobs", JobsConfig)
@@ -423,7 +433,7 @@ async def lots_report(pool: asyncpg.Pool, settings: PerformanceSettings) -> r.Lo
     explain = r.PerformanceExplain(formula_version="lots 1.0.0", formula=LOTS_FORMULA)
     snapshots = await _snapshots(pool)
     account_currency = snapshots[-1]["account_currency"] if snapshots else None
-    ledger = build_ledger(await _raw_transactions(pool), account_currency)
+    ledger = await _ledger(pool, account_currency, settings)
     if not ledger:
         return r.LotsResponse(
             status="unavailable", as_of=None, method=settings.cost_method, currency=account_currency,
@@ -577,7 +587,7 @@ async def attribution_report(
     if len(window) < 2:
         window = snapshots[-2:]
     account_currency = snapshots[-1]["account_currency"]
-    ledger = build_ledger(await _raw_transactions(pool), account_currency)
+    ledger = await _ledger(pool, account_currency, settings)
     day_values = _day_values(snapshots, ledger)
     flow_by_day = {d.date: d.flow for d in day_values}
     rate_by_day = {s["snapshot_date"]: s["fx_rate"] for s in snapshots}
@@ -692,11 +702,11 @@ SLEEVES_FORMULA = [
 ]
 
 
-async def ledger_entries(pool: asyncpg.Pool) -> list[LedgerEntry]:
+async def ledger_entries(pool: asyncpg.Pool, settings: PerformanceSettings) -> list[LedgerEntry]:
     """The dated ledger as built for every report, for export."""
     snapshots = await _snapshots(pool)
     account_currency = snapshots[-1]["account_currency"] if snapshots else None
-    return build_ledger(await _raw_transactions(pool), account_currency)
+    return await _ledger(pool, account_currency, settings)
 
 
 def _sleeve_out(s: Any, tickers: list[str]) -> r.SleeveOut:
@@ -727,7 +737,7 @@ async def sleeves_report(
     if len(snapshots) < 2:
         return unavailable("fewer than two daily snapshots are stored")
     account_currency = snapshots[-1]["account_currency"]
-    ledger = build_ledger(await _raw_transactions(pool), account_currency)
+    ledger = await _ledger(pool, account_currency, settings)
     rows = await pool.fetch(
         "select snapshot_date, ticker, quantity, current_price, fx_rate, value_base"
         " from public.position_snapshot where base_currency = $1 order by snapshot_date",

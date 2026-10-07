@@ -21,6 +21,8 @@ from steward.performance.benchmark import blended_index, compare_window, series_
 from steward.performance.ledger import (
     Kind,
     RawTransaction,
+    Split,
+    apply_splits,
     build_ledger,
     external_flows,
     position_breaks,
@@ -161,6 +163,32 @@ def test_position_breaks_report_what_fills_cannot_explain():
     assert gap.ticker == "AAA" and gap.difference == D("13")
     both = {b.ticker: b for b in position_breaks(entries, {"AAA": D("7"), "BBB": D("4")})}
     assert both["BBB"].ledger_quantity == 0 and "no fills" in both["BBB"].reason
+
+
+def test_an_entered_split_restates_earlier_fills_and_closes_the_position_break():
+    entries = build_ledger(
+        [
+            fill("f1", "BUY", "10", "100", "-1000", at(2025, 1, 6)),
+            fill("f2", "BUY", "5", "30", "-150", at(2026, 3, 2)),  # after the split: untouched
+            fill("f3", "SELL", "2", "110", "220", at(2025, 6, 2)),
+        ]
+    )
+    # a broker-side 4-for-1 on 2026-01-15: 8 old units became 32, plus the 5 bought after
+    restated = apply_splits(entries, [Split("AAA", day(2026, 1, 15), D("4"))])
+    by_id = {e.id: e for e in restated}
+    assert by_id["f1"].quantity == D("40") and by_id["f1"].price == D("25")
+    assert by_id["f1"].gross == D("1000") and by_id["f1"].cash_effect == D("-1000")
+    assert by_id["f2"].quantity == D("5") and by_id["f2"].price == D("30")
+    assert by_id["f3"].quantity == D("-8") and by_id["f3"].price == D("27.5")
+    assert any("restated" in f for f in by_id["f1"].flags)
+    assert position_breaks(restated, {"AAA": D("37")}) == []
+    assert position_breaks(entries, {"AAA": D("37")}) != []
+
+
+def test_splits_on_other_tickers_and_no_splits_change_nothing():
+    entries = build_ledger([fill("f1", "BUY", "10", "100", "-1000", at(2025, 1, 6))])
+    assert apply_splits(entries, []) == entries
+    assert apply_splits(entries, [Split("ZZZ", day(2026, 1, 15), D("2"))]) == entries
 
 
 def test_cash_reconciliation_within_and_outside_tolerance():

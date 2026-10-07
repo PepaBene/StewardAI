@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
 import type { SettingsData } from "@/lib/performance/performance";
-import { formToSettings, settingsToForm, type BenchmarkRow, type SettingsForm } from "@/lib/performance/settings-form";
+import { formToSettings, settingsToForm, type BenchmarkRow, type SettingsForm, type SplitRow } from "@/lib/performance/settings-form";
 
 const MAX_BENCHMARK_LINES = 4;
 const SELECT = "h-9 w-full border border-border bg-surface-raised px-2 text-sm";
@@ -34,6 +34,9 @@ export function SettingsFormPanel({ initial, onSaved }: { initial: SettingsData;
   };
   const setRow = (i: number, patch: Partial<BenchmarkRow>) =>
     set("benchmark", form.benchmark.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+
+  const setSplit = (i: number, patch: Partial<SplitRow>) =>
+    set("splits", form.splits.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -150,6 +153,35 @@ export function SettingsFormPanel({ initial, onSaved }: { initial: SettingsData;
             </Field>
           ) : null}
         </div>
+      </fieldset>
+
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-semibold">Splits</legend>
+        <p className="text-xs text-text-muted">
+          Trading212 reports a split as a change in what you hold, not as a trade, so the fills before it no longer add up. Enter each split here and earlier fills are restated into the new share count. Money amounts do not change.
+        </p>
+        {form.splits.map((row, i) => (
+          <div key={i} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_9rem_6rem_1fr_auto]">
+            <Field label={i === 0 ? "Ticker" : "Ticker "}>
+              <Input value={row.ticker} onChange={(e) => setSplit(i, { ticker: e.target.value })} placeholder="NVDA_US_EQ" />
+            </Field>
+            <Field label="First day, new count">
+              <Input type="date" value={row.day} onChange={(e) => setSplit(i, { day: e.target.value })} />
+            </Field>
+            <Field label="Ratio" hint={i === 0 ? "2 = 2-for-1" : undefined}>
+              <Input inputMode="decimal" value={row.ratio} onChange={(e) => setSplit(i, { ratio: e.target.value })} />
+            </Field>
+            <Field label="Note">
+              <Input value={row.note} maxLength={200} onChange={(e) => setSplit(i, { note: e.target.value })} />
+            </Field>
+            <Button type="button" variant="outline" size="sm" onClick={() => set("splits", form.splits.filter((_, j) => j !== i))}>
+              Remove
+            </Button>
+          </div>
+        ))}
+        <Button type="button" variant="outline" size="sm" onClick={() => set("splits", [...form.splits, { ticker: "", day: "", ratio: "", note: "" }])}>
+          Add a split
+        </Button>
       </fieldset>
 
       <Field label="Note to yourself" hint="Kept with this version of the settings.">

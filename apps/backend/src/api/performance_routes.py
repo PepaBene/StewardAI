@@ -79,7 +79,7 @@ async def export_performance(
     over `days`). The same rows the pages show."""
     settings, _ = await load_settings(pool, owner.user_id)
     if kind == "ledger":
-        body = exports.ledger_csv(await service.ledger_entries(pool))
+        body = exports.ledger_csv(await service.ledger_entries(pool, settings))
     elif kind == "attribution":
         body = exports.attribution_csv(await service.attribution_report(pool, settings, days))
     else:

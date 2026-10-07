@@ -2,7 +2,10 @@ import type { Settings } from "./performance";
 
 export type BenchmarkRow = { symbol: string; weight: string; currency: string; basis: "total" | "price" | "unknown" };
 
+export type SplitRow = { ticker: string; day: string; ratio: string; note: string };
+
 export type SettingsForm = {
+  splits: SplitRow[];
   core_tickers: string;
   cost_method: "fifo" | "average";
   time_test_years: string;
@@ -37,6 +40,7 @@ export function settingsToForm(s: Settings): SettingsForm {
       basis: c.basis ?? "unknown",
     })),
     rebalance: s.benchmark?.rebalance ?? "none",
+    splits: (s.splits ?? []).map((x) => ({ ticker: x.ticker, day: x.day, ratio: String(x.ratio), note: x.note ?? "" })),
     note: s.note ?? "",
   };
 }
@@ -94,6 +98,15 @@ export function formToSettings(form: SettingsForm): FormResult {
       rebalance: form.rebalance,
     };
   }
+  const splitRows = form.splits.filter((r) => r.ticker.trim() !== "" || r.day !== "" || r.ratio.trim() !== "");
+  for (const r of splitRows) {
+    const ratio = Number(r.ratio);
+    if (r.ticker.trim() === "" || !/^\d{4}-\d{2}-\d{2}$/.test(r.day) || !Number.isFinite(ratio) || ratio <= 0 || ratio === 1) {
+      errors.push("Every split needs a ticker, a date and a ratio above 0 other than 1 (2 for a 2-for-1, 0.1 for a 1-for-10 reverse split).");
+      break;
+    }
+  }
+  const splits = splitRows.map((r) => ({ ticker: r.ticker.trim(), day: r.day, ratio: String(Number(r.ratio)), note: r.note.trim() }));
   if (errors.length > 0) return { ok: false, errors };
   return {
     ok: true,
@@ -109,6 +122,7 @@ export function formToSettings(form: SettingsForm): FormResult {
       cash_tolerance: String(tolerance),
       alert_severity: severity,
       benchmark,
+      splits,
       note: form.note.trim(),
     },
   };

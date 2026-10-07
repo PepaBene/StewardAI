@@ -17,7 +17,7 @@ from __future__ import annotations
 import datetime as dt
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from enum import StrEnum
 from zoneinfo import ZoneInfo
@@ -159,6 +159,43 @@ def build_ledger(
     return sorted(
         (classify(r, account_currency) for r in rows), key=lambda e: (e.occurred_at, e.id)
     )
+
+
+@dataclass(frozen=True)
+class Split:
+    """A split the owner entered: `ratio` new units for each old one (2 = 2-for-1, 0.1 = a
+    1-for-10 reverse split). Fills before `day` are restated into the new units."""
+
+    ticker: str
+    day: dt.date
+    ratio: Decimal
+
+
+def apply_splits(entries: Iterable[LedgerEntry], splits: Sequence[Split]) -> list[LedgerEntry]:
+    """Restate pre-split fills in post-split units: quantity x ratio, price / ratio, the money
+    unchanged. The broker's own position snapshots are already in current units, so this is what
+    lets fills, lots and the position check agree. Every restated fill says so in its flags."""
+    by_ticker: dict[str, list[Split]] = defaultdict(list)
+    for s in splits:
+        by_ticker[s.ticker].append(s)
+    out: list[LedgerEntry] = []
+    for e in entries:
+        applicable = [s for s in by_ticker.get(e.ticker or "", []) if e.day < s.day]
+        if e.kind not in (Kind.BUY, Kind.SELL) or not applicable:
+            out.append(e)
+            continue
+        ratio = Decimal(1)
+        for s in applicable:
+            ratio *= s.ratio
+        out.append(
+            replace(
+                e,
+                quantity=e.quantity * ratio,
+                price=e.price / ratio if e.price is not None else None,
+                flags=(*e.flags, f"restated for splits: x{ratio.normalize():f}"),
+            )
+        )
+    return out
 
 
 def external_flows(entries: Iterable[LedgerEntry]) -> list[tuple[dt.date, Decimal]]:

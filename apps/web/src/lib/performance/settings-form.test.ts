@@ -15,6 +15,7 @@ const base: Settings = {
   cash_tolerance: "1",
   alert_severity: 2,
   benchmark: null,
+  splits: [],
   note: "",
 };
 
@@ -40,6 +41,18 @@ describe("settings form", () => {
         ["AGG", 0.4, "USD"],
       ]);
     }
+  });
+
+  it("round-trips entered splits and rejects a ratio of 1 or a missing date", () => {
+    const split = { ticker: "NVDA_US_EQ", day: "2024-06-10", ratio: "10", note: "10-for-1" };
+    expect(formToSettings(settingsToForm({ ...base, splits: [split] }))).toEqual({ ok: true, body: { ...base, splits: [split] } });
+    const form = settingsToForm(base);
+    form.splits = [{ ticker: "A", day: "2024-06-10", ratio: "1", note: "" }];
+    expect(formToSettings(form).ok).toBe(false);
+    form.splits = [{ ticker: "A", day: "", ratio: "2", note: "" }];
+    expect(formToSettings(form).ok).toBe(false);
+    form.splits = [{ ticker: "", day: "", ratio: "", note: "" }];
+    expect(formToSettings(form)).toEqual({ ok: true, body: base });
   });
 
   it("keeps the alert severity between 0 (off) and 3", () => {

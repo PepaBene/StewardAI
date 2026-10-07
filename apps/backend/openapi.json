@@ -52167,6 +52167,14 @@
               }
             ]
           },
+          "splits": {
+            "items": {
+              "$ref": "#/components/schemas/SplitEntry"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Splits"
+          },
           "note": {
             "type": "string",
             "maxLength": 500,
@@ -62905,6 +62913,51 @@
           "sources"
         ],
         "title": "SourcesHealth"
+      },
+      "SplitEntry": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Ticker"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day",
+            "description": "First day the new share count applies."
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Ratio",
+            "description": "New shares per old share: 2 for a 2-for-1 split, 0.1 for a 1-for-10 reverse split."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ticker",
+          "day",
+          "ratio"
+        ],
+        "title": "SplitEntry",
+        "description": "A split or reverse split you entered. The broker's fills are not restated for it, so\nwithout this a split shows up as a position the fills cannot explain."
       },
       "SpreadBucket": {
         "properties": {
