@@ -40,6 +40,7 @@ from steward.config.strategy import (
 )
 from steward.config.thesis import ThesesConfig
 from steward.jobs.runner import JobContext
+from steward.journal.service import scorecard as journal_scorecard
 from steward.llm.client import LLM, create_llm
 from steward.llm.routing import routing_client
 from steward.llm.types import Message, Request, provider_of
@@ -114,6 +115,11 @@ class ReviewBody(BaseModel):
         default_factory=list,
         description="Open lots with the date each passes the holding-period test; facts, not "
         "tax advice.",
+    )
+    decision_scorecard: list[str] = Field(
+        default_factory=list,
+        description="How past journal decisions turned out (price change since the decision, "
+        "each with its sample size; sections with too few decisions are not summarised).",
     )
     sources: list[Source]
     model: str | None = None
@@ -658,6 +664,34 @@ def keep_cited(
     return kept, dropped
 
 
+async def decision_scorecard_lines(pool: asyncpg.Pool, notes: list[str]) -> list[str]:
+    """The journal scorecard as plain lines. A failure adds a note and never stops the review."""
+    try:
+        # The worker has no signed-in user; the app has one owner, whose journal this reads.
+        owner_id = await pool.fetchval(
+            "select owner_id::text from public.decision_journal order by id limit 1"
+        )
+        if owner_id is None:
+            return []
+        card = await journal_scorecard(pool, owner_id)
+    except Exception:
+        logger.exception("decision scorecard failed")
+        notes.append("The decision scorecard could not be computed.")
+        return []
+    lines: list[str] = []
+    for section in card.sections:
+        if section.status != "ok":
+            lines.append(f"{section.title}: {section.note}")
+            continue
+        for row in section.rows:
+            change = (
+                f", median change {row.median_change:+.1%}" if row.median_change is not None else ""
+            )
+            share = f", {row.share:.0%}" if row.share is not None else ""
+            lines.append(f"{section.title} / {row.label}: n={row.n}{change}{share}")
+    return lines
+
+
 async def build_review(
     pool: asyncpg.Pool,
     now: dt.datetime,
@@ -692,6 +726,7 @@ async def build_review(
             "Performance checks (core versus stocks, holding periods) could not be computed."
         )
     kpis = await kpi_rows(pool, reg, theses)
+    scorecard_lines = await decision_scorecard_lines(pool, notes)
     today = now.date()
     due = [t.ticker for t in theses.theses if t.review_date is not None and t.review_date <= today]
     body = ReviewBody(
@@ -706,6 +741,7 @@ async def build_review(
         flags=await flags(pool, reg, settings),
         actions=[],
         holding_periods=holding_periods,
+        decision_scorecard=scorecard_lines,
         sources=[],
     )
     usage: Usage | None = None
@@ -746,6 +782,9 @@ def render_md(body: ReviewBody) -> str:
             )
             for h in body.holding_periods
         ]
+    if body.decision_scorecard:
+        lines += ["", "## Decision scorecard", ""]
+        lines += [f"- {line}" for line in body.decision_scorecard]
     lines += ["", "## Thesis KPIs", ""]
     lines += [f"- [{k.status}] {k.ref}: {k.description}" for k in body.kpis]
     if body.reviews_due:

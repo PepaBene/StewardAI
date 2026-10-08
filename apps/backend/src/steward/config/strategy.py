@@ -107,6 +107,13 @@ class PretradeThresholds(ConfigModel):
     short_term_tax_rate: float = Field(default=0.15, ge=0, le=1)
     trade_cost_bps: float = Field(default=0, ge=0, le=500)
     fx_cost_bps: float = Field(default=15, ge=0, le=500)
+    risk_contribution_cap: float | None = Field(
+        default=None,
+        gt=0,
+        le=1,
+        description="Largest share of portfolio volatility one stock may account for (null: "
+        "shown but not judged).",
+    )
 
 
 class RiskLimits(ConfigModel):

@@ -33,6 +33,8 @@ from pydantic import BaseModel, Field
 
 from steward.analytics.versions import version
 from steward.config.strategy import StrategyConfig
+from steward.decision import covariance
+from steward.decision.covariance import CovModel
 from steward.decision.lot_impact import SaleImpact
 from steward.portfolio.breaches import evaluate
 from steward.portfolio.drift import DriftReport
@@ -56,6 +58,13 @@ class PretradeRules(BaseModel):
     horizon_years: float | None = Field(
         default=None, gt=0, le=30, description="Defaults to the strategy's horizon, else 3 years."
     )
+    risk_contribution_cap: float | None = Field(
+        default=None,
+        gt=0,
+        le=1,
+        description="Largest share of the portfolio's volatility one stock may account for. "
+        "Unset: the share is shown but not judged, because the strategy states no number.",
+    )
 
     def start_cap(self, tier: str | None) -> float | None:
         return {
@@ -69,6 +78,12 @@ class TradeLeg(BaseModel):
     side: Literal["buy", "sell"]
     ticker: str = Field(min_length=1, max_length=32)
     value_base: float = Field(gt=0, description="Size of the trade in the base currency.")
+    bear_case_price: float | None = Field(
+        default=None,
+        gt=0,
+        description="Buys only: the price you expect in the bear case, in the quote currency. "
+        "A thesis stores no bear case, so the asymmetry gate needs it here.",
+    )
 
 
 class PretradeCheck(BaseModel):
@@ -137,6 +152,9 @@ class PretradeContext:
     extra_checks: list[PretradeCheck] = field(default_factory=list)
     horizon_years: float = 3.0
     notes: list[str] = field(default_factory=list)
+    cov: CovModel | None = None
+    weights_before: dict[str, float] = field(default_factory=dict)  # of total value, by ticker
+    weights_after: dict[str, float] = field(default_factory=dict)
 
 
 def expected_return(f: TickerFacts) -> tuple[float | None, str | None]:
@@ -255,17 +273,7 @@ def _buy_checks(t: TradeLeg, ctx: PretradeContext) -> list[PretradeCheck]:
                 values={"expected_return": er, "hurdle": rules.return_hurdle},
             )
         )
-    out.append(
-        PretradeCheck(
-            id="buy.asymmetry",
-            principle="8a",
-            ticker=t.ticker,
-            status="unavailable",
-            title="Upside against loss not checked",
-            detail=f"The gate needs a base-case upside of at least {rules.asymmetry_gate:g} times "
-            "the bear-case loss; a thesis stores a sell target but no bear case yet.",
-        )
-    )
+    out.append(_asymmetry(t, f, er, rules))
     after = (f.value_now + t.value_base) / ctx.total_value if ctx.total_value > 0 else 0.0
     cap = rules.start_cap(f.tier)
     if not f.held:
@@ -308,18 +316,93 @@ def _buy_checks(t: TradeLeg, ctx: PretradeContext) -> list[PretradeCheck]:
                 values={"weight_after": after},
             )
         )
-    out.append(
-        PretradeCheck(
-            id="buy.risk_budget",
-            principle="4e",
-            ticker=t.ticker,
+    out.append(_risk_budget(t, ctx))
+    return out
+
+
+def _asymmetry(
+    t: TradeLeg, f: TickerFacts, er: float | None, rules: PretradeRules
+) -> PretradeCheck:
+    base = dict(id="buy.asymmetry", principle="8a", ticker=t.ticker)
+    if t.bear_case_price is None:
+        return PretradeCheck(
+            **base,
+            status="unavailable",
+            title="Upside against loss not checked",
+            detail=f"The gate needs a base-case upside of at least {rules.asymmetry_gate:g} times "
+            "the bear-case loss. A thesis stores no bear case: enter your bear-case price on the "
+            "buy to run it.",
+        )
+    if er is None or f.price is None:
+        return PretradeCheck(
+            **base,
+            status="unavailable",
+            title="Upside against loss not checked",
+            detail="The upside to the sell target is not available, so there is nothing to "
+            "compare with the bear case.",
+        )
+    loss = 1 - t.bear_case_price / f.price
+    if loss <= 0:
+        return PretradeCheck(
+            **base,
+            status="pass",
+            title="Bear case is not below the price",
+            detail=f"Your bear-case price {t.bear_case_price:,.2f} is at or above {f.price:,.2f}, "
+            "so there is no loss to weigh the upside against.",
+            values={"upside": er, "bear_loss": loss},
+        )
+    ratio = er / loss
+    return PretradeCheck(
+        **base,
+        status="pass" if ratio >= rules.asymmetry_gate else "flag",
+        title=f"Upside {_pct(er)} against bear-case loss {_pct(loss)}: {ratio:.1f} times",
+        detail=f"The gate wants at least {rules.asymmetry_gate:g} times. The bear case is your "
+        f"own price of {t.bear_case_price:,.2f}.",
+        values={"upside": er, "bear_loss": loss, "ratio": ratio, "gate": rules.asymmetry_gate},
+    )
+
+
+def _risk_budget(t: TradeLeg, ctx: PretradeContext) -> PretradeCheck:
+    base = dict(id="buy.risk_budget", principle="4e", ticker=t.ticker)
+    model = ctx.cov
+    if model is None or model.index(t.ticker) is None:
+        return PretradeCheck(
+            **base,
             status="unavailable",
             title="Risk budget not checked",
-            detail="A per-stock cap on contribution to portfolio volatility needs the covariance "
-            "model, which is not built yet.",
+            detail="The covariance model has too little shared price history for this stock "
+            "(it needs about 120 common trading days with the rest of the portfolio).",
         )
+    before = covariance.contribution(model, ctx.weights_before, t.ticker) or 0.0
+    after = covariance.contribution(model, ctx.weights_after, t.ticker)
+    if after is None:
+        return PretradeCheck(
+            **base, status="unavailable", title="Risk budget not checked",
+            detail="The portfolio after the trade has no variance in the model.",
+        )  # fmt: skip
+    cap = ctx.rules.risk_contribution_cap
+    vol_after = covariance.volatility(model, ctx.weights_after)
+    detail = (
+        f"After the trade this stock accounts for {_pct(after)} of the portfolio's volatility "
+        f"(before: {_pct(before)}); portfolio volatility is {_pct(vol_after)} a year on "
+        f"{model.observations} shared trading days."
     )
-    return out
+    values: dict[str, float | str | None] = {
+        "contribution_before": before, "contribution_after": after, "volatility_after": vol_after,
+    }  # fmt: skip
+    if cap is None:
+        return PretradeCheck(
+            **base, status="info", title=f"Risk contribution {_pct(after)}",
+            detail=detail + " Your strategy sets no cap on this, so it is not judged.",
+            values=values,
+        )  # fmt: skip
+    return PretradeCheck(
+        **base,
+        status="pass" if after <= cap + 1e-9 else "flag",
+        title=f"Risk contribution {_pct(after)} against a {_pct(cap)} cap",
+        detail=detail,
+        values={**values, "cap": cap},
+    )
 
 
 # --------------------------------------------------------------------------------------- sells
@@ -596,19 +679,55 @@ def _switch_checks(sell: TradeLeg, buy: TradeLeg, ctx: PretradeContext) -> list[
                 values={"equal_risk_value": equal_risk, "proposed": buy.value_base},
             )
         )
-    out.append(
-        PretradeCheck(
-            id="switch.portfolio",
-            principle="9f",
-            ticker=None,
-            status="unavailable",
-            title="Portfolio risk-adjusted improvement not checked",
-            detail="Whether the switch improves the portfolio's risk-adjusted expected return "
-            "with every risk limit held needs the before/after covariance evaluation, which is "
-            "not built yet. The caps and tier limits are checked below.",
-        )
-    )
+    out.append(_switch_portfolio(sell, buy, ctx))
     return out
+
+
+def _switch_portfolio(sell: TradeLeg, buy: TradeLeg, ctx: PretradeContext) -> PretradeCheck:
+    """Does the switch lower portfolio volatility, and does the bought stock expect more than the
+    sold one? Only the two legs have expected returns (from theses), so the rest of the
+    portfolio's return is the same before and after and cancels in the comparison."""
+    base = dict(id="switch.portfolio", principle="9f", ticker=None)
+    model = ctx.cov
+    if model is None:
+        return PretradeCheck(
+            **base, status="unavailable",
+            title="Portfolio risk-adjusted improvement not checked",
+            detail="The covariance model could not be built from the stored price history.",
+        )  # fmt: skip
+    vol_before = covariance.volatility(model, ctx.weights_before)
+    vol_after = covariance.volatility(model, ctx.weights_after)
+    er_sell, why_sell = expected_return(ctx.facts.get(sell.ticker, TickerFacts(sell.ticker)))
+    er_buy, why_buy = expected_return(ctx.facts.get(buy.ticker, TickerFacts(buy.ticker)))
+    values: dict[str, float | str | None] = {"volatility_before": vol_before,
+                                             "volatility_after": vol_after}  # fmt: skip
+    risk_text = f"Portfolio volatility goes from {_pct(vol_before)} to {_pct(vol_after)} a year."
+    if er_sell is None or er_buy is None:
+        return PretradeCheck(
+            **base, status="info", title="Switch changes risk; expected return unknown",
+            detail=f"{risk_text} The expected-return comparison needs a sell target on both "
+            f"stocks ({why_sell or why_buy}).",
+            values=values,
+        )  # fmt: skip
+    gap = er_buy - er_sell
+    values["return_gap"] = gap
+    lower = vol_after <= vol_before + 1e-9
+    if gap > 0 and lower:
+        status: Status = "pass"
+        title = "Switch raises expected return and does not raise risk"
+    elif gap <= 0 and not lower:
+        status = "flag"
+        title = "Switch lowers expected return and raises risk"
+    else:
+        status = "info"
+        title = "Switch trades expected return against risk"
+    return PretradeCheck(
+        **base, status=status, title=title,
+        detail=f"{risk_text} Expected return to the thesis targets: {_pct(er_buy)} for "
+        f"{buy.ticker} against {_pct(er_sell)} for {sell.ticker} (gap {gap:+.1%}). Caps and "
+        "tier limits are checked below.",
+        values=values,
+    )  # fmt: skip
 
 
 def _tax_estimate(sell: TradeLeg, impact: SaleImpact | None, ctx: PretradeContext) -> float | None:

@@ -16,6 +16,7 @@ from steward.config.performance import PerformanceSettings
 from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig
+from steward.decision import covariance
 from steward.decision import pretrade as pt
 from steward.decision import rebalance as rb
 from steward.decision.lot_impact import OpenLot, SaleImpact, consume
@@ -624,8 +625,50 @@ async def run_pretrade(
     )
     await _attach_sales(pool, ctx, request.trades, positions, portfolio)
     await _attach_rates(pool, ctx, portfolio)
+    await _attach_covariance(pool, ctx, portfolio, request.trades)
     await _attach_lookthrough(pool, owner_id, ctx, request, loaded)
     return pt.run(request.trades, ctx)
+
+
+async def _attach_covariance(
+    pool: asyncpg.Pool, ctx: pt.PretradeContext, portfolio: PortfolioIn, trades: list[pt.TradeLeg]
+) -> None:
+    """The covariance model over the holdings and the traded stocks, and the weights before and
+    after the trades. A stock without enough shared history is left out and named."""
+    before = {p.ticker: p.value_base for p in portfolio.positions}
+    after = dict(before)
+    for t in trades:
+        after[t.ticker] = after.get(t.ticker, 0.0) + (
+            t.value_base if t.side == "buy" else -t.value_base
+        )
+    tickers = sorted(set(before) | set(after))
+    profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
+    symbols = await holding_symbols(
+        pool, tickers, profiles.body if profiles else HoldingProfilesConfig()
+    )
+    chosen = await choose_series(pool, symbols)
+    since = dt.date.today() - dt.timedelta(days=covariance.WINDOW_DAYS)
+    series: dict[str, list[tuple[dt.date, float]]] = {}
+    for ticker in tickers:
+        ref = chosen.get(ticker)
+        if ref is not None:
+            series[ticker] = [(d, float(p)) for d, p in await load_series(pool, ref) if d >= since]
+    model = covariance.build(series)
+    total = ctx.total_value
+    if model is None or total <= 0:
+        ctx.notes.append(
+            "The covariance model could not be built: too little shared price history."
+        )
+        return
+    ctx.cov = model
+    ctx.weights_before = {k: v / total for k, v in before.items() if v > 0}
+    ctx.weights_after = {k: v / total for k, v in after.items() if v > 0}
+    if model.left_out:
+        ctx.notes.append(
+            "Left out of the covariance model for lack of shared history: "
+            + ", ".join(model.left_out)
+            + "."
+        )
 
 
 async def _attach_rates(

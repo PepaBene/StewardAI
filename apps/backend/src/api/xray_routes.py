@@ -12,6 +12,8 @@ from api.db import Pool
 from steward import saved
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
+from steward.events import feed as events_feed
+from steward.events.feed import EventFeed
 from steward.events.paths import Direction, EventImpact, EventState, event_paths
 from steward.lookthrough.read import PortfolioIn
 from steward.xray import (
@@ -153,6 +155,26 @@ async def get_event_paths(
     """Where an event at one company reaches the portfolio along the supply-chain links, with
     each link's source and confidence, the weight at the end of each path and the thesis
     indicators to watch. A path is only as confident as its weakest link."""
+    chain, indicators = await _chain_and_indicators(pool, owner)
+    return event_paths(chain, symbol, direction, state, indicators)
+
+
+@router.get("/event-feed")
+async def get_event_feed(
+    pool: Pool, owner: Owner, days: Annotated[int, Query(ge=1, le=90)] = events_feed.DEFAULT_DAYS
+) -> EventFeed:
+    """Recent classified news about a company, followed along the supply-chain links to what you
+    hold. Only stories that reach another holding are listed; nothing is sent as an alert."""
+    chain, indicators = await _chain_and_indicators(pool, owner)
+    today = dt.date.today()
+    since = today - dt.timedelta(days=days)
+    stories = await events_feed.load_stories(pool, since)
+    return events_feed.build(stories, chain, indicators, today, since)
+
+
+async def _chain_and_indicators(
+    pool: Pool, owner: Owner
+) -> tuple[SupplyChain, dict[str, list[str]]]:
     loaded = await _loaded(pool, owner, None)
     chain = supply_chain.build(
         loaded.leafset,
@@ -166,7 +188,7 @@ async def get_event_paths(
         ]
         for t in (stored.body.theses if stored else [])
     }
-    return event_paths(chain, symbol, direction, state, indicators)
+    return chain, indicators
 
 
 @router.get("/index-weights")
