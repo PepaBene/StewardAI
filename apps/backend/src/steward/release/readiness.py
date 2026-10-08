@@ -29,7 +29,7 @@ STORES: dict[str, str] = {
     "holdings": "position_snapshot",
     "prices": "price_return_series",
     "listings": "security_listing",
-    "fundamentals": "source_observation",
+    "fundamentals": "financial_statement_fact",
     "fund holdings": "etf_snapshot",
     "fund facts": "fund_factsheet",
     "macro series": "macro_observation",
