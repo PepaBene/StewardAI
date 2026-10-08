@@ -729,3 +729,6 @@ async def test_a_screen_row_with_no_gate_says_so_instead_of_passing(
     gate = gated.rows[0].valuation_gate
     assert gate is not None and gate.usable_for_valuation is None
     assert gate.reasons == ["fact is not linked to an issuer"]
+    only = await _with_gates(backend_pool, result.model_copy(deep=True), None, True)
+    assert only.rows == [] and only.shown == 0
+    assert "1 matching rows were left out" in only.caveats[-1]

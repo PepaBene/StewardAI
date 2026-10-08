@@ -47,6 +47,11 @@ class ScreenRequest(BaseModel):
     reconciled_only: bool = Field(
         default=False, description="Only facts a reconciliation check passed."
     )
+    valuation_gate_only: bool = Field(
+        default=False,
+        description="Keep only rows whose period passed the valuation gate. A row with no gate "
+        "is dropped, never read as a pass; the count is in the caveats.",
+    )
 
 
 async def universe_tickers(pool: Pool, universe: str) -> list[str]:
@@ -105,10 +110,12 @@ async def run_screen_route(body: ScreenRequest, pool: Pool, _owner: Owner) -> Sc
         universe=label,
         universe_definition=definition,
     )
-    return await _with_gates(pool, result, body.as_of)
+    return await _with_gates(pool, result, body.as_of, body.valuation_gate_only)
 
 
-async def _with_gates(pool: Pool, result: ScreenResult, as_of: dt.datetime | None) -> ScreenResult:
+async def _with_gates(
+    pool: Pool, result: ScreenResult, as_of: dt.datetime | None, only_passing: bool = False
+) -> ScreenResult:
     """Attach each row's valuation gate. A row whose issuer or period has no gate says so (null),
     so a screen never reads a missing gate as a pass. The filters themselves are not changed."""
     if not result.rows:
@@ -130,4 +137,16 @@ async def _with_gates(pool: Pool, result: ScreenResult, as_of: dt.datetime | Non
     )
     for row, g in zip(result.rows, gated, strict=True):
         row.valuation_gate = RowGate(**g["valuation_gate"])
+    if only_passing:
+        kept = [
+            r for r in result.rows if r.valuation_gate and r.valuation_gate.usable_for_valuation
+        ]
+        dropped = len(result.rows) - len(kept)
+        result.rows = kept
+        result.shown = len(kept)
+        result.caveats = [
+            *result.caveats,
+            f"{dropped} matching rows were left out because their period did not pass the "
+            "valuation gate or has no gate.",
+        ]
     return result

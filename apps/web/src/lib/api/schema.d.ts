@@ -19830,6 +19830,12 @@ export interface components {
              * @default false
              */
             reconciled_only: boolean;
+            /**
+             * Valuation Gate Only
+             * @description Keep only rows whose period passed the valuation gate. A row with no gate is dropped, never read as a pass; the count is in the caveats.
+             * @default false
+             */
+            valuation_gate_only: boolean;
         };
         /** ScreenResult */
         ScreenResult: {

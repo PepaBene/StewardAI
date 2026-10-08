@@ -57993,6 +57993,12 @@
             "title": "Reconciled Only",
             "description": "Only facts a reconciliation check passed.",
             "default": false
+          },
+          "valuation_gate_only": {
+            "type": "boolean",
+            "title": "Valuation Gate Only",
+            "description": "Keep only rows whose period passed the valuation gate. A row with no gate is dropped, never read as a pass; the count is in the caveats.",
+            "default": false
           }
         },
         "additionalProperties": false,
