@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
-from steward.release import audit, defects, pilot, readiness
+from steward.release import activation, audit, defects, pilot, readiness
 
 router = APIRouter(tags=["release"])
 
@@ -36,6 +36,28 @@ async def get_readiness(pool: Pool, owner: Owner) -> readiness.Readiness:
     """Each marketed feature as ready, partial, unavailable or untested, with the free-access
     state of its inputs, its source audit and whether it may be switched on."""
     return await readiness.build_readiness(pool, owner.user_id)
+
+
+@router.get("/release/activation")
+async def get_activation(pool: Pool, owner: Owner) -> list[activation.Activation]:
+    """Which features you have switched on (the newest decision per feature)."""
+    return await activation.list_current(pool, owner.user_id)
+
+
+@router.post("/release/activation")
+async def set_activation(
+    body: activation.ActivationIn, pool: Pool, owner: Owner
+) -> list[activation.Activation]:
+    """Switch a feature on or off. Switching on is refused while the release gate says no."""
+    gate = await readiness.build_readiness(pool, owner.user_id)
+    try:
+        activation.check(body, gate)
+    except KeyError:
+        raise HTTPException(404, "That feature does not exist.") from None
+    except activation.ActivationRefused as exc:
+        raise HTTPException(409, str(exc)) from None
+    await activation.record(pool, owner.user_id, body)
+    return await activation.list_current(pool, owner.user_id)
 
 
 @router.get("/release/audit")

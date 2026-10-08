@@ -18591,6 +18591,86 @@
         ]
       }
     },
+    "/release/activation": {
+      "get": {
+        "tags": [
+          "release"
+        ],
+        "summary": "Get Activation",
+        "description": "Which features you have switched on (the newest decision per feature).",
+        "operationId": "get_activation",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Activation"
+                  },
+                  "type": "array",
+                  "title": "Response Get Activation"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "release"
+        ],
+        "summary": "Set Activation",
+        "description": "Switch a feature on or off. Switching on is refused while the release gate says no.",
+        "operationId": "set_activation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Activation"
+                  },
+                  "type": "array",
+                  "title": "Response Set Activation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/release/audit": {
       "get": {
         "tags": [
@@ -21377,6 +21457,74 @@
           "decided_at"
         ],
         "title": "ActionOut"
+      },
+      "Activation": {
+        "properties": {
+          "feature": {
+            "type": "string",
+            "title": "Feature"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Since"
+          }
+        },
+        "type": "object",
+        "required": [
+          "feature",
+          "active",
+          "note",
+          "since"
+        ],
+        "title": "Activation"
+      },
+      "ActivationIn": {
+        "properties": {
+          "feature": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Feature"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "feature",
+          "active"
+        ],
+        "title": "ActivationIn"
       },
       "ActivityCoverage": {
         "properties": {

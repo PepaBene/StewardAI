@@ -5910,6 +5910,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/release/activation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Activation
+         * @description Which features you have switched on (the newest decision per feature).
+         */
+        get: operations["get_activation"];
+        put?: never;
+        /**
+         * Set Activation
+         * @description Switch a feature on or off. Switching on is refused while the release gate says no.
+         */
+        post: operations["set_activation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/release/audit": {
         parameters: {
             query?: never;
@@ -6834,6 +6858,29 @@ export interface components {
             created_at: string;
             /** Decided At */
             decided_at: string | null;
+        };
+        /** Activation */
+        Activation: {
+            /** Feature */
+            feature: string;
+            /** Active */
+            active: boolean;
+            /** Note */
+            note: string | null;
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+        };
+        /** ActivationIn */
+        ActivationIn: {
+            /** Feature */
+            feature: string;
+            /** Active */
+            active: boolean;
+            /** Note */
+            note?: string | null;
         };
         /** ActivityCoverage */
         ActivityCoverage: {
@@ -37503,6 +37550,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Readiness"];
+                };
+            };
+        };
+    };
+    get_activation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Activation"][];
+                };
+            };
+        };
+    };
+    set_activation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Activation"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
