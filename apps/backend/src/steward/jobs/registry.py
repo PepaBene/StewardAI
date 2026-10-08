@@ -7,6 +7,7 @@ queue. Both look the handler up here.
 from typing import Literal
 
 from steward.approvals.ai import ai_approvals_handler
+from steward.changes.alerts import change_alerts_handler
 from steward.chat.assistant import chat_handler
 from steward.earnings.calendar import (
     earnings_calendar_full_handler,
@@ -98,6 +99,7 @@ JobType = Literal[
     "fund_characteristics_audit",
     "fund_issuer_facts",
     "free_source_alerts",
+    "change_alerts",
     "shadow_snapshot",
     "shadow_report",
     "raw_retention",
@@ -154,6 +156,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "fund_characteristics_audit": fund_characteristics_audit_handler,
     "fund_issuer_facts": fund_issuer_facts_handler,
     "free_source_alerts": free_source_alerts_handler,
+    "change_alerts": change_alerts_handler,
     "shadow_snapshot": shadow_snapshot_handler,
     "shadow_report": shadow_report_handler,
     "raw_retention": raw_retention_handler,

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import statistics
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import asyncpg
@@ -29,11 +29,30 @@ METHOD = (
 )
 
 NOT_COVERED = [
-    "Top products: segment revenue is stored per filing, not yet rolled up to a product list.",
-    "Patent areas: patents are stored per company and are not grouped by sector here.",
-    "Trade dependencies: trade data is by product code and country, not by company.",
+    "Top products: only companies whose annual report tags revenue by product are listed.",
+    "Patent areas: empty until patent data is collected (EPO OPS credentials are not set).",
+    "Trade dependencies: shown as the countries companies report revenue in, not customs data.",
     "Credit cycle signals: the stored credit-spread series is for the whole market, not a sector.",
 ]
+
+TOP_N = 5
+
+
+class ProductLine(BaseModel):
+    ticker: str
+    label: str
+    share: float = Field(description="Share of the company's annual revenue.")
+
+
+class GeoShare(BaseModel):
+    geography: str
+    mean_share: float = Field(description="Average share of revenue across reporting companies.")
+    n: int = Field(description="Companies that report revenue for this country.")
+
+
+class PatentArea(BaseModel):
+    code: str = Field(description="CPC subclass, such as H01L.")
+    families: int
 
 
 class Spread(BaseModel):
@@ -59,6 +78,9 @@ class GroupStats(BaseModel):
     confirmed_peer_links: int = Field(
         description="Confirmed peer links with both ends in the group."
     )
+    top_products: list[ProductLine] = Field(default_factory=list)
+    geography: list[GeoShare] = Field(default_factory=list)
+    patent_areas: list[PatentArea] = Field(default_factory=list)
 
 
 class SectorMap(BaseModel):
@@ -91,6 +113,44 @@ def spread(values: list[float | None], of: int) -> Spread:
     )
 
 
+@dataclass(frozen=True)
+class Detail:
+    """Per-company inputs for the group lists; empty when the data is not stored."""
+
+    products: dict[str, list[tuple[str, float]]] = field(default_factory=dict)  # label, share
+    geography: dict[str, dict[str, float]] = field(default_factory=dict)  # country -> share
+    patents: dict[str, dict[str, int]] = field(default_factory=dict)  # CPC subclass -> families
+
+
+def top_products(
+    tickers: list[str], products: dict[str, list[tuple[str, float]]]
+) -> list[ProductLine]:
+    lines = [
+        ProductLine(ticker=t, label=label, share=share)
+        for t in tickers
+        for label, share in products.get(t, [])
+    ]
+    return sorted(lines, key=lambda p: (-p.share, p.ticker, p.label))[:TOP_N]
+
+
+def geography_mix(tickers: list[str], geography: dict[str, dict[str, float]]) -> list[GeoShare]:
+    seen: dict[str, list[float]] = defaultdict(list)
+    for t in tickers:
+        for country, share in geography.get(t, {}).items():
+            seen[country].append(share)
+    mix = [GeoShare(geography=c, mean_share=sum(v) / len(v), n=len(v)) for c, v in seen.items()]
+    return sorted(mix, key=lambda g: (-g.mean_share, g.geography))[:TOP_N]
+
+
+def patent_areas(tickers: list[str], patents: dict[str, dict[str, int]]) -> list[PatentArea]:
+    total: dict[str, int] = defaultdict(int)
+    for t in tickers:
+        for code, n in patents.get(t, {}).items():
+            total[code] += n
+    areas = [PatentArea(code=c, families=n) for c, n in total.items()]
+    return sorted(areas, key=lambda a: (-a.families, a.code))[:TOP_N]
+
+
 def _group(
     name: str,
     kind: str,
@@ -101,10 +161,14 @@ def _group(
     pe: dict[str, float | None],
     weights: dict[str, float],
     links: set[tuple[str, str]],
+    detail: Detail,
 ) -> GroupStats:
     tickers = sorted(m.ticker for m in members)
     inside = set(tickers)
     return GroupStats(
+        top_products=top_products(tickers, detail.products),
+        geography=geography_mix(tickers, detail.geography),
+        patent_areas=patent_areas(tickers, detail.patents),
         name=name,
         kind=kind,
         parent=parent,
@@ -127,7 +191,9 @@ def build_map(
     pe: dict[str, float | None],
     weights: dict[str, float],
     links: set[tuple[str, str]],
+    detail: Detail | None = None,
 ) -> SectorMap:
+    detail = detail or Detail()
     by_sector: dict[str, list[Profile]] = defaultdict(list)
     by_industry: dict[tuple[str, str], list[Profile]] = defaultdict(list)
     for p in profiles:
@@ -136,11 +202,11 @@ def build_map(
             if p.industry:
                 by_industry[(p.sector, p.industry)].append(p)
     sectors = [
-        _group(name, "sector", None, m, growth, margin, pe, weights, links)
+        _group(name, "sector", None, m, growth, margin, pe, weights, links, detail)
         for name, m in by_sector.items()
     ]
     industries = [
-        _group(ind, "industry", sec, m, growth, margin, pe, weights, links)
+        _group(ind, "industry", sec, m, growth, margin, pe, weights, links, detail)
         for (sec, ind), m in by_industry.items()
     ]
     key = lambda g: (-g.companies, g.name)  # noqa: E731
@@ -226,9 +292,68 @@ async def load_links(pool: asyncpg.Pool) -> set[tuple[str, str]]:
     return {(r["ticker"], r["peer_ticker"]) for r in rows}
 
 
+async def load_products(pool: asyncpg.Pool) -> dict[str, list[tuple[str, float]]]:
+    """Each company's reported product lines (not subtotals) in its latest annual report, as a
+    share of that year's total revenue."""
+    rows = await pool.fetch(
+        "with p as (select x.ticker, s.label, s.value::float8 v, s.period_end"
+        "  from public.segment_revenue s join public.xbrl_filing x on x.id = s.filing_id"
+        "  where s.kind = 'product' and not s.subtotal and s.value > 0"
+        "  and (s.period_end - s.period_start) between 340 and 380),"
+        " latest as (select distinct on (ticker) ticker, period_end from p"
+        "  order by ticker, period_end desc),"
+        " t as (select x.ticker, s.period_end, max(s.value)::float8 total"
+        "  from public.segment_revenue s join public.xbrl_filing x on x.id = s.filing_id"
+        "  where s.kind = 'total' and (s.period_end - s.period_start) between 340 and 380"
+        "  group by 1, 2)"
+        " select p.ticker, p.label, p.v / t.total as share from p"
+        " join latest l on l.ticker = p.ticker and l.period_end = p.period_end"
+        " join t on t.ticker = p.ticker and t.period_end = p.period_end and t.total > 0"
+    )
+    out: dict[str, list[tuple[str, float]]] = defaultdict(list)
+    for r in rows:
+        if 0 < r["share"] <= 1:
+            out[r["ticker"]].append((r["label"], float(r["share"])))
+    return out
+
+
+async def load_geography(pool: asyncpg.Pool) -> dict[str, dict[str, float]]:
+    """Revenue share by country from each company's latest reported split."""
+    rows = await pool.fetch(
+        "select n.t212_ticker ticker, m.geography, m.weight::float8 weight"
+        " from public.exposure_mapping m join public.issuer i on i.id = m.issuer_id"
+        " join public.instrument n on n.cik = i.cik"
+        " where m.valid_to is null and m.basis = 'reported' and m.geography is not null"
+    )
+    out: dict[str, dict[str, float]] = defaultdict(dict)
+    for r in rows:
+        out[r["ticker"]][r["geography"]] = out[r["ticker"]].get(r["geography"], 0.0) + float(
+            r["weight"]
+        )
+    return out
+
+
+async def load_patent_areas(pool: asyncpg.Pool) -> dict[str, dict[str, int]]:
+    rows = await pool.fetch(
+        "select o.ticker, left(code, 4) area, count(distinct f.id) families"
+        " from public.patent_family f join public.patent_family_owner o on o.family_id = f.id"
+        " cross join lateral unnest(f.cpc_codes) as code"
+        " where o.valid_to is null and o.ticker is not null group by 1, 2"
+    )
+    out: dict[str, dict[str, int]] = defaultdict(dict)
+    for r in rows:
+        out[r["ticker"]][r["area"]] = int(r["families"])
+    return out
+
+
 async def build_sector_map(pool: asyncpg.Pool) -> SectorMap:
     profiles = await load_profiles(pool)
     growth, margin = await load_stats(pool, [p.ticker for p in profiles])
+    detail = Detail(
+        products=await load_products(pool),
+        geography=await load_geography(pool),
+        patents=await load_patent_areas(pool),
+    )
     return build_map(
         profiles,
         growth,
@@ -236,4 +361,5 @@ async def build_sector_map(pool: asyncpg.Pool) -> SectorMap:
         await load_pe(pool),
         await load_weights(pool),
         await load_links(pool),
+        detail,
     )

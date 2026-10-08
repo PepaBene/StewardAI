@@ -52,6 +52,7 @@ BudgetJobType = Literal[
     "fund_characteristics_audit",
     "fund_issuer_facts",
     "free_source_alerts",
+    "change_alerts",
     "shadow_snapshot",
     "shadow_report",
     "raw_retention",

@@ -5192,6 +5192,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/xray/event-feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Event Feed
+         * @description Recent classified news about a company, followed along the supply-chain links to what you
+         *     hold. Only stories that reach another holding are listed; nothing is sent as an alert.
+         */
+        get: operations["get_event_feed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/xray/index-weights": {
         parameters: {
             query?: never;
@@ -7243,7 +7264,7 @@ export interface components {
              * Area
              * @enum {string}
              */
-            area: "fundamentals" | "estimates" | "price" | "fund_holdings" | "graph" | "macro";
+            area: "fundamentals" | "estimates" | "price" | "fund_holdings" | "graph" | "macro" | "ownership" | "insiders" | "patents";
             /** Items */
             items: number;
             /**
@@ -8136,7 +8157,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -8548,8 +8569,8 @@ export interface components {
             /**
              * Not Covered
              * @default [
-             *       "Ownership: 13F and insider records carry no before/after state, so a change cannot be separated from a first load.",
-             *       "Patent portfolio: patents are stored per filing without a comparable earlier state.",
+             *       "Ownership and insiders are compared by period (the two latest 13F quarters, the last 90 days of insider trades against the 90 before), not by what the app knew on a date.",
+             *       "Patents: only new families are listed; a change inside a family is not tracked.",
              *       "Trade exposures: trade series are not compared between dates here."
              *     ]
              */
@@ -8566,7 +8587,7 @@ export interface components {
              * Area
              * @enum {string}
              */
-            area: "fundamentals" | "estimates" | "price" | "fund_holdings" | "graph" | "macro";
+            area: "fundamentals" | "estimates" | "price" | "fund_holdings" | "graph" | "macro" | "ownership" | "insiders" | "patents";
             /**
              * Kind
              * @enum {string}
@@ -11676,6 +11697,20 @@ export interface components {
             /** Exported To */
             exported_to: string | null;
         };
+        /** EventFeed */
+        EventFeed: {
+            /**
+             * Since
+             * Format: date
+             */
+            since: string;
+            /** Stories Read */
+            stories_read: number;
+            /** Items */
+            items: components["schemas"]["FeedItem"][];
+            /** Note */
+            note: string;
+        };
         /** EventImpact */
         EventImpact: {
             /** Symbol */
@@ -12895,6 +12930,24 @@ export interface components {
              * @enum {string}
              */
             status: "captured" | "partial" | "not_captured" | "no_fills";
+        };
+        /** FeedItem */
+        FeedItem: {
+            story: components["schemas"]["Story"];
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "confirmed" | "reported" | "rumoured";
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "downstream" | "upstream";
+            impact: components["schemas"]["EventImpact"];
+            top: components["schemas"]["EventPath"];
+            /** Would Alert */
+            would_alert: boolean;
         };
         /** FeedbackIn */
         FeedbackIn: {
@@ -14154,6 +14207,21 @@ export interface components {
              */
             denied_domains?: string[];
         };
+        /** GeoShare */
+        GeoShare: {
+            /** Geography */
+            geography: string;
+            /**
+             * Mean Share
+             * @description Average share of revenue across reporting companies.
+             */
+            mean_share: number;
+            /**
+             * N
+             * @description Companies that report revenue for this country.
+             */
+            n: number;
+        };
         /** GoldenAccuracy */
         GoldenAccuracy: {
             /**
@@ -14388,6 +14456,12 @@ export interface components {
              * @description Confirmed peer links with both ends in the group.
              */
             confirmed_peer_links: number;
+            /** Top Products */
+            top_products?: components["schemas"]["ProductLine"][];
+            /** Geography */
+            geography?: components["schemas"]["GeoShare"][];
+            /** Patent Areas */
+            patent_areas?: components["schemas"]["PatentArea"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -16488,6 +16562,8 @@ export interface components {
             fund_issuer_facts?: components["schemas"]["JobSchedule"];
             /** @description Evaluate credit, trade, patent and graph alerts. Default: daily 12:05. */
             free_source_alerts?: components["schemas"]["JobSchedule"];
+            /** @description Alert on a tier 1 deal story or a new patent family at a holding, once each. Default: daily 07:55. */
+            change_alerts?: components["schemas"]["JobSchedule"];
             /** @description Record the daily free-source shadow-run snapshot. Default: daily 23:50. */
             shadow_snapshot?: components["schemas"]["JobSchedule"];
             /** @description Generate the free-source shadow-run report. Default: Monday 08:00. */
@@ -19020,6 +19096,16 @@ export interface components {
             /** Skipped */
             skipped?: string | null;
         };
+        /** PatentArea */
+        PatentArea: {
+            /**
+             * Code
+             * @description CPC subclass, such as H01L.
+             */
+            code: string;
+            /** Families */
+            families: number;
+        };
         /** PatentFamilyInput */
         PatentFamilyInput: {
             /** Family Key */
@@ -20312,6 +20398,11 @@ export interface components {
              * @description Defaults to the strategy's horizon, else 3 years.
              */
             horizon_years?: number | null;
+            /**
+             * Risk Contribution Cap
+             * @description Largest share of the portfolio's volatility one stock may account for. Unset: the share is shown but not judged, because the strategy states no number.
+             */
+            risk_contribution_cap?: number | null;
         };
         /**
          * PretradeThresholds
@@ -20364,6 +20455,11 @@ export interface components {
              * @default 15
              */
             fx_cost_bps: number;
+            /**
+             * Risk Contribution Cap
+             * @description Largest share of portfolio volatility one stock may account for (null: shown but not judged).
+             */
+            risk_contribution_cap?: number | null;
         };
         /**
          * PriceBarOut
@@ -20569,6 +20665,18 @@ export interface components {
              * @default 120
              */
             intraday_cache_seconds: number;
+        };
+        /** ProductLine */
+        ProductLine: {
+            /** Ticker */
+            ticker: string;
+            /** Label */
+            label: string;
+            /**
+             * Share
+             * @description Share of the company's annual revenue.
+             */
+            share: number;
         };
         /** ProfileFact */
         ProfileFact: {
@@ -22264,6 +22372,11 @@ export interface components {
              * @description Open lots with the date each passes the holding-period test; facts, not tax advice.
              */
             holding_periods?: components["schemas"]["HoldingPeriodRow"][];
+            /**
+             * Decision Scorecard
+             * @description How past journal decisions turned out (price change since the decision, each with its sample size; sections with too few decisions are not summarised).
+             */
+            decision_scorecard?: string[];
             /** Sources */
             sources: components["schemas"]["Source"][];
             /** Model */
@@ -23214,9 +23327,9 @@ export interface components {
             /**
              * Not Covered
              * @default [
-             *       "Top products: segment revenue is stored per filing, not yet rolled up to a product list.",
-             *       "Patent areas: patents are stored per company and are not grouped by sector here.",
-             *       "Trade dependencies: trade data is by product code and country, not by company.",
+             *       "Top products: only companies whose annual report tags revenue by product are listed.",
+             *       "Patent areas: empty until patent data is collected (EPO OPS credentials are not set).",
+             *       "Trade dependencies: shown as the countries companies report revenue in, not customs data.",
              *       "Credit cycle signals: the stored credit-spread series is for the whole market, not a sector."
              *     ]
              */
@@ -24622,6 +24735,30 @@ export interface components {
              */
             preset?: "idea_pipeline" | null;
         };
+        /** Story */
+        Story: {
+            /** Id */
+            id: number;
+            /** Headline */
+            headline: string;
+            /** Url */
+            url: string;
+            /** Outlet */
+            outlet: string | null;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /** Event Type */
+            event_type: string;
+            /** Ticker */
+            ticker: string;
+            /** Tier */
+            tier: number;
+            /** Rumour */
+            rumour: boolean;
+        };
         /** StoryOut */
         StoryOut: {
             /** Id */
@@ -25587,6 +25724,11 @@ export interface components {
              * @description Size of the trade in the base currency.
              */
             value_base: number;
+            /**
+             * Bear Case Price
+             * @description Buys only: the price you expect in the bear case, in the quote currency. A thesis stores no bear case, so the asymmetry gate needs it here.
+             */
+            bear_case_price?: number | null;
         };
         /** TradeRow */
         TradeRow: {
@@ -36378,6 +36520,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventImpact"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_event_feed: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventFeed"];
                 };
             };
             /** @description Validation Error */

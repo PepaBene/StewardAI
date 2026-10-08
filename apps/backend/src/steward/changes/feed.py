@@ -18,7 +18,10 @@ import asyncpg
 from pydantic import BaseModel, Field
 
 Kind = Literal["new", "revised", "moved", "added", "removed", "dropped"]
-Area = Literal["fundamentals", "estimates", "price", "fund_holdings", "graph", "macro"]
+Area = Literal[
+    "fundamentals", "estimates", "price", "fund_holdings", "graph", "macro", "ownership",
+    "insiders", "patents",
+]  # fmt: skip
 
 REVISION_TOLERANCE = 1e-9
 PRICE_MOVE = 0.03
@@ -32,9 +35,9 @@ METHOD = (
 )
 
 NOT_COVERED = [
-    "Ownership: 13F and insider records carry no before/after state, so a change cannot be "
-    "separated from a first load.",
-    "Patent portfolio: patents are stored per filing without a comparable earlier state.",
+    "Ownership and insiders are compared by period (the two latest 13F quarters, the last 90 "
+    "days of insider trades against the 90 before), not by what the app knew on a date.",
+    "Patents: only new families are listed; a change inside a family is not tracked.",
     "Trade exposures: trade series are not compared between dates here.",
 ]
 
@@ -392,6 +395,133 @@ async def _macro(pool: asyncpg.Pool, since_cut: dt.datetime) -> tuple[list[Chang
     return out, len(rows)
 
 
+COMPLETE_QUARTER_MANAGERS = 1000
+INSIDER_WINDOW_DAYS = 90
+INSIDER_MOVE_SHARES = 1
+
+
+def ownership_item(
+    ticker: str,
+    prev: tuple[dt.date, int, float] | None,
+    now: tuple[dt.date, int, float] | None,
+    weights: dict[str, float],
+) -> ChangeItem | None:
+    """Holders and shares in the latest 13F quarter against the one before. A holding with no
+    record in the earlier quarter is 'new'; unchanged counts give no item."""
+    if now is None or (prev is not None and prev[1:] == now[1:]):
+        return None
+    after = f"{now[1]:,} managers, {now[2]:,.0f} shares ({now[0]})"
+    before = f"{prev[1]:,} managers, {prev[2]:,.0f} shares ({prev[0]})" if prev else None
+    return ChangeItem(
+        area="ownership", kind="moved" if prev else "new", subject=ticker,
+        what="Institutional holders in Form 13F filings", before=before, after=after,
+        before_ref=None, after_ref=Ref(table="institutional_holding", id=f"{ticker}:{now[0]}",
+                                       known_at=None),
+        weight=weight_of(ticker, weights),
+    )  # fmt: skip
+
+
+async def _ownership(
+    pool: asyncpg.Pool, tickers: list[str], weights: dict[str, float]
+) -> tuple[list[ChangeItem], int, str | None]:
+    rows = await pool.fetch(
+        "with p as (select period from public.form13f_filing group by period"
+        "  having count(distinct cik) > $2 order by period desc limit 2)"
+        " select f.period, h.ticker, count(distinct f.cik) managers, sum(h.shares)::float8 shares"
+        " from public.institutional_holding h"
+        " join public.form13f_filing f on f.accession = h.accession"
+        " where f.period in (select period from p) and h.ticker = any($1::text[])"
+        " and h.put_call is null group by 1, 2",
+        tickers,
+        COMPLETE_QUARTER_MANAGERS,
+    )
+    periods = sorted({r["period"] for r in rows})
+    by: dict[str, dict[dt.date, tuple[dt.date, int, float]]] = {}
+    for r in rows:
+        by.setdefault(r["ticker"], {})[r["period"]] = (r["period"], r["managers"], r["shares"])
+    if len(periods) < 2:
+        return [], len(by), "Fewer than two complete 13F quarters are stored."
+    out = []
+    for ticker, per in sorted(by.items()):
+        item = ownership_item(ticker, per.get(periods[0]), per.get(periods[1]), weights)
+        if item:
+            out.append(item)
+    return (
+        out,
+        len(by),
+        "Compares the two latest quarters; filings arrive up to 45 days late. Share totals add "
+        "up every filed line, so amendments and managers' sub-accounts may repeat; the manager "
+        "count is the steadier figure.",
+    )
+
+
+def insider_item(
+    ticker: str, recent: float, prior: float, weights: dict[str, float]
+) -> ChangeItem | None:
+    """Net open-market shares (purchases minus sales) in the last 90 days against the 90 before."""
+    if abs(recent - prior) < INSIDER_MOVE_SHARES:
+        return None
+    return ChangeItem(
+        area="insiders", kind="moved", subject=ticker,
+        what=f"Net open-market insider shares, {INSIDER_WINDOW_DAYS} days",
+        before=f"{prior:+,.0f}", after=f"{recent:+,.0f}", before_ref=None,
+        after_ref=Ref(table="insider_transaction", id=ticker, known_at=None),
+        weight=weight_of(ticker, weights),
+    )  # fmt: skip
+
+
+async def _insiders(
+    pool: asyncpg.Pool, tickers: list[str], weights: dict[str, float], now: dt.datetime
+) -> tuple[list[ChangeItem], int]:
+    today = now.date()
+    cut = today - dt.timedelta(days=INSIDER_WINDOW_DAYS)
+    start = today - dt.timedelta(days=2 * INSIDER_WINDOW_DAYS)
+    rows = await pool.fetch(
+        "select f.ticker, (t.transaction_date >= $3) as recent,"
+        " sum(case when t.transaction_code = 'P' then t.shares else -t.shares end)::float8 net"
+        " from public.insider_transaction t"
+        " join public.insider_filing f on f.accession = t.accession"
+        " where not t.derivative and t.transaction_code in ('P', 'S')"
+        " and f.ticker = any($1::text[]) and t.transaction_date >= $2"
+        " and t.transaction_date <= $4 and f.superseded_by_accession is null"
+        " group by 1, 2",
+        tickers, start, cut, today,
+    )  # fmt: skip
+    by: dict[str, dict[bool, float]] = {}
+    for r in rows:
+        by.setdefault(r["ticker"], {})[r["recent"]] = r["net"] or 0.0
+    out = [
+        item
+        for ticker, v in sorted(by.items())
+        if (item := insider_item(ticker, v.get(True, 0.0), v.get(False, 0.0), weights))
+    ]
+    return out, len(by)
+
+
+async def _patents(
+    pool: asyncpg.Pool, weights: dict[str, float], since_cut: dt.datetime
+) -> tuple[list[ChangeItem], int]:
+    rows = await pool.fetch(
+        "select f.id, f.family_title, f.source_url, f.known_at, o.ticker"
+        " from public.patent_family f join public.patent_family_owner o on o.family_id = f.id"
+        " where o.valid_to is null order by f.known_at desc limit 500"
+    )
+    out = [
+        ChangeItem(
+            area="patents", kind="new", subject=r["ticker"],
+            what=f"New patent family: {r['family_title'] or 'untitled'}", before=None,
+            after="stored", before_ref=None,
+            after_ref=Ref(
+                table="patent_family", id=str(r["id"]), known_at=r["known_at"], url=r["source_url"]
+            ),
+            weight=weight_of(r["ticker"], weights) if r["ticker"] else None,
+        )
+        for r in rows
+        if r["known_at"] > since_cut and r["ticker"]
+    ]  # fmt: skip
+    return out, len(rows)
+
+
 async def build_feed(pool: asyncpg.Pool, since: dt.date | None = None) -> ChangeFeed | None:
     days = await snapshot_days(pool)
     if not days:
@@ -450,5 +580,22 @@ async def build_feed(pool: asyncpg.Pool, since: dt.date | None = None) -> Change
     got, n = await _macro(pool, old_cut)
     items += got
     areas.append(AreaCount(area="macro", items=len(got), compared=n))
+
+    got, n, note = await _ownership(pool, tickers, weights)
+    items += got
+    areas.append(AreaCount(area="ownership", items=len(got), compared=n, note=note))
+    got, n = await _insiders(pool, tickers, weights, now_cut)
+    items += got
+    areas.append(AreaCount(area="insiders", items=len(got), compared=n))
+    got, n = await _patents(pool, weights, old_cut)
+    items += got
+    areas.append(
+        AreaCount(
+            area="patents",
+            items=len(got),
+            compared=n,
+            note=None if n else "No patent families are stored yet (EPO OPS credentials unset).",
+        )
+    )
 
     return ChangeFeed(since=old_day, compared_with=now_day, items=rank_items(items), areas=areas)

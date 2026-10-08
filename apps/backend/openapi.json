@@ -16811,6 +16811,57 @@
         }
       }
     },
+    "/portfolio/xray/event-feed": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Event Feed",
+        "description": "Recent classified news about a company, followed along the supply-chain links to what you\nhold. Only stories that reach another holding are listed; nothing is sent as an alert.",
+        "operationId": "get_event_feed",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "default": 14,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventFeed"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/xray/index-weights": {
       "get": {
         "tags": [
@@ -22644,7 +22695,10 @@
               "price",
               "fund_holdings",
               "graph",
-              "macro"
+              "macro",
+              "ownership",
+              "insiders",
+              "patents"
             ],
             "title": "Area"
           },
@@ -25346,6 +25400,7 @@
                 "fund_characteristics_audit",
                 "fund_issuer_facts",
                 "free_source_alerts",
+                "change_alerts",
                 "shadow_snapshot",
                 "shadow_report",
                 "raw_retention",
@@ -25411,6 +25466,7 @@
                 "fund_characteristics_audit",
                 "fund_issuer_facts",
                 "free_source_alerts",
+                "change_alerts",
                 "shadow_snapshot",
                 "shadow_report",
                 "raw_retention",
@@ -26456,8 +26512,8 @@
             "type": "array",
             "title": "Not Covered",
             "default": [
-              "Ownership: 13F and insider records carry no before/after state, so a change cannot be separated from a first load.",
-              "Patent portfolio: patents are stored per filing without a comparable earlier state.",
+              "Ownership and insiders are compared by period (the two latest 13F quarters, the last 90 days of insider trades against the 90 before), not by what the app knew on a date.",
+              "Patents: only new families are listed; a change inside a family is not tracked.",
               "Trade exposures: trade series are not compared between dates here."
             ]
           },
@@ -26486,7 +26542,10 @@
               "price",
               "fund_holdings",
               "graph",
-              "macro"
+              "macro",
+              "ownership",
+              "insiders",
+              "patents"
             ],
             "title": "Area"
           },
@@ -35131,6 +35190,38 @@
         ],
         "title": "EvalCandidateOut"
       },
+      "EventFeed": {
+        "properties": {
+          "since": {
+            "type": "string",
+            "format": "date",
+            "title": "Since"
+          },
+          "stories_read": {
+            "type": "integer",
+            "title": "Stories Read"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FeedItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "since",
+          "stories_read",
+          "items",
+          "note"
+        ],
+        "title": "EventFeed"
+      },
       "EventImpact": {
         "properties": {
           "symbol": {
@@ -38259,6 +38350,50 @@
           "status"
         ],
         "title": "FeeTotals"
+      },
+      "FeedItem": {
+        "properties": {
+          "story": {
+            "$ref": "#/components/schemas/Story"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "reported",
+              "rumoured"
+            ],
+            "title": "State"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "downstream",
+              "upstream"
+            ],
+            "title": "Direction"
+          },
+          "impact": {
+            "$ref": "#/components/schemas/EventImpact"
+          },
+          "top": {
+            "$ref": "#/components/schemas/EventPath"
+          },
+          "would_alert": {
+            "type": "boolean",
+            "title": "Would Alert"
+          }
+        },
+        "type": "object",
+        "required": [
+          "story",
+          "state",
+          "direction",
+          "impact",
+          "top",
+          "would_alert"
+        ],
+        "title": "FeedItem"
       },
       "FeedbackIn": {
         "properties": {
@@ -41943,6 +42078,31 @@
         "title": "GapResearchSettings",
         "description": "Filling what the structured sources left empty from reliable web pages, last resort.\nOnly empty, fillable slots off their cooldown are searched. Facts are kept apart from the\nstructured data and are approved by AI against the source tiers below."
       },
+      "GeoShare": {
+        "properties": {
+          "geography": {
+            "type": "string",
+            "title": "Geography"
+          },
+          "mean_share": {
+            "type": "number",
+            "title": "Mean Share",
+            "description": "Average share of revenue across reporting companies."
+          },
+          "n": {
+            "type": "integer",
+            "title": "N",
+            "description": "Companies that report revenue for this country."
+          }
+        },
+        "type": "object",
+        "required": [
+          "geography",
+          "mean_share",
+          "n"
+        ],
+        "title": "GeoShare"
+      },
       "GoldenAccuracy": {
         "properties": {
           "value": {
@@ -42621,6 +42781,27 @@
             "type": "integer",
             "title": "Confirmed Peer Links",
             "description": "Confirmed peer links with both ends in the group."
+          },
+          "top_products": {
+            "items": {
+              "$ref": "#/components/schemas/ProductLine"
+            },
+            "type": "array",
+            "title": "Top Products"
+          },
+          "geography": {
+            "items": {
+              "$ref": "#/components/schemas/GeoShare"
+            },
+            "type": "array",
+            "title": "Geography"
+          },
+          "patent_areas": {
+            "items": {
+              "$ref": "#/components/schemas/PatentArea"
+            },
+            "type": "array",
+            "title": "Patent Areas"
           }
         },
         "type": "object",
@@ -48832,6 +49013,10 @@
           "free_source_alerts": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Evaluate credit, trade, patent and graph alerts. Default: daily 12:05."
+          },
+          "change_alerts": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Alert on a tier 1 deal story or a new patent family at a holding, once each. Default: daily 07:55."
           },
           "shadow_snapshot": {
             "$ref": "#/components/schemas/JobSchedule",
@@ -56002,6 +56187,25 @@
         ],
         "title": "PairOverlap"
       },
+      "PatentArea": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "CPC subclass, such as H01L."
+          },
+          "families": {
+            "type": "integer",
+            "title": "Families"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "families"
+        ],
+        "title": "PatentArea"
+      },
       "PatentFamilyInput": {
         "properties": {
           "family_key": {
@@ -59857,6 +60061,20 @@
             ],
             "title": "Horizon Years",
             "description": "Defaults to the strategy's horizon, else 3 years."
+          },
+          "risk_contribution_cap": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Contribution Cap",
+            "description": "Largest share of the portfolio's volatility one stock may account for. Unset: the share is shown but not judged, because the strategy states no number."
           }
         },
         "type": "object",
@@ -59927,6 +60145,20 @@
             "minimum": 0.0,
             "title": "Fx Cost Bps",
             "default": 15
+          },
+          "risk_contribution_cap": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Contribution Cap",
+            "description": "Largest share of portfolio volatility one stock may account for (null: shown but not judged)."
           }
         },
         "additionalProperties": false,
@@ -60467,6 +60699,30 @@
         "type": "object",
         "title": "PriceSettings",
         "description": "Daily price history (Stooq, Yahoo as the fallback), intraday prices (Yahoo) and the\nrisk figures computed from the daily closes."
+      },
+      "ProductLine": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "share": {
+            "type": "number",
+            "title": "Share",
+            "description": "Share of the company's annual revenue."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "label",
+          "share"
+        ],
+        "title": "ProductLine"
       },
       "ProfileFact": {
         "properties": {
@@ -65264,6 +65520,14 @@
             "title": "Holding Periods",
             "description": "Open lots with the date each passes the holding-period test; facts, not tax advice."
           },
+          "decision_scorecard": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Decision Scorecard",
+            "description": "How past journal decisions turned out (price change since the decision, each with its sample size; sections with too few decisions are not summarised)."
+          },
           "sources": {
             "items": {
               "$ref": "#/components/schemas/Source"
@@ -67820,9 +68084,9 @@
             "type": "array",
             "title": "Not Covered",
             "default": [
-              "Top products: segment revenue is stored per filing, not yet rolled up to a product list.",
-              "Patent areas: patents are stored per company and are not grouped by sector here.",
-              "Trade dependencies: trade data is by product code and country, not by company.",
+              "Top products: only companies whose annual report tags revenue by product are listed.",
+              "Patent areas: empty until patent data is collected (EPO OPS credentials are not set).",
+              "Trade dependencies: shown as the countries companies report revenue in, not customs data.",
               "Credit cycle signals: the stored credit-spread series is for the whole market, not a sector."
             ]
           },
@@ -71843,6 +72107,67 @@
         "type": "object",
         "title": "StockRequest"
       },
+      "Story": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "outlet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlet"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "tier": {
+            "type": "integer",
+            "title": "Tier"
+          },
+          "rumour": {
+            "type": "boolean",
+            "title": "Rumour"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "headline",
+          "url",
+          "outlet",
+          "published_at",
+          "event_type",
+          "ticker",
+          "tier",
+          "rumour"
+        ],
+        "title": "Story"
+      },
       "StoryOut": {
         "properties": {
           "id": {
@@ -74356,6 +74681,19 @@
             "exclusiveMinimum": 0.0,
             "title": "Value Base",
             "description": "Size of the trade in the base currency."
+          },
+          "bear_case_price": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bear Case Price",
+            "description": "Buys only: the price you expect in the bear case, in the quote currency. A thesis stores no bear case, so the asymmetry gate needs it here."
           }
         },
         "type": "object",

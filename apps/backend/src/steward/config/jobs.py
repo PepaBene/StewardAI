@@ -1756,6 +1756,11 @@ class JobsConfig(ConfigModel):
         default_factory=lambda: JobSchedule(cron="5 12 * * *"),
         description="Evaluate credit, trade, patent and graph alerts. Default: daily 12:05.",
     )
+    change_alerts: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="55 7 * * *"),
+        description="Alert on a tier 1 deal story or a new patent family at a holding, once "
+        "each. Default: daily 07:55.",
+    )
     shadow_snapshot: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="50 23 * * *", enabled=False),
         description="Record the daily free-source shadow-run snapshot. Default: daily 23:50.",
@@ -1957,6 +1962,7 @@ class JobsConfig(ConfigModel):
             "fund_characteristics_audit": self.fund_characteristics_audit,
             "fund_issuer_facts": self.fund_issuer_facts,
             "free_source_alerts": self.free_source_alerts,
+            "change_alerts": self.change_alerts,
             "shadow_snapshot": self.shadow_snapshot,
             "shadow_report": self.shadow_report,
             "raw_retention": self.raw_retention,
