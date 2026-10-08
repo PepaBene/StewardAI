@@ -93,6 +93,7 @@ export const OTHER_PAGES = [
   { href: "/risk", label: "Risk and decisions", keywords: "var expected shortfall volatility drawdown tracking error correlation stress test shock themes what if rebalance pre-trade before a trade switch" },
   { href: "/journal", label: "Decision journal", keywords: "decisions thesis hypothesis buy sell pass review scorecard conviction catalysts disconfirming export report" },
   { href: "/quality", label: "Data quality", keywords: "cockpit stale prices identity conflicts fund weights claims provider quota access gaps" },
+  { href: "/insights", label: "What changed", keywords: "changes feed revisions estimates fund holdings price moves sector map industry growth margin valuation spread" },
   { href: "/release", label: "Release checks", keywords: "release gate readiness free access zero cost source audit pilot false alerts coverage activate partial unavailable" },
   { href: "/transactions", label: "Transactions and dividends", keywords: "orders dividends cash deposits withdrawals history holdings" },
   { href: "/glossary", label: "Glossary", keywords: "terms definitions metrics meaning help" },

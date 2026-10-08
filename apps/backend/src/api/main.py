@@ -33,6 +33,7 @@ from api.gate_routes import router as gate_router
 from api.graph_routes import router as graph_router
 from api.insider_activity_routes import router as insider_activity_router
 from api.insider_routes import router as insider_router
+from api.insight_routes import router as insight_router
 from api.investor_routes import router as investor_router
 from api.journal_routes import router as journal_router
 from api.lookthrough_routes import router as lookthrough_router
@@ -274,6 +275,7 @@ def create_app() -> FastAPI:
     app.include_router(decision_router)
     app.include_router(journal_router)
     app.include_router(release_router)
+    app.include_router(insight_router)
     app.include_router(pdmr_router)
     app.include_router(graph_router)
     app.include_router(data_context_router)

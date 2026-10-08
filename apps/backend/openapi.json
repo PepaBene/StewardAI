@@ -18940,6 +18940,91 @@
         ]
       }
     },
+    "/insights/sectors": {
+      "get": {
+        "tags": [
+          "insights"
+        ],
+        "summary": "Get Sector Map",
+        "description": "Sectors and industries of the companies with a stored profile: company and market counts,\ngrowth, margin and valuation spread, each with the sample behind it.",
+        "operationId": "get_sector_map",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SectorMap"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/insights/changes": {
+      "get": {
+        "tags": [
+          "insights"
+        ],
+        "summary": "Get Changes",
+        "description": "What differs between the app's knowledge at the earlier day and now, largest portfolio\nweight first, each item pointing at the old and new records.",
+        "operationId": "get_changes",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Compare with the end of this day; default is the previous snapshot.",
+              "title": "Since"
+            },
+            "description": "Compare with the end of this day; default is the previous snapshot."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeFeed"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/holdings/{ticker}/pdmr-notifications": {
       "get": {
         "tags": [
@@ -22400,6 +22485,49 @@
         ],
         "title": "AnnouncementRule",
         "description": "Maps a regulatory announcement's type (the RNS headline or the EQS category) to an\nevent type. First match wins; `classify` leaves the item to the classifier."
+      },
+      "AreaCount": {
+        "properties": {
+          "area": {
+            "type": "string",
+            "enum": [
+              "fundamentals",
+              "estimates",
+              "price",
+              "fund_holdings",
+              "graph",
+              "macro"
+            ],
+            "title": "Area"
+          },
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          },
+          "compared": {
+            "type": "integer",
+            "title": "Compared",
+            "description": "Records looked at in the area."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "area",
+          "items",
+          "compared"
+        ],
+        "title": "AreaCount"
       },
       "Assumptions": {
         "properties": {
@@ -26146,6 +26274,163 @@
         },
         "type": "object",
         "title": "Cell"
+      },
+      "ChangeFeed": {
+        "properties": {
+          "since": {
+            "type": "string",
+            "format": "date",
+            "title": "Since"
+          },
+          "compared_with": {
+            "type": "string",
+            "format": "date",
+            "title": "Compared With"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/AreaCount"
+            },
+            "type": "array",
+            "title": "Areas"
+          },
+          "not_covered": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not Covered",
+            "default": [
+              "Ownership: 13F and insider records carry no before/after state, so a change cannot be separated from a first load.",
+              "Patent portfolio: patents are stored per filing without a comparable earlier state.",
+              "Trade exposures: trade series are not compared between dates here."
+            ]
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": "Each area is compared as the app knew it at the end of the earlier day and as it knows it now. Items are sorted by the share of the portfolio in the company or fund they concern. A first-time record is 'new'; only a changed value for the same period is 'revised'. Prices compare the two portfolio snapshots and show moves of 3% or more."
+          }
+        },
+        "type": "object",
+        "required": [
+          "since",
+          "compared_with",
+          "items",
+          "areas"
+        ],
+        "title": "ChangeFeed"
+      },
+      "ChangeItem": {
+        "properties": {
+          "area": {
+            "type": "string",
+            "enum": [
+              "fundamentals",
+              "estimates",
+              "price",
+              "fund_holdings",
+              "graph",
+              "macro"
+            ],
+            "title": "Area"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "new",
+              "revised",
+              "moved",
+              "added",
+              "removed",
+              "dropped"
+            ],
+            "title": "Kind"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "description": "Ticker, fund or series."
+          },
+          "what": {
+            "type": "string",
+            "title": "What"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          },
+          "before_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Ref"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "after_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Ref"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight",
+            "description": "Share of the portfolio concerned; null if none."
+          }
+        },
+        "type": "object",
+        "required": [
+          "area",
+          "kind",
+          "subject",
+          "what",
+          "before",
+          "after",
+          "before_ref",
+          "after_ref",
+          "weight"
+        ],
+        "title": "ChangeItem"
       },
       "ChannelWeight": {
         "properties": {
@@ -42125,6 +42410,87 @@
           "value"
         ],
         "title": "GridCell"
+      },
+      "GroupStats": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "sector or industry"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "companies": {
+            "type": "integer",
+            "title": "Companies"
+          },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers"
+          },
+          "markets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Markets"
+          },
+          "held_weight": {
+            "type": "number",
+            "title": "Held Weight",
+            "description": "Share of the portfolio held in these companies."
+          },
+          "held": {
+            "type": "integer",
+            "title": "Held"
+          },
+          "revenue_growth": {
+            "$ref": "#/components/schemas/Spread"
+          },
+          "operating_margin": {
+            "$ref": "#/components/schemas/Spread"
+          },
+          "pe": {
+            "$ref": "#/components/schemas/Spread"
+          },
+          "confirmed_peer_links": {
+            "type": "integer",
+            "title": "Confirmed Peer Links",
+            "description": "Confirmed peer links with both ends in the group."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "parent",
+          "companies",
+          "tickers",
+          "markets",
+          "held_weight",
+          "held",
+          "revenue_growth",
+          "operating_margin",
+          "pe",
+          "confirmed_peer_links"
+        ],
+        "title": "GroupStats"
       },
       "HTTPValidationError": {
         "properties": {
@@ -62561,6 +62927,48 @@
         ],
         "title": "RecordedPeerResponse"
       },
+      "Ref": {
+        "properties": {
+          "table": {
+            "type": "string",
+            "title": "Table"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "known_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known At"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "table",
+          "id",
+          "known_at"
+        ],
+        "title": "Ref"
+      },
       "ReferenceGaps": {
         "properties": {
           "identity": {
@@ -67228,6 +67636,63 @@
         ],
         "title": "SectionCoverage"
       },
+      "SectorMap": {
+        "properties": {
+          "universe": {
+            "type": "integer",
+            "title": "Universe",
+            "description": "Companies with a profile."
+          },
+          "sectors": {
+            "items": {
+              "$ref": "#/components/schemas/GroupStats"
+            },
+            "type": "array",
+            "title": "Sectors"
+          },
+          "industries": {
+            "items": {
+              "$ref": "#/components/schemas/GroupStats"
+            },
+            "type": "array",
+            "title": "Industries"
+          },
+          "unclassified": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unclassified",
+            "description": "Held tickers with no profile."
+          },
+          "not_covered": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not Covered",
+            "default": [
+              "Top products: segment revenue is stored per filing, not yet rolled up to a product list.",
+              "Patent areas: patents are stored per company and are not grouped by sector here.",
+              "Trade dependencies: trade data is by product code and country, not by company.",
+              "Credit cycle signals: the stored credit-spread series is for the whole market, not a sector."
+            ]
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": "Companies are the ones with a stored profile. Revenue growth and operating margin are the latest filed year from the peer-comparison engine; price/earnings is the provider's trailing figure. A median needs at least three companies with a value."
+          }
+        },
+        "type": "object",
+        "required": [
+          "universe",
+          "sectors",
+          "industries",
+          "unclassified"
+        ],
+        "title": "SectorMap"
+      },
       "SegmentAnalysis": {
         "properties": {
           "ticker": {
@@ -70249,6 +70714,63 @@
         ],
         "title": "SplitEntry",
         "description": "A split or reverse split you entered. The broker's fills are not restated for it, so\nwithout this a split shows up as a position the fills cannot explain."
+      },
+      "Spread": {
+        "properties": {
+          "n": {
+            "type": "integer",
+            "title": "N",
+            "description": "Companies with a value."
+          },
+          "of": {
+            "type": "integer",
+            "title": "Of",
+            "description": "Companies in the group."
+          },
+          "median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median",
+            "description": "Null below the minimum sample."
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          }
+        },
+        "type": "object",
+        "required": [
+          "n",
+          "of",
+          "median",
+          "low",
+          "high"
+        ],
+        "title": "Spread"
       },
       "SpreadBucket": {
         "properties": {

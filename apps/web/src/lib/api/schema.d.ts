@@ -6021,6 +6021,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/insights/sectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Sector Map
+         * @description Sectors and industries of the companies with a stored profile: company and market counts,
+         *     growth, margin and valuation spread, each with the sample behind it.
+         */
+        get: operations["get_sector_map"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/insights/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Changes
+         * @description What differs between the app's knowledge at the earlier day and now, largest portfolio
+         *     weight first, each item pointing at the old and new records.
+         */
+        get: operations["get_changes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/pdmr-notifications": {
         parameters: {
             query?: never;
@@ -7147,6 +7189,23 @@ export interface components {
             pattern: string;
             /** Event Type */
             event_type: ("guidance_change" | "m_and_a" | "dividend_cut" | "earnings_release" | "management_change" | "regulatory_legal" | "capital_allocation" | "credit_rating" | "central_bank" | "macro_surprise" | "insider_transaction" | "product_business" | "sector_competitor" | "index_change" | "analyst_rating" | "delisting" | "entity_status" | "credit_stress" | "trade_exposure" | "patent_status" | "other") | "classify";
+        };
+        /** AreaCount */
+        AreaCount: {
+            /**
+             * Area
+             * @enum {string}
+             */
+            area: "fundamentals" | "estimates" | "price" | "fund_holdings" | "graph" | "macro";
+            /** Items */
+            items: number;
+            /**
+             * Compared
+             * @description Records looked at in the area.
+             */
+            compared: number;
+            /** Note */
+            note?: string | null;
         };
         /**
          * Assumptions
@@ -8422,6 +8481,68 @@ export interface components {
              * @default money
              */
             unit: string;
+        };
+        /** ChangeFeed */
+        ChangeFeed: {
+            /**
+             * Since
+             * Format: date
+             */
+            since: string;
+            /**
+             * Compared With
+             * Format: date
+             */
+            compared_with: string;
+            /** Items */
+            items: components["schemas"]["ChangeItem"][];
+            /** Areas */
+            areas: components["schemas"]["AreaCount"][];
+            /**
+             * Not Covered
+             * @default [
+             *       "Ownership: 13F and insider records carry no before/after state, so a change cannot be separated from a first load.",
+             *       "Patent portfolio: patents are stored per filing without a comparable earlier state.",
+             *       "Trade exposures: trade series are not compared between dates here."
+             *     ]
+             */
+            not_covered: string[];
+            /**
+             * Method
+             * @default Each area is compared as the app knew it at the end of the earlier day and as it knows it now. Items are sorted by the share of the portfolio in the company or fund they concern. A first-time record is 'new'; only a changed value for the same period is 'revised'. Prices compare the two portfolio snapshots and show moves of 3% or more.
+             */
+            method: string;
+        };
+        /** ChangeItem */
+        ChangeItem: {
+            /**
+             * Area
+             * @enum {string}
+             */
+            area: "fundamentals" | "estimates" | "price" | "fund_holdings" | "graph" | "macro";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "new" | "revised" | "moved" | "added" | "removed" | "dropped";
+            /**
+             * Subject
+             * @description Ticker, fund or series.
+             */
+            subject: string;
+            /** What */
+            what: string;
+            /** Before */
+            before: string | null;
+            /** After */
+            after: string | null;
+            before_ref: components["schemas"]["Ref"] | null;
+            after_ref: components["schemas"]["Ref"] | null;
+            /**
+             * Weight
+             * @description Share of the portfolio concerned; null if none.
+             */
+            weight: number | null;
         };
         /** ChannelWeight */
         ChannelWeight: {
@@ -14187,6 +14308,39 @@ export interface components {
             rate_shift: number | string;
             /** Value */
             value: number | string | null;
+        };
+        /** GroupStats */
+        GroupStats: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @description sector or industry
+             */
+            kind: string;
+            /** Parent */
+            parent: string | null;
+            /** Companies */
+            companies: number;
+            /** Tickers */
+            tickers: string[];
+            /** Markets */
+            markets: string[];
+            /**
+             * Held Weight
+             * @description Share of the portfolio held in these companies.
+             */
+            held_weight: number;
+            /** Held */
+            held: number;
+            revenue_growth: components["schemas"]["Spread"];
+            operating_margin: components["schemas"]["Spread"];
+            pe: components["schemas"]["Spread"];
+            /**
+             * Confirmed Peer Links
+             * @description Confirmed peer links with both ends in the group.
+             */
+            confirmed_peer_links: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -21228,6 +21382,17 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** Ref */
+        Ref: {
+            /** Table */
+            table: string;
+            /** Id */
+            id: string;
+            /** Known At */
+            known_at: string | null;
+            /** Url */
+            url?: string | null;
+        };
         /** ReferenceGaps */
         ReferenceGaps: {
             /** Identity */
@@ -22983,6 +23148,38 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** SectorMap */
+        SectorMap: {
+            /**
+             * Universe
+             * @description Companies with a profile.
+             */
+            universe: number;
+            /** Sectors */
+            sectors: components["schemas"]["GroupStats"][];
+            /** Industries */
+            industries: components["schemas"]["GroupStats"][];
+            /**
+             * Unclassified
+             * @description Held tickers with no profile.
+             */
+            unclassified: string[];
+            /**
+             * Not Covered
+             * @default [
+             *       "Top products: segment revenue is stored per filing, not yet rolled up to a product list.",
+             *       "Patent areas: patents are stored per company and are not grouped by sector here.",
+             *       "Trade dependencies: trade data is by product code and country, not by company.",
+             *       "Credit cycle signals: the stored credit-spread series is for the whole market, not a sector."
+             *     ]
+             */
+            not_covered: string[];
+            /**
+             * Method
+             * @default Companies are the ones with a stored profile. Revenue growth and operating margin are the latest filed year from the peer-comparison engine; price/earnings is the provider's trailing figure. A median needs at least three companies with a value.
+             */
+            method: string;
+        };
         /** SegmentAnalysis */
         SegmentAnalysis: {
             /** Ticker */
@@ -24078,6 +24275,28 @@ export interface components {
              * @default
              */
             note: string;
+        };
+        /** Spread */
+        Spread: {
+            /**
+             * N
+             * @description Companies with a value.
+             */
+            n: number;
+            /**
+             * Of
+             * @description Companies in the group.
+             */
+            of: number;
+            /**
+             * Median
+             * @description Null below the minimum sample.
+             */
+            median: number | null;
+            /** Low */
+            low: number | null;
+            /** High */
+            high: number | null;
         };
         /** SpreadBucket */
         SpreadBucket: {
@@ -37512,6 +37731,58 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sector_map: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectorMap"];
+                };
+            };
+        };
+    };
+    get_changes: {
+        parameters: {
+            query?: {
+                /** @description Compare with the end of this day; default is the previous snapshot. */
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeFeed"];
+                };
             };
             /** @description Validation Error */
             422: {
