@@ -118,13 +118,14 @@ function Downloads() {
         if (!res.response.ok || !res.data) throw new Error("report");
         save(`owner-report-${res.data.manifest.generated_at.slice(0, 10)}.json`, "application/json", JSON.stringify(res.data, null, 2));
       } else if (kind === "pdf") {
-        const res = await client.GET("/journal/export/report.html", { params: { query: {} }, parseAs: "text" });
-        if (!res.response.ok || typeof res.data !== "string") throw new Error("pdf");
-        const url = URL.createObjectURL(new Blob([res.data], { type: "text/html" }));
-        const win = window.open(url, "_blank");
-        if (!win) throw new Error("blocked");
-        win.addEventListener("load", () => win.print());
-        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        const res = await client.GET("/journal/export/report.pdf", { params: { query: {} }, parseAs: "blob" });
+        if (!res.response.ok || !(res.data instanceof Blob)) throw new Error("pdf");
+        const url = URL.createObjectURL(res.data);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "owner-report.pdf";
+        link.click();
+        URL.revokeObjectURL(url);
       } else {
         const res = await client.GET("/journal/export/entries.csv", { parseAs: "text" });
         if (!res.response.ok || typeof res.data !== "string") throw new Error("csv");
@@ -148,7 +149,7 @@ function Downloads() {
           {busy === "report" ? "Preparing…" : "Download the report (JSON)"}
         </Button>
         <Button type="button" variant="outline" disabled={busy !== null} onClick={() => get("pdf")}>
-          {busy === "pdf" ? "Preparing…" : "Print or save as PDF"}
+          {busy === "pdf" ? "Preparing…" : "Download the report (PDF)"}
         </Button>
         <Button type="button" variant="outline" disabled={busy !== null} onClick={() => get("csv")}>
           {busy === "csv" ? "Preparing…" : "Download the journal (CSV)"}

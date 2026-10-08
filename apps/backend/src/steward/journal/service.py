@@ -23,6 +23,13 @@ def sell_target_of(entry: JournalEntry) -> tuple[float | None, str | None]:
     return (float(value) if value is not None else None, target.get("currency"))
 
 
+def bear_case_of(entry: JournalEntry) -> float | None:
+    """The bear-case price the thesis named when the entry was written."""
+    thesis = entry.snapshot.get("thesis") or {}
+    value = (thesis.get("price_target") or {}).get("bear_case")
+    return float(value) if value is not None else None
+
+
 def first_hit(series: list[tuple[dt.date, float]], after: dt.date, target: float) -> dt.date | None:
     """First close strictly after `after` at or above `target`."""
     for day, close in series:
@@ -47,6 +54,12 @@ async def outcomes(pool: asyncpg.Pool, entries: list[JournalEntry]) -> list[Deci
     for e in entries:
         series = series_by.get(e.ticker or "", [])
         target, target_currency = sell_target_of(e)
+        bear = bear_case_of(e)
+        bear_ok = bear is not None and (
+            target_currency is None
+            or e.price_currency is None
+            or target_currency == e.price_currency
+        )
         comparable = target is not None and (
             target_currency is None
             or e.price_currency is None
@@ -66,6 +79,10 @@ async def outcomes(pool: asyncpg.Pool, entries: list[JournalEntry]) -> list[Deci
                 conviction=e.conviction,
                 main_reason=e.main_reason,
                 sell_target=target if comparable else None,
+                bear_case=bear if bear_ok else None,
+                low_since=min((c for d, c in series if d > e.decided_on), default=None)
+                if bear_ok
+                else None,
                 hit_on=first_hit(series, e.decided_on, target) if comparable and target else None,
             )
         )

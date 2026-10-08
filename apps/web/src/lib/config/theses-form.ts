@@ -180,6 +180,7 @@ export function rigorGaps(form: RigorForm): string[] {
 export type TargetForm = {
   sell_target: string;
   buy_target: string;
+  bear_case: string;
   currency: string;
   method: string;
   set_on: string; // yyyy-mm-dd or ""
@@ -188,6 +189,7 @@ export type TargetForm = {
 export const EMPTY_TARGET: TargetForm = {
   sell_target: "",
   buy_target: "",
+  bear_case: "",
   currency: "",
   method: "",
   set_on: "",
@@ -246,6 +248,7 @@ export function targetFromBody(
   return {
     sell_target: target.sell_target == null ? "" : String(target.sell_target),
     buy_target: target.buy_target == null ? "" : String(target.buy_target),
+    bear_case: target.bear_case == null ? "" : String(target.bear_case),
     currency: target.currency,
     method: target.method,
     set_on: target.set_on,
@@ -258,6 +261,7 @@ export function targetToBody(form: TargetForm): ThesisPriceTarget | null {
   return {
     sell_target: parseThreshold(form.sell_target),
     buy_target: parseThreshold(form.buy_target),
+    bear_case: parseThreshold(form.bear_case),
     currency: form.currency.trim().toUpperCase(),
     method: form.method.trim(),
     set_on: form.set_on,

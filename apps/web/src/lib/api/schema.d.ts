@@ -5895,6 +5895,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/journal/export/report.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Report Pdf
+         * @description The same report as a PDF file.
+         */
+        get: operations["export_report_pdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/journal/export/entries.csv": {
         parameters: {
             query?: never;
@@ -8641,7 +8661,7 @@ export interface components {
             not_covered: string[];
             /**
              * Method
-             * @default Each area is compared as the app knew it at the end of the earlier day and as it knows it now. Items are sorted by the share of the portfolio in the company or fund they concern. A first-time record is 'new'; only a changed value for the same period is 'revised'. Prices compare the two portfolio snapshots and show moves of 3% or more.
+             * @default Each area is compared as the app knew it at the end of the earlier day and as it knows it now. Items are sorted by a 0-100 relevance score: 60 points for the share of the portfolio in the company or fund they concern (full at 10%) and 40 for how much that kind of change in that area usually matters (fixed factors, not learned). A first-time record is 'new'; only a changed value for the same period is 'revised'. Prices compare the two portfolio snapshots and show moves of 3% or more.
              */
             method: string;
         };
@@ -8675,6 +8695,17 @@ export interface components {
              * @description Share of the portfolio concerned; null if none.
              */
             weight: number | null;
+            /**
+             * Relevance
+             * @description 0-100 score; see the method for its parts.
+             * @default 0
+             */
+            relevance: number;
+            /**
+             * Relevance Reason
+             * @default
+             */
+            relevance_reason: string;
         };
         /** ChannelWeight */
         ChannelWeight: {
@@ -22887,6 +22918,11 @@ export interface components {
         Row: {
             /** Label */
             label: string;
+            /**
+             * Entry Ids
+             * @description Journal entries the figure was computed from.
+             */
+            entry_ids?: number[];
             /** N */
             n: number;
             /** Median Change */
@@ -25671,8 +25707,13 @@ export interface components {
              */
             buy_target?: number | null;
             /**
+             * Bear Case
+             * @description Price the stock would fall to if the thesis fails, in the same currency. The pre-trade asymmetry check and the scorecard's risk section read it.
+             */
+            bear_case?: number | null;
+            /**
              * Currency
-             * @description Currency of both targets, as Trading212 quotes the instrument (GBX for pence).
+             * @description Currency of all the prices, as Trading212 quotes it (GBX for pence).
              * @example CZK
              */
             currency: string;
@@ -37872,6 +37913,36 @@ export interface operations {
                 content: {
                     "text/html": string;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_report_pdf: {
+        parameters: {
+            query?: {
+                /** @description Scorecard start; one year ago. */
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

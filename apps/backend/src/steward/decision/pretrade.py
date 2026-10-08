@@ -125,6 +125,7 @@ class TickerFacts:
     price: float | None = None  # in the quote currency
     quote_currency: str | None = None
     sell_target: float | None = None
+    bear_case: float | None = None  # the thesis's bear-case price, in the quote currency
     target_currency: str | None = None
     has_thesis: bool = False
     thesis_gaps: list[str] = field(default_factory=list)  # requirements the thesis does not meet
@@ -338,14 +339,15 @@ def _asymmetry(
     t: TradeLeg, f: TickerFacts, er: float | None, rules: PretradeRules
 ) -> PretradeCheck:
     base = dict(id="buy.asymmetry", principle="8a", ticker=t.ticker)
-    if t.bear_case_price is None:
+    bear = t.bear_case_price if t.bear_case_price is not None else f.bear_case
+    if bear is None:
         return PretradeCheck(
             **base,
             status="unavailable",
             title="Upside against loss not checked",
             detail=f"The gate needs a base-case upside of at least {rules.asymmetry_gate:g} times "
-            "the bear-case loss. A thesis stores no bear case: enter your bear-case price on the "
-            "buy to run it.",
+            "the bear-case loss. The thesis has no bear-case price: set one in the thesis, or "
+            "enter it on the buy to run the check.",
         )
     if er is None or f.price is None:
         return PretradeCheck(
@@ -355,13 +357,13 @@ def _asymmetry(
             detail="The upside to the sell target is not available, so there is nothing to "
             "compare with the bear case.",
         )
-    loss = 1 - t.bear_case_price / f.price
+    loss = 1 - bear / f.price
     if loss <= 0:
         return PretradeCheck(
             **base,
             status="pass",
             title="Bear case is not below the price",
-            detail=f"Your bear-case price {t.bear_case_price:,.2f} is at or above {f.price:,.2f}, "
+            detail=f"Your bear-case price {bear:,.2f} is at or above {f.price:,.2f}, "
             "so there is no loss to weigh the upside against.",
             values={"upside": er, "bear_loss": loss},
         )
@@ -371,7 +373,7 @@ def _asymmetry(
         status="pass" if ratio >= rules.asymmetry_gate else "flag",
         title=f"Upside {_pct(er)} against bear-case loss {_pct(loss)}: {ratio:.1f} times",
         detail=f"The gate wants at least {rules.asymmetry_gate:g} times. The bear case is your "
-        f"own price of {t.bear_case_price:,.2f}.",
+        f"own price of {bear:,.2f}.",
         values={"upside": er, "bear_loss": loss, "ratio": ratio, "gate": rules.asymmetry_gate},
     )
 

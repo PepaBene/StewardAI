@@ -80,3 +80,6 @@ def test_asymmetry_uses_the_bear_case_price() -> None:
     assert low.status == "flag"
     none = pt._asymmetry(leg.model_copy(update={"bear_case_price": None}), f, 0.5, rules)
     assert none.status == "unavailable"
+    f.bear_case = 80  # the thesis's own bear case is used when the buy gives none
+    stored = pt._asymmetry(leg.model_copy(update={"bear_case_price": None}), f, 0.5, rules)
+    assert stored.status == "pass" and stored.values["ratio"] == pytest.approx(2.5)

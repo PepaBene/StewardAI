@@ -83,6 +83,9 @@ function Area({ area, items }: { area: ChangeItem["area"]; items: ChangeItem[] }
               <th scope="row" className="py-1.5 pr-3 text-left font-normal">
                 <span className="font-semibold">{c.subject}</span> <span className="text-text-muted">{KIND_LABEL[c.kind]}</span>
                 <div className="text-xs text-text-muted">{c.what}</div>
+                <div className="text-xs text-text-muted" title={c.relevance_reason}>
+                  Relevance {c.relevance ?? 0} of 100
+                </div>
               </th>
               <td className="num py-1.5 text-right">{c.before ?? "No earlier record"}</td>
               <td className="num py-1.5 text-right">{c.after ?? "Gone"}</td>

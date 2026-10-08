@@ -12,10 +12,10 @@ from __future__ import annotations
 import datetime as dt
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 import asyncpg
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 Kind = Literal["new", "revised", "moved", "added", "removed", "dropped"]
 Area = Literal[
@@ -23,13 +23,23 @@ Area = Literal[
     "insiders", "patents",
 ]  # fmt: skip
 
+WEIGHT_FULL = 0.10
+AREA_IMPORTANCE = {
+    "fundamentals": 1.0, "estimates": 0.8, "graph": 0.8, "insiders": 0.7, "ownership": 0.6,
+    "fund_holdings": 0.6, "price": 0.6, "patents": 0.5, "macro": 0.4,
+}  # fmt: skip
+KIND_IMPORTANCE = {
+    "revised": 1.0, "removed": 0.9, "moved": 0.8, "added": 0.8, "dropped": 0.8, "new": 0.7,
+}  # fmt: skip
 REVISION_TOLERANCE = 1e-9
 PRICE_MOVE = 0.03
 FUND_WEIGHT_MOVE = 0.01
 
 METHOD = (
     "Each area is compared as the app knew it at the end of the earlier day and as it knows it "
-    "now. Items are sorted by the share of the portfolio in the company or fund they concern. "
+    "now. Items are sorted by a 0-100 relevance score: 60 points for the share of the portfolio "
+    "in the company or fund they concern (full at 10%) and 40 for how much that kind of change "
+    "in that area usually matters (fixed factors, not learned). "
     "A first-time record is 'new'; only a changed value for the same period is 'revised'. "
     "Prices compare the two portfolio snapshots and show moves of 3% or more."
 )
@@ -59,6 +69,14 @@ class ChangeItem(BaseModel):
     before_ref: Ref | None
     after_ref: Ref | None
     weight: float | None = Field(description="Share of the portfolio concerned; null if none.")
+    relevance: int = Field(default=0, description="0-100 score; see the method for its parts.")
+    relevance_reason: str = ""
+
+    @model_validator(mode="after")
+    def _score(self) -> Self:
+        if self.relevance == 0 and not self.relevance_reason:
+            self.relevance, self.relevance_reason = relevance(self.area, self.kind, self.weight)
+        return self
 
 
 class AreaCount(BaseModel):
@@ -115,11 +133,28 @@ def weight_of(subject: str, weights: dict[str, float]) -> float | None:
     return bare.get(subject.split("_")[0])
 
 
+def relevance(area: str, kind: str, weight: float | None) -> tuple[int, str]:
+    """0-100: 60 points for the portfolio weight (full at 10%), 40 for how much the kind of
+    change in this area usually matters. The parts are stated, not learned."""
+    w = min(max(weight or 0.0, 0.0) / WEIGHT_FULL, 1.0)
+    a = AREA_IMPORTANCE.get(area, 0.5)
+    k = KIND_IMPORTANCE.get(kind, 0.7)
+    score = round(100 * (0.6 * w + 0.4 * a * k))
+    return score, f"weight {w:.0%} of the {WEIGHT_FULL:.0%} cap; {area} {a:g} x {kind} {k:g}"
+
+
 def rank_items(items: list[ChangeItem]) -> list[ChangeItem]:
-    """Largest portfolio weight first; items outside the portfolio last."""
+    """Highest relevance first, then largest portfolio weight; items outside the portfolio
+    sort by relevance alone."""
     return sorted(
         items,
-        key=lambda i: (-(i.weight if i.weight is not None else -1.0), i.area, i.subject, i.what),
+        key=lambda i: (
+            -i.relevance,
+            -(i.weight if i.weight is not None else -1.0),
+            i.area,
+            i.subject,
+            i.what,
+        ),
     )
 
 

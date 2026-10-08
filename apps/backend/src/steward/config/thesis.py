@@ -57,8 +57,14 @@ class ThesisPriceTarget(ConfigModel):
     buy_target: float | None = Field(
         default=None, gt=0, description="Price at or below which buying more is attractive."
     )
+    bear_case: float | None = Field(
+        default=None,
+        gt=0,
+        description="Price the stock would fall to if the thesis fails, in the same currency. "
+        "The pre-trade asymmetry check and the scorecard's risk section read it.",
+    )
     currency: CurrencyCode = Field(
-        description="Currency of both targets, as Trading212 quotes the instrument (GBX for pence)."
+        description="Currency of all the prices, as Trading212 quotes it (GBX for pence)."
     )
     method: str = Field(
         min_length=1,

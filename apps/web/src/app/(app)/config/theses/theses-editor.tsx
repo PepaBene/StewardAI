@@ -403,7 +403,7 @@ function ThesisCard({
           unless the new thesis raises the target. At or below the buy target,
           the holding is a candidate to add to. Leave all blank for none.
         </p>
-        <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-3 lg:grid-cols-[0.8fr_0.8fr_0.6fr_1.6fr_0.9fr]">
+        <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-3 lg:grid-cols-[0.8fr_0.8fr_0.8fr_0.6fr_1.6fr_0.9fr]">
           <TextField
             label="Sell target"
             path={`${path}.price_target.sell_target`}
@@ -421,6 +421,16 @@ function ThesisCard({
             inputMode="decimal"
             className="num"
             onChange={(v) => setTarget({ buy_target: v })}
+          />
+          <TextField
+            label="Bear-case price"
+            path={`${path}.price_target.bear_case`}
+            errors={errors}
+            value={form.target.bear_case}
+            inputMode="decimal"
+            className="num"
+            hint="If the thesis fails"
+            onChange={(v) => setTarget({ bear_case: v })}
           />
           <TextField
             label="Currency"

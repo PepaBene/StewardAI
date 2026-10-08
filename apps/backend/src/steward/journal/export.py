@@ -81,7 +81,7 @@ async def build_report(
             "scorecard": f"{card.entries} decisions from {card.since} to {card.until}",
             "cockpit": f"{len(cockpit.checks)} checks ran; {len(cockpit.not_covered)} not covered",
         },
-        figure_sources=dict(FIGURE_SOURCES),
+        figure_sources=figure_sources_for(rows, card, cockpit, snapshot_day),
         method_versions=dict(METHOD_VERSIONS),
         notes=[
             "Returns are price changes without dividends, in the instrument's currency.",
@@ -96,6 +96,111 @@ async def build_report(
         cockpit=cockpit,
         snoozed=await snooze.list_rows(pool, owner_id),
     )
+
+
+def figure_sources_for(
+    rows: list[JournalEntry], card: Scorecard, cockpit: Cockpit, snapshot_day: object
+) -> dict[str, str]:
+    """A source line for each number in the report: the general lines, then one per journal
+    entry, per scorecard figure (with the entries behind it) and per cockpit check."""
+    out = dict(FIGURE_SOURCES)
+    for e in rows:
+        price = (
+            f"price {e.price_at_decision} {e.price_currency or ''} as stored with the entry"
+            if e.price_at_decision is not None
+            else "no price stored with the entry"
+        )
+        out[f"journal.entry.{e.id}"] = (
+            f"Written {e.created_at:%Y-%m-%d} for the decision of {e.decided_on}; {price}."
+        )
+    for section in card.sections:
+        for row in section.rows:
+            ids = ", ".join(str(i) for i in row.entry_ids) or "none"
+            out[f"scorecard.{section.id}.{row.label}"] = (
+                f"Journal entries {ids}; outcomes from the latest stored closes of each"
+                f" holding (price changes, no dividends); position snapshot {snapshot_day}."
+            )
+    for check in cockpit.checks:
+        out[f"cockpit.{check.kind}"] = (
+            f"{check.title}: {'ran' if check.ran else 'did not run'} over {check.denominator}."
+        )
+    return out
+
+
+def _latin(text: object) -> str:
+    """The built-in PDF fonts cover Latin-1; anything else becomes '?', never an error."""
+    return str(text).encode("latin-1", "replace").decode("latin-1")
+
+
+def report_pdf(report: OwnerReport) -> bytes:
+    """The report as a PDF file made here (no browser needed). Plain text in the built-in
+    fonts: the same sections and the same source lines as the page."""
+    from fpdf import FPDF
+    from fpdf.enums import XPos, YPos
+
+    pdf = FPDF(format="A4")
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_title("Owner report")
+    pdf.add_page()
+
+    def heading(text: str) -> None:
+        pdf.ln(3)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 7, _latin(text), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_font("Helvetica", "", 9)
+
+    def line(text: str) -> None:
+        pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(0, 4.5, _latin(text), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    m = report.manifest
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 9, "Owner report", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_font("Helvetica", "", 9)
+    line(f"Generated {m.generated_at.isoformat()}. {m.visibility}.")
+    heading("Decision journal")
+    for x in report.journal:
+        line(
+            f"{x.decided_on}  {x.ticker or x.scope}  {x.decision}"
+            + (f" - {x.main_reason}" if x.main_reason else "")
+        )
+    if not report.journal:
+        line("No entries.")
+    heading("Scorecard")
+    card = report.scorecard
+    line(f"{card.entries} decisions from {card.since} to {card.until}.")
+    for section in card.sections:
+        line(f"{section.title} [{section.status}]: {section.note}")
+        for row in section.rows:
+            parts = [f"n={row.n}"]
+            if row.share is not None:
+                parts.append(f"share {row.share:.0%}")
+            if row.median_change is not None:
+                parts.append(f"median change {row.median_change:+.1%}")
+            line(f"   {row.label}: " + ", ".join(parts))
+    heading("Data-quality checks")
+    for c in report.cockpit.checks:
+        line(
+            f"{c.title}: {'ran' if c.ran else 'did not run'}; {c.issues} issue(s); {c.denominator}"
+        )
+    heading("Issues set aside")
+    for s in report.snoozed:
+        line(f"{s.kind} {s.subject}: {s.action}" + (f" until {s.until}" if s.until else ""))
+    if not report.snoozed:
+        line("None.")
+    heading("Sources")
+    for source in m.sources:
+        line(f"- {source}")
+    heading("Where each figure comes from")
+    for k, v in m.figure_sources.items():
+        line(f"- {k}: {v}")
+    heading("Coverage")
+    for k, v in m.coverage.items():
+        line(f"- {k}: {v}")
+    heading("Notes")
+    for n in m.notes:
+        line(f"- {n}")
+    return bytes(pdf.output())
 
 
 def report_html(report: OwnerReport) -> str:

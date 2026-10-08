@@ -5,7 +5,7 @@ import datetime as dt
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 
 from api.auth import Owner
 from api.db import Pool
@@ -78,6 +78,21 @@ async def export_report_html(
     """The same report as a print-ready page; use Print > Save as PDF."""
     report = await owner_export.build_report(pool, owner.user_id, since)
     return HTMLResponse(owner_export.report_html(report))
+
+
+@router.get("/journal/export/report.pdf", response_class=Response)
+async def export_report_pdf(
+    pool: Pool,
+    owner: Owner,
+    since: Annotated[dt.date | None, Query(description="Scorecard start; one year ago.")] = None,
+) -> Response:
+    """The same report as a PDF file."""
+    report = await owner_export.build_report(pool, owner.user_id, since)
+    return Response(
+        owner_export.report_pdf(report),
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="owner-report.pdf"'},
+    )
 
 
 @router.get("/journal/export/entries.csv", response_class=PlainTextResponse)

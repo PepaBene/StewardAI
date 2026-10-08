@@ -127,11 +127,23 @@ class TestScorecard:
         review = outcome(2, "review", 110.0)
         assert card([old, review]).entries == 0
 
-    def test_switch_and_risk_sections_say_why_they_are_unavailable(self) -> None:
+    def test_switch_section_says_why_it_is_unavailable(self) -> None:
         sc = card([])
         assert section(sc, "switches").status == "unavailable"
         assert "switch log" in section(sc, "switches").note
-        assert section(sc, "risk_held").status == "unavailable"
+        assert section(sc, "risk_held").status == "too_few"
+
+    def test_risk_held_counts_buys_that_reached_their_bear_case(self) -> None:
+        # Bought at 100 with a bear case of 70; lows of 60, 65, 80, 90, 95: two reached it.
+        lows = [60.0, 65.0, 80.0, 90.0, 95.0]
+        buys = [
+            outcome(i, "buy", 100.0, bear_case=70.0, low_since=low)
+            for i, low in enumerate(lows, start=1)
+        ]
+        s = section(card(buys), "risk_held")
+        assert s.status == "ok" and s.n == 5
+        assert s.rows[0].share == pytest.approx(0.4)
+        assert s.rows[1].median_change == pytest.approx(-0.2)  # median of -40,-35,-20,-10,-5 %
 
     def test_passed_ideas_beating_the_buys_suggests_a_look_at_the_entry_bar(self) -> None:
         bought = [outcome(i, "buy", 105.0) for i in range(1, 6)]
@@ -255,6 +267,48 @@ class TestExport:
     def test_a_formula_typed_into_the_journal_is_neutralised(self) -> None:
         text = journal_csv([self.entry(hypothesis="=HYPERLINK(1)")])
         assert "'=HYPERLINK(1)" in text
+
+
+    def _report(self):  # type: ignore[no-untyped-def]
+        from steward.journal.export import Manifest, OwnerReport, figure_sources_for
+        from steward.quality.cockpit import Check, Cockpit
+
+        entries = [self.entry(hypothesis="Cesky č ✓", main_reason="quality")]
+        card = build_scorecard(
+            [outcome(i, "buy", 110.0, conviction=3) for i in range(1, 6)],
+            since=D(2026, 1, 1),
+            until=D(2026, 12, 31),
+        )
+        cockpit = Cockpit(
+            as_of=D(2026, 10, 8), portfolio_value_base=None, issues=[], affected_weight=0.0,
+            checks=[Check(kind="stale_price", title="Stale", ran=True, denominator="3 holdings")],
+            not_covered=[],
+        )  # fmt: skip
+        sources = figure_sources_for(entries, card, cockpit, D(2026, 10, 7))
+        manifest = Manifest(
+            generated_at=dt.datetime(2026, 10, 8, tzinfo=dt.UTC), sources=["s"],
+            coverage={"a": "b"}, figure_sources=sources, method_versions={}, notes=["n"],
+        )  # fmt: skip
+        return OwnerReport(manifest=manifest, journal=entries, scorecard=card, cockpit=cockpit)
+
+    def test_every_scorecard_figure_and_entry_has_its_own_source_line(self) -> None:
+        sources = self._report().manifest.figure_sources
+        assert "journal.entry.1" in sources
+        assert "Journal entries 1, 2, 3, 4, 5" in sources["scorecard.by_conviction.3"]
+        assert "cockpit.stale_price" in sources
+
+    def test_the_pdf_is_a_pdf_and_odd_characters_do_not_break_it(self) -> None:
+        from steward.journal.export import report_pdf
+
+        data = report_pdf(self._report())
+        assert data[:5] == b"%PDF-" and len(data) > 1000
+
+    def test_the_html_escapes_what_was_typed(self) -> None:
+        from steward.journal.export import report_html
+
+        r = self._report()
+        r.journal[0].main_reason = "<script>x</script>"  # type: ignore[assignment]
+        assert "<script>x" not in report_html(r)
 
 
 class TestCockpit:

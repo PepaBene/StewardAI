@@ -35,6 +35,12 @@ class DecisionOutcome(BaseModel):
     conviction: int | None = None
     main_reason: str | None = None
     sell_target: float | None = None
+    bear_case: float | None = Field(
+        default=None, description="The thesis's bear-case price when the entry was written."
+    )
+    low_since: float | None = Field(
+        default=None, description="Lowest stored close after the decision."
+    )
     hit_on: dt.date | None = Field(
         default=None, description="First close at or above the sell target after the decision."
     )
@@ -55,6 +61,9 @@ class DecisionOutcome(BaseModel):
 
 class Row(BaseModel):
     label: str
+    entry_ids: list[int] = Field(
+        default_factory=list, description="Journal entries the figure was computed from."
+    )
     n: int
     median_change: float | None = None
     share: float | None = Field(default=None, description="Share of the n with the stated result.")
@@ -110,6 +119,7 @@ def _row(label: str, group: list[DecisionOutcome], *, win_when_up: bool = True) 
     wins = [c for c in changes if (c > 0) == win_when_up and c != 0]
     return Row(
         label=label,
+        entry_ids=sorted(o.id for o in group),
         n=len(group),
         median_change=median(changes) if changes else None,
         share=len(wins) / len(changes) if changes else None,
@@ -136,6 +146,7 @@ def sell_targets(outcomes: list[DecisionOutcome]) -> Section:
         rows=[
             Row(
                 label="Reached",
+                entry_ids=sorted(o.id for o in set_),
                 n=len(set_),
                 share=len(hit) / len(set_),
                 detail=f"median {median(days):.0f} days" if days else None,
@@ -205,6 +216,52 @@ def sales(outcomes: list[DecisionOutcome], decision: str, id_: str, title: str) 
     )
 
 
+def risk_held(outcomes: list[DecisionOutcome]) -> Section:
+    """Did the bear case hold: how often a bought stock fell to the bear-case price the thesis
+    named, and how far it fell at worst, from the price written in the journal."""
+    title = "Did the risk estimates hold"
+    set_ = [
+        o
+        for o in outcomes
+        if o.decision in BUYS
+        and o.bear_case is not None
+        and o.low_since is not None
+        and o.price_at_decision
+    ]
+    if len(set_) < MIN_DECISIONS:
+        return _too_few(
+            "risk_held", title, len(set_), "buys with a bear-case price and a stored price series"
+        )
+    breached = [o for o in set_ if o.low_since is not None and o.bear_case is not None
+                and o.low_since <= o.bear_case]  # fmt: skip
+    falls = [
+        o.low_since / o.price_at_decision - 1 for o in set_ if o.low_since and o.price_at_decision
+    ]
+    return Section(
+        id="risk_held",
+        title=title,
+        status="ok",
+        n=len(set_),
+        note="The lowest stored close since each decision against the bear-case price the thesis "
+        "named when the entry was written. A bear case that was reached often means the risk "
+        "was understated.",
+        rows=[
+            Row(
+                label="Fell to the bear-case price or below",
+                entry_ids=sorted(o.id for o in set_),
+                n=len(set_),
+                share=len(breached) / len(set_),
+            ),
+            Row(
+                label="Worst fall from the decision price",
+                entry_ids=sorted(o.id for o in set_),
+                n=len(falls),
+                median_change=median(falls) if falls else None,
+            ),
+        ],
+    )
+
+
 def unavailable(id_: str, title: str, reason: str) -> Section:
     return Section(id=id_, title=title, status="unavailable", note=reason)
 
@@ -237,12 +294,7 @@ def build_scorecard(
             "Switches",
             "No switch log exists yet, so a bought stock cannot be compared with the one sold.",
         ),
-        unavailable(
-            "risk_held",
-            "Did the risk estimates hold",
-            "A thesis stores no volatility band or bear case yet, so realised volatility and "
-            "losses have nothing to be compared with.",
-        ),
+        risk_held(window),
     ]
     suggestions: list[str] = []
     bought = next((s for s in sections if s.id == "bought_vs_passed"), None)

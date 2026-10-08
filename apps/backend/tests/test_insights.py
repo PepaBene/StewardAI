@@ -56,6 +56,26 @@ def test_items_outside_the_portfolio_sort_last() -> None:
     assert [i.subject for i in rank_items(other + held)] == ["A", "Z"]
 
 
+def test_relevance_weighs_the_kind_of_change_as_well_as_the_weight() -> None:
+    from steward.changes.feed import ChangeItem, relevance
+
+    # fundamentals revised at 2%: 60 x 0.2 + 40 x 1.0 x 1.0 = 52; a price move at 3%: 18 + 19.2 = 37
+    assert relevance("fundamentals", "revised", 0.02)[0] == 52
+    assert relevance("price", "moved", 0.03)[0] == 37
+    assert relevance("macro", "new", None)[0] == 11  # no weight: only the area and kind parts
+    assert relevance("fundamentals", "revised", 0.5)[0] == 100  # weight part is capped
+    price = ChangeItem(
+        area="price", kind="moved", subject="P", what="w", before=None, after=None,
+        before_ref=None, after_ref=None, weight=0.03,
+    )  # fmt: skip
+    fund = ChangeItem(
+        area="fundamentals", kind="revised", subject="F", what="w", before=None, after=None,
+        before_ref=None, after_ref=None, weight=0.02,
+    )  # fmt: skip
+    assert [i.subject for i in rank_items([price, fund])] == ["F", "P"]
+    assert fund.relevance_reason
+
+
 def test_fund_constituents_added_dropped_and_moved() -> None:
     refs = (
         Ref(table="etf_snapshot", id="1", known_at=NOW),

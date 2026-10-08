@@ -18661,6 +18661,57 @@
         }
       }
     },
+    "/journal/export/report.pdf": {
+      "get": {
+        "tags": [
+          "journal"
+        ],
+        "summary": "Export Report Pdf",
+        "description": "The same report as a PDF file.",
+        "operationId": "export_report_pdf",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Scorecard start; one year ago.",
+              "title": "Since"
+            },
+            "description": "Scorecard start; one year ago."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/journal/export/entries.csv": {
       "get": {
         "tags": [
@@ -26714,7 +26765,7 @@
           "method": {
             "type": "string",
             "title": "Method",
-            "default": "Each area is compared as the app knew it at the end of the earlier day and as it knows it now. Items are sorted by the share of the portfolio in the company or fund they concern. A first-time record is 'new'; only a changed value for the same period is 'revised'. Prices compare the two portfolio snapshots and show moves of 3% or more."
+            "default": "Each area is compared as the app knew it at the end of the earlier day and as it knows it now. Items are sorted by a 0-100 relevance score: 60 points for the share of the portfolio in the company or fund they concern (full at 10%) and 40 for how much that kind of change in that area usually matters (fixed factors, not learned). A first-time record is 'new'; only a changed value for the same period is 'revised'. Prices compare the two portfolio snapshots and show moves of 3% or more."
           }
         },
         "type": "object",
@@ -26817,6 +26868,17 @@
             ],
             "title": "Weight",
             "description": "Share of the portfolio concerned; null if none."
+          },
+          "relevance": {
+            "type": "integer",
+            "title": "Relevance",
+            "description": "0-100 score; see the method for its parts.",
+            "default": 0
+          },
+          "relevance_reason": {
+            "type": "string",
+            "title": "Relevance Reason",
+            "default": ""
           }
         },
         "type": "object",
@@ -66805,6 +66867,14 @@
             "type": "string",
             "title": "Label"
           },
+          "entry_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Entry Ids",
+            "description": "Journal entries the figure was computed from."
+          },
           "n": {
             "type": "integer",
             "title": "N"
@@ -74479,11 +74549,24 @@
             "title": "Buy Target",
             "description": "Price at or below which buying more is attractive."
           },
+          "bear_case": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bear Case",
+            "description": "Price the stock would fall to if the thesis fails, in the same currency. The pre-trade asymmetry check and the scorecard's risk section read it."
+          },
           "currency": {
             "type": "string",
             "pattern": "^[A-Z]{3}$",
             "title": "Currency",
-            "description": "Currency of both targets, as Trading212 quotes the instrument (GBX for pence).",
+            "description": "Currency of all the prices, as Trading212 quotes it (GBX for pence).",
             "examples": [
               "CZK"
             ]

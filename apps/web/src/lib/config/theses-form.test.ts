@@ -39,6 +39,7 @@ const BODY: ThesesConfig = {
       price_target: {
         sell_target: 260,
         buy_target: 180,
+        bear_case: 120,
         currency: "USD",
         method: "DCF",
         set_on: "2026-10-01",
@@ -116,6 +117,7 @@ describe("theses form", () => {
     expect(thesesToBody(forms).theses![0].price_target).toEqual({
       sell_target: 300,
       buy_target: null,
+      bear_case: null,
       currency: "USD",
       method: "",
       set_on: "",

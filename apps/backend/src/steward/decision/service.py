@@ -558,6 +558,11 @@ async def build_pretrade_context(
             price=price,
             quote_currency=quote,
             sell_target=target.sell_target if target else None,
+            bear_case=(
+                target.bear_case
+                if target and (not quote or target.currency == quote)
+                else None
+            ),
             target_currency=target.currency if target else None,
             has_thesis=thesis is not None,
             thesis_gaps=thesis.missing_requirements() if thesis else [],
