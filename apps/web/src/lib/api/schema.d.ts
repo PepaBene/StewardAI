@@ -5719,6 +5719,133 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/journal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Journal
+         * @description Journal entries, newest decision first, optionally for one security.
+         */
+        get: operations["list_journal"];
+        put?: never;
+        /**
+         * Add Journal Entry
+         * @description Record a decision with the reasons written now. The thesis, holding, price and the config
+         *     and method versions in force are stored with it, so a later outcome can be judged against what
+         *     was known. An entry is never edited; to revisit one, add a review that names it.
+         */
+        post: operations["add_journal_entry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journal/scorecard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Scorecard
+         * @description Sell targets reached, returns by conviction and reason, bought against passed, and what
+         *     stocks did after they were sold, each with its sample size. Below five decisions a section
+         *     says so instead of reporting a figure.
+         */
+        get: operations["get_scorecard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journal/export/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Report
+         * @description The journal, scorecard and data-quality checks in one file with a manifest of sources,
+         *     coverage and calculation versions. Private: returned to you and stored nowhere.
+         */
+        get: operations["export_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journal/export/entries.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Entries Csv
+         * @description Every journal entry as CSV, oldest decision last.
+         */
+        get: operations["export_entries_csv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journal/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Journal Entry */
+        get: operations["get_journal_entry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quality/cockpit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cockpit
+         * @description What is wrong with the data behind the portfolio, largest affected weight first, with the
+         *     checks that ran, their denominators, and the checks that are not covered yet.
+         */
+        get: operations["get_cockpit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/pdmr-notifications": {
         parameters: {
             query?: never;
@@ -8142,24 +8269,6 @@ export interface components {
              */
             source_tiers?: (1 | 2 | 3)[];
         };
-        /** Check */
-        Check: {
-            /** Metric */
-            metric: string;
-            /** Op */
-            op: string;
-            /** Threshold */
-            threshold: number | string | string[];
-            /** Actual */
-            actual: number | string | null;
-            /**
-             * Outcome
-             * @enum {string}
-             */
-            outcome: "pass" | "fail" | "unknown";
-            /** Reason */
-            reason?: string | null;
-        };
         /** Checklist */
         Checklist: {
             /** Isin */
@@ -8403,6 +8512,27 @@ export interface components {
              * @default false
              */
             policy_rate: boolean;
+        };
+        /** Cockpit */
+        Cockpit: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Portfolio Value Base */
+            portfolio_value_base: number | null;
+            /** Issues */
+            issues: components["schemas"]["QualityIssue"][];
+            /** Checks */
+            checks: components["schemas"]["steward__quality__cockpit__Check"][];
+            /** Not Covered */
+            not_covered: components["schemas"]["NotCovered"][];
+            /**
+             * Affected Weight
+             * @description Share of the portfolio touched by at least one issue (holdings counted once).
+             */
+            affected_weight: number;
         };
         /** Column */
         Column: {
@@ -15737,6 +15867,102 @@ export interface components {
             note: string | null;
             body: components["schemas"]["JobsConfig"];
         };
+        /** JournalEntry */
+        JournalEntry: {
+            /** Id */
+            id: number;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "security" | "portfolio";
+            /** Ticker */
+            ticker: string | null;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "buy" | "add" | "hold" | "trim" | "sell" | "pass" | "watch" | "review";
+            /** Parent Id */
+            parent_id: number | null;
+            /**
+             * Decided On
+             * Format: date
+             */
+            decided_on: string;
+            /** Hypothesis */
+            hypothesis: string;
+            /** Valuation Assumptions */
+            valuation_assumptions: string | null;
+            /** Catalysts */
+            catalysts: string[];
+            /** Disconfirming */
+            disconfirming: string[];
+            /** Review Date */
+            review_date: string | null;
+            /** Conviction */
+            conviction: number | null;
+            /** Main Reason */
+            main_reason: string | null;
+            /** Price At Decision */
+            price_at_decision: number | null;
+            /** Price Currency */
+            price_currency: string | null;
+            /** Snapshot */
+            snapshot: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** JournalEntryIn */
+        JournalEntryIn: {
+            /**
+             * Scope
+             * @default security
+             * @enum {string}
+             */
+            scope: "security" | "portfolio";
+            /** Ticker */
+            ticker?: string | null;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "buy" | "add" | "hold" | "trim" | "sell" | "pass" | "watch" | "review";
+            /**
+             * Parent Id
+             * @description The entry this one reviews; its reasons stay untouched.
+             */
+            parent_id?: number | null;
+            /**
+             * Decided On
+             * @description Defaults to today.
+             */
+            decided_on?: string | null;
+            /** Hypothesis */
+            hypothesis: string;
+            /** Valuation Assumptions */
+            valuation_assumptions?: string | null;
+            /** Catalysts */
+            catalysts?: string[];
+            /** Disconfirming */
+            disconfirming?: string[];
+            /** Review Date */
+            review_date?: string | null;
+            /** Conviction */
+            conviction?: number | null;
+            /** Main Reason */
+            main_reason?: ("quality" | "value" | "catalyst" | "momentum" | "other") | null;
+            /**
+             * Price At Decision
+             * @description Defaults to the latest stored price.
+             */
+            price_at_decision?: number | null;
+        };
         /** JurisdictionCoverage */
         JurisdictionCoverage: {
             /** Jurisdiction */
@@ -16719,6 +16945,34 @@ export interface components {
             /** Earlier Period */
             earlier_period?: string | null;
         };
+        /** Manifest */
+        Manifest: {
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /**
+             * Visibility
+             * @default private: returned to the owner who asked; not stored or shared
+             */
+            visibility: string;
+            /** Sources */
+            sources: string[];
+            /**
+             * Coverage
+             * @description Each part of the report and the denominator it covers.
+             */
+            coverage: {
+                [key: string]: string;
+            };
+            /** Method Versions */
+            method_versions: {
+                [key: string]: string;
+            };
+            /** Notes */
+            notes: string[];
+        };
         /** ManualFactsheetInput */
         ManualFactsheetInput: {
             /**
@@ -17683,6 +17937,13 @@ export interface components {
              */
             disputed_count: number;
         };
+        /** NotCovered */
+        NotCovered: {
+            /** Title */
+            title: string;
+            /** Reason */
+            reason: string;
+        };
         /** NoteSentence */
         NoteSentence: {
             /** Text */
@@ -17964,6 +18225,14 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** OwnerReport */
+        OwnerReport: {
+            manifest: components["schemas"]["Manifest"];
+            /** Journal */
+            journal: components["schemas"]["JournalEntry"][];
+            scorecard: components["schemas"]["Scorecard"];
+            cockpit: components["schemas"]["Cockpit"];
         };
         /** OwnershipPeriod */
         OwnershipPeriod: {
@@ -19730,6 +19999,31 @@ export interface components {
             /** Benchmark Weight */
             benchmark_weight: number | string | null;
         };
+        /** QualityIssue */
+        QualityIssue: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            /**
+             * Subject
+             * @description Ticker, fund or provider the issue is about.
+             */
+            subject: string;
+            /** Detail */
+            detail: string;
+            /**
+             * Weight
+             * @description Share of the portfolio this touches; None when it has no holding.
+             */
+            weight?: number | null;
+            /**
+             * Fix
+             * @description What to do about it, in plain words.
+             */
+            fix: string;
+        };
         /** QueueContradiction */
         QueueContradiction: {
             /** Id */
@@ -21006,7 +21300,7 @@ export interface components {
                 [key: string]: components["schemas"]["MetricValue"];
             };
             /** Checks */
-            checks: components["schemas"]["Check"][];
+            checks: components["schemas"]["steward__discovery__engine__Check"][];
             /** Unknown */
             unknown: string[];
             /**
@@ -21469,6 +21763,22 @@ export interface components {
             /** Passage */
             passage: string | null;
         };
+        /** Row */
+        Row: {
+            /** Label */
+            label: string;
+            /** N */
+            n: number;
+            /** Median Change */
+            median_change?: number | null;
+            /**
+             * Share
+             * @description Share of the n with the stated result.
+             */
+            share?: number | null;
+            /** Detail */
+            detail?: string | null;
+        };
         /** Rubric */
         Rubric: {
             /** Ticker */
@@ -21738,6 +22048,35 @@ export interface components {
             /** Score */
             score: number;
         };
+        /** Scorecard */
+        Scorecard: {
+            /**
+             * Since
+             * Format: date
+             */
+            since: string;
+            /**
+             * Until
+             * Format: date
+             */
+            until: string;
+            /** Entries */
+            entries: number;
+            /**
+             * Min Decisions
+             * @default 5
+             */
+            min_decisions: number;
+            /** Sections */
+            sections: components["schemas"]["Section"][];
+            /**
+             * Method
+             * @default Price change from the price written in the journal to the latest stored close, in the instrument's currency, without dividends. A section needs at least 5 decisions; fewer are listed but not summarised.
+             */
+            method: string;
+            /** Suggestions */
+            suggestions?: string[];
+        };
         /** ScreenBody */
         ScreenBody: {
             /** Name */
@@ -21930,6 +22269,27 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** Section */
+        Section: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "too_few" | "unavailable";
+            /**
+             * N
+             * @default 0
+             */
+            n: number;
+            /** Note */
+            note: string;
+            /** Rows */
+            rows?: components["schemas"]["Row"][];
         };
         /** SectionCoverage */
         SectionCoverage: {
@@ -23793,6 +24153,28 @@ export interface components {
             note: string | null;
             body: components["schemas"]["ThesesConfig"];
         };
+        /**
+         * ThesisBaseRate
+         * @description How often companies of this size and sector have achieved the growth the price assumes.
+         */
+        ThesisBaseRate: {
+            /**
+             * Share Achieved
+             * @description Share of comparable companies that reached that growth (0-1).
+             */
+            share_achieved: number;
+            /**
+             * Comparison
+             * @description Which companies, which period and which growth were compared.
+             * @example US software, 5-10 bn revenue, 10-year CAGR above 12%
+             */
+            comparison: string;
+            /**
+             * Source
+             * @description Where the figure comes from.
+             */
+            source: string;
+        };
         /** ThesisBoard */
         ThesisBoard: {
             /** Theses Config Version Id */
@@ -23862,6 +24244,22 @@ export interface components {
             /** Review Date */
             review_date?: string | null;
             price_target?: components["schemas"]["ThesisPriceTarget"] | null;
+            /**
+             * Implied Growth
+             * @description Yearly growth the current price implies (reverse DCF), as a fraction; filled from the valuation workbench when available, otherwise entered by the owner.
+             */
+            implied_growth?: number | null;
+            base_rate?: components["schemas"]["ThesisBaseRate"] | null;
+            /**
+             * Pre Mortem
+             * @description The likeliest reasons the stock loses 40%, in plain words.
+             */
+            pre_mortem?: string[];
+            variant_perception?: components["schemas"]["ThesisVariantPerception"] | null;
+            /** Conviction */
+            conviction?: number | null;
+            /** Main Reason */
+            main_reason?: ("quality" | "value" | "catalyst" | "momentum" | "other") | null;
         };
         /**
          * ThesisKPI
@@ -23948,6 +24346,19 @@ export interface components {
              * @description Date of the valuation the targets come from.
              */
             set_on: string;
+        };
+        /**
+         * ThesisVariantPerception
+         * @description What the owner believes that the market does not, and what would prove it wrong.
+         */
+        ThesisVariantPerception: {
+            /** Belief */
+            belief: string;
+            /**
+             * Disproof
+             * @description The evidence that would show the belief is wrong.
+             */
+            disproof: string;
         };
         /** ThesisVerdictsRequest */
         ThesisVerdictsRequest: {
@@ -25796,6 +26207,45 @@ export interface components {
             checked_at: string;
             /** Reason */
             reason: string | null;
+        };
+        /** Check */
+        steward__discovery__engine__Check: {
+            /** Metric */
+            metric: string;
+            /** Op */
+            op: string;
+            /** Threshold */
+            threshold: number | string | string[];
+            /** Actual */
+            actual: number | string | null;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "pass" | "fail" | "unknown";
+            /** Reason */
+            reason?: string | null;
+        };
+        /** Check */
+        steward__quality__cockpit__Check: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            /** Title */
+            title: string;
+            /** Ran */
+            ran: boolean;
+            /** Denominator */
+            denominator: string;
+            /**
+             * Issues
+             * @default 0
+             */
+            issues: number;
+            /** Note */
+            note?: string | null;
         };
     };
     responses: never;
@@ -35786,6 +36236,206 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_journal: {
+        parameters: {
+            query?: {
+                ticker?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_journal_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JournalEntryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_scorecard: {
+        parameters: {
+            query?: {
+                /** @description Defaults to one year ago. */
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scorecard"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_report: {
+        parameters: {
+            query?: {
+                /** @description Scorecard start; one year ago. */
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_entries_csv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    get_journal_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cockpit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cockpit"];
                 };
             };
         };

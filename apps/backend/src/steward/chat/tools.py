@@ -14,6 +14,8 @@ from typing import Any
 
 import asyncpg
 
+from steward.chat import analytics_tools
+from steward.chat.analytics_tools import SELECTOR_KINDS
 from steward.config.research import ResearchProfilesConfig
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
@@ -118,6 +120,39 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "stress_test",
+        "description": "What the portfolio would lose in the named scenarios (equity fall, "
+        "rate rise, wider credit spreads, a fall in each foreign currency), computed from "
+        "measured sensitivities. Use for 'what happens if EUR falls' or 'what if stocks drop'. "
+        "Report the formula and the unshocked weight; never extend a result to holdings it "
+        "did not move.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "theme_exposure",
+        "description": "How much of the portfolio is exposed to one sector, industry, country, "
+        "currency, revenue country, commodity, trade product or issuer, directly and through "
+        "funds, with the unknown weight and a confidence level. Use for 'which holdings rely "
+        "on Chinese exports' (kind revenue_country or trade_product). If the unknown weight "
+        "is large, say so.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "kind": {"type": "string", "enum": SELECTOR_KINDS},
+                "value": {"type": "string", "description": "Name or code, e.g. CN, Technology."},
+            },
+            "required": ["kind", "value"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "decision_scorecard",
+        "description": "How the owner's recorded decisions have done over the last year: sell "
+        "targets reached, returns by conviction, bought against passed, with sample sizes. "
+        "Sections with too few decisions say so; report that instead of a number.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
         "name": "propose_job",
         "description": "Propose starting a job: re-run a holding's earnings check, start a "
         "research report, or run the portfolio sync. Nothing starts until the owner "
@@ -162,6 +197,27 @@ class ChatTools:
         except TypeError as exc:
             return {"error": f"bad arguments: {exc}"}
         return result
+
+    async def _owner(self) -> str | None:
+        return await analytics_tools.conversation_owner(self.pool, self.conversation_id)
+
+    async def _tool_stress_test(self) -> dict[str, Any]:
+        owner = await self._owner()
+        if owner is None:
+            return {"error": "this conversation has no owner"}
+        return await analytics_tools.stress_test(self.pool, self.registry, owner)
+
+    async def _tool_theme_exposure(self, kind: str, value: str) -> dict[str, Any]:
+        owner = await self._owner()
+        if owner is None:
+            return {"error": "this conversation has no owner"}
+        return await analytics_tools.theme(self.pool, self.registry, owner, kind, value)
+
+    async def _tool_decision_scorecard(self) -> dict[str, Any]:
+        owner = await self._owner()
+        if owner is None:
+            return {"error": "this conversation has no owner"}
+        return await analytics_tools.decision_scorecard(self.pool, self.registry, owner)
 
     async def _tool_portfolio_overview(self) -> dict[str, Any]:
         overview = await portfolio_overview(self.pool)

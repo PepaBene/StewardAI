@@ -18104,6 +18104,340 @@
         }
       }
     },
+    "/journal": {
+      "get": {
+        "tags": [
+          "journal"
+        ],
+        "summary": "List Journal",
+        "description": "Journal entries, newest decision first, optionally for one security.",
+        "operationId": "list_journal",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JournalEntry"
+                  },
+                  "title": "Response List Journal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "journal"
+        ],
+        "summary": "Add Journal Entry",
+        "description": "Record a decision with the reasons written now. The thesis, holding, price and the config\nand method versions in force are stored with it, so a later outcome can be judged against what\nwas known. An entry is never edited; to revisit one, add a review that names it.",
+        "operationId": "add_journal_entry",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JournalEntryIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalEntry"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/journal/scorecard": {
+      "get": {
+        "tags": [
+          "journal"
+        ],
+        "summary": "Get Scorecard",
+        "description": "Sell targets reached, returns by conviction and reason, bought against passed, and what\nstocks did after they were sold, each with its sample size. Below five decisions a section\nsays so instead of reporting a figure.",
+        "operationId": "get_scorecard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Defaults to one year ago.",
+              "title": "Since"
+            },
+            "description": "Defaults to one year ago."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scorecard"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/journal/export/report": {
+      "get": {
+        "tags": [
+          "journal"
+        ],
+        "summary": "Export Report",
+        "description": "The journal, scorecard and data-quality checks in one file with a manifest of sources,\ncoverage and calculation versions. Private: returned to you and stored nowhere.",
+        "operationId": "export_report",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Scorecard start; one year ago.",
+              "title": "Since"
+            },
+            "description": "Scorecard start; one year ago."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/journal/export/entries.csv": {
+      "get": {
+        "tags": [
+          "journal"
+        ],
+        "summary": "Export Entries Csv",
+        "description": "Every journal entry as CSV, oldest decision last.",
+        "operationId": "export_entries_csv",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/journal/{entry_id}": {
+      "get": {
+        "tags": [
+          "journal"
+        ],
+        "summary": "Get Journal Entry",
+        "operationId": "get_journal_entry",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entry_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Entry Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalEntry"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quality/cockpit": {
+      "get": {
+        "tags": [
+          "journal"
+        ],
+        "summary": "Get Cockpit",
+        "description": "What is wrong with the data behind the portfolio, largest affected weight first, with the\nchecks that ran, their denominators, and the checks that are not covered yet.",
+        "operationId": "get_cockpit",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cockpit"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/holdings/{ticker}/pdmr-notifications": {
       "get": {
         "tags": [
@@ -25310,83 +25644,6 @@
         "title": "ChatSettings",
         "description": "The chat panel's assistant: DB tools, web search on tiered outlets, cited answers."
       },
-      "Check": {
-        "properties": {
-          "metric": {
-            "type": "string",
-            "title": "Metric"
-          },
-          "op": {
-            "type": "string",
-            "title": "Op"
-          },
-          "threshold": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-              },
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              }
-            ],
-            "title": "Threshold"
-          },
-          "actual": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Actual"
-          },
-          "outcome": {
-            "type": "string",
-            "enum": [
-              "pass",
-              "fail",
-              "unknown"
-            ],
-            "title": "Outcome"
-          },
-          "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason"
-          }
-        },
-        "type": "object",
-        "required": [
-          "metric",
-          "op",
-          "threshold",
-          "actual",
-          "outcome"
-        ],
-        "title": "Check"
-      },
       "Checklist": {
         "properties": {
           "isin": {
@@ -25971,6 +26228,62 @@
         ],
         "title": "CnbSeries",
         "description": "A Czech National Bank rate from its keyless text files."
+      },
+      "Cockpit": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "portfolio_value_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Value Base"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/QualityIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/steward__quality__cockpit__Check"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "not_covered": {
+            "items": {
+              "$ref": "#/components/schemas/NotCovered"
+            },
+            "type": "array",
+            "title": "Not Covered"
+          },
+          "affected_weight": {
+            "type": "number",
+            "title": "Affected Weight",
+            "description": "Share of the portfolio touched by at least one issue (holdings counted once)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "portfolio_value_base",
+          "issues",
+          "checks",
+          "not_covered",
+          "affected_weight"
+        ],
+        "title": "Cockpit"
       },
       "Column": {
         "properties": {
@@ -46873,6 +47186,339 @@
         ],
         "title": "JobsConfigVersion"
       },
+      "JournalEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "security",
+              "portfolio"
+            ],
+            "title": "Scope"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "add",
+              "hold",
+              "trim",
+              "sell",
+              "pass",
+              "watch",
+              "review"
+            ],
+            "title": "Decision"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "decided_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Decided On"
+          },
+          "hypothesis": {
+            "type": "string",
+            "title": "Hypothesis"
+          },
+          "valuation_assumptions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Assumptions"
+          },
+          "catalysts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Catalysts"
+          },
+          "disconfirming": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Disconfirming"
+          },
+          "review_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Date"
+          },
+          "conviction": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conviction"
+          },
+          "main_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Reason"
+          },
+          "price_at_decision": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price At Decision"
+          },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
+          },
+          "snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Snapshot"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "scope",
+          "ticker",
+          "decision",
+          "parent_id",
+          "decided_on",
+          "hypothesis",
+          "valuation_assumptions",
+          "catalysts",
+          "disconfirming",
+          "review_date",
+          "conviction",
+          "main_reason",
+          "price_at_decision",
+          "price_currency",
+          "snapshot",
+          "created_at"
+        ],
+        "title": "JournalEntry"
+      },
+      "JournalEntryIn": {
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "security",
+              "portfolio"
+            ],
+            "title": "Scope",
+            "default": "security"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "add",
+              "hold",
+              "trim",
+              "sell",
+              "pass",
+              "watch",
+              "review"
+            ],
+            "title": "Decision"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id",
+            "description": "The entry this one reviews; its reasons stay untouched."
+          },
+          "decided_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided On",
+            "description": "Defaults to today."
+          },
+          "hypothesis": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Hypothesis"
+          },
+          "valuation_assumptions": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Assumptions"
+          },
+          "catalysts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Catalysts"
+          },
+          "disconfirming": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Disconfirming"
+          },
+          "review_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Date"
+          },
+          "conviction": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conviction"
+          },
+          "main_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "quality",
+                  "value",
+                  "catalyst",
+                  "momentum",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Reason"
+          },
+          "price_at_decision": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price At Decision",
+            "description": "Defaults to the latest stored price."
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision",
+          "hypothesis"
+        ],
+        "title": "JournalEntryIn"
+      },
       "JurisdictionCoverage": {
         "properties": {
           "jurisdiction": {
@@ -49830,6 +50476,58 @@
         ],
         "title": "ManagerSummary"
       },
+      "Manifest": {
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "visibility": {
+            "type": "string",
+            "title": "Visibility",
+            "default": "private: returned to the owner who asked; not stored or shared"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "coverage": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Coverage",
+            "description": "Each part of the report and the denominator it covers."
+          },
+          "method_versions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Method Versions"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "generated_at",
+          "sources",
+          "coverage",
+          "method_versions",
+          "notes"
+        ],
+        "title": "Manifest"
+      },
       "ManualFactsheetInput": {
         "properties": {
           "as_of": {
@@ -52341,6 +53039,24 @@
         ],
         "title": "NewsStats"
       },
+      "NotCovered": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "reason"
+        ],
+        "title": "NotCovered"
+      },
       "NoteSentence": {
         "properties": {
           "text": {
@@ -53198,6 +53914,34 @@
           "created_at"
         ],
         "title": "OwnerInput"
+      },
+      "OwnerReport": {
+        "properties": {
+          "manifest": {
+            "$ref": "#/components/schemas/Manifest"
+          },
+          "journal": {
+            "items": {
+              "$ref": "#/components/schemas/JournalEntry"
+            },
+            "type": "array",
+            "title": "Journal"
+          },
+          "scorecard": {
+            "$ref": "#/components/schemas/Scorecard"
+          },
+          "cockpit": {
+            "$ref": "#/components/schemas/Cockpit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "manifest",
+          "journal",
+          "scorecard",
+          "cockpit"
+        ],
+        "title": "OwnerReport"
       },
       "OwnershipPeriod": {
         "properties": {
@@ -58408,6 +59152,58 @@
         ],
         "title": "PublisherRow"
       },
+      "QualityIssue": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stale_price",
+              "identity_unresolved",
+              "fund_weights",
+              "claim_review",
+              "source_conflict",
+              "provider_access",
+              "provider_quota",
+              "thesis_gap"
+            ],
+            "title": "Kind"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "description": "Ticker, fund or provider the issue is about."
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight",
+            "description": "Share of the portfolio this touches; None when it has no holding."
+          },
+          "fix": {
+            "type": "string",
+            "title": "Fix",
+            "description": "What to do about it, in plain words."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "subject",
+          "detail",
+          "fix"
+        ],
+        "title": "QualityIssue"
+      },
       "QueueContradiction": {
         "properties": {
           "id": {
@@ -61960,7 +62756,7 @@
           },
           "checks": {
             "items": {
-              "$ref": "#/components/schemas/Check"
+              "$ref": "#/components/schemas/steward__discovery__engine__Check"
             },
             "type": "array",
             "title": "Checks"
@@ -63188,6 +63984,58 @@
         ],
         "title": "Role"
       },
+      "Row": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N"
+          },
+          "median_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Change"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share",
+            "description": "Share of the n with the stated result."
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "n"
+        ],
+        "title": "Row"
+      },
       "Rubric": {
         "properties": {
           "ticker": {
@@ -64068,6 +64916,56 @@
         ],
         "title": "ScorePoint"
       },
+      "Scorecard": {
+        "properties": {
+          "since": {
+            "type": "string",
+            "format": "date",
+            "title": "Since"
+          },
+          "until": {
+            "type": "string",
+            "format": "date",
+            "title": "Until"
+          },
+          "entries": {
+            "type": "integer",
+            "title": "Entries"
+          },
+          "min_decisions": {
+            "type": "integer",
+            "title": "Min Decisions",
+            "default": 5
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/Section"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": "Price change from the price written in the journal to the latest stored close, in the instrument's currency, without dividends. A section needs at least 5 decisions; fewer are listed but not summarised."
+          },
+          "suggestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "since",
+          "until",
+          "entries",
+          "sections"
+        ],
+        "title": "Scorecard"
+      },
       "ScreenBody": {
         "properties": {
           "name": {
@@ -64542,6 +65440,51 @@
           "created_at"
         ],
         "title": "ScreenVersion"
+      },
+      "Section": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "too_few",
+              "unavailable"
+            ],
+            "title": "Status"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N",
+            "default": 0
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/Row"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "status",
+          "note"
+        ],
+        "title": "Section"
       },
       "SectionCoverage": {
         "properties": {
@@ -69717,6 +70660,43 @@
         ],
         "title": "ThesesConfigVersion"
       },
+      "ThesisBaseRate": {
+        "properties": {
+          "share_achieved": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Share Achieved",
+            "description": "Share of comparable companies that reached that growth (0-1)."
+          },
+          "comparison": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Comparison",
+            "description": "Which companies, which period and which growth were compared.",
+            "examples": [
+              "US software, 5-10 bn revenue, 10-year CAGR above 12%"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Source",
+            "description": "Where the figure comes from."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "share_achieved",
+          "comparison",
+          "source"
+        ],
+        "title": "ThesisBaseRate",
+        "description": "How often companies of this size and sector have achieved the growth the price assumes."
+      },
       "ThesisBoard": {
         "properties": {
           "theses_config_version_id": {
@@ -69911,6 +70891,78 @@
                 "type": "null"
               }
             ]
+          },
+          "implied_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implied Growth",
+            "description": "Yearly growth the current price implies (reverse DCF), as a fraction; filled from the valuation workbench when available, otherwise entered by the owner."
+          },
+          "base_rate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisBaseRate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pre_mortem": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Pre Mortem",
+            "description": "The likeliest reasons the stock loses 40%, in plain words."
+          },
+          "variant_perception": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisVariantPerception"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conviction": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conviction"
+          },
+          "main_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "quality",
+                  "value",
+                  "catalyst",
+                  "momentum",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Reason"
           }
         },
         "additionalProperties": false,
@@ -70068,6 +71120,31 @@
         ],
         "title": "ThesisPriceTarget",
         "description": "The price levels the thesis's valuation sets, checked after each sync against the\nTrading212 price. Reaching the sell target asks for the research to be re-run: sell\nunless the new thesis raises the target. At or below the buy target the holding is a\ncandidate to add to."
+      },
+      "ThesisVariantPerception": {
+        "properties": {
+          "belief": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Belief"
+          },
+          "disproof": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Disproof",
+            "description": "The evidence that would show the belief is wrong."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "belief",
+          "disproof"
+        ],
+        "title": "ThesisVariantPerception",
+        "description": "What the owner believes that the market does not, and what would prove it wrong."
       },
       "ThesisVerdictsRequest": {
         "properties": {
@@ -75476,6 +76553,137 @@
           "reason"
         ],
         "title": "CoverageEntry"
+      },
+      "steward__discovery__engine__Check": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "op": {
+            "type": "string",
+            "title": "Op"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "actual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "unknown"
+            ],
+            "title": "Outcome"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "op",
+          "threshold",
+          "actual",
+          "outcome"
+        ],
+        "title": "Check"
+      },
+      "steward__quality__cockpit__Check": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stale_price",
+              "identity_unresolved",
+              "fund_weights",
+              "claim_review",
+              "source_conflict",
+              "provider_access",
+              "provider_quota",
+              "thesis_gap"
+            ],
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "ran": {
+            "type": "boolean",
+            "title": "Ran"
+          },
+          "denominator": {
+            "type": "string",
+            "title": "Denominator"
+          },
+          "issues": {
+            "type": "integer",
+            "title": "Issues",
+            "default": 0
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "title",
+          "ran",
+          "denominator"
+        ],
+        "title": "Check"
       }
     },
     "securitySchemes": {

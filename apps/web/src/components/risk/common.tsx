@@ -135,7 +135,7 @@ export function SavedList({ kind, refreshKey, onOpen }: { kind: SavedKind; refre
           <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
             <div className="min-w-0">
               <span className="font-medium">{item.name}</span>
-              <span className="ml-2 text-xs text-text-muted">saved {formatDate(item.created_at)}</span>
+              <span className="ml-2 text-xs text-text-muted">saved {formatDate(item.created_at.slice(0, 10))}</span>
             </div>
             <div className="flex gap-1">
               <Button type="button" size="sm" variant="ghost" onClick={() => open(item)}>

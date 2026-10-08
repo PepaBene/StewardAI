@@ -23,14 +23,18 @@ import {
   BASES,
   KNOWN_METRICS,
   KPI_PERIODS,
+  MAIN_REASONS,
   newKpi,
   newThesis,
   OPERATORS,
+  preMortemAsExits,
+  rigorGaps,
   slugFromMetric,
   thesesFromBody,
   thesesToBody,
   UNIT_EXAMPLES,
   type KpiForm,
+  type RigorForm,
   type TargetForm,
   type ThesisForm,
 } from "@/lib/config/theses-form";
@@ -241,6 +245,9 @@ function ThesisCard({
     }));
   const setTarget = (change: Partial<TargetForm>) =>
     onChange((f) => ({ ...f, target: { ...f.target, ...change } }));
+  const setRigor = (change: Partial<RigorForm>) =>
+    onChange((f) => ({ ...f, rigor: { ...f.rigor, ...change } }));
+  const gaps = rigorGaps(form.rigor);
 
   return (
     <section
@@ -357,6 +364,125 @@ function ThesisCard({
             {m}
           </p>
         ))}
+      </fieldset>
+
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-medium">Before you rely on it</legend>
+        <p className="text-sm text-text-muted">
+          What the price already assumes, how often that has happened, how it
+          could fail and what you know that the market does not.
+          {gaps.length > 0
+            ? ` Still missing: ${gaps.join("; ")}.`
+            : " Every requirement is filled in."}
+        </p>
+        <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-4">
+          <TextField
+            label="Growth the price implies"
+            path={`${path}.implied_growth`}
+            errors={errors}
+            value={form.rigor.implied_growth}
+            inputMode="decimal"
+            className="num"
+            hint="% a year, from the reverse DCF"
+            onChange={(v) => setRigor({ implied_growth: v })}
+          />
+          <TextField
+            label="Companies that achieved it"
+            path={`${path}.base_rate.share_achieved`}
+            errors={errors}
+            value={form.rigor.base_share}
+            inputMode="decimal"
+            className="num"
+            hint="% of comparable companies"
+            onChange={(v) => setRigor({ base_share: v })}
+          />
+          <TextField
+            className="col-span-2"
+            label="Which companies were compared"
+            path={`${path}.base_rate.comparison`}
+            errors={errors}
+            value={form.rigor.base_comparison}
+            placeholder="US software, 5-10 bn revenue, 10-year growth"
+            onChange={(v) => setRigor({ base_comparison: v })}
+          />
+          <TextField
+            className="col-span-2 sm:col-span-4"
+            label="Source of the base rate"
+            path={`${path}.base_rate.source`}
+            errors={errors}
+            value={form.rigor.base_source}
+            onChange={(v) => setRigor({ base_source: v })}
+          />
+        </div>
+        <TextAreaField
+          label="Pre-mortem: the three likeliest reasons it loses 40%"
+          path={`${path}.pre_mortem`}
+          errors={errors}
+          value={form.rigor.pre_mortem}
+          onChange={(v) => setRigor({ pre_mortem: v })}
+          hint="One per line, at most three."
+          rows={3}
+        />
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={form.rigor.pre_mortem.trim() === ""}
+            onClick={() =>
+              set(
+                "exit_conditions",
+                preMortemAsExits(form.exit_conditions, form.rigor.pre_mortem),
+              )
+            }
+          >
+            Add these as exit conditions
+          </Button>
+        </div>
+        <div className="grid gap-2 lg:grid-cols-2">
+          <TextAreaField
+            label="What you believe that the market does not"
+            path={`${path}.variant_perception.belief`}
+            errors={errors}
+            value={form.rigor.belief}
+            onChange={(v) => setRigor({ belief: v })}
+            rows={2}
+          />
+          <TextAreaField
+            label="The evidence that would prove you wrong"
+            path={`${path}.variant_perception.disproof`}
+            errors={errors}
+            value={form.rigor.disproof}
+            onChange={(v) => setRigor({ disproof: v })}
+            rows={2}
+          />
+        </div>
+        <div className="grid grid-cols-2 items-start gap-2 sm:max-w-md">
+          <SelectField
+            label="Conviction"
+            path={`${path}.conviction`}
+            errors={errors}
+            value={form.rigor.conviction}
+            options={[
+              { value: "", label: "Not stated" },
+              ...[1, 2, 3, 4, 5].map((n) => ({
+                value: String(n),
+                label: `${n} of 5`,
+              })),
+            ]}
+            onChange={(v) => setRigor({ conviction: v })}
+          />
+          <SelectField
+            label="Main reason for owning it"
+            path={`${path}.main_reason`}
+            errors={errors}
+            value={form.rigor.main_reason}
+            options={[
+              { value: "", label: "Not stated" },
+              ...MAIN_REASONS.map((r) => ({ value: r.value, label: r.label })),
+            ]}
+            onChange={(v) => setRigor({ main_reason: v })}
+          />
+        </div>
       </fieldset>
 
       <fieldset className="space-y-2">

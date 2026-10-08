@@ -427,6 +427,56 @@ Built in `steward/decision/` (risk report, shocks, themes, rebalance, lot impact
 
 **Exit checks:** a change item points to both old and new records; event-path confidence never exceeds its weakest edge; paid-only or missing vendor data cannot appear as a fabricated value in PDF/CSV/chat/export.
 
+### Phase 7 (this branch)
+
+Built so far: the decision journal and scorecard (`steward/journal/`, routes `/journal`, `/journal/scorecard`, `/journal/export/*`, pages `/journal`), the thesis fields in `ThesisConfig` and the theses editor, the data-quality cockpit (`steward/quality/`, route `/quality/cockpit`, page `/quality`) and three chat tools (`chat/analytics_tools.py`). Migration `20261019100000` adds `decision_journal`, which is append-only (insert and select only; a review is a new row with `parent_id`). **`M7.2`, `M7.3` and `M7.4` are not started.**
+
+| Item | Status | Gap |
+| --- | --- | --- |
+| `M7.1` | Built, with limits | Entries for a security or the portfolio: decision, hypothesis, valuation assumptions, catalysts, disconfirming evidence, review date, conviction, main reason, price. The thesis, holding weight, price, one-year volatility, active config version ids and every method version are stored with the entry. Reviews point at the entry they revisit. The snapshot does not include the valuation workbench scenarios, estimates, ownership or graph state. |
+| `M7.8` | Built, with limits | Reverse-DCF implied growth, base-rate check with source, three-reason pre-mortem (one click adds them to the exit conditions), variant perception with its disproof, conviction 1-5 and main reason, all optional so old theses still load. The editor lists what a thesis still lacks. Deep research does not pre-fill drafts, and the implied growth is typed, not filled from `M2.5`. |
+| `M7.9` | Partial | Sell targets reached and median days, returns by conviction and by main reason, bought against passed, price after trims and after sales, each with its sample size and "too few decisions" below five. Switches are unavailable (no switch log, `Q8.9`) and so is "did the risk estimates hold" (a thesis stores no volatility band or bear case). Not yet fed into the monthly review. |
+| `M7.2` | Not started | No before/after store of fundamentals, estimates, ownership, graph, patents or constituents to compare. |
+| `M7.3` | Not started | No sector/industry aggregate over the covered universe. |
+| `M7.4` | Not started | No event model; the graph has edges and confidence but nothing that chains them to a weight and a thesis KPI. |
+| `M7.5` | Partial | Stale or missing prices, unresolved identities, fund holdings that do not add to 100%, claims awaiting verification, open source conflicts, provider access problems, provider quota use and theses missing or incomplete, ranked by affected portfolio weight (each holding once). Missing corporate actions, inconsistent filing concepts, estimate coverage and macro revisions are listed on the page as not covered. |
+| `M7.6` | Partial | Chat tools `stress_test` (the standard shocks), `theme_exposure` (any sector, country, currency, revenue country, commodity, trade product or issuer) and `decision_scorecard`; each returns the formula, coverage and a citable source. "Why did I underperform" and "which fund duplicates this stock" have no tool. |
+| `M7.7` | Partial | `/journal/export/report` (JSON: journal, scorecard, cockpit, and a manifest with sources, dates, coverage per part and every method version) and `/journal/export/entries.csv`. Private: built when asked, stored nowhere. No PDF, and the manifest lists sources by description, not per figure. |
+
+**Phase 7 exit checks (for what is built):** a journal entry cannot be changed or deleted (no route, no update grant); a review must name an entry about the same security; a scorecard section below the minimum reports no figure; a missing price or a currency mismatch gives no change, never a guess; a missing value in the export is null.
+
+#### Phase 7 open gaps
+
+**Verification not done**
+- No `/journal`, `/journal/scorecard` or `/quality` page was rendered in a browser or run against the live account; neither was the new theses-editor section.
+- Migration `20261019100000` has not been applied to a real database.
+- The journal routes, `build_snapshot`, `scorecard` service, cockpit queries and the chat tools have no database-backed tests (they need `STEWARD_TEST_DATABASE_URL`). The pure parts (scorecard arithmetic, target-hit search, CSV, ranking, thesis fields, tool registration, web form helpers) are covered.
+- The cockpit SQL (`identity_match_decision`, `etf_snapshot`/`etf_holding`, `web_fact`, `source_conflict`, `provider_access`, `provider_quota_usage`) was written from the migrations, not run.
+- No component tests for the new pages.
+- Full suites after the last edits: web typecheck, lint, colour lint and 894 tests pass; backend 1919 passed, 600 skipped (database-backed). `test_every_budget_construction_in_the_code_is_registered` fails on Windows unless `PYTHONUTF8=1` is set (it reads source files in the system code page); it passes with it. The Phase 6 migration lacked its rollback file, which `test_lifecycle_phase8` caught; both Phase 6 and Phase 7 rollbacks are now in `supabase/rollback/`.
+
+**Method limits**
+- Scorecard returns are price changes without dividends. Outcomes read the latest stored close, so a stale price series understates how long a decision has run; the currency of the stored series is assumed to match the currency recorded with the entry.
+- A sell target is read from the thesis as it stood when the entry was written; an entry written for a stock with no thesis has none.
+- "Passed" ideas are only those the owner recorded as `pass`; ideas that reached deep research but were never journalled are not tracked.
+- The cockpit's stale-price limit (7 days) and quota warning (80%) are constants in `quality/cockpit.py`, not settings. Holdings without a stored price series are reported as having none, which includes cash-like instruments.
+- Chat tools run the same standard shocks and theme engine as the pages; their answer is only as good as the labels and sensitivities those have.
+
+**Product gaps**
+- The journal has no link to the valuation workbench or to the holding page; the ticker is typed.
+- A thesis review date and a journal review date are separate; neither raises an alert.
+- The data-quality list cannot be marked as handled or snoozed.
+- `M7.9` results are not yet part of the monthly review, and the scorecard cannot be limited to one security or one reason.
+- The journal cannot attach a rejected idea from deep research automatically; a pass must be entered by hand.
+- The theses editor shows what a thesis lacks but does not block saving without it, and the strategy does not yet enforce the requirements on a buy (`M6.7` does not read the new fields).
+
+**Not started (needs new data or models before any screen)**
+- `M7.2` needs a stored before/after state for each compared area (fundamentals, estimates, ownership, graph, patents, macro and trade exposure, fund constituents) and a portfolio-relevance score.
+- `M7.3` needs an aggregate over the covered universe with the company and market count behind each statistic.
+- `M7.4` needs an event model that chains graph edges to issuer, direct and fund-held weight and a thesis KPI, with the weakest edge setting the confidence and the only path allowed to raise a high-severity alert.
+- `M7.6` still lacks tools for performance attribution ("why did I underperform") and fund-to-stock overlap.
+- `M7.7` still lacks a PDF and per-figure source lists.
+
 ## Phase 8 — Validation, release and measurement
 
 **Dependency:** Phases 0–7. **Outcome:** a research tool whose impressive breadth is supported by measured coverage and correct arithmetic.

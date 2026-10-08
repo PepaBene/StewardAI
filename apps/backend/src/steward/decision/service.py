@@ -484,7 +484,7 @@ class PretradeRequest(BaseModel):
     )
 
 
-async def _volatility_and_price(
+async def volatility_and_price(
     pool: asyncpg.Pool, tickers: list[str]
 ) -> dict[str, tuple[float | None, float | None, dt.date | None]]:
     """(1-year volatility, last close, its date) from the holding's own stored series."""
@@ -528,7 +528,7 @@ async def build_pretrade_context(
     instruments = await _instruments(pool, unheld)
     theses = await load_active(pool, "theses", ThesesConfig)
     thesis_by = {t.ticker: t for t in (theses.body.theses if theses else [])}
-    market = await _volatility_and_price(pool, tickers)
+    market = await volatility_and_price(pool, tickers)
     notes: list[str] = []
 
     facts: dict[str, pt.TickerFacts] = {}

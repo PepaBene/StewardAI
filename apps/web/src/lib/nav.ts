@@ -42,6 +42,7 @@ export const CLUSTERS: readonly Cluster[] = [
     href: "/theses",
     pages: [
       { href: "/theses", label: "Theses" },
+      { href: "/journal", label: "Decision journal" },
       { href: "/review", label: "Review queue" },
       { href: "/relationships", label: "Relationship review" },
       { href: "/research", label: "Research" },
@@ -66,6 +67,7 @@ export const CLUSTERS: readonly Cluster[] = [
       { href: "/reviews", label: "Reviews" },
       { href: "/activity", label: "Activity" },
       { href: "/data-sources", label: "Data sources" },
+      { href: "/quality", label: "Data quality" },
       { href: "/verification", label: "Verification" },
       { href: "/ai-decisions", label: "AI decisions" },
     ],
