@@ -219,6 +219,34 @@ async def _lane_nport(pool: Pool, ticker: str, when: dt.datetime) -> list[LaneEn
     )
 
 
+def group_summary(holders: list[dict[str, Any]]) -> dict[str, Any]:
+    """What a filing says about its reporting persons as a group. `stated` only when a person's
+    cover page ticks the group box; several persons with no box ticked are a joint filing whose
+    group status is not stated, and the filing's stake is the largest single figure, never a sum
+    (members report overlapping shares)."""
+    n = len(holders)
+    ticked = [h for h in holders if h["member_of_group"] is True]
+    denied = [h for h in holders if h["member_of_group"] is False]
+    if ticked:
+        status = "stated_group"
+    elif n > 1 and len(denied) == n:
+        status = "stated_not_group"
+    elif n > 1:
+        status = "joint_filing_group_not_stated"
+    else:
+        status = "single_filer"
+    return {
+        "status": status,
+        "members": n,
+        "stated_members": len(ticked),
+        "note": (
+            "The stake shown is the largest single reporting person's figure, not a sum."
+            if n > 1
+            else None
+        ),
+    }
+
+
 async def stake_chain(
     pool: Pool, ticker: str, filer_cik: str, as_of: dt.datetime | None = None
 ) -> dict[str, Any]:
@@ -294,6 +322,9 @@ async def stake_chain(
                 "linked_to_previous": prev is not None
                 and r["prior_accession"] == prev["accession"],
                 "source_url": r["source_url"],
+                "group": group_summary(
+                    [dict(h) for h in holders if h["accession"] == r["accession"]]
+                ),
                 "holders": [
                     {
                         "name": h["person_name"],

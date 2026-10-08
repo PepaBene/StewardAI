@@ -190,6 +190,33 @@ class MarketHoliday(BaseModel):
     name: str
 
 
+class DisclosureAlertLine(BaseModel):
+    ticker: str
+    kind: str
+    headline: str
+    source_url: str | None
+    known_at: dt.datetime
+
+
+MAX_DISCLOSURE_LINES = 30
+
+
+async def disclosure_alert_lines(
+    pool: asyncpg.Pool, start: dt.datetime, end: dt.datetime
+) -> list[DisclosureAlertLine]:
+    """Public-disclosure alerts (insider trades, holder changes, relationship changes, deals)
+    raised in the window, newest first, as the alerts job worded them."""
+    rows = await pool.fetch(
+        """select ticker, kind, headline, source_url, known_at from public.disclosure_alert
+            where created_at >= $1 and created_at < $2
+            order by created_at desc, id desc limit $3""",
+        start,
+        end,
+        MAX_DISCLOSURE_LINES,
+    )
+    return [DisclosureAlertLine(**dict(r)) for r in rows]
+
+
 class DigestBody(BaseModel):
     kind: DigestKind
     window_start: dt.datetime
@@ -225,6 +252,10 @@ class DigestBody(BaseModel):
     )
     claims: ClaimCheckSummary | None = Field(
         default=None, description="The claim verifier's pass over the written sentences."
+    )
+    disclosure_alerts: list[DisclosureAlertLine] = Field(
+        default_factory=list,
+        description="Public-disclosure alerts raised in the period (newest first, at most 30).",
     )
 
 
@@ -795,6 +826,9 @@ def render_text(body: DigestBody, app_url: str | None, markdown: bool) -> str:
                 f"- {mc.manager_name or mc.cik} {verb} {mc.ticker} (period {mc.period}, "
                 f"filing {mc.accession})"
             )
+    if body.disclosure_alerts:
+        lines += ["", "## Public disclosures" if markdown else "PUBLIC DISCLOSURES"]
+        lines += [f"- {a.ticker}: {a.headline}" for a in body.disclosure_alerts]
     if body.holidays:
         lines += ["", "## Market holidays" if markdown else "MARKET HOLIDAYS"]
         lines += [f"- {h.date.isoformat()} {h.calendar}: {h.name}" for h in body.holidays]
@@ -856,6 +890,7 @@ async def build_digest(
         reviews_due=reviews_due(theses or ThesesConfig(), end.date()),
         macro=await macro_figures(pool, start),
         holidays=await market_holidays(pool, start, end),
+        disclosure_alerts=await disclosure_alert_lines(pool, start, end),
         ownership_changes=await tracked_manager_changes(pool, tracked_ciks or [], since=start)
         if tracked_ciks
         else [],

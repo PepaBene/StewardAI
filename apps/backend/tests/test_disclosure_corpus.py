@@ -69,7 +69,9 @@ def test_sample_manifest_is_honest_about_what_was_captured() -> None:
         for s in group:
             if s["status"] == "captured_model_checked":
                 assert s["source_url"] and len(s["sha256"]) == 64, s["slot"]
-                assert set(manifest["categories"][cat]["expected_fields"]) <= s["expected"].keys(), s["slot"]
+                assert (
+                    set(manifest["categories"][cat]["expected_fields"]) <= s["expected"].keys()
+                ), s["slot"]
                 assert s["captured_on"] == "2026-10-08", s["slot"]
             else:
                 assert s["status"] == "rejected_unavailable", s["slot"]

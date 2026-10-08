@@ -651,6 +651,15 @@ class ChainHolderOut(BaseModel):
     shared_dispositive: str | None
 
 
+class ChainGroupOut(BaseModel):
+    status: Literal[
+        "stated_group", "stated_not_group", "joint_filing_group_not_stated", "single_filer"
+    ]
+    members: int
+    stated_members: int
+    note: str | None
+
+
 class StakeChangeOut(BaseModel):
     change_type: str
     person: str | None
@@ -684,6 +693,7 @@ class StakeStepOut(BaseModel):
     prior_accession: str | None
     linked_to_previous: bool
     source_url: str
+    group: ChainGroupOut
     holders: list[ChainHolderOut]
     changes: list[StakeChangeOut]
     exhibits: list[StakeExhibitOut]

@@ -50,6 +50,7 @@ export function ScreensView() {
   const [drafts, setDrafts] = useState<FilterDraft[]>([{ id: 1, metric: "roic", op: "gte", value: "15" }]);
   const [missing, setMissing] = useState<MissingTreatment>("exclude");
   const [reconciledOnly, setReconciledOnly] = useState(false);
+  const [valuationGateOnly, setValuationGateOnly] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [run, setRun] = useState<Run>({ kind: "idle" });
 
@@ -63,7 +64,7 @@ export function ScreensView() {
   };
 
   const execute = async () => {
-    const { request, errors: found } = buildRequest({ universe, drafts, missing, sortBy: null, reconciledOnly });
+    const { request, errors: found } = buildRequest({ universe, drafts, missing, sortBy: null, reconciledOnly, valuationGateOnly });
     setErrors(found);
     if (!request) return;
     setRun({ kind: "running" });
@@ -206,6 +207,10 @@ export function ScreensView() {
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={reconciledOnly} onChange={(e) => setReconciledOnly(e.target.checked)} />
           Use only facts that match the filed statement
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={valuationGateOnly} onChange={(e) => setValuationGateOnly(e.target.checked)} />
+          Keep only periods that passed the valuation checks
         </label>
 
         {errors.length > 0 ? (
