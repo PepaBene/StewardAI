@@ -383,7 +383,7 @@ Built in `steward/decision/` (risk report, shocks, themes, rebalance, lot impact
 | `M6.4` | Built, with limits | To target or to the band edge, with cash floor, FX and trade costs, FIFO lot consequences with the time test, drift before and after and the X-Ray after. Costs are assumptions entered on the page. |
 | `M6.5` | Built, with limits | New security, contribution, withdrawal, dividend reinvestment, FX move (on the shock engine), benchmark change (on the risk report) and exit. Named cases are saved. |
 | `M6.6` | Partial | New risk limits feed the existing breach and alert path: one-day VaR, tracking error, stress loss, US high-yield spread, valuation terminal growth and yearly growth. The patent and deal-change trigger is not built. |
-| `M6.7` | Partial | Return hurdle, start size by tier, post-trade caps, sale lots and time test, and switch margin run as pass/flag. The asymmetry gate needs a bear case, and the risk budget and portfolio-improvement checks need a covariance model; none exists, so they are listed as "cannot check". Thresholds are the `PretradeRules` defaults, not stored in the strategy. |
+| `M6.7` | Partial | Return hurdle, start size by tier, post-trade caps, sale lots and time test, and switch margin run as pass/flag. The asymmetry gate needs a bear case, and the risk budget and portfolio-improvement checks need a covariance model; none exists, so they are listed as "cannot check". Thresholds are now read from a `pretrade` block in the strategy config (defaults unchanged); a request may still override them. The strategy editor has no fields for the block yet, so it is set by editing the strategy JSON. |
 
 **Phase 6 exit checks:** shock parts reconcile to the shocked total (tested); a holding without a valid sensitivity is listed, never silently moved (tested); a theme counts a holding once and keeps unknown weight (tested); a rebalance never sends an order; saved items reopen as they were saved.
 
@@ -403,7 +403,7 @@ Built in `steward/decision/` (risk report, shocks, themes, rebalance, lot impact
 - `M6.4`: costs are assumptions typed on the page. Lot consequences use FIFO and the time test from performance settings; units without a lot on record are listed. No tax-year exemption headroom is computed.
 - `M6.5`: a new security uses only the history it has for risk figures. Saved cases store the inputs and the result as they stood and reopen as saved, not recomputed.
 - `M6.6`: the patent and deal-change trigger is not built. The credit-spread alert reads the stored `us_hy_spread` series (FRED BAMLH0A0HYM2) only. Valuation flags apply only to saved valuation scenarios of held stocks, and only when a ceiling is set. The new limits are off until set in the strategy editor.
-- `M6.7`: thresholds are the `PretradeRules` defaults (return hurdle 30%, start sizes 5/3/1.5%, switch margin 5 pp, short-term tax rate 15%), not stored in the strategy config and not editable on the page. The asymmetry gate needs a bear case; the risk budget and portfolio-improvement checks need a covariance model; none exists, so they read "Cannot check". No chat entry point yet.
+- `M6.7`: thresholds (return hurdle 30%, start sizes 5/3/1.5%, switch margin 5 pp, short-term tax rate 15%) are stored in the strategy's `pretrade` block and used when a check names none; they are not editable on the page or in the strategy editor form. The asymmetry gate needs a bear case; the risk budget and portfolio-improvement checks need a covariance model; none exists, so they read "Cannot check". No chat entry point yet.
 - Rebalance and pre-trade are read-only; nothing is sent to Trading212.
 
 **Product gaps**
@@ -429,7 +429,7 @@ Built in `steward/decision/` (risk report, shocks, themes, rebalance, lot impact
 
 ### Phase 7 (this branch)
 
-Built so far: the decision journal and scorecard (`steward/journal/`, routes `/journal`, `/journal/scorecard`, `/journal/export/*`, pages `/journal`), the thesis fields in `ThesisConfig` and the theses editor, the data-quality cockpit (`steward/quality/`, route `/quality/cockpit`, page `/quality`) and three chat tools (`chat/analytics_tools.py`). Migration `20261019100000` adds `decision_journal`, which is append-only (insert and select only; a review is a new row with `parent_id`). **`M7.2`, `M7.3` and `M7.4` are not started.**
+Built so far: the decision journal and scorecard (`steward/journal/`, routes `/journal`, `/journal/scorecard`, `/journal/export/*`, pages `/journal`), the thesis fields in `ThesisConfig` and the theses editor, the data-quality cockpit (`steward/quality/`, route `/quality/cockpit`, page `/quality`) five chat tools (`chat/analytics_tools.py`) and event-to-portfolio paths (`steward/events/`). Migration `20261019100000` adds `decision_journal`, which is append-only (insert and select only; a review is a new row with `parent_id`). **`M7.2` and `M7.3` are not started.**
 
 | Item | Status | Gap |
 | --- | --- | --- |
@@ -438,9 +438,9 @@ Built so far: the decision journal and scorecard (`steward/journal/`, routes `/j
 | `M7.9` | Partial | Sell targets reached and median days, returns by conviction and by main reason, bought against passed, price after trims and after sales, each with its sample size and "too few decisions" below five. Switches are unavailable (no switch log, `Q8.9`) and so is "did the risk estimates hold" (a thesis stores no volatility band or bear case). Not yet fed into the monthly review. |
 | `M7.2` | Not started | No before/after store of fundamentals, estimates, ownership, graph, patents or constituents to compare. |
 | `M7.3` | Not started | No sector/industry aggregate over the covered universe. |
-| `M7.4` | Not started | No event model; the graph has edges and confidence but nothing that chains them to a weight and a thesis KPI. |
-| `M7.5` | Partial | Stale or missing prices, unresolved identities, fund holdings that do not add to 100%, claims awaiting verification, open source conflicts, provider access problems, provider quota use and theses missing or incomplete, ranked by affected portfolio weight (each holding once). Missing corporate actions, inconsistent filing concepts, estimate coverage and macro revisions are listed on the page as not covered. |
-| `M7.6` | Partial | Chat tools `stress_test` (the standard shocks), `theme_exposure` (any sector, country, currency, revenue country, commodity, trade product or issuer) and `decision_scorecard`; each returns the formula, coverage and a citable source. "Why did I underperform" and "which fund duplicates this stock" have no tool. |
+| `M7.4` | Partial | `steward/events/paths.py` follows an event at one company along supply-chain links (owner-entered and confirmed filing disclosures), downstream for a supplier disruption or upstream for a lost customer, up to three links. Each link is rated high, medium or low (stated share and a date within three years, no share, older), a path takes its weakest link, and only a confirmed event on high links reaching 2% of the portfolio can be rated high severity. Shown at the end of the path: weight (direct and through funds, combined), thesis indicators, and the revenue share for a single customer link. Route `/portfolio/xray/event-paths`, section on the supply-chain page. **It does not raise alerts, there is no event feed (the owner names the company and how sure the news is), and only the supply-chain graph is walked, not patents, deals or macro exposures.** |
+| `M7.5` | Partial | Stale or missing prices, unresolved identities, fund holdings that do not add to 100%, claims awaiting verification, open source conflicts, provider access problems, provider quota use and theses missing or incomplete, ranked by affected portfolio weight (each holding once). Missing corporate actions, inconsistent filing concepts, estimate coverage and macro revisions are listed on the page as not covered. An issue can be set aside for 7 to 90 days (migration `20261021100000`, append-only; it returns on its date and the check keeps running). |
+| `M7.6` | Partial | Chat tools `stress_test` (the standard shocks), `theme_exposure` (any sector, country, currency, revenue country, commodity, trade product or issuer) and `decision_scorecard`, `performance_explain` ("why did I underperform": attribution bridge, largest detractors and contributors, benchmark comparison with its like-for-like flag) and `fund_overlap` ("which fund duplicates this stock": channels, weight reached twice; limited to the 100 largest issuers); each returns the formula, coverage and a citable source. No tool for event paths yet. |
 | `M7.7` | Partial | `/journal/export/report` (JSON: journal, scorecard, cockpit, and a manifest with sources, dates, coverage per part and every method version) and `/journal/export/entries.csv`. Private: built when asked, stored nowhere. No PDF, and the manifest lists sources by description, not per figure. |
 
 **Phase 7 exit checks (for what is built):** a journal entry cannot be changed or deleted (no route, no update grant); a review must name an entry about the same security; a scorecard section below the minimum reports no figure; a missing price or a currency mismatch gives no change, never a guess; a missing value in the export is null.
@@ -465,7 +465,7 @@ Built so far: the decision journal and scorecard (`steward/journal/`, routes `/j
 **Product gaps**
 - The journal has no link to the valuation workbench or to the holding page; the ticker is typed.
 - A thesis review date and a journal review date are separate; neither raises an alert.
-- The data-quality list cannot be marked as handled or snoozed.
+- A snoozed data-quality issue cannot be marked "fixed" for good: it returns on its date if the check still finds it, and the snooze list is not part of the owner report.
 - `M7.9` results are not yet part of the monthly review, and the scorecard cannot be limited to one security or one reason.
 - The journal cannot attach a rejected idea from deep research automatically; a pass must be entered by hand.
 - The theses editor shows what a thesis lacks but does not block saving without it, and the strategy does not yet enforce the requirements on a buy (`M6.7` does not read the new fields).
@@ -473,8 +473,8 @@ Built so far: the decision journal and scorecard (`steward/journal/`, routes `/j
 **Not started (needs new data or models before any screen)**
 - `M7.2` needs a stored before/after state for each compared area (fundamentals, estimates, ownership, graph, patents, macro and trade exposure, fund constituents) and a portfolio-relevance score.
 - `M7.3` needs an aggregate over the covered universe with the company and market count behind each statistic.
-- `M7.4` needs an event model that chains graph edges to issuer, direct and fund-held weight and a thesis KPI, with the weakest edge setting the confidence and the only path allowed to raise a high-severity alert.
-- `M7.6` still lacks tools for performance attribution ("why did I underperform") and fund-to-stock overlap.
+- `M7.4` still needs an event feed (today the owner names the company and how sure the news is), patent, deal and macro-exposure edges in the walk, the direct versus fund-held split of the end weight, and the wiring of a high-severity path into the alert path. The path calculator, edge ratings and weakest-link rule are built.
+- `M7.6` has no tool for event paths or for the valuation workbench; `fund_overlap` finds only issuers inside the overlap report's top 100.
 - `M7.7` still lacks a PDF and per-figure source lists.
 
 ## Phase 8 — Validation, release and measurement
@@ -497,28 +497,28 @@ Built: the release gate (`steward/release/readiness.py`, route `/release/readine
 
 | Item | Status | Gap |
 | --- | --- | --- |
-| `M8.1` | Partial | The map ties each family the plan names (accounting identities, return reconciliation, X-Ray bucket totals, valuation sensitivity, FX inversion, peer-universe membership, point-in-time screens) to existing hand-worked tests and fails if one is renamed or removed. **No new calculations were added; the cases that already existed are only indexed.** Fund and portfolio golden cases for Phases 4–7 (rebalance, stress, scorecard) are in their own test files and are not yet in the map. |
+| `M8.1` | Partial | The map ties each family the plan names (accounting identities, return reconciliation, X-Ray bucket totals, valuation sensitivity, FX inversion, peer-universe membership, point-in-time screens) to existing hand-worked tests and fails if one is renamed or removed. **No new calculations were added; the cases that already existed are only indexed.** The Phase 6 cases (risk statistics, shock reconciliation, theme exposure, rebalance, pre-trade) are now in the map too. The Phase 4 lot and attribution cases, the Phase 7 scorecard and the event paths are in their own test files and are not yet in the map. |
 | `M8.2` | Ledger built, audit not done | You record a displayed fact, the source value and link, and the result; the page counts clean subjects against 20 securities (3 regions), 5 funds, 3 corporate-action histories and 2 cash-flow windows, lists differing facts and lets you re-check. **No comparison has been made.** Nothing checks that the link really supports the value you typed, and "multiple cash-flow windows" is set at two. |
-| `M8.3` | Partial | A pilot window (30 days) counts pages opened, days used, alerts sent and the share rated wrong or irrelevant, provider and job failures, facts marked wrong, and today's flagged share of the portfolio with the largest issues. **Time to answer a research question is not measured; coverage and stale weight are today's figures, not an average over the pilot; "priority by portfolio value" covers only issues that have a holding.** The page-use beacon sends the path only. |
+| `M8.3` | Partial | A pilot window (30 days) counts pages opened, days used, alerts sent and the share rated wrong or irrelevant, provider and job failures, facts marked wrong, and today's flagged share of the portfolio with the largest issues. A defect log on the pilot page takes problems you find yourself, ranked by the share of the portfolio in the holding named (migration `20261021100000`, append-only; closing is a new row). **Time to answer a research question is not measured; coverage and stale weight are today's figures, not an average over the pilot; "priority by portfolio value" covers only issues that have a holding.** The page-use beacon sends the path only. |
 | `M8.4` | Partial | The release pages and the Phase 6–7 tables now have captions and column scopes. A source scan (`lib/a11y`) fails when a file gains an unnamed table, an unscoped header or an unnamed svg; **61 existing findings in other pages are recorded as a baseline, not fixed.** Not checked at all: contrast, keyboard order, screen-reader output, responsive layout of dense tables and charts. That needs a browser pass with a real assistive tool. |
-| `M8.5` | Built, with limits | Twelve features, each with core inputs (stored data and free-tier endpoints), shown as ready, partial, not tested or unavailable, with three checkpoints (free access, source audit, zero cost). A feature can be switched on only when all three pass; the zero-cost audit comes from `audit_zero_cost`. **Nothing is switched off by the gate: it reports, and the app does not hide a feature that fails.** The input list is hand-written, and "ready" means the table has at least one row, not that the data is fresh or complete. Source audits are not required per region or per input. |
+| `M8.5` | Built, with limits | Twelve features, each with core inputs (stored data and free-tier endpoints), shown as ready, partial, not tested or unavailable, with three checkpoints (free access, source audit, zero cost). A feature can be switched on only when all three pass; the zero-cost audit comes from `audit_zero_cost`. **Nothing is switched off by the gate: it reports, and the app does not hide a feature that fails.** The input list is hand-written, and "ready" means the table has at least one row, not that the data is fresh or complete. A feature's audit now reads "passed" only with at least 3 matched facts on at least 2 subjects (fewer reads "thin"), and an empty endpoint manifest no longer passes the zero-cost check. Source audits are not required per region or per input. |
 
 **Phase 8 exit checks (for what is built):** the audit ledger has no edit or delete route; a "match" needs a source value and a link; one differing fact blocks both its feature and the sample; a feature with a paid-only or missing core input is "unavailable" and cannot be activated; a failing zero-cost audit blocks every feature; with nothing rated there is no false-alert rate, not zero.
 
 **Phase 8 open gaps (beyond the table)**
 
 *Release gate*
-- One matched fact is enough for a feature's audit to read "passed"; the gate does not require a minimum number of facts, regions or inputs per feature, and the 20 / 5 / 3 / 2 sample is judged across the whole app, not per feature. A feature can therefore be activatable on a single comparison.
+- A feature's audit needs 3 matched facts on 2 subjects (constants in `release/audit.py`); the gate does not require a minimum number of regions or inputs per feature, and the 20 / 5 / 3 / 2 sample is judged across the whole app, not per feature. A feature can still be activatable on three comparisons.
 - A feature with no listed input (the journal) is "ready" automatically. "Ready" for stored data means at least one row exists in the table, not that it is recent, complete or for the owner's holdings.
-- The feature list, its inputs and the store-to-table map (`FEATURES`, `STORES`) are hand-written; a new marketed feature is not gated until someone adds it. The web page keeps a second copy of the feature ids (`FEATURE_CHOICES`) with no test that the two match.
+- The feature list, its inputs and the store-to-table map (`FEATURES`, `STORES`) are hand-written; a new marketed feature is not gated until someone adds it. The web page keeps a second copy of the feature ids (`FEATURE_CHOICES`); a backend test now fails if the two lists differ.
 - Only endpoints in `provider_access` are checked. Keyless regulator sources (EDGAR, N-PORT, ESEF, issuer files) have no access record, so features that depend only on them are judged by stored rows alone.
 - The "unavailable / untested / partial" decision reads the detail text of an input; a new access state would need the rules updated.
-- The zero-cost audit needs the endpoint manifest; if it is empty the audit passes trivially.
+- The zero-cost audit needs the endpoint manifest; if it is empty the gate now treats it as not passed.
 - The gate shows the answer on `/release` only. Nav, feature pages and the chat do not yet show a "partial" or "unavailable" label from it.
 - Counting rows runs one query per store each time the page loads.
 
 *Audit ledger*
-- Region, subject and field are free text, so "EU" and "Europe" count as two regions and the same fact can be typed two ways and then count as two. Corporate-action histories and cash-flow windows are not linked to the records they describe.
+- Region, subject and field are still free text. Known region spellings (EU, Europe, EMEA, US, USA, APAC, and similar) are folded to one name, and case and spacing no longer make a second fact, but any other spelling ("Deutschland", "S. Korea" against "South Korea") counts separately. Corporate-action histories and cash-flow windows are not linked to the records they describe.
 - Results are entered by hand for one owner; nothing prompts which securities to sample, and the sample is not drawn at random or stratified (for example by market cap or listing venue).
 - A re-check replaces a result only when subject, feature and field are identical.
 - The ledger cannot attach the source document; it stores a link, which may change or break.
@@ -528,19 +528,21 @@ Built: the release gate (`steward/release/readiness.py`, route `/release/readine
 - Page use is counted by the browser beacon on every navigation, including refreshes, release pages and background route changes; a failed call is dropped silently, so counts are a lower bound.
 - False alerts count only alerts you rated; unrated alerts say nothing about accuracy. Missed alerts (a real event with no alert) cannot be measured.
 - "Coverage" is the cockpit's flagged share today, not a coverage percentage per feature, and no pilot figure is turned into a target or a pass mark.
-- No defects list is kept: issues from the cockpit are shown, but a defect you find yourself has nowhere to be logged and ranked by value affected.
+- The defect log ranks by the weight of one named ticker; a defect that affects several holdings or a whole feature is ranked as "not tied to a holding".
 
 *Tests and tooling*
 - The new tests cover the pure functions only (audit summary and validation, gate rules, false-alert rate, form building, the accessibility scan, the golden map). The SQL, routes, readiness counts and pilot report have no test against a database.
 - `tests/test_lifecycle_phase8.py` would exercise the new rollback file only when `STEWARD_TEST_DATABASE_URL` is set; it was not run.
 - The accessibility scan reads source text, so a table built from a spread of props or a component that renders a table is not seen; it does not look at `td`-only tables or ARIA grids.
 - `scripts/check-colors.test.ts` has a 5-second limit and timed out once when the backend suite ran at the same time; it passes alone.
-- The golden map does not yet include the Phase 4–7 cases, and it only checks that a test exists, not that the test is still meaningful.
+- The golden map includes the Phase 6 cases but not the Phase 4 or 7 ones, and it only checks that a test exists, not that the test is still meaningful.
 
 *Not done from the plan text*
 - `M8.2` source-to-screen comparison itself (20 securities, 5 ETFs, 3 corporate-action histories, several cash-flow windows) and the `M8.3` 30-day use; the exit check "successful sampled source audit for every marketed feature" is therefore not met.
 - `M8.4` responsive and keyboard QA of dense comparison tables, charts and evidence drill-downs, and checking that confidence and stale states keep their text labels in every page.
 - `M8.5` the decision to switch features on is the owner's; the app does not store that decision or enforce it.
+
+**Follow-up pass (Phases 6–8):** closed the gaps that code alone could close: stored pre-trade thresholds, the two missing chat tools, cockpit snoozing, event paths, the defect log, the per-feature audit minimum, region and fact-name folding, the feature-list parity test and the Phase 6 golden-map rows. Migration `20261021100000` (snooze and defect tables) has, like the others, never run against a database, and the new routes and pages were not exercised or rendered. Still open and needing a person or new data: `M7.2`, `M7.3`, the patent and deal-change alert (`M6.6`), the asymmetry and covariance checks (`M6.7`), the audit comparisons, the 30-day pilot and the browser accessibility pass.
 
 **Verification not done:** migration `20261020100000` has never run against a database; the new routes, queries and pages were not exercised against real data or rendered in a browser; there is no database-backed test for the readiness counts, the audit insert or the pilot report.
 

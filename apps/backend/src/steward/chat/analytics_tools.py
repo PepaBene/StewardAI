@@ -14,7 +14,10 @@ from steward.decision import service as decision_service
 from steward.decision.themes import METHOD as THEME_METHOD
 from steward.decision.themes import ThemeDefinition, ThemeSelector, theme_exposure
 from steward.journal import service as journal_service
+from steward.performance import service as performance_service
+from steward.performance.settings import load_settings
 from steward.research.sources import Registry
+from steward.xray import reports as xray_reports
 from steward.xray import service as xray_service
 
 SELECTOR_KINDS = [
@@ -112,6 +115,115 @@ async def theme(
         "formula": THEME_METHOD,
         "warnings": result.warnings,
     }
+
+
+async def fund_overlap(
+    pool: asyncpg.Pool, registry: Registry, owner_id: str, ticker: str
+) -> dict[str, Any]:
+    """Which held funds also hold a stock, and how much of the portfolio reaches it twice."""
+    loaded = await xray_service.load_cached(pool, owner_id)
+    if loaded.data.portfolio is None:
+        return UNAVAILABLE
+    wanted = ticker.split("_")[0].strip().upper()
+    if not wanted:
+        return {"error": "give a ticker, e.g. AAPL or AAPL_US_EQ"}
+    report = xray_reports.intersection_response(loaded)
+    hits = [
+        i
+        for i in report.issuers
+        if any((s.ticker or "").split("_")[0].upper() == wanted for s in i.securities)
+        or i.label.upper() == wanted
+    ]
+    if not hits:
+        return {
+            "ticker": wanted,
+            "found": False,
+            "note": "The ticker is not among the largest issuers the overlap report lists "
+            "(it covers the top 100) or no held fund reports it.",
+            "funds_looked_through": len(report.funds),
+        }
+    issuer = hits[0]
+    sid = registry.add(
+        "observation",
+        f"overlap:{wanted}",
+        f"Overlap in {issuer.label}",
+        app_path="/xray/overlap",
+        tier=1,
+        snippet=f"{issuer.weight:.2%} of the portfolio, {issuer.overlap_weight:.2%} reached twice",
+        as_of=report.as_of,
+    )
+    return {
+        "source_id": sid,
+        "ticker": wanted,
+        "found": True,
+        "issuer": issuer.label,
+        "total_weight": issuer.weight,
+        "direct_weight": issuer.direct_weight,
+        "via_funds_weight": issuer.fund_weight,
+        "reached_twice_weight": issuer.overlap_weight,
+        "channels": [
+            {"kind": c.kind, "label": c.label, "weight": c.weight} for c in issuer.channels
+        ],
+        "formula": "Securities of one issuer are merged. Weight is direct holding plus each "
+        "fund's holding of it times the fund's share of the portfolio; overlap is the weight "
+        "beyond the largest single channel.",
+        "coverage": f"{len(report.funds)} funds looked through; weight of funds not looked "
+        "through is in the unknown bucket and is not counted here.",
+    }
+
+
+async def performance_explain(
+    pool: asyncpg.Pool, registry: Registry, owner_id: str, days: int = 365
+) -> dict[str, Any]:
+    """Where the gain, or the shortfall against the benchmark, came from over the last `days`."""
+    settings, _ = await load_settings(pool, owner_id)
+    report = await performance_service.attribution_report(pool, settings, max(7, min(days, 3650)))
+    if report.status == "unavailable" or report.bridge is None:
+        return {"unavailable": report.gap or "attribution is not available"}
+    ranked = sorted(report.holdings, key=lambda h: h.total)
+    sid = registry.add(
+        "observation",
+        f"attribution:{report.end}:{report.days}",
+        f"Performance attribution to {report.end}",
+        app_path="/performance/attribution",
+        tier=1,
+        snippet=f"gain {report.bridge.gain.value}; residual {report.bridge.residual}",
+        as_of=str(report.end),
+    )
+    out: dict[str, Any] = {
+        "source_id": sid,
+        "start": str(report.start),
+        "end": str(report.end),
+        "base_currency": report.base_currency,
+        "gain": report.bridge.gain.value,
+        "components": report.bridge.components,
+        "residual": report.bridge.residual,
+        "net_external_flows": report.bridge.net_external_flows,
+        "unattributed_tickers": report.bridge.unattributed_tickers,
+        "largest_detractors": [
+            {"ticker": h.ticker, "name": h.name, "total": h.total}
+            for h in ranked[:5]
+            if h.total < 0
+        ],
+        "largest_contributors": [
+            {"ticker": h.ticker, "name": h.name, "total": h.total}
+            for h in reversed(ranked[-5:])
+            if h.total > 0
+        ],
+        "formula": report.explain.formula,
+    }
+    rel = report.benchmark
+    if rel is None:
+        out["versus_benchmark"] = "No benchmark comparison is available for these dates."
+    else:
+        out["versus_benchmark"] = {
+            "benchmark": rel.label,
+            "benchmark_return": rel.benchmark_return,
+            "active_total": rel.active_total,
+            "like_for_like": rel.like_for_like,
+            "notes": rel.notes,
+        }
+    return out
 
 
 async def decision_scorecard(

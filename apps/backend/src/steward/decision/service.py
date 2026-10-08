@@ -478,7 +478,10 @@ async def run_rebalance(
 
 class PretradeRequest(BaseModel):
     trades: list[pt.TradeLeg] = Field(min_length=1, max_length=40)
-    rules: pt.PretradeRules = Field(default_factory=pt.PretradeRules)
+    rules: pt.PretradeRules | None = Field(
+        default=None,
+        description="Thresholds for this check only; when omitted the strategy's are used.",
+    )
     deposit: float = Field(
         default=0, ge=-1e12, le=1e12, description="Cash added (or taken out) alongside the trades."
     )
@@ -612,8 +615,12 @@ async def run_pretrade(
     pool: asyncpg.Pool, owner_id: str, request: PretradeRequest
 ) -> pt.PretradeResult:
     loaded = await xray_service.load_cached(pool, owner_id)
+    rules = request.rules
+    if rules is None:
+        strategy = await load_strategy(pool)
+        rules = pt.PretradeRules(**strategy.pretrade.model_dump())
     ctx, portfolio, positions = await build_pretrade_context(
-        pool, owner_id, request.trades, request.rules, deposit=request.deposit, loaded=loaded
+        pool, owner_id, request.trades, rules, deposit=request.deposit, loaded=loaded
     )
     await _attach_sales(pool, ctx, request.trades, positions, portfolio)
     await _attach_rates(pool, ctx, portfolio)

@@ -62,8 +62,22 @@ def test_summary_counts_subjects_and_regions() -> None:
     rows += [row(300 + i, "cash_flow_window", f"W{i}", "match") for i in range(2)]
     s = audit.summarize(rows)
     assert s.complete
-    assert s.regions == ["EU", "JP", "US"]
+    assert s.regions == ["Europe", "JP", "North America"]
     assert s.facts_checked == 30
+
+
+def test_region_spellings_count_once() -> None:
+    assert audit.normalise_region(" eu ") == audit.normalise_region("Europe") == "Europe"
+    assert audit.normalise_region("Brazil") == "Brazil"
+    assert audit.normalise_region("  ") is None
+
+
+def test_a_fact_typed_two_ways_is_one_fact() -> None:
+    rows = [
+        row(1, "security", "SAP", "mismatch", field="Revenue"),
+        row(2, "security", "sap", "match", field="  revenue "),
+    ]
+    assert [r.id for r in audit.newest_per_fact(rows)] == [2]
 
 
 def test_one_mismatch_blocks_completion_and_is_listed() -> None:
@@ -100,7 +114,34 @@ def access(state: str, tested: bool = True) -> dict[str, object]:
 
 
 def passed_audit(feature: str) -> list[AuditRow]:
-    return [row(1, "security", "SAP", "match", feature=feature)]
+    return [
+        row(1, "security", "SAP", "match", feature=feature, field="revenue"),
+        row(2, "security", "SAP", "match", feature=feature, field="net income"),
+        row(3, "security", "BMW", "match", feature=feature, field="revenue"),
+    ]
+
+
+def test_web_feature_choices_match_the_gate() -> None:
+    import re
+    from pathlib import Path
+
+    web = Path(__file__).resolve().parents[2] / "web" / "src" / "lib" / "release" / "release.ts"
+    block = web.read_text(encoding="utf-8").split("FEATURE_CHOICES", 1)[1].split("];", 1)[0]
+    assert re.findall(r'id: "([a-z_]+)"', block) == [f.id for f in FEATURES]
+
+
+def test_one_or_two_matches_leave_the_audit_thin() -> None:
+    f = Feature("x", "X", "M0", needs=("holdings",))
+    one = [row(1, "security", "SAP", "match", feature="x")]
+    same_subject = [
+        row(1, "security", "SAP", "match", feature="x", field="a"),
+        row(2, "security", "SAP", "match", feature="x", field="b"),
+        row(3, "security", "SAP", "match", feature="x", field="c"),
+    ]
+    for rows in (one, same_subject):
+        out = assess(f, {}, {"holdings": 3}, rows, True)
+        assert out.audit == "thin"
+        assert not out.can_activate
 
 
 def test_paid_only_required_endpoint_is_unavailable_and_never_activatable() -> None:

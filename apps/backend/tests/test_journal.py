@@ -200,7 +200,10 @@ class TestChatTools:
         from steward.chat.tools import TOOL_DEFINITIONS, ChatTools
 
         declared = {t["name"] for t in TOOL_DEFINITIONS}
-        wanted = {"stress_test", "theme_exposure", "decision_scorecard"}
+        wanted = {
+            "stress_test", "theme_exposure", "decision_scorecard", "fund_overlap",
+            "performance_explain",
+        }  # fmt: skip
         assert wanted <= declared
         assert all(hasattr(ChatTools, f"_tool_{name}") for name in wanted)
 

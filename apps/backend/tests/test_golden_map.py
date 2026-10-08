@@ -16,6 +16,11 @@ REQUIRED = {
     "fx inversion",
     "peer-universe membership",
     "point-in-time screen",
+    "risk statistics",
+    "shock reconciliation",
+    "theme exposure",
+    "rebalance",
+    "pre-trade checks",
 }
 
 ROW = re.compile(r"^\|\s*(?P<family>[^|]+?)\s*\|\s*(?P<scope>[^|]+?)\s*\|\s*(?P<test>[^|]+?)\s*\|$")

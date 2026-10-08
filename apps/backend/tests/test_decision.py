@@ -583,3 +583,14 @@ def test_cash_weight_rule_still_validates_with_the_new_risk_block() -> None:
     )
     assert config.risk.stress_equity_fall == 0.20
     assert CSPX_ISIN  # fixture import used by the shared portfolio
+
+
+def test_strategy_pretrade_thresholds_default_to_the_check_defaults_and_build_its_rules() -> None:
+    from steward.config.strategy import PretradeThresholds
+    from steward.decision.pretrade import PretradeRules
+
+    stored = PretradeThresholds()
+    rules = PretradeRules(**stored.model_dump())
+    assert rules == PretradeRules()  # a strategy that sets nothing changes nothing
+    custom = PretradeRules(**PretradeThresholds(return_hurdle=0.4).model_dump())
+    assert custom.return_hurdle == 0.4 and custom.start_cap("core") == 0.05

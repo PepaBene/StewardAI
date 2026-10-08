@@ -16732,6 +16732,85 @@
         }
       }
     },
+    "/portfolio/xray/event-paths": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Event Paths",
+        "description": "Where an event at one company reaches the portfolio along the supply-chain links, with\neach link's source and confidence, the weight at the end of each path and the thesis\nindicators to watch. A path is only as confident as its weakest link.",
+        "operationId": "get_event_paths",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20,
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "downstream",
+                "upstream"
+              ],
+              "type": "string",
+              "default": "downstream",
+              "title": "Direction"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "confirmed",
+                "reported",
+                "rumoured"
+              ],
+              "type": "string",
+              "default": "reported",
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventImpact"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/xray/index-weights": {
       "get": {
         "tags": [
@@ -18438,6 +18517,53 @@
         ]
       }
     },
+    "/quality/snooze": {
+      "post": {
+        "tags": [
+          "journal"
+        ],
+        "summary": "Snooze Issue",
+        "description": "Set one data-quality issue aside until a date, or bring it back early. The check keeps\nrunning; the issue returns on its own when the date passes.",
+        "operationId": "snooze_issue",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnoozeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnoozeRow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/release/readiness": {
       "get": {
         "tags": [
@@ -18630,6 +18756,148 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/release/defects": {
+      "get": {
+        "tags": [
+          "release"
+        ],
+        "summary": "Get Defects",
+        "description": "Problems you logged while using the app, open ones first, largest affected holding first.",
+        "operationId": "get_defects",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Defect"
+                  },
+                  "type": "array",
+                  "title": "Response Get Defects"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "release"
+        ],
+        "summary": "Add Defect",
+        "description": "Log a problem no automatic check sees. Append-only; close it with the update route.",
+        "operationId": "add_defect",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Defect"
+                  },
+                  "type": "array",
+                  "title": "Response Add Defect"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/release/defects/{defect_id}": {
+      "post": {
+        "tags": [
+          "release"
+        ],
+        "summary": "Update Defect",
+        "description": "Mark a logged problem fixed or not going to be fixed (a new row; the report stays).",
+        "operationId": "update_defect",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "defect_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Defect Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefectUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Defect"
+                  },
+                  "title": "Response Update Defect"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/release/usage": {
@@ -26843,6 +27111,14 @@
             "type": "array",
             "title": "Issues"
           },
+          "snoozed": {
+            "items": {
+              "$ref": "#/components/schemas/SnoozedIssue"
+            },
+            "type": "array",
+            "title": "Snoozed",
+            "description": "Issues set aside until a date; they return on it."
+          },
           "checks": {
             "items": {
               "$ref": "#/components/schemas/steward__quality__cockpit__Check"
@@ -31224,6 +31500,173 @@
         ],
         "title": "DecisionHistory"
       },
+      "Defect": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "The id of the first report."
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "feature": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feature"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "fixed",
+              "wont_fix"
+            ],
+            "title": "State"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Opened At"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight",
+            "description": "Share of the portfolio held in the affected ticker today; None when no ticker is named or it is not held."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "detail",
+          "ticker",
+          "feature",
+          "state",
+          "opened_at",
+          "weight"
+        ],
+        "title": "Defect"
+      },
+      "DefectIn": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker",
+            "description": "The holding it affects."
+          },
+          "feature": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feature",
+            "description": "Release-gate feature id."
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "DefectIn"
+      },
+      "DefectUpdate": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "fixed",
+              "wont_fix"
+            ],
+            "title": "State"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "DefectUpdate"
+      },
       "Dependencies": {
         "properties": {
           "coverage": {
@@ -34255,6 +34698,146 @@
         ],
         "title": "EvalCandidateOut"
       },
+      "EventImpact": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "downstream",
+              "upstream"
+            ],
+            "title": "Direction"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "reported",
+              "rumoured"
+            ],
+            "title": "State"
+          },
+          "paths": {
+            "items": {
+              "$ref": "#/components/schemas/EventPath"
+            },
+            "type": "array",
+            "title": "Paths"
+          },
+          "reached_weight": {
+            "type": "number",
+            "title": "Reached Weight",
+            "description": "Portfolio weight in the companies reached, once each."
+          },
+          "own_weight": {
+            "type": "number",
+            "title": "Own Weight"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": "A path follows confirmed supply-chain links from the company in the event. The confidence of a path is its weakest link: a link is high when it is a stated fact (owner-entered or a confirmed filing disclosure) with a stated revenue share and a date within three years, medium when it has no stated share, and low when it is older than three years. Severity is high only for a confirmed event on a path of high links that reaches at least 2% of the portfolio. A revenue share is shown only for a single customer link that states one."
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "direction",
+          "state",
+          "paths",
+          "reached_weight",
+          "own_weight",
+          "notes"
+        ],
+        "title": "EventImpact"
+      },
+      "EventPath": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "title": "End"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/PathEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence",
+            "description": "The weakest link on the path."
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Portfolio weight in the company at the end of the path."
+          },
+          "revenue_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue Share",
+            "description": "Share of the end supplier's revenue that the lost customer represents, only for a single customer link that states one."
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "none"
+            ],
+            "title": "Severity"
+          },
+          "indicators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Indicators",
+            "description": "Thesis indicators of the end company to watch."
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "edges",
+          "confidence",
+          "weight",
+          "revenue_share",
+          "severity",
+          "indicators"
+        ],
+        "title": "EventPath"
+      },
       "EventRulesConfig": {
         "properties": {
           "schema_version": {
@@ -37011,6 +37594,7 @@
             "type": "string",
             "enum": [
               "none",
+              "thin",
               "passed",
               "mismatch"
             ],
@@ -55093,6 +55677,76 @@
         ],
         "title": "PatentYear"
       },
+      "PathEdge": {
+        "properties": {
+          "supplier": {
+            "type": "string",
+            "title": "Supplier"
+          },
+          "customer": {
+            "type": "string",
+            "title": "Customer"
+          },
+          "product": {
+            "type": "string",
+            "title": "Product"
+          },
+          "customer_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Share"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "filing"
+            ],
+            "title": "Origin"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence"
+          },
+          "why": {
+            "type": "string",
+            "title": "Why"
+          }
+        },
+        "type": "object",
+        "required": [
+          "supplier",
+          "customer",
+          "product",
+          "customer_share",
+          "source_url",
+          "as_of",
+          "origin",
+          "confidence",
+          "why"
+        ],
+        "title": "PathEdge"
+      },
       "PathUse": {
         "properties": {
           "path": {
@@ -58524,7 +59178,15 @@
             "title": "Trades"
           },
           "rules": {
-            "$ref": "#/components/schemas/PretradeRules"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PretradeRules"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Thresholds for this check only; when omitted the strategy's are used."
           },
           "deposit": {
             "type": "number",
@@ -58686,6 +59348,77 @@
         "type": "object",
         "title": "PretradeRules",
         "description": "The thresholds of principles 8, 9 and 10. Defaults are the strategy's stated values; each\ncan be changed for one check."
+      },
+      "PretradeThresholds": {
+        "properties": {
+          "return_hurdle": {
+            "type": "number",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Return Hurdle",
+            "default": 0.3
+          },
+          "asymmetry_gate": {
+            "type": "number",
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Asymmetry Gate",
+            "default": 2.0
+          },
+          "start_size_core": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Start Size Core",
+            "default": 0.05
+          },
+          "start_size_growth": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Start Size Growth",
+            "default": 0.03
+          },
+          "start_size_speculative": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Start Size Speculative",
+            "default": 0.015
+          },
+          "switch_safety_margin": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Switch Safety Margin",
+            "default": 0.05
+          },
+          "short_term_tax_rate": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Short Term Tax Rate",
+            "default": 0.15
+          },
+          "trade_cost_bps": {
+            "type": "number",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Trade Cost Bps",
+            "default": 0
+          },
+          "fx_cost_bps": {
+            "type": "number",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Fx Cost Bps",
+            "default": 15
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PretradeThresholds",
+        "description": "The thresholds the pre-trade check uses for principles 8, 9 and 10. The defaults are the\nstrategy's stated values; a check run without its own rules reads these."
       },
       "PriceBarOut": {
         "properties": {
@@ -68598,6 +69331,166 @@
         ],
         "title": "SnapshotValues"
       },
+      "SnoozeIn": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stale_price",
+              "identity_unresolved",
+              "fund_weights",
+              "claim_review",
+              "source_conflict",
+              "provider_access",
+              "provider_quota",
+              "thesis_gap"
+            ],
+            "title": "Kind"
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Subject"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "snooze",
+              "clear"
+            ],
+            "title": "Action",
+            "default": "snooze"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "subject"
+        ],
+        "title": "SnoozeIn"
+      },
+      "SnoozeRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stale_price",
+              "identity_unresolved",
+              "fund_weights",
+              "claim_review",
+              "source_conflict",
+              "provider_access",
+              "provider_quota",
+              "thesis_gap"
+            ],
+            "title": "Kind"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "snooze",
+              "clear"
+            ],
+            "title": "Action"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "subject",
+          "action",
+          "until",
+          "note"
+        ],
+        "title": "SnoozeRow"
+      },
+      "SnoozedIssue": {
+        "properties": {
+          "issue": {
+            "$ref": "#/components/schemas/QualityIssue"
+          },
+          "until": {
+            "type": "string",
+            "format": "date",
+            "title": "Until"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issue",
+          "until",
+          "note"
+        ],
+        "title": "SnoozedIssue"
+      },
       "Source": {
         "properties": {
           "id": {
@@ -70603,6 +71496,9 @@
           },
           "risk": {
             "$ref": "#/components/schemas/RiskLimits"
+          },
+          "pretrade": {
+            "$ref": "#/components/schemas/PretradeThresholds"
           },
           "hard_limit_severity": {
             "type": "string",

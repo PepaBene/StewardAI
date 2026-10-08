@@ -53,6 +53,13 @@ export const FEATURE_CHOICES: readonly { id: string; label: string }[] = [
   { id: "patents", label: "Patent research" },
 ];
 
+export type Defect = components["schemas"]["Defect"];
+export const DEFECT_STATE_LABEL: Record<Defect["state"], string> = {
+  open: "Open",
+  fixed: "Fixed",
+  wont_fix: "Won't fix",
+};
+
 export const RESULT_LABEL: Record<AuditResult, string> = {
   match: "Matches the source",
   mismatch: "Differs from the source",
@@ -62,6 +69,9 @@ export const RESULT_LABEL: Record<AuditResult, string> = {
 export function auditState(f: FeatureReadiness): { label: string; passed: boolean } {
   if (f.audit === "passed") return { label: `${f.audited_facts} fact${f.audited_facts === 1 ? "" : "s"} matched`, passed: true };
   if (f.audit === "mismatch") return { label: "A fact differs from its source", passed: false };
+  if (f.audit === "thin") {
+    return { label: `${f.audited_facts} matched; compare at least 3 facts on 2 subjects`, passed: false };
+  }
   return { label: "Nothing compared yet", passed: false };
 }
 

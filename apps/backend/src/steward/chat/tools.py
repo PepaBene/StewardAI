@@ -146,6 +146,30 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "fund_overlap",
+        "description": "Which held funds also hold a stock and how much of the portfolio reaches "
+        "it twice. Use for 'which fund duplicates this stock'. If the ticker is not found, say "
+        "the report covers only the largest issuers; do not guess.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"ticker": {"type": "string", "description": "e.g. AAPL or AAPL_US_EQ"}},
+            "required": ["ticker"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "performance_explain",
+        "description": "Where the portfolio's gain over the last N days came from (price, FX, "
+        "income, fees per holding, reconciled with a disclosed residual) and how it compares "
+        "with the benchmark. Use for 'why did I underperform'. Report unattributed holdings and "
+        "whether the benchmark comparison is like for like.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"days": {"type": "integer", "minimum": 7, "maximum": 3650}},
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "decision_scorecard",
         "description": "How the owner's recorded decisions have done over the last year: sell "
         "targets reached, returns by conviction, bought against passed, with sample sizes. "
@@ -212,6 +236,18 @@ class ChatTools:
         if owner is None:
             return {"error": "this conversation has no owner"}
         return await analytics_tools.theme(self.pool, self.registry, owner, kind, value)
+
+    async def _tool_fund_overlap(self, ticker: str) -> dict[str, Any]:
+        owner = await self._owner()
+        if owner is None:
+            return {"error": "this conversation has no owner"}
+        return await analytics_tools.fund_overlap(self.pool, self.registry, owner, ticker)
+
+    async def _tool_performance_explain(self, days: int = 365) -> dict[str, Any]:
+        owner = await self._owner()
+        if owner is None:
+            return {"error": "this conversation has no owner"}
+        return await analytics_tools.performance_explain(self.pool, self.registry, owner, days)
 
     async def _tool_decision_scorecard(self) -> dict[str, Any]:
         owner = await self._owner()

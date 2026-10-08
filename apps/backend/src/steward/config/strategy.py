@@ -94,6 +94,21 @@ StrategyRule = Annotated[
 ]
 
 
+class PretradeThresholds(ConfigModel):
+    """The thresholds the pre-trade check uses for principles 8, 9 and 10. The defaults are the
+    strategy's stated values; a check run without its own rules reads these."""
+
+    return_hurdle: float = Field(default=0.30, ge=0, le=5)
+    asymmetry_gate: float = Field(default=2.0, ge=0, le=20)
+    start_size_core: float = Field(default=0.05, ge=0, le=1)
+    start_size_growth: float = Field(default=0.03, ge=0, le=1)
+    start_size_speculative: float = Field(default=0.015, ge=0, le=1)
+    switch_safety_margin: float = Field(default=0.05, ge=0, le=1)
+    short_term_tax_rate: float = Field(default=0.15, ge=0, le=1)
+    trade_cost_bps: float = Field(default=0, ge=0, le=500)
+    fx_cost_bps: float = Field(default=15, ge=0, le=500)
+
+
 class RiskLimits(ConfigModel):
     """Portfolio risk limits, checked after each sync. Every limit is optional (null = off).
 
@@ -234,6 +249,7 @@ class StrategyConfig(ConfigModel):
     target_categories: list[CategoryTarget] = Field(default_factory=list)
     rules: list[StrategyRule] = Field(default_factory=list)
     risk: RiskLimits = Field(default_factory=RiskLimits)
+    pretrade: PretradeThresholds = Field(default_factory=PretradeThresholds)
     hard_limit_severity: Severity = Field(
         default="severity_3",
         description="Severity of a position above its hard limit (alerted when it opens, "

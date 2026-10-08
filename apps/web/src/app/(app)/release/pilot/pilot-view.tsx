@@ -12,6 +12,8 @@ import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { ISSUE_LABEL } from "@/lib/journal/journal";
 import { pilotDayLabel, type PilotReport, type PilotState } from "@/lib/release/release";
 
+import { DefectLog } from "./defect-log";
+
 const fetchPilot = () => getBrowserApiClient().GET("/release/pilot");
 
 export function PilotView() {
@@ -28,6 +30,7 @@ function Body({ pilot, onStarted }: { pilot: PilotState; onStarted: () => void }
     <div className="flex flex-col gap-5">
       <StartPanel pilot={pilot} onStarted={onStarted} />
       {pilot.report ? <Report report={pilot.report} /> : null}
+      <DefectLog />
     </div>
   );
 }

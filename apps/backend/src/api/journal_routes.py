@@ -15,6 +15,7 @@ from steward.journal import service as journal_service
 from steward.journal.entries import JournalEntry, JournalEntryIn
 from steward.journal.export import OwnerReport
 from steward.journal.scorecard import Scorecard
+from steward.quality import snooze
 from steward.quality.cockpit import Cockpit, build_cockpit
 
 router = APIRouter(tags=["journal"])
@@ -88,4 +89,14 @@ async def get_journal_entry(entry_id: int, pool: Pool, owner: Owner) -> JournalE
 async def get_cockpit(pool: Pool, owner: Owner) -> Cockpit:
     """What is wrong with the data behind the portfolio, largest affected weight first, with the
     checks that ran, their denominators, and the checks that are not covered yet."""
-    return await build_cockpit(pool)
+    cockpit = await build_cockpit(pool)
+    return snooze.with_snoozes(
+        cockpit, await snooze.list_rows(pool, owner.user_id), dt.date.today()
+    )
+
+
+@router.post("/quality/snooze", status_code=201)
+async def snooze_issue(body: snooze.SnoozeIn, pool: Pool, owner: Owner) -> snooze.SnoozeRow:
+    """Set one data-quality issue aside until a date, or bring it back early. The check keeps
+    running; the issue returns on its own when the date passes."""
+    return await snooze.record(pool, owner.user_id, body)

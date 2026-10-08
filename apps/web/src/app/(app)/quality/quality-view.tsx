@@ -1,24 +1,84 @@
 "use client";
 
+import { useState } from "react";
+
 import { ResourceGate } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
-import { formatPercent } from "@/lib/format";
+import { formatDate, formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import { ISSUE_LABEL, weightBar, type Cockpit } from "@/lib/journal/journal";
+import { ISSUE_LABEL, SNOOZE_CHOICES, snoozeUntil, weightBar, type Cockpit, type QualityIssue } from "@/lib/journal/journal";
 
 const fetchCockpit = () => getBrowserApiClient().GET("/quality/cockpit");
 
 export function QualityView() {
-  const { state } = useApiResource(fetchCockpit);
+  const { state, reload } = useApiResource(fetchCockpit);
   return (
     <ResourceGate state={state} label="the data-quality checks">
-      {(cockpit) => <Body cockpit={cockpit} />}
+      {(cockpit) => <Body cockpit={cockpit} onChanged={reload} />}
     </ResourceGate>
   );
 }
 
-function Body({ cockpit }: { cockpit: Cockpit }) {
+/** Set one issue aside until a date, or bring it back. The check keeps running either way. */
+function SnoozeControl({ issue, onChanged }: { issue: QualityIssue; onChanged: () => void }) {
+  const [days, setDays] = useState(30);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  async function send(action: "snooze" | "clear") {
+    setBusy(true);
+    setProblem(null);
+    const res = await getBrowserApiClient().POST("/quality/snooze", {
+      body: { kind: issue.kind, subject: issue.subject, action, until: action === "snooze" ? snoozeUntil(days) : null },
+    });
+    setBusy(false);
+    if (!res.response.ok) return setProblem("That could not be saved. Try again.");
+    onChanged();
+  }
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+      <label className="flex items-center gap-1">
+        <span className="text-text-muted">Set aside for</span>
+        <select className="h-7 border border-border bg-surface px-1" value={days} onChange={(e) => setDays(Number(e.target.value))}>
+          {SNOOZE_CHOICES.map((c) => (
+            <option key={c.days} value={c.days}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="button" disabled={busy} onClick={() => void send("snooze")} className="h-7 border border-border px-2 hover:bg-surface-muted disabled:opacity-60">
+        Set aside
+      </button>
+      {problem ? (
+        <span className="text-loss" role="alert">
+          {problem}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function BringBack({ issue, onChanged }: { issue: QualityIssue; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      className="h-7 border border-border px-2 text-xs hover:bg-surface-muted disabled:opacity-60"
+      onClick={async () => {
+        setBusy(true);
+        await getBrowserApiClient().POST("/quality/snooze", { body: { kind: issue.kind, subject: issue.subject, action: "clear", until: null } });
+        setBusy(false);
+        onChanged();
+      }}
+    >
+      Bring back now
+    </button>
+  );
+}
+
+function Body({ cockpit, onChanged }: { cockpit: Cockpit; onChanged: () => void }) {
   const max = Math.max(0, ...cockpit.issues.map((i) => i.weight ?? 0));
   const portfolio = cockpit.issues.filter((i) => i.weight !== null && i.weight !== undefined);
   const other = cockpit.issues.filter((i) => i.weight === null || i.weight === undefined);
@@ -50,6 +110,7 @@ function Body({ cockpit }: { cockpit: Cockpit }) {
                 <div className="min-w-0 text-sm">
                   <p>{issue.detail}</p>
                   <p className="text-xs text-text-muted">{issue.fix}</p>
+                  <SnoozeControl issue={issue} onChanged={onChanged} />
                 </div>
                 <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:gap-1">
                   <span className="num text-sm font-semibold">{formatPercent(issue.weight ?? 0, { decimals: 1 })}</span>
@@ -72,6 +133,24 @@ function Body({ cockpit }: { cockpit: Cockpit }) {
                 <span className="font-semibold">{issue.subject}</span> <span className="text-text-muted">· {ISSUE_LABEL[issue.kind]}</span>
                 <p>{issue.detail}</p>
                 <p className="text-xs text-text-muted">{issue.fix}</p>
+                <SnoozeControl issue={issue} onChanged={onChanged} />
+              </li>
+            ))}
+          </ul>
+        </Blueprint>
+      ) : null}
+
+      {(cockpit.snoozed ?? []).length > 0 ? (
+        <Blueprint className="border-dashed p-4">
+          <PanelHeading level={3} kicker="Set aside" title="Hidden until the date shown" />
+          <ul className="mt-3 divide-y divide-border-soft border-y border-border-soft text-sm">
+            {(cockpit.snoozed ?? []).map((s) => (
+              <li key={`${s.issue.kind}-${s.issue.subject}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span>
+                  <span className="font-semibold">{s.issue.subject}</span> <span className="text-text-muted">{ISSUE_LABEL[s.issue.kind]}: {s.issue.detail}</span>
+                  <span className="block text-xs text-text-muted">Comes back on {formatDate(s.until)}</span>
+                </span>
+                <BringBack issue={s.issue} onChanged={onChanged} />
               </li>
             ))}
           </ul>

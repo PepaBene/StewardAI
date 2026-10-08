@@ -58,10 +58,19 @@ class NotCovered(BaseModel):
     reason: str
 
 
+class SnoozedIssue(BaseModel):
+    issue: QualityIssue
+    until: dt.date
+    note: str | None
+
+
 class Cockpit(BaseModel):
     as_of: dt.date
     portfolio_value_base: float | None
     issues: list[QualityIssue]
+    snoozed: list[SnoozedIssue] = Field(
+        default_factory=list, description="Issues set aside until a date; they return on it."
+    )
     checks: list[Check]
     not_covered: list[NotCovered]
     affected_weight: float = Field(

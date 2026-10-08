@@ -18,7 +18,7 @@ from steward.release import audit as audit_ledger
 from steward.verify_sources.zero_cost import audit_zero_cost
 
 Status = Literal["ready", "partial", "unavailable", "untested"]
-AuditState = Literal["none", "passed", "mismatch"]
+AuditState = Literal["none", "thin", "passed", "mismatch"]
 
 # Access states in which an endpoint cannot be used at no cost.
 DEAD_STATES = {"paid_only", "not_covered"}
@@ -199,10 +199,15 @@ def assess(
     standing = audit_ledger.newest_per_fact(audit_rows)
     mine = [r for r in standing if r.feature == feature.id]
     matches = sum(r.result == "match" for r in mine)
+    subjects = audit_ledger.feature_match_subjects(audit_rows, feature.id)
     if any(r.result == "mismatch" for r in mine):
         audit_state: AuditState = "mismatch"
-    elif matches:
+    elif matches >= audit_ledger.MIN_FACTS_PER_FEATURE and (
+        subjects >= audit_ledger.MIN_SUBJECTS_PER_FEATURE
+    ):
         audit_state = "passed"
+    elif matches:
+        audit_state = "thin"
     else:
         audit_state = "none"
     return FeatureReadiness(
@@ -241,11 +246,13 @@ async def build_readiness(pool: asyncpg.Pool, owner_id: str) -> Readiness:
     counts = await _counts(pool)
     rows = await audit_ledger.list_rows(pool, owner_id)
     zero = await audit_zero_cost(pool)
-    features = [assess(f, access, counts, rows, zero.passed) for f in FEATURES]
+    # An empty endpoint manifest proves nothing, so it does not pass.
+    zero_ok = zero.passed and zero.checked > 0
+    features = [assess(f, access, counts, rows, zero_ok) for f in FEATURES]
     return Readiness(
         as_of=dt.date.today(),
         features=features,
-        zero_cost_passed=zero.passed,
+        zero_cost_passed=zero_ok,
         zero_cost_violations=len(zero.violations),
         ready=sum(f.status == "ready" for f in features),
         activatable=sum(f.can_activate for f in features),

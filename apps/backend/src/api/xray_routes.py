@@ -10,6 +10,9 @@ from pydantic import BaseModel, Field
 from api.auth import Owner
 from api.db import Pool
 from steward import saved
+from steward.config.store import load_active
+from steward.config.thesis import ThesesConfig
+from steward.events.paths import Direction, EventImpact, EventState, event_paths
 from steward.lookthrough.read import PortfolioIn
 from steward.xray import (
     derive,
@@ -137,6 +140,33 @@ async def get_supply_chain(pool: Pool, owner: Owner, as_of: AsOf = None) -> Supp
         await owner_input.current(pool, owner.user_id),
         await supply_chain.filing_edges(pool, loaded.leafset),
     )
+
+
+@router.get("/event-paths")
+async def get_event_paths(
+    pool: Pool,
+    owner: Owner,
+    symbol: Annotated[str, Query(min_length=1, max_length=20)],
+    direction: Direction = "downstream",
+    state: EventState = "reported",
+) -> EventImpact:
+    """Where an event at one company reaches the portfolio along the supply-chain links, with
+    each link's source and confidence, the weight at the end of each path and the thesis
+    indicators to watch. A path is only as confident as its weakest link."""
+    loaded = await _loaded(pool, owner, None)
+    chain = supply_chain.build(
+        loaded.leafset,
+        await owner_input.current(pool, owner.user_id),
+        await supply_chain.filing_edges(pool, loaded.leafset),
+    )
+    stored = await load_active(pool, "theses", ThesesConfig)
+    indicators = {
+        supply_chain.symbol_of(t.ticker): [
+            f"{k.metric} {k.operator} {k.threshold:g} {k.unit}" for k in t.kpis
+        ]
+        for t in (stored.body.theses if stored else [])
+    }
+    return event_paths(chain, symbol, direction, state, indicators)
 
 
 @router.get("/index-weights")

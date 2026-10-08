@@ -176,7 +176,20 @@ export function evidenceLines(snapshot: Record<string, unknown>, portfolioScope 
   return out;
 }
 
-export const ISSUE_LABEL: Record<QualityIssue["kind"], string> = {
+export const SNOOZE_CHOICES: readonly { days: number; label: string }[] = [
+  { days: 7, label: "1 week" },
+  { days: 30, label: "30 days" },
+  { days: 90, label: "90 days" },
+];
+
+/** The date an issue set aside today for `days` days comes back, as YYYY-MM-DD in local time. */
+export function snoozeUntil(days: number, today: Date = new Date()): string {
+  const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + days);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export const ISSUE_LABEL:Record<QualityIssue["kind"], string> = {
   stale_price: "Price",
   identity_unresolved: "Identity",
   fund_weights: "Fund weights",

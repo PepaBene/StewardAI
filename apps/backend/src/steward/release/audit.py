@@ -23,6 +23,52 @@ TARGETS: dict[str, int] = {
     "cash_flow_window": 2,
 }
 MIN_REGIONS = 3
+# A feature's audit reads "passed" only with this many matched facts on this many subjects.
+MIN_FACTS_PER_FEATURE = 3
+MIN_SUBJECTS_PER_FEATURE = 2
+
+# Spellings that mean the same region, so "EU" and "Europe" count once.
+REGION_ALIASES: dict[str, str] = {
+    "eu": "Europe",
+    "europe": "Europe",
+    "emea": "Europe",
+    "uk": "Europe",
+    "us": "North America",
+    "usa": "North America",
+    "united states": "North America",
+    "north america": "North America",
+    "canada": "North America",
+    "asia": "Asia-Pacific",
+    "apac": "Asia-Pacific",
+    "asia-pacific": "Asia-Pacific",
+    "asia pacific": "Asia-Pacific",
+    "japan": "Asia-Pacific",
+    "latam": "Latin America",
+    "latin america": "Latin America",
+    "em": "Emerging markets",
+    "emerging markets": "Emerging markets",
+}
+
+
+def normalise_region(region: str | None) -> str | None:
+    if region is None:
+        return None
+    text = " ".join(region.split())
+    if not text:
+        return None
+    return REGION_ALIASES.get(text.casefold(), text)
+
+
+def _squash(text: str) -> str:
+    return " ".join(text.split()).casefold()
+
+
+def fact_key(
+    subject_kind: str, subject: str, feature: str, field: str
+) -> tuple[str, str, str, str]:
+    """Identity of a fact: case and spacing in the typed names do not make a second fact."""
+    return (subject_kind, _squash(subject), _squash(feature), _squash(field))
+
 
 _COLUMNS = (
     "id, subject_kind, subject, region, feature, field, displayed, source_value, source_url,"
@@ -92,7 +138,7 @@ def newest_per_fact(rows: list[AuditRow]) -> list[AuditRow]:
     """The newest row for each (subject, field), which is the standing result for that fact."""
     latest: dict[tuple[str, str, str, str], AuditRow] = {}
     for r in sorted(rows, key=lambda r: r.id):
-        latest[(r.subject_kind, r.subject, r.feature, r.field)] = r
+        latest[fact_key(r.subject_kind, r.subject, r.feature, r.field)] = r
     return list(latest.values())
 
 
@@ -100,7 +146,7 @@ def summarize(rows: list[AuditRow]) -> AuditSummary:
     standing = newest_per_fact(rows)
     by_subject: dict[tuple[str, str], list[AuditRow]] = {}
     for r in standing:
-        by_subject.setdefault((r.subject_kind, r.subject), []).append(r)
+        by_subject.setdefault((r.subject_kind, r.subject.casefold()), []).append(r)
     progress: list[TargetProgress] = []
     for kind, target in TARGETS.items():
         subjects = [v for (k, _), v in by_subject.items() if k == kind]
@@ -115,9 +161,12 @@ def summarize(rows: list[AuditRow]) -> AuditSummary:
                 with_mismatch=len(bad),
             )
         )
-    regions = sorted(
-        {r.region for r in standing if r.subject_kind == "security" and r.region is not None}
+    named = (
+        normalise_region(r.region)
+        for r in standing
+        if r.subject_kind == "security" and r.result != "not_checkable"
     )
+    regions = sorted({n for n in named if n is not None})
     complete = (
         all(p.clean >= p.target and p.with_mismatch == 0 for p in progress)
         and len(regions) >= MIN_REGIONS
@@ -144,6 +193,16 @@ def feature_matches(rows: list[AuditRow], feature: str) -> int:
     return sum(r.result == "match" for r in newest_per_fact(rows) if r.feature == feature)
 
 
+def feature_match_subjects(rows: list[AuditRow], feature: str) -> int:
+    return len(
+        {
+            (r.subject_kind, _squash(r.subject))
+            for r in newest_per_fact(rows)
+            if r.feature == feature and r.result == "match"
+        }
+    )
+
+
 async def record(pool: asyncpg.Pool, owner_id: str, body: AuditIn) -> AuditRow:
     row = await pool.fetchrow(
         "insert into public.source_audit"  # noqa: S608 - constant column list
@@ -154,7 +213,7 @@ async def record(pool: asyncpg.Pool, owner_id: str, body: AuditIn) -> AuditRow:
         owner_id,
         body.subject_kind,
         body.subject.strip(),
-        body.region.strip() if body.region else None,
+        normalise_region(body.region),
         body.feature.strip(),
         body.field.strip(),
         body.displayed,

@@ -27,6 +27,16 @@ Format of a row: `| family | scope | file::test |`, one test per row. Add a row 
 | point-in-time screen | stock | tests/test_analytics_golden.py::test_delisted_names_stay_in_past_universes |
 | fund look-through | fund | tests/test_analytics_golden.py::test_look_through_keeps_unknown_and_paths |
 | fund overlap | fund | tests/test_analytics_golden.py::test_overlap |
+| risk statistics | portfolio | tests/test_decision.py::test_tracking_error_is_the_annualised_stdev_of_the_active_return |
+| risk statistics | portfolio | tests/test_decision.py::test_sortino_uses_only_the_shortfall_below_the_risk_free_rate |
+| risk statistics | portfolio | tests/test_decision.py::test_value_at_risk_and_shortfall_are_historical_and_need_250_observations |
+| shock reconciliation | portfolio | tests/test_decision.py::test_combined_shocks_keep_the_cross_term_so_the_factors_add_to_the_total |
+| shock reconciliation | portfolio | tests/test_decision.py::test_currency_move_translates_only_the_leaves_quoted_in_it |
+| theme exposure | portfolio | tests/test_decision.py::test_theme_counts_a_holding_once_and_keeps_every_path_and_the_unknown |
+| rebalance | portfolio | tests/test_decision.py::test_rebalance_moves_out_of_band_positions_to_target_and_funds_the_buy_from_the_sale |
+| rebalance | portfolio | tests/test_decision.py::test_a_sale_consumes_the_oldest_lots_first_and_flags_a_lot_near_the_time_test |
+| pre-trade checks | portfolio | tests/test_decision.py::test_buy_is_tested_against_the_return_hurdle_start_size_and_the_post_trade_cap |
+| pre-trade checks | portfolio | tests/test_decision.py::test_switch_compares_the_gap_with_tax_costs_and_margin_and_sizes_for_equal_risk |
 
 ## What is not pinned by a hand-worked example
 

@@ -2,7 +2,36 @@ import type { components } from "@/lib/api/schema";
 
 export type OwnerInputItem = components["schemas"]["OwnerInput"];
 export type SupplyChainData = components["schemas"]["SupplyChain"];
-export type IndexComparisonsData = components["schemas"]["IndexComparisons"];
+export type EventImpactData = components["schemas"]["EventImpact"];
+export type EventPathData = components["schemas"]["EventPath"];
+
+export const CONFIDENCE_LABEL: Record<EventPathData["confidence"], string> = {
+  high: "High: every link is stated and recent",
+  medium: "Medium: a link has no stated share",
+  low: "Low: a link is more than three years old",
+};
+export const SEVERITY_LABEL: Record<EventPathData["severity"], string> = {
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+  none: "None",
+};
+export const EVENT_DIRECTIONS: readonly { id: "downstream" | "upstream"; label: string }[] = [
+  { id: "downstream", label: "A supplier is disrupted (follows its customers)" },
+  { id: "upstream", label: "A customer is lost (follows its suppliers)" },
+];
+export const EVENT_STATES: readonly { id: "confirmed" | "reported" | "rumoured"; label: string }[] = [
+  { id: "confirmed", label: "Confirmed" },
+  { id: "reported", label: "Reported, not confirmed" },
+  { id: "rumoured", label: "Rumour" },
+];
+
+/** The path as a sentence: A supplies B, B supplies C. */
+export function pathLabel(path: EventPathData): string {
+  return [path.start, ...path.edges.map((e) => (path.edges[0].supplier === path.start ? e.customer : e.supplier))].join(" → ");
+}
+
+export type IndexComparisonsData =components["schemas"]["IndexComparisons"];
 export type IndexComparisonData = components["schemas"]["IndexComparison"];
 export type FundRelativeData = components["schemas"]["FundRelative"];
 export type RegionSplitBody = components["schemas"]["RegionSplitRequest"];

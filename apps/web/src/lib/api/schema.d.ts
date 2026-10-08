@@ -5170,6 +5170,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/xray/event-paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Event Paths
+         * @description Where an event at one company reaches the portfolio along the supply-chain links, with
+         *     each link's source and confidence, the weight at the end of each path and the thesis
+         *     indicators to watch. A path is only as confident as its weakest link.
+         */
+        get: operations["get_event_paths"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/xray/index-weights": {
         parameters: {
             query?: never;
@@ -5846,6 +5868,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/quality/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Snooze Issue
+         * @description Set one data-quality issue aside until a date, or bring it back early. The check keeps
+         *     running; the issue returns on its own when the date passes.
+         */
+        post: operations["snooze_issue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/release/readiness": {
         parameters: {
             query?: never;
@@ -5907,6 +5950,50 @@ export interface paths {
          * @description Start a new pilot window today. An earlier window is kept but no longer reported.
          */
         post: operations["start_pilot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/release/defects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Defects
+         * @description Problems you logged while using the app, open ones first, largest affected holding first.
+         */
+        get: operations["get_defects"];
+        put?: never;
+        /**
+         * Add Defect
+         * @description Log a problem no automatic check sees. Append-only; close it with the update route.
+         */
+        post: operations["add_defect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/release/defects/{defect_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update Defect
+         * @description Mark a logged problem fixed or not going to be fixed (a new row; the report stays).
+         */
+        post: operations["update_defect"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8746,6 +8833,11 @@ export interface components {
             portfolio_value_base: number | null;
             /** Issues */
             issues: components["schemas"]["QualityIssue"][];
+            /**
+             * Snoozed
+             * @description Issues set aside until a date; they return on it.
+             */
+            snoozed?: components["schemas"]["SnoozedIssue"][];
             /** Checks */
             checks: components["schemas"]["steward__quality__cockpit__Check"][];
             /** Not Covered */
@@ -10167,6 +10259,64 @@ export interface components {
             /** Limitations */
             limitations: string[];
         };
+        /** Defect */
+        Defect: {
+            /**
+             * Id
+             * @description The id of the first report.
+             */
+            id: number;
+            /** Title */
+            title: string;
+            /** Detail */
+            detail: string | null;
+            /** Ticker */
+            ticker: string | null;
+            /** Feature */
+            feature: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "open" | "fixed" | "wont_fix";
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /**
+             * Weight
+             * @description Share of the portfolio held in the affected ticker today; None when no ticker is named or it is not held.
+             */
+            weight: number | null;
+        };
+        /** DefectIn */
+        DefectIn: {
+            /** Title */
+            title: string;
+            /** Detail */
+            detail?: string | null;
+            /**
+             * Ticker
+             * @description The holding it affects.
+             */
+            ticker?: string | null;
+            /**
+             * Feature
+             * @description Release-gate feature id.
+             */
+            feature?: string | null;
+        };
+        /** DefectUpdate */
+        DefectUpdate: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "open" | "fixed" | "wont_fix";
+            /** Detail */
+            detail?: string | null;
+        };
         /** Dependencies */
         Dependencies: {
             coverage: components["schemas"]["SectionCoverage"];
@@ -11358,6 +11508,72 @@ export interface components {
             /** Exported To */
             exported_to: string | null;
         };
+        /** EventImpact */
+        EventImpact: {
+            /** Symbol */
+            symbol: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "downstream" | "upstream";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "confirmed" | "reported" | "rumoured";
+            /** Paths */
+            paths: components["schemas"]["EventPath"][];
+            /**
+             * Reached Weight
+             * @description Portfolio weight in the companies reached, once each.
+             */
+            reached_weight: number;
+            /** Own Weight */
+            own_weight: number;
+            /** Notes */
+            notes: string[];
+            /**
+             * Method
+             * @default A path follows confirmed supply-chain links from the company in the event. The confidence of a path is its weakest link: a link is high when it is a stated fact (owner-entered or a confirmed filing disclosure) with a stated revenue share and a date within three years, medium when it has no stated share, and low when it is older than three years. Severity is high only for a confirmed event on a path of high links that reaches at least 2% of the portfolio. A revenue share is shown only for a single customer link that states one.
+             */
+            method: string;
+        };
+        /** EventPath */
+        EventPath: {
+            /** Start */
+            start: string;
+            /** End */
+            end: string;
+            /** Edges */
+            edges: components["schemas"]["PathEdge"][];
+            /**
+             * Confidence
+             * @description The weakest link on the path.
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /**
+             * Weight
+             * @description Portfolio weight in the company at the end of the path.
+             */
+            weight: number;
+            /**
+             * Revenue Share
+             * @description Share of the end supplier's revenue that the lost customer represents, only for a single customer link that states one.
+             */
+            revenue_share: number | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "high" | "medium" | "low" | "none";
+            /**
+             * Indicators
+             * @description Thesis indicators of the end company to watch.
+             */
+            indicators: string[];
+        };
         /**
          * EventRulesConfig
          * @description Stored as `config_version` rows, domain `event_rules`.
@@ -12403,7 +12619,7 @@ export interface components {
              * Audit
              * @enum {string}
              */
-            audit: "none" | "passed" | "mismatch";
+            audit: "none" | "thin" | "passed" | "mismatch";
             /**
              * Audited Facts
              * @description Facts compared with a source that matched.
@@ -18668,6 +18884,36 @@ export interface components {
             /** Families */
             families: number;
         };
+        /** PathEdge */
+        PathEdge: {
+            /** Supplier */
+            supplier: string;
+            /** Customer */
+            customer: string;
+            /** Product */
+            product: string;
+            /** Customer Share */
+            customer_share: number | null;
+            /** Source Url */
+            source_url: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "owner" | "filing";
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /** Why */
+            why: string;
+        };
         /** PathUse */
         PathUse: {
             /** Path */
@@ -19779,7 +20025,8 @@ export interface components {
         PretradeRequest: {
             /** Trades */
             trades: components["schemas"]["TradeLeg"][];
-            rules?: components["schemas"]["PretradeRules"];
+            /** @description Thresholds for this check only; when omitted the strategy's are used. */
+            rules?: components["schemas"]["PretradeRules"] | null;
             /**
              * Deposit
              * @description Cash added (or taken out) alongside the trades.
@@ -19864,6 +20111,58 @@ export interface components {
              * @description Defaults to the strategy's horizon, else 3 years.
              */
             horizon_years?: number | null;
+        };
+        /**
+         * PretradeThresholds
+         * @description The thresholds the pre-trade check uses for principles 8, 9 and 10. The defaults are the
+         *     strategy's stated values; a check run without its own rules reads these.
+         */
+        PretradeThresholds: {
+            /**
+             * Return Hurdle
+             * @default 0.3
+             */
+            return_hurdle: number;
+            /**
+             * Asymmetry Gate
+             * @default 2
+             */
+            asymmetry_gate: number;
+            /**
+             * Start Size Core
+             * @default 0.05
+             */
+            start_size_core: number;
+            /**
+             * Start Size Growth
+             * @default 0.03
+             */
+            start_size_growth: number;
+            /**
+             * Start Size Speculative
+             * @default 0.015
+             */
+            start_size_speculative: number;
+            /**
+             * Switch Safety Margin
+             * @default 0.05
+             */
+            switch_safety_margin: number;
+            /**
+             * Short Term Tax Rate
+             * @default 0.15
+             */
+            short_term_tax_rate: number;
+            /**
+             * Trade Cost Bps
+             * @default 0
+             */
+            trade_cost_bps: number;
+            /**
+             * Fx Cost Bps
+             * @default 15
+             */
+            fx_cost_bps: number;
         };
         /**
          * PriceBarOut
@@ -23438,6 +23737,58 @@ export interface components {
              */
             unrealised: number;
         };
+        /** SnoozeIn */
+        SnoozeIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            /** Subject */
+            subject: string;
+            /**
+             * Action
+             * @default snooze
+             * @enum {string}
+             */
+            action: "snooze" | "clear";
+            /** Until */
+            until?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** SnoozeRow */
+        SnoozeRow: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            /** Subject */
+            subject: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "snooze" | "clear";
+            /** Until */
+            until: string | null;
+            /** Note */
+            note: string | null;
+        };
+        /** SnoozedIssue */
+        SnoozedIssue: {
+            issue: components["schemas"]["QualityIssue"];
+            /**
+             * Until
+             * Format: date
+             */
+            until: string;
+            /** Note */
+            note: string | null;
+        };
         /** Source */
         Source: {
             /**
@@ -24126,6 +24477,7 @@ export interface components {
             /** Rules */
             rules?: (components["schemas"]["PositionWeightRule"] | components["schemas"]["CategoryWeightRule"] | components["schemas"]["CashWeightRule"] | components["schemas"]["PositionCountRule"])[];
             risk?: components["schemas"]["RiskLimits"];
+            pretrade?: components["schemas"]["PretradeThresholds"];
             /**
              * Hard Limit Severity
              * @description Severity of a position above its hard limit (alerted when it opens, routed by the notification rules).
@@ -35740,6 +36092,39 @@ export interface operations {
             };
         };
     };
+    get_event_paths: {
+        parameters: {
+            query: {
+                symbol: string;
+                direction?: "downstream" | "upstream";
+                state?: "confirmed" | "reported" | "rumoured";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventImpact"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_index_weights: {
         parameters: {
             query?: {
@@ -36850,6 +37235,39 @@ export interface operations {
             };
         };
     };
+    snooze_issue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnoozeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnoozeRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_readiness: {
         parameters: {
             query?: never;
@@ -36974,6 +37392,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PilotWindow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_defects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Defect"][];
+                };
+            };
+        };
+    };
+    add_defect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Defect"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_defect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                defect_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefectUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Defect"][];
                 };
             };
             /** @description Validation Error */

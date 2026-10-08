@@ -3,12 +3,12 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
-from steward.release import audit, pilot, readiness
+from steward.release import audit, defects, pilot, readiness
 
 router = APIRouter(tags=["release"])
 
@@ -65,6 +65,29 @@ async def get_pilot(pool: Pool, owner: Owner) -> PilotState:
 async def start_pilot(body: PilotStart, pool: Pool, owner: Owner) -> pilot.PilotWindow:
     """Start a new pilot window today. An earlier window is kept but no longer reported."""
     return await pilot.start(pool, owner.user_id, body.length_days)
+
+
+@router.get("/release/defects")
+async def get_defects(pool: Pool, owner: Owner) -> list[defects.Defect]:
+    """Problems you logged while using the app, open ones first, largest affected holding first."""
+    return await defects.list_current(pool, owner.user_id)
+
+
+@router.post("/release/defects", status_code=201)
+async def add_defect(body: defects.DefectIn, pool: Pool, owner: Owner) -> list[defects.Defect]:
+    """Log a problem no automatic check sees. Append-only; close it with the update route."""
+    await defects.report(pool, owner.user_id, body)
+    return await defects.list_current(pool, owner.user_id)
+
+
+@router.post("/release/defects/{defect_id}")
+async def update_defect(
+    defect_id: int, body: defects.DefectUpdate, pool: Pool, owner: Owner
+) -> list[defects.Defect]:
+    """Mark a logged problem fixed or not going to be fixed (a new row; the report stays)."""
+    if not await defects.update(pool, owner.user_id, defect_id, body):
+        raise HTTPException(404, "That defect does not exist.")
+    return await defects.list_current(pool, owner.user_id)
 
 
 @router.post("/release/usage", status_code=204)
