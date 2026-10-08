@@ -22,6 +22,7 @@ from api.config_history_routes import router as config_history_router
 from api.control_stake_routes import router as control_stake_router
 from api.data_context_routes import router as data_context_router
 from api.db import close_pool, get_pool_or_error
+from api.decision_routes import router as decision_router
 from api.discover_routes import router as discover_router
 from api.escalation_routes import router as escalation_router
 from api.free_sources_routes import router as free_sources_router
@@ -268,6 +269,7 @@ def create_app() -> FastAPI:
     app.include_router(fund_router)
     app.include_router(performance_router)
     app.include_router(xray_router)
+    app.include_router(decision_router)
     app.include_router(pdmr_router)
     app.include_router(graph_router)
     app.include_router(data_context_router)

@@ -5436,6 +5436,289 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/risk/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Risk Report
+         * @description Volatility, downside deviation, Sortino and Sharpe, historical VaR and expected shortfall,
+         *     drawdown, beta, tracking error, rolling correlation with the benchmark, a correlation matrix of
+         *     the largest holdings and a diversification benefit. Each figure carries its sample size and is
+         *     withheld below the minimum.
+         */
+        get: operations["get_risk_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/standard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Standard Shocks
+         * @description The named starting shocks run on today's holdings: an equity fall, a rate rise, wider
+         *     credit spreads and a fall in each foreign currency.
+         */
+        get: operations["get_standard_shocks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/shock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Shock
+         * @description Move every part of the portfolio by the sensitivities that apply to it and reconcile to a
+         *     complete shocked portfolio. Measured betas where the history supports them, your values
+         *     otherwise; a holding with no valid sensitivity stays put and is listed.
+         */
+        post: operations["post_shock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/themes/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Theme Options
+         * @description The values you can pick for a theme, taken from what the portfolio actually holds.
+         */
+        get: operations["get_theme_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/themes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Theme
+         * @description Exposure to a theme or event through issuer, fund, sector, country, trade and currency
+         *     paths, each holding counted once, with the unknown weight and a stated confidence.
+         */
+        post: operations["post_theme"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/whatif": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Whatif
+         * @description A named case on today's holdings: a new security, a contribution or withdrawal, dividend
+         *     reinvestment, an FX move, a benchmark change or a thesis-triggered exit. Applied to a copy.
+         */
+        post: operations["post_whatif"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/rebalance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Rebalance
+         * @description Proposed buys and sells to bring positions back to the strategy's targets, with cash,
+         *     assumed costs, tax-lot consequences of each sale and the drift and X-Ray after. Read-only:
+         *     nothing is sent to Trading212.
+         */
+        post: operations["post_rebalance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/pretrade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Pretrade
+         * @description A pass/flag list for a proposed buy, add, sale or switch, citing the strategy's principles
+         *     8, 9 and 10 and your own caps. It never blocks and never places a trade.
+         */
+        post: operations["post_pretrade"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/shock/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Shock
+         * @description Keep a shock scenario: the server runs it now and stores the inputs with the result.
+         */
+        post: operations["save_shock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/themes/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Theme */
+        post: operations["save_theme"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/whatif/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Whatif */
+        post: operations["save_whatif"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/rebalance/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Rebalance */
+        post: operations["save_rebalance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/decision/saved": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Decision Saved
+         * @description Saved shock scenarios, themes, what-if cases or rebalance plans, newest first.
+         */
+        get: operations["list_decision_saved"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/decision/saved/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open Decision Saved
+         * @description A saved item as it stood: the inputs and the result, not a recomputation.
+         */
+        get: operations["open_decision_saved"];
+        put?: never;
+        post?: never;
+        /** Archive Decision Saved */
+        delete: operations["archive_decision_saved"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/pdmr-notifications": {
         parameters: {
             query?: never;
@@ -9105,6 +9388,26 @@ export interface components {
             ticker: string;
             /** Correlation */
             correlation: number | null;
+        };
+        /** CorrelationMatrix */
+        CorrelationMatrix: {
+            /** Tickers */
+            tickers: string[];
+            /** Values */
+            values: (number | null)[][];
+            /** Observations */
+            observations: number[][];
+            /**
+             * Average
+             * @description Mean of the pairs that have enough observations.
+             */
+            average: number | null;
+            /** Pairs Measured */
+            pairs_measured: number;
+            /** Pairs Total */
+            pairs_total: number;
+            /** Min Observations */
+            min_observations: number;
         };
         /**
          * CorroborationRules
@@ -16073,6 +16376,41 @@ export interface components {
             /** Forfeits Exemption Warning */
             forfeits_exemption_warning: boolean;
         };
+        /** LotUse */
+        LotUse: {
+            /** Lot Id */
+            lot_id: string;
+            /**
+             * Bought On
+             * Format: date
+             */
+            bought_on: string;
+            /** Quantity */
+            quantity: number;
+            /** Cost */
+            cost: number;
+            /** Proceeds */
+            proceeds: number;
+            /** Gain */
+            gain: number;
+            /**
+             * Passes On
+             * Format: date
+             */
+            passes_on: string;
+            /** Passed */
+            passed: boolean;
+            /**
+             * Months To Test
+             * @description 0 once the lot has passed the test.
+             */
+            months_to_test: number;
+            /**
+             * Near Test
+             * @description Not passed, and passes within the warning window: waiting may keep the exemption.
+             */
+            near_test: boolean;
+        };
         /** LotsResponse */
         LotsResponse: {
             /**
@@ -16613,6 +16951,24 @@ export interface components {
              * @description Yahoo Finance symbol of the same index (^GSPC, ^STOXX): intraday values, and closes when Stooq has none. Empty: the known counterpart of the Stooq symbol.
              */
             yahoo_symbol?: string | null;
+        };
+        /** MeasuredLine */
+        MeasuredLine: {
+            /** Ticker */
+            ticker: string;
+            /** Label */
+            label: string | null;
+            /**
+             * Kind
+             * @description equity beta or duration
+             */
+            kind: string;
+            /** Value */
+            value: number | null;
+            /** Source */
+            source: string;
+            /** Detail */
+            detail: string;
         };
         /** MemberLine */
         MemberLine: {
@@ -18772,6 +19128,118 @@ export interface components {
             /** Job Id */
             job_id: number;
         };
+        /** PretradeCheck */
+        PretradeCheck: {
+            /** Id */
+            id: string;
+            /** Principle */
+            principle: string;
+            /** Ticker */
+            ticker: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "flag" | "unavailable" | "info";
+            /** Title */
+            title: string;
+            /** Detail */
+            detail: string;
+            /** Values */
+            values?: {
+                [key: string]: number | string | null;
+            };
+        };
+        /** PretradeRequest */
+        PretradeRequest: {
+            /** Trades */
+            trades: components["schemas"]["TradeLeg"][];
+            rules?: components["schemas"]["PretradeRules"];
+            /**
+             * Deposit
+             * @description Cash added (or taken out) alongside the trades.
+             * @default 0
+             */
+            deposit: number;
+        };
+        /** PretradeResult */
+        PretradeResult: {
+            /** Method Version */
+            method_version: string;
+            /** Trades */
+            trades: components["schemas"]["TradeLeg"][];
+            /** Is Switch */
+            is_switch: boolean;
+            /** Checks */
+            checks: components["schemas"]["PretradeCheck"][];
+            /** Passed */
+            passed: number;
+            /** Flagged */
+            flagged: number;
+            /** Unavailable */
+            unavailable: number;
+            /** Notes */
+            notes: string[];
+            /** Disclaimer */
+            disclaimer: string;
+        };
+        /**
+         * PretradeRules
+         * @description The thresholds of principles 8, 9 and 10. Defaults are the strategy's stated values; each
+         *     can be changed for one check.
+         */
+        PretradeRules: {
+            /**
+             * Return Hurdle
+             * @default 0.3
+             */
+            return_hurdle: number;
+            /**
+             * Asymmetry Gate
+             * @default 2
+             */
+            asymmetry_gate: number;
+            /**
+             * Start Size Core
+             * @default 0.05
+             */
+            start_size_core: number;
+            /**
+             * Start Size Growth
+             * @default 0.03
+             */
+            start_size_growth: number;
+            /**
+             * Start Size Speculative
+             * @default 0.015
+             */
+            start_size_speculative: number;
+            /**
+             * Switch Safety Margin
+             * @default 0.05
+             */
+            switch_safety_margin: number;
+            /**
+             * Short Term Tax Rate
+             * @default 0.15
+             */
+            short_term_tax_rate: number;
+            /**
+             * Trade Cost Bps
+             * @default 0
+             */
+            trade_cost_bps: number;
+            /**
+             * Fx Cost Bps
+             * @default 15
+             */
+            fx_cost_bps: number;
+            /**
+             * Horizon Years
+             * @description Defaults to the strategy's horizon, else 3 years.
+             */
+            horizon_years?: number | null;
+        };
         /**
          * PriceBarOut
          * @description A stored daily bar. Stooq's open, high, low and volume are null when it gave none.
@@ -19108,6 +19576,12 @@ export interface components {
              * @description Securities from the investable universe or a watchlist to add.
              */
             additions?: components["schemas"]["ProposedWeight"][];
+            /**
+             * Deposit
+             * @description Cash added (positive) or taken out (negative), in the base currency. The weights are then shares of the total after it; a position not listed keeps its value.
+             * @default 0
+             */
+            deposit: number;
         };
         /** ProposedWeight */
         ProposedWeight: {
@@ -19526,6 +20000,107 @@ export interface components {
             holding_days: number | null;
             /** Gross Within Time Test */
             gross_within_time_test: number;
+        };
+        /** RebalancePlan */
+        RebalancePlan: {
+            /** Method Version */
+            method_version: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "to_target" | "to_band";
+            /** Weight Basis */
+            weight_basis: string;
+            /** Total Now */
+            total_now: number;
+            /** Total After Costs */
+            total_after_costs: number;
+            /** Cash Now */
+            cash_now: number;
+            /** Cash After */
+            cash_after: number;
+            /** Cash Floor */
+            cash_floor: number;
+            /** Deposit */
+            deposit: number;
+            /** Trades */
+            trades: components["schemas"]["Trade"][];
+            /** Buys */
+            buys: number;
+            /** Sells */
+            sells: number;
+            /** Costs */
+            costs: number;
+            /**
+             * Unfunded
+             * @description Buy value the cash could not fund, base currency.
+             */
+            unfunded: number;
+            /**
+             * Unrelated Positions
+             * @description Positions with no target: never traded.
+             */
+            unrelated_positions: number;
+            drift_before: components["schemas"]["DriftReport"];
+            drift_after: components["schemas"]["DriftReport"];
+            /** Assumptions */
+            assumptions: {
+                [key: string]: number | string;
+            };
+            /** Warnings */
+            warnings: string[];
+            /** Method */
+            method: string;
+        };
+        /** RebalanceRequest */
+        RebalanceRequest: {
+            /**
+             * Mode
+             * @default to_target
+             * @enum {string}
+             */
+            mode: "to_target" | "to_band";
+            /**
+             * Deposit
+             * @description Cash added (positive) or taken out (negative).
+             * @default 0
+             */
+            deposit: number;
+            /**
+             * Fx Cost Bps
+             * @description Assumed cost of converting currency, basis points.
+             * @default 15
+             */
+            fx_cost_bps: number;
+            /**
+             * Trade Cost Bps
+             * @description Assumed commission and spread per trade, basis points.
+             * @default 0
+             */
+            trade_cost_bps: number;
+            /**
+             * Target Overrides
+             * @description Ticker -> target weight to use instead of the strategy's (what-if only).
+             */
+            target_overrides?: {
+                [key: string]: number;
+            };
+            /** Note */
+            note?: string | null;
+        };
+        /** RebalanceResponse */
+        RebalanceResponse: {
+            /** As Of */
+            as_of: string;
+            plan: components["schemas"]["RebalancePlan"];
+            /** Lot Impacts */
+            lot_impacts: {
+                [key: string]: components["schemas"]["SaleImpact"];
+            };
+            xray: components["schemas"]["XrayProposal"] | null;
+            /** Notes */
+            notes: string[];
         };
         /** ReconcileRequest */
         ReconcileRequest: {
@@ -20761,12 +21336,90 @@ export interface components {
              */
             correlation_min_combined_weight: number;
             /**
+             * Max Var 95
+             * @description Ceiling on the portfolio's one-day historical 95 % value at risk, as a share of the portfolio (0.03 = 3 %), from the last year of daily returns. A descriptive estimate of the sample, not a forecast.
+             */
+            max_var_95?: number | null;
+            /**
+             * Max Tracking Error
+             * @description Ceiling on the annualised tracking error against the configured benchmark (0.08 = 8 %), from the last year of daily returns.
+             */
+            max_tracking_error?: number | null;
+            /**
+             * Max Stress Loss
+             * @description Ceiling on the portfolio's loss when equities fall by `stress_equity_fall` (scenario engine: measured betas where valid, 1.0 otherwise).
+             */
+            max_stress_loss?: number | null;
+            /**
+             * Stress Equity Fall
+             * @description Size of the equity fall the stress loss is measured against.
+             * @default 0.2
+             */
+            stress_equity_fall: number;
+            /**
+             * Credit Spread Alert Bp
+             * @description Alert when the stored US high-yield credit spread (series us_hy_spread) is at or above this level, in basis points. A market signal, not a portfolio measure.
+             */
+            credit_spread_alert_bp?: number | null;
+            /**
+             * Max Valuation Terminal Growth
+             * @description Flag a saved valuation scenario of a held stock whose terminal growth exceeds this rate (0.03 = 3 %): an unusual assumption to re-check.
+             */
+            max_valuation_terminal_growth?: number | null;
+            /**
+             * Max Valuation Growth
+             * @description Flag a saved valuation scenario of a held stock whose explicit-year free cash flow growth exceeds this rate in any year.
+             */
+            max_valuation_growth?: number | null;
+            /**
              * On Breach
              * @description Severity of a risk-limit breach (alerted when it opens).
              * @default severity_2
              * @enum {string}
              */
             on_breach: "severity_1" | "severity_2" | "severity_3";
+        };
+        /** RiskReport */
+        RiskReport: {
+            /** Method Version */
+            method_version: string;
+            /** As Of */
+            as_of: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            window: components["schemas"]["RiskWindow"];
+            /** Benchmark Symbol */
+            benchmark_symbol: string | null;
+            /** Benchmark Note */
+            benchmark_note: string | null;
+            risk_free: components["schemas"]["RiskFree"] | null;
+            /** Stats */
+            stats: {
+                [key: string]: components["schemas"]["AnalyticsResult"];
+            };
+            /** Rolling Correlation */
+            rolling_correlation: components["schemas"]["RiskSeriesPoint"][];
+            /** Rolling Window */
+            rolling_window: number;
+            /** Drawdown Path */
+            drawdown_path: components["schemas"]["RiskSeriesPoint"][];
+            correlation: components["schemas"]["CorrelationMatrix"];
+            diversification: components["schemas"]["AnalyticsResult"];
+            holdings_covered: components["schemas"]["ResultCoverage"];
+            /** Warnings */
+            warnings: string[];
+            /** Method */
+            method: string;
+        };
+        /** RiskSeriesPoint */
+        RiskSeriesPoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Value */
+            value: number;
         };
         /** RiskStat */
         RiskStat: {
@@ -20776,6 +21429,28 @@ export interface components {
             label: string;
             fund: components["schemas"]["AnalyticsResult"];
             benchmark?: components["schemas"]["AnalyticsResult"] | null;
+        };
+        /** RiskWindow */
+        RiskWindow: {
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+            /**
+             * Observations
+             * @description Aligned daily returns the statistics are built on.
+             */
+            observations: number;
+            /**
+             * Frequency
+             * @default daily
+             */
+            frequency: string;
+            /**
+             * Annualisation
+             * @default 252
+             */
+            annualisation: number;
         };
         /** Role */
         Role: {
@@ -20843,6 +21518,47 @@ export interface components {
              */
             tickers?: string[];
         };
+        /** SaleImpact */
+        SaleImpact: {
+            /** Ticker */
+            ticker: string;
+            /** Units */
+            units: number;
+            /** Units Matched */
+            units_matched: number;
+            /** Units Unmatched */
+            units_unmatched: number;
+            /**
+             * Gross Proceeds
+             * @description Account currency, at the price given.
+             */
+            gross_proceeds: number;
+            /** Cost */
+            cost: number;
+            /** Gain */
+            gain: number;
+            /** Gross Within Time Test */
+            gross_within_time_test: number;
+            /** Lots */
+            lots: components["schemas"]["LotUse"][];
+            /** Near Test Lots */
+            near_test_lots: number;
+            /**
+             * Earliest Pass
+             * @description When the first lot that has not passed yet will pass; null if none is waiting.
+             */
+            earliest_pass: string | null;
+            /** Method Note */
+            method_note: string;
+        };
+        /** SaveRebalance */
+        SaveRebalance: {
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            request?: components["schemas"]["RebalanceRequest"];
+        };
         /** SaveScenarioIn */
         SaveScenarioIn: {
             /** Name */
@@ -20850,6 +21566,31 @@ export interface components {
             request: components["schemas"]["ValuationRequest"];
             /** Note */
             note?: string | null;
+        };
+        /** SaveShock */
+        SaveShock: {
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            shocks: components["schemas"]["ShockSet"];
+            assumptions?: components["schemas"]["ShockAssumptions"];
+        };
+        /** SaveTheme */
+        SaveTheme: {
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            theme: components["schemas"]["ThemeDefinition"];
+        };
+        /** SaveWhatIf */
+        SaveWhatIf: {
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            case: components["schemas"]["WhatIfCase"];
         };
         /** SavedAnalysisItem */
         SavedAnalysisItem: {
@@ -20859,7 +21600,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "xray_scenario" | "performance_report";
+            kind: "xray_scenario" | "performance_report" | "shock_scenario" | "whatif_case" | "rebalance_plan" | "theme_exposure";
             /** Name */
             name: string;
             /** Note */
@@ -20906,6 +21647,17 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** SavedOpen */
+        SavedOpen: {
+            item: components["schemas"]["SavedAnalysisItem"];
+            /**
+             * Payload
+             * @description {request, result}: the inputs and the result exactly as they stood when saved.
+             */
+            payload: {
+                [key: string]: unknown;
+            };
+        };
         /** SavedScenario */
         SavedScenario: {
             /** Id */
@@ -20929,6 +21681,30 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** ScenarioMacroContext */
+        ScenarioMacroContext: {
+            /** Series Id */
+            series_id: string;
+            /** Label */
+            label: string;
+            /** Source */
+            source: string;
+            /** Unit */
+            unit: string | null;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Value */
+            value: number;
+            /** Year Ago */
+            year_ago: number | null;
+            /** Change */
+            change: number | null;
+            /** Url */
+            url: string | null;
         };
         /** ScenarioResult */
         ScenarioResult: {
@@ -21627,6 +22403,188 @@ export interface components {
              */
             reason: string | null;
         };
+        /**
+         * ShockAssumptions
+         * @description Sensitivities the owner sets. A measured value is used unless the owner overrides it.
+         */
+        ShockAssumptions: {
+            /**
+             * Equity Beta
+             * @description Held ticker -> equity beta the owner assumes.
+             */
+            equity_beta?: {
+                [key: string]: number;
+            };
+            /**
+             * Unmeasured Equity Beta
+             * @description Beta used for a holding with no valid measurement; null leaves it unshocked.
+             * @default 1
+             */
+            unmeasured_equity_beta: number | null;
+            /**
+             * Duration Years
+             * @description Held ticker -> effective duration the owner assumes.
+             */
+            duration_years?: {
+                [key: string]: number;
+            };
+            /**
+             * Spread Duration Years
+             * @description Held ticker -> spread duration the owner assumes.
+             */
+            spread_duration_years?: {
+                [key: string]: number;
+            };
+        };
+        /** ShockRequest */
+        ShockRequest: {
+            shocks?: components["schemas"]["ShockSet"];
+            assumptions?: components["schemas"]["ShockAssumptions"];
+        };
+        /** ShockRun */
+        ShockRun: {
+            /** As Of */
+            as_of: string;
+            /** Benchmark Symbol */
+            benchmark_symbol: string | null;
+            result: components["schemas"]["ShockScenarioResult"];
+            /** Measured */
+            measured: components["schemas"]["MeasuredLine"][];
+            /** Context */
+            context: components["schemas"]["ScenarioMacroContext"][];
+            /** Foreign Currencies */
+            foreign_currencies: string[];
+            /** Notes */
+            notes: string[];
+        };
+        /** ShockScenarioResult */
+        ShockScenarioResult: {
+            /** Method Version */
+            method_version: string;
+            shocks: components["schemas"]["ShockSet"];
+            assumptions: components["schemas"]["ShockAssumptions"];
+            /**
+             * Before Total
+             * @description Total portfolio value, base currency.
+             */
+            before_total: number;
+            /** After Total */
+            after_total: number;
+            /**
+             * Pnl
+             * @description after_total - before_total, base currency.
+             */
+            pnl: number;
+            /** Pnl Pct */
+            pnl_pct: number;
+            /** Positions */
+            positions: components["schemas"]["ShockedPosition"][];
+            /**
+             * By Factor
+             * @description P&L share by factor; adds to pnl_pct.
+             */
+            by_factor: {
+                [key: string]: number;
+            };
+            /** Shocked Weight */
+            shocked_weight: number;
+            /** Unshocked Weight */
+            unshocked_weight: number;
+            /** Unshocked */
+            unshocked: components["schemas"]["Unshocked"][];
+            /** Cash Weight */
+            cash_weight: number;
+            /**
+             * Reconciles
+             * @description after - before equals the sum of the P&L lines.
+             */
+            reconciles: boolean;
+            /** Warnings */
+            warnings: string[];
+            /** Method */
+            method: string;
+        };
+        /**
+         * ShockSet
+         * @description The factor moves of one scenario. Every field is optional; an empty set shocks nothing.
+         */
+        ShockSet: {
+            /**
+             * Equity Pct
+             * @description Equity market move, fraction (-0.2 = -20 %).
+             */
+            equity_pct?: number | null;
+            /**
+             * Rate Bp
+             * @description Parallel change in rates, basis points.
+             */
+            rate_bp?: number | null;
+            /**
+             * Credit Bp
+             * @description Change in credit spreads, basis points.
+             */
+            credit_bp?: number | null;
+            /**
+             * Fx
+             * @description Currency code -> move against the base currency, fraction (USD -0.1).
+             */
+            fx?: {
+                [key: string]: number;
+            };
+            /**
+             * Sector
+             * @description Sector -> demand move on top of the market, fraction.
+             */
+            sector?: {
+                [key: string]: number;
+            };
+            /**
+             * Country
+             * @description Country (ISO code) -> demand move on top of the market, fraction.
+             */
+            country?: {
+                [key: string]: number;
+            };
+        };
+        /** ShockedPosition */
+        ShockedPosition: {
+            /**
+             * Key
+             * @description Held ticker, or the bucket name for non-position weight.
+             */
+            key: string;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+            /**
+             * Shocked Weight
+             * @description Weight of the leaves that were moved.
+             */
+            shocked_weight: number;
+            /**
+             * Pnl
+             * @description Change in value, as a share of total portfolio value.
+             */
+            pnl: number;
+            /**
+             * Return Pct
+             * @description pnl / weight; null with no weight.
+             */
+            return_pct: number | null;
+            /**
+             * Effects
+             * @description P&L by factor: equity, rates, credit, fx, sector, country (cross terms kept in `interaction`).
+             */
+            effects: {
+                [key: string]: number;
+            };
+            /**
+             * Sensitivities
+             * @description Each sensitivity used, with its source.
+             */
+            sensitivities: string[];
+        };
         /** Sibling */
         Sibling: {
             /** Isin */
@@ -22126,6 +23084,32 @@ export interface components {
             percent_check: "consistent" | "inconsistent" | "not_checkable";
             /** Note */
             note: string | null;
+        };
+        /** StandardLine */
+        StandardLine: {
+            /** Name */
+            name: string;
+            shocks: components["schemas"]["ShockSet"];
+            /** Pnl Pct */
+            pnl_pct: number;
+            /** Pnl */
+            pnl: number;
+            /** Unshocked Weight */
+            unshocked_weight: number;
+        };
+        /** StandardTable */
+        StandardTable: {
+            /** As Of */
+            as_of: string;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Total Value */
+            total_value: number;
+            /** Lines */
+            lines: components["schemas"]["StandardLine"][];
+            assumptions: components["schemas"]["ShockAssumptions"];
+            /** Notes */
+            notes: string[];
         };
         /** StatedAction */
         StatedAction: {
@@ -22639,6 +23623,149 @@ export interface components {
             /** Alerts */
             alerts: components["schemas"]["AlertOut"][];
         };
+        /** ThemeDefinition */
+        ThemeDefinition: {
+            /** Name */
+            name: string;
+            /** Selectors */
+            selectors: components["schemas"]["ThemeSelector"][];
+            /** Note */
+            note?: string | null;
+        };
+        /** ThemeExposure */
+        ThemeExposure: {
+            /** Method Version */
+            method_version: string;
+            theme: components["schemas"]["ThemeDefinition"];
+            /**
+             * Exposed Weight
+             * @description Known exposure, share of total portfolio value.
+             */
+            exposed_weight: number;
+            /** Direct Weight */
+            direct_weight: number;
+            /** Fund Weight */
+            fund_weight: number;
+            unknown: components["schemas"]["ThemeUnknown"];
+            /**
+             * Upper Bound
+             * @description Known plus unknown: the most the theme could reach.
+             */
+            upper_bound: number;
+            /**
+             * Inferred Share
+             * @description Share of the known exposure resting on inferred labels.
+             */
+            inferred_share: number;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /** Confidence Reason */
+            confidence_reason: string;
+            /** Issuers */
+            issuers: components["schemas"]["ThemeIssuer"][];
+            /**
+             * By Selector
+             * @description Exposed weight per selector on its own (these overlap and do not add up).
+             */
+            by_selector: {
+                [key: string]: number;
+            };
+            /** Equity Weight */
+            equity_weight: number;
+            /** Warnings */
+            warnings: string[];
+            /** Method */
+            method: string;
+        };
+        /** ThemeIssuer */
+        ThemeIssuer: {
+            /** Issuer */
+            issuer: string;
+            /** Exposed */
+            exposed: number;
+            /** Direct */
+            direct: number;
+            /** Via Funds */
+            via_funds: number;
+            /** Paths */
+            paths: components["schemas"]["ThemePath"][];
+        };
+        /** ThemeOption */
+        ThemeOption: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+        };
+        /** ThemeOptions */
+        ThemeOptions: {
+            /** Options */
+            options: {
+                [key: string]: components["schemas"]["ThemeOption"][];
+            };
+        };
+        /** ThemePath */
+        ThemePath: {
+            /**
+             * Channel
+             * @description 'Direct holdings' or the fund the exposure comes through.
+             */
+            channel: string;
+            /** Channel Kind */
+            channel_kind: string;
+            /** Issuer */
+            issuer: string;
+            /**
+             * Weight
+             * @description Leaf weight, share of total portfolio value.
+             */
+            weight: number;
+            /**
+             * Exposed
+             * @description Weight counted as exposed (leaf weight x exposed share).
+             */
+            exposed: number;
+            /**
+             * Selectors
+             * @description Every selector that matched, with its label basis.
+             */
+            selectors: string[];
+            /**
+             * Basis
+             * @description Weakest label basis among the matching selectors.
+             */
+            basis: string;
+        };
+        /** ThemeSelector */
+        ThemeSelector: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "sector" | "industry" | "country" | "domicile" | "listing" | "currency" | "revenue_country" | "commodity" | "trade_product" | "issuer";
+            /**
+             * Value
+             * @description Sector name, ISO code, issuer key…
+             */
+            value: string;
+        };
+        /** ThemeUnknown */
+        ThemeUnknown: {
+            /** Weight */
+            weight: number;
+            /**
+             * Reasons
+             * @description Reason -> unknown weight.
+             */
+            reasons: {
+                [key: string]: number;
+            };
+        };
         /**
          * ThesesConfig
          * @description All theses. Stored as the body of `config_version` rows, domain `theses`.
@@ -22900,6 +24027,55 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** Trade */
+        Trade: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "buy" | "sell" | "hold";
+            /** Value Now */
+            value_now: number;
+            /** Weight Now */
+            weight_now: number;
+            /** Target Weight */
+            target_weight: number | null;
+            /** Lower */
+            lower: number | null;
+            /** Upper */
+            upper: number | null;
+            /** Status Now */
+            status_now: string;
+            /** Value After */
+            value_after: number;
+            /** Weight After */
+            weight_after: number;
+            /**
+             * Trade Value
+             * @description Signed: positive buys, negative sells (base currency).
+             */
+            trade_value: number;
+            /**
+             * Estimated Units
+             * @description Units at the last price (null without a stored quantity).
+             */
+            estimated_units: number | null;
+            /** Cost */
+            cost: number;
+            /**
+             * Funded
+             * @description Share of the wanted buy that the cash funds, 0 to 1.
+             */
+            funded: number;
+            /** Held */
+            held: boolean;
+            /** Reason */
+            reason: string;
+        };
         /** TradeContext */
         TradeContext: {
             /** Reporter */
@@ -22962,6 +24138,21 @@ export interface components {
             notice: string;
             /** Gap */
             gap?: string | null;
+        };
+        /** TradeLeg */
+        TradeLeg: {
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "buy" | "sell";
+            /** Ticker */
+            ticker: string;
+            /**
+             * Value Base
+             * @description Size of the trade in the base currency.
+             */
+            value_base: number;
         };
         /** TradeRow */
         TradeRow: {
@@ -23223,6 +24414,15 @@ export interface components {
             sold_on: string;
             /** Quantity */
             quantity: number;
+            /** Reason */
+            reason: string;
+        };
+        /** Unshocked */
+        Unshocked: {
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
             /** Reason */
             reason: string;
         };
@@ -23689,6 +24889,69 @@ export interface components {
             status: "approved" | "rejected";
             /** Note */
             note?: string | null;
+        };
+        /** WhatIfCase */
+        WhatIfCase: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "new_security" | "contribution" | "withdrawal" | "reinvest_dividends" | "fx_move" | "benchmark_change" | "thesis_exit";
+            /** Ticker */
+            ticker?: string | null;
+            /**
+             * Weight
+             * @description New security: share of total.
+             */
+            weight?: number | null;
+            /**
+             * Fund From
+             * @default cash
+             * @enum {string}
+             */
+            fund_from: "cash" | "pro_rata";
+            /**
+             * Amount
+             * @description Base currency, for a deposit, withdrawal or dividends.
+             */
+            amount?: number | null;
+            /**
+             * Split
+             * @description Ticker -> share of the amount (adds to at most 1); empty keeps a deposit in cash and spreads dividends over the current weights.
+             */
+            split?: {
+                [key: string]: number;
+            };
+            /** Currency */
+            currency?: string | null;
+            /**
+             * Move
+             * @description FX move against base.
+             */
+            move?: number | null;
+            /** Benchmark Symbol */
+            benchmark_symbol?: string | null;
+            /** Name */
+            name?: string | null;
+        };
+        /** WhatIfResult */
+        WhatIfResult: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "new_security" | "contribution" | "withdrawal" | "reinvest_dividends" | "fx_move" | "benchmark_change" | "thesis_exit";
+            /** Summary */
+            summary: string[];
+            proposal: components["schemas"]["XrayProposal"] | null;
+            shock: components["schemas"]["ShockScenarioResult"] | null;
+            risk: components["schemas"]["RiskReport"] | null;
+            risk_current: components["schemas"]["RiskReport"] | null;
+            pretrade: components["schemas"]["PretradeResult"] | null;
+            /** Assumptions */
+            assumptions: string[];
+            /** Notes */
+            notes: string[];
         };
         /** WikidataSummary */
         WikidataSummary: {
@@ -34048,6 +35311,473 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["XrayProposal"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_risk_report: {
+        parameters: {
+            query?: {
+                /** @description Look-back window, calendar days. */
+                days?: number;
+                /** @description Rolling correlation window. */
+                rolling?: number;
+                benchmark?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiskReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_standard_shocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandardTable"];
+                };
+            };
+        };
+    };
+    post_shock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShockRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShockRun"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_theme_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeOptions"];
+                };
+            };
+        };
+    };
+    post_theme: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThemeDefinition"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeExposure"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_whatif: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WhatIfCase"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatIfResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_rebalance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RebalanceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RebalanceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_pretrade: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PretradeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PretradeResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_shock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveShock"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_theme: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveTheme"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_whatif: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveWhatIf"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_rebalance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveRebalance"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_decision_saved: {
+        parameters: {
+            query: {
+                kind: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_decision_saved: {
+        parameters: {
+            query: {
+                kind: string;
+            };
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedOpen"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_decision_saved: {
+        parameters: {
+            query: {
+                kind: string;
+            };
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -150,6 +150,42 @@ class RiskLimits(ConfigModel):
         description="Combined weight, of the invested value, a correlated pair must reach "
         "before `max_pair_correlation` applies.",
     )
+    max_var_95: Weight | None = Field(
+        default=None,
+        description="Ceiling on the portfolio's one-day historical 95 % value at risk, as a share "
+        "of the portfolio (0.03 = 3 %), from the last year of daily returns. A descriptive "
+        "estimate of the sample, not a forecast.",
+    )
+    max_tracking_error: Weight | None = Field(
+        default=None,
+        description="Ceiling on the annualised tracking error against the configured benchmark "
+        "(0.08 = 8 %), from the last year of daily returns.",
+    )
+    max_stress_loss: Weight | None = Field(
+        default=None,
+        description="Ceiling on the portfolio's loss when equities fall by `stress_equity_fall` "
+        "(scenario engine: measured betas where valid, 1.0 otherwise).",
+    )
+    stress_equity_fall: Weight = Field(
+        default=0.20, description="Size of the equity fall the stress loss is measured against."
+    )
+    credit_spread_alert_bp: float | None = Field(
+        default=None,
+        gt=0,
+        le=3000,
+        description="Alert when the stored US high-yield credit spread (series us_hy_spread) is "
+        "at or above this level, in basis points. A market signal, not a portfolio measure.",
+    )
+    max_valuation_terminal_growth: Weight | None = Field(
+        default=None,
+        description="Flag a saved valuation scenario of a held stock whose terminal growth "
+        "exceeds this rate (0.03 = 3 %): an unusual assumption to re-check.",
+    )
+    max_valuation_growth: Weight | None = Field(
+        default=None,
+        description="Flag a saved valuation scenario of a held stock whose explicit-year free "
+        "cash flow growth exceeds this rate in any year.",
+    )
     on_breach: Severity = Field(
         default="severity_2",
         description="Severity of a risk-limit breach (alerted when it opens).",

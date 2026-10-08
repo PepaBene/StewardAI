@@ -9,7 +9,14 @@ from typing import Any, Literal
 import asyncpg
 from pydantic import BaseModel, Field
 
-SavedKind = Literal["xray_scenario", "performance_report"]
+SavedKind = Literal[
+    "xray_scenario",
+    "performance_report",
+    "shock_scenario",
+    "whatif_case",
+    "rebalance_plan",
+    "theme_exposure",
+]
 
 
 class SavedAnalysisItem(BaseModel):

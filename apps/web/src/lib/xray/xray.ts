@@ -186,7 +186,7 @@ export function buildProposal(rows: readonly EditRow[], additions: readonly AddR
     return { ok: false, error: `The weights add to ${(invested * 100).toFixed(1)}%; they cannot exceed 100%.` };
   }
   if (weights.length === 0 && adds.length === 0) return { ok: false, error: "Change a weight or add a security first." };
-  return { ok: true, request: { weights, additions: adds }, changed: weights.length + adds.length, invested };
+  return { ok: true, request: { weights, additions: adds, deposit: 0 }, changed: weights.length + adds.length, invested };
 }
 
 /**

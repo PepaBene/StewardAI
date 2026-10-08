@@ -24,6 +24,13 @@ class Thresholds:
     min_obs_drawdown: int = 20
     min_obs_beta: int = 60
     min_obs_var: int = 250
+    min_obs_correlation: int = 60
+    min_obs_tracking_error: int = 60
+    min_obs_diversification: int = 60
+    # A scenario sensitivity (beta) fitted on history needs this many aligned observations and a
+    # fit at least this good (R squared) to count as measured; otherwise the owner assumes it.
+    min_obs_sensitivity: int = 120
+    min_sensitivity_r2: Decimal = Decimal("0.05")
     # A screen metric is shown only when this share of the universe has it.
     min_metric_coverage_for_rank: Decimal = Decimal("0.5")
     min_universe_for_percentile: int = 20

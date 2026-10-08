@@ -65,6 +65,13 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
     max_drawdown: null,
     max_pair_correlation: null,
     correlation_min_combined_weight: 0.1,
+    max_var_95: null,
+    max_tracking_error: null,
+    max_stress_loss: null,
+    stress_equity_fall: 0.2,
+    credit_spread_alert_bp: null,
+    max_valuation_terminal_growth: null,
+    max_valuation_growth: null,
     on_breach: "severity_2",
   },
   hard_limit_severity: "severity_3",
@@ -180,6 +187,13 @@ export type StrategyForm = {
   risk_max_drawdown: string;
   risk_max_pair_correlation: string;
   risk_correlation_min_combined_weight: string;
+  risk_max_var_95: string;
+  risk_max_tracking_error: string;
+  risk_max_stress_loss: string;
+  risk_stress_equity_fall: string;
+  risk_credit_spread_alert_bp: string;
+  risk_max_valuation_terminal_growth: string;
+  risk_max_valuation_growth: string;
   risk_on_breach: OnBreach;
   /** Severity of a position above its hard limit. */
   hard_limit_severity: OnBreach;
@@ -257,6 +271,13 @@ export function strategyFromBody(body: StrategyConfig | null): StrategyForm {
     risk_max_drawdown: fractionToPercent(b.risk?.max_drawdown),
     risk_max_pair_correlation: b.risk?.max_pair_correlation == null ? "" : String(b.risk.max_pair_correlation),
     risk_correlation_min_combined_weight: fractionToPercent(b.risk?.correlation_min_combined_weight ?? 0.1),
+    risk_max_var_95: fractionToPercent(b.risk?.max_var_95),
+    risk_max_tracking_error: fractionToPercent(b.risk?.max_tracking_error),
+    risk_max_stress_loss: fractionToPercent(b.risk?.max_stress_loss),
+    risk_stress_equity_fall: fractionToPercent(b.risk?.stress_equity_fall ?? 0.2),
+    risk_credit_spread_alert_bp: b.risk?.credit_spread_alert_bp == null ? "" : String(b.risk.credit_spread_alert_bp),
+    risk_max_valuation_terminal_growth: fractionToPercent(b.risk?.max_valuation_terminal_growth),
+    risk_max_valuation_growth: fractionToPercent(b.risk?.max_valuation_growth),
     risk_on_breach: b.risk?.on_breach ?? "severity_2",
     categories,
     classifications,
@@ -368,6 +389,13 @@ export function strategyToBody(form: StrategyForm): StrategyConfig {
       max_drawdown: optionalPercent(form.risk_max_drawdown) as number | null,
       max_pair_correlation: optionalNumber(form.risk_max_pair_correlation) as number | null,
       correlation_min_combined_weight: percentToFraction(form.risk_correlation_min_combined_weight) as number,
+      max_var_95: optionalPercent(form.risk_max_var_95) as number | null,
+      max_tracking_error: optionalPercent(form.risk_max_tracking_error) as number | null,
+      max_stress_loss: optionalPercent(form.risk_max_stress_loss) as number | null,
+      stress_equity_fall: percentToFraction(form.risk_stress_equity_fall) as number,
+      credit_spread_alert_bp: optionalNumber(form.risk_credit_spread_alert_bp) as number | null,
+      max_valuation_terminal_growth: optionalPercent(form.risk_max_valuation_terminal_growth) as number | null,
+      max_valuation_growth: optionalPercent(form.risk_max_valuation_growth) as number | null,
       on_breach: form.risk_on_breach,
     },
     hard_limit_severity: form.hard_limit_severity,

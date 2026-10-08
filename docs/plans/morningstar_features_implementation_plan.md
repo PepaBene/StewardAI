@@ -371,6 +371,46 @@ Built in `steward/xray/`, behind `/portfolio/xray*` and the `/xray` pages (Expos
 
 **Exit checks:** scenario totals reconcile to a complete shocked portfolio; a sensitivity with inadequate history is unavailable or explicitly user-assumed; recommendations cite a breached rule, KPI or entered scenario and do not imply an automated trade.
 
+### Phase 6 (this branch)
+
+Built in `steward/decision/` (risk report, shocks, themes, rebalance, lot impact, pre-trade, what-if, service) behind `/portfolio/risk/report`, `/portfolio/scenarios/*`, `/portfolio/rebalance`, `/portfolio/pretrade` and `/portfolio/decision/saved`, with the `/risk` pages (Risk, Stress test, Themes, What if, Rebalance, Before a trade). Migration `20261018100000` widens the `saved_analysis` kinds; saved items keep the request and the result as they stood and are archived, never edited. Nothing is sent to Trading212.
+
+| Item | Status | Gap |
+| --- | --- | --- |
+| `M6.1` | Built, with limits | Downside deviation, Sortino, historical VaR and ES (95 and 99), tracking error, rolling benchmark correlation, a correlation matrix of the ten largest holdings and a diversification benefit. Each figure shows its sample size and is withheld below its minimum (`analytics/thresholds.py`). |
+| `M6.2` | Built, with limits | Equity, rates, credit, FX, sector and country shocks. Equity betas are measured where the regression is valid, else owner-set, else the stated fallback; rates and credit need a recorded fund duration or an owner value. A holding with no valid sensitivity stays put and is listed with the reason. Parts reconcile to the shocked total. Macro series are shown as context only. |
+| `M6.3` | Built, with limits | Selectors on sector, industry, country, revenue country, domicile, listing, currency, commodity, trade product and issuer. A holding counts once at its largest match; unknown weight, an upper bound and a confidence level are shown. |
+| `M6.4` | Built, with limits | To target or to the band edge, with cash floor, FX and trade costs, FIFO lot consequences with the time test, drift before and after and the X-Ray after. Costs are assumptions entered on the page. |
+| `M6.5` | Built, with limits | New security, contribution, withdrawal, dividend reinvestment, FX move (on the shock engine), benchmark change (on the risk report) and exit. Named cases are saved. |
+| `M6.6` | Partial | New risk limits feed the existing breach and alert path: one-day VaR, tracking error, stress loss, US high-yield spread, valuation terminal growth and yearly growth. The patent and deal-change trigger is not built. |
+| `M6.7` | Partial | Return hurdle, start size by tier, post-trade caps, sale lots and time test, and switch margin run as pass/flag. The asymmetry gate needs a bear case, and the risk budget and portfolio-improvement checks need a covariance model; none exists, so they are listed as "cannot check". Thresholds are the `PretradeRules` defaults, not stored in the strategy. |
+
+**Phase 6 exit checks:** shock parts reconcile to the shocked total (tested); a holding without a valid sensitivity is listed, never silently moved (tested); a theme counts a holding once and keeps unknown weight (tested); a rebalance never sends an order; saved items reopen as they were saved.
+
+#### Phase 6 open gaps
+
+**Verification not done**
+- No `/risk` page has been rendered in a browser or run against the live account. Web checks so far are typecheck, lint, colour lint and unit tests of the form helpers.
+- Migration `20261018100000` (widens the `saved_analysis` kinds) has not been applied to a real database.
+- The new routes (`api/decision_routes.py`) and services (`decision/service.py`, `series.py`) have no database-backed tests, because they need `STEWARD_TEST_DATABASE_URL`. The calculators (shocks, themes, rebalance, lot impact, pre-trade, what-if, risk statistics) are covered by hand-worked tests in `tests/test_decision.py`.
+- The full backend and web suites were not re-run after the last edits; only the touched files' tests were.
+- No component tests for the `/risk` views (rendering, save and open of saved items).
+
+**Method limits**
+- `M6.1`: statistics are descriptive of the sample, not forecasts; VaR and ES are historical. Holding-level figures cover only holdings with enough shared days, and the matrix shows the ten largest.
+- `M6.2`: rates and credit shocks move nothing without a recorded fund duration (`fund_owner_fact`, `effective_duration_years`) or an owner-entered one. Equity beta needs at least 120 observations and R² of 0.05; otherwise the owner value or the stated fallback is used. Sector and country shocks are demand moves on top of the market, with no historical sensitivity behind them. Macro series (FRED) are context only and imply no company beta. BIS, ECB, OECD, World Bank and Comtrade series are not wired into the narratives.
+- `M6.3`: confidence depends on the labels that exist; funds not looked through and missing labels count as unknown. Themes cover current holdings only.
+- `M6.4`: costs are assumptions typed on the page. Lot consequences use FIFO and the time test from performance settings; units without a lot on record are listed. No tax-year exemption headroom is computed.
+- `M6.5`: a new security uses only the history it has for risk figures. Saved cases store the inputs and the result as they stood and reopen as saved, not recomputed.
+- `M6.6`: the patent and deal-change trigger is not built. The credit-spread alert reads the stored `us_hy_spread` series (FRED BAMLH0A0HYM2) only. Valuation flags apply only to saved valuation scenarios of held stocks, and only when a ceiling is set. The new limits are off until set in the strategy editor.
+- `M6.7`: thresholds are the `PretradeRules` defaults (return hurdle 30%, start sizes 5/3/1.5%, switch margin 5 pp, short-term tax rate 15%), not stored in the strategy config and not editable on the page. The asymmetry gate needs a bear case; the risk budget and portfolio-improvement checks need a covariance model; none exists, so they read "Cannot check". No chat entry point yet.
+- Rebalance and pre-trade are read-only; nothing is sent to Trading212.
+
+**Product gaps**
+- The what-if page does not show a side-by-side diff for saved cases against today's holdings beyond the before/after tables.
+- `lib/nav.ts` lists one "Risk" entry; there is no deep link from a breached risk limit to the page that explains it.
+- `ProposalSummary` shows seven X-Ray measures; the full per-lens before/after stays on `/xray/proposed`.
+
 ## Phase 7 — Research workflow and differentiated features
 
 **Dependencies:** all prior phases. **Outcome:** capabilities beyond a conventional data dashboard.

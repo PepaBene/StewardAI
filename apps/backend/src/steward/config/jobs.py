@@ -865,6 +865,11 @@ class MacroSettings(ConfigModel):
             ),
             FredSeries(key="us_unemployment", label="US unemployment rate", series_id="UNRATE"),
             FredSeries(
+                key="us_hy_spread",
+                label="US high-yield credit spread (ICE BofA option-adjusted)",
+                series_id="BAMLH0A0HYM2",
+            ),
+            FredSeries(
                 key="fed_funds", label="Fed funds effective rate", series_id="DFF", policy_rate=True
             ),
             *(

@@ -53,6 +53,13 @@ class ProposedRequest(BaseModel):
         max_length=20,
         description="Securities from the investable universe or a watchlist to add.",
     )
+    deposit: float = Field(
+        default=0,
+        ge=-1e12,
+        le=1e12,
+        description="Cash added (positive) or taken out (negative), in the base currency. The "
+        "weights are then shares of the total after it; a position not listed keeps its value.",
+    )
 
 
 class ProposalError(ValueError):
@@ -76,7 +83,7 @@ def apply_proposal(
     request: ProposedRequest,
     candidates: dict[str, Candidate],
 ) -> tuple[PortfolioIn, list[str]]:
-    total = sum(p.value_base for p in portfolio.positions) + portfolio.cash_base
+    total = sum(p.value_base for p in portfolio.positions) + portfolio.cash_base + request.deposit
     if total <= 0:
         raise ProposalError("The portfolio has no value to reweight.")
     by_ticker = {p.ticker: p for p in portfolio.positions}
@@ -117,9 +124,10 @@ def apply_proposal(
         )
     if cash < 0:
         cash = 0.0
+    moved = f", after a deposit of {request.deposit:,.0f}" if request.deposit else ""
     notes.append(
-        f"Total value is held at {total:,.0f} {portfolio.base_currency}; cash is the remainder "
-        f"({cash / total:.1%})."
+        f"Total value is held at {total:,.0f} {portfolio.base_currency}{moved}; cash is the "
+        f"remainder ({cash / total:.1%})."
     )
     return (
         PortfolioIn(

@@ -17387,6 +17387,723 @@
         ]
       }
     },
+    "/portfolio/risk/report": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Risk Report",
+        "description": "Volatility, downside deviation, Sortino and Sharpe, historical VaR and expected shortfall,\ndrawdown, beta, tracking error, rolling correlation with the benchmark, a correlation matrix of\nthe largest holdings and a diversification benefit. Each figure carries its sample size and is\nwithheld below the minimum.",
+        "operationId": "get_risk_report",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1100,
+              "minimum": 120,
+              "description": "Look-back window, calendar days.",
+              "default": 365,
+              "title": "Days"
+            },
+            "description": "Look-back window, calendar days."
+          },
+          {
+            "name": "rolling",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 250,
+              "minimum": 60,
+              "description": "Rolling correlation window.",
+              "default": 90,
+              "title": "Rolling"
+            },
+            "description": "Rolling correlation window."
+          },
+          {
+            "name": "benchmark",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Benchmark"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/scenarios/standard": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Standard Shocks",
+        "description": "The named starting shocks run on today's holdings: an equity fall, a rate rise, wider\ncredit spreads and a fall in each foreign currency.",
+        "operationId": "get_standard_shocks",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardTable"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/scenarios/shock": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Post Shock",
+        "description": "Move every part of the portfolio by the sensitivities that apply to it and reconcile to a\ncomplete shocked portfolio. Measured betas where the history supports them, your values\notherwise; a holding with no valid sensitivity stays put and is listed.",
+        "operationId": "post_shock",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShockRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShockRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/scenarios/themes/options": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Theme Options",
+        "description": "The values you can pick for a theme, taken from what the portfolio actually holds.",
+        "operationId": "get_theme_options",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeOptions"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/scenarios/themes": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Post Theme",
+        "description": "Exposure to a theme or event through issuer, fund, sector, country, trade and currency\npaths, each holding counted once, with the unknown weight and a stated confidence.",
+        "operationId": "post_theme",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThemeDefinition"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeExposure"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/scenarios/whatif": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Post Whatif",
+        "description": "A named case on today's holdings: a new security, a contribution or withdrawal, dividend\nreinvestment, an FX move, a benchmark change or a thesis-triggered exit. Applied to a copy.",
+        "operationId": "post_whatif",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhatIfCase"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatIfResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/rebalance": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Post Rebalance",
+        "description": "Proposed buys and sells to bring positions back to the strategy's targets, with cash,\nassumed costs, tax-lot consequences of each sale and the drift and X-Ray after. Read-only:\nnothing is sent to Trading212.",
+        "operationId": "post_rebalance",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RebalanceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RebalanceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/pretrade": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Post Pretrade",
+        "description": "A pass/flag list for a proposed buy, add, sale or switch, citing the strategy's principles\n8, 9 and 10 and your own caps. It never blocks and never places a trade.",
+        "operationId": "post_pretrade",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PretradeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PretradeResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/scenarios/shock/save": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Save Shock",
+        "description": "Keep a shock scenario: the server runs it now and stores the inputs with the result.",
+        "operationId": "save_shock",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveShock"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedAnalysisItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/scenarios/themes/save": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Save Theme",
+        "operationId": "save_theme",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveTheme"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedAnalysisItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/scenarios/whatif/save": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Save Whatif",
+        "operationId": "save_whatif",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveWhatIf"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedAnalysisItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/rebalance/save": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Save Rebalance",
+        "operationId": "save_rebalance",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveRebalance"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedAnalysisItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/decision/saved": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "List Decision Saved",
+        "description": "Saved shock scenarios, themes, what-if cases or rebalance plans, newest first.",
+        "operationId": "list_decision_saved",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 30,
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SavedAnalysisItem"
+                  },
+                  "title": "Response List Decision Saved"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/decision/saved/{item_id}": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Open Decision Saved",
+        "description": "A saved item as it stood: the inputs and the result, not a recomputation.",
+        "operationId": "open_decision_saved",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 30,
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedOpen"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Archive Decision Saved",
+        "operationId": "archive_decision_saved",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 30,
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/holdings/{ticker}/pdmr-notifications": {
       "get": {
         "tags": [
@@ -28468,6 +29185,79 @@
           "correlation"
         ],
         "title": "Correlation"
+      },
+      "CorrelationMatrix": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tickers"
+          },
+          "values": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Values"
+          },
+          "observations": {
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Observations"
+          },
+          "average": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average",
+            "description": "Mean of the pairs that have enough observations."
+          },
+          "pairs_measured": {
+            "type": "integer",
+            "title": "Pairs Measured"
+          },
+          "pairs_total": {
+            "type": "integer",
+            "title": "Pairs Total"
+          },
+          "min_observations": {
+            "type": "integer",
+            "title": "Min Observations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tickers",
+          "values",
+          "observations",
+          "average",
+          "pairs_measured",
+          "pairs_total",
+          "min_observations"
+        ],
+        "title": "CorrelationMatrix"
       },
       "CorroborationRules": {
         "properties": {
@@ -48053,6 +48843,68 @@
         ],
         "title": "LotOut"
       },
+      "LotUse": {
+        "properties": {
+          "lot_id": {
+            "type": "string",
+            "title": "Lot Id"
+          },
+          "bought_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Bought On"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "cost": {
+            "type": "number",
+            "title": "Cost"
+          },
+          "proceeds": {
+            "type": "number",
+            "title": "Proceeds"
+          },
+          "gain": {
+            "type": "number",
+            "title": "Gain"
+          },
+          "passes_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Passes On"
+          },
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "months_to_test": {
+            "type": "number",
+            "title": "Months To Test",
+            "description": "0 once the lot has passed the test."
+          },
+          "near_test": {
+            "type": "boolean",
+            "title": "Near Test",
+            "description": "Not passed, and passes within the warning window: waiting may keep the exemption."
+          }
+        },
+        "type": "object",
+        "required": [
+          "lot_id",
+          "bought_on",
+          "quantity",
+          "cost",
+          "proceeds",
+          "gain",
+          "passes_on",
+          "passed",
+          "months_to_test",
+          "near_test"
+        ],
+        "title": "LotUse"
+      },
       "LotsResponse": {
         "properties": {
           "status": {
@@ -49579,6 +50431,59 @@
           "label"
         ],
         "title": "MarketStripItem"
+      },
+      "MeasuredLine": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "equity beta or duration"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "label",
+          "kind",
+          "value",
+          "source",
+          "detail"
+        ],
+        "title": "MeasuredLine"
       },
       "MemberLine": {
         "properties": {
@@ -55874,6 +56779,249 @@
         ],
         "title": "PostedMessage"
       },
+      "PretradeCheck": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "principle": {
+            "type": "string",
+            "title": "Principle"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "flag",
+              "unavailable",
+              "info"
+            ],
+            "title": "Status"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "principle",
+          "ticker",
+          "status",
+          "title",
+          "detail"
+        ],
+        "title": "PretradeCheck"
+      },
+      "PretradeRequest": {
+        "properties": {
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/TradeLeg"
+            },
+            "type": "array",
+            "maxItems": 40,
+            "minItems": 1,
+            "title": "Trades"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/PretradeRules"
+          },
+          "deposit": {
+            "type": "number",
+            "maximum": 1000000000000.0,
+            "minimum": -1000000000000.0,
+            "title": "Deposit",
+            "description": "Cash added (or taken out) alongside the trades.",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "trades"
+        ],
+        "title": "PretradeRequest"
+      },
+      "PretradeResult": {
+        "properties": {
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/TradeLeg"
+            },
+            "type": "array",
+            "title": "Trades"
+          },
+          "is_switch": {
+            "type": "boolean",
+            "title": "Is Switch"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/PretradeCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "passed": {
+            "type": "integer",
+            "title": "Passed"
+          },
+          "flagged": {
+            "type": "integer",
+            "title": "Flagged"
+          },
+          "unavailable": {
+            "type": "integer",
+            "title": "Unavailable"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method_version",
+          "trades",
+          "is_switch",
+          "checks",
+          "passed",
+          "flagged",
+          "unavailable",
+          "notes",
+          "disclaimer"
+        ],
+        "title": "PretradeResult"
+      },
+      "PretradeRules": {
+        "properties": {
+          "return_hurdle": {
+            "type": "number",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Return Hurdle",
+            "default": 0.3
+          },
+          "asymmetry_gate": {
+            "type": "number",
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Asymmetry Gate",
+            "default": 2.0
+          },
+          "start_size_core": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Start Size Core",
+            "default": 0.05
+          },
+          "start_size_growth": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Start Size Growth",
+            "default": 0.03
+          },
+          "start_size_speculative": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Start Size Speculative",
+            "default": 0.015
+          },
+          "switch_safety_margin": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Switch Safety Margin",
+            "default": 0.05
+          },
+          "short_term_tax_rate": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Short Term Tax Rate",
+            "default": 0.15
+          },
+          "trade_cost_bps": {
+            "type": "number",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Trade Cost Bps",
+            "default": 0
+          },
+          "fx_cost_bps": {
+            "type": "number",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Fx Cost Bps",
+            "default": 15
+          },
+          "horizon_years": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 30.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Years",
+            "description": "Defaults to the strategy's horizon, else 3 years."
+          }
+        },
+        "type": "object",
+        "title": "PretradeRules",
+        "description": "The thresholds of principles 8, 9 and 10. Defaults are the strategy's stated values; each\ncan be changed for one check."
+      },
       "PriceBarOut": {
         "properties": {
           "date": {
@@ -56793,6 +57941,14 @@
             "maxItems": 20,
             "title": "Additions",
             "description": "Securities from the investable universe or a watchlist to add."
+          },
+          "deposit": {
+            "type": "number",
+            "maximum": 1000000000000.0,
+            "minimum": -1000000000000.0,
+            "title": "Deposit",
+            "description": "Cash added (positive) or taken out (negative), in the base currency. The weights are then shares of the total after it; a position not listed keeps its value.",
+            "default": 0
           }
         },
         "type": "object",
@@ -58197,6 +59353,237 @@
           "gross_within_time_test"
         ],
         "title": "RealizedOut"
+      },
+      "RebalancePlan": {
+        "properties": {
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "to_target",
+              "to_band"
+            ],
+            "title": "Mode"
+          },
+          "weight_basis": {
+            "type": "string",
+            "title": "Weight Basis"
+          },
+          "total_now": {
+            "type": "number",
+            "title": "Total Now"
+          },
+          "total_after_costs": {
+            "type": "number",
+            "title": "Total After Costs"
+          },
+          "cash_now": {
+            "type": "number",
+            "title": "Cash Now"
+          },
+          "cash_after": {
+            "type": "number",
+            "title": "Cash After"
+          },
+          "cash_floor": {
+            "type": "number",
+            "title": "Cash Floor"
+          },
+          "deposit": {
+            "type": "number",
+            "title": "Deposit"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/Trade"
+            },
+            "type": "array",
+            "title": "Trades"
+          },
+          "buys": {
+            "type": "number",
+            "title": "Buys"
+          },
+          "sells": {
+            "type": "number",
+            "title": "Sells"
+          },
+          "costs": {
+            "type": "number",
+            "title": "Costs"
+          },
+          "unfunded": {
+            "type": "number",
+            "title": "Unfunded",
+            "description": "Buy value the cash could not fund, base currency."
+          },
+          "unrelated_positions": {
+            "type": "integer",
+            "title": "Unrelated Positions",
+            "description": "Positions with no target: never traded."
+          },
+          "drift_before": {
+            "$ref": "#/components/schemas/DriftReport"
+          },
+          "drift_after": {
+            "$ref": "#/components/schemas/DriftReport"
+          },
+          "assumptions": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Assumptions"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method_version",
+          "mode",
+          "weight_basis",
+          "total_now",
+          "total_after_costs",
+          "cash_now",
+          "cash_after",
+          "cash_floor",
+          "deposit",
+          "trades",
+          "buys",
+          "sells",
+          "costs",
+          "unfunded",
+          "unrelated_positions",
+          "drift_before",
+          "drift_after",
+          "assumptions",
+          "warnings",
+          "method"
+        ],
+        "title": "RebalancePlan"
+      },
+      "RebalanceRequest": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "to_target",
+              "to_band"
+            ],
+            "title": "Mode",
+            "default": "to_target"
+          },
+          "deposit": {
+            "type": "number",
+            "maximum": 1000000000000.0,
+            "minimum": -1000000000000.0,
+            "title": "Deposit",
+            "description": "Cash added (positive) or taken out (negative).",
+            "default": 0
+          },
+          "fx_cost_bps": {
+            "type": "number",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Fx Cost Bps",
+            "description": "Assumed cost of converting currency, basis points.",
+            "default": 15
+          },
+          "trade_cost_bps": {
+            "type": "number",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Trade Cost Bps",
+            "description": "Assumed commission and spread per trade, basis points.",
+            "default": 0
+          },
+          "target_overrides": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Target Overrides",
+            "description": "Ticker -> target weight to use instead of the strategy's (what-if only)."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "title": "RebalanceRequest"
+      },
+      "RebalanceResponse": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/RebalancePlan"
+          },
+          "lot_impacts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SaleImpact"
+            },
+            "type": "object",
+            "title": "Lot Impacts"
+          },
+          "xray": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/XrayProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "plan",
+          "lot_impacts",
+          "xray",
+          "notes"
+        ],
+        "title": "RebalanceResponse"
       },
       "ReconcileRequest": {
         "properties": {
@@ -61394,6 +62781,98 @@
             "description": "Combined weight, of the invested value, a correlated pair must reach before `max_pair_correlation` applies.",
             "default": 0.1
           },
+          "max_var_95": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Var 95",
+            "description": "Ceiling on the portfolio's one-day historical 95 % value at risk, as a share of the portfolio (0.03 = 3 %), from the last year of daily returns. A descriptive estimate of the sample, not a forecast."
+          },
+          "max_tracking_error": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tracking Error",
+            "description": "Ceiling on the annualised tracking error against the configured benchmark (0.08 = 8 %), from the last year of daily returns."
+          },
+          "max_stress_loss": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Stress Loss",
+            "description": "Ceiling on the portfolio's loss when equities fall by `stress_equity_fall` (scenario engine: measured betas where valid, 1.0 otherwise)."
+          },
+          "stress_equity_fall": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Stress Equity Fall",
+            "description": "Size of the equity fall the stress loss is measured against.",
+            "default": 0.2
+          },
+          "credit_spread_alert_bp": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 3000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credit Spread Alert Bp",
+            "description": "Alert when the stored US high-yield credit spread (series us_hy_spread) is at or above this level, in basis points. A market signal, not a portfolio measure."
+          },
+          "max_valuation_terminal_growth": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Valuation Terminal Growth",
+            "description": "Flag a saved valuation scenario of a held stock whose terminal growth exceeds this rate (0.03 = 3 %): an unusual assumption to re-check."
+          },
+          "max_valuation_growth": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Valuation Growth",
+            "description": "Flag a saved valuation scenario of a held stock whose explicit-year free cash flow growth exceeds this rate in any year."
+          },
           "on_breach": {
             "type": "string",
             "enum": [
@@ -61410,6 +62889,156 @@
         "type": "object",
         "title": "RiskLimits",
         "description": "Portfolio risk limits, checked after each sync. Every limit is optional (null = off).\n\nA breach here is a prompt for review, not an instruction to trade: the strategy decides\nbuys and sells on fundamentals and news, so a price-based limit only forces a thesis review."
+      },
+      "RiskReport": {
+        "properties": {
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "window": {
+            "$ref": "#/components/schemas/RiskWindow"
+          },
+          "benchmark_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Symbol"
+          },
+          "benchmark_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Note"
+          },
+          "risk_free": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskFree"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stats": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AnalyticsResult"
+            },
+            "type": "object",
+            "title": "Stats"
+          },
+          "rolling_correlation": {
+            "items": {
+              "$ref": "#/components/schemas/RiskSeriesPoint"
+            },
+            "type": "array",
+            "title": "Rolling Correlation"
+          },
+          "rolling_window": {
+            "type": "integer",
+            "title": "Rolling Window"
+          },
+          "drawdown_path": {
+            "items": {
+              "$ref": "#/components/schemas/RiskSeriesPoint"
+            },
+            "type": "array",
+            "title": "Drawdown Path"
+          },
+          "correlation": {
+            "$ref": "#/components/schemas/CorrelationMatrix"
+          },
+          "diversification": {
+            "$ref": "#/components/schemas/AnalyticsResult"
+          },
+          "holdings_covered": {
+            "$ref": "#/components/schemas/ResultCoverage"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method_version",
+          "as_of",
+          "base_currency",
+          "window",
+          "benchmark_symbol",
+          "benchmark_note",
+          "risk_free",
+          "stats",
+          "rolling_correlation",
+          "rolling_window",
+          "drawdown_path",
+          "correlation",
+          "diversification",
+          "holdings_covered",
+          "warnings",
+          "method"
+        ],
+        "title": "RiskReport"
+      },
+      "RiskSeriesPoint": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "value"
+        ],
+        "title": "RiskSeriesPoint"
       },
       "RiskStat": {
         "properties": {
@@ -61442,6 +63071,56 @@
           "fund"
         ],
         "title": "RiskStat"
+      },
+      "RiskWindow": {
+        "properties": {
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "observations": {
+            "type": "integer",
+            "title": "Observations",
+            "description": "Aligned daily returns the statistics are built on."
+          },
+          "frequency": {
+            "type": "string",
+            "title": "Frequency",
+            "default": "daily"
+          },
+          "annualisation": {
+            "type": "integer",
+            "title": "Annualisation",
+            "default": 252
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "observations"
+        ],
+        "title": "RiskWindow"
       },
       "Role": {
         "properties": {
@@ -61680,6 +63359,117 @@
         ],
         "title": "RuleMatch"
       },
+      "SaleImpact": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "units": {
+            "type": "number",
+            "title": "Units"
+          },
+          "units_matched": {
+            "type": "number",
+            "title": "Units Matched"
+          },
+          "units_unmatched": {
+            "type": "number",
+            "title": "Units Unmatched"
+          },
+          "gross_proceeds": {
+            "type": "number",
+            "title": "Gross Proceeds",
+            "description": "Account currency, at the price given."
+          },
+          "cost": {
+            "type": "number",
+            "title": "Cost"
+          },
+          "gain": {
+            "type": "number",
+            "title": "Gain"
+          },
+          "gross_within_time_test": {
+            "type": "number",
+            "title": "Gross Within Time Test"
+          },
+          "lots": {
+            "items": {
+              "$ref": "#/components/schemas/LotUse"
+            },
+            "type": "array",
+            "title": "Lots"
+          },
+          "near_test_lots": {
+            "type": "integer",
+            "title": "Near Test Lots"
+          },
+          "earliest_pass": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest Pass",
+            "description": "When the first lot that has not passed yet will pass; null if none is waiting."
+          },
+          "method_note": {
+            "type": "string",
+            "title": "Method Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "units",
+          "units_matched",
+          "units_unmatched",
+          "gross_proceeds",
+          "cost",
+          "gain",
+          "gross_within_time_test",
+          "lots",
+          "near_test_lots",
+          "earliest_pass",
+          "method_note"
+        ],
+        "title": "SaleImpact"
+      },
+      "SaveRebalance": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "request": {
+            "$ref": "#/components/schemas/RebalanceRequest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SaveRebalance"
+      },
       "SaveScenarioIn": {
         "properties": {
           "name": {
@@ -61711,6 +63501,102 @@
         ],
         "title": "SaveScenarioIn"
       },
+      "SaveShock": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "shocks": {
+            "$ref": "#/components/schemas/ShockSet"
+          },
+          "assumptions": {
+            "$ref": "#/components/schemas/ShockAssumptions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "shocks"
+        ],
+        "title": "SaveShock"
+      },
+      "SaveTheme": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "theme": {
+            "$ref": "#/components/schemas/ThemeDefinition"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "theme"
+        ],
+        "title": "SaveTheme"
+      },
+      "SaveWhatIf": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "case": {
+            "$ref": "#/components/schemas/WhatIfCase"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "case"
+        ],
+        "title": "SaveWhatIf"
+      },
       "SavedAnalysisItem": {
         "properties": {
           "id": {
@@ -61721,7 +63607,11 @@
             "type": "string",
             "enum": [
               "xray_scenario",
-              "performance_report"
+              "performance_report",
+              "shock_scenario",
+              "whatif_case",
+              "rebalance_plan",
+              "theme_exposure"
             ],
             "title": "Kind"
           },
@@ -61889,6 +63779,25 @@
         ],
         "title": "SavedComparisonIn"
       },
+      "SavedOpen": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/SavedAnalysisItem"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload",
+            "description": "{request, result}: the inputs and the result exactly as they stood when saved."
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "payload"
+        ],
+        "title": "SavedOpen"
+      },
       "SavedScenario": {
         "properties": {
           "id": {
@@ -61966,6 +63875,88 @@
           "created_at"
         ],
         "title": "SavedScenario"
+      },
+      "ScenarioMacroContext": {
+        "properties": {
+          "series_id": {
+            "type": "string",
+            "title": "Series Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "year_ago": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year Ago"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "series_id",
+          "label",
+          "source",
+          "unit",
+          "period",
+          "value",
+          "year_ago",
+          "change",
+          "url"
+        ],
+        "title": "ScenarioMacroContext"
       },
       "ScenarioResult": {
         "properties": {
@@ -63960,6 +65951,367 @@
         ],
         "title": "SharpeStats"
       },
+      "ShockAssumptions": {
+        "properties": {
+          "equity_beta": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Equity Beta",
+            "description": "Held ticker -> equity beta the owner assumes."
+          },
+          "unmeasured_equity_beta": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 4.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unmeasured Equity Beta",
+            "description": "Beta used for a holding with no valid measurement; null leaves it unshocked.",
+            "default": 1.0
+          },
+          "duration_years": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Duration Years",
+            "description": "Held ticker -> effective duration the owner assumes."
+          },
+          "spread_duration_years": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Spread Duration Years",
+            "description": "Held ticker -> spread duration the owner assumes."
+          }
+        },
+        "type": "object",
+        "title": "ShockAssumptions",
+        "description": "Sensitivities the owner sets. A measured value is used unless the owner overrides it."
+      },
+      "ShockRequest": {
+        "properties": {
+          "shocks": {
+            "$ref": "#/components/schemas/ShockSet"
+          },
+          "assumptions": {
+            "$ref": "#/components/schemas/ShockAssumptions"
+          }
+        },
+        "type": "object",
+        "title": "ShockRequest"
+      },
+      "ShockRun": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          },
+          "benchmark_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Symbol"
+          },
+          "result": {
+            "$ref": "#/components/schemas/ShockScenarioResult"
+          },
+          "measured": {
+            "items": {
+              "$ref": "#/components/schemas/MeasuredLine"
+            },
+            "type": "array",
+            "title": "Measured"
+          },
+          "context": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioMacroContext"
+            },
+            "type": "array",
+            "title": "Context"
+          },
+          "foreign_currencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Foreign Currencies"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "benchmark_symbol",
+          "result",
+          "measured",
+          "context",
+          "foreign_currencies",
+          "notes"
+        ],
+        "title": "ShockRun"
+      },
+      "ShockScenarioResult": {
+        "properties": {
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "shocks": {
+            "$ref": "#/components/schemas/ShockSet"
+          },
+          "assumptions": {
+            "$ref": "#/components/schemas/ShockAssumptions"
+          },
+          "before_total": {
+            "type": "number",
+            "title": "Before Total",
+            "description": "Total portfolio value, base currency."
+          },
+          "after_total": {
+            "type": "number",
+            "title": "After Total"
+          },
+          "pnl": {
+            "type": "number",
+            "title": "Pnl",
+            "description": "after_total - before_total, base currency."
+          },
+          "pnl_pct": {
+            "type": "number",
+            "title": "Pnl Pct"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/ShockedPosition"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "by_factor": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "By Factor",
+            "description": "P&L share by factor; adds to pnl_pct."
+          },
+          "shocked_weight": {
+            "type": "number",
+            "title": "Shocked Weight"
+          },
+          "unshocked_weight": {
+            "type": "number",
+            "title": "Unshocked Weight"
+          },
+          "unshocked": {
+            "items": {
+              "$ref": "#/components/schemas/Unshocked"
+            },
+            "type": "array",
+            "title": "Unshocked"
+          },
+          "cash_weight": {
+            "type": "number",
+            "title": "Cash Weight"
+          },
+          "reconciles": {
+            "type": "boolean",
+            "title": "Reconciles",
+            "description": "after - before equals the sum of the P&L lines."
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method_version",
+          "shocks",
+          "assumptions",
+          "before_total",
+          "after_total",
+          "pnl",
+          "pnl_pct",
+          "positions",
+          "by_factor",
+          "shocked_weight",
+          "unshocked_weight",
+          "unshocked",
+          "cash_weight",
+          "reconciles",
+          "warnings",
+          "method"
+        ],
+        "title": "ShockScenarioResult"
+      },
+      "ShockSet": {
+        "properties": {
+          "equity_pct": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": -0.95
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equity Pct",
+            "description": "Equity market move, fraction (-0.2 = -20 %)."
+          },
+          "rate_bp": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000.0,
+                "minimum": -1000.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Bp",
+            "description": "Parallel change in rates, basis points."
+          },
+          "credit_bp": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 3000.0,
+                "minimum": -1000.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credit Bp",
+            "description": "Change in credit spreads, basis points."
+          },
+          "fx": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Fx",
+            "description": "Currency code -> move against the base currency, fraction (USD -0.1)."
+          },
+          "sector": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Sector",
+            "description": "Sector -> demand move on top of the market, fraction."
+          },
+          "country": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Country",
+            "description": "Country (ISO code) -> demand move on top of the market, fraction."
+          }
+        },
+        "type": "object",
+        "title": "ShockSet",
+        "description": "The factor moves of one scenario. Every field is optional; an empty set shocks nothing."
+      },
+      "ShockedPosition": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Held ticker, or the bucket name for non-position weight."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "shocked_weight": {
+            "type": "number",
+            "title": "Shocked Weight",
+            "description": "Weight of the leaves that were moved."
+          },
+          "pnl": {
+            "type": "number",
+            "title": "Pnl",
+            "description": "Change in value, as a share of total portfolio value."
+          },
+          "return_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Pct",
+            "description": "pnl / weight; null with no weight."
+          },
+          "effects": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Effects",
+            "description": "P&L by factor: equity, rates, credit, fx, sector, country (cross terms kept in `interaction`)."
+          },
+          "sensitivities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sensitivities",
+            "description": "Each sensitivity used, with its source."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "weight",
+          "shocked_weight",
+          "pnl",
+          "return_pct",
+          "effects",
+          "sensitivities"
+        ],
+        "title": "ShockedPosition"
+      },
       "Sibling": {
         "properties": {
           "isin": {
@@ -65488,6 +67840,88 @@
         ],
         "title": "StakeReconciliationOut"
       },
+      "StandardLine": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "shocks": {
+            "$ref": "#/components/schemas/ShockSet"
+          },
+          "pnl_pct": {
+            "type": "number",
+            "title": "Pnl Pct"
+          },
+          "pnl": {
+            "type": "number",
+            "title": "Pnl"
+          },
+          "unshocked_weight": {
+            "type": "number",
+            "title": "Unshocked Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "shocks",
+          "pnl_pct",
+          "pnl",
+          "unshocked_weight"
+        ],
+        "title": "StandardLine"
+      },
+      "StandardTable": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "total_value": {
+            "type": "number",
+            "title": "Total Value"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/StandardLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "assumptions": {
+            "$ref": "#/components/schemas/ShockAssumptions"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "base_currency",
+          "total_value",
+          "lines",
+          "assumptions",
+          "notes"
+        ],
+        "title": "StandardTable"
+      },
       "StatedAction": {
         "properties": {
           "kind": {
@@ -66907,6 +69341,326 @@
         ],
         "title": "TestAlertResult"
       },
+      "ThemeDefinition": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "selectors": {
+            "items": {
+              "$ref": "#/components/schemas/ThemeSelector"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Selectors"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "selectors"
+        ],
+        "title": "ThemeDefinition"
+      },
+      "ThemeExposure": {
+        "properties": {
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "theme": {
+            "$ref": "#/components/schemas/ThemeDefinition"
+          },
+          "exposed_weight": {
+            "type": "number",
+            "title": "Exposed Weight",
+            "description": "Known exposure, share of total portfolio value."
+          },
+          "direct_weight": {
+            "type": "number",
+            "title": "Direct Weight"
+          },
+          "fund_weight": {
+            "type": "number",
+            "title": "Fund Weight"
+          },
+          "unknown": {
+            "$ref": "#/components/schemas/ThemeUnknown"
+          },
+          "upper_bound": {
+            "type": "number",
+            "title": "Upper Bound",
+            "description": "Known plus unknown: the most the theme could reach."
+          },
+          "inferred_share": {
+            "type": "number",
+            "title": "Inferred Share",
+            "description": "Share of the known exposure resting on inferred labels."
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence"
+          },
+          "confidence_reason": {
+            "type": "string",
+            "title": "Confidence Reason"
+          },
+          "issuers": {
+            "items": {
+              "$ref": "#/components/schemas/ThemeIssuer"
+            },
+            "type": "array",
+            "title": "Issuers"
+          },
+          "by_selector": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "By Selector",
+            "description": "Exposed weight per selector on its own (these overlap and do not add up)."
+          },
+          "equity_weight": {
+            "type": "number",
+            "title": "Equity Weight"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method_version",
+          "theme",
+          "exposed_weight",
+          "direct_weight",
+          "fund_weight",
+          "unknown",
+          "upper_bound",
+          "inferred_share",
+          "confidence",
+          "confidence_reason",
+          "issuers",
+          "by_selector",
+          "equity_weight",
+          "warnings",
+          "method"
+        ],
+        "title": "ThemeExposure"
+      },
+      "ThemeIssuer": {
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "title": "Issuer"
+          },
+          "exposed": {
+            "type": "number",
+            "title": "Exposed"
+          },
+          "direct": {
+            "type": "number",
+            "title": "Direct"
+          },
+          "via_funds": {
+            "type": "number",
+            "title": "Via Funds"
+          },
+          "paths": {
+            "items": {
+              "$ref": "#/components/schemas/ThemePath"
+            },
+            "type": "array",
+            "title": "Paths"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issuer",
+          "exposed",
+          "direct",
+          "via_funds",
+          "paths"
+        ],
+        "title": "ThemeIssuer"
+      },
+      "ThemeOption": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "label",
+          "weight"
+        ],
+        "title": "ThemeOption"
+      },
+      "ThemeOptions": {
+        "properties": {
+          "options": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/ThemeOption"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Options"
+          }
+        },
+        "type": "object",
+        "required": [
+          "options"
+        ],
+        "title": "ThemeOptions"
+      },
+      "ThemePath": {
+        "properties": {
+          "channel": {
+            "type": "string",
+            "title": "Channel",
+            "description": "'Direct holdings' or the fund the exposure comes through."
+          },
+          "channel_kind": {
+            "type": "string",
+            "title": "Channel Kind"
+          },
+          "issuer": {
+            "type": "string",
+            "title": "Issuer"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Leaf weight, share of total portfolio value."
+          },
+          "exposed": {
+            "type": "number",
+            "title": "Exposed",
+            "description": "Weight counted as exposed (leaf weight x exposed share)."
+          },
+          "selectors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Selectors",
+            "description": "Every selector that matched, with its label basis."
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis",
+            "description": "Weakest label basis among the matching selectors."
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel",
+          "channel_kind",
+          "issuer",
+          "weight",
+          "exposed",
+          "selectors",
+          "basis"
+        ],
+        "title": "ThemePath"
+      },
+      "ThemeSelector": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sector",
+              "industry",
+              "country",
+              "domicile",
+              "listing",
+              "currency",
+              "revenue_country",
+              "commodity",
+              "trade_product",
+              "issuer"
+            ],
+            "title": "Kind"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Value",
+            "description": "Sector name, ISO code, issuer key…"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "value"
+        ],
+        "title": "ThemeSelector"
+      },
+      "ThemeUnknown": {
+        "properties": {
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "reasons": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Reasons",
+            "description": "Reason -> unknown weight."
+          }
+        },
+        "type": "object",
+        "required": [
+          "weight",
+          "reasons"
+        ],
+        "title": "ThemeUnknown"
+      },
       "ThesesConfig": {
         "properties": {
           "schema_version": {
@@ -67545,6 +70299,142 @@
         ],
         "title": "TrackedManager"
       },
+      "Trade": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell",
+              "hold"
+            ],
+            "title": "Action"
+          },
+          "value_now": {
+            "type": "number",
+            "title": "Value Now"
+          },
+          "weight_now": {
+            "type": "number",
+            "title": "Weight Now"
+          },
+          "target_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Weight"
+          },
+          "lower": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lower"
+          },
+          "upper": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upper"
+          },
+          "status_now": {
+            "type": "string",
+            "title": "Status Now"
+          },
+          "value_after": {
+            "type": "number",
+            "title": "Value After"
+          },
+          "weight_after": {
+            "type": "number",
+            "title": "Weight After"
+          },
+          "trade_value": {
+            "type": "number",
+            "title": "Trade Value",
+            "description": "Signed: positive buys, negative sells (base currency)."
+          },
+          "estimated_units": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Units",
+            "description": "Units at the last price (null without a stored quantity)."
+          },
+          "cost": {
+            "type": "number",
+            "title": "Cost"
+          },
+          "funded": {
+            "type": "number",
+            "title": "Funded",
+            "description": "Share of the wanted buy that the cash funds, 0 to 1."
+          },
+          "held": {
+            "type": "boolean",
+            "title": "Held"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "action",
+          "value_now",
+          "weight_now",
+          "target_weight",
+          "lower",
+          "upper",
+          "status_now",
+          "value_after",
+          "weight_after",
+          "trade_value",
+          "estimated_units",
+          "cost",
+          "funded",
+          "held",
+          "reason"
+        ],
+        "title": "Trade"
+      },
       "TradeContext": {
         "properties": {
           "reporter": {
@@ -67774,6 +70664,37 @@
           "rows"
         ],
         "title": "TradeExposure"
+      },
+      "TradeLeg": {
+        "properties": {
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side"
+          },
+          "ticker": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Ticker"
+          },
+          "value_base": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Value Base",
+            "description": "Size of the trade in the base currency."
+          }
+        },
+        "type": "object",
+        "required": [
+          "side",
+          "ticker",
+          "value_base"
+        ],
+        "title": "TradeLeg"
       },
       "TradeRow": {
         "properties": {
@@ -68482,6 +71403,29 @@
           "reason"
         ],
         "title": "UnmatchedOut"
+      },
+      "Unshocked": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "weight",
+          "reason"
+        ],
+        "title": "Unshocked"
       },
       "UpcomingEvent": {
         "properties": {
@@ -69784,6 +72728,236 @@
           "status"
         ],
         "title": "WebFactDecision"
+      },
+      "WhatIfCase": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "new_security",
+              "contribution",
+              "withdrawal",
+              "reinvest_dividends",
+              "fx_move",
+              "benchmark_change",
+              "thesis_exit"
+            ],
+            "title": "Kind"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight",
+            "description": "New security: share of total."
+          },
+          "fund_from": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "pro_rata"
+            ],
+            "title": "Fund From",
+            "default": "cash"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000000000000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount",
+            "description": "Base currency, for a deposit, withdrawal or dividends."
+          },
+          "split": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Split",
+            "description": "Ticker -> share of the amount (adds to at most 1); empty keeps a deposit in cash and spreads dividends over the current weights."
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "move": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": -0.9
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Move",
+            "description": "FX move against base."
+          },
+          "benchmark_symbol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Symbol"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "WhatIfCase"
+      },
+      "WhatIfResult": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "new_security",
+              "contribution",
+              "withdrawal",
+              "reinvest_dividends",
+              "fx_move",
+              "benchmark_change",
+              "thesis_exit"
+            ],
+            "title": "Kind"
+          },
+          "summary": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Summary"
+          },
+          "proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/XrayProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shock": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShockScenarioResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "risk_current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pretrade": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PretradeResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assumptions"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "summary",
+          "proposal",
+          "shock",
+          "risk",
+          "risk_current",
+          "pretrade",
+          "assumptions",
+          "notes"
+        ],
+        "title": "WhatIfResult"
       },
       "WikidataSummary": {
         "properties": {

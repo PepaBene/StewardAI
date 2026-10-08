@@ -120,7 +120,7 @@ describe("buildProposal", () => {
     const built = buildProposal([{ ...rows[0], text: "10" }, rows[1]], [{ ticker: "NESN", text: "20" }]);
     expect(built).toEqual({
       ok: true,
-      request: { weights: [{ ticker: "AAPL", weight: 0.1 }], additions: [{ ticker: "NESN", weight: 0.2 }] },
+      request: { weights: [{ ticker: "AAPL", weight: 0.1 }], additions: [{ ticker: "NESN", weight: 0.2 }], deposit: 0 },
       changed: 2,
       invested: expect.closeTo(0.9),
     });
@@ -151,14 +151,14 @@ describe("applyScenario", () => {
   ];
 
   it("puts saved weights over the current holdings and keeps the others as they are", () => {
-    const out = applyScenario(holdings, { weights: [{ ticker: "AAA", weight: 0.15 }], additions: [{ ticker: "NEW", weight: 0.05 }] });
+    const out = applyScenario(holdings, { weights: [{ ticker: "AAA", weight: 0.15 }], additions: [{ ticker: "NEW", weight: 0.05 }], deposit: 0 });
     expect(out.texts).toEqual({ AAA: "15.000", BBB: "20.000" });
     expect(out.added).toEqual([{ ticker: "NEW", text: "5" }]);
     expect(out.missing).toEqual([]);
   });
 
   it("names a saved holding that is no longer held instead of dropping it silently", () => {
-    const out = applyScenario(holdings, { weights: [{ ticker: "GONE", weight: 0.1 }], additions: [] });
+    const out = applyScenario(holdings, { weights: [{ ticker: "GONE", weight: 0.1 }], additions: [], deposit: 0 });
     expect(out.missing).toEqual(["GONE"]);
     expect(out.texts).toEqual({ AAA: "30.000", BBB: "20.000" });
   });
