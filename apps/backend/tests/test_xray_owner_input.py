@@ -144,6 +144,23 @@ def test_a_company_cannot_supply_itself():
         SupplyEdgeRequest(supplier="aapl", customer="AAPL", product="x", **SOURCE)
 
 
+@pytest.mark.parametrize(
+    "name",
+    ["All Other", "Unidentified Customer One", "Accounts Receivable Customer F", "Customer A",
+     "Other customers", "One customer"],
+)  # fmt: skip
+def test_filing_placeholders_are_not_drawn_as_companies(name: str):
+    assert supply_chain.is_placeholder(name)
+
+
+@pytest.mark.parametrize(
+    "name", ["Sony", "Taiwan Semiconductor Manufacturing Company Limited (TSMC)", "U.S. government",
+             "Amazon Web Services", "Pepsico Inc", "Costco"],
+)  # fmt: skip
+def test_real_counterparties_are_kept(name: str):
+    assert not supply_chain.is_placeholder(name)
+
+
 # ----------------------------------------------------------------------------- index weights
 
 

@@ -10,6 +10,7 @@ on each other. It never infers an edge, and a company with no edges does not app
 from __future__ import annotations
 
 import datetime as dt
+import re
 from collections import defaultdict
 from typing import Literal
 
@@ -19,6 +20,19 @@ from pydantic import BaseModel, Field
 from steward.graph.keys import normalize_object_key
 from steward.xray.leaves import LeafSet
 from steward.xray.owner_input import OwnerInput
+
+# Filings name some counterparties only as a group or a letter ("All Other", "Unidentified Customer
+# One", "Accounts Receivable Customer F"). They are not companies, so they are not drawn.
+PLACEHOLDER = re.compile(
+    r"^(all|any) other|^others?$|^other (customers?|suppliers?)|unidentified|undisclosed|"
+    r"accounts? receivable|^(customer|supplier|distributor|partner)s?\s+[a-z0-9]{1,3}$|"
+    r"^(a|one|two|three|four) (major |large )?(customer|supplier)",
+    re.IGNORECASE,
+)
+
+
+def is_placeholder(name: str) -> bool:
+    return bool(PLACEHOLDER.search(name.strip()))
 
 
 class SupplyNode(BaseModel):
@@ -130,6 +144,8 @@ async def filing_edges(pool: asyncpg.Pool, leafset: LeafSet) -> list[SupplyEdge]
     for r in rows:
         issuer = symbol_of(r["ticker"])
         other_name = str(r["counterparty_name"]).strip()
+        if is_placeholder(other_name):
+            continue
         other = held_by_name.get(normalize_object_key(other_name), other_name.upper())
         if other == issuer:
             continue
