@@ -12,13 +12,13 @@ import datetime as dt
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import AwareDatetime, BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
 from api.routes import TickerPath
-from steward.disclosure import deal_read
+from steward.disclosure import deal_parties, deal_read
 from steward.disclosure.deals import DealType
 from steward.disclosure.deals import State as DealState
 
@@ -250,3 +250,57 @@ async def portfolio_public_deals(
 ) -> PortfolioDealsOut:
     """Portfolio weight sitting in holdings with an active deal, by state and type."""
     return PortfolioDealsOut(**await deal_read.portfolio_view(pool, as_of))
+
+
+class PartySuggestionOut(BaseModel):
+    participant_id: int
+    deal_id: int
+    role: str
+    name: str
+    status: str
+    issuer_ids: list[int]
+    basis: str | None
+    note: str
+
+
+class PartyDecisionIn(BaseModel):
+    issuer_id: Annotated[int, Field(gt=0)]
+
+
+@router.get("/deals/parties/pending")
+async def pending_deal_parties(
+    pool: Pool, _owner: Owner, limit: Annotated[int, Query(ge=1, le=200)] = 50
+) -> list[PartySuggestionOut]:
+    """Deal parties with no issuer yet, each with the issuers their name could belong to."""
+    return [
+        PartySuggestionOut(
+            participant_id=s.participant_id,
+            deal_id=s.deal_id,
+            role=s.role,
+            name=s.name,
+            status=s.status,
+            issuer_ids=list(s.issuer_ids),
+            basis=s.basis,
+            note=s.note,
+        )
+        for s in await deal_parties.pending(pool, limit)
+    ]
+
+
+@router.post("/deals/parties/{participant_id}/confirm", status_code=204)
+async def confirm_deal_party(
+    participant_id: int, body: PartyDecisionIn, pool: Pool, owner: Owner
+) -> None:
+    """The owner says this party is this issuer."""
+    if not await deal_parties.confirm(
+        pool, participant_id, body.issuer_id, f"owner:{owner.user_id}"
+    ):
+        raise HTTPException(404, "no unmatched party with that id, or no such issuer")
+
+
+@router.post("/deals/parties/{participant_id}/reject", status_code=204)
+async def reject_deal_party(
+    participant_id: int, body: PartyDecisionIn, pool: Pool, owner: Owner
+) -> None:
+    """The owner says this party is not this issuer; it is not suggested again."""
+    await deal_parties.reject(pool, participant_id, body.issuer_id, f"owner:{owner.user_id}")

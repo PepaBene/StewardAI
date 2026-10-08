@@ -4683,6 +4683,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/disclosures/adjudication/{dataset}/prelabel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Adjudication Prelabel
+         * @description Have the configured chat model suggest a label for every item of the sample. Suggestions
+         *     never count toward the gate: only the labels you save do.
+         */
+        post: operations["adjudication_prelabel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/adjudication/{dataset}/accept-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Adjudication Accept
+         * @description Save as your own labels the suggestions that need no individual look. Items flagged for
+         *     review (disagreements, traps, unsure ones and a random share) stay for you to label.
+         */
+        post: operations["adjudication_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/disclosures/adjudication/{dataset}/label": {
         parameters: {
             query?: never;
@@ -4982,6 +5024,66 @@ export interface paths {
         get: operations["portfolio_public_deals"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/deals/parties/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pending Deal Parties
+         * @description Deal parties with no issuer yet, each with the issuers their name could belong to.
+         */
+        get: operations["pending_deal_parties"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/deals/parties/{participant_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Deal Party
+         * @description The owner says this party is this issuer.
+         */
+        post: operations["confirm_deal_party"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/disclosures/deals/parties/{participant_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Deal Party
+         * @description The owner says this party is not this issuer; it is not suggested again.
+         */
+        post: operations["reject_deal_party"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5476,6 +5578,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AcceptedOut */
+        AcceptedOut: {
+            /** Accepted */
+            accepted: number;
+        };
         /** AccountTotals */
         AccountTotals: {
             /** Account Currency */
@@ -5609,6 +5716,17 @@ export interface components {
             machine_value: string | null;
             /** Hints */
             hints: string[];
+            /** Suggested Value */
+            suggested_value?: string | null;
+            /** Suggestion Reason */
+            suggestion_reason?: string | null;
+            /**
+             * Must Review
+             * @default true
+             */
+            must_review: boolean;
+            /** Review Reasons */
+            review_reasons?: string[];
         };
         /** AdjudicationSampleOut */
         AdjudicationSampleOut: {
@@ -16783,6 +16901,30 @@ export interface components {
             /** Pairs */
             pairs: components["schemas"]["PairReviewItemOut"][];
         };
+        /** PartyDecisionIn */
+        PartyDecisionIn: {
+            /** Issuer Id */
+            issuer_id: number;
+        };
+        /** PartySuggestionOut */
+        PartySuggestionOut: {
+            /** Participant Id */
+            participant_id: number;
+            /** Deal Id */
+            deal_id: number;
+            /** Role */
+            role: string;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** Issuer Ids */
+            issuer_ids: number[];
+            /** Basis */
+            basis: string | null;
+            /** Note */
+            note: string;
+        };
         /** PatentFamilyInput */
         PatentFamilyInput: {
             /** Family Key */
@@ -17716,6 +17858,15 @@ export interface components {
             message: components["schemas"]["MessageOut"];
             /** Job Id */
             job_id: number;
+        };
+        /** PrelabelOut */
+        PrelabelOut: {
+            /** Model */
+            model: string | null;
+            /** Suggested */
+            suggested: number;
+            /** Left To Person */
+            left_to_person: number;
         };
         /**
          * PriceBarOut
@@ -30101,6 +30252,73 @@ export interface operations {
             };
         };
     };
+    adjudication_prelabel: {
+        parameters: {
+            query?: {
+                size?: number;
+                seed?: string;
+            };
+            header?: never;
+            path: {
+                dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrelabelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    adjudication_accept: {
+        parameters: {
+            query: {
+                sample_key: string;
+            };
+            header?: never;
+            path: {
+                dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     adjudication_label: {
         parameters: {
             query?: never;
@@ -30584,6 +30802,103 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PortfolioDealsOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pending_deal_parties: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartySuggestionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_deal_party: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartyDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_deal_party: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartyDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

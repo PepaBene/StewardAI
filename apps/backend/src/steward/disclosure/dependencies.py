@@ -226,7 +226,9 @@ _NEGATED = re.compile(
     re.I,
 )
 _HYPOTHETICAL = re.compile(
-    r"\b(if we (lose|were to lose)|could (lose|be adversely)|may (lose|be adversely)"
+    r"\b(if (we|the company|any of our \w+) (lose|were to lose|lost|fail|are unable|cannot)"
+    r"|if (a|our|any) (customer|supplier|distributor|partner)s? (terminate|reduce|delay|fail)"
+    r"|could (lose|be adversely)|may (lose|be adversely)"
     r"|would (adversely|materially)|in the event (that )?(a|our) (customer|supplier))\b",
     re.I,
 )

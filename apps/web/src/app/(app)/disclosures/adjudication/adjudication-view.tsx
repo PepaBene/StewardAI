@@ -73,6 +73,31 @@ export function AdjudicationPageView() {
     };
   }, [dataset, meta.size, loadGate]);
 
+  async function reloadSample() {
+    const r = await getBrowserApiClient().GET("/disclosures/adjudication/{dataset}/sample", { params: { path: { dataset }, query: { size: meta.size } } });
+    if (r.data) setSample(r.data);
+  }
+
+  async function prelabel() {
+    setNote({ ok: true, text: "Asking the model for suggestions…" });
+    const r = await callApi(
+      () => getBrowserApiClient().POST("/disclosures/adjudication/{dataset}/prelabel", { params: { path: { dataset }, query: { size: meta.size } } }),
+      "Suggestions saved.",
+    );
+    setNote({ ok: r.ok, text: r.ok ? "Suggestions saved. Items marked “Label this yourself” still need your own label." : r.text });
+    if (r.ok) await reloadSample();
+  }
+
+  async function acceptRest() {
+    if (!sample) return;
+    const r = await callApi(
+      () => getBrowserApiClient().POST("/disclosures/adjudication/{dataset}/accept-suggestions", { params: { path: { dataset }, query: { sample_key: sample.sample_key } } }),
+      "Saved.",
+    );
+    setNote({ ok: r.ok, text: r.ok ? "The remaining suggestions are saved as your labels." : r.text });
+    if (r.ok) await loadGate(dataset, sample.sample_key);
+  }
+
   async function label(itemRef: string, machine: string | null, value: string) {
     if (!sample || !value) return;
     setLabels((l) => ({ ...l, [itemRef]: value }));
@@ -133,6 +158,13 @@ export function AdjudicationPageView() {
                   <p className="max-w-[72ch] text-sm">{it.text}</p>
                   {it.hints.length ? <p className="text-xs text-text-muted">{it.hints.join(" · ")}</p> : null}
                   {reveal ? <p className="text-xs text-text-muted">Machine said: {(it.machine_value ?? "nothing").replaceAll("_", " ")}</p> : null}
+                  {it.suggested_value ? (
+                    <p className="text-xs text-text-muted">
+                      Model suggests {it.suggested_value.replaceAll("_", " ")}
+                      {it.suggestion_reason ? `: ${it.suggestion_reason}` : ""}
+                      {it.must_review ? ` · Label this yourself (${(it.review_reasons ?? []).join(", ")})` : ""}
+                    </p>
+                  ) : null}
                 </div>
                 <select
                   aria-label={`Your label for item ${it.item_ref}`}
@@ -150,8 +182,12 @@ export function AdjudicationPageView() {
           </ol>
         )}
         {sample && sample.items.length > 0 ? (
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="outline" onClick={() => void loadGate(dataset, sample.sample_key)}>Refresh the result</Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => void prelabel()}>Ask the model to suggest labels</Button>
+            {sample.items.some((i) => i.suggested_value && !i.must_review) ? (
+              <Button type="button" size="sm" onClick={() => void acceptRest()}>Save the unflagged suggestions as my labels</Button>
+            ) : null}
           </div>
         ) : null}
       </Panel>

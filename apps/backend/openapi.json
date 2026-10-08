@@ -14768,6 +14768,150 @@
         }
       }
     },
+    "/disclosures/adjudication/{dataset}/prelabel": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Adjudication Prelabel",
+        "description": "Have the configured chat model suggest a label for every item of the sample. Suggestions\nnever count toward the gate: only the labels you save do.",
+        "operationId": "adjudication_prelabel",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dataset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "relationship_claim",
+                "insider_class",
+                "ownership_match",
+                "statement_note",
+                "document_sample"
+              ],
+              "type": "string",
+              "title": "Dataset"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 10,
+              "default": 50,
+              "title": "Size"
+            }
+          },
+          {
+            "name": "seed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "default": "owner",
+              "title": "Seed"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrelabelOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/adjudication/{dataset}/accept-suggestions": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Adjudication Accept",
+        "description": "Save as your own labels the suggestions that need no individual look. Items flagged for\nreview (disagreements, traps, unsure ones and a random share) stay for you to label.",
+        "operationId": "adjudication_accept",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dataset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "relationship_claim",
+                "insider_class",
+                "ownership_match",
+                "statement_note",
+                "document_sample"
+              ],
+              "type": "string",
+              "title": "Dataset"
+            }
+          },
+          {
+            "name": "sample_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Sample Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/disclosures/adjudication/{dataset}/label": {
       "post": {
         "tags": [
@@ -15868,6 +16012,163 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/deals/parties/pending": {
+      "get": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Pending Deal Parties",
+        "description": "Deal parties with no issuer yet, each with the issuers their name could belong to.",
+        "operationId": "pending_deal_parties",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PartySuggestionOut"
+                  },
+                  "title": "Response Pending Deal Parties"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/deals/parties/{participant_id}/confirm": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Confirm Deal Party",
+        "description": "The owner says this party is this issuer.",
+        "operationId": "confirm_deal_party",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "participant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Participant Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartyDecisionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disclosures/deals/parties/{participant_id}/reject": {
+      "post": {
+        "tags": [
+          "disclosures"
+        ],
+        "summary": "Reject Deal Party",
+        "description": "The owner says this party is not this issuer; it is not suggested again.",
+        "operationId": "reject_deal_party",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "participant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Participant Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartyDecisionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -17463,6 +17764,19 @@
   },
   "components": {
     "schemas": {
+      "AcceptedOut": {
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "title": "Accepted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accepted"
+        ],
+        "title": "AcceptedOut"
+      },
       "AccountTotals": {
         "properties": {
           "account_currency": {
@@ -17786,6 +18100,40 @@
             },
             "type": "array",
             "title": "Hints"
+          },
+          "suggested_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Value"
+          },
+          "suggestion_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggestion Reason"
+          },
+          "must_review": {
+            "type": "boolean",
+            "title": "Must Review",
+            "default": true
+          },
+          "review_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Review Reasons"
           }
         },
         "type": "object",
@@ -49381,6 +49729,78 @@
         ],
         "title": "PairReviewsOut"
       },
+      "PartyDecisionIn": {
+        "properties": {
+          "issuer_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Issuer Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issuer_id"
+        ],
+        "title": "PartyDecisionIn"
+      },
+      "PartySuggestionOut": {
+        "properties": {
+          "participant_id": {
+            "type": "integer",
+            "title": "Participant Id"
+          },
+          "deal_id": {
+            "type": "integer",
+            "title": "Deal Id"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "issuer_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Issuer Ids"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "participant_id",
+          "deal_id",
+          "role",
+          "name",
+          "status",
+          "issuer_ids",
+          "basis",
+          "note"
+        ],
+        "title": "PartySuggestionOut"
+      },
       "PatentFamilyInput": {
         "properties": {
           "family_key": {
@@ -52189,6 +52609,36 @@
           "job_id"
         ],
         "title": "PostedMessage"
+      },
+      "PrelabelOut": {
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "suggested": {
+            "type": "integer",
+            "title": "Suggested"
+          },
+          "left_to_person": {
+            "type": "integer",
+            "title": "Left To Person"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "suggested",
+          "left_to_person"
+        ],
+        "title": "PrelabelOut"
       },
       "PriceBarOut": {
         "properties": {

@@ -67,6 +67,19 @@ _TERMS = (
     ("termination", re.compile(r"\bterminat(e|ion|ed)\b|\bnotice of non-?renewal\b", re.I)),
 )
 _FALSE_SUBJECT = {"The Company", "We", "Our", "The", "Revenue", "Revenues", "Sales", "Net Sales"}
+# A residual bucket or a region is not a counterparty: "All Other", "Non-U.S. customers".
+_RESIDUAL = re.compile(
+    r"^(?:all |the )?(?:other|others|remaining|rest|total|international|domestic|"
+    r"non[- ]?(?:u\.?s\.?|us|domestic)|outside (?:of )?(?:the )?(?:u\.?s\.?|united states)|"
+    r"united states|u\.?s\.?|europe|asia|china|americas|emea|apac)\b",
+    re.I,
+)
+# "no customer accounted for 10%": the percentage in such a sentence is a threshold or a prior year.
+_NEGATED_SENTENCE = re.compile(
+    r"\b(?:no|not any|none of our|did not have any)\s+(?:single\s+)?(?:customers?|distributors?|"
+    r"suppliers?)\b|\bno\s+(?:one\s+)?(?:customer|supplier)\b",
+    re.I,
+)
 
 
 @dataclass(frozen=True)
@@ -149,6 +162,14 @@ def _from_sentence(text: str, start: int, end: int, out: Extraction) -> None:
     if hints:
         out.skipped.append(Skipped(offset, stop, sentence, "screened: " + ", ".join(hints)))
         return
+    if _NEGATED_SENTENCE.search(sentence):
+        out.skipped.append(
+            Skipped(offset, stop, sentence, "states that no counterparty reached the threshold")
+        )
+        return
+    if len(set(re.findall(r"\b20\d\d\b", sentence))) > 1 and len(re.findall(_NUM, sentence)) > 1:
+        out.skipped.append(Skipped(offset, stop, sentence, "several periods in one sentence"))
+        return
     if group:
         count = _WORDS.get(group["n"].lower()) or int(group["n"])
         share = _fraction(group.group(3))
@@ -178,7 +199,12 @@ def _from_sentence(text: str, start: int, end: int, out: Extraction) -> None:
     assert subject is not None
     who = subject["who"].strip()
     share = _fraction(subject.group(2))
-    if share is None or who in _FALSE_SUBJECT or who.split()[0] in {"The", "We", "Our"}:
+    if (
+        share is None
+        or who in _FALSE_SUBJECT
+        or who.split()[0] in {"The", "We", "Our"}
+        or _RESIDUAL.match(who)
+    ):
         out.skipped.append(Skipped(offset, stop, sentence, "no usable counterparty or share"))
         return
     anonymous = bool(_ANONYMOUS.match(who))
@@ -217,7 +243,7 @@ def _from_table(text: str, out: Extraction) -> None:
         if not years or len(pct) != len(years) or not all(pct) or not cells[0]:
             continue
         who = cells[0]
-        if who.lower() in {"total", "other", "all other", "all other customers"}:
+        if _RESIDUAL.match(who):
             continue
         anonymous = bool(_ANONYMOUS.match(who))
         for year, m in zip(years, pct, strict=True):

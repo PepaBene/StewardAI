@@ -19,6 +19,7 @@ import httpx
 from steward import __version__
 from steward.disclosure import alerts
 from steward.disclosure.deal_job import collect_deals
+from steward.disclosure.esef_facts import read_pending_esef_versions
 from steward.disclosure.estimate_store import collect_consensus
 from steward.disclosure.fetch import DisclosureFetcher, FetchFailure
 from steward.disclosure.foreign_job import collect_esef, held_lei_issuers
@@ -332,8 +333,13 @@ async def disclosure_esef_handler(ctx: JobContext) -> None:
                 )
             except SourceNotEnabled as exc:
                 step.detail["skipped"] = str(exc)
-                return
-            step.detail.update(totals.as_detail())
+            else:
+                step.detail.update(totals.as_detail())
+        # Reading stored reports needs no fetch, so it runs even when the source is off.
+        async with ctx.step("facts") as step:
+            step.detail.update(
+                await read_pending_esef_versions(ctx.pool, evidence_store(settings, http))
+            )
 
 
 async def disclosure_estimates_handler(ctx: JobContext) -> None:

@@ -1,0 +1,42 @@
+{
+  "documentInfo": {
+    "documentType": "https://xbrl.org/2021/xbrl-json",
+    "features": {"xbrl:canonicalValues": true},
+    "namespaces": {
+      "acme": "http://www.example.com/20251231",
+      "ifrs-full": "http://xbrl.ifrs.org/taxonomy/2020-03-16/ifrs-full",
+      "iso4217": "http://www.xbrl.org/2003/iso4217",
+      "scheme": "http://standards.iso.org/iso/17442",
+      "xbrl": "https://xbrl.org/2021",
+      "xbrli": "http://www.xbrl.org/2003/instance"
+    },
+    "taxonomy": ["http://www.example.com/xbrl/2025/ACMELEI0000000000001-2025-12-31.xsd"]
+  },
+  "facts": {
+    "f100": {"value": "2025-12-31", "dimensions": {"concept": "ifrs-full:DateOfEndOfReportingPeriod2013", "entity": "scheme:ACMELEI0000000000001", "period": "2025-01-01T00:00:00/2026-01-01T00:00:00"}},
+    "f101": {"value": "Acme N.V.", "dimensions": {"concept": "ifrs-full:NameOfParentEntity", "language": "en", "entity": "scheme:ACMELEI0000000000001", "period": "2025-01-01T00:00:00/2026-01-01T00:00:00"}},
+    "f102": {"value": "1200000000", "decimals": -6, "dimensions": {"concept": "ifrs-full:Inventories", "entity": "scheme:ACMELEI0000000000001", "period": "2026-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f1": {"value": "37417000000", "decimals": -6, "dimensions": {"concept": "ifrs-full:Revenue", "entity": "scheme:ACMELEI0000000000001", "period": "2025-01-01T00:00:00/2026-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f2": {"value": "26617000000", "decimals": -6, "dimensions": {"concept": "ifrs-full:Revenue", "entity": "scheme:ACMELEI0000000000001", "period": "2024-01-01T00:00:00/2025-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f3": {"value": "20100000000", "decimals": -6, "dimensions": {"concept": "ifrs-full:Revenue", "entity": "scheme:ACMELEI0000000000001", "period": "2025-01-01T00:00:00/2026-01-01T00:00:00", "unit": "iso4217:EUR", "ifrs-full:SegmentsAxis": "acme:EuropeMember"}},
+    "f4": {"value": "1056000000", "decimals": -6, "dimensions": {"concept": "ifrs-full:ProfitLossFromOperatingActivities", "entity": "scheme:ACMELEI0000000000001", "period": "2025-01-01T00:00:00/2026-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f5": {"value": "105363000000", "decimals": -6, "dimensions": {"concept": "ifrs-full:Assets", "entity": "scheme:ACMELEI0000000000001", "period": "2026-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f6": {"value": "39287000000", "decimals": -6, "dimensions": {"concept": "ifrs-full:Equity", "entity": "scheme:ACMELEI0000000000001", "period": "2026-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f7": {"value": "35126000000", "decimals": -6, "dimensions": {"concept": "ifrs-full:Equity", "entity": "scheme:ACMELEI0000000000001", "period": "2026-01-01T00:00:00", "unit": "iso4217:EUR", "ifrs-full:ComponentsOfEquityAxis": "ifrs-full:RetainedEarningsMember"}},
+    "f8": {"value": "6329000000", "decimals": -6, "dimensions": {"concept": "ifrs-full:CashAndCashEquivalents", "entity": "scheme:ACMELEI0000000000001", "period": "2026-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f9": {"value": "6329000000", "decimals": -3, "dimensions": {"concept": "ifrs-full:CashAndCashEquivalents", "entity": "scheme:ACMELEI0000000000001", "period": "2026-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f10": {"value": "66076000000", "decimals": -6, "dimensions": {"concept": "ifrs-full:Liabilities", "entity": "scheme:ACMELEI0000000000001", "period": "2026-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f11": {"value": "66070000000", "decimals": -6, "dimensions": {"concept": "ifrs-full:Liabilities", "entity": "scheme:ACMELEI0000000000001", "period": "2026-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f12": {"value": "n/a", "decimals": -6, "dimensions": {"concept": "ifrs-full:NoncurrentBorrowings", "entity": "scheme:ACMELEI0000000000001", "period": "2026-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f13": {"value": "400000000", "dimensions": {"concept": "ifrs-full:NumberOfSharesOutstanding", "entity": "scheme:ACMELEI0000000000001", "period": "2026-01-01T00:00:00", "unit": "xbrli:shares"}},
+    "f14": {"value": null, "dimensions": {"concept": "ifrs-full:ProfitLoss", "entity": "scheme:ACMELEI0000000000001", "period": "2025-01-01T00:00:00/2026-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f15": {"value": "5963000000", "decimals": -6, "dimensions": {"concept": "ifrs-full:CashFlowsFromUsedInOperatingActivities", "entity": "scheme:ACMELEI0000000000001", "period": "2025-01-01T00:00:00/2026-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f16": {"value": "1000", "decimals": 0, "dimensions": {"concept": "ifrs-full:Assets", "entity": "scheme:ACMELEI0000000000001", "period": "2025-01-01T00:00:00/2026-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f17": {"value": "2.31", "decimals": 2, "dimensions": {"concept": "ifrs-full:Revenue", "entity": "scheme:ACMELEI0000000000001", "period": "2023-01-01T00:00:00/2024-01-01T00:00:00", "unit": "iso4217:EUR/xbrli:shares"}},
+    "f18": {"value": "12", "dimensions": {"concept": "ifrs-full:Revenue", "entity": "scheme:ACMELEI0000000000001", "period": "2022-01-01T00:00:00/2023-01-01T00:00:00"}},
+    "f19": {"value": "12", "dimensions": {"concept": "ifrs-full:Revenue", "entity": "scheme:ACMELEI0000000000001", "period": "yesterday", "unit": "iso4217:EUR"}},
+    "f20": {"value": "7", "decimals": "many", "dimensions": {"concept": "ifrs-full:Revenue", "entity": "scheme:ACMELEI0000000000001", "period": "2021-01-01T00:00:00/2022-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f21": {"value": "50", "decimals": "INF", "dimensions": {"concept": "ifrs-full:CurrentBorrowings", "entity": "scheme:OTHERLEI000000000002", "period": "2026-01-01T00:00:00", "unit": "iso4217:EUR"}},
+    "f22": {"dimensions": {"entity": "scheme:ACMELEI0000000000001"}}
+  }
+}

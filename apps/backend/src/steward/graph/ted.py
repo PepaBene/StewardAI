@@ -221,6 +221,22 @@ async def search_awards(
     return awards
 
 
+def winner_matches(winner: str, names: Sequence[str]) -> bool:
+    """A winner is the holding when its normalised name equals one of the holding's names. A
+    one-word name ("CISCO") is shared by unrelated firms, so it counts only when the winner
+    is written exactly as the full name given ("Cisco Systems, Inc." is not shortened)."""
+    key = normalize_object_key(winner)
+    for name in names:
+        if not name.strip() or normalize_object_key(name) != key:
+            continue
+        if (
+            len(key.removeprefix("name:").split()) >= 2
+            or winner.strip().lower() == name.strip().lower()
+        ):
+            return True
+    return False
+
+
 def _fiscal_period(published: dt.date | None) -> str | None:
     return f"FY{published.year}" if published else None
 
@@ -235,7 +251,6 @@ async def collect_ted_awards(
 ) -> int:
     """Store awards won by the holding (a winner name equal to one of its names, normalised)
     as suggested `procurement_award` disclosures. Returns the number stored."""
-    wanted = {normalize_object_key(n) for n in names if n.strip()}
     try:
         awards = await search_awards(http, names, since)
     except FreeSourceError as exc:
@@ -249,7 +264,7 @@ async def collect_ted_awards(
         raise
     stored = 0
     for award in awards:
-        matched = [w for w in award.winners if normalize_object_key(w) in wanted]
+        matched = [w for w in award.winners if winner_matches(w, names)]
         if not matched:
             continue  # the query is a fuzzy match: only an exact legal-name winner counts
         buyer = award.buyer or "unnamed contracting authority"

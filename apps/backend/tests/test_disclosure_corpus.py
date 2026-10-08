@@ -55,6 +55,24 @@ def test_sample_manifest_is_honest_about_what_was_captured() -> None:
         if s["status"] == "rejected_unavailable":
             assert s["reason"], s["slot"]
     assert manifest["samples_per_category"] == 10
+    # P0.3 batch 2: these categories carry every field the category promises, read from the original
+    for cat in (
+        "13f_amendment",
+        "13dg_group",
+        "8k_deal_exhibit",
+        "xbrl_note",
+        "esef_block_note",
+        "relationship_disclosure",
+    ):
+        group = manifest["slots"][cat]
+        assert len(group) == 10, cat
+        for s in group:
+            if s["status"] == "captured_model_checked":
+                assert s["source_url"] and len(s["sha256"]) == 64, s["slot"]
+                assert set(manifest["categories"][cat]["expected_fields"]) <= s["expected"].keys(), s["slot"]
+                assert s["captured_on"] == "2026-10-08", s["slot"]
+            else:
+                assert s["status"] == "rejected_unavailable", s["slot"]
     assert len(manifest["categories"]) == 11  # Form 4 purchase/sale and non-discretionary split
     for name, spec in manifest["categories"].items():
         assert spec["expected_fields"] and spec["channel"], name

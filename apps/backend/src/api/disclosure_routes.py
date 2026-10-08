@@ -18,8 +18,11 @@ from pydantic import AwareDatetime, BaseModel, Field
 from api.auth import Owner
 from api.db import IdPath, Pool
 from api.routes import Storage, TickerPath
+from steward.config.jobs import JobsConfig
+from steward.config.store import load_active
 from steward.disclosure import (
     adjudication,
+    adjudication_assist,
     alerts,
     asof,
     dependency_read,
@@ -30,7 +33,11 @@ from steward.disclosure import (
     review,
     statement_read,
 )
+from steward.disclosure.dependencies import AUDIT_LABELS
+from steward.disclosure.insiders import ECONOMIC_CLASSES
 from steward.disclosure.parse import ParseError, parse_html
+from steward.llm.client import create_llm
+from steward.settings import get_settings
 from steward.storage import StorageError
 
 router = APIRouter(prefix="/disclosures", tags=["disclosures"])
@@ -1249,6 +1256,20 @@ class AdjudicationItemOut(BaseModel):
     text: str
     machine_value: str | None
     hints: list[str]
+    suggested_value: str | None = None
+    suggestion_reason: str | None = None
+    must_review: bool = True
+    review_reasons: list[str] = Field(default_factory=list)
+
+
+class PrelabelOut(BaseModel):
+    model: str | None
+    suggested: int
+    left_to_person: int
+
+
+class AcceptedOut(BaseModel):
+    accepted: int
 
 
 class AdjudicationSampleOut(BaseModel):
@@ -1297,16 +1318,81 @@ async def adjudication_sample(
         items = await adjudication.ownership_sample(pool, size, seed)
     else:
         raise HTTPException(422, f"no sampler exists yet for {dataset}")
+    sample_key = f"{dataset}:{seed}:{size}"
+    given = await adjudication_assist.suggestions(pool, dataset, sample_key)
     return AdjudicationSampleOut(
         dataset=dataset,
-        sample_key=f"{dataset}:{seed}:{size}",
+        sample_key=sample_key,
         items=[
             AdjudicationItemOut(
-                item_ref=i.item_ref, text=i.text, machine_value=i.machine_value, hints=list(i.hints)
+                item_ref=i.item_ref,
+                text=i.text,
+                machine_value=i.machine_value,
+                hints=list(i.hints),
+                suggested_value=s["suggested_value"] if (s := given.get(i.item_ref)) else None,
+                suggestion_reason=s["rationale"] if s else None,
+                must_review=s["must_review"] if s else True,
+                review_reasons=list(s["review_reasons"]) if s else [],
             )
             for i in items
         ],
     )
+
+
+def _labels_for(dataset: str) -> tuple[str, ...]:
+    if dataset == "relationship_claim":
+        return tuple(AUDIT_LABELS)
+    if dataset == "insider_class":
+        return tuple(sorted(ECONOMIC_CLASSES))
+    if dataset == "ownership_match":
+        return adjudication.OWNERSHIP_LABELS
+    raise HTTPException(422, f"no model labeller exists for {dataset}")
+
+
+@router.post("/adjudication/{dataset}/prelabel")
+async def adjudication_prelabel(
+    dataset: Dataset,
+    pool: Pool,
+    _owner: Owner,
+    size: Annotated[int, Query(ge=10, le=200)] = 50,
+    seed: Annotated[str, Query(min_length=1, max_length=40)] = "owner",
+) -> PrelabelOut:
+    """Have the configured chat model suggest a label for every item of the sample. Suggestions
+    never count toward the gate: only the labels you save do."""
+    labels = _labels_for(dataset)
+    sample = await adjudication_sample(dataset, pool, _owner, size, seed)
+    stored = await load_active(pool, "jobs", JobsConfig)
+    model = (stored.body if stored else JobsConfig()).chat.model
+    llm = create_llm(get_settings(), None)
+    if not llm.configured(model):
+        raise HTTPException(
+            409, f"the chat model {model} has no API key, so nothing can be suggested"
+        )
+    items = [
+        adjudication.SampleItem(
+            i.item_ref, i.text, i.machine_value, tuple(i.hints), i.item_ref.startswith("planted:")
+        )
+        for i in sample.items
+    ]
+    done = await adjudication_assist.prelabel(
+        pool, llm, model, dataset, sample.sample_key, items, labels
+    )
+    return PrelabelOut(model=model, **done)
+
+
+@router.post("/adjudication/{dataset}/accept-suggestions")
+async def adjudication_accept(
+    dataset: Dataset,
+    pool: Pool,
+    owner: Owner,
+    sample_key: Annotated[str, Query(min_length=1)],
+) -> AcceptedOut:
+    """Save as your own labels the suggestions that need no individual look. Items flagged for
+    review (disagreements, traps, unsure ones and a random share) stay for you to label."""
+    n = await adjudication_assist.accept_unflagged(
+        pool, dataset, sample_key, f"owner:{owner.user_id}"
+    )
+    return AcceptedOut(accepted=n)
 
 
 @router.post("/adjudication/{dataset}/label", status_code=status.HTTP_201_CREATED)
