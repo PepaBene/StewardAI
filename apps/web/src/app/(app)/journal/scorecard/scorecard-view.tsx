@@ -70,10 +70,10 @@ function save(name: string, type: string, text: string) {
 
 /** Private files for you: the report with its manifest of sources, coverage and versions, and the ledger. */
 function Downloads() {
-  const [busy, setBusy] = useState<"report" | "csv" | null>(null);
+  const [busy, setBusy] = useState<"report" | "pdf" | "csv" | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
-  async function get(kind: "report" | "csv") {
+  async function get(kind: "report" | "pdf" | "csv") {
     setBusy(kind);
     setProblem(null);
     const client = getBrowserApiClient();
@@ -82,6 +82,14 @@ function Downloads() {
         const res = await client.GET("/journal/export/report", { params: { query: {} } });
         if (!res.response.ok || !res.data) throw new Error("report");
         save(`owner-report-${res.data.manifest.generated_at.slice(0, 10)}.json`, "application/json", JSON.stringify(res.data, null, 2));
+      } else if (kind === "pdf") {
+        const res = await client.GET("/journal/export/report.html", { params: { query: {} }, parseAs: "text" });
+        if (!res.response.ok || typeof res.data !== "string") throw new Error("pdf");
+        const url = URL.createObjectURL(new Blob([res.data], { type: "text/html" }));
+        const win = window.open(url, "_blank");
+        if (!win) throw new Error("blocked");
+        win.addEventListener("load", () => win.print());
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
       } else {
         const res = await client.GET("/journal/export/entries.csv", { parseAs: "text" });
         if (!res.response.ok || typeof res.data !== "string") throw new Error("csv");
@@ -103,6 +111,9 @@ function Downloads() {
       <div className="mt-3 flex flex-wrap gap-2">
         <Button type="button" variant="outline" disabled={busy !== null} onClick={() => get("report")}>
           {busy === "report" ? "Preparing…" : "Download the report (JSON)"}
+        </Button>
+        <Button type="button" variant="outline" disabled={busy !== null} onClick={() => get("pdf")}>
+          {busy === "pdf" ? "Preparing…" : "Print or save as PDF"}
         </Button>
         <Button type="button" variant="outline" disabled={busy !== null} onClick={() => get("csv")}>
           {busy === "csv" ? "Preparing…" : "Download the journal (CSV)"}

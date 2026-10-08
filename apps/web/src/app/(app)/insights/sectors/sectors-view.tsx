@@ -31,6 +31,7 @@ function Body({ map }: { map: SectorMap }) {
       </p>
       <Table title="Sectors" groups={map.sectors} />
       <Table title="Industries" groups={map.industries} />
+      <Detail groups={map.sectors} />
       {map.unclassified.length > 0 ? (
         <p className="max-w-prose text-sm">
           Held but not classified, so left out of every group: <span className="font-semibold">{map.unclassified.join(", ")}</span>.
@@ -38,6 +39,58 @@ function Body({ map }: { map: SectorMap }) {
       ) : null}
       <Notes notes={[...map.not_covered, map.method]} title="Not covered, and how this works" />
     </div>
+  );
+}
+
+/** What each sector sells, where its companies earn, and what they patent. */
+function Detail({ groups }: { groups: GroupStats[] }) {
+  return (
+    <Blueprint className="p-4">
+      <PanelHeading level={3} title="What sectors sell and where they earn" />
+      <div className="mt-3 grid gap-4 lg:grid-cols-2">
+        {groups.map((g) => (
+          <section key={g.name} aria-label={g.name} className="border border-border-soft p-3 text-sm">
+            <h4 className="font-heading font-semibold">{g.name}</h4>
+            <p className="mt-2 text-xs text-text-muted">Largest reported product lines</p>
+            {(g.top_products ?? []).length > 0 ? (
+              <ul className="mt-1">
+                {(g.top_products ?? []).map((p) => (
+                  <li key={`${p.ticker}-${p.label}`}>
+                    {p.ticker.split("_")[0]}, {p.label}: {pct(p.share)} of revenue
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1">No company in this sector reports revenue by product.</p>
+            )}
+            <p className="mt-2 text-xs text-text-muted">Where revenue is earned (average of reporting companies)</p>
+            {(g.geography ?? []).length > 0 ? (
+              <ul className="mt-1">
+                {(g.geography ?? []).map((x) => (
+                  <li key={x.geography}>
+                    {x.geography}: {pct(x.mean_share)} ({x.n} {x.n === 1 ? "company" : "companies"})
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1">No country split is stored.</p>
+            )}
+            <p className="mt-2 text-xs text-text-muted">Patent areas</p>
+            {(g.patent_areas ?? []).length > 0 ? (
+              <ul className="mt-1">
+                {(g.patent_areas ?? []).map((a) => (
+                  <li key={a.code}>
+                    {a.code}: {a.families} {a.families === 1 ? "family" : "families"}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1">No patent data is stored yet.</p>
+            )}
+          </section>
+        ))}
+      </div>
+    </Blueprint>
   );
 }
 

@@ -38,7 +38,7 @@ export function PretradeView() {
           One trade is a buy or a sell. A sell and a buy together are read as a switch, with its margin and its tax cost. Amounts are in your base currency.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-[2fr_1fr]">
-          <Field label="Trades" hint="One per line: buy VUAA 1500, sell CSPX 800">
+          <Field label="Trades" hint="One per line: buy VUAA 1500, sell CSPX 800. Add “bear 80” to a buy to test upside against your bear-case price">
             <textarea className={TEXTAREA} value={text} onChange={(e) => setText(e.target.value)} placeholder={"buy VUAA 1500\nsell CSPX 800"} />
           </Field>
           <Field label="Cash added alongside" hint="Blank for none; negative takes cash out">

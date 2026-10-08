@@ -140,12 +140,14 @@ export function parseLegs(text: string): { legs: TradeLeg[] } | { error: string 
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (line === "") continue;
-    const match = /^(buy|sell)\s+(\S+)\s+([\d.,]+)$/i.exec(line);
+    const match = /^(buy|sell)\s+(\S+)\s+([\d.,]+)(?:\s+bear\s+([\d.,]+))?$/i.exec(line);
     const value = match ? parseNumber(match[3]) : undefined;
-    if (!match || value === null || value === undefined || value <= 0) {
-      return { error: `“${line}” should read like “buy VUAA 1500”: buy or sell, the ticker, an amount in your base currency.` };
+    const bear = match?.[4] ? parseNumber(match[4]) : undefined;
+    if (!match || value === null || value === undefined || value <= 0 || (match[4] && (bear === null || bear === undefined || bear <= 0))) {
+      return { error: `“${line}” should read like “buy VUAA 1500” (buy or sell, the ticker, an amount in your base currency), and a buy may end with “bear 80” for your bear-case price.` };
     }
-    legs.push({ side: match[1].toLowerCase() as TradeLeg["side"], ticker: match[2].toUpperCase(), value_base: value });
+    const side = match[1].toLowerCase() as TradeLeg["side"];
+    legs.push({ side, ticker: match[2].toUpperCase(), value_base: value, ...(side === "buy" && bear ? { bear_case_price: bear } : {}) });
   }
   if (legs.length === 0) return { error: "Add at least one trade." };
   return { legs };

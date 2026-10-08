@@ -12375,6 +12375,55 @@
         }
       }
     },
+    "/companies/{ticker}/thesis-prefill": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Thesis Prefill",
+        "description": "The figure the thesis editor's \"growth the price implies\" field can be filled from, so\nit is not typed from memory. Nothing is saved: you decide whether to keep it.",
+        "operationId": "get_thesis_prefill",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThesisPrefill"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/companies/{ticker}/segments": {
       "get": {
         "tags": [
@@ -18450,6 +18499,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OwnerReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/journal/export/report.html": {
+      "get": {
+        "tags": [
+          "journal"
+        ],
+        "summary": "Export Report Html",
+        "description": "The same report as a print-ready page; use Print > Save as PDF.",
+        "operationId": "export_report_html",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Scorecard start; one year ago.",
+              "title": "Since"
+            },
+            "description": "Scorecard start; one year ago."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -52528,6 +52635,14 @@
             "title": "Coverage",
             "description": "Each part of the report and the denominator it covers."
           },
+          "figure_sources": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Figure Sources",
+            "description": "For each figure in the report, where its value comes from."
+          },
           "method_versions": {
             "additionalProperties": {
               "type": "string"
@@ -73973,6 +74088,45 @@
         ],
         "title": "ThesisKPI",
         "description": "An absolute threshold the owner sets. v1 has no consensus-estimate comparisons."
+      },
+      "ThesisPrefill": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "implied_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implied Growth",
+            "description": "Yearly growth the current price implies (a fraction), from the reverse DCF at the valuation tab's base scenario; null when it cannot be worked out."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why there is no figure, when there is none."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "implied_growth",
+          "reason"
+        ],
+        "title": "ThesisPrefill"
       },
       "ThesisPriceTarget": {
         "properties": {

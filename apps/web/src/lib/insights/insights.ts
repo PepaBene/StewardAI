@@ -14,6 +14,9 @@ export const AREA_LABEL: Record<ChangeItem["area"], string> = {
   fund_holdings: "Fund holdings",
   graph: "Company links",
   macro: "Macro series",
+  ownership: "Institutional holders",
+  insiders: "Insider trading",
+  patents: "Patents",
 };
 
 export const KIND_LABEL: Record<ChangeItem["kind"], string> = {

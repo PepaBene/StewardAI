@@ -5,7 +5,7 @@ import datetime as dt
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from api.auth import Owner
 from api.db import Pool
@@ -64,6 +64,17 @@ async def export_report(
     """The journal, scorecard and data-quality checks in one file with a manifest of sources,
     coverage and calculation versions. Private: returned to you and stored nowhere."""
     return await owner_export.build_report(pool, owner.user_id, since)
+
+
+@router.get("/journal/export/report.html", response_class=HTMLResponse)
+async def export_report_html(
+    pool: Pool,
+    owner: Owner,
+    since: Annotated[dt.date | None, Query(description="Scorecard start; one year ago.")] = None,
+) -> HTMLResponse:
+    """The same report as a print-ready page; use Print > Save as PDF."""
+    report = await owner_export.build_report(pool, owner.user_id, since)
+    return HTMLResponse(owner_export.report_html(report))
 
 
 @router.get("/journal/export/entries.csv", response_class=PlainTextResponse)

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import csv
 import datetime as dt
+import html
 import io
 
 import asyncpg
@@ -32,8 +33,20 @@ class Manifest(BaseModel):
     coverage: dict[str, str] = Field(
         description="Each part of the report and the denominator it covers."
     )
+    figure_sources: dict[str, str] = Field(
+        default_factory=dict,
+        description="For each figure in the report, where its value comes from.",
+    )
     method_versions: dict[str, str]
     notes: list[str]
+
+
+FIGURE_SOURCES = {
+    "journal.entries": "Decision journal table: rows you wrote; nothing is added.",
+    "scorecard.hit_rate": "Journal entries compared with the stored price series since each decision date.",
+    "scorecard.returns": "Stored daily closes from your holding profiles; price change, no dividends.",
+    "cockpit.checks": "Provider access records, identity decisions, fund holdings snapshots, claims awaiting review.",
+}  # fmt: skip
 
 
 class OwnerReport(BaseModel):
@@ -64,6 +77,7 @@ async def build_report(
             "scorecard": f"{card.entries} decisions from {card.since} to {card.until}",
             "cockpit": f"{len(cockpit.checks)} checks ran; {len(cockpit.not_covered)} not covered",
         },
+        figure_sources=dict(FIGURE_SOURCES),
         method_versions=dict(METHOD_VERSIONS),
         notes=[
             "Returns are price changes without dividends, in the instrument's currency.",
@@ -72,6 +86,40 @@ async def build_report(
         ],
     )
     return OwnerReport(manifest=manifest, journal=rows, scorecard=card, cockpit=cockpit)
+
+
+def report_html(report: OwnerReport) -> str:
+    """A print-ready page: open it and use the browser's Print > Save as PDF. Every value is
+    escaped; there is no script and nothing is fetched."""
+    e = html.escape
+    m = report.manifest
+    rows = "".join(
+        f"<tr><td>{e(str(x.decided_on))}</td><td>{e(x.ticker or x.scope)}</td>"
+        f"<td>{e(x.decision)}</td><td>{e(x.main_reason or '')}</td></tr>"
+        for x in report.journal
+    )
+    checks = "".join(
+        f"<li>{e(c.model_dump_json())}</li>" for c in report.cockpit.checks
+    )
+    sources = "".join(f"<li>{e(s)}</li>" for s in m.sources)
+    figures = "".join(f"<li><b>{e(k)}</b>: {e(v)}</li>" for k, v in m.figure_sources.items())
+    coverage = "".join(f"<li><b>{e(k)}</b>: {e(v)}</li>" for k, v in m.coverage.items())
+    notes = "".join(f"<li>{e(n)}</li>" for n in m.notes)
+    card = e(report.scorecard.model_dump_json(indent=1))
+    return (
+        '<!doctype html><html lang="en"><meta charset="utf-8"><title>Owner report</title>'
+        "<style>body{font:14px/1.5 system-ui;max-width:48rem;margin:2rem auto;padding:0 1rem}"
+        "table{border-collapse:collapse;width:100%}td,th{border-top:1px solid #999;"
+        "padding:.25rem .4rem;text-align:left;vertical-align:top}pre{white-space:pre-wrap}"
+        "@media print{body{margin:0}}</style>"
+        f"<h1>Owner report</h1><p>Generated {e(m.generated_at.isoformat())}. {e(m.visibility)}.</p>"
+        f"<h2>Decision journal</h2><table><tr><th>Date</th><th>Subject</th><th>Decision</th>"
+        f"<th>Reason</th></tr>{rows}</table>"
+        f"<h2>Scorecard</h2><pre>{card}</pre>"
+        f"<h2>Data-quality checks</h2><ul>{checks}</ul>"
+        f"<h2>Sources</h2><ul>{sources}</ul><h2>Where each figure comes from</h2><ul>{figures}</ul>"
+        f"<h2>Coverage</h2><ul>{coverage}</ul><h2>Notes</h2><ul>{notes}</ul></html>"
+    )
 
 
 def journal_csv(rows: list[JournalEntry]) -> str:

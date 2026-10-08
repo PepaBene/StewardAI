@@ -14,6 +14,7 @@ import { GRAPH, layoutGraph, type SupplyChainData } from "@/lib/xray/owner-input
 
 import { Notes, TD, TH, TH_LEFT } from "../shared";
 import { EdgeForm } from "./edge-form";
+import { EventFeed } from "./event-feed";
 import { EventPaths } from "./event-paths";
 
 export function SupplyChainView() {
@@ -31,6 +32,7 @@ export function SupplyChainView() {
       <ResourceGate state={state} label="supply chain">
         {(data) => <Graph data={data} onChanged={() => setVersion((v) => v + 1)} />}
       </ResourceGate>
+      <EventFeed />
       <EventPaths />
       <EdgeForm onSaved={() => setVersion((v) => v + 1)} />
     </div>

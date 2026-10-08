@@ -3827,6 +3827,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/companies/{ticker}/thesis-prefill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Thesis Prefill
+         * @description The figure the thesis editor's "growth the price implies" field can be filled from, so
+         *     it is not typed from memory. Nothing is saved: you decide whether to keep it.
+         */
+        get: operations["get_thesis_prefill"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/companies/{ticker}/segments": {
         parameters: {
             query?: never;
@@ -5823,6 +5844,26 @@ export interface paths {
          *     coverage and calculation versions. Private: returned to you and stored nowhere.
          */
         get: operations["export_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journal/export/report.html": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Report Html
+         * @description The same report as a print-ready page; use Print > Save as PDF.
+         */
+        get: operations["export_report_html"];
         put?: never;
         post?: never;
         delete?: never;
@@ -17743,6 +17784,13 @@ export interface components {
             coverage: {
                 [key: string]: string;
             };
+            /**
+             * Figure Sources
+             * @description For each figure in the report, where its value comes from.
+             */
+            figure_sources?: {
+                [key: string]: string;
+            };
             /** Method Versions */
             method_versions: {
                 [key: string]: string;
@@ -25468,6 +25516,21 @@ export interface components {
              * @default
              */
             description: string;
+        };
+        /** ThesisPrefill */
+        ThesisPrefill: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Implied Growth
+             * @description Yearly growth the current price implies (a fraction), from the reverse DCF at the valuation tab's base scenario; null when it cannot be worked out.
+             */
+            implied_growth: number | null;
+            /**
+             * Reason
+             * @description Why there is no figure, when there is none.
+             */
+            reason: string | null;
         };
         /**
          * ThesisPriceTarget
@@ -34087,6 +34150,37 @@ export interface operations {
             };
         };
     };
+    get_thesis_prefill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThesisPrefill"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_segments: {
         parameters: {
             query?: {
@@ -37590,6 +37684,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OwnerReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_report_html: {
+        parameters: {
+            query?: {
+                /** @description Scorecard start; one year ago. */
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
                 };
             };
             /** @description Validation Error */

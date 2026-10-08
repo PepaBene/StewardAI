@@ -248,6 +248,24 @@ function ThesisCard({
   const setRigor = (change: Partial<RigorForm>) =>
     onChange((f) => ({ ...f, rigor: { ...f.rigor, ...change } }));
   const gaps = rigorGaps(form.rigor);
+  const [prefillBusy, setPrefillBusy] = useState(false);
+  const [prefillNote, setPrefillNote] = useState<string | null>(null);
+
+  /** Fills "growth the price implies" from the valuation tab's reverse DCF. Nothing is saved until you save the thesis. */
+  async function fillImplied() {
+    setPrefillBusy(true);
+    setPrefillNote(null);
+    const res = await api().GET("/companies/{ticker}/thesis-prefill", {
+      params: { path: { ticker: form.ticker.split("_")[0] } },
+    });
+    setPrefillBusy(false);
+    if (!res.response.ok || !res.data) return setPrefillNote("The valuation could not be read for this ticker.");
+    if (res.data.implied_growth === null || res.data.implied_growth === undefined) {
+      return setPrefillNote(res.data.reason ?? "The valuation gives no figure.");
+    }
+    setRigor({ implied_growth: (res.data.implied_growth * 100).toFixed(1) });
+    setPrefillNote("Filled from the base-case reverse DCF. Check it before you save.");
+  }
 
   return (
     <section
@@ -386,6 +404,17 @@ function ThesisCard({
             hint="% a year, from the reverse DCF"
             onChange={(v) => setRigor({ implied_growth: v })}
           />
+          <div className="col-span-2 flex flex-col justify-end gap-1 pb-1 sm:col-span-1">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!form.ticker || prefillBusy}
+              onClick={() => void fillImplied()}
+            >
+              {prefillBusy ? "Reading…" : "Fill from valuation"}
+            </Button>
+            {prefillNote ? <p className="text-xs text-text-muted">{prefillNote}</p> : null}
+          </div>
           <TextField
             label="Companies that achieved it"
             path={`${path}.base_rate.share_achieved`}

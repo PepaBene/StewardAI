@@ -177,6 +177,36 @@ async def get_ratios(
     return await _ratios_view(pool, company, owner.user_id, peers, group_id)
 
 
+class ThesisPrefill(BaseModel):
+    ticker: str
+    implied_growth: float | None = Field(
+        description="Yearly growth the current price implies (a fraction), from the reverse DCF "
+        "at the valuation tab's base scenario; null when it cannot be worked out."
+    )
+    reason: str | None = Field(description="Why there is no figure, when there is none.")
+
+
+@router.get("/{ticker}/thesis-prefill", response_model=ThesisPrefill)
+async def get_thesis_prefill(ticker: TickerPath, pool: Pool, owner: Owner) -> ThesisPrefill:
+    """The figure the thesis editor's "growth the price implies" field can be filled from, so
+    it is not typed from memory. Nothing is saved: you decide whether to keep it."""
+    company = await _company(pool, ticker)
+    val = valuation.build_valuation(
+        company.ticker,
+        company.annual,
+        company.quarterly,
+        company.market,
+        None,
+        valuation.ValuationRequest(selected="base"),
+    )
+    implied = valuation.implied_growth_value(val)
+    return ThesisPrefill(
+        ticker=company.ticker,
+        implied_growth=None if implied.value is None else float(implied.value),
+        reason=implied.reason,
+    )
+
+
 async def _ratios_view(
     pool: Pool, company: service.Company, owner_id: object, peers: Scope, group_id: int | None
 ) -> ratios.RatiosView:
