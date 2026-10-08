@@ -170,9 +170,10 @@ function Matrix({ report }: { report: RiskReport }) {
       </p>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full border-collapse text-sm">
+            <caption className="sr-only">Correlation between each pair of holdings</caption>
           <thead>
             <tr>
-              <th className="px-2 py-1" />
+              <th scope="col" className="px-2 py-1"><span className="sr-only">Holding</span></th>
               {m.tickers.map((t) => (
                 <th key={t} scope="col" className={`px-2 py-1 text-right font-medium ${t === focus ? "text-accent-ink" : ""}`}>
                   {t}

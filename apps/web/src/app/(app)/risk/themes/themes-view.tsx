@@ -217,13 +217,14 @@ function Result({ result, saveBar }: { result: ThemeExposure; saveBar: React.Rea
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm">
+            <caption className="sr-only">Companies in the theme and how the exposure arises</caption>
           <thead className="text-xs text-text-muted">
             <tr className="border-b border-border">
-              <th className={TH_LEFT}>Company</th>
-              <th className={TH}>In the theme</th>
-              <th className={TH}>Directly</th>
-              <th className={TH}>Via funds</th>
-              <th className={TH_LEFT}>Through</th>
+              <th scope="col" className={TH_LEFT}>Company</th>
+              <th scope="col" className={TH}>In the theme</th>
+              <th scope="col" className={TH}>Directly</th>
+              <th scope="col" className={TH}>Via funds</th>
+              <th scope="col" className={TH_LEFT}>Through</th>
             </tr>
           </thead>
           <tbody>

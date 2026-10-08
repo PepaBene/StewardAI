@@ -5846,6 +5846,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/release/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Readiness
+         * @description Each marketed feature as ready, partial, unavailable or untested, with the free-access
+         *     state of its inputs, its source audit and whether it may be switched on.
+         */
+        get: operations["get_readiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/release/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Audit
+         * @description The sampled source-to-screen checks, with progress against the plan's sample.
+         */
+        get: operations["get_audit"];
+        put?: never;
+        /**
+         * Add Audit
+         * @description Record one displayed fact checked against its source. Append-only: to correct a result,
+         *     record the fact again and the newest row stands.
+         */
+        post: operations["add_audit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/release/pilot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Pilot */
+        get: operations["get_pilot"];
+        put?: never;
+        /**
+         * Start Pilot
+         * @description Start a new pilot window today. An earlier window is kept but no longer reported.
+         */
+        post: operations["start_pilot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/release/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log Usage
+         * @description Note that a page was opened. Only the path is stored, and only while a pilot window is
+         *     open; with none running this does nothing.
+         */
+        post: operations["log_usage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/pdmr-notifications": {
         parameters: {
             query?: never;
@@ -6813,6 +6901,23 @@ export interface components {
              */
             created_at: string;
         };
+        /** AlertRate */
+        AlertRate: {
+            /** Sent */
+            sent: number;
+            /**
+             * Rated
+             * @description Sent alerts the owner marked.
+             */
+            rated: number;
+            /** Wrong Or Irrelevant */
+            wrong_or_irrelevant: number;
+            /**
+             * False Rate
+             * @description Wrong or irrelevant over rated alerts; None when none were rated.
+             */
+            false_rate: number | null;
+        };
         /** AliasOut */
         AliasOut: {
             /** Alias */
@@ -7052,6 +7157,123 @@ export interface components {
             benchmark?: components["schemas"]["BenchmarkRelativeOut"] | null;
             freshness?: components["schemas"]["FreshnessOut"] | null;
             explain: components["schemas"]["PerformanceExplain"];
+        };
+        /** AuditIn */
+        AuditIn: {
+            /**
+             * Subject Kind
+             * @enum {string}
+             */
+            subject_kind: "security" | "etf" | "corporate_action" | "cash_flow_window";
+            /**
+             * Subject
+             * @description Ticker, ISIN or window name.
+             */
+            subject: string;
+            /** Region */
+            region?: string | null;
+            /**
+             * Feature
+             * @description Release-gate feature id.
+             */
+            feature: string;
+            /**
+             * Field
+             * @description The fact that was compared.
+             */
+            field: string;
+            /**
+             * Displayed
+             * @description What the screen showed.
+             */
+            displayed: string;
+            /** Source Value */
+            source_value?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "match" | "mismatch" | "not_checkable";
+            /** Note */
+            note?: string | null;
+            /**
+             * Audited On
+             * @description Defaults to today.
+             */
+            audited_on?: string | null;
+        };
+        /** AuditOverview */
+        AuditOverview: {
+            summary: components["schemas"]["AuditSummary"];
+            /** Rows */
+            rows: components["schemas"]["AuditRow"][];
+        };
+        /** AuditRow */
+        AuditRow: {
+            /** Id */
+            id: number;
+            /**
+             * Subject Kind
+             * @enum {string}
+             */
+            subject_kind: "security" | "etf" | "corporate_action" | "cash_flow_window";
+            /** Subject */
+            subject: string;
+            /** Region */
+            region: string | null;
+            /** Feature */
+            feature: string;
+            /** Field */
+            field: string;
+            /** Displayed */
+            displayed: string;
+            /** Source Value */
+            source_value: string | null;
+            /** Source Url */
+            source_url: string | null;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "match" | "mismatch" | "not_checkable";
+            /** Note */
+            note: string | null;
+            /**
+             * Audited On
+             * Format: date
+             */
+            audited_on: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** AuditSummary */
+        AuditSummary: {
+            /** Facts Checked */
+            facts_checked: number;
+            /** Facts Matching */
+            facts_matching: number;
+            /** Facts Mismatched */
+            facts_mismatched: number;
+            /** Facts Not Checkable */
+            facts_not_checkable: number;
+            /** Targets */
+            targets: components["schemas"]["TargetProgress"][];
+            /** Regions */
+            regions: string[];
+            /** Regions Needed */
+            regions_needed: number;
+            /**
+             * Complete
+             * @description Every target and the region spread are met.
+             */
+            complete: boolean;
+            /** Open Mismatches */
+            open_mismatches: components["schemas"]["AuditRow"][];
         };
         /** BacktestName */
         BacktestName: {
@@ -9511,6 +9733,13 @@ export interface components {
             raw?: {
                 [key: string]: unknown;
             };
+        };
+        /** Correction */
+        Correction: {
+            /** Target Kind */
+            target_kind: string;
+            /** Count */
+            count: number;
         };
         /** Correlation */
         Correlation: {
@@ -12150,6 +12379,38 @@ export interface components {
             check: string;
             /** Detail */
             detail: string;
+        };
+        /** FeatureReadiness */
+        FeatureReadiness: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Plan */
+            plan: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "partial" | "unavailable" | "untested";
+            /** Reason */
+            reason: string;
+            /** Limit */
+            limit: string | null;
+            /** Inputs */
+            inputs: components["schemas"]["InputState"][];
+            /**
+             * Audit
+             * @enum {string}
+             */
+            audit: "none" | "passed" | "mismatch";
+            /**
+             * Audited Facts
+             * @description Facts compared with a source that matched.
+             */
+            audited_facts: number;
+            /** Can Activate */
+            can_activate: boolean;
         };
         /** FeeDrag */
         FeeDrag: {
@@ -14915,6 +15176,22 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** InputState */
+        InputState: {
+            /** Label */
+            label: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "endpoint" | "store";
+            /** Required */
+            required: boolean;
+            /** Ok */
+            ok: boolean;
+            /** Detail */
+            detail: string;
+        };
         /** Insider */
         Insider: {
             coverage: components["schemas"]["SectionCoverage"];
@@ -15556,6 +15833,13 @@ export interface components {
             attempts: number;
             /** Steps */
             steps: components["schemas"]["JobStepOut"][];
+        };
+        /** JobFailures */
+        JobFailures: {
+            /** Runs */
+            runs: number;
+            /** Failed */
+            failed: number;
         };
         /** JobList */
         JobList: {
@@ -18384,6 +18668,18 @@ export interface components {
             /** Families */
             families: number;
         };
+        /** PathUse */
+        PathUse: {
+            /** Path */
+            path: string;
+            /** Opens */
+            opens: number;
+            /**
+             * Days
+             * @description Distinct days the page was opened.
+             */
+            days: number;
+        };
         /**
          * PdlRefreshResponse
          * @description `skipped` is present only when the refresh was skipped (use exclude_unset).
@@ -18886,6 +19182,66 @@ export interface components {
             difference_annualised: number | string | null;
             /** Note */
             note?: string | null;
+        };
+        /** PilotReport */
+        PilotReport: {
+            window: components["schemas"]["PilotWindow"];
+            /** Use */
+            use: components["schemas"]["PathUse"][];
+            /** Days Used */
+            days_used: number;
+            alerts: components["schemas"]["AlertRate"];
+            /** Providers */
+            providers: components["schemas"]["ProviderFailure"][];
+            jobs: components["schemas"]["JobFailures"];
+            /** Corrections */
+            corrections: components["schemas"]["Correction"][];
+            /**
+             * Affected Weight
+             * @description Today's share of the portfolio touched by an issue.
+             */
+            affected_weight: number;
+            /** Top Issues */
+            top_issues: components["schemas"]["QualityIssue"][];
+            /** Not Measured */
+            not_measured: string[];
+        };
+        /** PilotStart */
+        PilotStart: {
+            /**
+             * Length Days
+             * @default 30
+             */
+            length_days: number;
+        };
+        /** PilotState */
+        PilotState: {
+            window: components["schemas"]["PilotWindow"] | null;
+            report: components["schemas"]["PilotReport"] | null;
+        };
+        /** PilotWindow */
+        PilotWindow: {
+            /** Id */
+            id: number;
+            /**
+             * Started On
+             * Format: date
+             */
+            started_on: string;
+            /** Length Days */
+            length_days: number;
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /**
+             * Day
+             * @description Day of the pilot today, 1-based; past the length when over.
+             */
+            day: number;
+            /** Over */
+            over: boolean;
         };
         /** PinInput */
         PinInput: {
@@ -19862,6 +20218,15 @@ export interface components {
              */
             weight: number;
         };
+        /** ProviderFailure */
+        ProviderFailure: {
+            /** Provider */
+            provider: string;
+            /** Attempts */
+            attempts: number;
+            /** Failures */
+            failures: number;
+        };
         /**
          * ProviderJobSettings
          * @description Limits for a free provider. There is no on/off switch: a provider is used as soon as it is
@@ -20252,6 +20617,24 @@ export interface components {
             input_hash: string;
             /** Sources */
             sources: components["schemas"]["SourceRef"][];
+        };
+        /** Readiness */
+        Readiness: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Features */
+            features: components["schemas"]["FeatureReadiness"][];
+            /** Zero Cost Passed */
+            zero_cost_passed: boolean;
+            /** Zero Cost Violations */
+            zero_cost_violations: number;
+            /** Ready */
+            ready: number;
+            /** Activatable */
+            activatable: number;
         };
         /** ReadinessResponse */
         ReadinessResponse: {
@@ -23947,6 +24330,28 @@ export interface components {
              */
             band: number;
         };
+        /** TargetProgress */
+        TargetProgress: {
+            /**
+             * Subject Kind
+             * @enum {string}
+             */
+            subject_kind: "security" | "etf" | "corporate_action" | "cash_flow_window";
+            /** Target */
+            target: number;
+            /**
+             * Audited
+             * @description Subjects with at least one fact compared.
+             */
+            audited: number;
+            /**
+             * Clean
+             * @description Subjects whose newest result is a match for every fact.
+             */
+            clean: number;
+            /** With Mismatch */
+            with_mismatch: number;
+        };
         /** TestAlertRequest */
         TestAlertRequest: {
             /**
@@ -24850,6 +25255,11 @@ export interface components {
             detail: string;
             /** Source */
             source?: string | null;
+        };
+        /** UsageIn */
+        UsageIn: {
+            /** Path */
+            path: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -36436,6 +36846,174 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Cockpit"];
+                };
+            };
+        };
+    };
+    get_readiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Readiness"];
+                };
+            };
+        };
+    };
+    get_audit: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditOverview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_audit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pilot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotState"];
+                };
+            };
+        };
+    };
+    start_pilot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PilotStart"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotWindow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    log_usage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UsageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

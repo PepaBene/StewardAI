@@ -489,6 +489,61 @@ Built so far: the decision journal and scorecard (`steward/journal/`, routes `/j
 
 **Exit checks:** every marketed feature has a defined coverage denominator, reproducible method and successful sampled source audit; no paid data or provider overage is required to use the baseline product.
 
+### Phase 8 (this branch)
+
+Built: the release gate (`steward/release/readiness.py`, route `/release/readiness`), the source-audit ledger (`steward/release/audit.py`, `/release/audit`), the pilot window and report (`steward/release/pilot.py`, `/release/pilot`, `/release/usage`), pages `/release`, `/release/audit` and `/release/pilot`, a golden-coverage map (`docs/analytics/golden_coverage.md`, checked by `tests/test_golden_map.py`) and a static accessibility ratchet (`apps/web/src/lib/a11y/`). Migration `20261020100000` adds `source_audit`, `pilot_run` and `usage_event` (insert and select only; a corrected audit result is a new row).
+
+**Most of this phase is human work that code cannot do: the audit comparisons, the 30 days of use, and the decision to switch features on. What is built is the place to record them and the rule that holds a feature back until they are done.**
+
+| Item | Status | Gap |
+| --- | --- | --- |
+| `M8.1` | Partial | The map ties each family the plan names (accounting identities, return reconciliation, X-Ray bucket totals, valuation sensitivity, FX inversion, peer-universe membership, point-in-time screens) to existing hand-worked tests and fails if one is renamed or removed. **No new calculations were added; the cases that already existed are only indexed.** Fund and portfolio golden cases for Phases 4–7 (rebalance, stress, scorecard) are in their own test files and are not yet in the map. |
+| `M8.2` | Ledger built, audit not done | You record a displayed fact, the source value and link, and the result; the page counts clean subjects against 20 securities (3 regions), 5 funds, 3 corporate-action histories and 2 cash-flow windows, lists differing facts and lets you re-check. **No comparison has been made.** Nothing checks that the link really supports the value you typed, and "multiple cash-flow windows" is set at two. |
+| `M8.3` | Partial | A pilot window (30 days) counts pages opened, days used, alerts sent and the share rated wrong or irrelevant, provider and job failures, facts marked wrong, and today's flagged share of the portfolio with the largest issues. **Time to answer a research question is not measured; coverage and stale weight are today's figures, not an average over the pilot; "priority by portfolio value" covers only issues that have a holding.** The page-use beacon sends the path only. |
+| `M8.4` | Partial | The release pages and the Phase 6–7 tables now have captions and column scopes. A source scan (`lib/a11y`) fails when a file gains an unnamed table, an unscoped header or an unnamed svg; **61 existing findings in other pages are recorded as a baseline, not fixed.** Not checked at all: contrast, keyboard order, screen-reader output, responsive layout of dense tables and charts. That needs a browser pass with a real assistive tool. |
+| `M8.5` | Built, with limits | Twelve features, each with core inputs (stored data and free-tier endpoints), shown as ready, partial, not tested or unavailable, with three checkpoints (free access, source audit, zero cost). A feature can be switched on only when all three pass; the zero-cost audit comes from `audit_zero_cost`. **Nothing is switched off by the gate: it reports, and the app does not hide a feature that fails.** The input list is hand-written, and "ready" means the table has at least one row, not that the data is fresh or complete. Source audits are not required per region or per input. |
+
+**Phase 8 exit checks (for what is built):** the audit ledger has no edit or delete route; a "match" needs a source value and a link; one differing fact blocks both its feature and the sample; a feature with a paid-only or missing core input is "unavailable" and cannot be activated; a failing zero-cost audit blocks every feature; with nothing rated there is no false-alert rate, not zero.
+
+**Phase 8 open gaps (beyond the table)**
+
+*Release gate*
+- One matched fact is enough for a feature's audit to read "passed"; the gate does not require a minimum number of facts, regions or inputs per feature, and the 20 / 5 / 3 / 2 sample is judged across the whole app, not per feature. A feature can therefore be activatable on a single comparison.
+- A feature with no listed input (the journal) is "ready" automatically. "Ready" for stored data means at least one row exists in the table, not that it is recent, complete or for the owner's holdings.
+- The feature list, its inputs and the store-to-table map (`FEATURES`, `STORES`) are hand-written; a new marketed feature is not gated until someone adds it. The web page keeps a second copy of the feature ids (`FEATURE_CHOICES`) with no test that the two match.
+- Only endpoints in `provider_access` are checked. Keyless regulator sources (EDGAR, N-PORT, ESEF, issuer files) have no access record, so features that depend only on them are judged by stored rows alone.
+- The "unavailable / untested / partial" decision reads the detail text of an input; a new access state would need the rules updated.
+- The zero-cost audit needs the endpoint manifest; if it is empty the audit passes trivially.
+- The gate shows the answer on `/release` only. Nav, feature pages and the chat do not yet show a "partial" or "unavailable" label from it.
+- Counting rows runs one query per store each time the page loads.
+
+*Audit ledger*
+- Region, subject and field are free text, so "EU" and "Europe" count as two regions and the same fact can be typed two ways and then count as two. Corporate-action histories and cash-flow windows are not linked to the records they describe.
+- Results are entered by hand for one owner; nothing prompts which securities to sample, and the sample is not drawn at random or stratified (for example by market cap or listing venue).
+- A re-check replaces a result only when subject, feature and field are identical.
+- The ledger cannot attach the source document; it stores a link, which may change or break.
+
+*Pilot*
+- The window starts today in UTC dates; a new pilot hides the earlier one's report (the rows stay). Only one report is shown at a time and it cannot be exported.
+- Page use is counted by the browser beacon on every navigation, including refreshes, release pages and background route changes; a failed call is dropped silently, so counts are a lower bound.
+- False alerts count only alerts you rated; unrated alerts say nothing about accuracy. Missed alerts (a real event with no alert) cannot be measured.
+- "Coverage" is the cockpit's flagged share today, not a coverage percentage per feature, and no pilot figure is turned into a target or a pass mark.
+- No defects list is kept: issues from the cockpit are shown, but a defect you find yourself has nowhere to be logged and ranked by value affected.
+
+*Tests and tooling*
+- The new tests cover the pure functions only (audit summary and validation, gate rules, false-alert rate, form building, the accessibility scan, the golden map). The SQL, routes, readiness counts and pilot report have no test against a database.
+- `tests/test_lifecycle_phase8.py` would exercise the new rollback file only when `STEWARD_TEST_DATABASE_URL` is set; it was not run.
+- The accessibility scan reads source text, so a table built from a spread of props or a component that renders a table is not seen; it does not look at `td`-only tables or ARIA grids.
+- `scripts/check-colors.test.ts` has a 5-second limit and timed out once when the backend suite ran at the same time; it passes alone.
+- The golden map does not yet include the Phase 4–7 cases, and it only checks that a test exists, not that the test is still meaningful.
+
+*Not done from the plan text*
+- `M8.2` source-to-screen comparison itself (20 securities, 5 ETFs, 3 corporate-action histories, several cash-flow windows) and the `M8.3` 30-day use; the exit check "successful sampled source audit for every marketed feature" is therefore not met.
+- `M8.4` responsive and keyboard QA of dense comparison tables, charts and evidence drill-downs, and checking that confidence and stale states keep their text labels in every page.
+- `M8.5` the decision to switch features on is the owner's; the app does not store that decision or enforce it.
+
+**Verification not done:** migration `20261020100000` has never run against a database; the new routes, queries and pages were not exercised against real data or rendered in a browser; there is no database-backed test for the readiness counts, the audit insert or the pilot report.
+
 ## Suggested delivery slices
 
 The phases are sequential on shared foundations, but each should ship a useful slice before the next starts:

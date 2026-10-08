@@ -134,15 +134,16 @@ function Plan({ data, saveBar }: { data: RebalanceResponse; saveBar: React.React
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm">
+            <caption className="sr-only">Proposed trades and the weights they give</caption>
           <thead className="text-xs text-text-muted">
             <tr className="border-b border-border">
-              <th className={TH_LEFT}>Holding</th>
-              <th className={TH_LEFT}>Action</th>
-              <th className={TH}>Amount</th>
-              <th className={TH}>Weight now</th>
-              <th className={TH}>Target</th>
-              <th className={TH}>Weight after</th>
-              <th className={TH}>Units</th>
+              <th scope="col" className={TH_LEFT}>Holding</th>
+              <th scope="col" className={TH_LEFT}>Action</th>
+              <th scope="col" className={TH}>Amount</th>
+              <th scope="col" className={TH}>Weight now</th>
+              <th scope="col" className={TH}>Target</th>
+              <th scope="col" className={TH}>Weight after</th>
+              <th scope="col" className={TH}>Units</th>
             </tr>
           </thead>
           <tbody>
@@ -182,13 +183,14 @@ function Plan({ data, saveBar }: { data: RebalanceResponse; saveBar: React.React
           <h3 className="mb-1 text-sm font-medium">What the sales would do to your tax position</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
+            <caption className="sr-only">Sales and the gain each would realise</caption>
               <thead className="text-xs text-text-muted">
                 <tr className="border-b border-border">
-                  <th className={TH_LEFT}>Sale</th>
-                  <th className={TH}>Proceeds</th>
-                  <th className={TH}>Gain</th>
-                  <th className={TH}>Sold inside the holding test</th>
-                  <th className={TH_LEFT}>Note</th>
+                  <th scope="col" className={TH_LEFT}>Sale</th>
+                  <th scope="col" className={TH}>Proceeds</th>
+                  <th scope="col" className={TH}>Gain</th>
+                  <th scope="col" className={TH}>Sold inside the holding test</th>
+                  <th scope="col" className={TH_LEFT}>Note</th>
                 </tr>
               </thead>
               <tbody>

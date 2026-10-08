@@ -79,13 +79,14 @@ function Workbench({ standard }: { standard: Standard }) {
         <PanelHeading level={3} kicker="Standard scenarios" title="What these would cost today" />
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-sm">
+            <caption className="sr-only">Result of each shock on the portfolio</caption>
             <thead className="text-xs text-text-muted">
               <tr className="border-b border-border">
-                <th className={TH_LEFT}>Scenario</th>
-                <th className={TH}>Change</th>
-                <th className={TH}>{currency}</th>
-                <th className={TH}>Not moved</th>
-                <th />
+                <th scope="col" className={TH_LEFT}>Scenario</th>
+                <th scope="col" className={TH}>Change</th>
+                <th scope="col" className={TH}>{currency}</th>
+                <th scope="col" className={TH}>Not moved</th>
+                <th scope="col"><span className="sr-only">Detail</span></th>
               </tr>
             </thead>
             <tbody>
@@ -301,12 +302,13 @@ function Sensitivities({ run }: { run: ShockRun }) {
       {run.measured.length > 0 ? (
         <div className="mt-2 overflow-x-auto">
           <table className="w-full">
+            <caption className="sr-only">Sensitivity used for each holding and where it came from</caption>
             <thead className="text-xs text-text-muted">
               <tr className="border-b border-border">
-                <th className={TH_LEFT}>Holding</th>
-                <th className={TH_LEFT}>Measure</th>
-                <th className={TH}>Value</th>
-                <th className={TH_LEFT}>Source</th>
+                <th scope="col" className={TH_LEFT}>Holding</th>
+                <th scope="col" className={TH_LEFT}>Measure</th>
+                <th scope="col" className={TH}>Value</th>
+                <th scope="col" className={TH_LEFT}>Source</th>
               </tr>
             </thead>
             <tbody>

@@ -44,6 +44,7 @@ from api.pdmr_routes import router as pdmr_router
 from api.performance_routes import router as performance_router
 from api.prompts_routes import router as prompts_router
 from api.reference_routes import router as reference_router
+from api.release_routes import router as release_router
 from api.research_context_routes import router as research_context_router
 from api.research_routes import router as research_router
 from api.routes import router
@@ -272,6 +273,7 @@ def create_app() -> FastAPI:
     app.include_router(xray_router)
     app.include_router(decision_router)
     app.include_router(journal_router)
+    app.include_router(release_router)
     app.include_router(pdmr_router)
     app.include_router(graph_router)
     app.include_router(data_context_router)

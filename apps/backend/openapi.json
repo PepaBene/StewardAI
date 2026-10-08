@@ -18438,6 +18438,240 @@
         ]
       }
     },
+    "/release/readiness": {
+      "get": {
+        "tags": [
+          "release"
+        ],
+        "summary": "Get Readiness",
+        "description": "Each marketed feature as ready, partial, unavailable or untested, with the free-access\nstate of its inputs, its source audit and whether it may be switched on.",
+        "operationId": "get_readiness",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Readiness"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/release/audit": {
+      "get": {
+        "tags": [
+          "release"
+        ],
+        "summary": "Get Audit",
+        "description": "The sampled source-to-screen checks, with progress against the plan's sample.",
+        "operationId": "get_audit",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2000,
+              "minimum": 1,
+              "default": 300,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditOverview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "release"
+        ],
+        "summary": "Add Audit",
+        "description": "Record one displayed fact checked against its source. Append-only: to correct a result,\nrecord the fact again and the newest row stands.",
+        "operationId": "add_audit",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditRow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/release/pilot": {
+      "get": {
+        "tags": [
+          "release"
+        ],
+        "summary": "Get Pilot",
+        "operationId": "get_pilot",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PilotState"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "release"
+        ],
+        "summary": "Start Pilot",
+        "description": "Start a new pilot window today. An earlier window is kept but no longer reported.",
+        "operationId": "start_pilot",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PilotStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PilotWindow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/release/usage": {
+      "post": {
+        "tags": [
+          "release"
+        ],
+        "summary": "Log Usage",
+        "description": "Note that a page was opened. Only the path is stored, and only while a pilot window is\nopen; with none running this does nothing.",
+        "operationId": "log_usage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/holdings/{ticker}/pdmr-notifications": {
       "get": {
         "tags": [
@@ -21240,6 +21474,43 @@
         ],
         "title": "AlertOut"
       },
+      "AlertRate": {
+        "properties": {
+          "sent": {
+            "type": "integer",
+            "title": "Sent"
+          },
+          "rated": {
+            "type": "integer",
+            "title": "Rated",
+            "description": "Sent alerts the owner marked."
+          },
+          "wrong_or_irrelevant": {
+            "type": "integer",
+            "title": "Wrong Or Irrelevant"
+          },
+          "false_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "False Rate",
+            "description": "Wrong or irrelevant over rated alerts; None when none were rated."
+          }
+        },
+        "type": "object",
+        "required": [
+          "sent",
+          "rated",
+          "wrong_or_irrelevant",
+          "false_rate"
+        ],
+        "title": "AlertRate"
+      },
       "AliasOut": {
         "properties": {
           "alias": {
@@ -22191,6 +22462,324 @@
           "explain"
         ],
         "title": "AttributionResponse"
+      },
+      "AuditIn": {
+        "properties": {
+          "subject_kind": {
+            "type": "string",
+            "enum": [
+              "security",
+              "etf",
+              "corporate_action",
+              "cash_flow_window"
+            ],
+            "title": "Subject Kind"
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Subject",
+            "description": "Ticker, ISIN or window name."
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          },
+          "feature": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Feature",
+            "description": "Release-gate feature id."
+          },
+          "field": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Field",
+            "description": "The fact that was compared."
+          },
+          "displayed": {
+            "type": "string",
+            "maxLength": 400,
+            "title": "Displayed",
+            "description": "What the screen showed."
+          },
+          "source_value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 400
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Value"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "match",
+              "mismatch",
+              "not_checkable"
+            ],
+            "title": "Result"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "audited_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audited On",
+            "description": "Defaults to today."
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject_kind",
+          "subject",
+          "feature",
+          "field",
+          "displayed",
+          "result"
+        ],
+        "title": "AuditIn"
+      },
+      "AuditOverview": {
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/AuditSummary"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/AuditRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary",
+          "rows"
+        ],
+        "title": "AuditOverview"
+      },
+      "AuditRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "subject_kind": {
+            "type": "string",
+            "enum": [
+              "security",
+              "etf",
+              "corporate_action",
+              "cash_flow_window"
+            ],
+            "title": "Subject Kind"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          },
+          "feature": {
+            "type": "string",
+            "title": "Feature"
+          },
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "displayed": {
+            "type": "string",
+            "title": "Displayed"
+          },
+          "source_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Value"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "match",
+              "mismatch",
+              "not_checkable"
+            ],
+            "title": "Result"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "audited_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Audited On"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "subject_kind",
+          "subject",
+          "region",
+          "feature",
+          "field",
+          "displayed",
+          "source_value",
+          "source_url",
+          "result",
+          "note",
+          "audited_on",
+          "created_at"
+        ],
+        "title": "AuditRow"
+      },
+      "AuditSummary": {
+        "properties": {
+          "facts_checked": {
+            "type": "integer",
+            "title": "Facts Checked"
+          },
+          "facts_matching": {
+            "type": "integer",
+            "title": "Facts Matching"
+          },
+          "facts_mismatched": {
+            "type": "integer",
+            "title": "Facts Mismatched"
+          },
+          "facts_not_checkable": {
+            "type": "integer",
+            "title": "Facts Not Checkable"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/TargetProgress"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "regions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Regions"
+          },
+          "regions_needed": {
+            "type": "integer",
+            "title": "Regions Needed"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete",
+            "description": "Every target and the region spread are met."
+          },
+          "open_mismatches": {
+            "items": {
+              "$ref": "#/components/schemas/AuditRow"
+            },
+            "type": "array",
+            "title": "Open Mismatches"
+          }
+        },
+        "type": "object",
+        "required": [
+          "facts_checked",
+          "facts_matching",
+          "facts_mismatched",
+          "facts_not_checkable",
+          "targets",
+          "regions",
+          "regions_needed",
+          "complete",
+          "open_mismatches"
+        ],
+        "title": "AuditSummary"
       },
       "BacktestName": {
         "properties": {
@@ -29474,6 +30063,24 @@
         ],
         "title": "CorporateActionInput"
       },
+      "Correction": {
+        "properties": {
+          "target_kind": {
+            "type": "string",
+            "title": "Target Kind"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_kind",
+          "count"
+        ],
+        "title": "Correction"
+      },
       "Correlation": {
         "properties": {
           "ticker": {
@@ -36353,6 +36960,86 @@
           "detail"
         ],
         "title": "FailedCheck"
+      },
+      "FeatureReadiness": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "plan": {
+            "type": "string",
+            "title": "Plan"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "partial",
+              "unavailable",
+              "untested"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "inputs": {
+            "items": {
+              "$ref": "#/components/schemas/InputState"
+            },
+            "type": "array",
+            "title": "Inputs"
+          },
+          "audit": {
+            "type": "string",
+            "enum": [
+              "none",
+              "passed",
+              "mismatch"
+            ],
+            "title": "Audit"
+          },
+          "audited_facts": {
+            "type": "integer",
+            "title": "Audited Facts",
+            "description": "Facts compared with a source that matched."
+          },
+          "can_activate": {
+            "type": "boolean",
+            "title": "Can Activate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "plan",
+          "status",
+          "reason",
+          "limit",
+          "inputs",
+          "audit",
+          "audited_facts",
+          "can_activate"
+        ],
+        "title": "FeatureReadiness"
       },
       "FeeDrag": {
         "properties": {
@@ -44444,6 +45131,43 @@
         ],
         "title": "Indicator"
       },
+      "InputState": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "endpoint",
+              "store"
+            ],
+            "title": "Kind"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "kind",
+          "required",
+          "ok",
+          "detail"
+        ],
+        "title": "InputState"
+      },
       "Insider": {
         "properties": {
           "coverage": {
@@ -46464,6 +47188,24 @@
           "steps"
         ],
         "title": "JobDetail"
+      },
+      "JobFailures": {
+        "properties": {
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "runs",
+          "failed"
+        ],
+        "title": "JobFailures"
       },
       "JobList": {
         "properties": {
@@ -54351,6 +55093,30 @@
         ],
         "title": "PatentYear"
       },
+      "PathUse": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "opens": {
+            "type": "integer",
+            "title": "Opens"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days",
+            "description": "Distinct days the page was opened."
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "opens",
+          "days"
+        ],
+        "title": "PathUse"
+      },
       "PdlRefreshResponse": {
         "properties": {
           "ticker": {
@@ -56008,6 +56774,161 @@
           "difference_annualised"
         ],
         "title": "PeriodReturn"
+      },
+      "PilotReport": {
+        "properties": {
+          "window": {
+            "$ref": "#/components/schemas/PilotWindow"
+          },
+          "use": {
+            "items": {
+              "$ref": "#/components/schemas/PathUse"
+            },
+            "type": "array",
+            "title": "Use"
+          },
+          "days_used": {
+            "type": "integer",
+            "title": "Days Used"
+          },
+          "alerts": {
+            "$ref": "#/components/schemas/AlertRate"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderFailure"
+            },
+            "type": "array",
+            "title": "Providers"
+          },
+          "jobs": {
+            "$ref": "#/components/schemas/JobFailures"
+          },
+          "corrections": {
+            "items": {
+              "$ref": "#/components/schemas/Correction"
+            },
+            "type": "array",
+            "title": "Corrections"
+          },
+          "affected_weight": {
+            "type": "number",
+            "title": "Affected Weight",
+            "description": "Today's share of the portfolio touched by an issue."
+          },
+          "top_issues": {
+            "items": {
+              "$ref": "#/components/schemas/QualityIssue"
+            },
+            "type": "array",
+            "title": "Top Issues"
+          },
+          "not_measured": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not Measured"
+          }
+        },
+        "type": "object",
+        "required": [
+          "window",
+          "use",
+          "days_used",
+          "alerts",
+          "providers",
+          "jobs",
+          "corrections",
+          "affected_weight",
+          "top_issues",
+          "not_measured"
+        ],
+        "title": "PilotReport"
+      },
+      "PilotStart": {
+        "properties": {
+          "length_days": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 7.0,
+            "title": "Length Days",
+            "default": 30
+          }
+        },
+        "type": "object",
+        "title": "PilotStart"
+      },
+      "PilotState": {
+        "properties": {
+          "window": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PilotWindow"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PilotReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "window",
+          "report"
+        ],
+        "title": "PilotState"
+      },
+      "PilotWindow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "started_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Started On"
+          },
+          "length_days": {
+            "type": "integer",
+            "title": "Length Days"
+          },
+          "ends_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Ends On"
+          },
+          "day": {
+            "type": "integer",
+            "title": "Day",
+            "description": "Day of the pilot today, 1-based; past the length when over."
+          },
+          "over": {
+            "type": "boolean",
+            "title": "Over"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "started_on",
+          "length_days",
+          "ends_on",
+          "day",
+          "over"
+        ],
+        "title": "PilotWindow"
       },
       "PinInput": {
         "properties": {
@@ -58722,6 +59643,29 @@
         ],
         "title": "ProposedWeight"
       },
+      "ProviderFailure": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "failures": {
+            "type": "integer",
+            "title": "Failures"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "attempts",
+          "failures"
+        ],
+        "title": "ProviderFailure"
+      },
       "ProviderJobSettings": {
         "properties": {
           "refresh_hours": {
@@ -60032,6 +60976,48 @@
           "sources"
         ],
         "title": "RatiosView"
+      },
+      "Readiness": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "features": {
+            "items": {
+              "$ref": "#/components/schemas/FeatureReadiness"
+            },
+            "type": "array",
+            "title": "Features"
+          },
+          "zero_cost_passed": {
+            "type": "boolean",
+            "title": "Zero Cost Passed"
+          },
+          "zero_cost_violations": {
+            "type": "integer",
+            "title": "Zero Cost Violations"
+          },
+          "ready": {
+            "type": "integer",
+            "title": "Ready"
+          },
+          "activatable": {
+            "type": "integer",
+            "title": "Activatable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "features",
+          "zero_cost_passed",
+          "zero_cost_violations",
+          "ready",
+          "activatable"
+        ],
+        "title": "Readiness"
       },
       "ReadinessResponse": {
         "properties": {
@@ -70169,6 +71155,47 @@
         ],
         "title": "TargetBand"
       },
+      "TargetProgress": {
+        "properties": {
+          "subject_kind": {
+            "type": "string",
+            "enum": [
+              "security",
+              "etf",
+              "corporate_action",
+              "cash_flow_window"
+            ],
+            "title": "Subject Kind"
+          },
+          "target": {
+            "type": "integer",
+            "title": "Target"
+          },
+          "audited": {
+            "type": "integer",
+            "title": "Audited",
+            "description": "Subjects with at least one fact compared."
+          },
+          "clean": {
+            "type": "integer",
+            "title": "Clean",
+            "description": "Subjects whose newest result is a match for every fact."
+          },
+          "with_mismatch": {
+            "type": "integer",
+            "title": "With Mismatch"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject_kind",
+          "target",
+          "audited",
+          "clean",
+          "with_mismatch"
+        ],
+        "title": "TargetProgress"
+      },
       "TestAlertRequest": {
         "properties": {
           "severity": {
@@ -72538,6 +73565,20 @@
           "detail"
         ],
         "title": "UpcomingEvent"
+      },
+      "UsageIn": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^/[a-z0-9/_-]{0,120}$",
+            "title": "Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "UsageIn"
       },
       "ValidationError": {
         "properties": {

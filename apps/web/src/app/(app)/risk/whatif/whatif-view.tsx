@@ -226,6 +226,7 @@ function RiskCompare({ after, before }: { after: RiskReport; before: RiskReport 
       <h3 className="mb-1 text-sm font-medium">Risk figures</h3>
       <div className="overflow-x-auto border border-border">
         <table className="w-full text-sm">
+            <caption className="sr-only">Portfolio measures before and after the change</caption>
           <thead>
             <tr className="bg-surface-muted text-left">
               <th scope="col" className="px-3 py-1.5 font-medium">Measure</th>

@@ -82,6 +82,7 @@ function Body({ cockpit }: { cockpit: Cockpit }) {
         <Blueprint className="p-4">
           <PanelHeading level={3} kicker="Checks that ran" title="And what each one covers" />
           <table className="mt-3 w-full text-sm">
+            <caption className="sr-only">Data checks that ran, what each covers and how many issues it found</caption>
             <thead>
               <tr className="text-left text-xs text-text-muted">
                 <th scope="col" className="py-1 font-medium">

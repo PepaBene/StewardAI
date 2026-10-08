@@ -138,6 +138,7 @@ function Section({ section, needed }: { section: ScoreSection; needed: number })
       <p className={cn("mt-2 max-w-prose text-sm", section.status === "ok" ? "" : "text-text-muted")}>{unavailable ? `Not available: ${section.note}` : section.note}</p>
       {(section.rows ?? []).length > 0 ? (
         <table className="mt-3 w-full text-sm">
+          <caption className="sr-only">{section.title}: decisions and results by group</caption>
           <thead>
             <tr className="text-left text-xs text-text-muted">
               <th scope="col" className="py-1 font-medium">

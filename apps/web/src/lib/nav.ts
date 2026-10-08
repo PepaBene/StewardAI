@@ -68,6 +68,7 @@ export const CLUSTERS: readonly Cluster[] = [
       { href: "/activity", label: "Activity" },
       { href: "/data-sources", label: "Data sources" },
       { href: "/quality", label: "Data quality" },
+      { href: "/release", label: "Release checks" },
       { href: "/verification", label: "Verification" },
       { href: "/ai-decisions", label: "AI decisions" },
     ],
