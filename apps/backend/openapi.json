@@ -16616,6 +16616,513 @@
         }
       }
     },
+    "/portfolio/xray/funds-vs-benchmark": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Funds Vs Benchmark",
+        "description": "Each held fund's annualised tracking difference against the benchmark you recorded for it,\nsame basis and currency only, plus the benchmark proxy fund against its own benchmark.",
+        "operationId": "get_funds_vs_benchmark",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show the holdings as they were on this date (the latest snapshot before).",
+              "title": "As Of"
+            },
+            "description": "Show the holdings as they were on this date (the latest snapshot before)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundRelative"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/xray/supply-chain": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Supply Chain",
+        "description": "The supply-chain graph from the edges you entered, each company placed against what the\nportfolio holds in it, and the edges where you hold both ends.",
+        "operationId": "get_supply_chain",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show the holdings as they were on this date (the latest snapshot before).",
+              "title": "As Of"
+            },
+            "description": "Show the holdings as they were on this date (the latest snapshot before)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplyChain"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/xray/index-weights": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Index Weights",
+        "description": "Active share against each list of index weights you entered.",
+        "operationId": "get_index_weights",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show the holdings as they were on this date (the latest snapshot before).",
+              "title": "As Of"
+            },
+            "description": "Show the holdings as they were on this date (the latest snapshot before)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexComparisons"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/xray/inputs": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "List Owner Inputs",
+        "description": "Everything you entered by hand for the X-Ray: regional splits, supply-chain edges and index\nweights, each with its source and date. The newest entry for each name is the one in force.",
+        "operationId": "list_owner_inputs",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OwnerInput"
+                  },
+                  "type": "array",
+                  "title": "Response List Owner Inputs"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/xray/inputs/regions": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Save Region Split",
+        "description": "Spread a region such as \"Europe\" over countries, so a company's reported \"Europe\" revenue\nreaches the revenue-country view. It is your estimate, labelled as yours there.",
+        "operationId": "save_region_split",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegionSplitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerInput"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/xray/inputs/supply-edges": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Save Supply Edge",
+        "description": "One supplier-to-customer link, with the product and where you read it.",
+        "operationId": "save_supply_edge",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplyEdgeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerInput"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/xray/inputs/index-weights": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Save Index Weights",
+        "description": "The constituents and weights of an index, pasted from its provider's factsheet.",
+        "operationId": "save_index_weights",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IndexWeightsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerInput"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/xray/inputs/derive/index-weights": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Derive Index Weights",
+        "description": "Fill an index's weights from the stored holdings of a fund that tracks it (equity rows,\nrenormalised), with the fund's data address and snapshot date. Recomputed whenever the fund's\nholdings are refreshed.",
+        "operationId": "derive_index_weights",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeriveIndexRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeriveResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/xray/inputs/derive/regions": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Derive Region",
+        "description": "Spread a region over countries the way a fund you name for it spreads its equity.",
+        "operationId": "derive_region",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeriveRegionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeriveResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/xray/inputs/derive/benchmarks": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Derive Benchmarks",
+        "description": "Index weights for every configured benchmark proxy that has stored holdings.",
+        "operationId": "derive_benchmarks",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeriveResult"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/xray/inputs/{input_id}": {
+      "delete": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Archive Owner Input",
+        "operationId": "archive_owner_input",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "input_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Input Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/xray/candidates": {
       "get": {
         "tags": [
@@ -20599,6 +21106,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/BenchmarkRelativeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "freshness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FreshnessOut"
               },
               {
                 "type": "null"
@@ -29225,6 +29742,91 @@
         ],
         "title": "Dependency"
       },
+      "DeriveIndexRequest": {
+        "properties": {
+          "fund_isin": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+            "title": "Fund Isin"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "Defaults to the fund's label."
+          }
+        },
+        "type": "object",
+        "required": [
+          "fund_isin"
+        ],
+        "title": "DeriveIndexRequest"
+      },
+      "DeriveRegionRequest": {
+        "properties": {
+          "region": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Region"
+          },
+          "fund_isin": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$",
+            "title": "Fund Isin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "region",
+          "fund_isin"
+        ],
+        "title": "DeriveRegionRequest"
+      },
+      "DeriveResult": {
+        "properties": {
+          "item": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OwnerInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changed": {
+            "type": "boolean",
+            "title": "Changed",
+            "default": false
+          },
+          "saved": {
+            "type": "integer",
+            "title": "Saved",
+            "default": 0
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "title": "DeriveResult"
+      },
       "DerivedListingResponse": {
         "properties": {
           "ticker": {
@@ -37457,6 +38059,155 @@
         ],
         "title": "FundProfile"
       },
+      "FundRelative": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/FundRelativeRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "covered_weight": {
+            "type": "number",
+            "title": "Covered Weight",
+            "description": "Portfolio weight of the held funds with a figure."
+          },
+          "fund_weight": {
+            "type": "number",
+            "title": "Fund Weight",
+            "description": "Portfolio weight of all held funds."
+          },
+          "average": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average",
+            "description": "Weight-averaged tracking difference over the funds with a figure."
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "rows",
+          "covered_weight",
+          "fund_weight",
+          "average",
+          "notes"
+        ],
+        "title": "FundRelative"
+      },
+      "FundRelativeRow": {
+        "properties": {
+          "isin": {
+            "type": "string",
+            "title": "Isin"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight",
+            "description": "Share of the portfolio; None for the proxy fund alone."
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark"
+          },
+          "tracking_difference": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracking Difference",
+            "description": "Annualised, fund minus benchmark, same basis and currency only."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why there is no figure."
+          },
+          "is_proxy": {
+            "type": "boolean",
+            "title": "Is Proxy",
+            "description": "The fund the X-Ray uses as its benchmark proxy."
+          }
+        },
+        "type": "object",
+        "required": [
+          "isin",
+          "ticker",
+          "name",
+          "weight",
+          "benchmark",
+          "tracking_difference",
+          "reason",
+          "is_proxy"
+        ],
+        "title": "FundRelativeRow"
+      },
       "FundRequest": {
         "properties": {
           "filters": {
@@ -42046,6 +42797,194 @@
         ],
         "title": "ImportResult"
       },
+      "IndexComparison": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "constituents": {
+            "type": "integer",
+            "title": "Constituents"
+          },
+          "index_weight_listed": {
+            "type": "number",
+            "title": "Index Weight Listed",
+            "description": "Sum of the pasted index weights."
+          },
+          "active_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Share"
+          },
+          "partial": {
+            "type": "boolean",
+            "title": "Partial",
+            "description": "The pasted weights cover less than the whole index."
+          },
+          "index_weight_held": {
+            "type": "number",
+            "title": "Index Weight Held",
+            "description": "Index weight in names the portfolio also holds."
+          },
+          "unmatched": {
+            "type": "integer",
+            "title": "Unmatched",
+            "description": "Pasted constituents that no holding matched."
+          },
+          "overweights": {
+            "items": {
+              "$ref": "#/components/schemas/IndexDifference"
+            },
+            "type": "array",
+            "title": "Overweights"
+          },
+          "underweights": {
+            "items": {
+              "$ref": "#/components/schemas/IndexDifference"
+            },
+            "type": "array",
+            "title": "Underweights"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "source_url",
+          "as_of",
+          "constituents",
+          "index_weight_listed",
+          "active_share",
+          "partial",
+          "index_weight_held",
+          "unmatched",
+          "overweights",
+          "underweights",
+          "notes"
+        ],
+        "title": "IndexComparison"
+      },
+      "IndexComparisons": {
+        "properties": {
+          "comparisons": {
+            "items": {
+              "$ref": "#/components/schemas/IndexComparison"
+            },
+            "type": "array",
+            "title": "Comparisons"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "comparisons",
+          "notes"
+        ],
+        "title": "IndexComparisons"
+      },
+      "IndexConstituent": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "isin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{2}[A-Z0-9]{9}[0-9]$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isin"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "weight"
+        ],
+        "title": "IndexConstituent"
+      },
+      "IndexDifference": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "portfolio_weight": {
+            "type": "number",
+            "title": "Portfolio Weight"
+          },
+          "index_weight": {
+            "type": "number",
+            "title": "Index Weight"
+          },
+          "difference": {
+            "type": "number",
+            "title": "Difference",
+            "description": "Portfolio minus index, in weight."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "portfolio_weight",
+          "index_weight",
+          "difference"
+        ],
+        "title": "IndexDifference"
+      },
       "IndexQuote": {
         "properties": {
           "symbol": {
@@ -42219,6 +43158,57 @@
           "points"
         ],
         "title": "IndexSeries"
+      },
+      "IndexWeightsRequest": {
+        "properties": {
+          "source_url": {
+            "type": "string",
+            "title": "Source Url",
+            "description": "Where the figures came from (a web address)."
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of",
+            "description": "The date the figures describe."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Label",
+            "description": "The index's name."
+          },
+          "constituents": {
+            "items": {
+              "$ref": "#/components/schemas/IndexConstituent"
+            },
+            "type": "array",
+            "maxItems": 2000,
+            "minItems": 1,
+            "title": "Constituents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_url",
+          "as_of",
+          "label",
+          "constituents"
+        ],
+        "title": "IndexWeightsRequest"
       },
       "Indicator": {
         "properties": {
@@ -46038,6 +47028,46 @@
         ],
         "title": "Line"
       },
+      "LinkedPair": {
+        "properties": {
+          "supplier": {
+            "type": "string",
+            "title": "Supplier"
+          },
+          "customer": {
+            "type": "string",
+            "title": "Customer"
+          },
+          "product": {
+            "type": "string",
+            "title": "Product"
+          },
+          "combined_weight": {
+            "type": "number",
+            "title": "Combined Weight"
+          },
+          "customer_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Share"
+          }
+        },
+        "type": "object",
+        "required": [
+          "supplier",
+          "customer",
+          "product",
+          "combined_weight",
+          "customer_share"
+        ],
+        "title": "LinkedPair"
+      },
       "LiquidityOut": {
         "properties": {
           "liquid": {
@@ -47120,6 +48150,16 @@
           },
           "explain": {
             "$ref": "#/components/schemas/PerformanceExplain"
+          },
+          "freshness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FreshnessOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -48649,6 +49689,58 @@
           "change"
         ],
         "title": "MemberLine"
+      },
+      "MergerEntry": {
+        "properties": {
+          "old_ticker": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Old Ticker"
+          },
+          "new_ticker": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "New Ticker"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day",
+            "description": "First day the new ticker applies."
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Ratio",
+            "description": "New shares per old share."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "old_ticker",
+          "new_ticker",
+          "day",
+          "ratio"
+        ],
+        "title": "MergerEntry",
+        "description": "A share-exchange merger you entered: each old share became `ratio` new shares. Earlier\nfills of the old ticker are carried over to the new one with their cost and purchase date."
       },
       "MessageOut": {
         "properties": {
@@ -51117,6 +52209,91 @@
         ],
         "title": "Overview"
       },
+      "OwnerInput": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "region_split",
+              "supply_edge",
+              "index_weights"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "derived"
+            ],
+            "title": "Origin",
+            "description": "'derived' entries are computed from fund holdings the app stores and are recomputed when those holdings are refreshed.",
+            "default": "owner"
+          },
+          "derived_from": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derived From"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "key",
+          "payload",
+          "source_url",
+          "as_of",
+          "note",
+          "created_at"
+        ],
+        "title": "OwnerInput"
+      },
       "OwnershipPeriod": {
         "properties": {
           "period": {
@@ -52871,6 +54048,22 @@
             "type": "array",
             "maxItems": 200,
             "title": "Splits"
+          },
+          "mergers": {
+            "items": {
+              "$ref": "#/components/schemas/MergerEntry"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Mergers"
+          },
+          "spin_offs": {
+            "items": {
+              "$ref": "#/components/schemas/SpinOffEntry"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Spin Offs"
           },
           "note": {
             "type": "string",
@@ -57654,6 +58847,58 @@
           "high"
         ],
         "title": "ReferenceValue"
+      },
+      "RegionSplitRequest": {
+        "properties": {
+          "source_url": {
+            "type": "string",
+            "title": "Source Url",
+            "description": "Where the figures came from (a web address)."
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of",
+            "description": "The date the figures describe."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "region": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Region",
+            "description": "A region such as \"Europe\"."
+          },
+          "countries": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "maxProperties": 80,
+            "minProperties": 1,
+            "title": "Countries",
+            "description": "Country (code or name) -> share of the region."
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_url",
+          "as_of",
+          "region",
+          "countries"
+        ],
+        "title": "RegionSplitRequest"
       },
       "RelatedPartyFigure": {
         "properties": {
@@ -62974,6 +64219,16 @@
             ],
             "title": "Reconciliation Error"
           },
+          "freshness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FreshnessOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "explain": {
             "$ref": "#/components/schemas/PerformanceExplain"
           }
@@ -63707,6 +64962,74 @@
           "sources"
         ],
         "title": "SourcesHealth"
+      },
+      "SpinOffEntry": {
+        "properties": {
+          "parent_ticker": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Parent Ticker"
+          },
+          "child_ticker": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Child Ticker"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day",
+            "description": "First day the child shares exist."
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Ratio",
+            "description": "Child shares per parent share."
+          },
+          "cost_share": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Cost Share",
+            "description": "Fraction of the parent's cost that moves to the child (0 to 1)."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "parent_ticker",
+          "child_ticker",
+          "day",
+          "ratio",
+          "cost_share"
+        ],
+        "title": "SpinOffEntry",
+        "description": "A spin-off you entered: holders on `day` received `ratio` child shares per parent share,\nand `cost_share` of the parent's cost moved to the child. The company's own notice gives the\nsplit of cost; Steward does not look it up."
       },
       "SplitEntry": {
         "properties": {
@@ -65207,6 +66530,243 @@
           "warnings"
         ],
         "title": "StyleView"
+      },
+      "SupplyChain": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/SupplyNode"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/SupplyEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "linked": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedPair"
+            },
+            "type": "array",
+            "title": "Linked",
+            "description": "Edges where the portfolio holds both ends, so one event can hit both."
+          },
+          "held_in_graph": {
+            "type": "number",
+            "title": "Held In Graph",
+            "description": "Portfolio weight in companies that appear in the graph."
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nodes",
+          "edges",
+          "linked",
+          "held_in_graph",
+          "notes"
+        ],
+        "title": "SupplyChain"
+      },
+      "SupplyEdge": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "Set for an entry you made (it can be removed); None for a filing."
+          },
+          "supplier": {
+            "type": "string",
+            "title": "Supplier"
+          },
+          "customer": {
+            "type": "string",
+            "title": "Customer"
+          },
+          "product": {
+            "type": "string",
+            "title": "Product"
+          },
+          "customer_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Share"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "filing"
+            ],
+            "title": "Origin",
+            "default": "owner"
+          },
+          "fiscal_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Period"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "supplier",
+          "customer",
+          "product",
+          "customer_share",
+          "source_url",
+          "as_of"
+        ],
+        "title": "SupplyEdge"
+      },
+      "SupplyEdgeRequest": {
+        "properties": {
+          "source_url": {
+            "type": "string",
+            "title": "Source Url",
+            "description": "Where the figures came from (a web address)."
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of",
+            "description": "The date the figures describe."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "supplier": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Supplier"
+          },
+          "customer": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Customer"
+          },
+          "product": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Product",
+            "description": "What is supplied."
+          },
+          "customer_share": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Share",
+            "description": "Share of the supplier's revenue this customer is."
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_url",
+          "as_of",
+          "supplier",
+          "customer",
+          "product"
+        ],
+        "title": "SupplyEdgeRequest"
+      },
+      "SupplyNode": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Share of the portfolio held in it, directly or through funds."
+          },
+          "held": {
+            "type": "boolean",
+            "title": "Held"
+          },
+          "level": {
+            "type": "integer",
+            "title": "Level",
+            "description": "0 for a company that only supplies; one more per step downstream."
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "name",
+          "weight",
+          "held",
+          "level"
+        ],
+        "title": "SupplyNode"
       },
       "TargetBand": {
         "properties": {

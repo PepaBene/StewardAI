@@ -7,6 +7,7 @@ import { useMemo } from "react";
 
 import { ResourceGate } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
+import { DataAgeBadge, ageInDays } from "@/components/freshness/data-age-badge";
 import { CsvDownload } from "@/components/ui/csv-download";
 import { CompositionStrip } from "@/components/xray/composition-strip";
 import { getBrowserApiClient } from "@/lib/api/client";
@@ -40,12 +41,21 @@ export function ExposureView() {
   );
 }
 
-function Coverage({ data }: { data: XrayData }) {
+function Coverage({ data, asOf }: { data: XrayData; asOf: string }) {
   const currency = data.base_currency ?? "";
   const unknown = data.unknown?.unknown_fund_weight ?? 0;
   return (
     <Blueprint className="px-[22px] py-4">
       <PanelHeading kicker="What this is built from" title="Your holdings and each fund's published holdings" />
+      <DataAgeBadge
+        items={[
+          {
+            label: asOf ? `Holdings snapshot, against ${formatDate(asOf)}` : "Holdings snapshot",
+            date: data.snapshot_date,
+            ageDays: ageInDays(data.snapshot_date, asOf ? new Date(`${asOf}T00:00:00Z`) : undefined),
+          },
+        ]}
+      />
       <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
         <Fact label="Portfolio value" note={data.snapshot_date ? `Snapshot ${formatDate(data.snapshot_date)}` : undefined}>
           {currency ? formatMoney(data.total_value, currency, { decimals: 0 }) : "—"}
@@ -327,7 +337,7 @@ function Exposure({ data, asOf }: { data: XrayData; asOf: string }) {
   }
   return (
     <div className="flex flex-col gap-5">
-      <Coverage data={data} />
+      <Coverage data={data} asOf={asOf} />
       <div className="grid gap-5 lg:grid-cols-[13rem_minmax(0,1fr)]">
         <LensRail views={data.views} active={view.dimension} />
         <div className="min-w-0 space-y-5">

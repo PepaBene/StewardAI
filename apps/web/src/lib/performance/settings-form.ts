@@ -4,8 +4,14 @@ export type BenchmarkRow = { symbol: string; weight: string; currency: string; b
 
 export type SplitRow = { ticker: string; day: string; ratio: string; note: string };
 
+export type MergerRow = { old_ticker: string; new_ticker: string; day: string; ratio: string; note: string };
+
+export type SpinOffRow = { parent_ticker: string; child_ticker: string; day: string; ratio: string; cost_percent: string; note: string };
+
 export type SettingsForm = {
   splits: SplitRow[];
+  mergers: MergerRow[];
+  spin_offs: SpinOffRow[];
   core_tickers: string;
   cost_method: "fifo" | "average";
   time_test_years: string;
@@ -41,6 +47,21 @@ export function settingsToForm(s: Settings): SettingsForm {
     })),
     rebalance: s.benchmark?.rebalance ?? "none",
     splits: (s.splits ?? []).map((x) => ({ ticker: x.ticker, day: x.day, ratio: String(x.ratio), note: x.note ?? "" })),
+    mergers: (s.mergers ?? []).map((x) => ({
+      old_ticker: x.old_ticker,
+      new_ticker: x.new_ticker,
+      day: x.day,
+      ratio: String(x.ratio),
+      note: x.note ?? "",
+    })),
+    spin_offs: (s.spin_offs ?? []).map((x) => ({
+      parent_ticker: x.parent_ticker,
+      child_ticker: x.child_ticker,
+      day: x.day,
+      ratio: String(x.ratio),
+      cost_percent: String(Math.round(Number(x.cost_share) * 1e6) / 1e4),
+      note: x.note ?? "",
+    })),
     note: s.note ?? "",
   };
 }
@@ -107,6 +128,42 @@ export function formToSettings(form: SettingsForm): FormResult {
     }
   }
   const splits = splitRows.map((r) => ({ ticker: r.ticker.trim(), day: r.day, ratio: String(Number(r.ratio)), note: r.note.trim() }));
+  const isDay = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const mergerRows = form.mergers.filter((r) => [r.old_ticker, r.new_ticker, r.day, r.ratio].some((v) => v.trim() !== ""));
+  for (const r of mergerRows) {
+    const ratio = Number(r.ratio);
+    if (r.old_ticker.trim() === "" || r.new_ticker.trim() === "" || r.old_ticker.trim() === r.new_ticker.trim() || !isDay(r.day) || !Number.isFinite(ratio) || ratio <= 0) {
+      errors.push("Every merger needs two different tickers, a date and the new shares you got for each old one (above 0).");
+      break;
+    }
+  }
+  const mergers = mergerRows.map((r) => ({
+    old_ticker: r.old_ticker.trim(),
+    new_ticker: r.new_ticker.trim(),
+    day: r.day,
+    ratio: String(Number(r.ratio)),
+    note: r.note.trim(),
+  }));
+  const spinRows = form.spin_offs.filter((r) => [r.parent_ticker, r.child_ticker, r.day, r.ratio, r.cost_percent].some((v) => v.trim() !== ""));
+  for (const r of spinRows) {
+    const ratio = Number(r.ratio);
+    const cost = Number(r.cost_percent);
+    if (
+      r.parent_ticker.trim() === "" || r.child_ticker.trim() === "" || r.parent_ticker.trim() === r.child_ticker.trim() ||
+      !isDay(r.day) || !Number.isFinite(ratio) || ratio <= 0 || r.cost_percent.trim() === "" || !Number.isFinite(cost) || cost < 0 || cost > 100
+    ) {
+      errors.push("Every spin-off needs two different tickers, a date, the child shares per parent share (above 0) and the share of cost that moved (0 to 100).");
+      break;
+    }
+  }
+  const spin_offs = spinRows.map((r) => ({
+    parent_ticker: r.parent_ticker.trim(),
+    child_ticker: r.child_ticker.trim(),
+    day: r.day,
+    ratio: String(Number(r.ratio)),
+    cost_share: String(Math.round(Number(r.cost_percent) * 1e4) / 1e6),
+    note: r.note.trim(),
+  }));
   if (errors.length > 0) return { ok: false, errors };
   return {
     ok: true,
@@ -123,6 +180,8 @@ export function formToSettings(form: SettingsForm): FormResult {
       alert_severity: severity,
       benchmark,
       splits,
+      mergers,
+      spin_offs,
       note: form.note.trim(),
     },
   };

@@ -20,13 +20,17 @@ from steward.performance.attribution import (
 from steward.performance.benchmark import blended_index, compare_window, series_return
 from steward.performance.ledger import (
     Kind,
+    Merger,
     RawTransaction,
+    SpinOff,
     Split,
+    apply_mergers,
     apply_splits,
     build_ledger,
     external_flows,
     position_breaks,
     reconcile_cash,
+    spin_off_units,
     summarize,
 )
 from steward.performance.lots import (
@@ -217,6 +221,61 @@ def test_splits_on_other_tickers_and_no_splits_change_nothing():
     entries = build_ledger([fill("f1", "BUY", "10", "100", "-1000", at(2025, 1, 6))])
     assert apply_splits(entries, []) == entries
     assert apply_splits(entries, [Split("ZZZ", day(2026, 1, 15), D("2"))]) == entries
+
+
+def test_a_merger_carries_earlier_fills_to_the_new_ticker_with_cost_and_date():
+    entries = build_ledger(
+        [
+            fill("f1", "BUY", "10", "100", "-1000", at(2025, 1, 6)),
+            fill("f2", "BUY", "3", "50", "-150", at(2026, 6, 1), ),  # after the merger: untouched
+        ]
+    )
+    merged = apply_mergers(entries, [Merger("AAA", "BBB", day(2026, 3, 2), D("1.5"))])
+    by_id = {e.id: e for e in merged}
+    assert by_id["f1"].ticker == "BBB" and by_id["f1"].quantity == D("15")
+    assert by_id["f1"].price == D("100") / D("1.5") and by_id["f1"].cash_effect == D("-1000")
+    assert by_id["f1"].day == day(2025, 1, 6) and any("merger" in f for f in by_id["f1"].flags)
+    assert by_id["f2"].ticker == "AAA"
+    lots = build_lots(merged).lots
+    assert [(x.ticker, x.bought_on, x.remaining_quantity) for x in lots if x.ticker == "BBB"] == [
+        ("BBB", day(2025, 1, 6), D("15"))
+    ]
+
+
+def test_a_spin_off_moves_a_share_of_each_open_lot_cost_to_the_child_and_keeps_its_date():
+    entries = build_ledger(
+        [
+            fill("f1", "BUY", "10", "100", "-1000", at(2025, 1, 6)),
+            fill("f2", "SELL", "4", "120", "480", at(2025, 9, 1)),
+            fill("f3", "BUY", "5", "100", "-500", at(2026, 6, 1)),  # after the spin-off
+        ]
+    )
+    spin = SpinOff("AAA", "CCC", day(2026, 3, 2), D("0.5"), D("0.2"))
+    book = build_lots(entries, "fifo", [spin])
+    by_ticker = {t: [x for x in book.lots if x.ticker == t] for t in ("AAA", "CCC")}
+    child = by_ticker["CCC"]
+    assert len(child) == 1 and child[0].bought_on == day(2025, 1, 6)
+    assert child[0].remaining_quantity == D("3")  # 6 parent units still held x 0.5
+    assert child[0].remaining_quantity * child[0].unit_cost == D("120")  # 20% of 6 x 100
+    parent_old = next(x for x in by_ticker["AAA"] if x.bought_on == day(2025, 1, 6))
+    assert parent_old.unit_cost == D("80")  # 80% of the cost stays
+    parent_new = next(x for x in by_ticker["AAA"] if x.bought_on == day(2026, 6, 1))
+    assert parent_new.unit_cost == D("100")
+    assert spin_off_units(entries, [spin]) == {"CCC": D("3")}
+    assert position_breaks(entries, {"AAA": D("11"), "CCC": D("3")}, received={"CCC": D("3")}) == []
+
+
+def test_a_spin_off_leaves_gains_on_the_parent_correct_after_the_cost_moved():
+    entries = build_ledger(
+        [
+            fill("f1", "BUY", "10", "100", "-1000", at(2025, 1, 6)),
+            fill("f2", "SELL", "10", "100", "1000", at(2026, 6, 1)),
+        ]
+    )
+    book = build_lots(entries, "fifo", [SpinOff("AAA", "CCC", day(2026, 3, 2), D("1"), D("0.25"))])
+    sale = book.realized[0]
+    assert sale.cost == D("750") and sale.gain == D("250")
+    assert [x.ticker for x in book.lots] == ["CCC"] and book.lots[0].unit_cost == D("25")
 
 
 def test_cash_reconciliation_within_and_outside_tolerance():

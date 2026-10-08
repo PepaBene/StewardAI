@@ -5,17 +5,32 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
 from steward import saved
 from steward.lookthrough.read import PortfolioIn
-from steward.xray import service
+from steward.xray import (
+    derive,
+    fund_relative,
+    index_weights,
+    owner_input,
+    service,
+    supply_chain,
+)
 from steward.xray.benchmark import XrayBenchmark
 from steward.xray.exports import xray_csv
+from steward.xray.fund_relative import FundRelative
+from steward.xray.index_weights import IndexComparisons
 from steward.xray.intersection import XrayIntersection
 from steward.xray.metrics import XrayFundamentals
+from steward.xray.owner_input import (
+    IndexWeightsRequest,
+    OwnerInput,
+    RegionSplitRequest,
+    SupplyEdgeRequest,
+)
 from steward.xray.reports import (
     XrayConcentrationResponse,
     XrayResponse,
@@ -24,6 +39,7 @@ from steward.xray.reports import (
     xray_response,
 )
 from steward.xray.scenario import ProposalError, ProposedRequest, XrayProposal
+from steward.xray.supply_chain import SupplyChain
 
 router = APIRouter(prefix="/portfolio/xray", tags=["portfolio"])
 
@@ -102,6 +118,131 @@ async def get_benchmark(pool: Pool, owner: Owner, as_of: AsOf = None) -> XrayBen
     index's historical membership); only like-for-like classifications are compared."""
     result, _ = service.benchmark_result(await _loaded(pool, owner, as_of))
     return result
+
+
+@router.get("/funds-vs-benchmark")
+async def get_funds_vs_benchmark(pool: Pool, owner: Owner, as_of: AsOf = None) -> FundRelative:
+    """Each held fund's annualised tracking difference against the benchmark you recorded for it,
+    same basis and currency only, plus the benchmark proxy fund against its own benchmark."""
+    return await fund_relative.build(pool, owner.user_id, await _loaded(pool, owner, as_of))
+
+
+@router.get("/supply-chain")
+async def get_supply_chain(pool: Pool, owner: Owner, as_of: AsOf = None) -> SupplyChain:
+    """The supply-chain graph from the edges you entered, each company placed against what the
+    portfolio holds in it, and the edges where you hold both ends."""
+    loaded = await _loaded(pool, owner, as_of)
+    return supply_chain.build(
+        loaded.leafset,
+        await owner_input.current(pool, owner.user_id),
+        await supply_chain.filing_edges(pool, loaded.leafset),
+    )
+
+
+@router.get("/index-weights")
+async def get_index_weights(pool: Pool, owner: Owner, as_of: AsOf = None) -> IndexComparisons:
+    """Active share against each list of index weights you entered."""
+    loaded = await _loaded(pool, owner, as_of)
+    return index_weights.build(loaded.leafset, await owner_input.current(pool, owner.user_id))
+
+
+@router.get("/inputs")
+async def list_owner_inputs(pool: Pool, owner: Owner) -> list[OwnerInput]:
+    """Everything you entered by hand for the X-Ray: regional splits, supply-chain edges and index
+    weights, each with its source and date. The newest entry for each name is the one in force."""
+    return await owner_input.current(pool, owner.user_id)
+
+
+@router.post("/inputs/regions", status_code=201)
+async def save_region_split(body: RegionSplitRequest, pool: Pool, owner: Owner) -> OwnerInput:
+    """Spread a region such as "Europe" over countries, so a company's reported "Europe" revenue
+    reaches the revenue-country view. It is your estimate, labelled as yours there."""
+    result = await owner_input.save(
+        pool, owner.user_id, "region_split", body.region, {"countries": body.countries}, body
+    )
+    service.drop_cache(owner.user_id)
+    return result
+
+
+@router.post("/inputs/supply-edges", status_code=201)
+async def save_supply_edge(body: SupplyEdgeRequest, pool: Pool, owner: Owner) -> OwnerInput:
+    """One supplier-to-customer link, with the product and where you read it."""
+    return await owner_input.save(
+        pool, owner.user_id, "supply_edge", f"{body.supplier}>{body.customer}",
+        {"supplier": body.supplier, "customer": body.customer, "product": body.product,
+         "customer_share": body.customer_share}, body,
+    )  # fmt: skip
+
+
+@router.post("/inputs/index-weights", status_code=201)
+async def save_index_weights(body: IndexWeightsRequest, pool: Pool, owner: Owner) -> OwnerInput:
+    """The constituents and weights of an index, pasted from its provider's factsheet."""
+    return await owner_input.save(
+        pool, owner.user_id, "index_weights", body.label,
+        {"constituents": [c.model_dump() for c in body.constituents]}, body,
+    )  # fmt: skip
+
+
+class DeriveIndexRequest(BaseModel):
+    fund_isin: str = Field(pattern=r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
+    label: str | None = Field(
+        default=None, max_length=120, description="Defaults to the fund's label."
+    )
+
+
+class DeriveRegionRequest(BaseModel):
+    region: str = Field(min_length=1, max_length=60)
+    fund_isin: str = Field(pattern=r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
+
+
+class DeriveResult(BaseModel):
+    item: OwnerInput | None = None
+    changed: bool = False
+    saved: int = 0
+    message: str | None = None
+
+
+@router.post("/inputs/derive/index-weights")
+async def derive_index_weights(body: DeriveIndexRequest, pool: Pool, owner: Owner) -> DeriveResult:
+    """Fill an index's weights from the stored holdings of a fund that tracks it (equity rows,
+    renormalised), with the fund's data address and snapshot date. Recomputed whenever the fund's
+    holdings are refreshed."""
+    try:
+        item, changed = await derive.derive_index_weights(
+            pool, owner.user_id, body.fund_isin, body.label
+        )
+    except derive.DeriveError as err:
+        raise HTTPException(422, str(err)) from err
+    return DeriveResult(item=item, changed=changed)
+
+
+@router.post("/inputs/derive/regions")
+async def derive_region(body: DeriveRegionRequest, pool: Pool, owner: Owner) -> DeriveResult:
+    """Spread a region over countries the way a fund you name for it spreads its equity."""
+    try:
+        item, changed = await derive.derive_region_split(
+            pool, owner.user_id, body.region, body.fund_isin
+        )
+    except derive.DeriveError as err:
+        raise HTTPException(422, str(err)) from err
+    if changed:
+        service.drop_cache(owner.user_id)
+    return DeriveResult(item=item, changed=changed)
+
+
+@router.post("/inputs/derive/benchmarks")
+async def derive_benchmarks(pool: Pool, owner: Owner) -> DeriveResult:
+    """Index weights for every configured benchmark proxy that has stored holdings."""
+    saved = await derive.derive_benchmark_indexes(pool, owner.user_id)
+    message = None if saved else "Nothing new: no benchmark proxy has newer stored holdings."
+    return DeriveResult(saved=saved, message=message)
+
+
+@router.delete("/inputs/{input_id}", status_code=204)
+async def archive_owner_input(input_id: int, pool: Pool, owner: Owner) -> None:
+    if not await owner_input.archive(pool, owner.user_id, input_id):
+        raise HTTPException(404, "no such entry")
+    service.drop_cache(owner.user_id)
 
 
 class XrayCandidates(BaseModel):

@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal
 
-from steward.performance.ledger import Kind, LedgerEntry
+from steward.performance.ledger import Kind, LedgerEntry, SpinOff
 
 ZERO = Decimal(0)
 CostMethod = Literal["fifo", "average"]
@@ -77,14 +77,52 @@ class LotBook:
     fees: Decimal  # fill fees plus cash fees, account currency
 
 
-def build_lots(entries: Iterable[LedgerEntry], method: CostMethod = "fifo") -> LotBook:
+def _apply_spin_off(
+    s: SpinOff,
+    queues: dict[str, deque[Lot]],
+    pooled_cost: dict[str, Decimal],
+    pooled_qty: dict[str, Decimal],
+) -> None:
+    """Split every open parent lot: `cost_share` of its cost and `ratio` units per parent unit go
+    to a child lot that keeps the parent lot's purchase date (the owner's tax rules decide whether
+    that is right for them), and the parent lot keeps the rest of its cost."""
+    moved_total = ZERO
+    child_units = ZERO
+    for lot in list(queues[s.parent]):
+        if lot.remaining_quantity <= 0:
+            continue
+        moved = lot.remaining_quantity * lot.unit_cost * s.cost_share
+        units = lot.remaining_quantity * s.ratio
+        lot.unit_cost -= lot.unit_cost * s.cost_share
+        queues[s.child].append(
+            Lot(f"{lot.lot_id}:spin-off:{s.child}", s.child, lot.bought_on, units, units,
+                moved / units, lot.currency)
+        )  # fmt: skip
+        moved_total += moved
+        child_units += units
+    if queues[s.child]:
+        queues[s.child] = deque(sorted(queues[s.child], key=lambda x: (x.bought_on, x.lot_id)))
+    pooled_cost[s.parent] -= moved_total
+    pooled_cost[s.child] += moved_total
+    pooled_qty[s.child] += child_units
+
+
+def build_lots(
+    entries: Iterable[LedgerEntry],
+    method: CostMethod = "fifo",
+    spin_offs: Sequence[SpinOff] = (),
+) -> LotBook:
     """Replay fills in time order. `average` pools cost per ticker for the realized gain but
-    keeps the FIFO lots, because the time test is dated per purchase."""
+    keeps the FIFO lots, because the time test is dated per purchase. A spin-off the owner
+    entered applies at the start of its day, before that day's fills."""
     queues: dict[str, deque[Lot]] = defaultdict(deque)
     book = LotBook(method, [], [], [], ZERO, ZERO)
     pooled_cost: dict[str, Decimal] = defaultdict(Decimal)
     pooled_qty: dict[str, Decimal] = defaultdict(Decimal)
+    pending = sorted(spin_offs, key=lambda x: x.day)
     for e in entries:
+        while pending and pending[0].day <= e.day:
+            _apply_spin_off(pending.pop(0), queues, pooled_cost, pooled_qty)
         if e.needs_fx:
             continue
         if e.kind is Kind.DIVIDEND:
@@ -101,6 +139,8 @@ def build_lots(entries: Iterable[LedgerEntry], method: CostMethod = "fifo") -> L
         elif e.kind is Kind.SELL and e.ticker and e.quantity < 0:
             book.fees += e.fees
             _sell(e, queues[e.ticker], pooled_cost, pooled_qty, book, method)
+    for s in pending:
+        _apply_spin_off(s, queues, pooled_cost, pooled_qty)
     book.lots = [lot for q in queues.values() for lot in q if lot.remaining_quantity > 0]
     book.lots.sort(key=lambda lot: (lot.ticker, lot.bought_on, lot.lot_id))
     return book

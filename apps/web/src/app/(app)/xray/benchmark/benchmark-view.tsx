@@ -13,6 +13,8 @@ import { asOfQuery, parseAsOf } from "@/lib/xray/as-of";
 import { activeBar, pointsLabel, type BenchmarkData, type BenchmarkDim } from "@/lib/xray/xray";
 
 import { Fact, Notes, Pct, TD, TH, TH_LEFT, Toned } from "../shared";
+import { FundsAgainstBenchmark } from "./funds-against-benchmark";
+import { IndexWeightsPanel } from "./index-weights-panel";
 
 const DIM_TITLE: Record<string, string> = {
   sector: "Sector",
@@ -29,9 +31,13 @@ export function BenchmarkView() {
   );
   const { state } = useApiResource(fetcher);
   return (
-    <ResourceGate state={state} label="benchmark comparison">
-      {(data) => <Benchmark data={data} />}
-    </ResourceGate>
+    <div className="flex flex-col gap-5">
+      <ResourceGate state={state} label="benchmark comparison">
+        {(data) => <Benchmark data={data} />}
+      </ResourceGate>
+      <FundsAgainstBenchmark />
+      <IndexWeightsPanel />
+    </div>
   );
 }
 

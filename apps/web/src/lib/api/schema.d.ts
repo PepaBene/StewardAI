@@ -5128,6 +5128,229 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/xray/funds-vs-benchmark": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Funds Vs Benchmark
+         * @description Each held fund's annualised tracking difference against the benchmark you recorded for it,
+         *     same basis and currency only, plus the benchmark proxy fund against its own benchmark.
+         */
+        get: operations["get_funds_vs_benchmark"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/supply-chain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Supply Chain
+         * @description The supply-chain graph from the edges you entered, each company placed against what the
+         *     portfolio holds in it, and the edges where you hold both ends.
+         */
+        get: operations["get_supply_chain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/index-weights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Index Weights
+         * @description Active share against each list of index weights you entered.
+         */
+        get: operations["get_index_weights"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Owner Inputs
+         * @description Everything you entered by hand for the X-Ray: regional splits, supply-chain edges and index
+         *     weights, each with its source and date. The newest entry for each name is the one in force.
+         */
+        get: operations["list_owner_inputs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs/regions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Region Split
+         * @description Spread a region such as "Europe" over countries, so a company's reported "Europe" revenue
+         *     reaches the revenue-country view. It is your estimate, labelled as yours there.
+         */
+        post: operations["save_region_split"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs/supply-edges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Supply Edge
+         * @description One supplier-to-customer link, with the product and where you read it.
+         */
+        post: operations["save_supply_edge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs/index-weights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Index Weights
+         * @description The constituents and weights of an index, pasted from its provider's factsheet.
+         */
+        post: operations["save_index_weights"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs/derive/index-weights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Derive Index Weights
+         * @description Fill an index's weights from the stored holdings of a fund that tracks it (equity rows,
+         *     renormalised), with the fund's data address and snapshot date. Recomputed whenever the fund's
+         *     holdings are refreshed.
+         */
+        post: operations["derive_index_weights"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs/derive/regions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Derive Region
+         * @description Spread a region over countries the way a fund you name for it spreads its equity.
+         */
+        post: operations["derive_region"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs/derive/benchmarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Derive Benchmarks
+         * @description Index weights for every configured benchmark proxy that has stored holdings.
+         */
+        post: operations["derive_benchmarks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs/{input_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Archive Owner Input */
+        delete: operations["archive_owner_input"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/xray/candidates": {
         parameters: {
             query?: never;
@@ -6417,6 +6640,7 @@ export interface components {
                 };
             };
             benchmark?: components["schemas"]["BenchmarkRelativeOut"] | null;
+            freshness?: components["schemas"]["FreshnessOut"] | null;
             explain: components["schemas"]["PerformanceExplain"];
         };
         /** BacktestName */
@@ -9340,6 +9564,39 @@ export interface components {
             evidence_id: number | null;
             /** Known At */
             known_at: string | null;
+        };
+        /** DeriveIndexRequest */
+        DeriveIndexRequest: {
+            /** Fund Isin */
+            fund_isin: string;
+            /**
+             * Label
+             * @description Defaults to the fund's label.
+             */
+            label?: string | null;
+        };
+        /** DeriveRegionRequest */
+        DeriveRegionRequest: {
+            /** Region */
+            region: string;
+            /** Fund Isin */
+            fund_isin: string;
+        };
+        /** DeriveResult */
+        DeriveResult: {
+            item?: components["schemas"]["OwnerInput"] | null;
+            /**
+             * Changed
+             * @default false
+             */
+            changed: boolean;
+            /**
+             * Saved
+             * @default 0
+             */
+            saved: number;
+            /** Message */
+            message?: string | null;
         };
         /** DerivedListingResponse */
         DerivedListingResponse: {
@@ -12399,6 +12656,64 @@ export interface components {
             /** Warnings */
             warnings?: string[];
         };
+        /** FundRelative */
+        FundRelative: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Rows */
+            rows: components["schemas"]["FundRelativeRow"][];
+            /**
+             * Covered Weight
+             * @description Portfolio weight of the held funds with a figure.
+             */
+            covered_weight: number;
+            /**
+             * Fund Weight
+             * @description Portfolio weight of all held funds.
+             */
+            fund_weight: number;
+            /**
+             * Average
+             * @description Weight-averaged tracking difference over the funds with a figure.
+             */
+            average: number | null;
+            /** Notes */
+            notes: string[];
+        };
+        /** FundRelativeRow */
+        FundRelativeRow: {
+            /** Isin */
+            isin: string;
+            /** Ticker */
+            ticker: string | null;
+            /** Name */
+            name: string | null;
+            /**
+             * Weight
+             * @description Share of the portfolio; None for the proxy fund alone.
+             */
+            weight: number | null;
+            /** Benchmark */
+            benchmark: string | null;
+            /**
+             * Tracking Difference
+             * @description Annualised, fund minus benchmark, same basis and currency only.
+             */
+            tracking_difference: number | null;
+            /**
+             * Reason
+             * @description Why there is no figure.
+             */
+            reason: string | null;
+            /**
+             * Is Proxy
+             * @description The fund the X-Ray uses as its benchmark proxy.
+             */
+            is_proxy: boolean;
+        };
         /** FundRequest */
         FundRequest: {
             /** Filters */
@@ -13981,6 +14296,80 @@ export interface components {
              */
             unchanged: string[];
         };
+        /** IndexComparison */
+        IndexComparison: {
+            /** Label */
+            label: string;
+            /** Source Url */
+            source_url: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Constituents */
+            constituents: number;
+            /**
+             * Index Weight Listed
+             * @description Sum of the pasted index weights.
+             */
+            index_weight_listed: number;
+            /** Active Share */
+            active_share: number | null;
+            /**
+             * Partial
+             * @description The pasted weights cover less than the whole index.
+             */
+            partial: boolean;
+            /**
+             * Index Weight Held
+             * @description Index weight in names the portfolio also holds.
+             */
+            index_weight_held: number;
+            /**
+             * Unmatched
+             * @description Pasted constituents that no holding matched.
+             */
+            unmatched: number;
+            /** Overweights */
+            overweights: components["schemas"]["IndexDifference"][];
+            /** Underweights */
+            underweights: components["schemas"]["IndexDifference"][];
+            /** Notes */
+            notes: string[];
+        };
+        /** IndexComparisons */
+        IndexComparisons: {
+            /** Comparisons */
+            comparisons: components["schemas"]["IndexComparison"][];
+            /** Notes */
+            notes: string[];
+        };
+        /** IndexConstituent */
+        IndexConstituent: {
+            /** Name */
+            name: string;
+            /** Isin */
+            isin?: string | null;
+            /** Ticker */
+            ticker?: string | null;
+            /** Weight */
+            weight: number;
+        };
+        /** IndexDifference */
+        IndexDifference: {
+            /** Name */
+            name: string;
+            /** Portfolio Weight */
+            portfolio_weight: number;
+            /** Index Weight */
+            index_weight: number;
+            /**
+             * Difference
+             * @description Portfolio minus index, in weight.
+             */
+            difference: number;
+        };
         /** IndexQuote */
         IndexQuote: {
             /** Symbol */
@@ -14037,6 +14426,29 @@ export interface components {
             points: {
                 [key: string]: unknown;
             }[];
+        };
+        /** IndexWeightsRequest */
+        IndexWeightsRequest: {
+            /**
+             * Source Url
+             * @description Where the figures came from (a web address).
+             */
+            source_url: string;
+            /**
+             * As Of
+             * Format: date
+             * @description The date the figures describe.
+             */
+            as_of: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Label
+             * @description The index's name.
+             */
+            label: string;
+            /** Constituents */
+            constituents: components["schemas"]["IndexConstituent"][];
         };
         /** Indicator */
         Indicator: {
@@ -15311,6 +15723,19 @@ export interface components {
             /** Dimensions */
             dimensions?: components["schemas"]["DimensionDetail"][];
         };
+        /** LinkedPair */
+        LinkedPair: {
+            /** Supplier */
+            supplier: string;
+            /** Customer */
+            customer: string;
+            /** Product */
+            product: string;
+            /** Combined Weight */
+            combined_weight: number;
+            /** Customer Share */
+            customer_share: number | null;
+        };
         /** LiquidityOut */
         LiquidityOut: {
             /** Liquid */
@@ -15682,6 +16107,7 @@ export interface components {
             /** Disclaimer */
             disclaimer: string;
             explain: components["schemas"]["PerformanceExplain"];
+            freshness?: components["schemas"]["FreshnessOut"] | null;
         };
         /** MacroComparison */
         MacroComparison: {
@@ -16220,6 +16646,33 @@ export interface components {
             change: number | string | null;
             /** Definition Note */
             definition_note?: string | null;
+        };
+        /**
+         * MergerEntry
+         * @description A share-exchange merger you entered: each old share became `ratio` new shares. Earlier
+         *     fills of the old ticker are carried over to the new one with their cost and purchase date.
+         */
+        MergerEntry: {
+            /** Old Ticker */
+            old_ticker: string;
+            /** New Ticker */
+            new_ticker: string;
+            /**
+             * Day
+             * Format: date
+             * @description First day the new ticker applies.
+             */
+            day: string;
+            /**
+             * Ratio
+             * @description New shares per old share.
+             */
+            ratio: number | string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** MessageOut */
         MessageOut: {
@@ -17115,6 +17568,47 @@ export interface components {
             /** Method Version */
             method_version: string;
         };
+        /** OwnerInput */
+        OwnerInput: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "region_split" | "supply_edge" | "index_weights";
+            /** Key */
+            key: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Source Url */
+            source_url: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Note */
+            note: string | null;
+            /**
+             * Origin
+             * @description 'derived' entries are computed from fund holdings the app stores and are recomputed when those holdings are refreshed.
+             * @default owner
+             * @enum {string}
+             */
+            origin: "owner" | "derived";
+            /** Derived From */
+            derived_from?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** OwnershipPeriod */
         OwnershipPeriod: {
             /**
@@ -17694,6 +18188,10 @@ export interface components {
             benchmark?: components["schemas"]["BenchmarkSpec"] | null;
             /** Splits */
             splits?: components["schemas"]["SplitEntry"][];
+            /** Mergers */
+            mergers?: components["schemas"]["MergerEntry"][];
+            /** Spin Offs */
+            spin_offs?: components["schemas"]["SpinOffEntry"][];
             /**
              * Note
              * @default
@@ -19250,6 +19748,34 @@ export interface components {
             high: number | string | null;
             /** Reason */
             reason?: string | null;
+        };
+        /** RegionSplitRequest */
+        RegionSplitRequest: {
+            /**
+             * Source Url
+             * @description Where the figures came from (a web address).
+             */
+            source_url: string;
+            /**
+             * As Of
+             * Format: date
+             * @description The date the figures describe.
+             */
+            as_of: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Region
+             * @description A region such as "Europe".
+             */
+            region: string;
+            /**
+             * Countries
+             * @description Country (code or name) -> share of the region.
+             */
+            countries: {
+                [key: string]: number;
+            };
         };
         /** RelatedPartyFigure */
         RelatedPartyFigure: {
@@ -21169,6 +21695,7 @@ export interface components {
             message: string;
             /** Reconciliation Error */
             reconciliation_error: number | null;
+            freshness?: components["schemas"]["FreshnessOut"] | null;
             explain: components["schemas"]["PerformanceExplain"];
         };
         /** SnapshotCreated */
@@ -21441,6 +21968,39 @@ export interface components {
              * @description Every configured source, in config order.
              */
             sources: components["schemas"]["SourceHealth"][];
+        };
+        /**
+         * SpinOffEntry
+         * @description A spin-off you entered: holders on `day` received `ratio` child shares per parent share,
+         *     and `cost_share` of the parent's cost moved to the child. The company's own notice gives the
+         *     split of cost; Steward does not look it up.
+         */
+        SpinOffEntry: {
+            /** Parent Ticker */
+            parent_ticker: string;
+            /** Child Ticker */
+            child_ticker: string;
+            /**
+             * Day
+             * Format: date
+             * @description First day the child shares exist.
+             */
+            day: string;
+            /**
+             * Ratio
+             * @description Child shares per parent share.
+             */
+            ratio: number | string;
+            /**
+             * Cost Share
+             * @description Fraction of the parent's cost that moves to the child (0 to 1).
+             */
+            cost_share: number | string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /**
          * SplitEntry
@@ -21932,6 +22492,105 @@ export interface components {
              * @default 1.0.0
              */
             method_version: string;
+        };
+        /** SupplyChain */
+        SupplyChain: {
+            /** Nodes */
+            nodes: components["schemas"]["SupplyNode"][];
+            /** Edges */
+            edges: components["schemas"]["SupplyEdge"][];
+            /**
+             * Linked
+             * @description Edges where the portfolio holds both ends, so one event can hit both.
+             */
+            linked: components["schemas"]["LinkedPair"][];
+            /**
+             * Held In Graph
+             * @description Portfolio weight in companies that appear in the graph.
+             */
+            held_in_graph: number;
+            /** Notes */
+            notes: string[];
+        };
+        /** SupplyEdge */
+        SupplyEdge: {
+            /**
+             * Id
+             * @description Set for an entry you made (it can be removed); None for a filing.
+             */
+            id: number | null;
+            /** Supplier */
+            supplier: string;
+            /** Customer */
+            customer: string;
+            /** Product */
+            product: string;
+            /** Customer Share */
+            customer_share: number | null;
+            /** Source Url */
+            source_url: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Origin
+             * @default owner
+             * @enum {string}
+             */
+            origin: "owner" | "filing";
+            /** Fiscal Period */
+            fiscal_period?: string | null;
+        };
+        /** SupplyEdgeRequest */
+        SupplyEdgeRequest: {
+            /**
+             * Source Url
+             * @description Where the figures came from (a web address).
+             */
+            source_url: string;
+            /**
+             * As Of
+             * Format: date
+             * @description The date the figures describe.
+             */
+            as_of: string;
+            /** Note */
+            note?: string | null;
+            /** Supplier */
+            supplier: string;
+            /** Customer */
+            customer: string;
+            /**
+             * Product
+             * @description What is supplied.
+             */
+            product: string;
+            /**
+             * Customer Share
+             * @description Share of the supplier's revenue this customer is.
+             */
+            customer_share?: number | null;
+        };
+        /** SupplyNode */
+        SupplyNode: {
+            /** Symbol */
+            symbol: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Weight
+             * @description Share of the portfolio held in it, directly or through funds.
+             */
+            weight: number;
+            /** Held */
+            held: boolean;
+            /**
+             * Level
+             * @description 0 for a company that only supplies; one more per step downstream.
+             */
+            level: number;
         };
         /** TargetBand */
         TargetBand: {
@@ -32882,6 +33541,336 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["XrayBenchmark"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_funds_vs_benchmark: {
+        parameters: {
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FundRelative"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_supply_chain: {
+        parameters: {
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplyChain"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_index_weights: {
+        parameters: {
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndexComparisons"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_owner_inputs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerInput"][];
+                };
+            };
+        };
+    };
+    save_region_split: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegionSplitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerInput"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_supply_edge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplyEdgeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerInput"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_index_weights: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IndexWeightsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerInput"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    derive_index_weights: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeriveIndexRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeriveResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    derive_region: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeriveRegionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeriveResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    derive_benchmarks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeriveResult"];
+                };
+            };
+        };
+    };
+    archive_owner_input: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                input_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

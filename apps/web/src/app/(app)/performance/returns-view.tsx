@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { Absent, ResourceGate } from "@/components/company/primitives";
+import { DataAgeBadge } from "@/components/freshness/data-age-badge";
 import { LineChart } from "@/components/performance/line-chart";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
@@ -18,33 +19,18 @@ import { Formula, Money, PlainReturn, Points, ReturnCell, TD, TH, TH_LEFT } from
 
 const fetchPerformance = () => getBrowserApiClient().GET("/portfolio/performance");
 
-function age(days: number | null | undefined): string {
-  if (days === null || days === undefined) return "unknown date";
-  if (days <= 0) return "today";
-  return days === 1 ? "1 day old" : `${days} days old`;
-}
-
-/** How old the prices, exchange rates and benchmark under a chart are; it turns to a warning when
- * either is past the limit, so an old figure is never read as current. */
+/** How old the prices, exchange rates and benchmark under a chart are. */
 function FreshnessBadge({ data }: { data: PerformanceData }) {
   const f = data.freshness;
   if (!f) return null;
   return (
-    <p
-      className={`mt-2 inline-flex flex-wrap gap-x-4 gap-y-1 border px-2 py-1 text-xs ${
-        f.stale ? "border-warning-signal bg-warning-signal-subtle text-text" : "border-border text-text-muted"
-      }`}
-    >
-      <span>
-        Prices and rates: {f.prices_as_of ? formatDate(f.prices_as_of) : "unknown date"} ({age(f.prices_age_days)})
-      </span>
-      {data.benchmark_label ? (
-        <span>
-          Benchmark: {f.benchmark_as_of ? formatDate(f.benchmark_as_of) : "no close stored"} ({age(f.benchmark_age_days)})
-        </span>
-      ) : null}
-      {f.stale ? <span className="font-medium">Older than {f.stale_after_days} days: figures may lag the market.</span> : null}
-    </p>
+    <DataAgeBadge
+      staleAfterDays={f.stale_after_days}
+      items={[
+        { label: "Prices and rates", date: f.prices_as_of, ageDays: f.prices_age_days },
+        ...(data.benchmark_label ? [{ label: "Benchmark", date: f.benchmark_as_of, ageDays: f.benchmark_age_days }] : []),
+      ]}
+    />
   );
 }
 

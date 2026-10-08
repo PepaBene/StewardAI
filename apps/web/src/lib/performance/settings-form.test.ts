@@ -16,6 +16,8 @@ const base: Settings = {
   alert_severity: 2,
   benchmark: null,
   splits: [],
+  mergers: [],
+  spin_offs: [],
   note: "",
 };
 
@@ -52,6 +54,28 @@ describe("settings form", () => {
     form.splits = [{ ticker: "A", day: "", ratio: "2", note: "" }];
     expect(formToSettings(form).ok).toBe(false);
     form.splits = [{ ticker: "", day: "", ratio: "", note: "" }];
+    expect(formToSettings(form)).toEqual({ ok: true, body: base });
+  });
+
+  it("round-trips mergers and spin-offs, with the cost share typed as a percent", () => {
+    const merger = { old_ticker: "AAA_US_EQ", new_ticker: "BBB_US_EQ", day: "2025-03-03", ratio: "1.5", note: "" };
+    const spin = { parent_ticker: "AAA_US_EQ", child_ticker: "CCC_US_EQ", day: "2025-04-01", ratio: "0.5", cost_share: "0.2", note: "" };
+    const saved = { ...base, mergers: [merger], spin_offs: [spin] };
+    const form = settingsToForm(saved);
+    expect(form.spin_offs[0].cost_percent).toBe("20");
+    expect(formToSettings(form)).toEqual({ ok: true, body: saved });
+  });
+
+  it("rejects a merger or spin-off that is incomplete, circular or out of range", () => {
+    const form = settingsToForm(base);
+    form.mergers = [{ old_ticker: "A", new_ticker: "A", day: "2025-03-03", ratio: "1", note: "" }];
+    expect(formToSettings(form).ok).toBe(false);
+    form.mergers = [{ old_ticker: "A", new_ticker: "B", day: "", ratio: "1", note: "" }];
+    expect(formToSettings(form).ok).toBe(false);
+    form.mergers = [];
+    form.spin_offs = [{ parent_ticker: "A", child_ticker: "B", day: "2025-04-01", ratio: "1", cost_percent: "120", note: "" }];
+    expect(formToSettings(form).ok).toBe(false);
+    form.spin_offs = [{ parent_ticker: "", child_ticker: "", day: "", ratio: "", cost_percent: "", note: "" }];
     expect(formToSettings(form)).toEqual({ ok: true, body: base });
   });
 

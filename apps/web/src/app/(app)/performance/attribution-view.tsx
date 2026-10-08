@@ -14,7 +14,7 @@ import { fetchExport } from "@/lib/performance/export";
 import { barScale, type AttributionData } from "@/lib/performance/performance";
 import { cn } from "@/lib/utils";
 
-import { Formula, Money, TD, TH, TH_LEFT, Toned } from "./shared";
+import { Formula, Money, PriceAge, TD, TH, TH_LEFT, Toned } from "./shared";
 
 const RANGES = [
   { id: "30", label: "1M" },
@@ -101,6 +101,9 @@ function Body({ data }: { data: AttributionData }) {
   const group = active ? Object.entries(data.groups[active]).sort((a, c) => c[1] - a[1]) : [];
   return (
     <div className="flex flex-col gap-5">
+      <div>
+        <PriceAge freshness={data.freshness} benchmark={!!data.benchmark} />
+      </div>
       {b.unattributed_tickers.length > 0 ? (
         <AlertMessage title="Part of the portfolio could not be attributed">
           The number of units changed without a stored fill for {b.unattributed_tickers.join(", ")} (a split, or a missing transaction). Their moves are left in “Not assigned”.

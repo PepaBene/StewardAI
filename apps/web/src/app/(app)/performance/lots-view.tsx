@@ -14,7 +14,7 @@ import { fetchExport } from "@/lib/performance/export";
 import { holdingProgress, monthsRemainingLabel, type LotsData } from "@/lib/performance/performance";
 import { cn } from "@/lib/utils";
 
-import { Formula, Money, TD, TH, TH_LEFT } from "./shared";
+import { Formula, Money, PriceAge, TD, TH, TH_LEFT } from "./shared";
 
 const fetchLots = () => getBrowserApiClient().GET("/portfolio/performance/lots");
 
@@ -197,6 +197,7 @@ export function LotsView() {
                 title="Open lots, soonest first"
                 action={<CsvDownload label="Lots CSV" filename="performance-lots.csv" fetchCsv={() => fetchExport("lots")} />}
               />
+              <PriceAge freshness={data.freshness} />
               <LotsTable data={data} />
             </Blueprint>
             <Realized data={data} />

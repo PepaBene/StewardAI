@@ -233,6 +233,51 @@ async def test_an_entered_split_changes_the_lots_quantity(api: httpx.AsyncClient
     )
 
 
+async def test_an_entered_merger_moves_the_lot_to_the_new_ticker_and_keeps_cost_and_date(
+    api: httpx.AsyncClient,
+) -> None:
+    before = (await api.get("/portfolio/performance/lots")).json()["lots"][0]
+    settings = (await api.get("/portfolio/performance/settings")).json()["settings"]
+    settings["mergers"] = [
+        {
+            "old_ticker": "AAA_US_EQ",
+            "new_ticker": "BBB_US_EQ",
+            "day": "2030-01-01",
+            "ratio": "1.5",
+            "note": "",
+        }
+    ]
+    assert (await api.put("/portfolio/performance/settings", json=settings)).status_code == 200
+    after = (await api.get("/portfolio/performance/lots")).json()["lots"][0]
+    assert after["ticker"] == "BBB_US_EQ" and after["bought_on"] == before["bought_on"]
+    assert after["quantity"] == pytest.approx(1.5 * before["quantity"])
+    assert after["cost"] == pytest.approx(before["cost"])
+
+
+async def test_an_entered_spin_off_gives_the_child_its_share_of_cost_and_the_parents_date(
+    api: httpx.AsyncClient,
+) -> None:
+    before = (await api.get("/portfolio/performance/lots")).json()["lots"][0]
+    settings = (await api.get("/portfolio/performance/settings")).json()["settings"]
+    settings["spin_offs"] = [
+        {
+            "parent_ticker": "AAA_US_EQ",
+            "child_ticker": "CCC_US_EQ",
+            "day": "2029-06-01",
+            "ratio": "0.5",
+            "cost_share": "0.2",
+            "note": "",
+        }
+    ]
+    assert (await api.put("/portfolio/performance/settings", json=settings)).status_code == 200
+    lots = {x["ticker"]: x for x in (await api.get("/portfolio/performance/lots")).json()["lots"]}
+    assert lots["CCC_US_EQ"]["bought_on"] == before["bought_on"]
+    assert lots["CCC_US_EQ"]["quantity"] == pytest.approx(0.5 * before["quantity"])
+    assert lots["CCC_US_EQ"]["cost"] == pytest.approx(0.2 * before["cost"])
+    assert lots["AAA_US_EQ"]["cost"] == pytest.approx(0.8 * before["cost"])
+    assert lots["AAA_US_EQ"]["quantity"] == pytest.approx(before["quantity"])
+
+
 async def test_csv_exports_match_the_pages(api: httpx.AsyncClient) -> None:
     lots = await api.get("/portfolio/performance/export", params={"kind": "lots"})
     assert lots.status_code == 200 and lots.headers["content-type"].startswith("text/csv")

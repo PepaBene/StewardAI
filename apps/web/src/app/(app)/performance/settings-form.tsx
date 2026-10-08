@@ -7,7 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
 import type { SettingsData } from "@/lib/performance/performance";
-import { formToSettings, settingsToForm, type BenchmarkRow, type SettingsForm, type SplitRow } from "@/lib/performance/settings-form";
+import {
+  formToSettings,
+  settingsToForm,
+  type BenchmarkRow,
+  type MergerRow,
+  type SettingsForm,
+  type SpinOffRow,
+  type SplitRow,
+} from "@/lib/performance/settings-form";
 
 const MAX_BENCHMARK_LINES = 4;
 const SELECT = "h-9 w-full border border-border bg-surface-raised px-2 text-sm";
@@ -37,6 +45,10 @@ export function SettingsFormPanel({ initial, onSaved }: { initial: SettingsData;
 
   const setSplit = (i: number, patch: Partial<SplitRow>) =>
     set("splits", form.splits.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const setMerger = (i: number, patch: Partial<MergerRow>) =>
+    set("mergers", form.mergers.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const setSpinOff = (i: number, patch: Partial<SpinOffRow>) =>
+    set("spin_offs", form.spin_offs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -181,6 +193,78 @@ export function SettingsFormPanel({ initial, onSaved }: { initial: SettingsData;
         ))}
         <Button type="button" variant="outline" size="sm" onClick={() => set("splits", [...form.splits, { ticker: "", day: "", ratio: "", note: "" }])}>
           Add a split
+        </Button>
+      </fieldset>
+
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-semibold">Mergers</legend>
+        <p className="text-xs text-text-muted">
+          When shares of one company were exchanged for shares of another, enter it here and earlier fills of the old ticker move to the new one, with their cost and purchase date. A share exchange is not a sale. Cash paid for a fraction of a share is not modelled.
+        </p>
+        {form.mergers.map((row, i) => (
+          <div key={i} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_1fr_9rem_6rem_1fr_auto]">
+            <Field label="Old ticker">
+              <Input value={row.old_ticker} onChange={(e) => setMerger(i, { old_ticker: e.target.value })} />
+            </Field>
+            <Field label="New ticker">
+              <Input value={row.new_ticker} onChange={(e) => setMerger(i, { new_ticker: e.target.value })} />
+            </Field>
+            <Field label="First day, new ticker">
+              <Input type="date" value={row.day} onChange={(e) => setMerger(i, { day: e.target.value })} />
+            </Field>
+            <Field label="New per old" hint={i === 0 ? "1.5 = 1.5 new shares" : undefined}>
+              <Input inputMode="decimal" value={row.ratio} onChange={(e) => setMerger(i, { ratio: e.target.value })} />
+            </Field>
+            <Field label="Note">
+              <Input value={row.note} maxLength={200} onChange={(e) => setMerger(i, { note: e.target.value })} />
+            </Field>
+            <Button type="button" variant="outline" size="sm" onClick={() => set("mergers", form.mergers.filter((_, j) => j !== i))}>
+              Remove
+            </Button>
+          </div>
+        ))}
+        <Button type="button" variant="outline" size="sm" onClick={() => set("mergers", [...form.mergers, { old_ticker: "", new_ticker: "", day: "", ratio: "", note: "" }])}>
+          Add a merger
+        </Button>
+      </fieldset>
+
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-semibold">Spin-offs</legend>
+        <p className="text-xs text-text-muted">
+          When a company handed its holders shares of a new one, enter it here. The new shares go into lots that keep the original purchase date, and the share of cost you give moves from the parent lots to them. The company&apos;s own notice states that split of cost; Steward does not look it up. Whether the purchase date carries over is for your tax rules to decide.
+        </p>
+        {form.spin_offs.map((row, i) => (
+          <div key={i} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_1fr_9rem_6rem_6rem_1fr_auto]">
+            <Field label="Parent ticker">
+              <Input value={row.parent_ticker} onChange={(e) => setSpinOff(i, { parent_ticker: e.target.value })} />
+            </Field>
+            <Field label="New ticker">
+              <Input value={row.child_ticker} onChange={(e) => setSpinOff(i, { child_ticker: e.target.value })} />
+            </Field>
+            <Field label="First day">
+              <Input type="date" value={row.day} onChange={(e) => setSpinOff(i, { day: e.target.value })} />
+            </Field>
+            <Field label="New per parent" hint={i === 0 ? "0.5 = one per two" : undefined}>
+              <Input inputMode="decimal" value={row.ratio} onChange={(e) => setSpinOff(i, { ratio: e.target.value })} />
+            </Field>
+            <Field label="Cost moved, %" hint={i === 0 ? "0 to 100" : undefined}>
+              <Input inputMode="decimal" value={row.cost_percent} onChange={(e) => setSpinOff(i, { cost_percent: e.target.value })} />
+            </Field>
+            <Field label="Note">
+              <Input value={row.note} maxLength={200} onChange={(e) => setSpinOff(i, { note: e.target.value })} />
+            </Field>
+            <Button type="button" variant="outline" size="sm" onClick={() => set("spin_offs", form.spin_offs.filter((_, j) => j !== i))}>
+              Remove
+            </Button>
+          </div>
+        ))}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => set("spin_offs", [...form.spin_offs, { parent_ticker: "", child_ticker: "", day: "", ratio: "", cost_percent: "", note: "" }])}
+        >
+          Add a spin-off
         </Button>
       </fieldset>
 

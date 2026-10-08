@@ -12,7 +12,7 @@ import { formatDate } from "@/lib/format";
 import { useApiResource, type ResourceState } from "@/lib/hooks/use-api-resource";
 import type { SleevesData } from "@/lib/performance/performance";
 
-import { Formula, PlainReturn, Points } from "./shared";
+import { Formula, PlainReturn, Points, PriceAge } from "./shared";
 
 type SleeveCardData = NonNullable<SleevesData["core"]>;
 
@@ -84,6 +84,9 @@ function SleevesBody({ state }: { state: ResourceState<SleevesData> }) {
           </AlertMessage>
         ) : (
           <div className="flex flex-col gap-5">
+            <div>
+              <PriceAge freshness={data.freshness} />
+            </div>
             {data.review_item ? (
               <AlertMessage title="Review item: your stocks are lagging the core">{data.message}</AlertMessage>
             ) : (

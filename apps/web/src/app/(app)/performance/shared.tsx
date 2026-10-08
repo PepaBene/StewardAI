@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Absent } from "@/components/company/primitives";
+import { DataAgeBadge } from "@/components/freshness/data-age-badge";
 import { formatMoney, formatPercent, gainLossTone } from "@/lib/format";
 import { figureReason, type Figure } from "@/lib/performance/performance";
 import { cn } from "@/lib/utils";
@@ -58,6 +59,28 @@ export function Points({ value }: { value: number | null | undefined }) {
 export const TH = "px-3 py-1.5 text-right font-medium";
 export const TH_LEFT = "px-3 py-1.5 text-left font-medium";
 export const TD = "num px-3 py-1.5 text-right";
+
+type FreshnessInput = {
+  prices_as_of?: string | null;
+  prices_age_days?: number | null;
+  benchmark_as_of?: string | null;
+  benchmark_age_days?: number | null;
+  stale_after_days: number;
+};
+
+/** The age of the prices and rates under a chart, plus the benchmark when one is compared. */
+export function PriceAge({ freshness, benchmark = false }: { freshness: FreshnessInput | null | undefined; benchmark?: boolean }) {
+  if (!freshness) return null;
+  return (
+    <DataAgeBadge
+      staleAfterDays={freshness.stale_after_days}
+      items={[
+        { label: "Prices and rates", date: freshness.prices_as_of, ageDays: freshness.prices_age_days },
+        ...(benchmark ? [{ label: "Benchmark", date: freshness.benchmark_as_of, ageDays: freshness.benchmark_age_days }] : []),
+      ]}
+    />
+  );
+}
 
 export function Formula({ lines, version }: { lines: string[]; version: string }) {
   return (

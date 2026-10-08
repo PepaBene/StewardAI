@@ -71,6 +71,46 @@ class SplitEntry(BaseModel):
         return value
 
 
+class MergerEntry(BaseModel):
+    """A share-exchange merger you entered: each old share became `ratio` new shares. Earlier
+    fills of the old ticker are carried over to the new one with their cost and purchase date."""
+
+    model_config = ConfigDict(extra="forbid")
+    old_ticker: Ticker = Field(min_length=1, max_length=40)
+    new_ticker: Ticker = Field(min_length=1, max_length=40)
+    day: dt.date = Field(description="First day the new ticker applies.")
+    ratio: Decimal = Field(gt=0, description="New shares per old share.")
+    note: str = Field(default="", max_length=200)
+
+    @model_validator(mode="after")
+    def _different(self) -> MergerEntry:
+        if self.old_ticker == self.new_ticker:
+            raise ValueError("a merger needs two different tickers")
+        return self
+
+
+class SpinOffEntry(BaseModel):
+    """A spin-off you entered: holders on `day` received `ratio` child shares per parent share,
+    and `cost_share` of the parent's cost moved to the child. The company's own notice gives the
+    split of cost; Steward does not look it up."""
+
+    model_config = ConfigDict(extra="forbid")
+    parent_ticker: Ticker = Field(min_length=1, max_length=40)
+    child_ticker: Ticker = Field(min_length=1, max_length=40)
+    day: dt.date = Field(description="First day the child shares exist.")
+    ratio: Decimal = Field(gt=0, description="Child shares per parent share.")
+    cost_share: Decimal = Field(
+        ge=0, le=1, description="Fraction of the parent's cost that moves to the child (0 to 1)."
+    )
+    note: str = Field(default="", max_length=200)
+
+    @model_validator(mode="after")
+    def _different(self) -> SpinOffEntry:
+        if self.parent_ticker == self.child_ticker:
+            raise ValueError("a spin-off needs two different tickers")
+        return self
+
+
 class PerformanceSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     core_tickers: list[Ticker] = Field(
@@ -102,6 +142,8 @@ class PerformanceSettings(BaseModel):
     )
     benchmark: BenchmarkSpec | None = None
     splits: list[SplitEntry] = Field(default_factory=list, max_length=200)
+    mergers: list[MergerEntry] = Field(default_factory=list, max_length=100)
+    spin_offs: list[SpinOffEntry] = Field(default_factory=list, max_length=100)
     note: str = Field(default="", max_length=500)
 
     @field_validator("exemption_currency")

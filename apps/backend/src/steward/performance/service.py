@@ -40,12 +40,16 @@ from steward.performance.ledger import (
     CashReconciliation,
     Kind,
     LedgerEntry,
+    Merger,
     RawTransaction,
+    SpinOff,
     Split,
+    apply_mergers,
     apply_splits,
     build_ledger,
     position_breaks,
     reconcile_cash,
+    spin_off_units,
     summarize,
 )
 from steward.performance.lots import build_lots, exemption_year, holding_periods
@@ -102,9 +106,27 @@ async def _raw_transactions(pool: asyncpg.Pool) -> list[RawTransaction]:
 async def _ledger(
     pool: asyncpg.Pool, account_currency: str | None, settings: PerformanceSettings
 ) -> list[LedgerEntry]:
-    """The classified ledger with the owner's entered splits applied to earlier fills."""
+    """The classified ledger with the owner's entered splits and mergers applied to earlier fills,
+    in date order so a split after a merger restates the merged shares."""
     entries = build_ledger(await _raw_transactions(pool), account_currency)
-    return apply_splits(entries, [Split(s.ticker, s.day, s.ratio) for s in settings.splits])
+    actions: list[tuple[dt.date, Split | Merger]] = [
+        *((s.day, Split(s.ticker, s.day, s.ratio)) for s in settings.splits),
+        *((m.day, Merger(m.old_ticker, m.new_ticker, m.day, m.ratio)) for m in settings.mergers),
+    ]
+    for _, action in sorted(actions, key=lambda x: x[0]):
+        entries = (
+            apply_splits(entries, [action])
+            if isinstance(action, Split)
+            else apply_mergers(entries, [action])
+        )
+    return entries
+
+
+def spin_offs_of(settings: PerformanceSettings) -> list[SpinOff]:
+    return [
+        SpinOff(s.parent_ticker, s.child_ticker, s.day, s.ratio, s.cost_share)
+        for s in settings.spin_offs
+    ]
 
 
 STALE_AFTER_DAYS = 5  # covers a weekend plus a market holiday
@@ -395,7 +417,9 @@ async def performance_report(
             " (select max(snapshot_date) from public.position_snapshot)"
         )
     }
-    pos_breaks = position_breaks(ledger, quantities)
+    pos_breaks = position_breaks(
+        ledger, quantities, received=spin_off_units(ledger, spin_offs_of(settings))
+    )
     summary = summarize(ledger)
     year_ago = days[-1].date - dt.timedelta(days=365)
     # Costs are in the account currency, so measure them against the account-currency value.
@@ -467,7 +491,7 @@ async def lots_report(pool: asyncpg.Pool, settings: PerformanceSettings) -> r.Lo
             exemption=[], time_test_years=settings.time_test_years,
             warnings=["no transactions stored"], disclaimer=DISCLAIMER, explain=explain,
         )  # fmt: skip
-    book = build_lots(ledger, settings.cost_method)
+    book = build_lots(ledger, settings.cost_method, spin_offs_of(settings))
     as_of = snapshots[-1]["snapshot_date"] if snapshots else dt.date.today()
     prices: dict[str, Decimal] = {}
     names: dict[str, str | None] = {}
@@ -577,7 +601,7 @@ async def lots_report(pool: asyncpg.Pool, settings: PerformanceSettings) -> r.Lo
         realized_gain=float(sum((s.gain for s in book.realized), ZERO)),
         dividends=float(book.dividends), fees=float(book.fees), exemption=exemption,
         time_test_years=settings.time_test_years, warnings=warnings, disclaimer=DISCLAIMER,
-        explain=explain,
+        explain=explain, freshness=freshness(as_of if snapshots else None, [], dt.date.today()),
     )  # fmt: skip
 
 
@@ -661,9 +685,7 @@ async def attribution_report(
         )
         for s in window
     ]
-    report = attribute(
-        account_days, positions, trades, income, costs, ticker_fx_lookup(positions)
-    )
+    report = attribute(account_days, positions, trades, income, costs, ticker_fx_lookup(positions))
     if report is None:
         return r.AttributionResponse(
             status="unavailable", start=None, end=None, base_currency=None, days=days,
@@ -741,6 +763,9 @@ async def attribution_report(
             for h in report.holdings
         ],
         groups=groups, benchmark=benchmark_out, explain=explain,
+        freshness=freshness(
+            snapshots[-1]["snapshot_date"], bench_series if label else [], dt.date.today()
+        ),
     )  # fmt: skip
 
 
@@ -843,5 +868,5 @@ async def sleeves_report(
         history_days=outcome.history_days, annual_gap_points=r.num(outcome.annual_gap_points),
         gap_limit_points=limit, too_early=outcome.too_early, review_item=outcome.review_item,
         message=outcome.message, reconciliation_error=r.num(outcome.reconciliation_error),
-        explain=explain,
+        explain=explain, freshness=freshness(valuation_days[-1], [], dt.date.today()),
     )  # fmt: skip

@@ -237,6 +237,7 @@ class LotsResponse(BaseModel):
     warnings: list[str]
     disclaimer: str
     explain: PerformanceExplain
+    freshness: FreshnessOut | None = None
 
 
 # --- attribution -------------------------------------------------------------------------------
@@ -298,6 +299,7 @@ class AttributionResponse(BaseModel):
     holdings: list[ContributionOut]
     groups: dict[str, dict[str, float]]
     benchmark: BenchmarkRelativeOut | None = None
+    freshness: FreshnessOut | None = None
     explain: PerformanceExplain
 
 
@@ -328,4 +330,5 @@ class SleevesResponse(BaseModel):
     review_item: bool
     message: str
     reconciliation_error: float | None
+    freshness: FreshnessOut | None = None
     explain: PerformanceExplain

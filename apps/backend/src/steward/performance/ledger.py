@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from enum import StrEnum
@@ -198,6 +198,70 @@ def apply_splits(entries: Iterable[LedgerEntry], splits: Sequence[Split]) -> lis
     return out
 
 
+@dataclass(frozen=True)
+class Merger:
+    """A share-exchange merger the owner entered: each `old` share became `ratio` `new` shares.
+    Fills of `old` before `day` are carried over to `new`; cost and purchase dates stay."""
+
+    old: str
+    new: str
+    day: dt.date
+    ratio: Decimal
+
+
+def apply_mergers(entries: Iterable[LedgerEntry], mergers: Sequence[Merger]) -> list[LedgerEntry]:
+    """Rewrite earlier fills of the old ticker onto the new one: quantity x ratio, price / ratio,
+    the money, the date and so the lot's age unchanged (a share exchange is not a sale). Cash paid
+    in lieu of a fraction is not modelled; it shows as a cash difference, never hidden."""
+    current = list(entries)
+    for m in sorted(mergers, key=lambda x: x.day):
+        out: list[LedgerEntry] = []
+        for e in current:
+            if e.ticker != m.old or e.kind not in (Kind.BUY, Kind.SELL) or e.day >= m.day:
+                out.append(e)
+                continue
+            out.append(
+                replace(
+                    e,
+                    ticker=m.new,
+                    quantity=e.quantity * m.ratio,
+                    price=e.price / m.ratio if e.price is not None else None,
+                    flags=(
+                        *e.flags,
+                        f"carried over from {m.old} in a merger: x{m.ratio.normalize():f}",
+                    ),
+                )
+            )
+        current = out
+    return current
+
+
+@dataclass(frozen=True)
+class SpinOff:
+    """A spin-off the owner entered: holders of `parent` on `day` received `ratio` `child` shares
+    per parent share, and `cost_share` of the parent's cost moved to the child."""
+
+    parent: str
+    child: str
+    day: dt.date
+    ratio: Decimal
+    cost_share: Decimal
+
+
+def spin_off_units(
+    entries: Iterable[LedgerEntry], spin_offs: Sequence[SpinOff]
+) -> dict[str, Decimal]:
+    """Child units each spin-off delivered: the parent units the fills show as held before `day`,
+    times the ratio. Used to reconcile the broker's position, not to price anything."""
+    fills = [e for e in entries if e.kind in (Kind.BUY, Kind.SELL) and e.ticker]
+    received: dict[str, Decimal] = defaultdict(Decimal)
+    for s in spin_offs:
+        held = sum((e.quantity for e in fills if e.ticker == s.parent and e.day < s.day), ZERO)
+        if held > 0:
+            received[s.child] += held * s.ratio
+    return dict(received)
+
+
 def external_flows(entries: Iterable[LedgerEntry]) -> list[tuple[dt.date, Decimal]]:
     return [
         (e.day, e.external_flow) for e in entries if e.kind in EXTERNAL_KINDS and not e.needs_fx
@@ -223,17 +287,21 @@ def position_breaks(
     broker_quantities: dict[str, Decimal],
     *,
     tolerance: Decimal = Decimal("0.000001"),
+    received: Mapping[str, Decimal] | None = None,
 ) -> list[PositionBreak]:
     """Held units rebuilt from fills against the latest broker position snapshot.
 
     A positive difference means the broker holds more than the fills explain: usually history
     older than the first stored fill, or a corporate action (split, merger, spin-off) that is
-    not a fill. It is reported, never netted away.
+    not a fill. It is reported, never netted away. `received` adds units a spin-off the owner
+    entered delivered.
     """
     held: dict[str, Decimal] = defaultdict(Decimal)
     for entry in entries:
         if entry.ticker and entry.kind in (Kind.BUY, Kind.SELL):
             held[entry.ticker] += entry.quantity
+    for ticker, units in (received or {}).items():
+        held[ticker] += units
     breaks: list[PositionBreak] = []
     for ticker in sorted(set(held) | set(broker_quantities)):
         ledger_q = held.get(ticker, ZERO)

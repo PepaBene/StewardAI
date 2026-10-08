@@ -10,7 +10,7 @@ import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { fetchExport } from "@/lib/performance/export";
 import { ledgerSentence, type PerformanceData, type SettingsData } from "@/lib/performance/performance";
 
-import { Money, TD, TH, TH_LEFT } from "./shared";
+import { Money, PriceAge, TD, TH, TH_LEFT } from "./shared";
 import { SettingsFormPanel } from "./settings-form";
 
 const fetchPerformance = () => getBrowserApiClient().GET("/portfolio/performance");
@@ -38,6 +38,7 @@ function Health({ data }: { data: PerformanceData }) {
           action={l.entries > 0 ? <CsvDownload label="Ledger CSV" filename="performance-ledger.csv" fetchCsv={() => fetchExport("ledger")} /> : undefined}
         />
         <p className="mt-2 max-w-3xl text-sm text-text-muted">{ledgerSentence(l)}</p>
+        <PriceAge freshness={data.freshness} />
         <dl className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
           {Object.entries(l.by_kind).map(([kind, count]) => (
             <div key={kind}>

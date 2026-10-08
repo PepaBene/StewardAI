@@ -9,6 +9,7 @@ import datetime as dt
 import logging
 import time
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any
@@ -40,6 +41,7 @@ from steward.lookthrough.read import (
     load_snapshots,
 )
 from steward.xray import benchmark as bench_mod
+from steward.xray import owner_input
 from steward.xray.leaves import (
     IssuerFacts,
     LeafSet,
@@ -231,9 +233,15 @@ def _country_value(label: str) -> str:
     return country_code(label) or label
 
 
-def revenue_slices(analysis: segments.SegmentAnalysis) -> dict[str, list[RevenueSlice]]:
+def revenue_slices(
+    analysis: segments.SegmentAnalysis,
+    regions: Mapping[str, Mapping[str, float]] | None = None,
+) -> dict[str, list[RevenueSlice]]:
     """Owner mappings first; where the owner mapped no country, the reported geography members
-    whose label is exactly a country name."""
+    whose label is exactly a country name, plus members named for a region the owner has spread
+    over countries (`regions`: lower-cased region -> country code -> share). A region spread is the
+    owner's own estimate, so its slices carry the `owner` basis."""
+    regions = regions or {}
     out: dict[str, list[RevenueSlice]] = {}
     for exp in analysis.exposures:
         dim = REVENUE_CONTEXTS.get(exp.context)
@@ -254,12 +262,26 @@ def revenue_slices(analysis: segments.SegmentAnalysis) -> dict[str, list[Revenue
         geo = next((b for b in analysis.breakdowns if b.kind == "geographic"), None)
         if geo is not None:
             acc: dict[str, float] = defaultdict(float)
+            spread: dict[str, float] = defaultdict(float)
             for m in geo.members:
-                code = country_code(m.label) if m.role == "operating" else None
-                if code and m.latest_share is not None and m.latest_share > 0:
+                if m.role != "operating" or m.latest_share is None or m.latest_share <= 0:
+                    continue
+                code = country_code(m.label)
+                if code:
                     acc[code] += float(m.latest_share)
-            if acc:
-                out["revenue_country"] = [RevenueSlice(c, s, "reported") for c, s in acc.items()]
+                elif m.label.strip().lower() in regions:
+                    for c, s in regions[m.label.strip().lower()].items():
+                        spread[c] += float(m.latest_share) * s
+            slices = [RevenueSlice(c, s, "reported") for c, s in acc.items()]
+            slices += [RevenueSlice(c, s, "owner") for c, s in spread.items() if c not in acc]
+            for c, s in spread.items():
+                if c in acc:  # a country named outright and also inside a region: one slice
+                    slices = [
+                        RevenueSlice(x.value, x.share + s, "owner") if x.value == c else x
+                        for x in slices
+                    ]
+            if slices:
+                out["revenue_country"] = slices
     return out
 
 
@@ -268,6 +290,7 @@ async def _revenue(
     owner_id: str,
     ranked: list[tuple[str, str]],
     leaf_tickers: dict[str, str],
+    regions: Mapping[str, Mapping[str, float]] | None = None,
 ) -> dict[str, dict[str, list[RevenueSlice]]]:
     """Revenue-country, commodity and trade-product slices by ISIN, for owner-mapped companies and
     the largest issuers' reported geography."""
@@ -292,7 +315,7 @@ async def _revenue(
         except Exception:  # one company's missing statements must not stop the view
             log.warning("xray: no segment analysis for %s", ticker, exc_info=True)
             continue
-        slices = revenue_slices(analysis)
+        slices = revenue_slices(analysis, regions)
         if slices:
             out[isin.upper()] = slices
             out.setdefault(ticker.upper(), slices)
@@ -376,7 +399,8 @@ async def load(
             + [x.isin for x in first.leaves if x.channel_kind == "direct" and x.isin],
         )
     }
-    data.revenue = await _revenue(pool, owner_id, ranked, {**ticker_of, **t212})
+    regions = await owner_input.region_splits(pool, owner_id)
+    data.revenue = await _revenue(pool, owner_id, ranked, {**ticker_of, **t212}, regions)
     if as_of is not None:
         notes.append(
             f"Holdings as of {day.isoformat()}. Fund holdings and statements are those known by "
@@ -406,6 +430,11 @@ _cache: dict[str, tuple[float, Loaded]] = {}
 
 def clear_cache() -> None:
     _cache.clear()
+
+
+def drop_cache(owner_id: str) -> None:
+    """Forget one owner's loaded X-Ray, so an input they just changed shows at once."""
+    _cache.pop(owner_id, None)
 
 
 async def load_cached(pool: asyncpg.Pool, owner_id: str) -> Loaded:
