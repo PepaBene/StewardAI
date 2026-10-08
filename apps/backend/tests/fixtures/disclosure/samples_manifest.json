@@ -1,22 +1,961 @@
 {
-  "version": 1,
-  "purpose": "P0.3 capture protocol: ten samples for each of ten disclosure types, each with manual ground truth. Slots are named `<category>-01` to `<category>-10` and are ALL `pending_capture` today: nothing has been captured yet. A slot becomes `captured` only when the original bytes are archived (sha256) and a person has recorded the expected parsed fields. No slot is pre-filled with invented values.",
-  "captured": 0,
-  "slot_fields": ["slot", "status", "issuer_key", "source_url", "sha256", "published_at", "known_at", "expected", "captured_by", "captured_on"],
-  "status_values": ["pending_capture", "captured", "rejected_unavailable"],
-  "categories": {
-    "13f_amendment": {"expected_fields": ["manager", "period", "amends_accession", "holdings_replaced", "shares_total"], "channel": "sec"},
-    "13dg_group": {"expected_fields": ["filer_group_members", "class", "shares", "percent", "voting_power", "purpose", "filing_time"], "channel": "sec"},
-    "form4_purchase_sale": {"expected_fields": ["insider", "role", "code", "shares", "price", "post_holdings", "plan_flag"], "channel": "sec"},
-    "form4_non_discretionary": {"expected_fields": ["insider", "code", "shares", "footnote_reason", "plan_flag"], "channel": "sec"},
-    "nport": {"expected_fields": ["fund", "report_date", "filing_date", "holding_id", "value", "derivative_flag"], "channel": "sec"},
-    "8k_deal_exhibit": {"expected_fields": ["parties", "announced_date", "consideration", "conditions", "state"], "channel": "sec"},
-    "xbrl_note": {"expected_fields": ["concept", "context", "value", "unit", "scale", "period"], "channel": "sec"},
-    "esef_block_note": {"expected_fields": ["issuer_lei", "block_concept", "text_offsets", "extension_taxonomy"], "channel": "esef"},
-    "sedarplus_filing": {"expected_fields": ["issuer", "document_id", "form", "filed_time", "stable_url"], "channel": "sedarplus"},
-    "issuer_consensus_version": {"expected_fields": ["issuer", "publisher", "file_version", "metric", "period", "mean", "median", "panel_size", "basis"], "channel": "issuer_ir"},
-    "relationship_disclosure": {"expected_fields": ["reporter", "counterparty_or_anonymous_label", "direction", "percentage", "denominator", "period", "passage_offsets"], "channel": "sec"}
+ "version": 1,
+ "purpose": "P0.3 capture protocol: ten samples for each of ten disclosure types, each with manual ground truth. Slots are named `<category>-01` to `<category>-10` and are `pending_capture` unless `slots` says otherwise. A slot becomes `captured` only when the original bytes are archived (sha256) and a person has recorded the expected parsed fields. No slot is pre-filled with invented values.",
+ "captured": 0,
+ "slot_fields": [
+  "slot",
+  "status",
+  "issuer_key",
+  "source_url",
+  "sha256",
+  "published_at",
+  "known_at",
+  "expected",
+  "captured_by",
+  "captured_on"
+ ],
+ "status_values": [
+  "pending_capture",
+  "captured",
+  "captured_model_checked",
+  "rejected_unavailable"
+ ],
+ "categories": {
+  "13f_amendment": {
+   "expected_fields": [
+    "manager",
+    "period",
+    "amends_accession",
+    "holdings_replaced",
+    "shares_total"
+   ],
+   "channel": "sec"
   },
-  "samples_per_category": 10,
-  "adjudication": "Every captured slot is read by a person before it becomes ground truth; disagreements are kept in `expected_notes`."
+  "13dg_group": {
+   "expected_fields": [
+    "filer_group_members",
+    "class",
+    "shares",
+    "percent",
+    "voting_power",
+    "purpose",
+    "filing_time"
+   ],
+   "channel": "sec"
+  },
+  "form4_purchase_sale": {
+   "expected_fields": [
+    "insider",
+    "role",
+    "code",
+    "shares",
+    "price",
+    "post_holdings",
+    "plan_flag"
+   ],
+   "channel": "sec"
+  },
+  "form4_non_discretionary": {
+   "expected_fields": [
+    "insider",
+    "code",
+    "shares",
+    "footnote_reason",
+    "plan_flag"
+   ],
+   "channel": "sec"
+  },
+  "nport": {
+   "expected_fields": [
+    "fund",
+    "report_date",
+    "filing_date",
+    "holding_id",
+    "value",
+    "derivative_flag"
+   ],
+   "channel": "sec"
+  },
+  "8k_deal_exhibit": {
+   "expected_fields": [
+    "parties",
+    "announced_date",
+    "consideration",
+    "conditions",
+    "state"
+   ],
+   "channel": "sec"
+  },
+  "xbrl_note": {
+   "expected_fields": [
+    "concept",
+    "context",
+    "value",
+    "unit",
+    "scale",
+    "period"
+   ],
+   "channel": "sec"
+  },
+  "esef_block_note": {
+   "expected_fields": [
+    "issuer_lei",
+    "block_concept",
+    "text_offsets",
+    "extension_taxonomy"
+   ],
+   "channel": "esef"
+  },
+  "sedarplus_filing": {
+   "expected_fields": [
+    "issuer",
+    "document_id",
+    "form",
+    "filed_time",
+    "stable_url"
+   ],
+   "channel": "sedarplus"
+  },
+  "issuer_consensus_version": {
+   "expected_fields": [
+    "issuer",
+    "publisher",
+    "file_version",
+    "metric",
+    "period",
+    "mean",
+    "median",
+    "panel_size",
+    "basis"
+   ],
+   "channel": "issuer_ir"
+  },
+  "relationship_disclosure": {
+   "expected_fields": [
+    "reporter",
+    "counterparty_or_anonymous_label",
+    "direction",
+    "percentage",
+    "denominator",
+    "period",
+    "passage_offsets"
+   ],
+   "channel": "sec"
+  }
+ },
+ "samples_per_category": 10,
+ "adjudication": "Every `captured` slot is read by a person before it becomes ground truth. A `captured_model_checked` slot was checked against the original source by the model (2026-10-08) and still needs a person's read before it counts toward a release gate; disagreements are kept in `expected_notes`.",
+ "slots": {
+  "form4_purchase_sale": [
+   {
+    "slot": "form4_purchase_sale-01",
+    "status": "captured_model_checked",
+    "issuer_key": "NFLX_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1065280/000106528025000256/wk-form4_1748995666.xml",
+    "sha256": "c0f16a7c5c09f26564b27ab2baa11ec2f96111ca4c1992c8534b296b62bb70ac",
+    "published_at": "2025-06-03",
+    "known_at": "2025-06-03 23:59:59+00",
+    "expected": {
+     "row": "0001065280-25-000256:15",
+     "insider": "HASTINGS REED",
+     "code": "S",
+     "date": "2025-06-02",
+     "shares": 1946.0,
+     "price": 1215.3773,
+     "post_holdings": 7324.0,
+     "xml_owners": [
+      "HASTINGS REED"
+     ],
+     "xml_aff10b5One": "1"
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-02",
+    "status": "captured_model_checked",
+    "issuer_key": "FB_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000095010321005724/dp149574_4-zuckerberg0416.xml",
+    "sha256": "f01c83bcda058e6ed4213d31999dc8adc12ed8492a6dcfe7a42086674b3dc983",
+    "published_at": "2021-04-19",
+    "known_at": "2021-04-19 23:59:59+00",
+    "expected": {
+     "row": "0000950103-21-005724:3",
+     "insider": "Zuckerberg Mark",
+     "code": "S",
+     "date": "2021-04-16",
+     "shares": 1400.0,
+     "price": 306.9771,
+     "post_holdings": 1100.0,
+     "xml_owners": [
+      "Zuckerberg Mark"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-03",
+    "status": "captured_model_checked",
+    "issuer_key": "GOOGL_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000120919121039274/doc4.xml",
+    "sha256": "1500b2082414c58f15af70a6df75327739701b0dd963d70cf81f41885c01e92e",
+    "published_at": "2021-06-09",
+    "known_at": "2021-06-09 23:59:59+00",
+    "expected": {
+     "row": "0001209191-21-039274:5",
+     "insider": "Page Lawrence",
+     "code": "S",
+     "date": "2021-06-07",
+     "shares": 1100.0,
+     "price": 2387.2926,
+     "post_holdings": 9162.0,
+     "xml_owners": [
+      "Page Lawrence"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-04",
+    "status": "captured_model_checked",
+    "issuer_key": "FB_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000095010321003693/dp147498_4-zuckerberg2.xml",
+    "sha256": "4b3eca01d479de8e90f0e4e90a5bf55320ece6193735e7556ea946b03dbf8538",
+    "published_at": "2021-03-08",
+    "known_at": "2021-03-08 23:59:59+00",
+    "expected": {
+     "row": "0000950103-21-003693:2",
+     "insider": "Zuckerberg Mark",
+     "code": "S",
+     "date": "2021-03-04",
+     "shares": 270.0,
+     "price": 255.9391,
+     "post_holdings": 4330.0,
+     "xml_owners": [
+      "Zuckerberg Mark"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-05",
+    "status": "captured_model_checked",
+    "issuer_key": "FB_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000095010324012229/dp216661_4-zuckerberg0812.xml",
+    "sha256": "44d3fece0f30d254dc1abcade7deecb43328a444f38006600b72f24641cb345e",
+    "published_at": "2024-08-14",
+    "known_at": "2024-08-14 23:59:59+00",
+    "expected": {
+     "row": "0000950103-24-012229:4",
+     "insider": "Zuckerberg Mark",
+     "code": "S",
+     "date": "2024-08-12",
+     "shares": 4999.0,
+     "price": 515.1065,
+     "post_holdings": 628743.0,
+     "xml_owners": [
+      "Zuckerberg Mark"
+     ],
+     "xml_aff10b5One": "1"
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-06",
+    "status": "captured_model_checked",
+    "issuer_key": "AMD_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/2488/000000248819000128/wf-form4_156572890341539.xml",
+    "sha256": "af01d764c388238323eaaf975376b96c7ff5647554f48de28259e7637baa2228",
+    "published_at": "2019-08-13",
+    "known_at": "2019-08-13 23:59:59+00",
+    "expected": {
+     "row": "0000002488-19-000128:1",
+     "insider": "Su Lisa T",
+     "code": "S",
+     "date": "2019-08-12",
+     "shares": 429497.0,
+     "price": 33.53,
+     "post_holdings": 2802267.0,
+     "xml_owners": [
+      "Su Lisa T"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-07",
+    "status": "captured_model_checked",
+    "issuer_key": "GOOGL_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000120919121060519/doc4.xml",
+    "sha256": "3bea8c7167ab5972932c112f8c0667c93766f31c68240bbfe9f4cec7b232088c",
+    "published_at": "2021-10-15",
+    "known_at": "2021-10-15 23:59:59+00",
+    "expected": {
+     "row": "0001209191-21-060519:5",
+     "insider": "Brin Sergey",
+     "code": "S",
+     "date": "2021-10-13",
+     "shares": 900.0,
+     "price": 2738.3022,
+     "post_holdings": 11888.0,
+     "xml_owners": [
+      "Brin Sergey"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-08",
+    "status": "captured_model_checked",
+    "issuer_key": "AMD_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/2488/000000248820000168/wf-form4_160530290595176.xml",
+    "sha256": "dd9ae243cb07d1c9995c6f87f5b53a88f485b63c9b18895279caf26b80059406",
+    "published_at": "2020-11-13",
+    "known_at": "2020-11-13 23:59:59+00",
+    "expected": {
+     "row": "0000002488-20-000168:2",
+     "insider": "Su Lisa T",
+     "code": "S",
+     "date": "2020-11-10",
+     "shares": 64658.0,
+     "price": 79.07,
+     "post_holdings": 2722793.0,
+     "xml_owners": [
+      "Su Lisa T"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-09",
+    "status": "captured_model_checked",
+    "issuer_key": "GOOGL_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000120919121063755/doc4.xml",
+    "sha256": "9fac6a2b26141a55d378418e10db4357db501683aaeaad5e19e0f7c5f3f3f82d",
+    "published_at": "2021-11-09",
+    "known_at": "2021-11-09 23:59:59+00",
+    "expected": {
+     "row": "0001209191-21-063755:26",
+     "insider": "Brin Sergey",
+     "code": "S",
+     "date": "2021-11-08",
+     "shares": 200.0,
+     "price": 3008.55,
+     "post_holdings": 0.0,
+     "xml_owners": [
+      "Brin Sergey"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-10",
+    "status": "captured_model_checked",
+    "issuer_key": "FB_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000095010320022110/dp140824_4-zuckerberg.xml",
+    "sha256": "2c4440bf5f8f8f0d1e25206aecc218d5f60328c0d3e55c11b77416a64d480bdb",
+    "published_at": "2020-11-12",
+    "known_at": "2020-11-12 23:59:59+00",
+    "expected": {
+     "row": "0000950103-20-022110:2",
+     "insider": "Zuckerberg Mark",
+     "code": "S",
+     "date": "2020-11-10",
+     "shares": 3000.0,
+     "price": 266.239,
+     "post_holdings": 24800.0,
+     "xml_owners": [
+      "Zuckerberg Mark"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   }
+  ],
+  "form4_non_discretionary": [
+   {
+    "slot": "form4_non_discretionary-01",
+    "status": "captured_model_checked",
+    "issuer_key": "UNH_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/731766/000073176624000360/wk-form4_1734643055.xml",
+    "sha256": "b517f1fa372997b7502b4f1f4289f732cc859e97511982bcdf6928766475a23a",
+    "published_at": "2024-12-19",
+    "known_at": "2024-12-19 23:59:59+00",
+    "expected": {
+     "row": "0000731766-24-000360:0",
+     "insider": "MONTGOMERY RICE VALERIE MD",
+     "code": "A",
+     "date": "2024-12-17",
+     "shares": 24.0,
+     "price": 0.0,
+     "post_holdings": 5866.0,
+     "xml_owners": [
+      "MONTGOMERY RICE VALERIE MD"
+     ],
+     "xml_aff10b5One": "0"
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-02",
+    "status": "captured_model_checked",
+    "issuer_key": "UNH_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/731766/000073176625000118/wk-form4_1743713628.xml",
+    "sha256": "74c6b86d4d9a5c1c5b41924a6c1e0c12e3d99de577313263be8b39c212d54c78",
+    "published_at": "2025-04-03",
+    "known_at": "2025-04-03 23:59:59+00",
+    "expected": {
+     "row": "0000731766-25-000118:0",
+     "insider": "Noseworthy John H",
+     "code": "A",
+     "date": "2025-04-01",
+     "shares": 180.0,
+     "price": 0.0,
+     "post_holdings": 5763.0,
+     "xml_owners": [
+      "Noseworthy John H"
+     ],
+     "xml_aff10b5One": "0"
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-03",
+    "status": "captured_model_checked",
+    "issuer_key": "KO_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/21344/000112760221006947/form4.xml",
+    "sha256": "3310a35b6edfe8315174943538f1bfbfe0e861063c2dd45a963c4e1f487d6d33",
+    "published_at": "2021-02-22",
+    "known_at": "2021-02-22 23:59:59+00",
+    "expected": {
+     "row": "0001127602-21-006947:0",
+     "insider": "LOVELESS KATHY",
+     "code": "A",
+     "date": "2021-02-18",
+     "shares": 717.0,
+     "price": 0.0,
+     "post_holdings": 12476.0,
+     "xml_owners": [
+      "LOVELESS KATHY"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-04",
+    "status": "captured_model_checked",
+    "issuer_key": "UBER_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1543151/000156218021001954/primarydocument.xml",
+    "sha256": "6e2d3547ac421315e0e48444b62f562996ae614bc806ab75196eddc645b3d31f",
+    "published_at": "2021-03-03",
+    "known_at": "2021-03-03 23:59:59+00",
+    "expected": {
+     "row": "0001562180-21-001954:0",
+     "insider": "Chai Nelson",
+     "code": "F",
+     "date": "2021-03-01",
+     "shares": 1756.0,
+     "price": 54.4,
+     "post_holdings": 177016.0,
+     "xml_owners": [
+      "Chai Nelson"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-05",
+    "status": "captured_model_checked",
+    "issuer_key": "FB_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000095010321007471/dp151257_4-cox.xml",
+    "sha256": "470b61d153155789806a3d40593763a289576e9ce4beb80d4db9c6f87baff39a",
+    "published_at": "2021-05-18",
+    "known_at": "2021-05-18 23:59:59+00",
+    "expected": {
+     "row": "0000950103-21-007471:2",
+     "insider": "Cox Christopher K",
+     "code": "M",
+     "date": "2021-05-15",
+     "shares": 17317.0,
+     "price": 0.0,
+     "post_holdings": 132323.0,
+     "xml_owners": [
+      "Cox Christopher K"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-06",
+    "status": "captured_model_checked",
+    "issuer_key": "FB_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000095010325002194/dp225056_4-newstead.xml",
+    "sha256": "4f51bd03a8e5a080a47d8780cb2e8f3d87c0e58c6849bd75a575319cace1c487",
+    "published_at": "2025-02-19",
+    "known_at": "2025-02-19 23:59:59+00",
+    "expected": {
+     "row": "0000950103-25-002194:3",
+     "insider": "Newstead Jennifer",
+     "code": "M",
+     "date": "2025-02-15",
+     "shares": 2679.0,
+     "price": 0.0,
+     "post_holdings": 45380.0,
+     "xml_owners": [
+      "Newstead Jennifer"
+     ],
+     "xml_aff10b5One": "1"
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-07",
+    "status": "captured_model_checked",
+    "issuer_key": "FB_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000112760219019063/form4.xml",
+    "sha256": "018bb3e2d70c06a1cb7ab2e7270eb7f88b4e256fb8fe691c1efae5c6b77e0db4",
+    "published_at": "2019-05-17",
+    "known_at": "2019-05-17 23:59:59+00",
+    "expected": {
+     "row": "0001127602-19-019063:0",
+     "insider": "HASTINGS REED",
+     "code": "M",
+     "date": "2019-05-15",
+     "shares": 1640.0,
+     "price": 0.0,
+     "post_holdings": 89245.0,
+     "xml_owners": [
+      "HASTINGS REED"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-08",
+    "status": "captured_model_checked",
+    "issuer_key": "ORCL_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1341439/000112760217024194/form4.xml",
+    "sha256": "92093512452534c7265d1311c85d7192b6f64ffb46336be2dc61f88aab5bff8b",
+    "published_at": "2017-07-26",
+    "known_at": "2017-07-26 23:59:59+00",
+    "expected": {
+     "row": "0001127602-17-024194:1",
+     "insider": "Daley Dorian",
+     "code": "F",
+     "date": "2017-07-24",
+     "shares": 6931.0,
+     "price": 50.8,
+     "post_holdings": 56753.0,
+     "xml_owners": [
+      "Daley Dorian"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-09",
+    "status": "captured_model_checked",
+    "issuer_key": "GOOGL_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000120919119039355/doc4.xml",
+    "sha256": "7be20d9d084f12cd6974bc1f6d9df9edf5da6159ccf1422a806a882af38a5286",
+    "published_at": "2019-06-27",
+    "known_at": "2019-06-27 23:59:59+00",
+    "expected": {
+     "row": "0001209191-19-039355:0",
+     "insider": "O'Toole Amie Thuener",
+     "code": "C",
+     "date": "2019-06-25",
+     "shares": 69.0,
+     "price": 0.0,
+     "post_holdings": 457.0,
+     "xml_owners": [
+      "O'Toole Amie Thuener"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-10",
+    "status": "captured_model_checked",
+    "issuer_key": "NFLX_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1065280/000110465924016672/tm245893-1_4seq1.xml",
+    "sha256": "5042e1b1a92977eda0cf2ff946e3fdce3db69b929984c7381b7eb26d39c80097",
+    "published_at": "2024-02-12",
+    "known_at": "2024-02-12 23:59:59+00",
+    "expected": {
+     "row": "0001104659-24-016672:11",
+     "insider": "Hoag Jay C",
+     "code": "M",
+     "date": "2024-02-08",
+     "shares": 151.0,
+     "price": 269.58,
+     "post_holdings": 1336.0,
+     "xml_owners": [
+      "Hoag Jay C"
+     ],
+     "xml_aff10b5One": "0"
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   }
+  ],
+  "sedarplus_filing": [
+   {
+    "slot": "sedarplus_filing-01",
+    "status": "captured_model_checked",
+    "issuer_key": "000006073",
+    "source_url": null,
+    "sha256": "413fa3926703a607c0c9a2229fff41563df500f8a932b5e00c45c2bf7209ca18",
+    "published_at": "2026-10-08T07:21:37+00:00",
+    "known_at": "2026-10-08T07:21:37+00:00",
+    "expected": {
+     "issuer": "Nano One Materials Corp.",
+     "document_id": "000006073:20261008T072137Z:c045cb7a9635:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "News release - English.pdf",
+     "filed_time": "2026-10-08T07:21:37+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-02",
+    "status": "captured_model_checked",
+    "issuer_key": "000102279",
+    "source_url": null,
+    "sha256": "b14fec9a176b0d18b643a2244af3470d4def845f51a4715be337676e32d40fab",
+    "published_at": "2026-10-08T06:47:01+00:00",
+    "known_at": "2026-10-08T06:47:01+00:00",
+    "expected": {
+     "issuer": "Platform Advisor, LLC",
+     "document_id": "000102279:20261008T064701Z:3bf17d332e95:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Report of exempt distribution (45-106F1).pdf",
+     "filed_time": "2026-10-08T06:47:01+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-03",
+    "status": "captured_model_checked",
+    "issuer_key": "000102279",
+    "source_url": null,
+    "sha256": "9b9232f6b5b18ac92ee6f1b33a1b67771edb990be728b5c3011bc8ef5db77462",
+    "published_at": "2026-10-08T05:56:03+00:00",
+    "known_at": "2026-10-08T05:56:03+00:00",
+    "expected": {
+     "issuer": "Platform Advisor, LLC",
+     "document_id": "000102279:20261008T055603Z:bd7e6f351b9a:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Report of exempt distribution (45-106F1).pdf",
+     "filed_time": "2026-10-08T05:56:03+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-04",
+    "status": "captured_model_checked",
+    "issuer_key": "000102279",
+    "source_url": null,
+    "sha256": "aeeb77cbd1cc0c4700251af7d7790fc9b6138befeacd6318ec37765ec191b959",
+    "published_at": "2026-10-08T04:53:54+00:00",
+    "known_at": "2026-10-08T04:53:54+00:00",
+    "expected": {
+     "issuer": "Platform Advisor, LLC",
+     "document_id": "000102279:20261008T045354Z:c5c91e95682d:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Report of exempt distribution (45-106F1).pdf",
+     "filed_time": "2026-10-08T04:53:54+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-05",
+    "status": "captured_model_checked",
+    "issuer_key": "000021176",
+    "source_url": null,
+    "sha256": "bfcb529a69ffcdce19d4ed24cb0f804b3e2fa8136cd91e5ac47564ca9c5f6f5d",
+    "published_at": "2026-10-08T02:14:10+00:00",
+    "known_at": "2026-10-08T02:14:10+00:00",
+    "expected": {
+     "issuer": "North American Financial 15 Split Corp.",
+     "document_id": "000021176:20261008T021410Z:6d11af8a7bab:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Prospectus (non pricing) supplement (ATM) – English.pdf",
+     "filed_time": "2026-10-08T02:14:10+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-06",
+    "status": "captured_model_checked",
+    "issuer_key": "000020286",
+    "source_url": null,
+    "sha256": "f5b272a295e62e5009462a1c372c57caaf00456c98521119d00822f77c6cfa17",
+    "published_at": "2026-10-08T02:11:29+00:00",
+    "known_at": "2026-10-08T02:11:29+00:00",
+    "expected": {
+     "issuer": "Dividend 15 Split Corp.",
+     "document_id": "000020286:20261008T021129Z:2d490c282c3f:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Prospectus (non pricing) supplement (ATM) – English.pdf",
+     "filed_time": "2026-10-08T02:11:29+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-07",
+    "status": "captured_model_checked",
+    "issuer_key": "000020286",
+    "source_url": null,
+    "sha256": "3534c45daafeb4da4d83c9523b860736dd9491288e9b14e5c3f6cc01436959a7",
+    "published_at": "2026-10-08T02:11:29+00:00",
+    "known_at": "2026-10-08T02:11:29+00:00",
+    "expected": {
+     "issuer": "Dividend 15 Split Corp.",
+     "document_id": "000020286:20261008T021129Z:40b50c8d263e:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Other material contract(s).pdf",
+     "filed_time": "2026-10-08T02:11:29+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-08",
+    "status": "captured_model_checked",
+    "issuer_key": "000043146",
+    "source_url": null,
+    "sha256": "dcf2a1fbb61b6499a73223c0d9671e0deb40cf959df73cf8d0f9d7fe9362e9b6",
+    "published_at": "2026-10-08T02:03:21+00:00",
+    "known_at": "2026-10-08T02:03:21+00:00",
+    "expected": {
+     "issuer": "Scully Royalty Ltd.",
+     "document_id": "000043146:20261008T020321Z:77844a17caee:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Other.pdf",
+     "filed_time": "2026-10-08T02:03:21+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-09",
+    "status": "captured_model_checked",
+    "issuer_key": "000022832",
+    "source_url": null,
+    "sha256": "90dd78c7c1e99543db0e0c28e81d83876e2f8ce19d958f86ed52b4256bdac129",
+    "published_at": "2026-10-08T01:38:26+00:00",
+    "known_at": "2026-10-08T01:38:26+00:00",
+    "expected": {
+     "issuer": "Eagle Credit Card Trust",
+     "document_id": "000022832:20261008T013826Z:94b057a63d8e:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Pricing supplement (other than specified derivative) – English.pdf",
+     "filed_time": "2026-10-08T01:38:26+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-10",
+    "status": "captured_model_checked",
+    "issuer_key": "000022832",
+    "source_url": null,
+    "sha256": "bc482743f4d8eccba96e51d29dc762b58abcc127788075e74134b1dc4b25f361",
+    "published_at": "2026-10-08T01:31:50+00:00",
+    "known_at": "2026-10-08T01:31:50+00:00",
+    "expected": {
+     "issuer": "Eagle Credit Card Trust",
+     "document_id": "000022832:20261008T013150Z:0bae39eb2667:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Material change report - French.pdf",
+     "filed_time": "2026-10-08T01:31:50+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   }
+  ],
+  "nport": [
+   {
+    "slot": "nport-01",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-02",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-03",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-04",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-05",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-06",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-07",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-08",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-09",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-10",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   }
+  ],
+  "issuer_consensus_version": [
+   {
+    "slot": "issuer_consensus_version-01",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-02",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-03",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-04",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-05",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-06",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-07",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-08",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-09",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-10",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   }
+  ]
+ },
+ "captured_model_checked": 30
 }

@@ -15,7 +15,7 @@ from steward.disclosure.registry import seed_sources
 from tests.test_disclosure_deals import PRESS
 from tests.test_disclosure_esef_discovery import LEI_A, entry
 from tests.test_disclosure_estimates_db import setup
-from tests.test_disclosure_jurisdiction_adapters import EDINET
+from tests.test_disclosure_jurisdiction_adapters import EDINET, LIVE_SEDAR_PAGE
 
 pytestmark = pytest.mark.db
 
@@ -88,6 +88,27 @@ async def test_edinet_rows_are_stored_with_the_filing_time_and_matched_issuer(
     assert all(r["known_at"] >= r["filed_at"] for r in rows)  # never before the filing
     again = await foreign_job.collect_edinet_day(backend_pool, EDINET, codes)
     assert again.stored == 0 and again.unchanged == 2
+
+
+async def test_sedarplus_page_rows_are_stored_only_for_held_profiles(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    issuer = await lei_issuer(backend_pool)
+    held: dict[str, int | None] = {"000006073": issuer}
+    out = await foreign_job.collect_sedarplus_page(backend_pool, LIVE_SEDAR_PAGE, held)
+    assert (out.seen, out.stored) == (3, 1)
+    assert out.skipped == {"no_doc_id": 1, "not_held": 2}
+    row = await backend_pool.fetchrow(
+        """select d.external_id, d.issuer_id, v.known_at, v.filed_at
+             from public.source_document d
+             join public.source_document_version v on v.document_id = d.id
+            where d.regulator = 'SEDAR+'"""
+    )
+    assert row["issuer_id"] == issuer
+    assert row["filed_at"] == dt.datetime(2026, 10, 8, 7, 21, 37, tzinfo=dt.UTC)
+    assert row["known_at"] >= row["filed_at"]
+    again = await foreign_job.collect_sedarplus_page(backend_pool, LIVE_SEDAR_PAGE, held)
+    assert again.stored == 0 and again.unchanged == 1
 
 
 def submissions() -> bytes:

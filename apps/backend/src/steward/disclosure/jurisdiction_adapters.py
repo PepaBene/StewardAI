@@ -27,6 +27,8 @@ date without a time is known at the end of that day in the same offset.
 """
 
 import datetime as dt
+import hashlib
+import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -186,6 +188,86 @@ def _sedar_moment(day: object, clock: object) -> tuple[dt.datetime | None, dt.da
     return None, end_utc  # an unreadable time falls back to the day, the later reading
 
 
+def _aware_moment(value: object) -> dt.datetime | None:
+    """An ISO time that states its own offset, in UTC; anything else is None."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(value.strip())
+    except ValueError:
+        return None
+    return parsed.astimezone(dt.UTC) if parsed.tzinfo else None
+
+
+# Zone names the SEDAR+ results table prints, as offsets in hours.
+_CANADA_ZONES = {
+    "Newfoundland Daylight Time": -2.5,
+    "Newfoundland Standard Time": -3.5,
+    "Atlantic Daylight Time": -3,
+    "Atlantic Standard Time": -4,
+    "Eastern Daylight Time": -4,
+    "Eastern Standard Time": -5,
+    "Central Daylight Time": -5,
+    "Central Standard Time": -6,
+    "Mountain Daylight Time": -6,
+    "Mountain Standard Time": -7,
+    "Pacific Daylight Time": -7,
+    "Pacific Standard Time": -8,
+}
+_SEDAR_STAMP = re.compile(r"(\w+ \d{1,2} \d{4}) at (\d{1,2}:\d{2}:\d{2}) ([A-Za-z ]+?)\s*$")
+_SEDAR_PROFILE = re.compile(r"\((\d{6,})\)\s*$")
+
+
+def sedarplus_page_rows(captured: object) -> list[dict[str, Any]]:
+    """Contract rows from the rows of the SEDAR+ document-search results table, as read from a
+    signed-in browser page (checked against the live page on 2026-10-08). A row carries the
+    profile as "Name (000006073)", the document name, a submitted stamp such as
+    "October 08 2026 at 03:21:37 Eastern Daylight Time", the principal jurisdiction and a size.
+    The page gives no document id (its links are session tokens), so the id is derived from the
+    stated profile, time, name and size, with a counter for rows identical in all four, and is
+    marked as derived. A row whose time or profile cannot be read keeps no id and is skipped
+    downstream rather than guessed."""
+    if not isinstance(captured, list):
+        raise ValueError("captured SEDAR+ rows are not a list")
+    out: list[dict[str, Any]] = []
+    seen: dict[str, int] = {}
+    for item in captured:
+        if not isinstance(item, dict):
+            out.append({})
+            continue
+        profile_text = _text(item.get("profile")) or ""
+        match = _SEDAR_PROFILE.search(profile_text)
+        stamp = _SEDAR_STAMP.search(_text(item.get("submitted")) or "")
+        filed: dt.datetime | None = None
+        if stamp and stamp.group(3) in _CANADA_ZONES:
+            try:
+                local = dt.datetime.strptime(
+                    f"{stamp.group(1)} {stamp.group(2)}", "%B %d %Y %H:%M:%S"
+                )
+            except ValueError:
+                local = None
+            if local:
+                zone = dt.timezone(dt.timedelta(hours=_CANADA_ZONES[stamp.group(3)]))
+                filed = local.replace(tzinfo=zone).astimezone(dt.UTC)
+        name = _text(item.get("document"))
+        row: dict[str, Any] = {
+            "profile_number": match.group(1) if match else None,
+            "issuer_name": _text(profile_text[: match.start()].split(" / ")[0]) if match else None,
+            "document_type": name,
+            "jurisdiction": _text(item.get("jurisdiction")),
+            "size": _text(item.get("size")),
+            "id_basis": "derived",
+        }
+        if filed is not None and match and name:
+            row["filed_at"] = filed.isoformat()
+            base = "|".join((match.group(1), filed.isoformat(), name, row["size"] or ""))
+            digest = hashlib.sha256(base.encode()).hexdigest()[:12]
+            n = seen[digest] = seen.get(digest, -1) + 1
+            row["document_id"] = f"{match.group(1)}:{filed:%Y%m%dT%H%M%SZ}:{digest}:{n}"
+        out.append(row)
+    return out
+
+
 def sedarplus_documents(rows: object, observed_at: dt.datetime | None = None) -> AdapterDiscovery:
     """Documents of an assumed SEDAR+ filing-list export (see the module docstring: the row
     shape is not verified). A row needs a document id and a filing date; without a time the
@@ -204,6 +286,9 @@ def sedarplus_documents(rows: object, observed_at: dt.datetime | None = None) ->
             )
             continue
         filed, end_of_day = _sedar_moment(row.get("filing_date"), row.get("filing_time"))
+        stated = _aware_moment(row.get("filed_at"))
+        if stated is not None:  # a time that carries its own zone beats the assumed offset
+            filed, end_of_day = stated, stated
         if end_of_day is None:
             out.skipped.append(
                 SkippedDocument(doc_id, "no_filing_time", f"filing_date {row.get('filing_date')!r}")

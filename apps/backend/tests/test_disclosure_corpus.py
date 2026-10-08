@@ -42,7 +42,18 @@ def test_identifiers_are_never_invented() -> None:
 
 def test_sample_manifest_is_honest_about_what_was_captured() -> None:
     manifest = load("samples_manifest.json")
-    assert manifest["captured"] == 0
+    slots = [s for group in manifest["slots"].values() for s in group]
+    # `captured` means a person has read the slot; the model's own check never counts as that
+    assert manifest["captured"] == sum(1 for s in slots if s["status"] == "captured") == 0
+    assert manifest["captured_model_checked"] == sum(
+        1 for s in slots if s["status"] == "captured_model_checked"
+    )
+    for s in slots:
+        assert s["status"] in manifest["status_values"], s["slot"]
+        if s["status"] == "captured_model_checked":
+            assert s["sha256"] and s["expected"] and s["captured_by"].startswith("claude-model")
+        if s["status"] == "rejected_unavailable":
+            assert s["reason"], s["slot"]
     assert manifest["samples_per_category"] == 10
     assert len(manifest["categories"]) == 11  # Form 4 purchase/sale and non-discretionary split
     for name, spec in manifest["categories"].items():

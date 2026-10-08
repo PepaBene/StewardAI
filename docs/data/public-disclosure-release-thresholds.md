@@ -35,4 +35,23 @@ Plan P0.6, written **2026-10-07**, before any collector is enabled. A dataset is
 
 ## Status
 
-No dataset has been measured yet. All thresholds above are unmet by definition until the adjudicated samples exist (`samples_manifest.json` has zero captured slots).
+### Measured 2026-10-08 on the production database (labels by the model, not a person)
+
+The owner asked the model to adjudicate with its own judgement. Labels are stored under sample key `prod-20261008-model`, reviewer `claude-model (not a human)`, every note starting `[model-adjudicated]`. The process above asks for a person, so **no gate below counts as passed for release**; the numbers say where the datasets stand and which defects to fix.
+
+| Dataset | Labelled | Correct | Rate | Bar | Result |
+|---|---|---|---|---|---|
+| Relationship claims | 93 real + 7 planted | 86 of 93; 7 of 7 planted caught | 92.5% | 95%, 100 real claims | not met: below the bar and 93 of 100 real claims (production holds 101 claims in all) |
+| Insider economic classes | 55 | 54 | 98.2% | 98%, 50 items | meets the bar on the model's reading; one dividend-reinvestment purchase filed under code P was classed an open-market buy |
+| Ownership matches (13F CUSIP to ticker) | 24 | 24 | 100% | 98%, 50 items | not met: only 24 CUSIP and ticker pairs exist |
+| Deal states, revision pairs, note values | 0 | n/a | n/a | n/a | not measurable: no deals stored, no consensus snapshots, no note sample drawn |
+
+Relationship misses, each a defect to fix: three TED procurement awards matched "CISCO" (a French construction firm) to Cisco Systems; two "All Other" residual buckets stored as customers; one risk sentence ("If we lose Microsoft Corporation's support") stored as a supplier; one 2023 customer share stored for a year in which no customer reached 10%; one geographic share (non-U.S. customers) stored as a customer relationship.
+
+### Zero-dollar check (P0.6)
+
+Every source used in the 2026-10-08 runs is free: SEC EDGAR and company-facts, GLEIF, filings.xbrl.org, TED, and the public SEDAR+ search. No paid key was used; EDINET and Companies House need free keys the owner does not have, so those two lanes are not run.
+
+### Capture manifest
+
+`samples_manifest.json` has 30 slots checked by the model against the original source (10 Form 4 purchases and sales, 10 non-discretionary Form 4 rows, 10 SEDAR+ rows) and 20 marked unavailable (N-PORT: no held US-ISIN fund; consensus: no issuer source registered). 60 slots are still pending. A slot counts as captured only after a person reads it, so `captured` stays 0.

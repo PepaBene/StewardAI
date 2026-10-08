@@ -9,6 +9,7 @@ from steward.disclosure.jurisdiction_adapters import (
     contract_summary,
     edinet_documents,
     sedarplus_documents,
+    sedarplus_page_rows,
 )
 from steward.sources.free_market import FreeSourceError
 
@@ -139,3 +140,55 @@ def test_sedarplus_rows_without_an_id_or_date_are_skipped_not_invented() -> None
     assert all(d.known_at == seen for d in sedarplus_documents(SEDAR, seen).discovered)
     with pytest.raises(ValueError):
         sedarplus_documents({"rows": []})
+
+
+# Rows as read from the live SEDAR+ results table on 2026-10-08 (signed-in browser page).
+LIVE_SEDAR_PAGE = [
+    {
+        "profile": "Nano One Materials Corp. / Nano One Materials Corp (000006073)",
+        "document": "News release - English.pdf",
+        "submitted": "October 08 2026 at 03:21:37 Eastern Daylight Time",
+        "jurisdiction": "British Columbia",
+        "size": "158 KB",
+    },
+    {
+        "profile": "Eagle Credit Card Trust / Eagle Credit Card Trust (000022832)",
+        "document": "Pricing supplement (other than specified derivative) - English.pdf",
+        "submitted": "October 07 2026 at 21:38:26 Eastern Daylight Time",
+        "jurisdiction": "Ontario",
+        "size": "118 KB",
+    },
+    {
+        "profile": "Eagle Credit Card Trust / Eagle Credit Card Trust (000022832)",
+        "document": "Pricing supplement (other than specified derivative) - English.pdf",
+        "submitted": "October 07 2026 at 21:38:26 Eastern Daylight Time",
+        "jurisdiction": "Ontario",
+        "size": "118 KB",
+    },
+    {"profile": "No Number Corp", "document": "x.pdf", "submitted": "garbled", "size": "1 KB"},
+]
+
+
+def test_live_sedarplus_page_rows_read_the_zone_they_state() -> None:
+    rows = sedarplus_page_rows(LIVE_SEDAR_PAGE)
+    out = sedarplus_documents(rows)
+    first = out.discovered[0]
+    assert first.issuer_code == "000006073" and first.issuer_name == "Nano One Materials Corp."
+    assert first.filed_at == dt.datetime(2026, 10, 8, 7, 21, 37, tzinfo=UTC)  # EDT is UTC-4
+    assert first.known_at == first.filed_at and first.jurisdiction == "CA"
+
+
+def test_live_sedarplus_rows_identical_in_every_field_get_distinct_derived_ids() -> None:
+    rows = sedarplus_page_rows(LIVE_SEDAR_PAGE)
+    assert rows[1]["document_id"] != rows[2]["document_id"]
+    assert rows[1]["document_id"].endswith(":0") and rows[2]["document_id"].endswith(":1")
+    assert rows[1]["id_basis"] == "derived"
+    assert sedarplus_page_rows(LIVE_SEDAR_PAGE)[1]["document_id"] == rows[1]["document_id"]
+
+
+def test_live_sedarplus_row_with_no_readable_time_or_profile_gets_no_id() -> None:
+    rows = sedarplus_page_rows(LIVE_SEDAR_PAGE)
+    assert "document_id" not in rows[3]
+    out = sedarplus_documents(rows)
+    assert [s.reason for s in out.skipped] == ["no_doc_id"]
+    assert len(out.discovered) == 3

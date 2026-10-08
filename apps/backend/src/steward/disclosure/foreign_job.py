@@ -6,8 +6,10 @@
 * EDINET: one submission day's document list is read for the issuers' EDINET codes. The list row
   is stored as the document version (the PDF costs a credit and is not downloaded here), known at
   the filing time, or at the end of the filing day when only the date is stated.
-* SEDAR+ has no public list or export (a browser session is required), so there is no fetcher
-  for it; its parser takes a file a person exports.
+* SEDAR+: public search works only in a browser that has passed the portal's bot check, and its
+  result links are session tokens. There is no unattended fetcher. A person's signed-in page is
+  read into rows (`sedarplus_page_rows`) and `collect_sedarplus_page` stores the rows of held
+  profiles. The portal gives no document id, so the id is derived and marked as such.
 
 Nothing here reads a value out of a document: the statements of an ESEF report reach the evidence
 layer through the existing statement pipeline. The same bytes are stored once, and a source that
@@ -27,11 +29,17 @@ import asyncpg
 from steward.disclosure.esef_discovery import DiscoveredEsefFiling, discover_esef
 from steward.disclosure.fetch import FetchFailure
 from steward.disclosure.ingest import DocumentRecord, ingest_document_version
-from steward.disclosure.jurisdiction_adapters import DiscoveredDocument, edinet_documents
+from steward.disclosure.jurisdiction_adapters import (
+    DiscoveredDocument,
+    edinet_documents,
+    sedarplus_documents,
+    sedarplus_page_rows,
+)
 from steward.sources.esef import ENTITY_FILINGS_URL
 
 ESEF_SOURCE = "esef.filings_xbrl_org"
 EDINET_SOURCE = "edinet.api"
+SEDAR_SOURCE = "sedarplus.portal"
 type Fetch = Callable[[str], Awaitable[Any]]
 
 
@@ -212,6 +220,58 @@ async def store_edinet(
         now=now,
     )
     return out.created
+
+
+async def collect_sedarplus_page(
+    pool: asyncpg.Pool,
+    captured: object,
+    holdings: dict[str, int | None],
+    *,
+    observed_at: dt.datetime | None = None,
+) -> ForeignTotals:
+    """Store the rows of one captured SEDAR+ results page whose profile number is in `holdings`
+    (profile number to issuer id, None when unmatched). The page comes from a person's signed-in
+    browser (see `sedarplus_page_rows`); nothing here logs in or drives a page. Other rows are
+    counted as `not_held`, not stored."""
+    found = sedarplus_documents(sedarplus_page_rows(captured), observed_at)
+    totals = ForeignTotals()
+    for s in found.skipped:
+        totals.skipped[s.reason] = totals.skipped.get(s.reason, 0) + 1
+    for doc in found.discovered:
+        totals.seen += 1
+        if doc.issuer_code not in holdings:
+            totals.skipped["not_held"] = totals.skipped.get("not_held", 0) + 1
+            continue
+        out = await ingest_document_version(
+            pool,
+            DocumentRecord(
+                regulator="SEDAR+",
+                external_id=doc.doc_id,
+                stable_url=f"sedarplus:{doc.doc_id}",
+                form=doc.form_label or "filing",
+                known_at=doc.known_at,
+                issuer_id=holdings[doc.issuer_code or ""],
+                source_key=SEDAR_SOURCE,
+                filed_at=doc.filed_at,
+                date_notes={"filed_precision": doc.filed_precision, "id_basis": "derived"},
+            ),
+            json.dumps(
+                {
+                    "document_id": doc.doc_id,
+                    "profile_number": doc.issuer_code,
+                    "issuer_name": doc.issuer_name,
+                    "document": doc.form_label,
+                    "filed_at": doc.filed_at.isoformat() if doc.filed_at else None,
+                },
+                sort_keys=True,
+            ).encode(),
+            now=observed_at,
+        )
+        if out.created:
+            totals.stored += 1
+        else:
+            totals.unchanged += 1
+    return totals
 
 
 async def collect_edinet_day(

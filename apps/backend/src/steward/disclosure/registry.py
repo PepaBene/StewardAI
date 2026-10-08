@@ -188,7 +188,10 @@ SOURCES: tuple[SourceSpec, ...] = (
         "CSA SEDAR+",
         "browser_session",
         ("html", "pdf"),
-        "No stable document ID, incremental discovery or export; fall back to issuer files",
+        "Live check 2026-10-08: a bot check (hCaptcha) a person must pass precedes search; rows "
+        "carry profile number, document name, submit time to the second with its zone, "
+        "jurisdiction and size, but no document id (links are session tokens); Export and "
+        "Generate URL exist; fall back to issuer files and the CSA Data Distribution Service",
         rate_per_second=0.2,
     ),
     SourceSpec(
