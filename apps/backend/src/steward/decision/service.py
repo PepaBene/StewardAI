@@ -560,6 +560,7 @@ async def build_pretrade_context(
             sell_target=target.sell_target if target else None,
             target_currency=target.currency if target else None,
             has_thesis=thesis is not None,
+            thesis_gaps=thesis.missing_requirements() if thesis else [],
             volatility=vol,
             currency=quote,
         )

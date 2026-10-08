@@ -72,9 +72,19 @@ async def outcomes(pool: asyncpg.Pool, entries: list[JournalEntry]) -> list[Deci
     return out
 
 
-async def scorecard(pool: asyncpg.Pool, owner_id: str, since: dt.date | None = None) -> Scorecard:
+async def scorecard(
+    pool: asyncpg.Pool,
+    owner_id: str,
+    since: dt.date | None = None,
+    ticker: str | None = None,
+    reason: str | None = None,
+) -> Scorecard:
     today = dt.date.today()
     entries = await list_entries(pool, owner_id, limit=2000)
     return build_scorecard(
-        await outcomes(pool, entries), since=since or today - dt.timedelta(days=365), until=today
+        await outcomes(pool, entries),
+        since=since or today - dt.timedelta(days=365),
+        until=today,
+        ticker=ticker,
+        reason=reason,
     )

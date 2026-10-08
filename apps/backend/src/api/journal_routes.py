@@ -48,11 +48,14 @@ async def get_scorecard(
     pool: Pool,
     owner: Owner,
     since: Annotated[dt.date | None, Query(description="Defaults to one year ago.")] = None,
+    ticker: Annotated[str | None, Query(max_length=40, description="One security.")] = None,
+    reason: Annotated[str | None, Query(max_length=40, description="One main reason.")] = None,
 ) -> Scorecard:
     """Sell targets reached, returns by conviction and reason, bought against passed, and what
     stocks did after they were sold, each with its sample size. Below five decisions a section
-    says so instead of reporting a figure."""
-    return await journal_service.scorecard(pool, owner.user_id, since)
+    says so instead of reporting a figure. `ticker` and `reason` limit it to one security or one
+    main reason, which usually leaves too few decisions to summarise; the sections say so."""
+    return await journal_service.scorecard(pool, owner.user_id, since, ticker, reason)
 
 
 @router.get("/journal/export/report")

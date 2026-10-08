@@ -51,6 +51,23 @@ def section(sc, id_: str):
 
 
 class TestScorecard:
+    def test_the_scorecard_can_be_limited_to_one_security_and_one_reason(self) -> None:
+        rows = [
+            outcome(1, "buy", 110.0, ticker="AAA", main_reason="valuation"),
+            outcome(2, "buy", 120.0, ticker="AAA", main_reason="quality"),
+            outcome(3, "buy", 90.0, ticker="BBB", main_reason="valuation"),
+        ]
+        both = build_scorecard(
+            rows, since=D(2026, 1, 1), until=D(2026, 12, 31), ticker="AAA", reason="valuation"
+        )
+        assert both.entries == 1
+        assert both.filtered_by == ["security AAA", "main reason valuation"]
+        only_ticker = build_scorecard(
+            rows, since=D(2026, 1, 1), until=D(2026, 12, 31), ticker="AAA"
+        )
+        assert only_ticker.entries == 2
+        assert card(rows).filtered_by == []
+
     def test_returns_by_conviction_median_and_win_share(self) -> None:
         # Five buys at 100 now 110/120/90/100/130 -> changes +10%, +20%, -10%, 0, +30%.
         # Sorted -10, 0, 10, 20, 30 -> median +10%. Wins are the strictly positive: 3 of 5.
@@ -202,7 +219,7 @@ class TestChatTools:
         declared = {t["name"] for t in TOOL_DEFINITIONS}
         wanted = {
             "stress_test", "theme_exposure", "decision_scorecard", "fund_overlap",
-            "performance_explain",
+            "performance_explain", "event_paths",
         }  # fmt: skip
         assert wanted <= declared
         assert all(hasattr(ChatTools, f"_tool_{name}") for name in wanted)

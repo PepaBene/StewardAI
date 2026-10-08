@@ -130,7 +130,12 @@ function Result({ impact }: { impact: EventImpactData }) {
                     </ul>
                   </th>
                   <td className="px-3 py-1.5">{CONFIDENCE_LABEL[p.confidence]}</td>
-                  <td className={TD}>{formatPercent(p.weight, { decimals: 1 })}</td>
+                  <td className={TD}>
+                    {formatPercent(p.weight, { decimals: 1 })}
+                    <div className="text-xs text-text-muted">
+                      {formatPercent(p.direct_weight ?? 0, { decimals: 1 })} direct, {formatPercent(p.fund_weight ?? 0, { decimals: 1 })} in funds
+                    </div>
+                  </td>
                   <td className={TD}>{p.revenue_share === null || p.revenue_share === undefined ? "Not stated" : formatPercent(p.revenue_share, { decimals: 0 })}</td>
                   <td className="px-3 py-1.5">{SEVERITY_LABEL[p.severity]}</td>
                   <td className="px-3 py-1.5 text-xs">{p.indicators.length > 0 ? p.indicators.join("; ") : "No thesis indicators"}</td>

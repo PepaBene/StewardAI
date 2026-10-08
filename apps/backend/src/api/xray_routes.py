@@ -10,8 +10,6 @@ from pydantic import BaseModel, Field
 from api.auth import Owner
 from api.db import Pool
 from steward import saved
-from steward.config.store import load_active
-from steward.config.thesis import ThesesConfig
 from steward.events import feed as events_feed
 from steward.events.feed import EventFeed
 from steward.events.paths import Direction, EventImpact, EventState, event_paths
@@ -175,20 +173,7 @@ async def get_event_feed(
 async def _chain_and_indicators(
     pool: Pool, owner: Owner
 ) -> tuple[SupplyChain, dict[str, list[str]]]:
-    loaded = await _loaded(pool, owner, None)
-    chain = supply_chain.build(
-        loaded.leafset,
-        await owner_input.current(pool, owner.user_id),
-        await supply_chain.filing_edges(pool, loaded.leafset),
-    )
-    stored = await load_active(pool, "theses", ThesesConfig)
-    indicators = {
-        supply_chain.symbol_of(t.ticker): [
-            f"{k.metric} {k.operator} {k.threshold:g} {k.unit}" for k in t.kpis
-        ]
-        for t in (stored.body.theses if stored else [])
-    }
-    return chain, indicators
+    return await events_feed.chain_and_indicators(pool, owner.user_id)
 
 
 @router.get("/index-weights")

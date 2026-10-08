@@ -127,6 +127,7 @@ class TickerFacts:
     sell_target: float | None = None
     target_currency: str | None = None
     has_thesis: bool = False
+    thesis_gaps: list[str] = field(default_factory=list)  # requirements the thesis does not meet
     volatility: float | None = None  # annualised, 1 year of the holding's own price history
     currency: str | None = None  # instrument currency, for the cost estimate
 
@@ -231,6 +232,19 @@ def _buy_checks(t: TradeLeg, ctx: PretradeContext) -> list[PretradeCheck]:
                 title="No thesis",
                 detail=f"{label} has no stored thesis. A stock is bought only on a written, "
                 "intact thesis; the core ETFs are the exception.",
+            )
+        )
+    elif f.thesis_gaps and f.tier != "core":
+        out.append(
+            PretradeCheck(
+                id="buy.thesis",
+                principle="8a",
+                ticker=t.ticker,
+                status="flag",
+                title="Thesis incomplete",
+                detail=f"The thesis for {label} lacks: {'; '.join(f.thesis_gaps)}. "
+                "A stock is bought on a thesis that states what the price implies, how it "
+                "could fail and what you know that the market does not.",
             )
         )
     else:

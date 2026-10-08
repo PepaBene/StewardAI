@@ -48,6 +48,16 @@ def test_build_map_carries_the_detail_into_each_group() -> None:
     assert sector.top_products[0].label == "Compute" and sector.patent_areas[0].families == 5
 
 
+def test_credit_signal_counts_leveraged_companies_and_needs_three_for_a_median() -> None:
+    profiles = [*PROFILES, Profile("CCC_US_EQ", "Tech", "Chips", "US")]
+    leverage = {"AAA_US_EQ": 2.5, "BBB_US_EQ": 0.2, "CCC_US_EQ": None}
+    sector = build_map(profiles, {}, {}, {}, {}, set(), None, leverage).sectors[0]
+    assert sector.leveraged == 1
+    assert sector.net_debt_to_equity is not None
+    assert sector.net_debt_to_equity.n == 2 and sector.net_debt_to_equity.median is None
+    assert sector.net_debt_to_equity.high == 2.5
+
+
 def test_map_without_detail_has_empty_lists() -> None:
     sector = build_map(PROFILES, {}, {}, {}, {}, set()).sectors[0]
     assert sector.top_products == [] and sector.geography == [] and sector.patent_areas == []

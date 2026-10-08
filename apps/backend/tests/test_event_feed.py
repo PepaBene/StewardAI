@@ -1,5 +1,7 @@
 import datetime as dt
 
+import pytest
+
 from steward.events.feed import Story, build, state_of
 from steward.xray.supply_chain import SupplyChain, SupplyEdge, SupplyNode
 
@@ -56,6 +58,25 @@ def test_confirmed_event_on_high_links_would_alert() -> None:
 def test_reported_event_never_would_alert() -> None:
     feed = build([_story(2, False)], _chain(), {}, TODAY, TODAY - dt.timedelta(days=14))
     assert feed.items and not feed.items[0].would_alert
+
+
+@pytest.mark.asyncio
+async def test_event_alert_is_raised_for_a_would_alert_item(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from steward.changes import alerts
+    from steward.events import feed as events_feed
+
+    async def chain(pool, owner):  # type: ignore[no-untyped-def]
+        return _chain(), {}
+
+    async def stories(pool, since):  # type: ignore[no-untyped-def]
+        return [_story(1, False)]
+
+    monkeypatch.setattr(events_feed, "chain_and_indicators", chain)
+    monkeypatch.setattr(events_feed, "load_stories", stories)
+    now = dt.datetime(2026, 10, 8, 8, tzinfo=dt.UTC)
+    got = await alerts.find_event_changes(None, "owner", now)  # type: ignore[arg-type]
+    assert [c.kind for c in got] == ["event"]
+    assert got[0].severity == 3 and got[0].key == "change:event:1:downstream"
 
 
 def test_story_without_links_is_left_out() -> None:

@@ -544,6 +544,18 @@ def test_missing_inputs_make_a_check_unavailable_not_a_pass() -> None:
     assert got["buy.thesis"].status == "flag"
 
 
+def test_an_incomplete_thesis_is_flagged_on_a_stock_but_not_a_core_holding() -> None:
+    config = StrategyConfig(base_currency="EUR")
+    gaps = ["a pre-mortem with three reasons", "a conviction level"]
+    for tier, status in ((None, "flag"), ("core", "info")):
+        facts = pt.TickerFacts("NEW", price=10, has_thesis=True, thesis_gaps=gaps, tier=tier)
+        ctx = pretrade_context(config, {"NEW": facts}, {"A": 100}, 100, {"A": 100, "NEW": 10}, 90)
+        got = by_id(pt.run([pt.TradeLeg(side="buy", ticker="NEW", value_base=10)], ctx))
+        assert got["buy.thesis"].status == status
+        if status == "flag":
+            assert "pre-mortem" in got["buy.thesis"].detail
+
+
 # --------------------------------------------------------------------------------- risk limits
 
 

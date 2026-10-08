@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { ResourceGate } from "@/components/company/primitives";
 import { Problem } from "@/components/risk/common";
@@ -14,14 +14,48 @@ import { cn } from "@/lib/utils";
 
 import { Notes } from "../../xray/shared";
 
-const fetchScorecard = () => getBrowserApiClient().GET("/journal/scorecard", { params: { query: {} } });
+const REASONS = ["quality", "value", "catalyst", "momentum", "other"] as const;
 
 export function ScorecardView() {
+  const [ticker, setTicker] = useState("");
+  const [reason, setReason] = useState("");
+  const fetchScorecard = useCallback(
+    () =>
+      getBrowserApiClient().GET("/journal/scorecard", {
+        params: { query: { ticker: ticker.trim() || undefined, reason: reason || undefined } },
+      }),
+    [ticker, reason],
+  );
   const { state } = useApiResource(fetchScorecard);
+  const field = "border border-border bg-transparent px-2 py-1 text-sm";
   return (
-    <ResourceGate state={state} label="the scorecard">
-      {(card) => <Card card={card} />}
-    </ResourceGate>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end gap-3 text-sm">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-text-muted">Limit to one security</span>
+          <input
+            className={cn(field, "w-48")}
+            value={ticker}
+            placeholder="AAPL_US_EQ"
+            onChange={(e) => setTicker(e.target.value)}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-text-muted">Limit to one main reason</span>
+          <select className={field} value={reason} onChange={(e) => setReason(e.target.value)}>
+            <option value="">All reasons</option>
+            {REASONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <ResourceGate state={state} label="the scorecard">
+        {(card) => <Card card={card} />}
+      </ResourceGate>
+    </div>
   );
 }
 
@@ -35,6 +69,7 @@ function Card({ card }: { card: Scorecard }) {
   return (
     <div className="flex flex-col gap-5">
       <p className="max-w-prose text-sm text-text-muted">
+        {(card.filtered_by ?? []).length > 0 ? `Limited to ${(card.filtered_by ?? []).join(" and ")}. ` : ""}
         {card.entries} decision{card.entries === 1 ? "" : "s"} from {formatDate(card.since)} to {formatDate(card.until)}. Squares count decisions toward the {card.min_decisions} a figure needs; with fewer, the section says so
         instead of reporting a number.
       </p>

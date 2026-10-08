@@ -12424,6 +12424,55 @@
         }
       }
     },
+    "/companies/{ticker}/thesis-draft": {
+      "post": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Post Thesis Draft",
+        "description": "A first draft of the thesis text from the stored research, computed figures and report\nconflicts. Every line names the facts it rests on; a line with none is removed. One model\ncall (the chat model); nothing is saved, so you edit the draft and save it yourself.",
+        "operationId": "post_thesis_draft",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThesisDraft"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/companies/{ticker}/segments": {
       "get": {
         "tags": [
@@ -18406,7 +18455,7 @@
           "journal"
         ],
         "summary": "Get Scorecard",
-        "description": "Sell targets reached, returns by conviction and reason, bought against passed, and what\nstocks did after they were sold, each with its sample size. Below five decisions a section\nsays so instead of reporting a figure.",
+        "description": "Sell targets reached, returns by conviction and reason, bought against passed, and what\nstocks did after they were sold, each with its sample size. Below five decisions a section\nsays so instead of reporting a figure. `ticker` and `reason` limit it to one security or one\nmain reason, which usually leaves too few decisions to summarise; the sections say so.",
         "operationId": "get_scorecard",
         "security": [
           {
@@ -18432,6 +18481,44 @@
               "title": "Since"
             },
             "description": "Defaults to one year ago."
+          },
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "One security.",
+              "title": "Ticker"
+            },
+            "description": "One security."
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "One main reason.",
+              "title": "Reason"
+            },
+            "description": "One main reason."
           }
         ],
         "responses": {
@@ -31489,6 +31576,43 @@
         ],
         "title": "CoverageSummary"
       },
+      "CreditContext": {
+        "properties": {
+          "latest": {
+            "type": "number",
+            "title": "Latest"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "median_1y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median 1Y"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "latest",
+          "as_of",
+          "median_1y",
+          "note"
+        ],
+        "title": "CreditContext",
+        "description": "The market-wide US high-yield spread. It is not a sector figure."
+      },
       "CreditStressRule": {
         "properties": {
           "key": {
@@ -35424,6 +35548,18 @@
             "type": "number",
             "title": "Weight",
             "description": "Portfolio weight in the company at the end of the path."
+          },
+          "direct_weight": {
+            "type": "number",
+            "title": "Direct Weight",
+            "description": "Of that weight, the part held directly.",
+            "default": 0.0
+          },
+          "fund_weight": {
+            "type": "number",
+            "title": "Fund Weight",
+            "description": "Of that weight, the part held in funds.",
+            "default": 0.0
           },
           "revenue_share": {
             "anyOf": [
@@ -42888,6 +43024,23 @@
             "type": "integer",
             "title": "Confirmed Peer Links",
             "description": "Confirmed peer links with both ends in the group."
+          },
+          "net_debt_to_equity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Spread"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Balance-sheet leverage, latest filed year (credit signal)."
+          },
+          "leveraged": {
+            "type": "integer",
+            "title": "Leveraged",
+            "description": "Companies with net debt above 1x equity.",
+            "default": 0
           },
           "top_products": {
             "items": {
@@ -56072,6 +56225,14 @@
           },
           "cockpit": {
             "$ref": "#/components/schemas/Cockpit"
+          },
+          "snoozed": {
+            "items": {
+              "$ref": "#/components/schemas/SnoozeRow"
+            },
+            "type": "array",
+            "title": "Snoozed",
+            "description": "Data-quality issues you set aside, with their dates."
           }
         },
         "type": "object",
@@ -67609,6 +67770,14 @@
             },
             "type": "array",
             "title": "Suggestions"
+          },
+          "filtered_by": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Filtered By",
+            "description": "What the decisions were limited to, if anything."
           }
         },
         "type": "object",
@@ -68170,6 +68339,16 @@
             "title": "Universe",
             "description": "Companies with a profile."
           },
+          "credit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CreditContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sectors": {
             "items": {
               "$ref": "#/components/schemas/GroupStats"
@@ -68202,7 +68381,7 @@
               "Top products: only companies whose annual report tags revenue by product are listed.",
               "Patent areas: empty until patent data is collected (EPO OPS credentials are not set).",
               "Trade dependencies: shown as the countries companies report revenue in, not customs data.",
-              "Credit cycle signals: the stored credit-spread series is for the whole market, not a sector."
+              "Credit: no sector credit spread is stored. The balance-sheet leverage of the group's own companies stands in for it, and the market-wide high-yield spread is shown beside it."
             ]
           },
           "method": {
@@ -73121,6 +73300,12 @@
             "type": "boolean",
             "title": "Held"
           },
+          "direct_weight": {
+            "type": "number",
+            "title": "Direct Weight",
+            "description": "The part of the weight held directly; the rest is through funds.",
+            "default": 0.0
+          },
           "level": {
             "type": "integer",
             "title": "Level",
@@ -74005,6 +74190,144 @@
           "why_owned"
         ],
         "title": "ThesisConfig"
+      },
+      "ThesisDraft": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "why_owned": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisDraftLine"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exit_conditions": {
+            "items": {
+              "$ref": "#/components/schemas/ThesisDraftLine"
+            },
+            "type": "array",
+            "title": "Exit Conditions"
+          },
+          "pre_mortem": {
+            "items": {
+              "$ref": "#/components/schemas/ThesisDraftLine"
+            },
+            "type": "array",
+            "title": "Pre Mortem"
+          },
+          "variant_perception": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisDraftVariant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "facts_used": {
+            "type": "integer",
+            "title": "Facts Used"
+          },
+          "dropped": {
+            "type": "integer",
+            "title": "Dropped",
+            "description": "Lines removed because they named no fact in the list."
+          },
+          "left_to_owner": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Left To Owner"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "model",
+          "why_owned",
+          "exit_conditions",
+          "pre_mortem",
+          "variant_perception",
+          "facts_used",
+          "dropped",
+          "left_to_owner",
+          "notes"
+        ],
+        "title": "ThesisDraft"
+      },
+      "ThesisDraftLine": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts",
+            "description": "The facts the line rests on, quoted as given."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "facts"
+        ],
+        "title": "ThesisDraftLine"
+      },
+      "ThesisDraftVariant": {
+        "properties": {
+          "belief": {
+            "type": "string",
+            "title": "Belief"
+          },
+          "disproof": {
+            "type": "string",
+            "title": "Disproof"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "belief",
+          "disproof",
+          "facts"
+        ],
+        "title": "ThesisDraftVariant"
       },
       "ThesisKPI": {
         "properties": {

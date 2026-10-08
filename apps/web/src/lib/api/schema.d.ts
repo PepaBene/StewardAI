@@ -3848,6 +3848,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/companies/{ticker}/thesis-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Thesis Draft
+         * @description A first draft of the thesis text from the stored research, computed figures and report
+         *     conflicts. Every line names the facts it rests on; a line with none is removed. One model
+         *     call (the chat model); nothing is saved, so you edit the draft and save it yourself.
+         */
+        post: operations["post_thesis_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/companies/{ticker}/segments": {
         parameters: {
             query?: never;
@@ -5820,7 +5842,8 @@ export interface paths {
          * Get Scorecard
          * @description Sell targets reached, returns by conviction and reason, bought against passed, and what
          *     stocks did after they were sold, each with its sample size. Below five decisions a section
-         *     says so instead of reporting a figure.
+         *     says so instead of reporting a figure. `ticker` and `reason` limit it to one security or one
+         *     main reason, which usually leaves too few decisions to summarise; the sections say so.
          */
         get: operations["get_scorecard"];
         put?: never;
@@ -10267,6 +10290,23 @@ export interface components {
             note: string;
         };
         /**
+         * CreditContext
+         * @description The market-wide US high-yield spread. It is not a sector figure.
+         */
+        CreditContext: {
+            /** Latest */
+            latest: number;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Median 1Y */
+            median_1y: number | null;
+            /** Note */
+            note: string;
+        };
+        /**
          * CreditStressRule
          * @description A threshold on one stored macro series. Fires once, when a genuinely new observation
          *     (a later period than any known before it) is beyond the threshold and the previous
@@ -11802,6 +11842,18 @@ export interface components {
              * @description Portfolio weight in the company at the end of the path.
              */
             weight: number;
+            /**
+             * Direct Weight
+             * @description Of that weight, the part held directly.
+             * @default 0
+             */
+            direct_weight: number;
+            /**
+             * Fund Weight
+             * @description Of that weight, the part held in funds.
+             * @default 0
+             */
+            fund_weight: number;
             /**
              * Revenue Share
              * @description Share of the end supplier's revenue that the lost customer represents, only for a single customer link that states one.
@@ -14497,6 +14549,14 @@ export interface components {
              * @description Confirmed peer links with both ends in the group.
              */
             confirmed_peer_links: number;
+            /** @description Balance-sheet leverage, latest filed year (credit signal). */
+            net_debt_to_equity?: components["schemas"]["Spread"] | null;
+            /**
+             * Leveraged
+             * @description Companies with net debt above 1x equity.
+             * @default 0
+             */
+            leveraged: number;
             /** Top Products */
             top_products?: components["schemas"]["ProductLine"][];
             /** Geography */
@@ -19058,6 +19118,11 @@ export interface components {
             journal: components["schemas"]["JournalEntry"][];
             scorecard: components["schemas"]["Scorecard"];
             cockpit: components["schemas"]["Cockpit"];
+            /**
+             * Snoozed
+             * @description Data-quality issues you set aside, with their dates.
+             */
+            snoozed?: components["schemas"]["SnoozeRow"][];
         };
         /** OwnershipPeriod */
         OwnershipPeriod: {
@@ -23131,6 +23196,11 @@ export interface components {
             method: string;
             /** Suggestions */
             suggestions?: string[];
+            /**
+             * Filtered By
+             * @description What the decisions were limited to, if anything.
+             */
+            filtered_by?: string[];
         };
         /** ScreenBody */
         ScreenBody: {
@@ -23363,6 +23433,7 @@ export interface components {
              * @description Companies with a profile.
              */
             universe: number;
+            credit?: components["schemas"]["CreditContext"] | null;
             /** Sectors */
             sectors: components["schemas"]["GroupStats"][];
             /** Industries */
@@ -23378,7 +23449,7 @@ export interface components {
              *       "Top products: only companies whose annual report tags revenue by product are listed.",
              *       "Patent areas: empty until patent data is collected (EPO OPS credentials are not set).",
              *       "Trade dependencies: shown as the countries companies report revenue in, not customs data.",
-             *       "Credit cycle signals: the stored credit-spread series is for the whole market, not a sector."
+             *       "Credit: no sector credit spread is stored. The balance-sheet leverage of the group's own companies stands in for it, and the market-wide high-yield spread is shown beside it."
              *     ]
              */
             not_covered: string[];
@@ -25117,6 +25188,12 @@ export interface components {
             /** Held */
             held: boolean;
             /**
+             * Direct Weight
+             * @description The part of the weight held directly; the rest is through funds.
+             * @default 0
+             */
+            direct_weight: number;
+            /**
              * Level
              * @description 0 for a company that only supplies; one more per step downstream.
              */
@@ -25468,6 +25545,49 @@ export interface components {
             conviction?: number | null;
             /** Main Reason */
             main_reason?: ("quality" | "value" | "catalyst" | "momentum" | "other") | null;
+        };
+        /** ThesisDraft */
+        ThesisDraft: {
+            /** Ticker */
+            ticker: string;
+            /** Model */
+            model: string | null;
+            why_owned: components["schemas"]["ThesisDraftLine"] | null;
+            /** Exit Conditions */
+            exit_conditions: components["schemas"]["ThesisDraftLine"][];
+            /** Pre Mortem */
+            pre_mortem: components["schemas"]["ThesisDraftLine"][];
+            variant_perception: components["schemas"]["ThesisDraftVariant"] | null;
+            /** Facts Used */
+            facts_used: number;
+            /**
+             * Dropped
+             * @description Lines removed because they named no fact in the list.
+             */
+            dropped: number;
+            /** Left To Owner */
+            left_to_owner: string[];
+            /** Notes */
+            notes: string[];
+        };
+        /** ThesisDraftLine */
+        ThesisDraftLine: {
+            /** Text */
+            text: string;
+            /**
+             * Facts
+             * @description The facts the line rests on, quoted as given.
+             */
+            facts: string[];
+        };
+        /** ThesisDraftVariant */
+        ThesisDraftVariant: {
+            /** Belief */
+            belief: string;
+            /** Disproof */
+            disproof: string;
+            /** Facts */
+            facts: string[];
         };
         /**
          * ThesisKPI
@@ -34181,6 +34301,37 @@ export interface operations {
             };
         };
     };
+    post_thesis_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThesisDraft"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_segments: {
         parameters: {
             query?: {
@@ -37638,6 +37789,10 @@ export interface operations {
             query?: {
                 /** @description Defaults to one year ago. */
                 since?: string | null;
+                /** @description One security. */
+                ticker?: string | null;
+                /** @description One main reason. */
+                reason?: string | null;
             };
             header?: never;
             path?: never;

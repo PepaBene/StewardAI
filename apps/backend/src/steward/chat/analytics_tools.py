@@ -13,6 +13,8 @@ import asyncpg
 from steward.decision import service as decision_service
 from steward.decision.themes import METHOD as THEME_METHOD
 from steward.decision.themes import ThemeDefinition, ThemeSelector, theme_exposure
+from steward.events import feed as events_feed
+from steward.events.paths import event_paths
 from steward.journal import service as journal_service
 from steward.performance import service as performance_service
 from steward.performance.settings import load_settings
@@ -114,6 +116,57 @@ async def theme(
         ],
         "formula": THEME_METHOD,
         "warnings": result.warnings,
+    }
+
+
+async def event_reach(
+    pool: asyncpg.Pool,
+    registry: Registry,
+    owner_id: str,
+    symbol: str,
+    direction: str,
+    state: str,
+) -> dict[str, Any]:
+    """Where an event at one company reaches the portfolio along the supply-chain links."""
+    if direction not in ("downstream", "upstream"):
+        return {"error": "direction must be downstream or upstream"}
+    if state not in ("confirmed", "reported", "rumoured"):
+        return {"error": "state must be confirmed, reported or rumoured"}
+    chain, indicators = await events_feed.chain_and_indicators(pool, owner_id)
+    wanted = symbol.split("_")[0].strip().upper()
+    if not wanted:
+        return {"error": "give a company symbol, e.g. TSM"}
+    impact = event_paths(chain, wanted, direction, state, indicators)  # type: ignore[arg-type]
+    sid = registry.add(
+        "observation",
+        f"event_paths:{wanted}:{direction}:{state}",
+        f"Event at {wanted}, {direction}",
+        app_path="/xray/supply-chain",
+        tier=1,
+        snippet=f"{len(impact.paths)} path(s), reaching {impact.reached_weight:.1%} of holdings",
+    )
+    return {
+        "source_id": sid,
+        "symbol": wanted,
+        "direction": direction,
+        "state": state,
+        "reached_weight": impact.reached_weight,
+        "own_weight": impact.own_weight,
+        "paths": [
+            {
+                "start": p.start,
+                "links": [f"{e.supplier} supplies {e.customer} ({e.product})" for e in p.edges],
+                "end": p.end,
+                "end_weight": p.weight,
+                "confidence": p.confidence,
+                "severity": p.severity,
+                "revenue_share": p.revenue_share,
+                "indicators": p.indicators,
+            }
+            for p in impact.paths[:8]
+        ],
+        "notes": impact.notes,
+        "formula": impact.method,
     }
 
 

@@ -60,6 +60,8 @@ class EventPath(BaseModel):
     edges: list[PathEdge]
     confidence: Confidence = Field(description="The weakest link on the path.")
     weight: float = Field(description="Portfolio weight in the company at the end of the path.")
+    direct_weight: float = Field(default=0.0, description="Of that weight, the part held directly.")
+    fund_weight: float = Field(default=0.0, description="Of that weight, the part held in funds.")
     revenue_share: float | None = Field(
         description="Share of the end supplier's revenue that the lost customer represents, "
         "only for a single customer link that states one."
@@ -114,6 +116,7 @@ def event_paths(
     today = today or dt.date.today()
     symbol = symbol.strip().upper()
     weights = {n.symbol: n.weight for n in chain.nodes}
+    directs = {n.symbol: n.direct_weight for n in chain.nodes}
     nxt: dict[str, list[SupplyEdge]] = {}
     for e in chain.edges:
         key = e.supplier if direction == "downstream" else e.customer
@@ -129,7 +132,9 @@ def event_paths(
             if other in seen:
                 continue
             trail2 = [*trail, e]
-            paths.append(_path(symbol, other, trail2, direction, state, weights, indicators, today))
+            paths.append(
+                _path(symbol, other, trail2, direction, state, weights, indicators, today, directs)
+            )
             walk(other, trail2, seen | {other})
 
     walk(symbol, [], {symbol})
@@ -167,6 +172,7 @@ def _path(
     weights: dict[str, float],
     indicators: dict[str, list[str]] | None,
     today: dt.date,
+    directs: dict[str, float] | None = None,
 ) -> EventPath:
     edges: list[PathEdge] = []
     for e in trail:
@@ -180,6 +186,7 @@ def _path(
         )  # fmt: skip
     confidence = weakest([e.confidence for e in edges])
     weight = weights.get(end, 0.0)
+    direct = min((directs or {}).get(end, 0.0), weight)
     share: float | None = None
     # Only a direct link states how much of the supplier's revenue the customer is; compounding
     # that over more steps would claim a precision the filings do not give.
@@ -187,6 +194,7 @@ def _path(
         share = trail[0].customer_share
     return EventPath(
         start=start, end=end, edges=edges, confidence=confidence, weight=weight,
-        revenue_share=share, severity=severity_of(confidence, state, weight),
+        direct_weight=direct, fund_weight=weight - direct, revenue_share=share,
+        severity=severity_of(confidence, state, weight),
         indicators=(indicators or {}).get(end, []),
     )  # fmt: skip

@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
+from steward.ai import AINotConfigured, create_client
 from steward.company import (
     autoevidence,
     evidence,
@@ -30,7 +31,12 @@ from steward.company.statements import (
     csv_text,
     load_rows,
 )
+from steward.config.jobs import JobsConfig
+from steward.config.store import load_active
 from steward.fx.history import load_fx_history
+from steward.llm.client import create_llm
+from steward.settings import get_settings
+from steward.thesis import draft as thesis_draft
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
@@ -205,6 +211,25 @@ async def get_thesis_prefill(ticker: TickerPath, pool: Pool, owner: Owner) -> Th
         implied_growth=None if implied.value is None else float(implied.value),
         reason=implied.reason,
     )
+
+
+@router.post("/{ticker}/thesis-draft", response_model=thesis_draft.ThesisDraft)
+async def post_thesis_draft(ticker: TickerPath, pool: Pool, owner: Owner) -> thesis_draft.ThesisDraft:
+    """A first draft of the thesis text from the stored research, computed figures and report
+    conflicts. Every line names the facts it rests on; a line with none is removed. One model
+    call (the chat model); nothing is saved, so you edit the draft and save it yourself."""
+    company = await _company(pool, ticker)
+    built = await _report(pool, company, owner.user_id)
+    jobs = await load_active(pool, "jobs", JobsConfig)
+    model = (jobs.body if jobs else JobsConfig()).chat.model
+    try:
+        llm = create_llm(get_settings(), create_client(get_settings()))
+    except AINotConfigured:
+        llm = create_llm(get_settings(), None)
+    try:
+        return await thesis_draft.draft_thesis(llm, model, built)
+    except thesis_draft.DraftUnavailable as err:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(err)) from err
 
 
 async def _ratios_view(

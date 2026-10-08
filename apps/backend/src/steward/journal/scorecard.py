@@ -82,6 +82,9 @@ class Scorecard(BaseModel):
         f"{MIN_DECISIONS} decisions; fewer are listed but not summarised."
     )
     suggestions: list[str] = Field(default_factory=list)
+    filtered_by: list[str] = Field(
+        default_factory=list, description="What the decisions were limited to, if anything."
+    )
 
 
 def _too_few(id_: str, title: str, n: int, what: str) -> Section:
@@ -207,9 +210,21 @@ def unavailable(id_: str, title: str, reason: str) -> Section:
 
 
 def build_scorecard(
-    outcomes: list[DecisionOutcome], *, since: dt.date, until: dt.date
+    outcomes: list[DecisionOutcome],
+    *,
+    since: dt.date,
+    until: dt.date,
+    ticker: str | None = None,
+    reason: str | None = None,
 ) -> Scorecard:
     window = [o for o in outcomes if since <= o.decided_on <= until and o.decision != "review"]
+    filtered_by: list[str] = []
+    if ticker:
+        window = [o for o in window if o.ticker == ticker]
+        filtered_by.append(f"security {ticker}")
+    if reason:
+        window = [o for o in window if o.main_reason == reason]
+        filtered_by.append(f"main reason {reason}")
     sections = [
         sell_targets(window),
         by_dimension(window, "conviction", "Returns by conviction", "by_conviction"),
@@ -242,5 +257,10 @@ def build_scorecard(
                 "Ideas you passed on did better than the ones you bought; revisit the entry bar."
             )
     return Scorecard(
-        since=since, until=until, entries=len(window), sections=sections, suggestions=suggestions
+        since=since,
+        until=until,
+        entries=len(window),
+        sections=sections,
+        suggestions=suggestions,
+        filtered_by=filtered_by,
     )

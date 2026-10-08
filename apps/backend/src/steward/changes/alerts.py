@@ -1,6 +1,9 @@
 """Alerts for deal and patent changes at companies you hold (plan M6.6).
 
-Two rules, both facts about a holding that was not known before, each raised once:
+Three rules, each raised once:
+
+- An event path: a confirmed story whose supply-chain path reaches a holding at high severity
+  (the event feed's `would_alert`), severity 3. Needs OWNER_USER_ID, as the graph is the owner's.
 
 - A deal: a news story classified as mergers and acquisitions about a holding, from a tier 1
   source (the company or a regulator filing) and not a rumour, in the last few days.
@@ -20,15 +23,22 @@ import asyncpg
 
 from steward.config.notifications import NotificationsConfig
 from steward.config.store import load_active
+from steward.config.thesis import ThesesConfig
+from steward.events import feed as events_feed
 from steward.jobs.runner import JobContext
 from steward.notify.alerts import create_alerts
 from steward.notify.route import AlertRequest
+from steward.settings import get_settings
 from steward.xray.supply_chain import symbol_of
 
 DEAL_DAYS = 3
 PATENT_DAYS = 7
+EVENT_DAYS = 3
 DEAL_SEVERITY = 2
 PATENT_SEVERITY = 1
+EVENT_SEVERITY = 3
+REVIEW_SEVERITY = 1
+REVIEW_GRACE_DAYS = 30
 
 
 @dataclass(frozen=True)
@@ -90,6 +100,73 @@ async def find_changes(pool: asyncpg.Pool, now: dt.datetime) -> list[Change]:
     return out
 
 
+async def find_review_changes(pool: asyncpg.Pool, today: dt.date) -> list[Change]:
+    """A thesis or journal entry whose review date has come (and passed by under a month) with
+    no review recorded since. One alert per item and date."""
+    out: list[Change] = []
+    since = today - dt.timedelta(days=REVIEW_GRACE_DAYS)
+    stored = await load_active(pool, "theses", ThesesConfig)
+    for t in stored.body.theses if stored else []:
+        if t.review_date is not None and since <= t.review_date <= today:
+            out.append(
+                Change(
+                    key=f"change:thesis_review:{t.ticker}:{t.review_date}",
+                    ticker=t.ticker,
+                    kind="review",
+                    severity=REVIEW_SEVERITY,
+                    message=f"The thesis for {t.ticker} was due for review on {t.review_date}.",
+                )
+            )
+    rows = await pool.fetch(
+        "select j.id, j.ticker, j.review_date from public.decision_journal j"
+        " where j.review_date between $1 and $2 and j.parent_id is null"
+        " and not exists (select 1 from public.decision_journal r where r.parent_id = j.id)",
+        since,
+        today,
+    )
+    for r in rows:
+        out.append(
+            Change(
+                key=f"change:journal_review:{r['id']}:{r['review_date']}",
+                ticker=r["ticker"] or "portfolio",
+                kind="review",
+                severity=REVIEW_SEVERITY,
+                message=f"Journal entry {r['id']} ({r['ticker'] or 'portfolio'}) was due for "
+                f"review on {r['review_date']}; no review has been recorded.",
+            )
+        )
+    return out
+
+
+async def find_event_changes(pool: asyncpg.Pool, owner_id: str, now: dt.datetime) -> list[Change]:
+    """A confirmed story whose supply-chain path reaches a holding with a high-severity rating
+    (a confirmed event on high-confidence links reaching 2% of the portfolio)."""
+    chain, indicators = await events_feed.chain_and_indicators(pool, owner_id)
+    today = now.date()
+    since = today - dt.timedelta(days=EVENT_DAYS)
+    stories = await events_feed.load_stories(pool, since)
+    feed = events_feed.build(stories, chain, indicators, today, since)
+    out: list[Change] = []
+    for item in feed.items:
+        if not item.would_alert:
+            continue
+        top = item.top
+        out.append(
+            Change(
+                key=f"change:event:{item.story.id}:{item.direction}",
+                ticker=top.end,
+                kind="event",
+                severity=EVENT_SEVERITY,
+                message=(
+                    f"{item.story.headline} ({item.story.url}) at {item.story.ticker} reaches "
+                    f"{top.end} ({top.weight:.1%} of the portfolio) {item.direction}, "
+                    f"weakest link {top.confidence}."
+                ),
+            )
+        )
+    return out
+
+
 async def raise_alerts(
     pool: asyncpg.Pool, changes: list[Change], *, now: dt.datetime, job_id: int
 ) -> int:
@@ -115,5 +192,14 @@ async def change_alerts_handler(ctx: JobContext) -> None:
     now = dt.datetime.now(dt.UTC)
     async with ctx.step("change_alerts") as step:
         changes = await find_changes(ctx.pool, now)
+        changes += await find_review_changes(ctx.pool, now.date())
+        owner = get_settings().owner_user_id
+        if owner:
+            try:
+                changes += await find_event_changes(ctx.pool, owner, now)
+            except Exception as exc:  # the other rules still alert
+                step.detail["event_paths"] = f"failed: {exc}"[:200]
+        else:
+            step.detail["event_paths"] = "OWNER_USER_ID is not set: event paths were not read"
         step.detail["found"] = len(changes)
         step.detail["alerts"] = await raise_alerts(ctx.pool, changes, now=now, job_id=ctx.job_id)

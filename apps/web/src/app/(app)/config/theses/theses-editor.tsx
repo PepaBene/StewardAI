@@ -267,6 +267,56 @@ function ThesisCard({
     setPrefillNote("Filled from the base-case reverse DCF. Check it before you save.");
   }
 
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [draftNote, setDraftNote] = useState<string | null>(null);
+  const [draftFacts, setDraftFacts] = useState<string[]>([]);
+
+  /** Drafts the text fields from the stored research and figures. It fills only fields that are empty and saves nothing. */
+  async function draftText() {
+    setDraftBusy(true);
+    setDraftNote(null);
+    setDraftFacts([]);
+    const res = await api().POST("/companies/{ticker}/thesis-draft", {
+      params: { path: { ticker: form.ticker.split("_")[0] } },
+    });
+    setDraftBusy(false);
+    if (!res.response.ok || !res.data) {
+      const detail = (res.error as { detail?: unknown } | undefined)?.detail;
+      return setDraftNote(typeof detail === "string" ? detail : "The draft could not be made.");
+    }
+    const d = res.data;
+    const lines = (items: { text: string }[]) => items.map((i) => i.text).join("\n");
+    onChange((f) => {
+      const next = { ...f, rigor: { ...f.rigor } };
+      if (!f.why_owned.trim() && d.why_owned) {
+        next.why_owned = d.why_owned.text;
+      }
+      if (!f.exit_conditions.trim() && d.exit_conditions.length > 0) {
+        next.exit_conditions = lines(d.exit_conditions);
+      }
+      if (!f.rigor.pre_mortem.trim() && d.pre_mortem.length > 0) {
+        next.rigor.pre_mortem = lines(d.pre_mortem);
+      }
+      if (!f.rigor.belief.trim() && !f.rigor.disproof.trim() && d.variant_perception) {
+        next.rigor.belief = d.variant_perception.belief;
+        next.rigor.disproof = d.variant_perception.disproof;
+      }
+      return next;
+    });
+    const facts = [
+      d.why_owned,
+      ...d.exit_conditions,
+      ...d.pre_mortem,
+      d.variant_perception,
+    ].flatMap((x) => (x ? x.facts : []));
+    setDraftFacts([...new Set(facts)]);
+    setDraftNote(
+      `Draft written into the empty fields. Check every line against the facts below, then edit and save. ${
+        d.dropped > 0 ? `${d.dropped} line(s) with no supporting fact were removed. ` : ""
+      }Left for you: ${d.left_to_owner.join("; ")}. ${d.notes.join(" ")}`,
+    );
+  }
+
   return (
     <section
       id={form.ticker || undefined}
@@ -304,6 +354,30 @@ function ThesisCard({
           <Trash2Icon aria-hidden="true" />
           Remove thesis
         </Button>
+      </div>
+      <div className="flex flex-col gap-1">
+        <div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!form.ticker || draftBusy}
+            onClick={() => void draftText()}
+          >
+            {draftBusy ? "Drafting…" : "Draft from research"}
+          </Button>
+        </div>
+        {draftNote ? <p className="max-w-prose text-xs text-text-muted">{draftNote}</p> : null}
+        {draftFacts.length > 0 ? (
+          <details className="max-w-prose text-xs">
+            <summary className="cursor-pointer">Facts the draft rests on ({draftFacts.length})</summary>
+            <ul className="mt-1 list-disc pl-5">
+              {draftFacts.map((f) => (
+                <li key={f}>{f}</li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </div>
       <TextAreaField
         label="Why it is owned"

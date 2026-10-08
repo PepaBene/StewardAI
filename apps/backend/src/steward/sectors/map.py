@@ -10,6 +10,7 @@ forecast, and a company with no value is counted as missing, never as zero.
 
 from __future__ import annotations
 
+import datetime as dt
 import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -32,8 +33,11 @@ NOT_COVERED = [
     "Top products: only companies whose annual report tags revenue by product are listed.",
     "Patent areas: empty until patent data is collected (EPO OPS credentials are not set).",
     "Trade dependencies: shown as the countries companies report revenue in, not customs data.",
-    "Credit cycle signals: the stored credit-spread series is for the whole market, not a sector.",
+    "Credit: no sector credit spread is stored. The balance-sheet leverage of the group's own "
+    "companies stands in for it, and the market-wide high-yield spread is shown beside it.",
 ]
+
+LEVERAGED_ABOVE = 1.0  # net debt / equity above this counts a company as leveraged
 
 TOP_N = 5
 
@@ -78,13 +82,29 @@ class GroupStats(BaseModel):
     confirmed_peer_links: int = Field(
         description="Confirmed peer links with both ends in the group."
     )
+    net_debt_to_equity: Spread | None = Field(
+        default=None, description="Balance-sheet leverage, latest filed year (credit signal)."
+    )
+    leveraged: int = Field(
+        default=0, description=f"Companies with net debt above {LEVERAGED_ABOVE:g}x equity."
+    )
     top_products: list[ProductLine] = Field(default_factory=list)
     geography: list[GeoShare] = Field(default_factory=list)
     patent_areas: list[PatentArea] = Field(default_factory=list)
 
 
+class CreditContext(BaseModel):
+    """The market-wide US high-yield spread. It is not a sector figure."""
+
+    latest: float
+    as_of: dt.date
+    median_1y: float | None
+    note: str
+
+
 class SectorMap(BaseModel):
     universe: int = Field(description="Companies with a profile.")
+    credit: CreditContext | None = None
     sectors: list[GroupStats]
     industries: list[GroupStats]
     unclassified: list[str] = Field(description="Held tickers with no profile.")
@@ -162,10 +182,13 @@ def _group(
     weights: dict[str, float],
     links: set[tuple[str, str]],
     detail: Detail,
+    leverage: dict[str, float | None],
 ) -> GroupStats:
     tickers = sorted(m.ticker for m in members)
     inside = set(tickers)
     return GroupStats(
+        net_debt_to_equity=spread([leverage.get(t) for t in tickers], len(tickers)),
+        leveraged=sum(1 for t in tickers if (leverage.get(t) or 0) > LEVERAGED_ABOVE),
         top_products=top_products(tickers, detail.products),
         geography=geography_mix(tickers, detail.geography),
         patent_areas=patent_areas(tickers, detail.patents),
@@ -192,8 +215,11 @@ def build_map(
     weights: dict[str, float],
     links: set[tuple[str, str]],
     detail: Detail | None = None,
+    leverage: dict[str, float | None] | None = None,
+    credit: CreditContext | None = None,
 ) -> SectorMap:
     detail = detail or Detail()
+    leverage = leverage or {}
     by_sector: dict[str, list[Profile]] = defaultdict(list)
     by_industry: dict[tuple[str, str], list[Profile]] = defaultdict(list)
     for p in profiles:
@@ -202,17 +228,18 @@ def build_map(
             if p.industry:
                 by_industry[(p.sector, p.industry)].append(p)
     sectors = [
-        _group(name, "sector", None, m, growth, margin, pe, weights, links, detail)
+        _group(name, "sector", None, m, growth, margin, pe, weights, links, detail, leverage)
         for name, m in by_sector.items()
     ]
     industries = [
-        _group(ind, "industry", sec, m, growth, margin, pe, weights, links, detail)
+        _group(ind, "industry", sec, m, growth, margin, pe, weights, links, detail, leverage)
         for (sec, ind), m in by_industry.items()
     ]
     key = lambda g: (-g.companies, g.name)  # noqa: E731
     profiled = {p.ticker for p in profiles}
     return SectorMap(
         universe=len(profiles),
+        credit=credit,
         sectors=sorted(sectors, key=key),
         industries=sorted(industries, key=key),
         unclassified=sorted(t for t, w in weights.items() if w > 0 and t not in profiled),
@@ -252,7 +279,7 @@ async def load_weights(pool: asyncpg.Pool) -> dict[str, float]:
 
 async def load_stats(
     pool: asyncpg.Pool, tickers: list[str]
-) -> tuple[dict[str, float | None], dict[str, float | None]]:
+) -> tuple[dict[str, float | None], dict[str, float | None], dict[str, float | None]]:
     bare = sorted({t.split("_")[0] for t in tickers} | set(tickers))
     facts = await pool.fetch(
         "select ticker, concept, period_start, period_end, basis, value, unit, dimensions,"
@@ -264,13 +291,15 @@ async def load_stats(
     metrics = financial_peer_metrics([dict(r) for r in facts])
     growth: dict[str, float | None] = {}
     margin: dict[str, float | None] = {}
+    leverage: dict[str, float | None] = {}
     for t in tickers:
         # Facts may be stored under the bare symbol or the broker ticker; the broker one wins.
         entry = metrics.get(t) or metrics.get(t.split("_")[0])
         period = latest_period(entry["periods"]) if entry else None  # type: ignore[arg-type]
         growth[t] = _num(period.get("revenue_growth")) if period else None
         margin[t] = _num(period.get("operating_margin")) if period else None
-    return growth, margin
+        leverage[t] = _num(period.get("net_debt_to_equity")) if period else None
+    return growth, margin, leverage
 
 
 async def load_pe(pool: asyncpg.Pool) -> dict[str, float | None]:
@@ -346,9 +375,28 @@ async def load_patent_areas(pool: asyncpg.Pool) -> dict[str, dict[str, int]]:
     return out
 
 
+async def load_credit(pool: asyncpg.Pool) -> CreditContext | None:
+    """The latest stored US high-yield spread against its own one-year median."""
+    rows = await pool.fetch(
+        "select period, value from public.macro_series where series_id = 'us_hy_spread'"
+        " and value is not null order by period desc limit 260"
+    )
+    if not rows:
+        return None
+    latest = rows[0]
+    cutoff = latest["period"] - dt.timedelta(days=365)
+    year = [float(r["value"]) for r in rows if r["period"] >= cutoff]
+    return CreditContext(
+        latest=float(latest["value"]),
+        as_of=latest["period"],
+        median_1y=statistics.median(year) if len(year) >= 20 else None,
+        note="US high-yield spread, a market-wide figure. It is not specific to any sector.",
+    )
+
+
 async def build_sector_map(pool: asyncpg.Pool) -> SectorMap:
     profiles = await load_profiles(pool)
-    growth, margin = await load_stats(pool, [p.ticker for p in profiles])
+    growth, margin, leverage = await load_stats(pool, [p.ticker for p in profiles])
     detail = Detail(
         products=await load_products(pool),
         geography=await load_geography(pool),
@@ -362,4 +410,6 @@ async def build_sector_map(pool: asyncpg.Pool) -> SectorMap:
         await load_weights(pool),
         await load_links(pool),
         detail,
+        leverage,
+        await load_credit(pool),
     )

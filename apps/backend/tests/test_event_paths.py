@@ -2,6 +2,8 @@
 
 import datetime as dt
 
+import pytest
+
 from steward.events.paths import HIGH_WEIGHT, event_paths, severity_of
 from steward.xray.supply_chain import SupplyChain, SupplyEdge, SupplyNode
 
@@ -31,6 +33,14 @@ def test_a_supplier_event_reaches_the_customer_it_feeds_with_its_weight() -> Non
     assert out.paths[0].indicators == ["revenue_growth > 5 %"]
     assert out.own_weight == 0.05
     assert out.reached_weight == 0.10
+
+
+def test_the_end_weight_is_split_into_direct_and_through_funds() -> None:
+    c = chain([edge("A", "B")], {"A": 0.0, "B": 0.10})
+    c.nodes[1].direct_weight = 0.04
+    (path,) = event_paths(c, "A", "downstream", "confirmed", None, TODAY).paths
+    assert (path.weight, path.direct_weight) == (0.10, 0.04)
+    assert path.fund_weight == pytest.approx(0.06)
 
 
 def test_path_confidence_never_exceeds_its_weakest_link() -> None:

@@ -31,6 +31,12 @@ function Body({ map }: { map: SectorMap }) {
       </p>
       <Table title="Sectors" groups={map.sectors} />
       <Table title="Industries" groups={map.industries} />
+      {map.credit ? (
+        <p className="max-w-prose text-sm">
+          US high-yield spread: <span className="num font-semibold">{map.credit.latest.toFixed(2)}%</span> on {map.credit.as_of}
+          {map.credit.median_1y != null ? `, against a one-year median of ${map.credit.median_1y.toFixed(2)}%` : ""}. {map.credit.note}
+        </p>
+      ) : null}
       <Detail groups={map.sectors} />
       {map.unclassified.length > 0 ? (
         <p className="max-w-prose text-sm">
@@ -74,6 +80,14 @@ function Detail({ groups }: { groups: GroupStats[] }) {
               </ul>
             ) : (
               <p className="mt-1">No country split is stored.</p>
+            )}
+            <p className="mt-2 text-xs text-text-muted">Credit: net debt to equity (latest filed year)</p>
+            {g.net_debt_to_equity && g.net_debt_to_equity.n > 0 ? (
+              <p className="mt-1">
+                {spreadLabel(g.net_debt_to_equity, multiple)}; {g.leveraged ?? 0} of {g.net_debt_to_equity.n} above 1.0x
+              </p>
+            ) : (
+              <p className="mt-1">No balance-sheet leverage is stored for this sector.</p>
             )}
             <p className="mt-2 text-xs text-text-muted">Patent areas</p>
             {(g.patent_areas ?? []).length > 0 ? (

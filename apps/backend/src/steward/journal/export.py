@@ -17,6 +17,7 @@ from steward.journal import entries
 from steward.journal import service as journal_service
 from steward.journal.entries import JournalEntry
 from steward.journal.scorecard import Scorecard
+from steward.quality import snooze
 from steward.quality.cockpit import Cockpit, build_cockpit
 
 CSV_COLUMNS = (
@@ -43,10 +44,10 @@ class Manifest(BaseModel):
 
 FIGURE_SOURCES = {
     "journal.entries": "Decision journal table: rows you wrote; nothing is added.",
-    "scorecard.hit_rate": "Journal entries compared with the stored price series since each decision date.",
-    "scorecard.returns": "Stored daily closes from your holding profiles; price change, no dividends.",
-    "cockpit.checks": "Provider access records, identity decisions, fund holdings snapshots, claims awaiting review.",
-}  # fmt: skip
+    "scorecard.hit_rate": "Journal entries compared with the stored prices since each decision.",
+    "scorecard.returns": "Stored daily closes of your holdings; price change, no dividends.",
+    "cockpit.checks": "Provider access, identity decisions, fund holdings and claims to review.",
+}
 
 
 class OwnerReport(BaseModel):
@@ -54,6 +55,9 @@ class OwnerReport(BaseModel):
     journal: list[JournalEntry]
     scorecard: Scorecard
     cockpit: Cockpit
+    snoozed: list[snooze.SnoozeRow] = Field(
+        default_factory=list, description="Data-quality issues you set aside, with their dates."
+    )
 
 
 async def build_report(
@@ -85,7 +89,13 @@ async def build_report(
             "No paid-only source is used; a missing value is null, never estimated.",
         ],
     )
-    return OwnerReport(manifest=manifest, journal=rows, scorecard=card, cockpit=cockpit)
+    return OwnerReport(
+        manifest=manifest,
+        journal=rows,
+        scorecard=card,
+        cockpit=cockpit,
+        snoozed=await snooze.list_rows(pool, owner_id),
+    )
 
 
 def report_html(report: OwnerReport) -> str:
@@ -98,8 +108,12 @@ def report_html(report: OwnerReport) -> str:
         f"<td>{e(x.decision)}</td><td>{e(x.main_reason or '')}</td></tr>"
         for x in report.journal
     )
-    checks = "".join(
-        f"<li>{e(c.model_dump_json())}</li>" for c in report.cockpit.checks
+    checks = "".join(f"<li>{e(c.model_dump_json())}</li>" for c in report.cockpit.checks)
+    snoozed = "".join(
+        f"<li>{e(s.kind)} {e(s.subject)}: {e(s.action)}"
+        f"{' until ' + e(str(s.until)) if s.until else ''}"
+        f"{' (' + e(s.note) + ')' if s.note else ''}</li>"
+        for s in report.snoozed
     )
     sources = "".join(f"<li>{e(s)}</li>" for s in m.sources)
     figures = "".join(f"<li><b>{e(k)}</b>: {e(v)}</li>" for k, v in m.figure_sources.items())
@@ -117,6 +131,7 @@ def report_html(report: OwnerReport) -> str:
         f"<th>Reason</th></tr>{rows}</table>"
         f"<h2>Scorecard</h2><pre>{card}</pre>"
         f"<h2>Data-quality checks</h2><ul>{checks}</ul>"
+        f"<h2>Issues set aside</h2><ul>{snoozed or '<li>None</li>'}</ul>"
         f"<h2>Sources</h2><ul>{sources}</ul><h2>Where each figure comes from</h2><ul>{figures}</ul>"
         f"<h2>Coverage</h2><ul>{coverage}</ul><h2>Notes</h2><ul>{notes}</ul></html>"
     )

@@ -108,6 +108,28 @@ def build(
     return EventFeed(since=since, stories_read=len(stories), items=items, note=note)
 
 
+async def chain_and_indicators(
+    pool: asyncpg.Pool, owner_id: str
+) -> tuple[SupplyChain, dict[str, list[str]]]:
+    """The owner's supply-chain graph and each thesis's indicators, as the feed needs them."""
+    from steward.config.store import load_active
+    from steward.config.thesis import ThesesConfig
+    from steward.xray import owner_input, service, supply_chain
+
+    loaded = await service.load_cached(pool, owner_id)
+    chain = supply_chain.build(
+        loaded.leafset,
+        await owner_input.current(pool, owner_id),
+        await supply_chain.filing_edges(pool, loaded.leafset),
+    )
+    stored = await load_active(pool, "theses", ThesesConfig)
+    indicators = {
+        symbol_of(t.ticker): [f"{k.metric} {k.operator} {k.threshold:g} {k.unit}" for k in t.kpis]
+        for t in (stored.body.theses if stored else [])
+    }
+    return chain, indicators
+
+
 async def load_stories(pool: asyncpg.Pool, since: dt.date) -> list[Story]:
     rows = await pool.fetch(
         "select distinct on (coalesce(cluster_id::text, id::text)) id, headline, url,"

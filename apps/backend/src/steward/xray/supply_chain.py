@@ -42,6 +42,9 @@ class SupplyNode(BaseModel):
         description="Share of the portfolio held in it, directly or through funds."
     )
     held: bool
+    direct_weight: float = Field(
+        default=0.0, description="The part of the weight held directly; the rest is through funds."
+    )
     level: int = Field(
         description="0 for a company that only supplies; one more per step downstream."
     )
@@ -84,6 +87,15 @@ class SupplyChain(BaseModel):
 def symbol_of(ticker: str | None) -> str:
     """`AAPL_US_EQ` and `aapl` are both AAPL."""
     return (ticker or "").split("_")[0].strip().upper()
+
+
+def direct_by_symbol(leafset: LeafSet) -> dict[str, float]:
+    """The weight of each equity symbol that is held directly, not through a fund."""
+    out: dict[str, float] = defaultdict(float)
+    for leaf in leafset.leaves:
+        if leaf.is_equity and leaf.channel_kind == "direct" and symbol_of(leaf.ticker):
+            out[symbol_of(leaf.ticker)] += leaf.weight
+    return dict(out)
 
 
 def holdings_by_symbol(leafset: LeafSet) -> tuple[dict[str, float], dict[str, str | None]]:
@@ -175,6 +187,7 @@ def build(
     leafset: LeafSet, inputs: list[OwnerInput], filings: list[SupplyEdge] | None = None
 ) -> SupplyChain:
     weights, names = holdings_by_symbol(leafset)
+    directs = direct_by_symbol(leafset)
     edges = [
         SupplyEdge(
             id=i.id,
@@ -196,6 +209,7 @@ def build(
             symbol=sym,
             name=names.get(sym),
             weight=weights.get(sym, 0.0),
+            direct_weight=directs.get(sym, 0.0),
             held=weights.get(sym, 0.0) > 0,
             level=lvl,
         )

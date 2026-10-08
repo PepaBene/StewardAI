@@ -40,9 +40,9 @@ describe("parseConstituents", () => {
 describe("layoutGraph", () => {
   it("puts suppliers on the left and each level one column to the right", () => {
     const { positions, width, height } = layoutGraph([
-      { symbol: "TSM", name: null, weight: 0, held: false, level: 0 },
-      { symbol: "ASML", name: null, weight: 0, held: false, level: 0 },
-      { symbol: "AAPL", name: null, weight: 0.1, held: true, level: 1 },
+      { symbol: "TSM", name: null, weight: 0, direct_weight: 0, held: false, level: 0 },
+      { symbol: "ASML", name: null, weight: 0, direct_weight: 0, held: false, level: 0 },
+      { symbol: "AAPL", name: null, weight: 0.1, direct_weight: 0.1, held: true, level: 1 },
     ]);
     expect(positions.get("TSM")!.x).toBe(GRAPH.pad);
     expect(positions.get("AAPL")!.x).toBe(GRAPH.pad + GRAPH.colWidth);
