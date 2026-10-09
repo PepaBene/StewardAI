@@ -258,6 +258,20 @@ def _npv(rate: Decimal, flows: Sequence[tuple[dt.date, Decimal]]) -> Decimal:
     )
 
 
+def _npv_sign_changes(
+    flows: Sequence[tuple[dt.date, Decimal]], low: Decimal, high: Decimal, steps: int = 600
+) -> int:
+    """Sign changes of NPV on a grid spaced evenly in log(1 + rate); more than one means the
+    flows have several rates and bisection would return an arbitrary one."""
+    ratio = (ONE + high) / (ONE + low)
+    signs: list[bool] = []
+    for i in range(steps + 1):
+        value = _npv((ONE + low) * ratio ** (Decimal(i) / steps) - ONE, flows)
+        if value != 0:
+            signs.append(value > 0)
+    return sum(1 for a, b in pairwise(signs) if a != b)
+
+
 def xirr(
     flows: Sequence[tuple[dt.date, Decimal]], *, upper: Decimal = XIRR_UPPER
 ) -> AnalyticsResult:
@@ -288,6 +302,8 @@ def xirr(
         return unavailable(
             "fraction", method, "no stable root within the solver bounds", inputs=inputs
         )
+    elif _npv_sign_changes(ordered, low, high) > 1:
+        return unavailable("fraction", method, "more than one rate fits these flows", inputs=inputs)
     else:
         for _ in range(400):
             mid = (low + high) / 2

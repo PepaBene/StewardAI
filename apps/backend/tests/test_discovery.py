@@ -724,3 +724,29 @@ def test_csv_export_carries_provenance_and_unknown_is_blank_with_reason() -> Non
     a = next(ln for ln in lines if ln.startswith("A,"))
     b = next(ln for ln in lines if ln.startswith("B,"))
     assert a.split(",")[2] == "0.2" and b.split(",")[2] == "" and b.split(",")[3] == "missing x"
+
+
+def test_pence_dividend_is_put_on_the_major_unit_and_future_listing_is_unknown() -> None:
+    rec = stock_record(
+        m("Z", currency="GBX"),
+        StockInputs(
+            closes=closes(30, "1250", "0"),
+            dividends_ttm=D(25),
+            dividend_currency="GBX",
+            first_trade=TODAY + dt.timedelta(days=30),
+        ),
+        TODAY,
+    )
+    assert rec.values["dividend_yield"].value == D("0.25") / D("12.5")
+    assert rec.values["years_since_listing"].value is None
+
+
+def test_fund_concentration_is_the_whole_funds_not_the_equity_sleeve() -> None:
+    holdings = [
+        {"asset_class": "equity", "name": "A", "weight": "0.30", "row_index": 0},
+        {"asset_class": "equity", "name": "B", "weight": "0.30", "row_index": 1},
+        {"asset_class": "bond", "name": "Bond", "weight": "0.40", "row_index": 2},
+    ]
+    rec = fund_record(FundInputs(isin="IE0000000001", as_of=TODAY, holdings=holdings), TODAY)
+    assert rec.values["top10_weight"].value == D(1)
+    assert rec.values["effective_holdings"].value == D(1) / (D("0.09") + D("0.09") + D("0.16"))

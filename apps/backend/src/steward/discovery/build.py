@@ -230,6 +230,8 @@ def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> R
     cap_source = "price_bar x filed shares"
     if price is None:
         cap_reason = "no stored close or trading currency"
+    elif data.closes and (as_of - data.closes[-1][0]).days > 10:
+        cap_reason = f"last stored close is {data.closes[-1][0]}, too old to value the company"
     elif shares is None:
         cap_reason = "no stored share count"
     elif not statement_ccy:
@@ -409,22 +411,32 @@ def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> R
         dy_reason: str | None = "no dividend history stored"
     elif price is None:
         dy, dy_reason = None, "no stored close"
-    elif data.dividend_currency and data.dividend_currency != price[1]:
-        dy, dy_reason = (
-            None,
-            f"dividend currency {data.dividend_currency} differs from price currency {price[1]}",
-        )
     else:
-        dy, dy_reason = data.dividends_ttm / price[0], None
+        # Pence amounts are put on the major unit the price is in.
+        pence = data.dividend_currency == "GBX"
+        div_ccy = "GBP" if pence else data.dividend_currency
+        if div_ccy and div_ccy != price[1]:
+            dy, dy_reason = (
+                None,
+                f"dividend currency {data.dividend_currency} differs from price "
+                f"currency {price[1]}",
+            )
+        else:
+            dy, dy_reason = data.dividends_ttm / (100 if pence else 1) / price[0], None
     values["dividend_yield"] = _mv(dy, reason=dy_reason, source="corporate_action")
     values["avg_daily_turnover"] = _mv(
         data.turnover[0] if data.turnover else None,
         reason=None if data.turnover else "no FITRS liquidity record",
         source="listing_liquidity",
     )
+    listed = data.first_trade is not None and data.first_trade <= as_of
     values["years_since_listing"] = _mv(
-        (Decimal((as_of - data.first_trade).days) / 365) if data.first_trade else None,
-        reason=None if data.first_trade else "first trade date not published",
+        (Decimal((as_of - data.first_trade).days) / 365) if listed and data.first_trade else None,
+        reason=None
+        if listed
+        else "not yet listed on this date"
+        if data.first_trade
+        else "first trade date not published",
         source="listing",
     )
     values["insider_buyers_90d"] = _mv(
@@ -556,28 +568,40 @@ def fund_record(data: FundInputs, as_of: dt.date) -> Record:
         period_end=data.as_of,
     )
     if equity_rows:
-        weights: dict[str, Decimal] = {}
-        for h in equity_rows:
-            # One issuer may hold several lines (share classes, ISINs): key by issuer id, then a
-            # normalised name, before the security identifiers.
-            name = " ".join(re.sub(r"[^\w ]", " ", str(h.get("name") or "")).casefold().split())
-            key = (
-                (f"issuer:{h['issuer_id']}" if h.get("issuer_id") else None)
-                or (f"name:{name}" if name else None)
-                or h.get("isin")
-                or h.get("ticker")
-                or str(h.get("row_index"))
-            )
-            weights[key] = weights.get(key, ZERO) + Decimal(h["weight"])
+
+        def positions(rows: list[dict[str, Any]]) -> dict[str, Decimal]:
+            out: dict[str, Decimal] = {}
+            for h in rows:
+                if h.get("weight") is None:
+                    continue
+                # One issuer may hold several lines (share classes, ISINs): key by issuer id, then
+                # a normalised name, before the security identifiers.
+                name = " ".join(re.sub(r"[^\w ]", " ", str(h.get("name") or "")).casefold().split())
+                key = (
+                    (f"issuer:{h['issuer_id']}" if h.get("issuer_id") else None)
+                    or (f"name:{name}" if name else None)
+                    or h.get("isin")
+                    or h.get("ticker")
+                    or str(h.get("row_index"))
+                )
+                out[key] = out.get(key, ZERO) + Decimal(h["weight"])
+            return out
+
+        weights = positions(equity_rows)
         total = sum(weights.values(), ZERO)
-        shares = (
-            sorted((w / total for w in weights.values() if w > 0), reverse=True)
-            if total > 0
+        # Concentration is the whole fund's, so a 60/40 fund does not report its equity sleeve's.
+        fund_weights = positions(list(data.holdings))
+        fund_total = sum(fund_weights.values(), ZERO)
+        fund_shares = (
+            sorted((w / fund_total for w in fund_weights.values() if w > 0), reverse=True)
+            if fund_total > 0
             else []
         )
-        hhi = sum((s * s for s in shares), ZERO)
+        hhi = sum((s * s for s in fund_shares), ZERO)
         values["top10_weight"] = _mv(
-            sum(shares[:10], ZERO) if shares else None, period_end=data.as_of, source="holdings"
+            sum(fund_shares[:10], ZERO) if fund_shares else None,
+            period_end=data.as_of,
+            source="holdings",
         )
         values["effective_holdings"] = _mv(
             ONE / hhi if hhi else None, period_end=data.as_of, source="holdings"

@@ -24,10 +24,13 @@ def member(ticker: str, **kw: object) -> universe.UniverseMember:
 
 
 R1, R2, END = day(2021, 1, 4), day(2021, 7, 1), day(2022, 1, 3)
+# The signal is read at a rebalance day's close and the trade fills at the next session's, so
+# every fill price sits one day after the rebalance date.
+F1, F2 = day(2021, 1, 5), day(2021, 7, 2)
 CLOSES = {
-    "A": [(R1, D(100)), (R2, D(120)), (END, D(150))],
-    "GONE": [(R1, D(50)), (day(2021, 6, 15), D(40))],
-    "B": [(R2, D(10)), (END, D(9))],
+    "A": [(R1, D(1)), (F1, D(100)), (R2, D(1)), (F2, D(120)), (END, D(150))],
+    "GONE": [(R1, D(1)), (F1, D(50)), (day(2021, 6, 15), D(40))],
+    "B": [(R2, D(1)), (F2, D(10)), (END, D(9))],
 }
 
 
@@ -100,6 +103,6 @@ def test_empty_selection_stays_in_cash_and_says_so() -> None:
 
 
 def test_benchmark_chain() -> None:
-    bench = [(R1, D(100)), (R2, D(110)), (END, D(121))]
+    bench = [(F1, D(100)), (F2, D(110)), (END, D(121))]
     r = run_backtest(plan(10), {R1: ["A"], R2: ["A"]}, CLOSES, END, benchmark=bench)
     assert r.benchmark_cumulative == D("0.21000000")  # 1.10 x 1.10 - 1

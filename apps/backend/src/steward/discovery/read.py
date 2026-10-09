@@ -311,12 +311,19 @@ async def load_stock_inputs(
 
     by_listing = {m.listing_id: m.ticker for m in members if m.listing_id}
     if by_listing:
+        # Splits scale the filed share counts onto the basis of the split-adjusted closes.
+        for r in await pool.fetch(
+            """select listing_id, ex_date, ratio from public.corporate_action
+               where listing_id=any($1::bigint[]) and action_type='split' and status='confirmed'
+                 and ratio is not null and ratio > 0 order by ex_date""",
+            list(by_listing),
+        ):
+            out[by_listing[r["listing_id"]]].splits.append((r["ex_date"], r["ratio"]))
         rows = await pool.fetch(
-            """select listing_id, currency, sum(cash_amount) as total from public.corporate_action
+            """select listing_id, currency, ex_date, cash_amount from public.corporate_action
                where listing_id=any($1::bigint[]) and action_type='cash_dividend' and status='confirmed'
                  and cash_amount is not null and ex_date > $2 and ex_date <= $3
-                 and ($4::timestamptz is null or known_at<=$4)
-               group by listing_id, currency""",
+                 and ($4::timestamptz is null or known_at<=$4)""",
             list(by_listing),
             as_of - dt.timedelta(days=365),
             as_of,
@@ -326,19 +333,17 @@ async def load_stock_inputs(
         for r in rows:
             t = by_listing[r["listing_id"]]
             seen[t].add(r["currency"])
-            out[t].dividends_ttm = (out[t].dividends_ttm or Decimal(0)) + r["total"]
+            # Declared per share as it stood on the ex-date; the close is split-adjusted, so the
+            # amount is divided by every split after the ex-date.
+            factor = Decimal(1)
+            for ex, ratio in out[t].splits:
+                if ex > r["ex_date"]:
+                    factor *= ratio
+            out[t].dividends_ttm = (out[t].dividends_ttm or Decimal(0)) + r["cash_amount"] / factor
             out[t].dividend_currency = r["currency"]
         for t, ccys in seen.items():
             if len(ccys) > 1:
                 out[t].dividends_ttm, out[t].dividend_currency = None, None
-        # Splits scale the filed share counts onto the basis of the split-adjusted closes.
-        for r in await pool.fetch(
-            """select listing_id, ex_date, ratio from public.corporate_action
-               where listing_id=any($1::bigint[]) and action_type='split' and status='confirmed'
-                 and ratio is not null and ratio > 0 order by ex_date""",
-            list(by_listing),
-        ):
-            out[by_listing[r["listing_id"]]].splits.append((r["ex_date"], r["ratio"]))
     isins = sorted({m.isin for m in members if m.isin})
     if isins:
         rows = await pool.fetch(
@@ -372,7 +377,9 @@ async def load_stock_inputs(
     ins = await pool.fetch(
         """select f.ticker, count(distinct t.reporting_owner_cik) as buyers
            from public.insider_filing f join public.insider_transaction t using (accession)
-           where f.ticker=any($1::text[]) and f.superseded_by_accession is null and t.economic_class='open_market_buy'
+           where f.ticker=any($1::text[]) and t.economic_class='open_market_buy'
+             and not exists (select 1 from public.insider_filing s
+                             where s.accession=f.superseded_by_accession and s.filed <= $3)
              and not t.derivative and coalesce(t.rule_10b5_1_plan,false)=false and t.shares > 0
              and coalesce(t.transaction_date, f.filed) between $2 and $3 and f.filed <= $3
            group by f.ticker""",
@@ -384,8 +391,9 @@ async def load_stock_inputs(
     has_filings = {
         r["ticker"]
         for r in await pool.fetch(
-            "select distinct ticker from public.insider_filing where ticker=any($1::text[])",
+            "select distinct ticker from public.insider_filing where ticker=any($1::text[]) and filed <= $2",
             tickers,
+            as_of,
         )
     }
     for t in has_filings:

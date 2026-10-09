@@ -152,6 +152,13 @@ def _today() -> dt.date:
     return dt.datetime.now(dt.UTC).date()
 
 
+def _cutoff(as_of: dt.date, known_at: dt.datetime | None) -> dt.datetime | None:
+    """Facts known by `known_at`; a past `as_of` alone means known by the end of that day."""
+    if known_at is not None or as_of >= _today():
+        return known_at
+    return dt.datetime.combine(as_of, dt.time.max, tzinfo=dt.UTC)
+
+
 def _422(problems: list[str]) -> HTTPException:
     return HTTPException(422, detail=problems)
 
@@ -202,7 +209,12 @@ async def _stock_records(
     access: dict[tuple[str, str], str],
 ) -> tuple[list[Record], dict[str, composite.QvmScore]]:
     records = await read.stock_records(
-        pool, members, req_as_of, cutoff=known_at, reconciled_only=reconciled_only, access=access
+        pool,
+        members,
+        req_as_of,
+        cutoff=_cutoff(req_as_of, known_at),
+        reconciled_only=reconciled_only,
+        access=access,
     )
     scores = composite.compute_qvm(records)
     build.apply_scores(records, scores)
@@ -459,7 +471,8 @@ async def export_csv(body: ExportRequest, pool: Pool, owner: Owner) -> Response:
     with method version, hashes, data date and filters as header comments."""
     stamp = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
     if body.kind == "fund":
-        result = await _run_fund(pool, body.fund or FundRequest(limit=200), owner.user_id)
+        fund_req = (body.fund or FundRequest()).model_copy(update={"limit": 200, "cursor": None})
+        result = await _run_fund(pool, fund_req, owner.user_id)
         cat: dict[str, MetricDef] = FUND_CATALOGUE
     else:
         req = (body.stock or StockRequest()).model_copy(update={"limit": 200, "cursor": None})
@@ -505,9 +518,11 @@ async def peer_baselines(
     if peers_of:
         rows = await pool.fetch(
             "select peer_ticker from public.peer_set where ticker=$1 and status='confirmed'"
-            " and (valid_to is null or valid_to >= $2)",
+            " and (valid_from is null or valid_from <= $2) and (valid_to is null or valid_to >= $2)"
+            " and ($3::timestamptz is null or known_at <= $3)",
             peers_of,
             day,
+            _cutoff(day, None),
         )
         saved += [r["peer_ticker"] for r in rows]
     if scope == "saved_set" and not saved:
@@ -694,6 +709,10 @@ async def backtest_screen(body: BacktestRequest, pool: Pool, owner: Owner) -> Ba
         current_members=members,
     )
     warnings = list(outcome.warnings)
+    if not body.filters and not body.sort_by:
+        warnings.append(
+            "no filters and no sort: the picks are the first names alphabetically, not a strategy"
+        )
     if body.benchmark_ticker and body.benchmark_ticker not in closes:
         warnings.append(
             f"benchmark {body.benchmark_ticker} has no stored prices: no benchmark line"
@@ -788,8 +807,10 @@ def _definition(body: ScreenBody) -> dict[str, object]:
     if req is None:
         raise _422([f"a {body.kind} definition is required"])
     data = req.model_dump(mode="json", exclude={"cursor", "limit"})
-    if body.kind == "stock":  # a saved screen is reproduced as of the run date, not frozen to today
-        data["as_of"] = None
+    # A saved screen is reproduced as of the run date, not frozen to the save date.
+    data["as_of"] = None
+    if body.kind == "stock":
+        data["known_at"] = None
     return data
 
 
@@ -876,13 +897,18 @@ async def save_screen_version(
                 digest,
                 version("screen"),
             )
-        row = await conn.fetchrow(
-            "update public.screen_definition set latest_version=$2, name=$3 where id=$1"
-            " returning id, name, kind, latest_version, updated_at",
-            screen_id,
-            next_version,
-            body.name.strip(),
-        )
+        try:
+            row = await conn.fetchrow(
+                "update public.screen_definition set latest_version=$2, name=$3 where id=$1"
+                " returning id, name, kind, latest_version, updated_at",
+                screen_id,
+                next_version,
+                body.name.strip(),
+            )
+        except asyncpg.UniqueViolationError as exc:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "A screen with this name already exists"
+            ) from exc
     return ScreenSummary(**dict(row), definition_hash=digest)
 
 

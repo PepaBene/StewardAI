@@ -381,3 +381,11 @@ def test_stale_fund_holdings_lag() -> None:
     assert lag == case["lag_days"]
     assert case["stale_after_days"] == STALE_DAYS
     assert lag > STALE_DAYS
+
+
+def test_xirr_with_several_rates_is_unavailable() -> None:
+    # -100, +230, -132 one year apart has roots near 10 % and 20 %: no stable rate.
+    out = returns.xirr(
+        [(day("2020-01-01"), D(-100)), (day("2021-01-01"), D(230)), (day("2022-01-01"), D(-132))]
+    )
+    assert out.status == Status.UNAVAILABLE
