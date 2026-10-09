@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { Notes, Warnings } from "../../xray/shared";
+import { IdeaPanel } from "./idea-panel";
 import { ShockPanel } from "./shock-panel";
 
 type Region = "developed" | "europe" | "us";
@@ -58,6 +59,7 @@ export function FactorsView() {
       </div>
       <RegionReport key={region} region={region} />
       <ShockPanel region={region} />
+      <IdeaPanel region={region} />
     </div>
   );
 }

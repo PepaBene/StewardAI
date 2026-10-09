@@ -24,6 +24,8 @@ from steward.config import (
 )
 from steward.config.common import Ticker
 from steward.config.store import ConfigConflictError, StoredConfig, load_active, save_config
+from steward.decision.allocator import AllocationPlan, allocate_deposit
+from steward.decision.service import resolve_tickers
 from steward.earnings.check import local_today
 from steward.earnings.read import (
     FACT_CONFIDENCE,
@@ -44,6 +46,7 @@ from steward.earnings.review import review_fact as review_fact_in_db
 from steward.earnings.review_stats import ReviewStats, review_stats
 from steward.jobs import queue
 from steward.jobs.runner import create_job
+from steward.portfolio.concentration import ConcentrationReport, concentration_report
 from steward.portfolio.exante import ExAnteRisk, ex_ante_risk
 from steward.portfolio.factor_shock import (
     Scenario,
@@ -73,6 +76,7 @@ from steward.portfolio.read import (
 from steward.portfolio.replay import StressReplay, stress_replay
 from steward.portfolio.risk import PortfolioRisk, portfolio_risk
 from steward.portfolio.risk_snapshots import SnapshotRow, get_snapshot, list_snapshots
+from steward.portfolio.sizing import StartSize, start_size
 from steward.portfolio.transactions import (
     TransactionFilters,
     TransactionsPage,
@@ -258,6 +262,46 @@ async def get_idea_factor_fit(
     return await idea_fit(
         pool, [s for s in symbols.split(",") if s.strip()], currency.upper(), region, weight
     )
+
+
+@router.get("/portfolio/risk/sizing", tags=["portfolio"])
+async def get_start_size(
+    pool: Pool,
+    _owner: Owner,
+    ticker: Annotated[str, Query(min_length=1, max_length=32)],
+    premium: Annotated[float, Query(ge=0, le=0.15)] = 0.05,
+) -> StartSize:
+    """Risk-aware starting size for a stock: the smaller of the tier's starting cap (principle
+    8b) and the largest weight that raises no new ex-ante limit breach, with the quarter-Kelly
+    upper bound and its inputs where the stock has a thesis. A ceiling, never a target."""
+    name = (await resolve_tickers(pool, [ticker])).get(ticker.strip(), ticker.strip())
+    return await start_size(pool, name, premium)
+
+
+@router.get("/portfolio/risk/deposit", tags=["portfolio"])
+async def get_deposit_plan(
+    pool: Pool,
+    _owner: Owner,
+    amount: Annotated[float, Query(gt=0, le=1e9)],
+) -> AllocationPlan:
+    """Where a deposit (base currency) should go under principle 8c, in whole shares, with every
+    rule, cap, band and ex-ante limit respected and the risk impact of each line. Read-only."""
+    try:
+        return await allocate_deposit(pool, amount)
+    except LookupError as err:
+        raise HTTPException(409, str(err)) from err
+
+
+@router.get("/portfolio/risk/over-cap", tags=["portfolio"])
+async def get_over_cap(
+    pool: Pool,
+    _owner: Owner,
+    monthly_deposit: Annotated[float | None, Query(ge=0, le=1e9)] = None,
+    cap: Annotated[float | None, Query(gt=0, le=1)] = None,
+) -> ConcentrationReport:
+    """Stocks above the single-position cap (principle 4f): how long deposits alone take to
+    dilute each under the cap, and the sale that trims it to 8 %."""
+    return await concentration_report(pool, monthly_deposit, cap)
 
 
 @router.get("/portfolio/risk/stress-replay", tags=["portfolio"])

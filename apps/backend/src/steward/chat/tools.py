@@ -180,6 +180,80 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "risk_whatif",
+        "description": "What proposed buys or sells, or a deposit, do to the portfolio's "
+        "ex-ante risk: forecast volatility, effective bets, each position's share of risk, tier "
+        "risk budgets and every ex-ante limit, before and after. Use for 'what does buying X do "
+        "to my risk?'. Sizes are in the base currency. Expected Shortfall and drawdown "
+        "probability are not modelled yet; say so.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "trades": {
+                    "type": "array",
+                    "maxItems": 10,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "side": {"type": "string", "enum": ["buy", "sell"]},
+                            "ticker": {"type": "string"},
+                            "value_base": {"type": "number", "description": "Size, base currency."},
+                        },
+                        "required": ["side", "ticker", "value_base"],
+                    },
+                },
+                "deposit": {
+                    "type": "number",
+                    "description": "Cash added alongside, base currency.",
+                },
+            },
+            "required": ["trades"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "start_size",
+        "description": "The suggested starting weight for a stock: the smaller of the tier's "
+        "starting cap (principle 8b) and the largest weight that raises no new ex-ante limit "
+        "breach, with the quarter-Kelly upper bound and its inputs where a thesis exists.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"ticker": {"type": "string"}},
+            "required": ["ticker"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "deposit_allocation",
+        "description": "Where a deposit or sale proceeds should go under principle 8c: core "
+        "first while below target, then the most under-represented tier, sector or country, "
+        "then the best idea above the hurdle, else a core ETF. Whole shares, every rule, cap, "
+        "band and ex-ante limit respected, risk impact per line. Read-only. Use for 'where "
+        "should my next deposit go?'.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"amount": {"type": "number", "description": "Base currency."}},
+            "required": ["amount"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "over_cap_positions",
+        "description": "Positions above the single-stock cap (principle 4f): months until "
+        "deposits alone dilute each below the cap, and the sale that trims it to 8 % (10 % above "
+        "the 15 % backstop). Whether the thesis still projects growth is the owner's call.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "monthly_deposit": {
+                    "type": "number",
+                    "description": "Expected deposit per month; default the last year's average.",
+                }
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "theme_exposure",
         "description": "How much of the portfolio is exposed to one sector, industry, country, "
         "currency, revenue country, commodity, trade product or issuer, directly and through "
@@ -321,6 +395,22 @@ class ChatTools:
         return await analytics_tools.idea_factor_fit(
             self.pool, self.registry, symbols, currency.upper(), weight
         )
+
+    async def _tool_risk_whatif(
+        self, trades: list[dict[str, Any]], deposit: float = 0.0
+    ) -> dict[str, Any]:
+        return await analytics_tools.risk_whatif(self.pool, self.registry, trades, deposit)
+
+    async def _tool_start_size(self, ticker: str) -> dict[str, Any]:
+        return await analytics_tools.start_size_for(self.pool, self.registry, ticker)
+
+    async def _tool_deposit_allocation(self, amount: float) -> dict[str, Any]:
+        return await analytics_tools.deposit_allocation(self.pool, self.registry, amount)
+
+    async def _tool_over_cap_positions(
+        self, monthly_deposit: float | None = None
+    ) -> dict[str, Any]:
+        return await analytics_tools.over_cap_positions(self.pool, self.registry, monthly_deposit)
 
     async def _tool_theme_exposure(self, kind: str, value: str) -> dict[str, Any]:
         owner = await self._owner()

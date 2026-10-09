@@ -15,6 +15,7 @@ const TABS = [
   { href: "/risk/whatif", label: "What if" },
   { href: "/risk/rebalance", label: "Rebalance" },
   { href: "/risk/pretrade", label: "Before a trade" },
+  { href: "/risk/deposit", label: "Size and deposit" },
 ] as const;
 
 export function RiskTabs() {

@@ -12,6 +12,7 @@ export type ThemeSelector = S["ThemeSelector"];
 export type RebalanceResponse = S["RebalanceResponse"];
 export type RebalanceRequest = S["RebalanceRequest"];
 export type PretradeResult = S["PretradeResult"];
+export type PretradeResponse = S["PretradeResponse"];
 export type PretradeCheck = S["PretradeCheck"];
 export type TradeLeg = S["TradeLeg"];
 export type WhatIfCase = S["WhatIfCase"];

@@ -966,6 +966,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/risk/sizing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Start Size
+         * @description Risk-aware starting size for a stock: the smaller of the tier's starting cap (principle
+         *     8b) and the largest weight that raises no new ex-ante limit breach, with the quarter-Kelly
+         *     upper bound and its inputs where the stock has a thesis. A ceiling, never a target.
+         */
+        get: operations["get_start_size"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/risk/deposit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Deposit Plan
+         * @description Where a deposit (base currency) should go under principle 8c, in whole shares, with every
+         *     rule, cap, band and ex-ante limit respected and the risk impact of each line. Read-only.
+         */
+        get: operations["get_deposit_plan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/risk/over-cap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Over Cap
+         * @description Stocks above the single-position cap (principle 4f): how long deposits alone take to
+         *     dilute each under the cap, and the sale that trims it to 8 %.
+         */
+        get: operations["get_over_cap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/risk/stress-replay": {
         parameters: {
             query?: never;
@@ -5914,7 +5978,8 @@ export interface paths {
         /**
          * Post Pretrade
          * @description A pass/flag list for a proposed buy, add, sale or switch, citing the strategy's principles
-         *     8, 9 and 10 and your own caps. It never blocks and never places a trade.
+         *     8, 9 and 10 and your own caps, with the ex-ante risk of the book before and after. It never
+         *     blocks and never places a trade.
          */
         post: operations["post_pretrade"];
         delete?: never;
@@ -8582,6 +8647,83 @@ export interface components {
             sessions: number;
             /** Note */
             note: string;
+        };
+        /** AllocationLine */
+        AllocationLine: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "core_below_target" | "under_represented" | "above_hurdle" | "core_fallback";
+            /** Principle */
+            principle: string;
+            /** Shares */
+            shares: number;
+            /** Price Base */
+            price_base: number;
+            /**
+             * Value
+             * @description Shares times price, base currency.
+             */
+            value: number;
+            /** Weight Before */
+            weight_before: number;
+            /** Weight After */
+            weight_after: number;
+            /**
+             * Expected Return
+             * @description Return to the thesis sell target.
+             */
+            expected_return: number | null;
+            /**
+             * Volatility Change
+             * @description Change in ex-ante portfolio volatility from this line (percentage points of annual volatility, as a fraction).
+             */
+            volatility_change: number | null;
+        };
+        /** AllocationPlan */
+        AllocationPlan: {
+            /**
+             * Method Version
+             * @default allocator-1
+             */
+            method_version: string;
+            /** Amount */
+            amount: number;
+            /** Spent */
+            spent: number;
+            /** Left Over */
+            left_over: number;
+            /** Base Currency */
+            base_currency: string;
+            /** Lines */
+            lines: components["schemas"]["AllocationLine"][];
+            /** Set Aside */
+            set_aside: components["schemas"]["SetAside"][];
+            /** Volatility Before */
+            volatility_before: number | null;
+            /** Volatility After */
+            volatility_after: number | null;
+            /** Effective Bets Before */
+            effective_bets_before: number | null;
+            /** Effective Bets After */
+            effective_bets_after: number | null;
+            /**
+             * Rule Findings After
+             * @description Rule, cap and band breaches that exist after the purchases and did not get deeper (already open before).
+             */
+            rule_findings_after: string[];
+            /** Notes */
+            notes?: string[];
+            /**
+             * Disclaimer
+             * @default A ranked suggestion against your own principles. Nothing is bought; whole shares at the last stored price, so the real fill will differ a little.
+             */
+            disclaimer: string;
         };
         /** AllocationSlice */
         AllocationSlice: {
@@ -11798,6 +11940,37 @@ export interface components {
             /** Notes */
             notes: string[];
         };
+        /** ConcentrationReport */
+        ConcentrationReport: {
+            /**
+             * Method Version
+             * @default concentration-1
+             */
+            method_version: string;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Cap */
+            cap: number;
+            /** Trim To */
+            trim_to: number;
+            /** Backstop */
+            backstop: number;
+            /** Monthly Deposit */
+            monthly_deposit: number;
+            /** Deposit Source */
+            deposit_source: string;
+            /** Total Value */
+            total_value: number;
+            /** Positions */
+            positions: components["schemas"]["OverCap"][];
+            /**
+             * Exempt
+             * @description Over the cap but exempt (core ETFs).
+             */
+            exempt?: string[];
+            /** Reason */
+            reason?: string | null;
+        };
         /** ConfigDiff */
         ConfigDiff: {
             /** Domain */
@@ -13658,6 +13831,13 @@ export interface components {
             text: string;
             /** Fact Ids */
             fact_ids: number[];
+        };
+        /** DilutionPoint */
+        DilutionPoint: {
+            /** Month */
+            month: number;
+            /** Weight */
+            weight: number;
         };
         /** DimensionAllocation */
         DimensionAllocation: {
@@ -20592,6 +20772,48 @@ export interface components {
             /** Detail */
             detail: string | null;
         };
+        /** KellyOut */
+        KellyOut: {
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Thesis Return
+             * @description Return to the thesis sell target, annualised.
+             */
+            thesis_return?: number | null;
+            /** Equilibrium Return */
+            equilibrium_return?: number | null;
+            /**
+             * Confidence
+             * @description Weight on the thesis return; from the thesis's conviction.
+             */
+            confidence?: number | null;
+            /**
+             * Expected Return
+             * @description Thesis and equilibrium returns blended by the confidence.
+             */
+            expected_return?: number | null;
+            /** Risk Free */
+            risk_free?: number | null;
+            /** Beta */
+            beta?: number | null;
+            /** Volatility */
+            volatility?: number | null;
+            /** Full Kelly */
+            full_kelly?: number | null;
+            /**
+             * Fraction
+             * @default 0.25
+             */
+            fraction: number;
+            /**
+             * Bound
+             * @description Upper bound, share of the portfolio.
+             */
+            bound?: number | null;
+        };
         /** KeyFigure */
         KeyFigure: {
             /** Id */
@@ -20924,6 +21146,24 @@ export interface components {
             source: string;
             /** As Of */
             as_of: string | null;
+        };
+        /** LimitLine */
+        LimitLine: {
+            /** Key */
+            key: string;
+            /** Ticker */
+            ticker: string | null;
+            /** Detail */
+            detail: string;
+            /** Observed */
+            observed: number | null;
+            /** Limit */
+            limit: number | null;
+            /**
+             * Change
+             * @description new, deeper, still_open, eased or cleared.
+             */
+            change: string;
         };
         /** Line */
         Line: {
@@ -22946,6 +23186,51 @@ export interface components {
             /** Share */
             share: number | string | null;
         };
+        /** OverCap */
+        OverCap: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Value */
+            value: number;
+            /** Weight */
+            weight: number;
+            /** Cap */
+            cap: number;
+            /**
+             * Excess Value
+             * @description Value above the cap.
+             */
+            excess_value: number;
+            /**
+             * Zone
+             * @enum {string}
+             */
+            zone: "above_cap" | "above_backstop";
+            /**
+             * Months To Cap
+             * @description Months of deposits (all going elsewhere, no price moves) until the weight is at or under the cap; null when not reached in three years.
+             */
+            months_to_cap: number | null;
+            /** Path */
+            path: components["schemas"]["DilutionPoint"][];
+            /**
+             * Trim Weight
+             * @description Where a trim takes it: 8 %, or 10 % above the backstop.
+             */
+            trim_weight: number;
+            /** Trim Value */
+            trim_value: number;
+            /** Trim Shares */
+            trim_shares: number | null;
+            /** Price Base */
+            price_base: number | null;
+            /** Thesis Gaps */
+            thesis_gaps?: string[];
+            /** Advice */
+            advice: string;
+        };
         /** Overview */
         Overview: {
             /** Ticker */
@@ -24807,6 +25092,29 @@ export interface components {
              * @default 0
              */
             deposit: number;
+        };
+        /** PretradeResponse */
+        PretradeResponse: {
+            /** Method Version */
+            method_version: string;
+            /** Trades */
+            trades: components["schemas"]["TradeLeg"][];
+            /** Is Switch */
+            is_switch: boolean;
+            /** Checks */
+            checks: components["schemas"]["PretradeCheck"][];
+            /** Passed */
+            passed: number;
+            /** Flagged */
+            flagged: number;
+            /** Unavailable */
+            unavailable: number;
+            /** Notes */
+            notes: string[];
+            /** Disclaimer */
+            disclaimer: string;
+            /** @description Ex-ante risk of the book before and after the trades (plan Q5.1). */
+            risk?: components["schemas"]["TradeRisk"] | null;
         };
         /** PretradeResult */
         PretradeResult: {
@@ -27657,6 +27965,33 @@ export interface components {
              */
             stress_episodes?: components["schemas"]["StressEpisodeConfig"][];
         };
+        /** RiskLine */
+        RiskLine: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Tier */
+            tier: string;
+            /** Weight Before */
+            weight_before: number;
+            /** Weight After */
+            weight_after: number;
+            /** Risk Share Before */
+            risk_share_before: number | null;
+            /** Risk Share After */
+            risk_share_after: number | null;
+            /**
+             * Volatility
+             * @description Standalone annualised volatility (after).
+             */
+            volatility: number | null;
+            /**
+             * Status After
+             * @description real, proxied or excluded after the trade.
+             */
+            status_after: string | null;
+        };
         /** RiskReport */
         RiskReport: {
             /** Method Version */
@@ -28685,6 +29020,13 @@ export interface components {
              * @enum {string}
              */
             state: "observed" | "missing" | "disagrees";
+        };
+        /** SetAside */
+        SetAside: {
+            /** Ticker */
+            ticker: string;
+            /** Reason */
+            reason: string;
         };
         /** SettingsResponse */
         SettingsResponse: {
@@ -29994,6 +30336,57 @@ export interface components {
             /** Notes */
             notes: string[];
         };
+        /** StartSize */
+        StartSize: {
+            /**
+             * Method Version
+             * @default sizing-1
+             */
+            method_version: string;
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "unavailable";
+            /** Reason */
+            reason?: string | null;
+            /** Tier */
+            tier?: string | null;
+            /**
+             * Tier Cap
+             * @description Principle 8b starting cap.
+             */
+            tier_cap?: number | null;
+            /**
+             * Risk Ceiling
+             * @description Largest weight inside the ex-ante limits (up to the tier cap).
+             */
+            risk_ceiling?: number | null;
+            /**
+             * Suggested
+             * @description The smaller of the two.
+             */
+            suggested?: number | null;
+            /** Suggested Value */
+            suggested_value?: number | null;
+            /**
+             * Binding
+             * @default none
+             * @enum {string}
+             */
+            binding: "tier_cap" | "risk_limits" | "none";
+            /** Limits Reached */
+            limits_reached?: string[];
+            /** Base Currency */
+            base_currency?: string | null;
+            kelly?: components["schemas"]["KellyOut"] | null;
+            /** Warnings */
+            warnings?: string[];
+        };
         /** StatedAction */
         StatedAction: {
             /** Kind */
@@ -31166,6 +31559,17 @@ export interface components {
             /** Breached */
             breached: boolean;
         };
+        /** TierLine */
+        TierLine: {
+            /** Tier */
+            tier: string;
+            /** Risk Share Before */
+            risk_share_before: number;
+            /** Risk Share After */
+            risk_share_after: number;
+            /** Budget */
+            budget: number | null;
+        };
         /** Tilt */
         Tilt: {
             /** Factor */
@@ -31393,6 +31797,46 @@ export interface components {
              * @description Buys only: the price you expect in the bear case, in the quote currency. Overrides the thesis's bear case for the asymmetry gate.
              */
             bear_case_price?: number | null;
+        };
+        /** TradeRisk */
+        TradeRisk: {
+            /**
+             * Method Version
+             * @default trade-risk-1
+             */
+            method_version: string;
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** As Of */
+            as_of?: string | null;
+            /** Volatility Before */
+            volatility_before?: number | null;
+            /** Volatility After */
+            volatility_after?: number | null;
+            /** Volatility Limit */
+            volatility_limit?: number | null;
+            /** Effective Bets Before */
+            effective_bets_before?: number | null;
+            /** Effective Bets After */
+            effective_bets_after?: number | null;
+            /** Diversification Before */
+            diversification_before?: number | null;
+            /** Diversification After */
+            diversification_after?: number | null;
+            /** Covered Share After */
+            covered_share_after?: number | null;
+            /** Lines */
+            lines?: components["schemas"]["RiskLine"][];
+            /** Tiers */
+            tiers?: components["schemas"]["TierLine"][];
+            /** Limits */
+            limits?: components["schemas"]["LimitLine"][];
+            /** Not Modelled */
+            not_modelled?: string[];
+            /** Warnings */
+            warnings?: string[];
         };
         /** TradeRow */
         TradeRow: {
@@ -34612,6 +35056,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdeaFitReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_start_size: {
+        parameters: {
+            query: {
+                ticker: string;
+                premium?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartSize"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_deposit_plan: {
+        parameters: {
+            query: {
+                amount: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AllocationPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_over_cap: {
+        parameters: {
+            query?: {
+                monthly_deposit?: number | null;
+                cap?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConcentrationReport"];
                 };
             };
             /** @description Validation Error */
@@ -43416,7 +43955,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PretradeResult"];
+                    "application/json": components["schemas"]["PretradeResponse"];
                 };
             };
             /** @description Validation Error */

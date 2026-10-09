@@ -223,6 +223,120 @@ async def idea_factor_fit(
     }
 
 
+async def risk_whatif(
+    pool: asyncpg.Pool, registry: Registry, trades: list[dict[str, Any]], deposit: float
+) -> dict[str, Any]:
+    """What proposed trades or a deposit do to the ex-ante risk of the book (plan Q5.1)."""
+    from steward.decision.pretrade import TradeLeg
+    from steward.portfolio.trade_risk import trade_risk
+
+    names = await decision_service.resolve_tickers(pool, [str(t.get("ticker", "")) for t in trades])
+    try:
+        legs = [
+            TradeLeg(
+                side=t["side"],
+                ticker=names.get(str(t["ticker"]).strip(), str(t["ticker"]).strip()),
+                value_base=float(t["value_base"]),
+            )
+            for t in trades
+        ]
+    except (KeyError, ValueError) as err:
+        return {"error": f"each trade needs side (buy or sell), ticker and value_base: {err}"}
+    report = await trade_risk(pool, legs, deposit)
+    if not report.available:
+        return {"unavailable": report.reason}
+    sid = registry.add(
+        "observation",
+        f"tradeRisk:{report.as_of}:{','.join(leg.ticker for leg in legs)}",
+        f"Ex-ante risk before and after the proposed trades ({report.as_of})",
+        app_path="/risk/pretrade",
+        tier=1,
+        snippet=f"volatility {report.volatility_before:.1%} to {report.volatility_after:.1%}",
+        as_of=str(report.as_of),
+    )
+    return {
+        "source_id": sid,
+        "trades": [leg.model_dump() for leg in legs],
+        "deposit": deposit,
+        **report.model_dump(exclude={"lines"}),
+        "largest_lines": [x.model_dump() for x in report.lines[:8]],
+        "use": "Quote the before and after figures and any limit marked new or deeper. Say "
+        "that Expected Shortfall and the drawdown probability are not modelled yet.",
+    }
+
+
+async def start_size_for(pool: asyncpg.Pool, registry: Registry, ticker: str) -> dict[str, Any]:
+    """The risk-aware starting size and the quarter-Kelly bound for a stock (plan Q5.2, Q5.3)."""
+    from steward.portfolio.sizing import start_size
+
+    name = (await decision_service.resolve_tickers(pool, [ticker])).get(ticker.strip(), ticker)
+    out = await start_size(pool, name)
+    if out.status != "ok":
+        return {"unavailable": out.reason, "ticker": name}
+    sid = registry.add(
+        "observation",
+        f"startSize:{name}",
+        f"Starting size for {name}",
+        app_path="/risk/deposit",
+        tier=1,
+        snippet=f"suggested {out.suggested:.1%} (tier cap {out.tier_cap:.1%})"
+        if out.suggested is not None and out.tier_cap is not None
+        else "",
+    )
+    return {
+        "source_id": sid,
+        **out.model_dump(),
+        "use": "The tier cap of principle 8b stays authoritative; the suggestion only lowers it. "
+        "Kelly is an upper bound shown with its inputs, never a target.",
+    }
+
+
+async def deposit_allocation(
+    pool: asyncpg.Pool, registry: Registry, amount: float
+) -> dict[str, Any]:
+    """Where a deposit should go under principle 8c (plan Q5.4)."""
+    from steward.decision.allocator import allocate_deposit
+
+    try:
+        plan = await allocate_deposit(pool, amount)
+    except LookupError as err:
+        return {"unavailable": str(err)}
+    sid = registry.add(
+        "observation",
+        f"deposit:{amount:.0f}",
+        f"Deposit allocation of {amount:,.0f} {plan.base_currency}",
+        app_path="/risk/deposit",
+        tier=1,
+        snippet="; ".join(f"{x.ticker} x{x.shares}" for x in plan.lines)[:300],
+    )
+    return {"source_id": sid, **plan.model_dump()}
+
+
+async def over_cap_positions(
+    pool: asyncpg.Pool, registry: Registry, monthly_deposit: float | None
+) -> dict[str, Any]:
+    """Positions above the single-stock cap and the hold-and-dilute or trim paths (plan Q5.5)."""
+    from steward.portfolio.concentration import concentration_report
+
+    report = await concentration_report(pool, monthly_deposit)
+    if report.reason:
+        return {"unavailable": report.reason}
+    sid = registry.add(
+        "observation",
+        f"overCap:{report.cap}",
+        "Positions above the single-stock cap",
+        app_path="/risk/deposit",
+        tier=1,
+        snippet="; ".join(f"{p.ticker} {p.weight:.1%}" for p in report.positions)[:300],
+    )
+    return {
+        "source_id": sid,
+        **report.model_dump(),
+        "use": "Whether the thesis still projects growth is the owner's judgement (principle "
+        "4f); present both paths and do not choose between them.",
+    }
+
+
 async def theme(
     pool: asyncpg.Pool, registry: Registry, owner_id: str, kind: str, value: str
 ) -> dict[str, Any]:

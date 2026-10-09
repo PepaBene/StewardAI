@@ -40,6 +40,7 @@ from steward.performance.settings import load_latest_settings
 from steward.portfolio.drift import HoldingValue, compute_drift
 from steward.portfolio.risk import _risk_free
 from steward.portfolio.risk_tier import with_saved_tiers
+from steward.portfolio.trade_risk import TradeRisk, checks_from, trade_risk
 from steward.reference import risk as ref_risk
 from steward.reference.price_series import choose_series, holding_symbols
 from steward.reference.read import load_series
@@ -695,9 +696,16 @@ async def build_pretrade_context(
     return ctx, portfolio, positions
 
 
+class PretradeResponse(pt.PretradeResult):
+    risk: TradeRisk | None = Field(
+        default=None,
+        description="Ex-ante risk of the book before and after the trades (plan Q5.1).",
+    )
+
+
 async def run_pretrade(
     pool: asyncpg.Pool, owner_id: str, request: PretradeRequest
-) -> pt.PretradeResult:
+) -> PretradeResponse:
     loaded = await xray_service.load_cached(pool, owner_id)
     rules = request.rules
     if rules is None:
@@ -710,7 +718,15 @@ async def run_pretrade(
     await _attach_rates(pool, ctx, portfolio)
     await _attach_covariance(pool, ctx, portfolio, request.trades)
     await _attach_lookthrough(pool, owner_id, ctx, request, loaded)
-    return pt.run(request.trades, ctx)
+    risk: TradeRisk | None
+    try:
+        risk = await trade_risk(pool, request.trades, request.deposit)
+    except Exception as exc:  # the rule checks must still come back
+        log.warning("ex-ante what-if failed: %s", exc)
+        risk = TradeRisk(available=False, reason=f"the ex-ante model failed: {exc}")
+    ctx.extra_checks += checks_from(risk)
+    result = pt.run(request.trades, ctx)
+    return PretradeResponse(**result.model_dump(), risk=risk)
 
 
 async def _attach_covariance(

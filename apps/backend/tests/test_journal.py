@@ -232,7 +232,8 @@ class TestChatTools:
         wanted = {
             "stress_test", "theme_exposure", "decision_scorecard", "fund_overlap",
             "performance_explain", "event_paths", "risk_forecast", "past_episodes",
-            "factor_tilts", "idea_factor_fit",
+            "factor_tilts", "idea_factor_fit", "risk_whatif", "start_size", "deposit_allocation",
+            "over_cap_positions",
         }  # fmt: skip
         assert wanted <= declared
         assert all(hasattr(ChatTools, f"_tool_{name}") for name in wanted)
@@ -268,7 +269,6 @@ class TestExport:
     def test_a_formula_typed_into_the_journal_is_neutralised(self) -> None:
         text = journal_csv([self.entry(hypothesis="=HYPERLINK(1)")])
         assert "'=HYPERLINK(1)" in text
-
 
     def _report(self):  # type: ignore[no-untyped-def]
         from steward.journal.export import Manifest, OwnerReport, figure_sources_for

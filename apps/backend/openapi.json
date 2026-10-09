@@ -2676,6 +2676,193 @@
         }
       }
     },
+    "/portfolio/risk/sizing": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Start Size",
+        "description": "Risk-aware starting size for a stock: the smaller of the tier's starting cap (principle\n8b) and the largest weight that raises no new ex-ante limit breach, with the quarter-Kelly\nupper bound and its inputs where the stock has a thesis. A ceiling, never a target.",
+        "operationId": "get_start_size",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "premium",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 0.15,
+              "minimum": 0,
+              "default": 0.05,
+              "title": "Premium"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartSize"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/risk/deposit": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Deposit Plan",
+        "description": "Where a deposit (base currency) should go under principle 8c, in whole shares, with every\nrule, cap, band and ex-ante limit respected and the risk impact of each line. Read-only.",
+        "operationId": "get_deposit_plan",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "amount",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 1000000000.0,
+              "exclusiveMinimum": 0,
+              "title": "Amount"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllocationPlan"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/risk/over-cap": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Over Cap",
+        "description": "Stocks above the single-position cap (principle 4f): how long deposits alone take to\ndilute each under the cap, and the sale that trims it to 8 %.",
+        "operationId": "get_over_cap",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "monthly_deposit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 1000000000.0,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Monthly Deposit"
+            }
+          },
+          {
+            "name": "cap",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 1,
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cap"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConcentrationReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/risk/stress-replay": {
       "get": {
         "tags": [
@@ -18519,7 +18706,7 @@
           "portfolio"
         ],
         "summary": "Post Pretrade",
-        "description": "A pass/flag list for a proposed buy, add, sale or switch, citing the strategy's principles\n8, 9 and 10 and your own caps. It never blocks and never places a trade.",
+        "description": "A pass/flag list for a proposed buy, add, sale or switch, citing the strategy's principles\n8, 9 and 10 and your own caps, with the ex-ante risk of the book before and after. It never\nblocks and never places a trade.",
         "operationId": "post_pretrade",
         "requestBody": {
           "content": {
@@ -18537,7 +18724,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PretradeResult"
+                  "$ref": "#/components/schemas/PretradeResponse"
                 }
               }
             }
@@ -26907,6 +27094,217 @@
           "note"
         ],
         "title": "Alignment"
+      },
+      "AllocationLine": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "core_below_target",
+              "under_represented",
+              "above_hurdle",
+              "core_fallback"
+            ],
+            "title": "Stage"
+          },
+          "principle": {
+            "type": "string",
+            "title": "Principle"
+          },
+          "shares": {
+            "type": "integer",
+            "title": "Shares"
+          },
+          "price_base": {
+            "type": "number",
+            "title": "Price Base"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value",
+            "description": "Shares times price, base currency."
+          },
+          "weight_before": {
+            "type": "number",
+            "title": "Weight Before"
+          },
+          "weight_after": {
+            "type": "number",
+            "title": "Weight After"
+          },
+          "expected_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Return",
+            "description": "Return to the thesis sell target."
+          },
+          "volatility_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility Change",
+            "description": "Change in ex-ante portfolio volatility from this line (percentage points of annual volatility, as a fraction)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "stage",
+          "principle",
+          "shares",
+          "price_base",
+          "value",
+          "weight_before",
+          "weight_after",
+          "expected_return",
+          "volatility_change"
+        ],
+        "title": "AllocationLine"
+      },
+      "AllocationPlan": {
+        "properties": {
+          "method_version": {
+            "type": "string",
+            "title": "Method Version",
+            "default": "allocator-1"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "spent": {
+            "type": "number",
+            "title": "Spent"
+          },
+          "left_over": {
+            "type": "number",
+            "title": "Left Over"
+          },
+          "base_currency": {
+            "type": "string",
+            "title": "Base Currency"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/AllocationLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "set_aside": {
+            "items": {
+              "$ref": "#/components/schemas/SetAside"
+            },
+            "type": "array",
+            "title": "Set Aside"
+          },
+          "volatility_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility Before"
+          },
+          "volatility_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility After"
+          },
+          "effective_bets_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Bets Before"
+          },
+          "effective_bets_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Bets After"
+          },
+          "rule_findings_after": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Findings After",
+            "description": "Rule, cap and band breaches that exist after the purchases and did not get deeper (already open before)."
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer",
+            "default": "A ranked suggestion against your own principles. Nothing is bought; whole shares at the last stored price, so the real fill will differ a little."
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount",
+          "spent",
+          "left_over",
+          "base_currency",
+          "lines",
+          "set_aside",
+          "volatility_before",
+          "volatility_after",
+          "effective_bets_before",
+          "effective_bets_after",
+          "rule_findings_after"
+        ],
+        "title": "AllocationPlan"
       },
       "AllocationSlice": {
         "properties": {
@@ -36683,6 +37081,88 @@
         ],
         "title": "ConcentrationOut"
       },
+      "ConcentrationReport": {
+        "properties": {
+          "method_version": {
+            "type": "string",
+            "title": "Method Version",
+            "default": "concentration-1"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "cap": {
+            "type": "number",
+            "title": "Cap"
+          },
+          "trim_to": {
+            "type": "number",
+            "title": "Trim To"
+          },
+          "backstop": {
+            "type": "number",
+            "title": "Backstop"
+          },
+          "monthly_deposit": {
+            "type": "number",
+            "title": "Monthly Deposit"
+          },
+          "deposit_source": {
+            "type": "string",
+            "title": "Deposit Source"
+          },
+          "total_value": {
+            "type": "number",
+            "title": "Total Value"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/OverCap"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "exempt": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Exempt",
+            "description": "Over the cap but exempt (core ETFs)."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_currency",
+          "cap",
+          "trim_to",
+          "backstop",
+          "monthly_deposit",
+          "deposit_source",
+          "total_value",
+          "positions"
+        ],
+        "title": "ConcentrationReport"
+      },
       "ConfigDiff": {
         "properties": {
           "domain": {
@@ -42102,6 +42582,24 @@
           "fact_ids"
         ],
         "title": "DigestVerdict"
+      },
+      "DilutionPoint": {
+        "properties": {
+          "month": {
+            "type": "integer",
+            "title": "Month"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "weight"
+        ],
+        "title": "DilutionPoint"
       },
       "DimensionAllocation": {
         "properties": {
@@ -62129,6 +62627,138 @@
         ],
         "title": "JurisdictionCoverage"
       },
+      "KellyOut": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "thesis_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thesis Return",
+            "description": "Return to the thesis sell target, annualised."
+          },
+          "equilibrium_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equilibrium Return"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence",
+            "description": "Weight on the thesis return; from the thesis's conviction."
+          },
+          "expected_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Return",
+            "description": "Thesis and equilibrium returns blended by the confidence."
+          },
+          "risk_free": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Free"
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta"
+          },
+          "volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility"
+          },
+          "full_kelly": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Kelly"
+          },
+          "fraction": {
+            "type": "number",
+            "title": "Fraction",
+            "default": 0.25
+          },
+          "bound": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bound",
+            "description": "Upper bound, share of the portfolio."
+          }
+        },
+        "type": "object",
+        "required": [
+          "available"
+        ],
+        "title": "KellyOut"
+      },
       "KeyFigure": {
         "properties": {
           "id": {
@@ -63248,6 +63878,66 @@
           "as_of"
         ],
         "title": "LegalLink"
+      },
+      "LimitLine": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "observed": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "change": {
+            "type": "string",
+            "title": "Change",
+            "description": "new, deeper, still_open, eased or cleared."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "ticker",
+          "detail",
+          "observed",
+          "limit",
+          "change"
+        ],
+        "title": "LimitLine"
       },
       "Line": {
         "properties": {
@@ -68763,6 +69453,129 @@
           "share"
         ],
         "title": "OperationLine"
+      },
+      "OverCap": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "cap": {
+            "type": "number",
+            "title": "Cap"
+          },
+          "excess_value": {
+            "type": "number",
+            "title": "Excess Value",
+            "description": "Value above the cap."
+          },
+          "zone": {
+            "type": "string",
+            "enum": [
+              "above_cap",
+              "above_backstop"
+            ],
+            "title": "Zone"
+          },
+          "months_to_cap": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Months To Cap",
+            "description": "Months of deposits (all going elsewhere, no price moves) until the weight is at or under the cap; null when not reached in three years."
+          },
+          "path": {
+            "items": {
+              "$ref": "#/components/schemas/DilutionPoint"
+            },
+            "type": "array",
+            "title": "Path"
+          },
+          "trim_weight": {
+            "type": "number",
+            "title": "Trim Weight",
+            "description": "Where a trim takes it: 8 %, or 10 % above the backstop."
+          },
+          "trim_value": {
+            "type": "number",
+            "title": "Trim Value"
+          },
+          "trim_shares": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trim Shares"
+          },
+          "price_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Base"
+          },
+          "thesis_gaps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Thesis Gaps"
+          },
+          "advice": {
+            "type": "string",
+            "title": "Advice"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "value",
+          "weight",
+          "cap",
+          "excess_value",
+          "zone",
+          "months_to_cap",
+          "path",
+          "trim_weight",
+          "trim_value",
+          "trim_shares",
+          "price_base",
+          "advice"
+        ],
+        "title": "OverCap"
       },
       "Overview": {
         "properties": {
@@ -74462,6 +75275,79 @@
           "trades"
         ],
         "title": "PretradeRequest"
+      },
+      "PretradeResponse": {
+        "properties": {
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/TradeLeg"
+            },
+            "type": "array",
+            "title": "Trades"
+          },
+          "is_switch": {
+            "type": "boolean",
+            "title": "Is Switch"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/PretradeCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "passed": {
+            "type": "integer",
+            "title": "Passed"
+          },
+          "flagged": {
+            "type": "integer",
+            "title": "Flagged"
+          },
+          "unavailable": {
+            "type": "integer",
+            "title": "Unavailable"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer"
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TradeRisk"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Ex-ante risk of the book before and after the trades (plan Q5.1)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "method_version",
+          "trades",
+          "is_switch",
+          "checks",
+          "passed",
+          "flagged",
+          "unavailable",
+          "notes",
+          "disclaimer"
+        ],
+        "title": "PretradeResponse"
       },
       "PretradeResult": {
         "properties": {
@@ -82100,6 +82986,96 @@
         "title": "RiskLimits",
         "description": "Portfolio risk limits, checked after each sync. Every limit is optional (null = off).\n\nA breach here is a prompt for review, not an instruction to trade: the strategy decides\nbuys and sells on fundamentals and news, so a price-based limit only forces a thesis review."
       },
+      "RiskLine": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "tier": {
+            "type": "string",
+            "title": "Tier"
+          },
+          "weight_before": {
+            "type": "number",
+            "title": "Weight Before"
+          },
+          "weight_after": {
+            "type": "number",
+            "title": "Weight After"
+          },
+          "risk_share_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Share Before"
+          },
+          "risk_share_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Share After"
+          },
+          "volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility",
+            "description": "Standalone annualised volatility (after)."
+          },
+          "status_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status After",
+            "description": "real, proxied or excluded after the trade."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "tier",
+          "weight_before",
+          "weight_after",
+          "risk_share_before",
+          "risk_share_after",
+          "volatility",
+          "status_after"
+        ],
+        "title": "RiskLine"
+      },
       "RiskReport": {
         "properties": {
           "method_version": {
@@ -85148,6 +86124,24 @@
           "state"
         ],
         "title": "SessionState"
+      },
+      "SetAside": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "reason"
+        ],
+        "title": "SetAside"
       },
       "SettingsResponse": {
         "properties": {
@@ -88861,6 +89855,158 @@
         ],
         "title": "StandardTable"
       },
+      "StartSize": {
+        "properties": {
+          "method_version": {
+            "type": "string",
+            "title": "Method Version",
+            "default": "sizing-1"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "tier_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier Cap",
+            "description": "Principle 8b starting cap."
+          },
+          "risk_ceiling": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Ceiling",
+            "description": "Largest weight inside the ex-ante limits (up to the tier cap)."
+          },
+          "suggested": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested",
+            "description": "The smaller of the two."
+          },
+          "suggested_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Value"
+          },
+          "binding": {
+            "type": "string",
+            "enum": [
+              "tier_cap",
+              "risk_limits",
+              "none"
+            ],
+            "title": "Binding",
+            "default": "none"
+          },
+          "limits_reached": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limits Reached"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "kelly": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KellyOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "status"
+        ],
+        "title": "StartSize"
+      },
       "StatedAction": {
         "properties": {
           "kind": {
@@ -91905,6 +93051,41 @@
         ],
         "title": "TierCheck"
       },
+      "TierLine": {
+        "properties": {
+          "tier": {
+            "type": "string",
+            "title": "Tier"
+          },
+          "risk_share_before": {
+            "type": "number",
+            "title": "Risk Share Before"
+          },
+          "risk_share_after": {
+            "type": "number",
+            "title": "Risk Share After"
+          },
+          "budget": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tier",
+          "risk_share_before",
+          "risk_share_after",
+          "budget"
+        ],
+        "title": "TierLine"
+      },
       "Tilt": {
         "properties": {
           "factor": {
@@ -92589,6 +93770,170 @@
           "value_base"
         ],
         "title": "TradeLeg"
+      },
+      "TradeRisk": {
+        "properties": {
+          "method_version": {
+            "type": "string",
+            "title": "Method Version",
+            "default": "trade-risk-1"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "volatility_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility Before"
+          },
+          "volatility_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility After"
+          },
+          "volatility_limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility Limit"
+          },
+          "effective_bets_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Bets Before"
+          },
+          "effective_bets_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Bets After"
+          },
+          "diversification_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diversification Before"
+          },
+          "diversification_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diversification After"
+          },
+          "covered_share_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Covered Share After"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/RiskLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "tiers": {
+            "items": {
+              "$ref": "#/components/schemas/TierLine"
+            },
+            "type": "array",
+            "title": "Tiers"
+          },
+          "limits": {
+            "items": {
+              "$ref": "#/components/schemas/LimitLine"
+            },
+            "type": "array",
+            "title": "Limits"
+          },
+          "not_modelled": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not Modelled"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available"
+        ],
+        "title": "TradeRisk"
       },
       "TradeRow": {
         "properties": {

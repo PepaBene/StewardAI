@@ -193,7 +193,7 @@ Code: `steward/quant/{returns,proxy,covariance,decompose}.py`, `steward/portfoli
 - [x] `Q4.1` Ingest the Ken French Data Library factor files (Developed, Europe, US: 5 factors + momentum, daily and weekly) as a macro source with the existing source-status and coverage tracking.
 - [x] `Q4.2` `quant/factors.py`: rolling (2-year weekly) regressions per holding and for the portfolio, with t-statistics, R² and Newey-West standard errors; currency and rates factors added.
 - [x] `Q4.3` Portfolio factor tilt vs the benchmark's tilt; flag a tilt beyond ±0.3 as a concentration note in the monthly review (not a breach).
-- [ ] `Q4.4` Use factor exposures in "propose new ideas" (principle 7c): rank candidates partly by how much they reduce the dominant factor tilt.
+- [x] `Q4.4` Use factor exposures in "propose new ideas" (principle 7c): rank candidates partly by how much they reduce the dominant factor tilt.
 - [x] `Q4.5` Frontend: factor exposure chart for portfolio vs benchmark, per-holding table.
 
 **Exit check:** the benchmark ETF regressed on its own region's market factor gives beta ≈ 1 and R² > 0.9.
@@ -245,14 +245,35 @@ Code: `quant/{stress,factors,french,french_store}.py`, `portfolio/{replay,factor
 
 **Outcome:** the decisions the owner already makes, with risk numbers attached before acting in Trading212.
 
-- [ ] `Q5.1` Pre-trade "what-if" endpoint: given proposed buys/sells or a deposit, return the full rule and risk-limit evaluation after the trade (caps, tiers, ex-ante vol, ES, drawdown probability, correlation, risk budgets, effective bets) as a before/after diff.
-- [ ] `Q5.2` Risk-aware starting size for a new position (method table), shown next to the principle 8b cap.
-- [ ] `Q5.3` Expected-return input from thesis and valuation, shrunk toward equilibrium; ¼-Kelly upper bound displayed with its inputs.
-- [ ] `Q5.4` Deposit allocator (principle 8c): ranked allocation of a given CZK amount, whole shares, all constraints, risk impact of each line; read-only.
-- [ ] `Q5.5` Rule 9 helper: for a position above 10 %, show the dilution path from expected deposits and the trim size to 8 % when the thesis is weakened.
-- [ ] `Q5.6` Chat tools: "what does buying X do to my risk?", "where should my next deposit go?" — the assistant calls Q5.1/Q5.4 and cites the computed result.
+- [x] `Q5.1` Pre-trade "what-if" endpoint: given proposed buys/sells or a deposit, return the full rule and risk-limit evaluation after the trade (caps, tiers, ex-ante vol, ES, drawdown probability, correlation, risk budgets, effective bets) as a before/after diff.
+- [x] `Q5.2` Risk-aware starting size for a new position (method table), shown next to the principle 8b cap.
+- [x] `Q5.3` Expected-return input from thesis and valuation, shrunk toward equilibrium; ¼-Kelly upper bound displayed with its inputs.
+- [x] `Q5.4` Deposit allocator (principle 8c): ranked allocation of a given CZK amount, whole shares, all constraints, risk impact of each line; read-only.
+- [x] `Q5.5` Rule 9 helper: for a position above 10 %, show the dilution path from expected deposits and the trim size to 8 % when the thesis is weakened.
+- [x] `Q5.6` Chat tools: "what does buying X do to my risk?", "where should my next deposit go?" — the assistant calls Q5.1/Q5.4 and cites the computed result.
 
 **Exit check:** an allocation never breaches a cap in the post-trade evaluation; every proposal cites the rule or KPI it serves (as the monthly review already requires).
+
+### Status of Q5 (implemented 9 October 2026) and the gaps that remain
+
+Code: `quant/sizing.py` (equilibrium and shrunk returns, quarter-Kelly, bisection, dilution path, trim), `portfolio/trade_risk.py` (Q5.1), `portfolio/sizing.py` (Q5.2, Q5.3), `decision/allocator.py` (Q5.4), `portfolio/concentration.py` (Q5.5), chat tools `risk_whatif`, `start_size`, `deposit_allocation`, `over_cap_positions` (Q5.6). Endpoints: `POST /portfolio/pretrade` now returns `risk` (before and after), `GET /portfolio/risk/{sizing,deposit,over-cap}`. Web: "Your risk before and after" on `/risk/pretrade`, the new tab `/risk/deposit` ("Size and deposit"), and the idea panel on the Factors page (Q4.4). Tests: `test_sizing.py`, `test_trade_risk.py`, `test_allocator.py`, `test_concentration.py`, `test_sizing_db.py`, `lib/risk/sizing.test.ts`.
+
+- `Q5.1`: the trades and deposit are applied to a copy of the loaded book and the ex-ante report is rebuilt, so before and after share the model, proxies and tiers. The ex-ante limits (volatility forecast, tier risk budgets, effective bets, pair correlation, tier criteria) are evaluated on both sides with the code that raises them after a sync; each is marked new, deeper, still open, eased or cleared, and added to the pre-trade checks. The rule, cap and band evaluation was already there.
+- `Q5.2`: suggested = min(tier starting cap of 8b, largest weight at which buying from cash adds no new or deeper ex-ante breach and keeps the stock's own share of volatility within `risk_contribution_cap` when set). The tier cap stays authoritative.
+- `Q5.3`: Kelly bound = ¼ × (expected return − cash rate) ÷ variance, with the expected return the thesis return to its sell target annualised, pulled toward CAPM equilibrium (cash rate + beta × 5 % premium) by a confidence from the thesis conviction (1 to 5 maps to 20 to 80 %, none stored 50 %). Shown with all its inputs; absent, with the reason, when there is no thesis.
+- `Q5.4`: greedy by principle 8c (core below target, then the most under-represented tier, sector or country, then the best idea above the hurdle, else a core fund); each purchase is halved until the post-purchase rules, caps, bands and ex-ante limits show nothing new or deeper than leaving the deposit in cash.
+- `Q5.5`: positions above the cap show the months until deposits alone dilute them, the trim to 8 % (to 10 % above the 15 % backstop) in money and shares; the outlook judgement is left to the owner.
+
+**Gaps**
+
+- G43. Expected Shortfall and the drawdown probability are not in the before and after, because Q2 is not built; the result names them as not modelled.
+- G44. The equity premium (5 %) and the conviction-to-confidence mapping are fixed in code; the premium can be changed per request on the sizing endpoint. They should become strategy settings if the owner wants to tune them.
+- G45. The deposit allocator is greedy, not a global optimiser (scipy is not added). It can miss a better combination; it is deterministic and every step is explained. Rank within a stage uses the thesis return to the sell target, not the risk-adjusted score of Q8.4.
+- G46. Bench ideas are the stocks with a thesis, not held, and a stored price series and instrument record; one without them is listed under "left out" with the reason. Prices are the last stored close at the stored rate, not a live quote.
+- G47. A fund is recognised by the instrument type `ETF`. A core stock that passes principle 8a is eligible for the "core" stage only through its derived or entered tier and its thesis.
+- G48. Expected deposits for Q5.5 default to the last twelve months' average of `DEPOSIT` cash movements; there is no plan of future deposits.
+- G49. The pre-trade check runs the ex-ante model for every request (a few seconds on a large book); nothing is cached beyond the one-minute book cache.
+- G50. The pages were typechecked and unit-tested but, as before (G3), not rendered in a browser.
 
 ## Phase Q6 — Process evaluation and model validation
 
