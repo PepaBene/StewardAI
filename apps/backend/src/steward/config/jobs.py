@@ -1912,6 +1912,42 @@ class JobsConfig(ConfigModel):
         "SEC XBRL filing (reported basis). Your own exposure entries are never changed. "
         "Default: Tuesdays 05:50.",
     )
+    disclosure_sources: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 6 * * *"),
+        description="Re-test every disclosure source, store the result, switch a failing one off "
+        "and the SEC sources on when they pass. Default: daily 06:00.",
+    )
+    disclosure_ingest: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="40 6 * * 1-5"),
+        description="Fetch, store and parse the newest SEC annual and quarterly filings of held "
+        "issuers. Skips itself until the SEC sources pass their access test. "
+        "Default: weekdays 06:40.",
+    )
+    disclosure_identifiers: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="20 6 * * 6"),
+        description="Suggest missing LEIs (GLEIF) and FIGIs (OpenFIGI); you confirm each. "
+        "Default: Saturdays 06:20.",
+    )
+    disclosure_deals: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="50 6 * * 1-5"),
+        description="Read the recent 8-K, 6-K, S-4, proxy and tender-offer filings of held "
+        "issuers and store the deals, states and terms they state. Default: weekdays 06:50.",
+    )
+    disclosure_esef: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="0 7 * * 1-5"),
+        description="Read the filings.xbrl.org index for held issuers with a confirmed LEI and "
+        "store each new ESEF report as a dated document version. Default: weekdays 07:00.",
+    )
+    disclosure_estimates: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="30 6 * * 1-5"),
+        description="Fetch each enabled issuer consensus file once and store a new version only "
+        "when its bytes changed. Default: weekdays 06:30.",
+    )
+    disclosure_alerts: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="15 13 * * *"),
+        description="Scan verified disclosures for new alerts and e-mail them, grouped by "
+        "ticker, when e-mail is configured. Default: daily 13:15.",
+    )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
     exposure_build_settings: ExposureBuildSettings = Field(default_factory=ExposureBuildSettings)
     ir_discovery_settings: IrDiscoverySettings = Field(default_factory=IrDiscoverySettings)
@@ -1982,6 +2018,13 @@ class JobsConfig(ConfigModel):
             "ir_discovery": self.ir_discovery,
             "gap_research": self.gap_research,
             "exposure_build": self.exposure_build,
+            "disclosure_sources": self.disclosure_sources,
+            "disclosure_ingest": self.disclosure_ingest,
+            "disclosure_identifiers": self.disclosure_identifiers,
+            "disclosure_deals": self.disclosure_deals,
+            "disclosure_esef": self.disclosure_esef,
+            "disclosure_estimates": self.disclosure_estimates,
+            "disclosure_alerts": self.disclosure_alerts,
             "twelve_data_corporate_actions": self.twelve_data_corporate_actions,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,

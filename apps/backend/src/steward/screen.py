@@ -43,8 +43,18 @@ class ScreenFilter(BaseModel):
     )
 
 
+class RowGate(BaseModel):
+    usable_for_valuation: bool | None = Field(
+        description="Null when no gate could be computed for this period: never read as a pass."
+    )
+    reasons: list[str]
+
+
 class ScreenRow(BaseModel):
     ticker: str
+    valuation_gate: RowGate | None = Field(
+        default=None, description="Whether this period's statements passed the valuation checks."
+    )
     name: str | None = None
     basis: str
     period_end: str

@@ -41,6 +41,8 @@ FIELDS = [
     "total-value",
     "total-value-cur",
     "publication-date",
+    "classification-cpv",
+    "identifier-lot",
 ]
 AWARD_NOTICE_TYPES = frozenset({"can-standard", "can-social", "can-desg", "can-modif"})
 PAGE_LIMIT = 100
@@ -56,6 +58,12 @@ class TedAward:
     value: Decimal | None
     currency: str | None
     published: dt.date | None
+    cpv_codes: tuple[str, ...] = ()
+    lot_ids: tuple[str, ...] = ()
+
+    @property
+    def status(self) -> str:
+        return "modified" if self.notice_type == "can-modif" else "awarded"
 
     @property
     def url(self) -> str:
@@ -126,9 +134,47 @@ def parse_ted_response(body: Mapping[str, Any]) -> tuple[list[TedAward], int]:
                 value=value,
                 currency=currencies[0] if currencies else None,
                 published=_date(notice.get("publication-date")),
+                cpv_codes=tuple(dict.fromkeys(_localized(notice.get("classification-cpv")))),
+                lot_ids=tuple(dict.fromkeys(_localized(notice.get("identifier-lot")))),
             )
         )
     return awards, int(total) if isinstance(total, int) else len(awards)
+
+
+async def store_award_detail(
+    pool: asyncpg.Pool | asyncpg.Connection, disclosure_id: int, award: TedAward
+) -> int:
+    """Keep the structured fields of an award: one row per lot, or one row when none is named.
+    Re-reading a notice updates its rows in place, so a correction or a repeated lot never
+    duplicates. The row belongs to a procurement claim and has no revenue share or denominator."""
+    currency = award.currency if award.currency and len(award.currency) == 3 else None
+    lots = award.lot_ids or ("",)
+    await pool.executemany(
+        """insert into public.procurement_award_detail
+             (disclosure_id, notice_number, lot_id, notice_type, cpv_codes, value, currency,
+              status, published)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+           on conflict (notice_number, lot_id) do update set
+             disclosure_id = excluded.disclosure_id, notice_type = excluded.notice_type,
+             cpv_codes = excluded.cpv_codes, value = excluded.value,
+             currency = excluded.currency, status = excluded.status,
+             published = excluded.published""",
+        [
+            (
+                disclosure_id,
+                award.number,
+                lot,
+                award.notice_type or None,
+                list(award.cpv_codes),
+                award.value,
+                currency.upper() if currency else None,
+                award.status,
+                award.published,
+            )
+            for lot in lots
+        ],
+    )
+    return len(lots)
 
 
 def build_query(names: Sequence[str], since: dt.date) -> str:
@@ -175,6 +221,22 @@ async def search_awards(
     return awards
 
 
+def winner_matches(winner: str, names: Sequence[str]) -> bool:
+    """A winner is the holding when its normalised name equals one of the holding's names. A
+    one-word name ("CISCO") is shared by unrelated firms, so it counts only when the winner
+    is written exactly as the full name given ("Cisco Systems, Inc." is not shortened)."""
+    key = normalize_object_key(winner)
+    for name in names:
+        if not name.strip() or normalize_object_key(name) != key:
+            continue
+        if (
+            len(key.removeprefix("name:").split()) >= 2
+            or winner.strip().lower() == name.strip().lower()
+        ):
+            return True
+    return False
+
+
 def _fiscal_period(published: dt.date | None) -> str | None:
     return f"FY{published.year}" if published else None
 
@@ -189,7 +251,6 @@ async def collect_ted_awards(
 ) -> int:
     """Store awards won by the holding (a winner name equal to one of its names, normalised)
     as suggested `procurement_award` disclosures. Returns the number stored."""
-    wanted = {normalize_object_key(n) for n in names if n.strip()}
     try:
         awards = await search_awards(http, names, since)
     except FreeSourceError as exc:
@@ -203,7 +264,7 @@ async def collect_ted_awards(
         raise
     stored = 0
     for award in awards:
-        matched = [w for w in award.winners if normalize_object_key(w) in wanted]
+        matched = [w for w in award.winners if winner_matches(w, names)]
         if not matched:
             continue  # the query is a fuzzy match: only an exact legal-name winner counts
         buyer = award.buyer or "unnamed contracting authority"
@@ -213,7 +274,7 @@ async def collect_ted_awards(
             f"{award.title or 'contract'}"
             f" awarded to {', '.join(award.winners)} by {buyer}{value}."
         )
-        await upsert_disclosure(
+        claim_id = await upsert_disclosure(
             pool,
             ticker=ticker,
             relationship="procurement_award",
@@ -227,6 +288,7 @@ async def collect_ted_awards(
             valid_from=award.published,
             origin="ted_award",
         )
+        await store_award_detail(pool, claim_id, award)
         stored += 1
     await record_access(
         pool,

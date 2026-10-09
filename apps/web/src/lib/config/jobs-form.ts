@@ -310,6 +310,48 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Builds each holding's revenue-by-country exposure from its latest annual SEC filing. Only single countries are mapped; your own exposure entries are never changed, and a row you delete is not rebuilt.",
     cron: "50 5 * * 2",
   },
+  disclosure_sources: {
+    label: "Disclosure source tests",
+    description:
+      "Re-tests every disclosure source each day and stores what it answered. A source that stops answering is switched off; the SEC sources are switched on again when they pass.",
+    cron: "0 6 * * *",
+  },
+  disclosure_ingest: {
+    label: "Filing ingestion",
+    description:
+      "Fetches, stores and parses the newest annual and quarterly SEC filings of your holdings. Switch it on after the SEC sources pass their access test; a filing that fails is reported, not skipped silently.",
+    cron: "40 6 * * 1-5",
+  },
+  disclosure_identifiers: {
+    label: "Identifier suggestions",
+    description:
+      "Looks up missing LEIs and FIGIs and stores them as suggestions. Nothing is confirmed until you decide it.",
+    cron: "20 6 * * 6",
+  },
+  disclosure_deals: {
+    label: "Deal filings",
+    description:
+      "Reads recent 8-K, S-4, proxy and tender-offer filings of your holdings and stores the deals, their state and the terms they state. A filing that does not name two parties and a deal type is counted, never guessed.",
+    cron: "50 6 * * 1-5",
+  },
+  disclosure_esef: {
+    label: "European annual reports",
+    description:
+      "Checks filings.xbrl.org for new ESEF reports of holdings with a confirmed LEI and stores each with the date it was published. It reads no values; statements come through the statement pipeline.",
+    cron: "0 7 * * 1-5",
+  },
+  disclosure_estimates: {
+    label: "Consensus files",
+    description:
+      "Fetches each issuer consensus file you have enabled and stores a new version only when it changed. A file it cannot read is reported with the reason, never stored half-read.",
+    cron: "30 6 * * 1-5",
+  },
+  disclosure_alerts: {
+    label: "Disclosure alerts",
+    description:
+      "Scans verified filings for new insider trades, major-holder changes and relationship changes, and e-mails the new ones grouped by ticker when e-mail is configured.",
+    cron: "15 13 * * *",
+  },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
 

@@ -97,6 +97,13 @@ class Filing13F:
     filed: dt.date
     submission_type: str
     amendment_type: str | None
+    # From the filing's own summary page: how many lines the manager reported and their total
+    # value, so a total can be reconciled even though only some lines are stored. None when the
+    # dataset has no summary page; never zero by default.
+    reported_line_count: int | None = None
+    reported_total_value_usd: Decimal | None = None
+    # True when the cover says holdings were omitted under a confidential treatment request.
+    omitted_holdings_notice: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -128,6 +135,16 @@ def _num(text: str) -> Decimal | None:
         return Decimal(text)
     except InvalidOperation:
         return None
+
+
+def _yes_no(text: str | None) -> bool | None:
+    """The dataset's Y/N flags. A blank is unknown, not 'no'."""
+    value = (text or "").strip().upper()
+    if value in {"Y", "YES", "TRUE", "1"}:
+        return True
+    if value in {"N", "NO", "FALSE", "0"}:
+        return False
+    return None
 
 
 def _value_usd(text: str, filed: dt.date) -> Decimal | None:
@@ -218,6 +235,11 @@ def parse_dataset(
         }
         with archive.open(_member(archive, "COVERPAGE.tsv")) as f:
             covers = {r["ACCESSION_NUMBER"]: r for r in _rows(f)}
+        try:
+            with archive.open(_member(archive, "SUMMARYPAGE.tsv")) as f:
+                summaries = {r["ACCESSION_NUMBER"]: r for r in _rows(f)}
+        except KeyError:
+            summaries = {}  # older archives: no summary page, so the totals stay unknown
         positions: list[Position13F] = []
         with archive.open(_member(archive, "INFOTABLE.tsv")) as f:
             for r in _rows(f):
@@ -257,15 +279,23 @@ def parse_dataset(
         # manager that sold out must still be seen.
         cik = r["CIK"].strip().zfill(10)
         cover = covers.get(accession, {})
+        summary = summaries.get(accession, {})
+        line_count = _num(summary.get("TABLEENTRYTOTAL", ""))
+        filed = _date(r["FILING_DATE"])
         filings.append(
             Filing13F(
                 accession=accession,
                 cik=cik,
                 manager_name=cover.get("FILINGMANAGER_NAME", "").strip() or None,
                 period=_date(r["PERIODOFREPORT"]),
-                filed=_date(r["FILING_DATE"]),
+                filed=filed,
                 submission_type=r["SUBMISSIONTYPE"].strip(),
                 amendment_type=cover.get("AMENDMENTTYPE", "").strip() or None,
+                reported_line_count=None if line_count is None else int(line_count),
+                reported_total_value_usd=_value_usd(summary.get("TABLEVALUETOTAL", ""), filed),
+                omitted_holdings_notice=_yes_no(
+                    cover.get("ISCONFIDENTIALOMITTED") or summary.get("ISCONFIDENTIALOMITTED")
+                ),
             )
         )
     return Dataset(filings, positions, name_matched)

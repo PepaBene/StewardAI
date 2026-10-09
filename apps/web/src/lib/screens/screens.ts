@@ -49,6 +49,7 @@ export function buildRequest(input: {
   sortBy: MetricId | null;
   limit?: number;
   reconciledOnly?: boolean;
+  valuationGateOnly?: boolean;
 }): BuiltRequest {
   const errors: string[] = [];
   const seen = new Set<string>();
@@ -82,6 +83,7 @@ export function buildRequest(input: {
       sort_by: input.sortBy,
       limit: input.limit ?? 100,
       reconciled_only: input.reconciledOnly ?? false,
+      valuation_gate_only: input.valuationGateOnly ?? false,
     },
     errors: [],
   };

@@ -356,3 +356,9 @@ async def run_insider_filings(ctx: JobContext, edgar: EdgarClient) -> None:
 
 async def insider_trades_handler(ctx: JobContext) -> None:
     await collect_insiders(ctx)
+    # Alerts follow a collection that finished; a failed collection raised above and alerts nothing.
+    # The scan counts failures per ticker and never fails the job that stored the filings.
+    from steward.disclosure.alerts import scan_all
+
+    async with ctx.step("disclosure-alerts") as step:
+        step.detail.update(await scan_all(ctx.pool))

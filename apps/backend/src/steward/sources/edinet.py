@@ -190,6 +190,13 @@ async def collect_edinet_day(
         raise FreeSourceError("EDINET sent no JSON") from exc
     documents = parse_document_list(payload, set(holdings))
     now = dt.datetime.now(dt.UTC)
+    # The same response, no extra credit: also keep the rows as dated document versions.
+    from steward.disclosure import foreign_job
+
+    issuers = await foreign_job.issuer_ids_for_tickers(pool, sorted(set(holdings.values())))
+    await foreign_job.collect_edinet_day(
+        pool, payload, {code: issuers.get(t) for code, t in holdings.items()}, observed_at=now
+    )
     for doc in documents:
         ticker = holdings[doc.edinet_code]
         await link_public_document(

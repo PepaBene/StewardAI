@@ -9,6 +9,15 @@ from typing import Literal
 from steward.approvals.ai import ai_approvals_handler
 from steward.changes.alerts import change_alerts_handler
 from steward.chat.assistant import chat_handler
+from steward.disclosure.jobs import (
+    disclosure_alerts_handler,
+    disclosure_deals_handler,
+    disclosure_esef_handler,
+    disclosure_estimates_handler,
+    disclosure_identifiers_handler,
+    disclosure_ingest_handler,
+    disclosure_sources_handler,
+)
 from steward.earnings.calendar import (
     earnings_calendar_full_handler,
     earnings_calendar_handler,
@@ -120,6 +129,13 @@ JobType = Literal[
     "ir_discovery",
     "gap_research",
     "exposure_build",
+    "disclosure_sources",
+    "disclosure_ingest",
+    "disclosure_identifiers",
+    "disclosure_deals",
+    "disclosure_esef",
+    "disclosure_estimates",
+    "disclosure_alerts",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -177,4 +193,11 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "ir_discovery": ir_discovery_handler,
     "gap_research": gap_research_handler,
     "exposure_build": exposure_build_handler,
+    "disclosure_sources": disclosure_sources_handler,
+    "disclosure_ingest": disclosure_ingest_handler,
+    "disclosure_identifiers": disclosure_identifiers_handler,
+    "disclosure_deals": disclosure_deals_handler,
+    "disclosure_esef": disclosure_esef_handler,
+    "disclosure_estimates": disclosure_estimates_handler,
+    "disclosure_alerts": disclosure_alerts_handler,
 }

@@ -49,6 +49,7 @@ const body: DigestBody = {
   window_end: "2026-09-26T05:00:00Z",
   nothing_material: false,
   headline: "h",
+  disclosure_alerts_more: 0,
   alerts_sent: 2,
   dropped_sentences: 0,
   overview: [

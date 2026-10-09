@@ -1,0 +1,16 @@
+{
+  "directory": {
+    "name": "/Archives/edgar/data/1234/000000123426000003",
+    "item": [
+      {"name": "acme-20251231.htm", "type": "text.gif", "size": "5400000"},
+      {"name": "acme-20251231_htm.xml", "type": "text.gif", "size": "3000000"},
+      {"name": "acme-20251231.xsd", "type": "text.gif", "size": "20000"},
+      {"name": "acme-20251231_cal.xml", "type": "text.gif", "size": "20000"},
+      {"name": "ex21.htm", "type": "text.gif", "size": "3000"},
+      {"name": "ex10-3.htm", "type": "text.gif", "size": "90000"},
+      {"name": "R2.htm", "type": "text.gif", "size": "9000"},
+      {"name": "FilingSummary.xml", "type": "text.gif", "size": "9000"},
+      {"name": "0000001234-26-000003-index.html", "type": "text.gif", "size": "9000"}
+    ]
+  }
+}

@@ -56,6 +56,7 @@ NO_OVERAGE_PROVIDERS: dict[str, str] = {
 
 # `Budget(` constructions per source file under src/steward (excluding verify_sources).
 BUDGET_SITES: dict[str, int] = {
+    "steward/disclosure/fetch.py": 1,
     "steward/free_sources.py": 2,
     "steward/macro/public_collect.py": 1,
     "steward/news/feeds.py": 1,
@@ -126,6 +127,13 @@ def literal_budgets() -> list[CollectorBudget]:
         ("finnhub", ANY_ENDPOINT, Budget(), free),
         (av, "account_free", d25, audit),
         (av, "account_free", d25, prices),
+        # the SEC fair-access ceiling; each source row may set a lower one
+        (
+            "sec.archive",
+            ANY_ENDPOINT,
+            Budget(per_minute=Decimal(600)),
+            "steward/disclosure/fetch.py",
+        ),
         # the module's own constants, so the registry cannot drift from them
         ("finnhub", ANY_ENDPOINT, FINNHUB_BUDGET, "steward/reference/exchange_probes.py"),
         ("twelve_data", ANY_ENDPOINT, TWELVE_BUDGET, "steward/reference/exchange_probes.py"),
