@@ -31,6 +31,7 @@ from steward.company.evidence import CaseView, Overview
 from steward.company.ratios import RatiosView
 from steward.company.rubric import Rubric
 from steward.company.segments import SegmentAnalysis
+from steward.company.service import VersionConflict
 from steward.company.statements import StatementsView
 from steward.research.run import ResearchBody
 
@@ -355,20 +356,29 @@ async def save_version(
 ) -> ReportVersion:
     snapshot = report.model_copy(update={"conclusion": ""}).model_dump(mode="json")
     research_id = report.research.report_id if report.research else None
-    row = await pool.fetchrow(
-        """insert into public.company_report_version
-             (owner_id, ticker, version, snapshot, research_report_id, conclusion, method_version, input_hash)
-           select $1, $2, coalesce(max(version), 0) + 1, $3::jsonb, $4, $5, $6, $7
-           from public.company_report_version where owner_id=$1 and ticker=$2
-           returning version, created_at""",
-        owner_id,
-        report.ticker,
-        json.dumps(snapshot),
-        research_id,
-        conclusion,
-        report.method_version,
-        report.input_hash,
-    )
+    try:
+        async with pool.acquire() as con, con.transaction():
+            # One save per owner and ticker at a time, so max+1 cannot hand out a number twice.
+            await con.execute(
+                "select pg_advisory_xact_lock(hashtext($1))",
+                f"company_report_version:{owner_id}:{report.ticker}",
+            )
+            row = await con.fetchrow(
+                """insert into public.company_report_version
+                     (owner_id, ticker, version, snapshot, research_report_id, conclusion, method_version, input_hash)
+                   select $1, $2, coalesce(max(version), 0) + 1, $3::jsonb, $4, $5, $6, $7
+                   from public.company_report_version where owner_id=$1 and ticker=$2
+                   returning version, created_at""",
+                owner_id,
+                report.ticker,
+                json.dumps(snapshot),
+                research_id,
+                conclusion,
+                report.method_version,
+                report.input_hash,
+            )
+    except asyncpg.UniqueViolationError as err:
+        raise VersionConflict("Another save took this version number; try again.") from err
     assert row is not None
     report = report.model_copy(update={"conclusion": conclusion})
     return ReportVersion(

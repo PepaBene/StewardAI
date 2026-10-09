@@ -189,8 +189,23 @@ async def fmp_company_handler(ctx: JobContext) -> None:
                         )
                 except (QuotaExceeded, RuntimeError) as exc:
                     step.detail["compensation_stopped"] = f"{type(exc).__name__}: {exc}"[:200]
+                    unchecked = ("quota_exhausted", step.detail["compensation_stopped"])
                 except (FreeSourceError, httpx.HTTPError):
                     compensation[ticker] = -1
+                    unchecked = ("temporarily_failed", "compensation request failed")
+                else:
+                    unchecked = ("access_unverified", "compensation not fetched: provider gated")
+                # A gated, over-quota or failed compensation call leaves no coverage row, and a
+                # ticker without one is treated as unchecked, so its profile would be re-fetched
+                # every run. Record the attempt without overwriting a real result; compensation
+                # itself is still retried because it is due while it has no observations.
+                await ctx.pool.execute(
+                    "insert into public.coverage_status (provider,dataset,entity_key,state,reason)"
+                    " values ('fmp','executive_compensation',$1,$2,$3)"
+                    " on conflict (provider,dataset,entity_key) do nothing",
+                    ticker,
+                    *unchecked,
+                )
         step.detail["refreshed"] = results
         step.detail["compensation_rows"] = compensation
 

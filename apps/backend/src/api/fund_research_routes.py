@@ -26,6 +26,7 @@ from steward.fundresearch.data import (
     SavedComparison,
     SavedComparisonIn,
     archive_comparison,
+    lending_answer,
     list_comparisons,
     list_funds,
     load_fact_history,
@@ -215,6 +216,8 @@ async def put_fund_fact(isin: IsinPath, body: FactIn, pool: Pool, owner: Owner) 
         raise HTTPException(
             422, "replication_method must be physical_full, physical_sampled or synthetic"
         )
+    if body.key == "securities_lending" and lending_answer(body.value) is None:
+        raise HTTPException(422, "securities_lending must start with yes or no")
     if body.key in NUMERIC_FACTS:
         try:
             number = Decimal(body.value)

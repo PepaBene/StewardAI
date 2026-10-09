@@ -114,8 +114,10 @@ def build_series(key: str, obs: Sequence[Obs], view: View = "restated") -> Serie
         elif days > QUARTER_DAYS[1]:
             cumulative[start][end] = val
     # Quarters that were filed only as year-to-date figures: this period's cumulative minus the
-    # previous one's, when the two end one quarter apart.
-    for start, by_end in cumulative.items():
+    # previous one's, when the two end one quarter apart. A share count is a period average, not
+    # a flow: two year-to-date averages do not subtract to a quarter's average, so none is built.
+    counts = any(o.unit.lower() == "shares" for o in obs)
+    for start, by_end in () if counts else cumulative.items():
         ends = sorted(by_end)
         for prev, cur in itertools.pairwise(ends):
             if cur in series.quarter or not _within((cur - prev).days, QUARTER_DAYS):
@@ -133,17 +135,24 @@ def build_series(key: str, obs: Sequence[Obs], view: View = "restated") -> Serie
                 restated=a.restated or b.restated,
                 original=None,
             )
-    series.ttm, series.ttm_end = _ttm(series)
+    series.ttm, series.ttm_end = _ttm(series, counts=counts)
     return series
 
 
-def _ttm(series: Series) -> tuple[Val | None, dt.date | None]:
+def _ttm(series: Series, *, counts: bool = False) -> tuple[Val | None, dt.date | None]:
     last_q = max(series.quarter, default=None)
     last_a = max(series.annual, default=None)
     if last_a is not None and (last_q is None or last_a >= last_q - dt.timedelta(days=MATCH_DAYS)):
         return series.annual[last_a], last_a
     if last_q is None:
         return None, None
+    if counts:
+        # Four quarterly share counts are not added up: the latest quarter's is the TTM figure.
+        newest = series.quarter[last_q]
+        latest = Val(
+            newest.value, newest.obs, derived="latest quarter, share counts are not summed"
+        )
+        return latest, last_q
     ends = [last_q]
     for _ in range(3):
         before = [e for e in series.quarter if _within((ends[-1] - e).days, QUARTER_DAYS)]

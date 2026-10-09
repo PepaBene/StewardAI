@@ -224,8 +224,11 @@ async def performance_view(
         chosen = recorded.value
     if chosen:
         opt = next((o for o in options if o.symbol == chosen), None)
-        fact_basis = data.facts.get("benchmark_basis")
-        fact_ccy = data.facts.get("benchmark_currency")
+        # The recorded basis and currency describe the recorded benchmark only; a different index
+        # picked with ?benchmark= must not inherit them.
+        is_recorded = recorded is not None and recorded.value == chosen
+        fact_basis = data.facts.get("benchmark_basis") if is_recorded else None
+        fact_ccy = data.facts.get("benchmark_currency") if is_recorded else None
         from_ledger = opt is not None and opt.basis != "unknown"
         basis: performance.Basis = (
             opt.basis
@@ -243,6 +246,8 @@ async def performance_view(
             if from_ledger
             else "Basis you recorded for this benchmark."
             if basis != "unknown"
+            else "The recorded basis applies only to the benchmark you recorded, and its return basis (price or total) is not recorded for this one."
+            if recorded is not None and not is_recorded
             else "The series' return basis (price or total) is not recorded."
         )
         if recorded is not None and benchmark_symbol is None:

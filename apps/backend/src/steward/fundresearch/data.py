@@ -6,9 +6,10 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import re
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 import asyncpg
 from pydantic import BaseModel, Field
@@ -34,6 +35,22 @@ FACT_KEYS = (
 )
 
 NUMERIC_FACTS = ("lending_revenue_share", "average_maturity_years", "effective_duration_years")
+
+_LENDS = re.compile(r"(yes|true|y|lends?|lending)\b", re.IGNORECASE)
+_NO_LENDING = re.compile(
+    r"(no|false|n|none|never|not lending|does not lend|doesn't lend|no lending)\b", re.IGNORECASE
+)
+
+
+def lending_answer(value: str) -> Literal["yes", "no"] | None:
+    """Read the free-text securities_lending fact: a leading yes ("Yes (up to 10%)") or a leading
+    no; anything else ("unknown", "partial") is None and is neither scored good nor recorded."""
+    text = value.strip()
+    if _NO_LENDING.match(text):
+        return "no"
+    if _LENDS.match(text):
+        return "yes"
+    return None
 
 
 class NavPoint(BaseModel):
@@ -168,7 +185,7 @@ async def load_fund(
             meta["provider"],
             isin,
         )
-    facts = await load_facts(pool, owner_id, isin)
+    facts = await load_facts(pool, owner_id, isin, as_of)
     nav = await load_nav(pool, owner_id, isin, as_of)
     return FundData(
         isin=isin,
@@ -213,8 +230,8 @@ async def load_nav(
 async def save_nav(pool: asyncpg.Pool, owner_id: Any, isin: str, points: list[NavIn]) -> int:
     async with pool.acquire() as conn, conn.transaction():
         await conn.executemany(
-            "insert into public.fund_nav_point (owner_id, fund_isin, as_of, nav, currency, source_url)"
-            " values ($1,$2,$3,$4,$5,$6)",
+            "insert into public.fund_nav_point (owner_id, fund_isin, as_of, nav, currency, source_url, origin)"
+            " values ($1,$2,$3,$4,$5,$6,'owner')",
             [(owner_id, isin, p.as_of, p.nav, p.currency, p.source_url.strip()) for p in points],
         )
     return len(points)
@@ -253,14 +270,18 @@ async def archive_comparison(pool: asyncpg.Pool, owner_id: Any, comparison_id: i
     return str(done).endswith("1")
 
 
-async def load_facts(pool: asyncpg.Pool, owner_id: Any, isin: str) -> dict[str, Fact]:
-    """The newest recorded value per key."""
+async def load_facts(
+    pool: asyncpg.Pool, owner_id: Any, isin: str, as_of: dt.date | None = None
+) -> dict[str, Fact]:
+    """The newest recorded value per key; with `as_of`, only facts recorded by the end of that day."""
     rows = await pool.fetch(
         """select distinct on (key) key, value, source_url, passage, as_of, created_at
            from public.fund_owner_fact where owner_id=$1 and fund_isin=$2
+             and ($3::timestamptz is null or created_at < $3)
            order by key, id desc""",
         owner_id,
         isin,
+        _cutoff(as_of),
     )
     return {
         r["key"]: Fact(

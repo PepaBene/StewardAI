@@ -154,7 +154,9 @@ def capital_observations(years: Sequence[AllocationYear]) -> list[Observed]:
     out: list[Observed] = []
 
     full = [
-        y for y in win if y.fcf is not None and (y.dividends is not None or y.buybacks is not None)
+        y
+        for y in win
+        if y.fcf is not None and y.dividends is not None and y.buybacks is not None
     ]
     fcf_total = sum((y.fcf or ZERO for y in full), ZERO)
     returned = sum(((y.dividends or ZERO) + (y.buybacks or ZERO) for y in full), ZERO)
@@ -169,7 +171,7 @@ def capital_observations(years: Sequence[AllocationYear]) -> list[Observed]:
             detail=f"Dividends and repurchases paid over free cash flow, summed over {len(full)} of {len(win)} years with both figures.",
             reason=None
             if full and fcf_total > 0
-            else "needs free cash flow above zero and a dividend or repurchase figure",
+            else "needs free cash flow above zero and both a dividend and a repurchase figure",
             source="filed cash-flow statements",
         )
     )

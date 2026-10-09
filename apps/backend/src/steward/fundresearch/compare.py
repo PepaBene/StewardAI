@@ -160,21 +160,30 @@ def build_comparison(prepared: Sequence[Prepared]) -> FundComparison:
         elif key:
             seen[key] = f.isin
         funds.append(f)
-    # Classes the issuer gave no shared portfolio id (or from different issuers) are still one
-    # portfolio when their holdings are the same issuers at the same weights.
-    weights = {p.fund.isin: (_issuer_weights(p.rows)[0] if p.view.row_count else {}) for p in prepared}
+    # Classes the issuer gave no shared portfolio id are still one portfolio when their holdings are
+    # the same issuers at the same weights, from the same provider and the same holdings date.
+    # Funds of different providers that track one index look alike without being one portfolio.
+    weights = {
+        p.fund.isin: (_issuer_weights(p.rows)[0] if p.view.row_count else {}) for p in prepared
+    }
     for i, f in enumerate(funds):
         if f.duplicate_of is not None or not weights[f.isin]:
             continue
         for earlier in funds[:i]:
             if earlier.duplicate_of is not None or not weights[earlier.isin]:
                 continue
+            if not f.provider or f.provider != earlier.provider:
+                continue
+            if f.holdings_as_of != earlier.holdings_as_of:
+                continue
             if set(weights[f.isin]) != set(weights[earlier.isin]):
                 continue
             common = sum(
                 (min(w, weights[earlier.isin][k]) for k, w in weights[f.isin].items()), ZERO
             )
-            total = max(sum(weights[f.isin].values(), ZERO), sum(weights[earlier.isin].values(), ZERO))
+            total = max(
+                sum(weights[f.isin].values(), ZERO), sum(weights[earlier.isin].values(), ZERO)
+            )
             if total > 0 and common / total >= IDENTICAL_OVERLAP:
                 funds[i] = f.model_copy(
                     update={"duplicate_of": earlier.isin, "duplicate_basis": "identical_holdings"}

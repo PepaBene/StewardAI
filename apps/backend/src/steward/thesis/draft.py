@@ -11,6 +11,8 @@ left to the owner, because no input here supports them.
 from __future__ import annotations
 
 import logging
+import re
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
 import asyncpg
@@ -23,6 +25,7 @@ from steward.llm.types import LLMError, Message, Request
 logger = logging.getLogger("steward.thesis.draft")
 
 MAX_FACTS = 60
+MAX_CONFLICT_FACTS = 15
 
 SYSTEM = """\
 You help an investor write down why they own a stock. You receive a numbered list of FACTS \
@@ -111,16 +114,53 @@ def facts_for(report: CompanyReport) -> list[str]:
         shown = ", ".join(f"{label} {share:.0%}" for label, share in seg.lines if share is not None)
         if shown:
             out.append(f"Revenue by {seg.breakdown} {seg.period or ''}: {shown}".replace("  ", " "))
-    for c in report.conflicts:
-        out.append(f"Conflict ({c.area}): {c.text}")
-    return out[:MAX_FACTS]
+    conflicts = [f"Conflict ({c.area}): {c.text}" for c in report.conflicts]
+    # Conflict warnings are kept first: the cap trims research, figures and segments, never them.
+    conflicts = conflicts[:MAX_CONFLICT_FACTS]
+    out = out[: max(0, MAX_FACTS - len(conflicts))]
+    return out + conflicts
+
+
+_NUMBER = re.compile(r"(?<![\w.])-?\d[\d,]*(?:\.\d+)?")
+_ALLOWED_NUMBERS = {Decimal(40)}  # the pre-mortem loss level the instructions themselves state
+
+
+def _numbers(text: str) -> list[tuple[Decimal, int]]:
+    found: list[tuple[Decimal, int]] = []
+    for m in _NUMBER.finditer(text):
+        raw = m.group().replace(",", "").rstrip(".")
+        try:
+            value = Decimal(raw)
+        except InvalidOperation:
+            continue
+        found.append((value, len(raw.split(".")[1]) if "." in raw else 0))
+    return found
+
+
+def numbers_supported(text: str, facts: list[str]) -> bool:
+    """True when every figure in `text` appears in the facts (as written, or as a percentage of
+    a fraction the facts give). Bare whole numbers up to ten are ordinary words, not figures."""
+    pool = [value for fact in facts for value, _ in _numbers(fact)]
+    for value, places in _numbers(text):
+        if value in _ALLOWED_NUMBERS or (value == value.to_integral_value() and abs(value) <= 10):
+            continue
+        quantum = Decimal(1).scaleb(-places)
+        if not any(
+            value
+            in (p.quantize(quantum, ROUND_HALF_UP), (p * 100).quantize(quantum, ROUND_HALF_UP))
+            for p in pool
+        ):
+            return False
+    return True
 
 
 def _resolve(line: DraftLine | None, facts: list[str]) -> ThesisDraftLine | None:
     if line is None:
         return None
     cited = [facts[i - 1] for i in dict.fromkeys(line.facts) if 1 <= i <= len(facts)]
-    return ThesisDraftLine(text=line.text.strip(), facts=cited) if cited else None
+    if not cited or not numbers_supported(line.text, facts):
+        return None
+    return ThesisDraftLine(text=line.text.strip(), facts=cited)
 
 
 def resolve(model: ModelDraft, facts: list[str], model_id: str | None, ticker: str) -> ThesisDraft:
@@ -145,7 +185,7 @@ def resolve(model: ModelDraft, facts: list[str], model_id: str | None, ticker: s
     if model.variant_perception is not None:
         v = model.variant_perception
         cited = [facts[i - 1] for i in dict.fromkeys(v.facts) if 1 <= i <= len(facts)]
-        if cited:
+        if cited and numbers_supported(f"{v.belief} {v.disproof}", facts):
             variant = ThesisDraftVariant(
                 belief=v.belief.strip(), disproof=v.disproof.strip(), facts=cited
             )

@@ -660,6 +660,25 @@ def build_view(
     native_set = {o.currency for o in plain if o.currency and o.unit.upper() == o.currency.upper()}
     native_currency = next(iter(sorted(native_set)), None)
     converted_to: str | None = None
+
+    def _transform() -> None:
+        if transform != "none" or per_share or units != 1:
+            warnings.extend(
+                apply_transform(
+                    tables,
+                    columns,
+                    transform=transform,
+                    per_share=per_share,
+                    units=units,
+                    standardized=standardized,
+                )
+            )
+
+    # Growth is computed in the filing currency, so it never includes the FX move: year-over-year
+    # runs before translation (translation skips the resulting fraction cells).
+    yoy_first = transform == "yoy"
+    if yoy_first:
+        _transform()
     if convert is not None:
         target, translate = convert
         if len(native_set) == 1 and native_currency and native_currency != target:
@@ -671,17 +690,8 @@ def build_view(
             warnings.append(
                 "Facts are in more than one currency or none is stated, so no conversion was applied."
             )
-    if transform != "none" or per_share or units != 1:
-        warnings.extend(
-            apply_transform(
-                tables,
-                columns,
-                transform=transform,
-                per_share=per_share,
-                units=units,
-                standardized=standardized,
-            )
-        )
+    if not yoy_first:
+        _transform()
     currencies = {o.currency for o in plain if o.currency and o.unit.upper() == o.currency.upper()}
     if len(currencies) > 1:
         warnings.append(

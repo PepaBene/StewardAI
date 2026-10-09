@@ -11,6 +11,7 @@ from steward.thesis import draft
 from steward.thesis.draft import DraftLine, DraftUnavailable, DraftVariant, ModelDraft
 
 FACTS = [f"fact {i}" for i in range(1, 8)]
+FACTS[1] = "fact 2: operating margin 20%"
 
 
 def test_lines_without_a_real_fact_are_dropped_and_counted() -> None:

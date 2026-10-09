@@ -143,8 +143,8 @@ def test_facts_are_written_only_when_new_or_changed_and_never_over_the_owners_so
     recorded = {
         "domicile": sync.RecordedFact("ireland", "https://www.ishares.com/ch/x"),  # same value
         "ucits": sync.RecordedFact(
-            "yes", "https://www.blackrock.com/uk/y"
-        ),  # issuer family: update
+            "yes", "https://www.blackrock.com/uk/y", f"p {sync.AUTO_PASSAGE_SUFFIX}"
+        ),  # written by the sync from the issuer family: update
         "tracking_index": sync.RecordedFact("My own index note", "https://example.org/mine"),
     }
     plan = sync.plan_fact_writes(cands, recorded, ish)
@@ -156,17 +156,52 @@ def test_facts_are_written_only_when_new_or_changed_and_never_over_the_owners_so
     )
 
 
+def test_an_owner_value_citing_the_issuers_page_is_not_superseded():
+    ish = "https://www.ishares.com/uk/individual/en/products/253741"
+    recorded = {"ucits": sync.RecordedFact("yes", ish, "my reading of the factsheet")}
+    plan = sync.plan_fact_writes({"ucits": sync.Candidate("no", "p")}, recorded, ish)
+    assert not plan.writes and set(plan.conflicts) == {"ucits"}
+
+
+def test_non_object_payload_nodes_are_skipped_not_raised():
+    body = {
+        "componentsByNameMap": {
+            "keyFundFacts": {
+                "containersByNameMap": {
+                    "default": {
+                        "dataPointsByNameMap": {"isin": "oops", "domicile": {"value": "IE"}}
+                    },
+                    "broken": "not a container",
+                    "empty": {"dataPointsByNameMap": ["x"]},
+                }
+            }
+        }
+    }
+    points = sync._points(body, "keyFundFacts")
+    assert sync._shown(points, "default.domicile") == "IE"
+    assert "default.isin" not in points
+    with pytest.raises(sync.IssuerReadError):
+        sync._points(
+            {"componentsByNameMap": {"keyFundFacts": {"containersByNameMap": []}}}, "keyFundFacts"
+        )
+
+
 def test_nav_rules():
     nav = sync.NavReading(dt.date(2026, 10, 6), D("10.66"), "USD")
     ish = "https://www.ishares.com/uk/individual/en/products/287254"
     assert sync.plan_nav_write(None, [], ish) == "none"
     assert sync.plan_nav_write(nav, [], ish) == "write"
-    assert sync.plan_nav_write(nav, [(D("10.66"), "USD", ish)], ish) == "unchanged"
+    assert sync.plan_nav_write(nav, [(D("10.66"), "USD", ish, "owner")], ish) == "unchanged"
     assert (
-        sync.plan_nav_write(nav, [(D("10.60"), "USD", "https://www.ishares.com/ch/z")], ish)
+        sync.plan_nav_write(
+            nav, [(D("10.60"), "USD", "https://www.ishares.com/ch/z", "issuer")], ish
+        )
         == "write"
     )
     assert (
-        sync.plan_nav_write(nav, [(D("10.60"), "USD", "https://example.org/mine")], ish)
+        sync.plan_nav_write(nav, [(D("10.60"), "USD", "https://example.org/mine", "issuer")], ish)
         == "conflict"
     )
+    # An owner entry (or a row of unknown origin) citing the issuer's own page is never superseded.
+    for origin in ("owner", None):
+        assert sync.plan_nav_write(nav, [(D("10.60"), "USD", ish, origin)], ish) == "conflict"
