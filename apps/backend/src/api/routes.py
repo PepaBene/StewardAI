@@ -44,6 +44,7 @@ from steward.earnings.review import review_fact as review_fact_in_db
 from steward.earnings.review_stats import ReviewStats, review_stats
 from steward.jobs import queue
 from steward.jobs.runner import create_job
+from steward.portfolio.exante import ExAnteRisk, ex_ante_risk
 from steward.portfolio.read import (
     ContributionReport,
     HoldingsResponse,
@@ -129,6 +130,18 @@ async def get_portfolio_risk(
     return, average risk-free rate, the window and the number of observations. `sharpe` is
     null with a `reason` under 60 observations or without a stored risk-free rate."""
     return await portfolio_risk(pool, days)
+
+
+@router.get("/portfolio/risk/ex-ante", tags=["portfolio"])
+async def get_portfolio_risk_ex_ante(pool: Pool, _owner: Owner) -> ExAnteRisk:
+    """Today's risk from the current weights: the forecast annualised volatility (the higher
+    of an EWMA and a Ledoit-Wolf covariance model on three years of weekly base-currency
+    returns, cash at zero volatility), each position's Euler share of it, the shares summed by
+    tier, sector, country and currency, the diversification ratio, the effective number of
+    independent bets, the tier-criterion volatility checks and the coverage: which weight rests
+    on a proxy-backfilled history and which is left out. `volatility_forecast` is null with a
+    `reason` when no position has enough history."""
+    return await ex_ante_risk(pool)
 
 
 @router.get("/portfolio/transactions", tags=["portfolio"])

@@ -2131,6 +2131,33 @@
         }
       }
     },
+    "/portfolio/risk/ex-ante": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Risk Ex Ante",
+        "description": "Today's risk from the current weights: the forecast annualised volatility (the higher\nof an EWMA and a Ledoit-Wolf covariance model on three years of weekly base-currency\nreturns, cash at zero volatility), each position's Euler share of it, the shares summed by\ntier, sector, country and currency, the diversification ratio, the effective number of\nindependent bets, the tier-criterion volatility checks and the coverage: which weight rests\non a proxy-backfilled history and which is left out. `volatility_forecast` is null with a\n`reason` when no position has enough history.",
+        "operationId": "get_portfolio_risk_ex_ante",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExAnteRisk"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/portfolio/transactions": {
       "get": {
         "tags": [
@@ -38010,70 +38037,6 @@
         ],
         "title": "CostsOut"
       },
-      "Coverage": {
-        "properties": {
-          "total_value": {
-            "type": "number",
-            "title": "Total Value"
-          },
-          "cash_value": {
-            "type": "number",
-            "title": "Cash Value"
-          },
-          "direct_value": {
-            "type": "number",
-            "title": "Direct Value"
-          },
-          "fund_value": {
-            "type": "number",
-            "title": "Fund Value"
-          },
-          "looked_through_value": {
-            "type": "number",
-            "title": "Looked Through Value"
-          },
-          "not_looked_through_value": {
-            "type": "number",
-            "title": "Not Looked Through Value"
-          },
-          "fund_share_looked_through": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Fund Share Looked Through",
-            "description": "Share of the funds' value whose holdings are looked through."
-          },
-          "portfolio_share_looked_through": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Portfolio Share Looked Through",
-            "description": "Share of total portfolio value that is direct stocks or looked-through funds (the rest is cash and funds not looked through)."
-          }
-        },
-        "type": "object",
-        "required": [
-          "total_value",
-          "cash_value",
-          "direct_value",
-          "fund_value",
-          "looked_through_value",
-          "not_looked_through_value",
-          "fund_share_looked_through",
-          "portfolio_share_looked_through"
-        ],
-        "title": "Coverage"
-      },
       "CoverageGapOut": {
         "properties": {
           "kind": {
@@ -45777,6 +45740,326 @@
         ],
         "title": "EvidenceSummary"
       },
+      "ExAnteLimits": {
+        "properties": {
+          "max_volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Volatility"
+          },
+          "tier_risk_budgets": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier Risk Budgets"
+          },
+          "min_effective_bets": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Effective Bets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "max_volatility",
+          "tier_risk_budgets",
+          "min_effective_bets"
+        ],
+        "title": "ExAnteLimits"
+      },
+      "ExAnteRisk": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "window_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Start"
+          },
+          "window_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window End"
+          },
+          "weeks": {
+            "type": "integer",
+            "title": "Weeks"
+          },
+          "total_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Value"
+          },
+          "volatility_ewma": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility Ewma"
+          },
+          "volatility_ledoit_wolf": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility Ledoit Wolf"
+          },
+          "volatility_forecast": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility Forecast",
+            "description": "The higher of the two, tested against the volatility limit."
+          },
+          "forecast_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ewma",
+                  "ledoit_wolf"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Model"
+          },
+          "shrinkage_intensity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shrinkage Intensity",
+            "description": "Weight Ledoit-Wolf puts on the constant-correlation target."
+          },
+          "realized_volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realized Volatility",
+            "description": "Realized volatility of the flow-adjusted index over the last year."
+          },
+          "diversification_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diversification Ratio"
+          },
+          "effective_bets": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Bets"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/PositionExAnte"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "by_tier": {
+            "items": {
+              "$ref": "#/components/schemas/GroupRisk"
+            },
+            "type": "array",
+            "title": "By Tier"
+          },
+          "by_sector": {
+            "items": {
+              "$ref": "#/components/schemas/GroupRisk"
+            },
+            "type": "array",
+            "title": "By Sector"
+          },
+          "by_country": {
+            "items": {
+              "$ref": "#/components/schemas/GroupRisk"
+            },
+            "type": "array",
+            "title": "By Country"
+          },
+          "by_currency": {
+            "items": {
+              "$ref": "#/components/schemas/GroupRisk"
+            },
+            "type": "array",
+            "title": "By Currency"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/steward__portfolio__exante__Coverage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tier_checks": {
+            "items": {
+              "$ref": "#/components/schemas/TierCheck"
+            },
+            "type": "array",
+            "title": "Tier Checks"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/ExAnteLimits"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why there is no forecast, when there is none."
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "base_currency",
+          "method_version",
+          "method",
+          "window_start",
+          "window_end",
+          "weeks",
+          "total_value",
+          "volatility_ewma",
+          "volatility_ledoit_wolf",
+          "volatility_forecast",
+          "forecast_model",
+          "shrinkage_intensity",
+          "realized_volatility",
+          "diversification_ratio",
+          "effective_bets",
+          "positions",
+          "by_tier",
+          "by_sector",
+          "by_country",
+          "by_currency",
+          "coverage",
+          "tier_checks",
+          "limits",
+          "warnings",
+          "reason"
+        ],
+        "title": "ExAnteRisk"
+      },
       "ExchangeCalendar": {
         "properties": {
           "exchanges": {
@@ -52883,6 +53166,29 @@
           "value"
         ],
         "title": "GridCell"
+      },
+      "GroupRisk": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "risk_share": {
+            "type": "number",
+            "title": "Risk Share"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "weight",
+          "risk_share"
+        ],
+        "title": "GroupRisk"
       },
       "GroupStats": {
         "properties": {
@@ -62573,7 +62879,7 @@
           "coverage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Coverage"
+                "$ref": "#/components/schemas/steward__lookthrough__read__Coverage"
               },
               {
                 "type": "null"
@@ -72550,6 +72856,120 @@
         ],
         "title": "PositionDrift"
       },
+      "PositionExAnte": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "tier": {
+            "type": "string",
+            "title": "Tier"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "real",
+              "proxied",
+              "excluded"
+            ],
+            "title": "Status",
+            "description": "real: own history over the whole window; proxied: part of it backfilled from a proxy ETF; excluded: left out of the model (see `reason`)."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Share of total portfolio value, cash included."
+          },
+          "volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility",
+            "description": "Standalone annualised volatility."
+          },
+          "risk_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Share",
+            "description": "Euler share of the forecast variance; all positions sum to 1."
+          },
+          "marginal_risk": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginal Risk",
+            "description": "Change in annualised portfolio volatility per unit of weight."
+          },
+          "real_weeks": {
+            "type": "integer",
+            "title": "Real Weeks"
+          },
+          "proxy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProxyFitOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "tier",
+          "status",
+          "reason",
+          "weight",
+          "volatility",
+          "risk_share",
+          "marginal_risk",
+          "real_weeks",
+          "proxy"
+        ],
+        "title": "PositionExAnte"
+      },
       "PositionTarget": {
         "properties": {
           "target_weight": {
@@ -73567,7 +73987,17 @@
             "maximum": 10.0,
             "minimum": 1.0,
             "title": "History Years",
-            "default": 2
+            "description": "Years of daily closes (and ECB FX rates) fetched for holdings, benchmarks and proxy ETFs. The covariance model needs three years of weekly returns; stress replays need more.",
+            "default": 10
+          },
+          "proxy_series": {
+            "items": {
+              "$ref": "#/components/schemas/ProxySeries"
+            },
+            "type": "array",
+            "maxItems": 40,
+            "title": "Proxy Series",
+            "description": "Sector and region ETFs collected as stand-ins for holdings with under three years of history (the ex-ante risk model regresses a recent listing on the best-fitting one)."
           },
           "plausibility_tolerance_pct": {
             "type": "number",
@@ -74465,6 +74895,103 @@
           "identifier"
         ],
         "title": "ProviderSymbol"
+      },
+      "ProxyFitOut": {
+        "properties": {
+          "proxy": {
+            "type": "string",
+            "title": "Proxy",
+            "description": "Stooq symbol of the ETF the history was backfilled from."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "beta": {
+            "type": "number",
+            "title": "Beta"
+          },
+          "r_squared": {
+            "type": "number",
+            "title": "R Squared"
+          },
+          "fit_weeks": {
+            "type": "integer",
+            "title": "Fit Weeks"
+          },
+          "fit_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Fit Start"
+          },
+          "fit_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Fit End"
+          },
+          "backfilled_weeks": {
+            "type": "integer",
+            "title": "Backfilled Weeks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "proxy",
+          "label",
+          "beta",
+          "r_squared",
+          "fit_weeks",
+          "fit_start",
+          "fit_end",
+          "backfilled_weeks"
+        ],
+        "title": "ProxyFitOut"
+      },
+      "ProxySeries": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "pattern": "^\\^?[a-z0-9._-]{1,24}$",
+            "title": "Symbol",
+            "examples": [
+              "xlk.us"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Label",
+            "examples": [
+              "US technology"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency",
+            "description": "Quote currency of the ETF's closes.",
+            "default": "USD"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sector",
+              "region",
+              "market"
+            ],
+            "title": "Kind",
+            "default": "sector"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "symbol",
+          "label"
+        ],
+        "title": "ProxySeries",
+        "description": "A sector or region ETF whose daily closes stand in for a holding with a short history\n(quant plan Q0.3/Q0.4): a recent listing is regressed on it and the missing weeks are\nbackfilled from it."
       },
       "PublicDataSettings": {
         "properties": {
@@ -79789,7 +80316,7 @@
               }
             ],
             "title": "Max Volatility",
-            "description": "Ceiling on the portfolio's annualised volatility (0.20 = 20 %), measured on the time-weighted daily returns over the last year."
+            "description": "Ceiling on the portfolio's annualised volatility (0.20 = 20 %). Tested two ways: realized, on the time-weighted daily returns over the last year, and as a forecast from today's weights (the higher of the EWMA and Ledoit-Wolf covariance models, cash at zero volatility). A breach of either forces a thesis review."
           },
           "max_beta": {
             "anyOf": [
@@ -79887,7 +80414,7 @@
               }
             ],
             "title": "Max Pair Correlation",
-            "description": "Ceiling on the correlation of two held positions' daily returns over the last year (0.85). Only pairs weighing at least `correlation_min_combined_weight` together are checked, so small positions do not raise noise."
+            "description": "Ceiling on the correlation of two held positions' weekly base-currency returns over the last two years (0.85). Only pairs weighing at least `correlation_min_combined_weight` together are checked, so small positions do not raise noise."
           },
           "correlation_min_combined_weight": {
             "type": "number",
@@ -79988,6 +80515,72 @@
             ],
             "title": "Max Valuation Growth",
             "description": "Flag a saved valuation scenario of a held stock whose explicit-year free cash flow growth exceeds this rate in any year."
+          },
+          "tier_risk_budgets": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number",
+                  "maximum": 1.0,
+                  "minimum": 0.0
+                },
+                "propertyNames": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "examples": [
+                    "Semiconductors"
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier Risk Budgets",
+            "description": "Ceiling on each risk tier's share of the portfolio's forecast volatility (Euler risk contributions of the ex-ante model), by tier bucket in the 'risk' dimension, e.g. {'core': 0.45, 'growth': 0.45, 'speculative': 0.25}. A tier not listed is unchecked."
+          },
+          "min_effective_bets": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Effective Bets",
+            "description": "Floor on the effective number of independent bets (Meucci's entropy of the principal-component risk shares): a book of many names can still be one bet."
+          },
+          "tier_speculative_volatility": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier Speculative Volatility",
+            "description": "A holding in the core or growth tier whose annualised volatility (one year of daily local-currency returns, as on its page) is above this (0.35 = 35 %) no longer meets the tier and needs a review. The owner reclassifies by hand."
+          },
+          "tier_core_max_volatility": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier Core Max Volatility",
+            "description": "A core-tier holding whose annualised volatility is above this (0.25 = 25 %) no longer meets the core criterion and needs a review."
           },
           "on_breach": {
             "type": "string",
@@ -89110,6 +89703,58 @@
         "type": "object",
         "title": "ThesisVerdictsRequest"
       },
+      "TierCheck": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "tier": {
+            "type": "string",
+            "title": "Tier"
+          },
+          "volatility": {
+            "type": "number",
+            "title": "Volatility"
+          },
+          "window_days": {
+            "type": "integer",
+            "title": "Window Days"
+          },
+          "observations": {
+            "type": "integer",
+            "title": "Observations"
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold"
+          },
+          "rule": {
+            "type": "string",
+            "enum": [
+              "speculative_above",
+              "core_above"
+            ],
+            "title": "Rule"
+          },
+          "breached": {
+            "type": "boolean",
+            "title": "Breached"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "tier",
+          "volatility",
+          "window_days",
+          "observations",
+          "threshold",
+          "rule",
+          "breached"
+        ],
+        "title": "TierCheck"
+      },
       "TimelineMonth": {
         "properties": {
           "month": {
@@ -94803,6 +95448,70 @@
         ],
         "title": "Check"
       },
+      "steward__lookthrough__read__Coverage": {
+        "properties": {
+          "total_value": {
+            "type": "number",
+            "title": "Total Value"
+          },
+          "cash_value": {
+            "type": "number",
+            "title": "Cash Value"
+          },
+          "direct_value": {
+            "type": "number",
+            "title": "Direct Value"
+          },
+          "fund_value": {
+            "type": "number",
+            "title": "Fund Value"
+          },
+          "looked_through_value": {
+            "type": "number",
+            "title": "Looked Through Value"
+          },
+          "not_looked_through_value": {
+            "type": "number",
+            "title": "Not Looked Through Value"
+          },
+          "fund_share_looked_through": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Share Looked Through",
+            "description": "Share of the funds' value whose holdings are looked through."
+          },
+          "portfolio_share_looked_through": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Share Looked Through",
+            "description": "Share of total portfolio value that is direct stocks or looked-through funds (the rest is cash and funds not looked through)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_value",
+          "cash_value",
+          "direct_value",
+          "fund_value",
+          "looked_through_value",
+          "not_looked_through_value",
+          "fund_share_looked_through",
+          "portfolio_share_looked_through"
+        ],
+        "title": "Coverage"
+      },
       "steward__ownership__control_stakes_read__StakeChangeOut": {
         "properties": {
           "change_type": {
@@ -94863,6 +95572,42 @@
           "detail"
         ],
         "title": "StakeChangeOut"
+      },
+      "steward__portfolio__exante__Coverage": {
+        "properties": {
+          "invested_weight": {
+            "type": "number",
+            "title": "Invested Weight",
+            "description": "Share of total portfolio value held in positions."
+          },
+          "real_weight": {
+            "type": "number",
+            "title": "Real Weight"
+          },
+          "proxied_weight": {
+            "type": "number",
+            "title": "Proxied Weight"
+          },
+          "uncovered_weight": {
+            "type": "number",
+            "title": "Uncovered Weight",
+            "description": "Positions left out of the model."
+          },
+          "covered_share": {
+            "type": "number",
+            "title": "Covered Share",
+            "description": "(real + proxied) / invested."
+          }
+        },
+        "type": "object",
+        "required": [
+          "invested_weight",
+          "real_weight",
+          "proxied_weight",
+          "uncovered_weight",
+          "covered_share"
+        ],
+        "title": "Coverage"
       },
       "steward__quality__cockpit__Check": {
         "properties": {

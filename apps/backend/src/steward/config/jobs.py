@@ -642,6 +642,45 @@ class MarketStripItem(ConfigModel):
         return self.yahoo_symbol or STOOQ_INDEX_YAHOO.get(self.symbol)
 
 
+class ProxySeries(ConfigModel):
+    """A sector or region ETF whose daily closes stand in for a holding with a short history
+    (quant plan Q0.3/Q0.4): a recent listing is regressed on it and the missing weeks are
+    backfilled from it."""
+
+    symbol: StooqSymbol = Field(examples=["xlk.us"])
+    label: str = Field(min_length=1, max_length=40, examples=["US technology"])
+    currency: Annotated[str, Field(pattern=r"^[A-Z]{3}$")] = Field(
+        default="USD", description="Quote currency of the ETF's closes."
+    )
+    kind: Literal["sector", "region", "market"] = "sector"
+
+    def yahoo(self) -> str | None:
+        ticker, _, suffix = self.symbol.rpartition(".")
+        return ticker.upper() if suffix == "us" and ticker else None
+
+
+def _default_proxy_series() -> list[ProxySeries]:
+    sectors = {
+        "xlk.us": "US technology",
+        "xlv.us": "US health care",
+        "xlf.us": "US financials",
+        "xle.us": "US energy",
+        "xly.us": "US consumer discretionary",
+        "xlp.us": "US consumer staples",
+        "xli.us": "US industrials",
+        "xlb.us": "US materials",
+        "xlu.us": "US utilities",
+        "xlc.us": "US communication services",
+    }
+    out = [ProxySeries(symbol=s, label=name, kind="sector") for s, name in sectors.items()]
+    out += [
+        ProxySeries(symbol="vgk.us", label="Europe", kind="region"),
+        ProxySeries(symbol="vwo.us", label="Emerging markets", kind="region"),
+        ProxySeries(symbol="vt.us", label="World equities", kind="market"),
+    ]
+    return out
+
+
 def _default_market_strip() -> list[MarketStripItem]:
     return [
         MarketStripItem(symbol="^spx", label="S&P 500", yahoo_symbol="^GSPC"),
@@ -662,7 +701,21 @@ class PriceSettings(ConfigModel):
         description="Stooq symbols of the benchmarks (^spx S&P 500, ^dax DAX, ^ukx FTSE 100). "
         "The first is used for beta and the holding charts.",
     )
-    history_years: int = Field(default=2, ge=1, le=10)
+    history_years: int = Field(
+        default=10,
+        ge=1,
+        le=10,
+        description="Years of daily closes (and ECB FX rates) fetched for holdings, benchmarks "
+        "and proxy ETFs. The covariance model needs three years of weekly returns; stress "
+        "replays need more.",
+    )
+    proxy_series: list[ProxySeries] = Field(
+        default_factory=_default_proxy_series,
+        max_length=40,
+        description="Sector and region ETFs collected as stand-ins for holdings with under "
+        "three years of history (the ex-ante risk model regresses a recent listing on the "
+        "best-fitting one).",
+    )
     plausibility_tolerance_pct: float = Field(
         default=1.0,
         gt=0,
@@ -708,6 +761,7 @@ class PriceSettings(ConfigModel):
     @model_validator(mode="after")
     def _unique_strip(self) -> Self:
         require_unique("market strip symbols", (i.symbol for i in self.market_strip))
+        require_unique("proxy series symbols", (p.symbol for p in self.proxy_series))
         return self
 
     def index_yahoo(self, symbol: str) -> str | None:

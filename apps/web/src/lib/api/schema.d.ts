@@ -762,6 +762,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/risk/ex-ante": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Risk Ex Ante
+         * @description Today's risk from the current weights: the forecast annualised volatility (the higher
+         *     of an EWMA and a Ledoit-Wolf covariance model on three years of weekly base-currency
+         *     returns, cash at zero volatility), each position's Euler share of it, the shares summed by
+         *     tier, sector, country and currency, the diversification ratio, the effective number of
+         *     independent bets, the tier-criterion volatility checks and the coverage: which weight rests
+         *     on a proxy-backfilled history and which is left out. `volatility_forecast` is null with a
+         *     `reason` when no position has enough history.
+         */
+        get: operations["get_portfolio_risk_ex_ante"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/transactions": {
         parameters: {
             query?: never;
@@ -12201,31 +12227,6 @@ export interface components {
             /** Note */
             note: string;
         };
-        /** Coverage */
-        Coverage: {
-            /** Total Value */
-            total_value: number;
-            /** Cash Value */
-            cash_value: number;
-            /** Direct Value */
-            direct_value: number;
-            /** Fund Value */
-            fund_value: number;
-            /** Looked Through Value */
-            looked_through_value: number;
-            /** Not Looked Through Value */
-            not_looked_through_value: number;
-            /**
-             * Fund Share Looked Through
-             * @description Share of the funds' value whose holdings are looked through.
-             */
-            fund_share_looked_through: number | null;
-            /**
-             * Portfolio Share Looked Through
-             * @description Share of total portfolio value that is direct stocks or looked-through funds (the rest is cash and funds not looked through).
-             */
-            portfolio_share_looked_through: number | null;
-        };
         /** CoverageGapOut */
         CoverageGapOut: {
             /** Kind */
@@ -14938,6 +14939,82 @@ export interface components {
             /** Gaps */
             gaps: components["schemas"]["Gap"][];
         };
+        /** ExAnteLimits */
+        ExAnteLimits: {
+            /** Max Volatility */
+            max_volatility: number | null;
+            /** Tier Risk Budgets */
+            tier_risk_budgets: {
+                [key: string]: number;
+            } | null;
+            /** Min Effective Bets */
+            min_effective_bets: number | null;
+        };
+        /** ExAnteRisk */
+        ExAnteRisk: {
+            /** As Of */
+            as_of: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Method Version */
+            method_version: string;
+            /** Method */
+            method: string;
+            /** Window Start */
+            window_start: string | null;
+            /** Window End */
+            window_end: string | null;
+            /** Weeks */
+            weeks: number;
+            /** Total Value */
+            total_value: number | null;
+            /** Volatility Ewma */
+            volatility_ewma: number | null;
+            /** Volatility Ledoit Wolf */
+            volatility_ledoit_wolf: number | null;
+            /**
+             * Volatility Forecast
+             * @description The higher of the two, tested against the volatility limit.
+             */
+            volatility_forecast: number | null;
+            /** Forecast Model */
+            forecast_model: ("ewma" | "ledoit_wolf") | null;
+            /**
+             * Shrinkage Intensity
+             * @description Weight Ledoit-Wolf puts on the constant-correlation target.
+             */
+            shrinkage_intensity: number | null;
+            /**
+             * Realized Volatility
+             * @description Realized volatility of the flow-adjusted index over the last year.
+             */
+            realized_volatility: number | null;
+            /** Diversification Ratio */
+            diversification_ratio: number | null;
+            /** Effective Bets */
+            effective_bets: number | null;
+            /** Positions */
+            positions: components["schemas"]["PositionExAnte"][];
+            /** By Tier */
+            by_tier: components["schemas"]["GroupRisk"][];
+            /** By Sector */
+            by_sector: components["schemas"]["GroupRisk"][];
+            /** By Country */
+            by_country: components["schemas"]["GroupRisk"][];
+            /** By Currency */
+            by_currency: components["schemas"]["GroupRisk"][];
+            coverage: components["schemas"]["steward__portfolio__exante__Coverage"] | null;
+            /** Tier Checks */
+            tier_checks: components["schemas"]["TierCheck"][];
+            limits: components["schemas"]["ExAnteLimits"];
+            /** Warnings */
+            warnings: string[];
+            /**
+             * Reason
+             * @description Why there is no forecast, when there is none.
+             */
+            reason: string | null;
+        };
         /** ExchangeCalendar */
         ExchangeCalendar: {
             /**
@@ -17467,6 +17544,15 @@ export interface components {
             rate_shift: number | string;
             /** Value */
             value: number | string | null;
+        };
+        /** GroupRisk */
+        GroupRisk: {
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+            /** Risk Share */
+            risk_share: number;
         };
         /** GroupStats */
         GroupStats: {
@@ -20699,7 +20785,7 @@ export interface components {
             available: boolean;
             /** Method */
             method: string;
-            coverage: components["schemas"]["Coverage"] | null;
+            coverage: components["schemas"]["steward__lookthrough__read__Coverage"] | null;
             /** Exposures */
             exposures: components["schemas"]["ExposureDimension"][];
             /** Top Holdings */
@@ -24163,6 +24249,46 @@ export interface components {
             /** Held */
             held: boolean;
         };
+        /** PositionExAnte */
+        PositionExAnte: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Tier */
+            tier: string;
+            /**
+             * Status
+             * @description real: own history over the whole window; proxied: part of it backfilled from a proxy ETF; excluded: left out of the model (see `reason`).
+             * @enum {string}
+             */
+            status: "real" | "proxied" | "excluded";
+            /** Reason */
+            reason: string | null;
+            /**
+             * Weight
+             * @description Share of total portfolio value, cash included.
+             */
+            weight: number;
+            /**
+             * Volatility
+             * @description Standalone annualised volatility.
+             */
+            volatility: number | null;
+            /**
+             * Risk Share
+             * @description Euler share of the forecast variance; all positions sum to 1.
+             */
+            risk_share: number | null;
+            /**
+             * Marginal Risk
+             * @description Change in annualised portfolio volatility per unit of weight.
+             */
+            marginal_risk: number | null;
+            /** Real Weeks */
+            real_weeks: number;
+            proxy: components["schemas"]["ProxyFitOut"] | null;
+        };
         /** PositionTarget */
         PositionTarget: {
             /** Target Weight */
@@ -24586,9 +24712,15 @@ export interface components {
             benchmark_symbols?: string[];
             /**
              * History Years
-             * @default 2
+             * @description Years of daily closes (and ECB FX rates) fetched for holdings, benchmarks and proxy ETFs. The covariance model needs three years of weekly returns; stress replays need more.
+             * @default 10
              */
             history_years: number;
+            /**
+             * Proxy Series
+             * @description Sector and region ETFs collected as stand-ins for holdings with under three years of history (the ex-ante risk model regresses a recent listing on the best-fitting one).
+             */
+            proxy_series?: components["schemas"]["ProxySeries"][];
             /**
              * Plausibility Tolerance Pct
              * @description Largest gap between Stooq's close and Trading212's price on a sync day before it is flagged.
@@ -24910,6 +25042,64 @@ export interface components {
             match_status?: string | null;
         } & {
             [key: string]: unknown;
+        };
+        /** ProxyFitOut */
+        ProxyFitOut: {
+            /**
+             * Proxy
+             * @description Stooq symbol of the ETF the history was backfilled from.
+             */
+            proxy: string;
+            /** Label */
+            label: string;
+            /** Beta */
+            beta: number;
+            /** R Squared */
+            r_squared: number;
+            /** Fit Weeks */
+            fit_weeks: number;
+            /**
+             * Fit Start
+             * Format: date
+             */
+            fit_start: string;
+            /**
+             * Fit End
+             * Format: date
+             */
+            fit_end: string;
+            /** Backfilled Weeks */
+            backfilled_weeks: number;
+        };
+        /**
+         * ProxySeries
+         * @description A sector or region ETF whose daily closes stand in for a holding with a short history
+         *     (quant plan Q0.3/Q0.4): a recent listing is regressed on it and the missing weeks are
+         *     backfilled from it.
+         */
+        ProxySeries: {
+            /**
+             * Symbol
+             * @example xlk.us
+             */
+            symbol: string;
+            /**
+             * Label
+             * @example US technology
+             */
+            label: string;
+            /**
+             * Currency
+             * @description Quote currency of the ETF's closes.
+             * @default USD
+             */
+            currency: string;
+            /**
+             * Kind
+             * @default sector
+             * @enum {string}
+             */
+            kind: "sector" | "region" | "market";
         };
         /**
          * PublicDataSettings
@@ -26824,7 +27014,7 @@ export interface components {
         RiskLimits: {
             /**
              * Max Volatility
-             * @description Ceiling on the portfolio's annualised volatility (0.20 = 20 %), measured on the time-weighted daily returns over the last year.
+             * @description Ceiling on the portfolio's annualised volatility (0.20 = 20 %). Tested two ways: realized, on the time-weighted daily returns over the last year, and as a forecast from today's weights (the higher of the EWMA and Ledoit-Wolf covariance models, cash at zero volatility). A breach of either forces a thesis review.
              */
             max_volatility?: number | null;
             /**
@@ -26859,7 +27049,7 @@ export interface components {
             max_drawdown?: number | null;
             /**
              * Max Pair Correlation
-             * @description Ceiling on the correlation of two held positions' daily returns over the last year (0.85). Only pairs weighing at least `correlation_min_combined_weight` together are checked, so small positions do not raise noise.
+             * @description Ceiling on the correlation of two held positions' weekly base-currency returns over the last two years (0.85). Only pairs weighing at least `correlation_min_combined_weight` together are checked, so small positions do not raise noise.
              */
             max_pair_correlation?: number | null;
             /**
@@ -26904,6 +27094,28 @@ export interface components {
              * @description Flag a saved valuation scenario of a held stock whose explicit-year free cash flow growth exceeds this rate in any year.
              */
             max_valuation_growth?: number | null;
+            /**
+             * Tier Risk Budgets
+             * @description Ceiling on each risk tier's share of the portfolio's forecast volatility (Euler risk contributions of the ex-ante model), by tier bucket in the 'risk' dimension, e.g. {'core': 0.45, 'growth': 0.45, 'speculative': 0.25}. A tier not listed is unchecked.
+             */
+            tier_risk_budgets?: {
+                [key: string]: number;
+            } | null;
+            /**
+             * Min Effective Bets
+             * @description Floor on the effective number of independent bets (Meucci's entropy of the principal-component risk shares): a book of many names can still be one bet.
+             */
+            min_effective_bets?: number | null;
+            /**
+             * Tier Speculative Volatility
+             * @description A holding in the core or growth tier whose annualised volatility (one year of daily local-currency returns, as on its page) is above this (0.35 = 35 %) no longer meets the tier and needs a review. The owner reclassifies by hand.
+             */
+            tier_speculative_volatility?: number | null;
+            /**
+             * Tier Core Max Volatility
+             * @description A core-tier holding whose annualised volatility is above this (0.25 = 25 %) no longer meets the core criterion and needs a review.
+             */
+            tier_core_max_volatility?: number | null;
             /**
              * On Breach
              * @description Severity of a risk-limit breach (alerted when it opens).
@@ -30173,6 +30385,28 @@ export interface components {
              */
             ticker?: string | null;
         };
+        /** TierCheck */
+        TierCheck: {
+            /** Ticker */
+            ticker: string;
+            /** Tier */
+            tier: string;
+            /** Volatility */
+            volatility: number;
+            /** Window Days */
+            window_days: number;
+            /** Observations */
+            observations: number;
+            /** Threshold */
+            threshold: number;
+            /**
+             * Rule
+             * @enum {string}
+             */
+            rule: "speculative_above" | "core_above";
+            /** Breached */
+            breached: boolean;
+        };
         /** TimelineMonth */
         TimelineMonth: {
             /** Month */
@@ -32118,6 +32352,31 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** Coverage */
+        steward__lookthrough__read__Coverage: {
+            /** Total Value */
+            total_value: number;
+            /** Cash Value */
+            cash_value: number;
+            /** Direct Value */
+            direct_value: number;
+            /** Fund Value */
+            fund_value: number;
+            /** Looked Through Value */
+            looked_through_value: number;
+            /** Not Looked Through Value */
+            not_looked_through_value: number;
+            /**
+             * Fund Share Looked Through
+             * @description Share of the funds' value whose holdings are looked through.
+             */
+            fund_share_looked_through: number | null;
+            /**
+             * Portfolio Share Looked Through
+             * @description Share of total portfolio value that is direct stocks or looked-through funds (the rest is cash and funds not looked through).
+             */
+            portfolio_share_looked_through: number | null;
+        };
         /** StakeChangeOut */
         steward__ownership__control_stakes_read__StakeChangeOut: {
             /** Change Type */
@@ -32130,6 +32389,28 @@ export interface components {
             new_value: string | null;
             /** Detail */
             detail: string | null;
+        };
+        /** Coverage */
+        steward__portfolio__exante__Coverage: {
+            /**
+             * Invested Weight
+             * @description Share of total portfolio value held in positions.
+             */
+            invested_weight: number;
+            /** Real Weight */
+            real_weight: number;
+            /** Proxied Weight */
+            proxied_weight: number;
+            /**
+             * Uncovered Weight
+             * @description Positions left out of the model.
+             */
+            uncovered_weight: number;
+            /**
+             * Covered Share
+             * @description (real + proxied) / invested.
+             */
+            covered_share: number;
         };
         /** Check */
         steward__quality__cockpit__Check: {
@@ -33255,6 +33536,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_risk_ex_ante: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExAnteRisk"];
                 };
             };
         };

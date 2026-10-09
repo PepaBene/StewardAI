@@ -958,6 +958,12 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
         wanted: list[tuple[str | None, str, PriceSymbols]] = [
             (t, t, s) for t, s in holdings.items()
         ] + [(None, b, index_symbols(settings, b)) for b in indices]
+        # Proxy ETFs for the ex-ante risk model's short-history backfill (quant plan Q0.3).
+        wanted += [
+            (None, p.symbol, PriceSymbols(stooq=p.symbol, yahoo=p.yahoo()))
+            for p in settings.proxy_series
+            if p.symbol not in indices
+        ]
         for ticker, key, symbols in wanted:
             used, gap = await collect_series(
                 pool,

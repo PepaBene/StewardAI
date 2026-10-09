@@ -10,11 +10,15 @@ import datetime as dt
 import logging
 from dataclasses import dataclass, field
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import asyncpg
 
 from steward.config.strategy import RiskLimits, StrategyConfig
 from steward.portfolio.breaches import Finding
+
+if TYPE_CHECKING:
+    from steward.portfolio.exante import LoadedBook
 from steward.portfolio.snapshot import PositionRow
 from steward.settings import get_settings
 
@@ -61,6 +65,15 @@ class ValuationFlag:
     value: float
 
 
+@dataclass(frozen=True)
+class TierFlag:
+    ticker: str
+    tier: str
+    volatility: float
+    threshold: float
+    rule: str  # "speculative_above" or "core_above"
+
+
 @dataclass
 class RiskInputs:
     volatility: float | None = None
@@ -71,6 +84,11 @@ class RiskInputs:
     stress_loss: float | None = None  # positive loss, share of the portfolio
     credit_spread_bp: float | None = None
     credit_spread_date: dt.date | None = None
+    volatility_forecast: float | None = None  # ex-ante, the higher of EWMA and Ledoit-Wolf
+    forecast_model: str | None = None
+    tier_risk_shares: dict[str, float] = field(default_factory=dict)  # tier -> share of risk
+    effective_bets: float | None = None
+    tier_flags: list[TierFlag] = field(default_factory=list)
     valuation_flags: list[ValuationFlag] = field(default_factory=list)
     correlations: list[PairCorrelation] = field(default_factory=list)
     positions: list[PositionLoss] = field(default_factory=list)
@@ -82,6 +100,10 @@ class RiskInputs:
 
 def _pct(x: float) -> str:
     return f"{x * 100:.2f}%"
+
+
+def _model_name(model: str | None) -> str:
+    return {"ewma": "EWMA model", "ledoit_wolf": "Ledoit-Wolf model"}.get(model or "", "model")
 
 
 def evaluate_risk(inputs: RiskInputs, limits: RiskLimits) -> list[Finding]:
@@ -102,6 +124,78 @@ def evaluate_risk(inputs: RiskInputs, limits: RiskLimits) -> list[Finding]:
                 f"the limit is {_pct(limits.max_volatility)}",
                 inputs.volatility,
                 limits.max_volatility,
+            )
+        )
+    if (
+        limits.max_volatility is not None
+        and inputs.volatility_forecast is not None
+        and inputs.volatility_forecast > limits.max_volatility
+    ):
+        findings.append(
+            Finding(
+                "risk:volatility_forecast",
+                "rule",
+                None,
+                severity,
+                f"Risk limit: the forecast annualised volatility of today's portfolio is "
+                f"{_pct(inputs.volatility_forecast)} ({_model_name(inputs.forecast_model)}); "
+                f"the limit is {_pct(limits.max_volatility)}. A review prompt, not an "
+                "instruction to trade",
+                inputs.volatility_forecast,
+                limits.max_volatility,
+            )
+        )
+    for tier, budget in sorted((limits.tier_risk_budgets or {}).items()):
+        share = inputs.tier_risk_shares.get(tier)
+        if share is not None and share > budget:
+            findings.append(
+                Finding(
+                    f"risk:tier_budget:{tier}",
+                    "rule",
+                    None,
+                    severity,
+                    f"Risk limit: the {tier} tier accounts for {_pct(share)} of the portfolio's "
+                    f"forecast volatility; its risk budget is {_pct(budget)}",
+                    share,
+                    budget,
+                )
+            )
+    if (
+        limits.min_effective_bets is not None
+        and inputs.effective_bets is not None
+        and inputs.effective_bets < limits.min_effective_bets
+    ):
+        findings.append(
+            Finding(
+                "risk:effective_bets",
+                "rule",
+                None,
+                severity,
+                f"Risk limit: the portfolio holds about {inputs.effective_bets:.1f} independent "
+                f"bets; the floor is {limits.min_effective_bets:.1f}. Many names can still be "
+                "one bet: check what the largest risk contributors have in common",
+                inputs.effective_bets,
+                limits.min_effective_bets,
+            )
+        )
+    for tf in inputs.tier_flags:
+        what = (
+            f"is above {_pct(tf.threshold)}, so it is not a "
+            f"{tf.tier} stock by the tier criteria (speculative above that volatility)"
+            if tf.rule == "speculative_above"
+            else f"is above the core ceiling of {_pct(tf.threshold)}"
+        )
+        findings.append(
+            Finding(
+                f"risk:tier:{tf.rule}:{tf.ticker}",
+                "rule",
+                tf.ticker,
+                severity,
+                f"Tier criterion: {tf.ticker} ({tf.tier}) has annualised volatility "
+                f"{_pct(tf.volatility)} over the last year, which {what}. Re-check its tier "
+                "at the thesis review; reclassify by hand",
+                tf.volatility,
+                tf.threshold,
             )
         )
     if limits.max_beta is not None and inputs.beta is not None and inputs.beta > limits.max_beta:
@@ -319,12 +413,26 @@ async def gather_risk_inputs(
             inputs.unavailable["volatility"] = inputs.unavailable["beta"] = str(exc)
             inputs.unavailable["drawdown"] = str(exc)
     await _decision_inputs(pool, strategy, positions, inputs)
-    if limits.max_pair_correlation is not None:
+    wants_book = (
+        limits.max_pair_correlation is not None
+        or limits.max_volatility is not None
+        or limits.tier_risk_budgets
+        or limits.min_effective_bets is not None
+        or limits.tier_speculative_volatility is not None
+        or limits.tier_core_max_volatility is not None
+    )
+    if wants_book:
+        # One load of the weekly base-currency return matrix serves the correlation limit and
+        # the ex-ante model.
         try:
-            inputs.correlations = await pair_correlations(pool, positions)
+            from steward.portfolio.exante import book_from_positions
+
+            book = await book_from_positions(pool, positions)
+            _book_inputs(book, strategy, inputs)
         except Exception as exc:
-            log.warning("correlation failed: %s", exc)
-            inputs.unavailable["correlation"] = str(exc)
+            log.warning("ex-ante measurement failed: %s", exc)
+            for name in ("correlation", "volatility_forecast", "tier_risk", "effective_bets"):
+                inputs.unavailable.setdefault(name, str(exc))
     wants_xray = (
         limits.max_look_through_weight is not None
         or limits.max_sector_weight is not None
@@ -470,36 +578,31 @@ async def _xray_inputs(
         inputs.exposures += [Exposure("country", b.label, b.weight) for b in classified("country")]
 
 
-async def pair_correlations(
-    pool: asyncpg.Pool, positions: list[PositionRow]
-) -> list[PairCorrelation]:
-    """Correlation of daily returns (last year) for every pair of held positions that both have
-    a stored price series."""
-    # Imported here for the same cycle as in gather_risk_inputs.
-    from steward.config.holding_profiles import HoldingProfilesConfig
-    from steward.config.store import load_active
-    from steward.reference import risk as ref_risk
-    from steward.reference.price_series import choose_series, holding_symbols
-    from steward.reference.read import load_series
+def _book_inputs(book: "LoadedBook", strategy: StrategyConfig, inputs: RiskInputs) -> None:
+    """Fill the weekly-correlation and ex-ante inputs from a loaded book."""
+    # Imported here: portfolio.exante imports portfolio.snapshot, as this module's callers do.
+    from steward.portfolio.exante import build_report, weekly_pair_correlations
 
-    held = {p.ticker: float(p.value_base) for p in positions if p.value_base > 0}
-    total = sum(held.values())
-    if len(held) < 2 or total <= 0:
-        return []
-    profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
-    symbols = await holding_symbols(
-        pool, sorted(held), profiles.body if profiles else HoldingProfilesConfig()
-    )
-    chosen = await choose_series(pool, symbols)
-    series = {}
-    for ticker, ref in chosen.items():
-        if ref is not None:
-            series[ticker] = await load_series(pool, ref)
-    out: list[PairCorrelation] = []
-    tickers = sorted(series)
-    for i, a in enumerate(tickers):
-        for b in tickers[i + 1 :]:
-            corr = ref_risk.correlation(series[a], series[b])
-            if corr is not None:
-                out.append(PairCorrelation(a, b, corr, (held[a] + held[b]) / total))
-    return out
+    limits = strategy.risk
+    invested = {p.ticker: p.value_base for p in book.positions}
+    total = sum(invested.values())
+    if limits.max_pair_correlation is not None and len(invested) >= 2 and total > 0:
+        inputs.correlations = [
+            PairCorrelation(a, b, corr, (invested[a] + invested[b]) / total)
+            for a, b, corr, _ in weekly_pair_correlations(book)
+        ]
+    report = build_report(book, strategy)
+    if report.volatility_forecast is None:
+        reason = report.reason or "no estimate"
+        for name in ("volatility_forecast", "tier_risk", "effective_bets"):
+            inputs.unavailable[name] = reason
+    else:
+        inputs.volatility_forecast = report.volatility_forecast
+        inputs.forecast_model = report.forecast_model
+        inputs.effective_bets = report.effective_bets
+        inputs.tier_risk_shares = {g.label: g.risk_share for g in report.by_tier}
+    inputs.tier_flags = [
+        TierFlag(c.ticker, c.tier, c.volatility, c.threshold, c.rule)
+        for c in report.tier_checks
+        if c.breached
+    ]

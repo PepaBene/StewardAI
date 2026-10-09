@@ -112,6 +112,57 @@ The owner accepted every recommendation below. Implementation notes from the des
 
 **Exit check:** risk contributions sum to 100 % of forecast volatility; an EWMA forecast matches a reference implementation on a fixed fixture to 1e-9.
 
+### Status of Q0 and Q1 (implemented 9 October 2026) and the gaps that remain
+
+Code: `steward/quant/{returns,proxy,covariance,decompose}.py`, `steward/portfolio/exante.py`, new `RiskLimits` fields, `GET /portfolio/risk/ex-ante`, the web tab `/risk/ex-ante`. Tests: `tests/test_quant.py`, `tests/test_exante.py`, `lib/risk/ex-ante.test.ts`. Tasks `Q0.1`–`Q0.6` and `Q1.1`–`Q1.5` are built; the items below are what is not done, not verified, or deliberately different from the text above. Close them before Q2 relies on this layer.
+
+**Not verified (exit checks and runtime)**
+
+- G1. Q0 exit check not run: no one has confirmed that ≥ 95 % of the live book's invested weight gets real or proxied history, or that a hand-checked holding's CZK return matches Trading212 within FX rounding.
+- G2. Nothing ran against a database. `load_book`, `_book_from_snapshot`, `book_from_positions` and `gather_risk_inputs` with the new limits are untested; the tests use a synthetic `LoadedBook`. Needs a `db`-marked test that runs a sync and checks the findings open, alert once and clear.
+- G3. The web page was typechecked, linted and its helpers unit-tested, but never rendered: no screenshot, no mobile-width check, no keyboard or contrast check, no component test.
+- G4. No measurement of cost. Each API call and each sync loads up to ~3 years of daily closes for every holding, the benchmark and 13 proxy ETFs and builds the matrix with per-day FX lookups, uncached. Time it on the live book; cache per sync if slow.
+- G5. The Ledoit-Wolf "golden test against the reference implementation" (engineering rule 4) is a test against a line-by-line transcription of the authors' published `covCor` formulas, not against their code or a library output. The EWMA test is likewise against a loop written for the test. Add a fixture with output from a published implementation.
+
+**Data gaps**
+
+- G6. Proxy ETFs have no stored prices until the prices job next runs with the new `proxy_series`; until then short-history holdings show as left out. Not yet confirmed that Stooq has all 13 default symbols (`xlk.us` … `vt.us`) or that the Yahoo fallback covers them.
+- G7. `history_years` defaulting to 10 does not change a stored jobs config that pins 2 (D2). Setting it to 10 in the Jobs editor is a manual step still to be done; FX re-backfills from Frankfurter when it grows.
+- G8. FX for the return matrix is hard-wired to ECB reference rates (the only source backfilled over `history_years`), while the app's base-currency figures use ČNB for a CZK base. Differences are small but the two are not identical; ČNB history is not backfilled anywhere.
+- G9. Default proxies are US sector ETFs plus Europe, emerging markets and world. A European or Czech small cap has no sector-matched proxy; the choice is purely highest R² among the candidates and the benchmark, with no sector or country mapping from the holding.
+- G10. Q0.4 asked for the proxy, fit window and R² to be "stored and shown". They are shown and returned by the API but not persisted; they are recomputed on each request and can change as data arrives.
+- G11. A series whose last close is more than 7 days old has no level, so its recent weeks look missing and are silently backfilled from the proxy and labelled "proxied", which can hide a stalled price feed. Add a stale-feed warning.
+- G12. Daily CZK returns (Q0.2) are built by `build_return_matrix(..., "daily", ...)` and tested, but nothing loads or uses them; `load_book` builds weekly only. Q2 (tail and bootstrap) needs a daily loader and proxy handling for daily data (the backfill is weekly only).
+- G13. The final partial week (after the last Wednesday) is not in the matrix, so the model lags the latest prices by up to six days.
+
+**Method differences and open decisions**
+
+- G14. The pair-correlation limit now uses 2 years of weekly returns with at least 40 shared weeks. The plan kept the 0.85 threshold but did not set a window, and it dropped the old 1-year daily measure. The 0.85 level was chosen for daily data; weekly correlations are typically higher between US and European names, so the threshold may need recalibrating. Principle 4(d) in the strategy notes still says "return correlation" without the window.
+- G15. Positions left out of the model count as zero risk, so the forecast understates the risk by about their weight (reported in `coverage`, with a warning above 0.5 %). Decide whether the limit should instead be tested on a scaled-up forecast.
+- G16. Weights are shares of total portfolio value including cash (D3) regardless of the strategy's `weight_basis`. A strategy set to `invested` weights will see tier and position weights here on a different basis from the rest of the app.
+- G17. EWMA is zero-mean (RiskMetrics) and both models share one 156-week window; the plan's "Ledoit-Wolf on 3 years, EWMA for the current regime" is satisfied but the EWMA window is not independently chosen.
+- G18. Backfilled weeks resample the regression residuals, so risk numbers for a proxied holding are not fully reproducible if the proxy list, window or data change; the draw is seeded per series key only.
+- G19. The look-through of ETFs into their underlying companies is not used for risk (the plan says to use the ETF's own series; correct), so risk by sector and country is by the holding's classification label, not the X-Ray's look-through exposure. An ETF classified "Unclassified" sits in its own bucket.
+
+**Limits and strategy**
+
+- G20. Tier-based features are inert until holdings carry a `risk` classification: `strategy.json` has an empty `classifications`, so tier budgets and tier-criteria checks have nothing to act on, and unclassified holdings are never flagged. Classify the holdings (or add an import path).
+- G21. The new limits take effect only after the updated strategy is imported; the files are updated but not loaded into the app.
+- G22. D5 limits for expected shortfall and drawdown probability are not added (they belong to Q2.4). Principle 4(e), a per-stock contribution cap of 8 %, is Q8.6 and has no check; the risk shares computed here are its input.
+- G23. Tier-criteria checks cover only the volatility criterion (D6). Market cap, profitability history and the other principle 3 criteria are not checked.
+- G24. The tier flag is one finding per ticker and rule, so a holding that breaches both rules opens two alerts.
+
+**Engineering rules not yet met**
+
+- G25. Rule 2 (every output carries value, as_of, window, observations, method_version, coverage, warnings): the report has these at the top level and per position, but the individual figures (forecast volatility, risk shares, tier checks) do not each carry their own window and observation count, and "too few observations returns null" applies only at the whole-model level.
+- G26. Rule 5 (results that feed a decision are snapshotted with `method_version`): not done. Findings carry the observed value but the report itself is recomputed live, so a later model change rewrites what the owner saw. Becomes necessary at Q2.4 / Q5.1.
+- G27. Method notes are in module docstrings; the README, the setup guide and the glossary (Q7.4) have no entry for the new measures, and the page's wording for "risk share", "independent bets" and "diversification ratio" has not been reviewed with the owner.
+
+**Not in scope of Q0/Q1 but touched by them**
+
+- G28. Q1.5 listed ex-ante vs realized volatility and a coverage line on the page; the Overview risk tile and the holding pages show neither the forecast nor a position's risk share. The holding page's volatility figure and the new tier check use different windows and bases (daily local currency vs weekly CZK).
+- G29. No chat tool or monthly-review section uses the new figures (Q5.6, Q7.1, Q7.2); Q8's stage B switch (from standalone volatility to marginal risk) is therefore still open, even though the marginal contribution to risk is now computed and returned per position.
+
 ## Phase Q2 — Tail and drawdown risk
 
 **Outcome:** the probability of the outcome the strategy fears most.

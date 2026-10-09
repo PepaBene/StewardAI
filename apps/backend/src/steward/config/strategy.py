@@ -125,8 +125,10 @@ class RiskLimits(ConfigModel):
 
     max_volatility: Weight | None = Field(
         default=None,
-        description="Ceiling on the portfolio's annualised volatility (0.20 = 20 %), measured "
-        "on the time-weighted daily returns over the last year.",
+        description="Ceiling on the portfolio's annualised volatility (0.20 = 20 %). Tested two "
+        "ways: realized, on the time-weighted daily returns over the last year, and as a "
+        "forecast from today's weights (the higher of the EWMA and Ledoit-Wolf covariance "
+        "models, cash at zero volatility). A breach of either forces a thesis review.",
     )
     max_beta: float | None = Field(
         default=None,
@@ -163,8 +165,9 @@ class RiskLimits(ConfigModel):
     )
     max_pair_correlation: Weight | None = Field(
         default=None,
-        description="Ceiling on the correlation of two held positions' daily returns over the "
-        "last year (0.85). Only pairs weighing at least `correlation_min_combined_weight` "
+        description="Ceiling on the correlation of two held positions' weekly base-currency "
+        "returns over the last two years (0.85). Only pairs weighing at least "
+        "`correlation_min_combined_weight` "
         "together are checked, so small positions do not raise noise.",
     )
     correlation_min_combined_weight: Weight = Field(
@@ -207,6 +210,31 @@ class RiskLimits(ConfigModel):
         default=None,
         description="Flag a saved valuation scenario of a held stock whose explicit-year free "
         "cash flow growth exceeds this rate in any year.",
+    )
+    tier_risk_budgets: dict[Bucket, Weight] | None = Field(
+        default=None,
+        description="Ceiling on each risk tier's share of the portfolio's forecast volatility "
+        "(Euler risk contributions of the ex-ante model), by tier bucket in the 'risk' "
+        "dimension, e.g. {'core': 0.45, 'growth': 0.45, 'speculative': 0.25}. A tier not listed "
+        "is unchecked.",
+    )
+    min_effective_bets: float | None = Field(
+        default=None,
+        gt=0,
+        le=100,
+        description="Floor on the effective number of independent bets (Meucci's entropy of the "
+        "principal-component risk shares): a book of many names can still be one bet.",
+    )
+    tier_speculative_volatility: Weight | None = Field(
+        default=None,
+        description="A holding in the core or growth tier whose annualised volatility (one year "
+        "of daily local-currency returns, as on its page) is above this (0.35 = 35 %) no longer "
+        "meets the tier and needs a review. The owner reclassifies by hand.",
+    )
+    tier_core_max_volatility: Weight | None = Field(
+        default=None,
+        description="A core-tier holding whose annualised volatility is above this (0.25 = 25 %) "
+        "no longer meets the core criterion and needs a review.",
     )
     on_breach: Severity = Field(
         default="severity_2",
