@@ -143,10 +143,12 @@ export function gates(out: Pick<StatementsOut, "checks" | "usable_for_valuation"
 export type MaturityBucket = { label: string; value: number };
 
 /** Debt maturity buckets summed against the reported total, net of discount. */
-export function maturityCheck(buckets: readonly MaturityBucket[], total: number | null, discount = 0, tol = 0.005) {
+export function maturityCheck(buckets: readonly MaturityBucket[], total: number | null, discount = 0, tol = 0.005, unit = 1) {
   if (total == null || buckets.length === 0) return { status: "needs_review" as const, sum: null };
+  // As in `check_debt_maturities`: a negative bucket needs a person, and rounding to the reported unit is allowed.
+  if (buckets.some((b) => b.value < 0)) return { status: "needs_review" as const, sum: null };
   const sum = buckets.reduce((a, b) => a + b.value, 0) - discount;
-  const ok = Math.abs(sum - total) <= Math.max(Math.abs(total), Math.abs(sum)) * tol;
+  const ok = Math.abs(sum - total) <= Math.max(Math.max(Math.abs(total), Math.abs(sum)) * tol, unit);
   return { status: ok ? ("pass" as const) : ("fail" as const), sum };
 }
 

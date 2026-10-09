@@ -1257,8 +1257,19 @@ async def acknowledge_disclosure_alert(alert_id: IdPath, pool: Pool, owner: Owne
 
 
 Dataset = Literal[
-    "relationship_claim", "insider_class", "ownership_match", "statement_note", "document_sample"
+    "relationship_claim",
+    "insider_class",
+    "ownership_match",
+    "statement_note",
+    "document_sample",
+    "deal_state",
 ]
+
+
+def _sample_size(dataset: str, size: int | None) -> int:
+    """The gate's own sample size unless the person asks for another, so the default sample can
+    meet the gate (a relationship sample adds its planted items on top)."""
+    return size if size is not None else adjudication.GATES[dataset][0]
 
 
 class AdjudicationItemOut(BaseModel):
@@ -1315,17 +1326,21 @@ async def adjudication_sample(
     dataset: Dataset,
     pool: Pool,
     _owner: Owner,
-    size: Annotated[int, Query(ge=10, le=200)] = 50,
+    size: Annotated[int | None, Query(ge=10, le=200)] = None,
     seed: Annotated[str, Query(min_length=1, max_length=40)] = "owner",
 ) -> AdjudicationSampleOut:
-    """A reproducible sample to label. Relationship samples include unmarked deliberate false
-    positives: a reviewer who calls one a true relationship fails the gate."""
+    """A reproducible sample to label, by default as large as the gate needs. Relationship
+    samples add unmarked deliberate false positives on top: a reviewer who calls one a true
+    relationship fails the gate."""
+    size = _sample_size(dataset, size)
     if dataset == "relationship_claim":
         items = await adjudication.relationship_sample(pool, size, seed)
     elif dataset == "insider_class":
         items = await adjudication.insider_sample(pool, size, seed)
     elif dataset == "ownership_match":
         items = await adjudication.ownership_sample(pool, size, seed)
+    elif dataset == "deal_state":
+        items = await adjudication.deal_state_sample(pool, size, seed)
     else:
         raise HTTPException(422, f"no sampler exists yet for {dataset}")
     sample_key = f"{dataset}:{seed}:{size}"
@@ -1356,6 +1371,8 @@ def _labels_for(dataset: str) -> tuple[str, ...]:
         return tuple(sorted(ECONOMIC_CLASSES))
     if dataset == "ownership_match":
         return adjudication.OWNERSHIP_LABELS
+    if dataset == "deal_state":
+        return adjudication.DEAL_STATE_LABELS
     raise HTTPException(422, f"no model labeller exists for {dataset}")
 
 
@@ -1364,7 +1381,7 @@ async def adjudication_prelabel(
     dataset: Dataset,
     pool: Pool,
     _owner: Owner,
-    size: Annotated[int, Query(ge=10, le=200)] = 50,
+    size: Annotated[int | None, Query(ge=10, le=200)] = None,
     seed: Annotated[str, Query(min_length=1, max_length=40)] = "owner",
 ) -> PrelabelOut:
     """Have the configured chat model suggest a label for every item of the sample. Suggestions

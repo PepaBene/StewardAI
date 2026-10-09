@@ -14695,7 +14695,7 @@
           "disclosures"
         ],
         "summary": "Adjudication Sample",
-        "description": "A reproducible sample to label. Relationship samples include unmarked deliberate false\npositives: a reviewer who calls one a true relationship fails the gate.",
+        "description": "A reproducible sample to label, by default as large as the gate needs. Relationship\nsamples add unmarked deliberate false positives on top: a reviewer who calls one a true\nrelationship fails the gate.",
         "operationId": "adjudication_sample",
         "security": [
           {
@@ -14713,7 +14713,8 @@
                 "insider_class",
                 "ownership_match",
                 "statement_note",
-                "document_sample"
+                "document_sample",
+                "deal_state"
               ],
               "type": "string",
               "title": "Dataset"
@@ -14724,10 +14725,16 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "maximum": 200,
-              "minimum": 10,
-              "default": 50,
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 200,
+                  "minimum": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Size"
             }
           },
@@ -14792,7 +14799,8 @@
                 "insider_class",
                 "ownership_match",
                 "statement_note",
-                "document_sample"
+                "document_sample",
+                "deal_state"
               ],
               "type": "string",
               "title": "Dataset"
@@ -14803,10 +14811,16 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "maximum": 200,
-              "minimum": 10,
-              "default": 50,
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 200,
+                  "minimum": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Size"
             }
           },
@@ -14871,7 +14885,8 @@
                 "insider_class",
                 "ownership_match",
                 "statement_note",
-                "document_sample"
+                "document_sample",
+                "deal_state"
               ],
               "type": "string",
               "title": "Dataset"
@@ -14935,7 +14950,8 @@
                 "insider_class",
                 "ownership_match",
                 "statement_note",
-                "document_sample"
+                "document_sample",
+                "deal_state"
               ],
               "type": "string",
               "title": "Dataset"
@@ -15000,7 +15016,8 @@
                 "insider_class",
                 "ownership_match",
                 "statement_note",
-                "document_sample"
+                "document_sample",
+                "deal_state"
               ],
               "type": "string",
               "title": "Dataset"
@@ -18005,7 +18022,8 @@
               "insider_class",
               "ownership_match",
               "statement_note",
-              "document_sample"
+              "document_sample",
+              "deal_state"
             ],
             "title": "Dataset"
           },
@@ -18154,7 +18172,8 @@
               "insider_class",
               "ownership_match",
               "statement_note",
-              "document_sample"
+              "document_sample",
+              "deal_state"
             ],
             "title": "Dataset"
           },
@@ -22184,6 +22203,47 @@
         ],
         "title": "CategoryWeightRule",
         "description": "Limit on a category's weight; with no bucket it applies to every bucket of the dimension."
+      },
+      "ChainGroupOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "stated_group",
+              "stated_not_group",
+              "joint_filing_group_not_stated",
+              "single_filer"
+            ],
+            "title": "Status"
+          },
+          "members": {
+            "type": "integer",
+            "title": "Members"
+          },
+          "stated_members": {
+            "type": "integer",
+            "title": "Stated Members"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "members",
+          "stated_members",
+          "note"
+        ],
+        "title": "ChainGroupOut"
       },
       "ChainHolderOut": {
         "properties": {
@@ -28513,6 +28573,20 @@
               }
             ],
             "description": "The claim verifier's pass over the written sentences."
+          },
+          "disclosure_alerts": {
+            "items": {
+              "$ref": "#/components/schemas/DisclosureAlertLine"
+            },
+            "type": "array",
+            "title": "Disclosure Alerts",
+            "description": "Public-disclosure alerts raised in the period (newest first, at most 30)."
+          },
+          "disclosure_alerts_more": {
+            "type": "integer",
+            "title": "Disclosure Alerts More",
+            "description": "Alerts of the period left out of the list above.",
+            "default": 0
           }
         },
         "type": "object",
@@ -29095,6 +29169,47 @@
           "resolution"
         ],
         "title": "Disagreement"
+      },
+      "DisclosureAlertLine": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "known_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Known At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "kind",
+          "headline",
+          "source_url",
+          "known_at"
+        ],
+        "title": "DisclosureAlertLine"
       },
       "DisclosureAlertOut": {
         "properties": {
@@ -31762,6 +31877,17 @@
               }
             ],
             "title": "Actual Observation Id"
+          },
+          "release_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Basis"
           },
           "formula_version": {
             "type": "string",
@@ -55432,6 +55558,32 @@
               }
             ],
             "title": "Ref"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "new",
+                  "changed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "was": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Was"
           }
         },
         "type": "object",
@@ -60876,6 +61028,9 @@
             "type": "string",
             "title": "Source Url"
           },
+          "group": {
+            "$ref": "#/components/schemas/ChainGroupOut"
+          },
           "holders": {
             "items": {
               "$ref": "#/components/schemas/ChainHolderOut"
@@ -60918,6 +61073,7 @@
           "prior_accession",
           "linked_to_previous",
           "source_url",
+          "group",
           "holders",
           "changes",
           "exhibits"

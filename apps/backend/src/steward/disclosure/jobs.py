@@ -18,28 +18,43 @@ import httpx
 
 from steward import __version__
 from steward.disclosure import alerts
+from steward.disclosure.conditional import ConditionalFetch
 from steward.disclosure.deal_job import collect_deals
 from steward.disclosure.esef_facts import read_pending_esef_versions
 from steward.disclosure.estimate_store import collect_consensus
-from steward.disclosure.fetch import DisclosureFetcher, FetchFailure
+from steward.disclosure.fetch import DisclosureFetcher, FetchFailure, Validators
 from steward.disclosure.foreign_job import collect_esef, held_lei_issuers
 from steward.disclosure.identifier_job import (
     gleif_lei_lookup,
     openfigi_figi_lookup,
     resolve_identifiers,
 )
-from steward.disclosure.ingest_job import ingest_filings, mirror_stored_facts, require_source
+from steward.disclosure.ingest import attempts_done_sql, record_attempt
+from steward.disclosure.ingest_job import (
+    CURRENT_REPORT_FORMS,
+    index_filing_items,
+    ingest_filings,
+    mirror_stored_facts,
+    require_source,
+)
 from steward.disclosure.note_job import extract_notes_for_document
-from steward.disclosure.parse import parse_html
+from steward.disclosure.parse import PARSER_VERSION, parse_html
 from steward.disclosure.probe import run_probes
 from steward.disclosure.registry import (
     SPEC_BY_KEY,
     SourceNotEnabled,
+    load_cursor,
     record_access_test,
+    save_cursor,
     seed_sources,
     set_enabled,
 )
-from steward.disclosure.sec_discovery import discover_filings
+from steward.disclosure.sec_discovery import (
+    DiscoveredFiling,
+    discover_filings,
+    incremental,
+    next_cursor,
+)
 from steward.jobs.runner import JobContext
 from steward.notify.channels import ChannelError, EmailChannel
 from steward.settings import Settings, get_settings
@@ -47,10 +62,30 @@ from steward.sources.gleif import GleifClient
 from steward.storage import EvidenceStore
 
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
+SUBMISSIONS_SOURCE = "sec.submissions"
 FORMS = {"10-K", "10-Q", "20-F", "40-F"}
 FILINGS_PER_ISSUER = 3
 MAX_MAILED = 100
 type Pool = asyncpg.Pool
+
+
+def new_filings(filings: list[DiscoveredFiling], cursor: dict[str, str]) -> list[DiscoveredFiling]:
+    """The newest `FILINGS_PER_ISSUER` filings after the issuer's stored cursor."""
+    return incremental(filings, cursor)[-FILINGS_PER_ISSUER:]
+
+
+def advance_cursor(
+    filings: list[DiscoveredFiling], cursor: dict[str, str], validators: Validators
+) -> dict[str, str]:
+    """The issuer's cursor after a clean run: the newest filing read, and the listing's
+    validators so an unchanged listing next time costs a 304 and nothing else."""
+    out = next_cursor(filings, cursor)
+    for name, value in (("etag", validators.etag), ("last_modified", validators.last_modified)):
+        if value:
+            out[name] = value
+        else:
+            out.pop(name, None)
+    return out
 
 
 async def held_issuers(pool: Pool) -> list[asyncpg.Record]:
@@ -96,17 +131,33 @@ async def disclosure_ingest_handler(ctx: JobContext) -> None:
             async def fetch(url: str) -> Any:
                 return await fetcher.fetch("sec.archive", url)
 
-            totals = {"ingested": 0, "unchanged": 0, "failed": 0}
+            totals = {
+                "ingested": 0,
+                "unchanged": 0,
+                "failed": 0,
+                "listings_unchanged": 0,
+                "release_items": 0,
+            }
             errors: list[str] = []
             for issuer in await held_issuers(ctx.pool):
                 cik = str(int(issuer["cik"])).zfill(10)
                 try:
+                    cursor = await load_cursor(ctx.pool, SUBMISSIONS_SOURCE, cik)
                     listing = await fetcher.fetch(
-                        "sec.submissions", SUBMISSIONS_URL.format(cik=cik)
+                        SUBMISSIONS_SOURCE,
+                        SUBMISSIONS_URL.format(cik=cik),
+                        validators=Validators(cursor.get("etag"), cursor.get("last_modified")),
                     )
-                    filings = discover_filings(
-                        cik, json.loads(listing.content or b"{}"), forms=FORMS
-                    )[-FILINGS_PER_ISSUER:]
+                    if not listing.modified:
+                        totals["listings_unchanged"] += 1
+                        continue
+                    submissions = json.loads(listing.content or b"{}")
+                    totals["release_items"] += await index_filing_items(
+                        ctx.pool,
+                        issuer["id"],
+                        discover_filings(cik, submissions, forms=CURRENT_REPORT_FORMS),
+                    )
+                    filings = new_filings(discover_filings(cik, submissions, forms=FORMS), cursor)
                     outcome = await ingest_filings(
                         ctx.pool,
                         issuer_id=issuer["id"],
@@ -124,6 +175,13 @@ async def disclosure_ingest_handler(ctx: JobContext) -> None:
                 totals["ingested"] += outcome.ingested
                 totals["unchanged"] += outcome.unchanged
                 totals["failed"] += outcome.failed
+                if outcome.failed == 0:  # a failed filing is read again on the next run
+                    await save_cursor(
+                        ctx.pool,
+                        SUBMISSIONS_SOURCE,
+                        cik,
+                        advance_cursor(filings, cursor, listing.validators),
+                    )
             step.detail.update(totals)
             step.detail["errors"] = errors
         async with ctx.step("backfill") as step:
@@ -135,14 +193,16 @@ async def disclosure_ingest_handler(ctx: JobContext) -> None:
 
 BACKFILL_PER_RUN = 5
 BACKFILL_WINDOW = dt.timedelta(days=30)
+BACKFILL_STEP = "sec_backfill"
 
 
 async def backfill_stored(pool: Pool, store: EvidenceStore) -> dict[str, Any]:
     """Finish the work on recently archived filings that have no linked facts yet: link the
     stored statement facts to their place in the document and read the note tables. Both are
-    safe to repeat. A filing that still yields nothing is retried only while it is recent."""
+    safe to repeat. A filing this parser already read without result, or failed on three times,
+    is skipped, so it cannot hold a slot every run; a new parser version tries it again."""
     rows = await pool.fetch(
-        """select v.id version_id, v.archive_path, v.known_at, d.issuer_id, d.external_id,
+        f"""select v.id version_id, v.archive_path, v.known_at, d.issuer_id, d.external_id,
                   d.form, d.stable_url,
                   (select l.ticker from public.security_listing l
                      join public.security s on s.id = l.security_id
@@ -154,18 +214,22 @@ async def backfill_stored(pool: Pool, store: EvidenceStore) -> dict[str, Any]:
               and d.regulator = 'SEC' and v.first_seen_at > now() - $1::interval
               and not exists (select 1 from public.disclosure_observation o
                                where o.document_version_id = v.id)
-            order by v.id desc limit $2""",
+              and not {attempts_done_sql("v.id", BACKFILL_STEP, "$3")}
+            order by v.id desc limit $2""",  # noqa: S608 - fixed fragments, no input
         BACKFILL_WINDOW,
         BACKFILL_PER_RUN,
+        PARSER_VERSION,
     )
     done: dict[str, Any] = {"checked": len(rows), "mirrored": 0, "note_rows": 0, "errors": []}
     errors: list[str] = []
     for row in rows:
+        version_id = int(row["version_id"])
         try:
             doc = parse_html(await store.get(row["archive_path"]))
-            done["mirrored"] += await mirror_stored_facts(
+            mirrored = await mirror_stored_facts(
                 pool, row["issuer_id"], row["external_id"], row["version_id"], doc
             )
+            done["mirrored"] += mirrored
             notes = await extract_notes_for_document(
                 pool,
                 issuer_id=row["issuer_id"],
@@ -177,8 +241,20 @@ async def backfill_stored(pool: Pool, store: EvidenceStore) -> dict[str, Any]:
                 doc=doc,
             )
             done["note_rows"] += notes.stored
+            if mirrored == 0:
+                await record_attempt(
+                    pool,
+                    version_id,
+                    BACKFILL_STEP,
+                    PARSER_VERSION,
+                    "empty",
+                    f"{notes.stored} note rows, no observations",
+                )
         except Exception as exc:  # one filing must not stop the rest
             errors.append(f"version {row['version_id']}: {type(exc).__name__}")
+            await record_attempt(
+                pool, version_id, BACKFILL_STEP, PARSER_VERSION, "failed", type(exc).__name__
+            )
     done["errors"] = errors
     return done
 
@@ -290,8 +366,7 @@ async def disclosure_deals_handler(ctx: JobContext) -> None:
                 store=evidence_store(settings, http),
             )
 
-            async def fetch_json(url: str) -> Any:
-                return await fetcher.fetch("sec.submissions", url)
+            listing = ConditionalFetch(ctx.pool, fetcher, SUBMISSIONS_SOURCE, "deals")
 
             async def fetch(url: str) -> Any:
                 return await fetcher.fetch("sec.archive", url)
@@ -301,10 +376,11 @@ async def disclosure_deals_handler(ctx: JobContext) -> None:
                 totals = await collect_deals(
                     ctx.pool,
                     await held_issuers(ctx.pool),
-                    fetch_json,
+                    listing,
                     fetch,
                     submissions_url=SUBMISSIONS_URL,
                     since=(dt.datetime.now(dt.UTC) - DEAL_LOOKBACK).date(),
+                    on_done=listing.done,
                 )
             except SourceNotEnabled as exc:
                 step.detail["skipped"] = str(exc)
@@ -328,8 +404,9 @@ async def disclosure_esef_handler(ctx: JobContext) -> None:
 
             try:
                 await require_source(ctx.pool, "esef.filings_xbrl_org")
+                index = ConditionalFetch(ctx.pool, fetcher, "esef.filings_xbrl_org", "esef_index")
                 totals = await collect_esef(
-                    ctx.pool, await held_lei_issuers(ctx.pool), fetch, fetch
+                    ctx.pool, await held_lei_issuers(ctx.pool), index, fetch, on_done=index.done
                 )
             except SourceNotEnabled as exc:
                 step.detail["skipped"] = str(exc)
@@ -353,11 +430,9 @@ async def disclosure_estimates_handler(ctx: JobContext) -> None:
                 store=evidence_store(settings, http),
             )
 
-            async def fetch(url: str) -> Any:
-                return await fetcher.fetch("issuer_ir.consensus", url)
-
+            pages = ConditionalFetch(ctx.pool, fetcher, "issuer_ir.consensus", "consensus")
             try:
-                step.detail.update(await collect_consensus(ctx.pool, fetch))
+                step.detail.update(await collect_consensus(ctx.pool, pages, on_done=pages.done))
             except SourceNotEnabled as exc:
                 step.detail["skipped"] = str(exc)
 

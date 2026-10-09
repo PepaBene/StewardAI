@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Panel } from "@/components/oversight/panel";
 import { PageHeader } from "@/components/page-header";
@@ -10,6 +10,9 @@ import { callApi } from "@/app/(app)/relationships/decision-form";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { ALERT_HREF, ALERT_KIND_LABEL, byKnown, digestKindLabel, digestOrder, forTicker, scanTotal, splitByState, whyLines, type DigestGroup, type DisclosureAlert } from "@/lib/disclosure/alerts";
 import { formatDay } from "@/lib/disclosure/model";
+
+const UNREAD_LIMIT = 200;
+const RECENT_LIMIT = 50;
 
 /**
  * What the disclosure collectors found that you may want to read: a verified insider trade, a large
@@ -25,13 +28,31 @@ export function AlertsPageView() {
   const [digestError, setDigestError] = useState<string | null>(null);
   const [ticker, setTicker] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [unreadCapped, setUnreadCapped] = useState(false);
+  const acking = useRef(new Set<number>());
+
+  // Unread alerts are fetched on their own, so a long history of read ones can never push an unread one out of the list.
   const load = useCallback(async () => {
     try {
-      const r = await getBrowserApiClient().GET("/disclosures/alerts", { params: { query: { include_acknowledged: true, limit: 200 } } });
-      if (r.data) setAlerts(r.data);
-      else setMessage({ ok: false, text: r.response.status === 401 || r.response.status === 403 ? "Sign in again (with MFA) and retry." : `Alerts failed to load (HTTP ${r.response.status}).` });
+      const api = getBrowserApiClient();
+      const [unread, recent] = await Promise.all([
+        api.GET("/disclosures/alerts", { params: { query: { include_acknowledged: false, limit: UNREAD_LIMIT } } }),
+        api.GET("/disclosures/alerts", { params: { query: { include_acknowledged: true, limit: RECENT_LIMIT } } }),
+      ]);
+      if (unread.data && recent.data) {
+        const unreadIds = new Set(unread.data.map((x) => x.id));
+        setAlerts([...unread.data, ...recent.data.filter((x) => x.acknowledged_at != null && !unreadIds.has(x.id))]);
+        setUnreadCapped(unread.data.length >= UNREAD_LIMIT);
+        setLoadError(null);
+      } else {
+        const status = (unread.data ? recent : unread).response.status;
+        setAlerts(null); // never keep an older list on screen after a failed reload
+        setLoadError(status === 401 || status === 403 ? "Sign in again (with MFA) and retry." : `Alerts failed to load (HTTP ${status}).`);
+      }
     } catch (e) {
-      setMessage({ ok: false, text: `Backend unreachable: ${e instanceof Error ? e.message : String(e)}` });
+      setAlerts(null);
+      setLoadError(`Backend unreachable: ${e instanceof Error ? e.message : String(e)}`);
     }
   }, []);
 
@@ -78,8 +99,11 @@ export function AlertsPageView() {
   }
 
   async function acknowledge(id: number) {
+    if (acking.current.has(id)) return; // a double click must not post twice
+    acking.current.add(id);
     const r = await callApi(() => getBrowserApiClient().POST("/disclosures/alerts/{alert_id}/acknowledge", { params: { path: { alert_id: id } } }), "Marked as read.");
     setMessage({ ok: r.ok, text: r.text });
+    acking.current.delete(id);
     if (r.ok) await Promise.all([load(), loadDigest()]);
   }
 
@@ -150,13 +174,16 @@ export function AlertsPageView() {
           </p>
         ) : null}
         {alerts === null ? (
-          <p className="text-sm text-text-muted">Loading alerts…</p>
+          loadError ? <p role="alert" className="border border-warning-signal/40 bg-warning-signal-subtle px-3 py-2 text-sm">{loadError} <button type="button" className="underline" onClick={() => void load()}>Try again</button></p> : <p className="text-sm text-text-muted">Loading alerts…</p>
         ) : open.length === 0 ? (
           <p className="text-sm text-text-muted">Nothing is waiting. New filings for your holdings appear here after the next collection, or press “Check for new filings”.</p>
         ) : shownOpen.length === 0 ? (
           <p className="text-sm text-text-muted">No unread alerts for {ticker}. Choose “Show all tickers” to see the rest.</p>
         ) : (
-          <AlertList alerts={byKnown(shownOpen)} onAcknowledge={acknowledge} />
+          <>
+            {unreadCapped ? <p role="note" className="mb-2 text-sm text-text-muted">Showing the newest {UNREAD_LIMIT} unread alerts; mark some as read to see the rest.</p> : null}
+            <AlertList alerts={byKnown(shownOpen)} onAcknowledge={acknowledge} />
+          </>
         )}
       </Panel>
 

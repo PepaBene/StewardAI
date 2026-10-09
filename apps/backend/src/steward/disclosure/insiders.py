@@ -208,7 +208,11 @@ def find_bundles(
     for k, sold_rows in sells.items():
         if k not in ex:
             continue
-        exercised = sum((r.shares or ZERO for r in ex[k]), ZERO)
+        # One exercise is reported twice on Form 4: the option leaves Table II (derivative) and
+        # the shares arrive in Table I. Count the shares received when Table I states them, else
+        # the options exercised, never both.
+        received = [r for r in ex[k] if not r.derivative]
+        exercised = sum((r.shares or ZERO for r in (received or ex[k])), ZERO)
         sold = sum((r.shares or ZERO for r in sold_rows), ZERO)
         if sold <= exercised:
             proceeds = sum(((r.shares or ZERO) * (r.price or ZERO) for r in sold_rows), ZERO)
@@ -402,9 +406,17 @@ def caveats(tx: InsiderTx) -> list[str]:
 # -------------------------------------------------------------------------------------- alerts
 @dataclass(frozen=True)
 class AlertCandidate:
-    tx: InsiderTx
-    value: Decimal
+    tx: InsiderTx  # the first line of the group, for the headline and links
+    value: Decimal  # the whole group's value
     reason: str
+    rows: tuple[InsiderTx, ...] = ()  # every line of one person, day and direction
+
+    @property
+    def shares(self) -> Decimal | None:
+        lines = self.rows or (self.tx,)
+        if any(r.shares is None for r in lines):
+            return None
+        return sum((r.shares or ZERO for r in lines), ZERO)
 
 
 def alerts(
@@ -421,25 +433,31 @@ def alerts(
     ovr = list(overrides)
     rows = visible(txs, as_of)
     bundled = _bundled_keys(find_bundles(rows, ovr, as_of))
-    seen: dict[
-        tuple[str, dt.date | None, str | None, Decimal | None, Decimal | None], InsiderTx
+    # A line repeated in a LATER filing (an amendment not linked to its original) is the same
+    # trade and counts once; identical lines inside ONE filing are separate fills and all count.
+    first_filing: dict[
+        tuple[str, dt.date | None, str | None, Decimal | None, Decimal | None], str
     ] = {}
+    groups: dict[tuple[str, dt.date | None, str | None], list[InsiderTx]] = defaultdict(list)
     for t in sorted(rows, key=lambda r: (r.known_at, r.accession, r.row_index)):
         cls = effective_class(t, ovr, as_of)
         confirmed = t.class_confirmed or any((o.accession, o.row_index) == t.key for o in ovr)
         if not (confirmed and countable(t, cls)) or t.key in bundled or t.plan is True:
             continue
-        if since is not None and t.known_at <= since:
+        line = (t.insider, t.tx_date, cls, t.shares, t.price)
+        if first_filing.setdefault(line, t.accession) != t.accession:
             continue
-        seen.setdefault((t.insider, t.tx_date, cls, t.shares, t.price), t)
+        groups[(t.insider, t.tx_date, cls)].append(t)
+    # Materiality is judged per person, day and direction: a large sale reported as many small
+    # lots is one material sale. A group alerts once something in it is newly known.
     out: list[AlertCandidate] = []
-    for t in seen.values():
-        value = (t.shares or ZERO) * (t.price or ZERO)
+    for (_who, _day, cls), members in groups.items():
+        if since is not None and all(m.known_at <= since for m in members):
+            continue
+        value = sum(((m.shares or ZERO) * (m.price or ZERO) for m in members), ZERO)
         if value >= min_value:
-            buy = effective_class(t, ovr, as_of) == "open_market_buy"
-            out.append(
-                AlertCandidate(t, value, "open-market purchase" if buy else "open-market sale")
-            )
+            reason = "open-market purchase" if cls == "open_market_buy" else "open-market sale"
+            out.append(AlertCandidate(members[0], value, reason, tuple(members)))
     return sorted(out, key=lambda a: (a.tx.known_at, a.tx.accession, a.tx.row_index))
 
 

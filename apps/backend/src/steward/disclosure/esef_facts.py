@@ -32,10 +32,11 @@ from typing import Any, Literal
 
 import asyncpg
 
-from steward.disclosure.ingest import record_observation
+from steward.disclosure.ingest import attempts_done_sql, record_attempt, record_observation
 from steward.storage import EvidenceStore
 
 ESEF_PARSER_VERSION = "esef-xbrl-json-1"
+ESEF_STEP = "esef_facts"
 EXTRACTION_METHOD = "xbrl-json"
 PER_RUN = 10
 
@@ -428,7 +429,8 @@ async def read_pending_esef_versions(
     """Read the newest archived ESEF versions this parser version has not read yet. A version is
     marked read (`source_document_version.parser_version`) once its report was parsed, including
     one that holds no allow-listed fact or cannot be parsed, so it is not retried every run; a
-    failed archive read is not marked and is tried again."""
+    failed archive read is not marked and is tried again. A store failure is counted in
+    `disclosure_backfill_attempt` and given up after `MAX_FAILED_ATTEMPTS` for this parser."""
     detail: dict[str, Any] = {
         "versions": 0,
         "extracted": 0,
@@ -442,13 +444,14 @@ async def read_pending_esef_versions(
         detail["skipped_reason"] = "no evidence store configured"
         return detail
     rows = await pool.fetch(
-        """select v.id version_id, v.archive_path, d.issuer_id, i.lei
+        f"""select v.id version_id, v.archive_path, d.issuer_id, i.lei
              from public.source_document_version v
              join public.source_document d on d.id = v.document_id
              left join public.issuer i on i.id = d.issuer_id
             where d.regulator = 'ESEF' and v.archive_path is not null and not v.quarantined
               and d.issuer_id is not null and v.parser_version is distinct from $1
-            order by v.id desc limit $2""",
+              and not {attempts_done_sql("v.id", ESEF_STEP, "$1")}
+            order by v.id desc limit $2""",  # noqa: S608 - fixed fragments, no input
         parser_version,
         limit,
     )
@@ -477,6 +480,15 @@ async def read_pending_esef_versions(
             if isinstance(exc, EsefParseError):
                 skipped["unreadable_report"] = skipped.get("unreadable_report", 0) + 1
                 await _mark_read(pool, int(row["version_id"]), parser_version)
+            else:  # counted, so a filing that always fails stops holding a slot every run
+                await record_attempt(
+                    pool,
+                    int(row["version_id"]),
+                    ESEF_STEP,
+                    parser_version,
+                    "failed",
+                    type(exc).__name__,
+                )
             continue
         detail["extracted"] += stored.extracted
         detail["unchanged"] += stored.unchanged

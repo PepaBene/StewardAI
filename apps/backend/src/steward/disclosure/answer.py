@@ -13,6 +13,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 from collections.abc import Iterable
+from decimal import Decimal
 from typing import Any
 
 import asyncpg
@@ -22,7 +23,6 @@ from steward.disclosure import asof
 type Pool = asyncpg.Pool | asyncpg.Connection
 
 _WORD = re.compile(r"[a-z][a-z0-9&-]{3,}")
-_NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
 _STOP = frozenset(
     "what which when where does have been from that this with their about into than "
     "over under were your".split()
@@ -34,16 +34,101 @@ def keywords(question: str) -> set[str]:
     return {w for w in _WORD.findall(question.lower()) if w not in _STOP}
 
 
+_MONTHS = (
+    "january february march april may june july august september october november december".split()
+)
+_MONTH_RX = "|".join(m[:3] + r"[a-z]*\.?" for m in _MONTHS)
+_ISO_DATE = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
+_TEXT_DATE_MDY = re.compile(
+    rf"\b({_MONTH_RX})\s+(\d{{1,2}})(?:st|nd|rd|th)?,?\s+(\d{{4}})\b", re.IGNORECASE
+)
+_TEXT_DATE_DMY = re.compile(
+    rf"\b(\d{{1,2}})(?:st|nd|rd|th)?\s+({_MONTH_RX})\s+(\d{{4}})\b", re.IGNORECASE
+)
+_QUANTITY = re.compile(
+    r"(?P<open>\()?(?P<neg>(?<![\w.])-)?[$€£]?(?P<num>\d[\d,]*(?:\.\d+)?)(?P<close>\))?"
+    r"(?:\s?(?P<mag>thousand|million|billion|trillion|bn|mm|m|k)(?![A-Za-z]))?",
+    re.IGNORECASE,
+)
+_MAGNITUDE = {
+    "thousand": Decimal(10) ** 3,
+    "k": Decimal(10) ** 3,
+    "million": Decimal(10) ** 6,
+    "mm": Decimal(10) ** 6,
+    "m": Decimal(10) ** 6,
+    "billion": Decimal(10) ** 9,
+    "bn": Decimal(10) ** 9,
+    "trillion": Decimal(10) ** 12,
+}
+_AMBIGUOUS_COMMA = re.compile(r"\d+,\d{1,2}")
+
+type Token = tuple[str, Decimal | str]
+
+
+def _month_number(word: str) -> int | None:
+    prefix = word.lower()[:3]
+    for i, m in enumerate(_MONTHS, 1):
+        if m[:3] == prefix:
+            return i
+    return None
+
+
+def _iso(y: str, m: int | None, d: str) -> str | None:
+    if m is None:
+        return None
+    try:
+        return dt.date(int(y), m, int(d)).isoformat()
+    except ValueError:
+        return None
+
+
+def dates_in(text: str) -> tuple[set[str], str]:
+    """Calendar dates in `text` as ISO strings, and the text with those spans blanked out so their
+    digits are never read as separate numbers. A date is one token: it must appear whole."""
+    found: set[str] = set()
+
+    def blank(m: re.Match[str], iso: str | None) -> str:
+        if iso:
+            found.add(iso)
+        return " " * len(m.group(0))
+
+    text = _ISO_DATE.sub(lambda m: blank(m, _iso(m[1], int(m[2]), m[3])), text)
+    text = _TEXT_DATE_MDY.sub(lambda m: blank(m, _iso(m[3], _month_number(m[1]), m[2])), text)
+    text = _TEXT_DATE_DMY.sub(lambda m: blank(m, _iso(m[3], _month_number(m[2]), m[1])), text)
+    return found, text
+
+
+def number_tokens(text: str) -> set[Token]:
+    """Quantities in `text` with sign (parentheses mean negative) and magnitude word applied, so
+    "(1.5 billion)" is -1500000000. Dates are separate whole tokens. "12,5" (one comma, one or two
+    digits after it) could be 12.5 or 12 500, so it is kept as its exact string."""
+    out: set[Token] = set()
+    dates, rest = dates_in(text)
+    out |= {("date", d) for d in dates}
+    for m in _QUANTITY.finditer(rest):
+        raw = m.group("num").rstrip(".")
+        if _AMBIGUOUS_COMMA.fullmatch(raw):
+            out.add(("raw", raw))
+            continue
+        value = Decimal(raw.replace(",", ""))
+        value *= _MAGNITUDE.get((m.group("mag") or "").lower(), Decimal(1))
+        if m.group("neg") or (m.group("open") and m.group("close")):
+            value = -value
+        out.add(("num", value))
+    return out
+
+
 def numbers_in(text: str) -> set[str]:
-    return {n.replace(",", "").rstrip(".") for n in _NUMBER.findall(text)}
+    return {str(v) for _, v in number_tokens(text)}
 
 
 def numbers_grounded(text: str, evidence_texts: Iterable[str]) -> bool:
-    """Every number in `text` must occur in some retrieved evidence string."""
-    allowed: set[str] = set()
+    """Every number and date in `text` must occur, with the same sign and magnitude, in some
+    retrieved evidence string."""
+    allowed: set[Token] = set()
     for e in evidence_texts:
-        allowed |= numbers_in(e)
-    return numbers_in(text) <= allowed
+        allowed |= number_tokens(e)
+    return number_tokens(text) <= allowed
 
 
 def _evidence_row(kind: str, r: dict[str, Any]) -> dict[str, Any]:
@@ -79,7 +164,7 @@ def select(question: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         score = sum(w in hay for w in words)
         if score:
             hits.append((score, r))
-    hits.sort(key=lambda t: (-t[0], t[1]["known_at"], t[1]["id"]))
+    hits.sort(key=lambda t: (-t[0], -t[1]["known_at"].timestamp(), -int(t[1]["id"])))
     return [r for _, r in hits[:MAX_EVIDENCE]]
 
 

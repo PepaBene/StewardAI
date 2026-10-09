@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from collections import Counter
 from decimal import Decimal
 from typing import Any
 
@@ -133,7 +134,7 @@ async def statements(
     `as_of`."""
     when = _aware(as_of)
     rows = await pool.fetch(
-        """select id, concept, period_start, period_end, value, known_at, accession
+        """select id, concept, period_start, period_end, value, known_at, accession, currency
              from public.financial_statement_fact
             where issuer_id = $1 and known_at <= $2 and value is not null
               and statement = any($3::text[])
@@ -142,6 +143,15 @@ async def statements(
         when,
         list(_STATEMENTS),
     )
+    # A filer can tag one line in two currencies (a 20-F with a convenience translation). The
+    # history uses the currency most of its money facts are reported in and drops the others,
+    # so two currencies are never read as a restatement or added together.
+    currencies = Counter(r["currency"] for r in rows if r["currency"])
+    reporting = currencies.most_common(1)[0][0] if currencies else None
+    other_currency = sum(
+        1 for r in rows if r["currency"] and reporting and r["currency"] != reporting
+    )
+    rows = [r for r in rows if not (r["currency"] and r["currency"] != reporting)]
     facts: list[FiledFact] = []
     unmapped = 0
     for r in rows:
@@ -233,6 +243,8 @@ async def statements(
         "checks": checks,
         "usable_for_valuation": gate,
         "unmapped_concepts": unmapped,
+        "reporting_currency": reporting,
+        "other_currency_facts_dropped": other_currency,
         "valuation_gate": valuation_gate,
         "formulas": formulas,
     }
@@ -322,17 +334,31 @@ async def segment_bridge(
     to its own consolidated total, each axis on its own; cross-axis facts come back as their own
     breakdown. `axes`, `total` and `notes` keep describing revenue, as before."""
     when = _aware(as_of)
+    # A 10-Q reports one period end for several durations (3 months and year to date). One bridge
+    # uses one duration: the longest one reported (the earliest start). Instant facts (assets)
+    # carry no start and always belong.
+    start: dt.date | None = await pool.fetchval(
+        """select min(period_start) from public.financial_statement_fact
+            where issuer_id=$1 and period_end=$2 and known_at<=$3 and period_start is not null
+              and value is not null and concept = any($4::text[])""",
+        issuer_id,
+        period_end,
+        when,
+        _ALL_CONCEPTS,
+    )
     total_rows = await pool.fetch(
         """select concept, value from public.financial_statement_fact
             where issuer_id=$1 and period_end=$2 and known_at<=$3
               and statement in ('income','balance_sheet','cash_flow') and value is not null
               and concept = any($4::text[])
+              and (period_start is null or period_start = $5)
               and coalesce(dimensions->'members', '[]'::jsonb) = '[]'::jsonb
             order by known_at desc""",
         issuer_id,
         period_end,
         when,
         _ALL_CONCEPTS,
+        start,
     )
     totals: dict[str, Decimal | None] = {}
     best: dict[str, int] = {}
@@ -349,11 +375,13 @@ async def segment_bridge(
              from public.financial_statement_fact
             where issuer_id=$1 and period_end=$2 and known_at<=$3 and statement='segment'
               and value is not null and concept = any($4::text[])
+              and (period_start is null or period_start = $5)
             order by concept, dimensions::text, known_at desc""",
         issuer_id,
         period_end,
         when,
         _ALL_CONCEPTS,
+        start,
     )
     chosen: dict[tuple[str, tuple[str, ...], tuple[str, ...]], tuple[int, Decimal]] = {}
     for r in seg:

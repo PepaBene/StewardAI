@@ -8,7 +8,7 @@ stored claims, with each source and date, and says what it could not find.
 from __future__ import annotations
 
 import datetime as dt
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query
 from pydantic import AwareDatetime, BaseModel, Field
@@ -30,6 +30,9 @@ class ReplayItemOut(BaseModel):
     known_at: dt.datetime | None
     detail: str
     ref: str | None
+    #: only on `since` items: "new", or "changed" with what it read as on the replay date
+    change: Literal["new", "changed"] | None = None
+    was: str | None = None
 
 
 class ReplayDatasetOut(BaseModel):

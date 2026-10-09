@@ -100,7 +100,13 @@ def test_quality_rates_have_numerator_denominator_and_null_when_unsampled() -> N
         {"dataset": "insider_class", "sample_key": "s", "item_ref": "i0", "correct": True}
     )
     labels.append(
-        {"dataset": "relationship_claim", "sample_key": "s", "item_ref": "r", "correct": False}
+        {
+            "dataset": "relationship_claim",
+            "sample_key": "s",
+            "item_ref": "r",
+            "correct": False,
+            "human_value": "unrelated_third_party",
+        }
     )
     q = {r["dataset"]: r for r in cr.quality_rows(labels)}
     assert (q["insider_class"]["errors"], q["insider_class"]["labelled"]) == (
@@ -134,7 +140,7 @@ def rel(ticker: str, kind: str, share: str | None, name: str | None = "Big Co") 
         name,
         name is None,
         None if share is None else D(share),
-        None,
+        "issuer_revenue",
         "FY2025",
         at(8, 1),
     )
@@ -279,6 +285,11 @@ def test_ratio_field_uses_latest_period_with_both_inputs_and_positive_denominato
         row("operating_cash_flow", dt.date(2026, 6, 30), "50", at(8, 1)),
         row("net_income", dt.date(2026, 6, 30), "-10", at(8, 1)),  # a loss: ratio meaningless
     ]
-    got = sc.ratio_field(rows, "operating_cash_flow", "net_income", "obs")
-    assert got is not None and got.value == D("1.5000") and got.period == "2025-12-31"
-    assert sc.ratio_field(rows[:1], "operating_cash_flow", "net_income", "obs") is None
+    # The latest period has a loss: Missing with the reason, never the older period instead.
+    latest = sc.ratio_field(rows, "operating_cash_flow", "net_income", "obs")
+    assert isinstance(latest, sc.Missing) and "undefined" in latest.reason
+    got = sc.ratio_field(rows[:3], "operating_cash_flow", "net_income", "obs")
+    assert isinstance(got, sc.FieldValue)
+    assert got.value == D("1.5000") and got.period == "2025-12-31"
+    alone = sc.ratio_field(rows[:1], "operating_cash_flow", "net_income", "obs")
+    assert isinstance(alone, sc.Missing)

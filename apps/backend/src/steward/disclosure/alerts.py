@@ -31,8 +31,11 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from decimal import Decimal
+from functools import partial
 from typing import Any
 
 import asyncpg
@@ -40,6 +43,8 @@ import asyncpg
 from steward.disclosure import dependency_read, estimate_read, insider_analysis, review
 from steward.disclosure import estimates as est
 from steward.disclosure.note_store import CONCEPT_PREFIX, NOTE_SOURCE
+
+log = logging.getLogger(__name__)
 
 type Pool = asyncpg.Pool | asyncpg.Connection
 
@@ -163,8 +168,25 @@ async def scan_insiders(
     raised = 0
     for a in await insider_analysis.pending_alerts(pool, ticker, min_value, now):
         t = a.tx
+        lines = a.rows or (t,)
+        accessions = sorted({r.accession for r in lines})
+        # The key names the person, day and direction, never split-restated share counts, so a
+        # later split cannot make an old trade look new. An alert stored under the earlier key
+        # format (shares and price in the key) for one of these filings already covers it.
+        already = await pool.fetchval(
+            """select exists (select 1 from public.disclosure_alert
+                               where kind = 'insider_trade' and ticker = $1
+                                 and detail ->> 'insider' = $2
+                                 and detail ->> 'accession' = any($3::text[]))""",
+            ticker,
+            t.insider,
+            accessions,
+        )
+        if already:
+            continue
         who = t.name or t.insider
-        shares = f"{t.shares:,.0f}" if t.shares is not None else "an unknown number of"
+        total = a.shares
+        shares = f"{total:,.0f}" if total is not None else "an unknown number of"
         url = await pool.fetchval(
             "select source_url from public.insider_filing where accession = $1", t.accession
         )
@@ -172,10 +194,12 @@ async def scan_insiders(
             pool,
             kind="insider_trade",
             ticker=ticker,
-            dedupe_key=f"insider:{t.insider}:{t.tx_date}:{a.reason}:{t.shares}:{t.price}",
+            dedupe_key=f"insider:{ticker}:{t.insider}:{t.tx_date}:{a.reason}",
             headline=f"{who} reported an {a.reason} of {shares} shares ({_money(a.value)})",
             detail={
                 "accession": t.accession,
+                "accessions": accessions,
+                "lines": len(lines),
                 "row_index": t.row_index,
                 "insider": t.insider,
                 "role": t.role,
@@ -277,17 +301,29 @@ async def scan_controlling_stakes(
     *,
     threshold: Decimal = CONTROL_THRESHOLD,
 ) -> int:
-    """A verified 13D/G stake on a CUSIP-matched class that reached `threshold` percent and was
-    below it (or absent) before. A stake with no stated percentage never alerts."""
+    """A 13D/G stake on a class matched by CUSIP (the only check a 13D/G row carries) that reached
+    `threshold` percent and was below it before. The prior stake is the linked prior filing, else
+    the same filer's latest earlier filing on that class. An amendment with no earlier filing
+    found is not a crossing: the stake may have been above the threshold all along. A stake with
+    no stated percentage never alerts."""
     rows = await pool.fetch(
         """select f.accession, f.schedule, f.stake_percent, f.filed, f.known_at, f.source_url,
-                  f.filer_cik, p.stake_percent as prior_percent,
+                  f.filer_cik, f.is_amendment, prior.stake_percent as prior_percent,
+                  prior.accession as prior_found,
                   (select h.person_name from public.control_stake_holder h
                     where h.accession = f.accession
                     order by h.aggregate_shares desc nulls last, h.row_index limit 1) as holder
              from public.control_stake_filing f
              join public.control_stake_issuer_link l on l.accession = f.accession
-             left join public.control_stake_filing p on p.accession = f.prior_accession
+             left join lateral (
+               select q.accession, q.stake_percent
+                 from public.control_stake_filing q
+                 join public.control_stake_issuer_link lq on lq.accession = q.accession
+                where (q.accession = f.prior_accession
+                       or (f.prior_accession is null and q.filer_cik = f.filer_cik
+                           and lq.ticker = $1 and q.known_at < f.known_at))
+                order by (q.accession = f.prior_accession) desc, q.known_at desc
+                limit 1) prior on true
             where l.ticker = $1 and l.class_status = 'cusip_match'
               and f.known_at > $2 and f.known_at <= $3
             order by f.known_at, f.accession""",
@@ -299,6 +335,10 @@ async def scan_controlling_stakes(
     for r in rows:
         pct = None if r["stake_percent"] is None else Decimal(r["stake_percent"])
         prior = None if r["prior_percent"] is None else Decimal(r["prior_percent"])
+        if r["is_amendment"] and r["prior_found"] is None:
+            continue
+        if r["prior_found"] is not None and prior is None:
+            continue  # an earlier filing exists but states no percentage: no crossing is shown
         if not crossed_control(prior, pct, threshold):
             continue
         who = r["holder"] or r["filer_cik"] or "an unnamed filer"
@@ -361,7 +401,9 @@ async def scan_estimate_revisions(
     if issuer is None:
         return 0, 0
     rows = await pool.fetch(estimate_read.VALUE_SQL, int(issuer["id"]), now)
-    values = [estimate_read.to_value(r) for r in rows]
+    # Only what the estimates page shows: a file replaced by a correction known by now is gone,
+    # so a superseded file and its correction never form a "revision".
+    values = est.visible([estimate_read.to_value(r) for r in rows], now)
     g = await estimate_read.gate(pool)
     alerted = reviewed = 0
     for p in est.revision_pairs(v for v in values if not est.problems(v)):
@@ -449,8 +491,12 @@ async def scan_suggested_edges(
     return opened
 
 
-async def scan_debt_maturity(pool: Pool, ticker: str, now: dt.datetime) -> int:
-    """Compare the near-term share of the two latest filings' debt maturity schedules."""
+async def scan_debt_maturity(
+    pool: Pool, ticker: str, now: dt.datetime, *, since: dt.datetime | None = None
+) -> int:
+    """Compare the near-term share of the two latest filings' debt maturity schedules. With
+    `since`, only a schedule that became known after it can alert, so an old shift found late (a
+    backfill) is not raised as news."""
     rows = await pool.fetch(
         """select accession, known_at, source_url, value,
                   dimensions #>> '{note,bucket}' as bucket, dimensions #>> '{note,status}' as status
@@ -475,6 +521,8 @@ async def scan_debt_maturity(pool: Pool, ticker: str, now: dt.datetime) -> int:
     if len(ordered) < 2:
         return 0
     (_, prior), (acc, cur) = ordered[-2], ordered[-1]
+    if since is not None and cur["known_at"] <= since:
+        return 0
     shift = maturity_shift(prior["buckets"], cur["buckets"], DEBT_SHIFT_MIN_POINTS)
     if shift is None:
         return 0
@@ -541,7 +589,8 @@ async def scan_relationships(
 
 async def scan_deals(pool: Pool, ticker: str, since: dt.datetime, now: dt.datetime) -> int:
     """One alert per documented state transition that became known in the window. A rumoured
-    state is unverified and never alerts; the alert states the new state and its source, no more."""
+    state is unverified and never alerts; a filing that repeats the state the deal was already in
+    is not a change; the alert states the new state and its source, no more."""
     rows = await pool.fetch(
         """select t.id, t.state, t.known_at, e.title, e.deal_type, d.stable_url as source_url
              from public.deal_state_transition t
@@ -550,6 +599,10 @@ async def scan_deals(pool: Pool, ticker: str, since: dt.datetime, now: dt.dateti
              left join public.source_document d on d.id = v.document_id
             where e.ticker = $1 and t.state <> 'rumored'
               and t.known_at > $2 and t.known_at <= $3
+              and t.state is distinct from (
+                select p.state from public.deal_state_transition p
+                 where p.deal_id = t.deal_id and (p.known_at, p.id) < (t.known_at, t.id)
+                 order by p.known_at desc, p.id desc limit 1)
             order by t.known_at, t.id""",
         ticker,
         since,
@@ -603,22 +656,31 @@ async def scan_all(
         "failed": 0,
     }
     for ticker in await held_tickers(pool):
-        try:
-            totals["insider_trade"] += await scan_insiders(pool, ticker, end)
-            totals["major_holder"] += await scan_major_holders(pool, ticker, start, end)
-            totals["relationship_change"] += await scan_relationships(pool, ticker, start, end)
-            totals["deal_state"] += await scan_deals(pool, ticker, start, end)
-            totals["controlling_stake"] += await scan_controlling_stakes(pool, ticker, start, end)
-            totals["insider_buy_cluster"] += await scan_insider_clusters(
-                pool, ticker, end, since=start
-            )
-            alerted, reviewed = await scan_estimate_revisions(pool, ticker, start, end)
-            totals["estimate_revision"] += alerted
-            totals["review_tasks"] += reviewed
-            totals["review_tasks"] += await scan_suggested_edges(pool, ticker, start, end)
-            totals["debt_maturity_change"] += await scan_debt_maturity(pool, ticker, end)
-        except (asyncpg.PostgresError, ValueError):
-            totals["failed"] += 1
+        scans: list[tuple[str, Callable[[], Awaitable[int | tuple[int, int]]]]] = [
+            ("insider_trade", partial(scan_insiders, pool, ticker, end)),
+            ("major_holder", partial(scan_major_holders, pool, ticker, start, end)),
+            ("relationship_change", partial(scan_relationships, pool, ticker, start, end)),
+            ("deal_state", partial(scan_deals, pool, ticker, start, end)),
+            ("controlling_stake", partial(scan_controlling_stakes, pool, ticker, start, end)),
+            ("insider_buy_cluster", partial(scan_insider_clusters, pool, ticker, end, since=start)),
+            ("estimate_revision", partial(scan_estimate_revisions, pool, ticker, start, end)),
+            ("review_tasks", partial(scan_suggested_edges, pool, ticker, start, end)),
+            ("debt_maturity_change", partial(scan_debt_maturity, pool, ticker, end, since=start)),
+        ]
+        # Each scan stands alone: bad data in one (an unparsable number, a missing field) is
+        # counted and the rest still run, for this ticker and the next.
+        for kind, run in scans:
+            try:
+                got = await run()
+            except (asyncpg.PostgresError, ValueError, ArithmeticError, TypeError, KeyError):
+                log.exception("disclosure alert scan %s failed for %s", kind, ticker)
+                totals["failed"] += 1
+                continue
+            if isinstance(got, tuple):
+                totals[kind] += got[0]
+                totals["review_tasks"] += got[1]
+            else:
+                totals[kind] += got
     return totals
 
 

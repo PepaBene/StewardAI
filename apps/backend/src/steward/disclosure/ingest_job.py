@@ -113,6 +113,34 @@ def record_for(filing: DiscoveredFiling, issuer_id: int, source_key: str) -> Doc
     )
 
 
+CURRENT_REPORT_FORMS = {"8-K"}
+
+
+async def index_filing_items(
+    pool: Pool, issuer_id: int, filings: Sequence[DiscoveredFiling]
+) -> int:
+    """Remember the items each 8-K of an issuer declares (one row per accession; a row is never
+    changed). The earnings release (Item 2.02) is read from here. Returns the rows added."""
+    added = 0
+    for f in filings:
+        if f.base_form not in CURRENT_REPORT_FORMS or not f.items:
+            continue
+        status = await pool.execute(
+            """insert into public.sec_filing_item
+                 (accession, issuer_id, form, items, report_date, filed_at, known_at)
+               values ($1,$2,$3,$4,$5,$6,$7) on conflict (accession) do nothing""",
+            f.accession,
+            issuer_id,
+            f.form,
+            f.items,
+            f.report_date,
+            f.filed_at,
+            f.known_at,
+        )
+        added += status.endswith(" 1")
+    return added
+
+
 async def _already_stored(pool: Pool, accession: str, digest: str) -> bool:
     found = await pool.fetchval(
         """select 1 from public.source_document d

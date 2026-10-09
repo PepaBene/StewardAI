@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { breakReasons, choices, figure, gateWords, lanesOf, lineWarnings, revisionPairs, SERIES, statisticOf, unitLabel, visibleAt } from "@/lib/disclosure/estimates";
+import { allLines, breakReasons, choices, defaultChoice, figure, gateWords, lanesOf, lineWarnings, revisionPairs, SERIES, statisticOf, unitLabel, visibleAt } from "@/lib/disclosure/estimates";
 import { sampleEstimates } from "@/lib/disclosure/fixtures-estimates";
 
 const at = (iso: string) => Date.parse(iso);
@@ -119,5 +119,16 @@ describe("words", () => {
     const l = lanesOf(Object.values(view("2026-08-01T00:00:00Z").lanes).flat()).published_analyst_consensus.find((x) => x.id === 9)!;
     expect(lineWarnings(l).join(" ")).toMatch(/analyst count not stated/);
     expect(choices([l]).map((c) => c.label)).toEqual(["Adjusted EPS, FY2026Q3"]);
+  });
+});
+
+describe("default choice", () => {
+  it("opens on the metric and period with the most consensus lines, never a fixed name", () => {
+    const lines = allLines(view("2026-08-20T23:59:59Z"));
+    const options = choices(lines);
+    const picked = defaultChoice(options, lines)!;
+    const n = (key: string) => lines.filter((l) => !l.segment && l.series === "published_analyst_consensus" && `${l.metric.toLowerCase()}¦${l.fiscal_period}` === key).length;
+    expect(options.every((o) => n(o.key) <= n(picked.key))).toBe(true);
+    expect(defaultChoice([], [])).toBeUndefined();
   });
 });

@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 
 import { ConsiderationBridge, DealDefs, DealFacts, DealFilters, DealTable, DealTimeline, EncodingLegend, ImpactTable, ImpactWaterfalls, PortfolioDealsPanel, TransitionTable, VersionTable } from "@/components/disclosure/deals";
+import { ReleaseNotice } from "@/components/disclosure/release-notice";
+import { outcomeOf } from "@/lib/disclosure/keyed";
+import { useKeyedLoad } from "@/lib/disclosure/use-keyed-load";
 import { Panel, SectionNav } from "@/components/oversight/panel";
 import { PageHeader } from "@/components/page-header";
 import { Field } from "@/components/reference/form-bits";
@@ -25,7 +29,6 @@ const SECTIONS = [
 
 const TICKER = /^[A-Za-z0-9._-]{1,32}$/;
 const DAY_MS = 86_400_000;
-const LOADING = <p className="text-sm text-text-muted">Loading…</p>;
 
 /**
  * Public deals, financing and corporate actions for one holding, replayable by date. A deal's life is
@@ -42,52 +45,29 @@ export function DealsPageView() {
   const [ticker, setTicker] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>();
   const [offerError, setOfferError] = useState<string | undefined>();
-  const [live, setLive] = useState<HoldingDeals | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
-  const [portfolio, setPortfolio] = useState<PortfolioDeals | null>(null);
   const [filter, setFilter] = useState<DealFilter>({ type: "", state: "" });
   const [selected, setSelected] = useState<number | null>(null);
+  // "Show deals" bumps this so the same inputs fetch again
+  const [nonce, setNonce] = useState(0);
 
   const sample = ticker === null;
 
-  useEffect(() => {
-    if (sample) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await getBrowserApiClient().GET("/disclosures/portfolio/deals", { params: { query: { as_of: new Date(cutoff).toISOString() } } });
-        if (!cancelled) setPortfolio(r.data ?? null);
-      } catch {
-        if (!cancelled) setPortfolio(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [sample, cutoff]);
-
-  useEffect(() => {
-    if (!ticker) return;
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const r = await getBrowserApiClient().GET("/disclosures/holdings/{ticker}/deals", {
-          params: { path: { ticker }, query: { as_of: new Date(cutoff).toISOString(), ...(offer != null ? { offer_price: offer } : {}) } },
-        });
-        if (cancelled) return;
-        if (r.data) {
-          setFailure(null);
-          setLive(r.data);
-        } else setFailure(r.response.status === 401 || r.response.status === 403 ? "Sign in again (with MFA) and retry." : `The deals read failed (HTTP ${r.response.status}). Try again in a minute; if it keeps failing, check the backend log.`);
-      } catch (e) {
-        if (!cancelled) setFailure(`Backend unreachable: ${e instanceof Error ? e.message : String(e)}. Start the backend or check your connection, then press Show deals again.`);
-      }
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [ticker, cutoff, offer]);
+  // keyed by the inputs that produced it: a failed refetch never shows old data under new inputs, and an HTTP error is an error
+  const portfolioState = useKeyedLoad<PortfolioDeals>(sample ? null : `${cutoff}`, "The portfolio deals", async () => {
+    const r = await getBrowserApiClient().GET("/disclosures/portfolio/deals", { params: { query: { as_of: new Date(cutoff).toISOString() } } });
+    return outcomeOf("The portfolio deals", r);
+  }, nonce);
+  const liveState = useKeyedLoad<HoldingDeals>(ticker ? `${ticker}:${cutoff}:${offer ?? ""}` : null, "The deals read", async () => {
+    const r = await getBrowserApiClient().GET("/disclosures/holdings/{ticker}/deals", {
+      params: { path: { ticker: ticker as string }, query: { as_of: new Date(cutoff).toISOString(), ...(offer != null ? { offer_price: offer } : {}) } },
+    });
+    return outcomeOf("The deals read", r);
+  }, nonce, 250);
+  const live = liveState?.state === "ready" ? liveState.data : null;
+  const failure = liveState?.state === "error" ? liveState.message : null;
+  const portfolio = portfolioState?.state === "ready" ? portfolioState.data : null;
+  const portfolioFailure = portfolioState?.state === "error" ? portfolioState.message : null;
+  const LOADING = <p className="text-sm text-text-muted">{failure ? "Not loaded." : "Loading…"}</p>;
 
   const view = useMemo(() => (sample ? sampleDeals(cutoff, offer) : live), [sample, cutoff, offer, live]);
   const portfolioView = useMemo(() => (sample ? samplePortfolioDeals(cutoff) : portfolio), [sample, cutoff, portfolio]);
@@ -101,8 +81,8 @@ export function DealsPageView() {
     e.preventDefault();
     const t = input.trim();
     const o = offerInput.trim();
-    setLive(null);
     setSelected(null);
+    setNonce((n) => n + 1); // the same inputs still refetch
     if (o === "") {
       setOffer(null);
       setOfferError(undefined);
@@ -131,6 +111,11 @@ export function DealsPageView() {
         description="Acquisitions, sales, spin-offs, offerings, debt and buybacks a holding has made public: what stage each is at, what the terms said and when that was known, and what the stated terms would change. Terms that are not stated stay unknown."
         aside={<span>{ticker ?? SAMPLE_DEAL_TICKER} · as known on {formatDay(asOf)}</span>}
       />
+
+      <ReleaseNotice page="deals" />
+      <p className="text-sm">
+        Deal parties that could not be matched to an issuer wait for your review: <Link href="/disclosures/deals/parties" className="text-accent-ink underline underline-offset-2">review deal parties</Link>.
+      </p>
 
       {sample ? (
         <p role="note" className="border border-dashed border-border bg-surface-muted px-3 py-2 text-sm">
@@ -214,7 +199,7 @@ export function DealsPageView() {
       </Panel>
 
       <Panel id="portfolio" title="Across the portfolio" description="How much of the portfolio sits in holdings with an active deal. Holdings with none known are listed as unknown.">
-        {portfolioView ? <PortfolioDealsPanel data={portfolioView} names={sample ? SAMPLE_DEAL_NAMES : undefined} /> : <p className="text-sm text-text-muted">Loading the portfolio…</p>}
+        {portfolioView ? <PortfolioDealsPanel data={portfolioView} names={sample ? SAMPLE_DEAL_NAMES : undefined} /> : portfolioFailure ? <p role="alert" className="border border-warning-signal/40 bg-warning-signal-subtle px-3 py-2 text-sm">{portfolioFailure}</p> : <p className="text-sm text-text-muted">Loading the portfolio…</p>}
       </Panel>
     </div>
   );

@@ -10,6 +10,7 @@ stored an `available` result. Documentation or a marketing claim enables nothing
 from __future__ import annotations
 
 import datetime as dt
+import json
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -285,4 +286,30 @@ async def set_enabled(
     check_enable(row["access_state"], enabled)
     await pool.execute(
         "update public.disclosure_source set enabled=$2 where source_key=$1", source_key, enabled
+    )
+
+
+async def load_cursor(
+    pool: asyncpg.Pool | asyncpg.Connection, source_key: str, key: str
+) -> dict[str, str]:
+    """One entry of a source's `cursor` (for example one CIK's last seen filing and validators);
+    empty when none was stored."""
+    raw = await pool.fetchval(
+        "select cursor -> $2 from public.disclosure_source where source_key=$1", source_key, key
+    )
+    value = json.loads(raw) if isinstance(raw, str) else raw
+    return {k: str(v) for k, v in value.items() if v is not None} if isinstance(value, dict) else {}
+
+
+async def save_cursor(
+    pool: asyncpg.Pool | asyncpg.Connection, source_key: str, key: str, value: dict[str, str]
+) -> None:
+    """Replace one entry of a source's `cursor`, leaving the other entries alone."""
+    await pool.execute(
+        """update public.disclosure_source
+              set cursor = jsonb_set(cursor, array[$2::text], $3::jsonb, true)
+            where source_key=$1""",
+        source_key,
+        key,
+        json.dumps(value, sort_keys=True),
     )

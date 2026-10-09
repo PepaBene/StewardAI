@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { ConcentrationBars, ConflictList, DependencyGraph, LivePortfolio, OwnerWeights, PortfolioExposure, ScenarioView, SuggestedEdges } from "@/components/disclosure/network";
+import { ReleaseNotice } from "@/components/disclosure/release-notice";
+import { outcomeOf } from "@/lib/disclosure/keyed";
+import { useKeyedLoad } from "@/lib/disclosure/use-keyed-load";
 import { Panel, SectionNav } from "@/components/oversight/panel";
 import { PageHeader } from "@/components/page-header";
 import { Field } from "@/components/reference/form-bits";
@@ -38,49 +41,24 @@ export function NetworkPageView() {
   const [input, setInput] = useState("");
   const [ticker, setTicker] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>();
-  const [live, setLive] = useState<DependencyView | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
+  // "Show" and every edit bump this so the same inputs fetch again
   const [nonce, setNonce] = useState(0);
-  const [portfolio, setPortfolio] = useState<PortfolioDependencies | null>(null);
 
   const sample = ticker === null;
 
-  useEffect(() => {
-    if (sample) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await getBrowserApiClient().GET("/disclosures/portfolio/dependencies", { params: { query: { as_of: new Date(cutoff).toISOString() } } });
-        if (!cancelled) setPortfolio(r.data ?? null);
-      } catch {
-        if (!cancelled) setPortfolio(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [sample, cutoff, nonce]);
-
-  useEffect(() => {
-    if (!ticker) return;
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const r = await getBrowserApiClient().GET("/disclosures/holdings/{ticker}/dependencies", { params: { path: { ticker }, query: { as_of: new Date(cutoff).toISOString(), shock } } });
-        if (cancelled) return;
-        if (r.data) {
-          setFailure(null);
-          setLive(r.data);
-        } else setFailure(r.response.status === 401 || r.response.status === 403 ? "Sign in again (with MFA) and retry." : `The dependency read failed (HTTP ${r.response.status}).`);
-      } catch (e) {
-        if (!cancelled) setFailure(`Backend unreachable: ${e instanceof Error ? e.message : String(e)}`);
-      }
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [ticker, cutoff, shock, nonce]);
+  // keyed by the inputs that produced it: a failed refetch never shows old data under new inputs, and an HTTP error is an error
+  const portfolioState = useKeyedLoad<PortfolioDependencies>(sample ? null : `${cutoff}`, "The portfolio dependencies", async () => {
+    const r = await getBrowserApiClient().GET("/disclosures/portfolio/dependencies", { params: { query: { as_of: new Date(cutoff).toISOString() } } });
+    return outcomeOf("The portfolio dependencies", r);
+  }, nonce);
+  const liveState = useKeyedLoad<DependencyView>(ticker ? `${ticker}:${cutoff}:${shock}` : null, "The dependency read", async () => {
+    const r = await getBrowserApiClient().GET("/disclosures/holdings/{ticker}/dependencies", { params: { path: { ticker: ticker as string }, query: { as_of: new Date(cutoff).toISOString(), shock } } });
+    return outcomeOf("The dependency read", r);
+  }, nonce, 250);
+  const live = liveState?.state === "ready" ? liveState.data : null;
+  const failure = liveState?.state === "error" ? liveState.message : null;
+  const portfolio = portfolioState?.state === "ready" ? portfolioState.data : null;
+  const portfolioFailure = portfolioState?.state === "error" ? portfolioState.message : null;
 
   const view = useMemo(() => (sample ? sampleDependencies(cutoff, shock) : live), [sample, cutoff, shock, live]);
   const holdings = useMemo(() => (sample ? samplePortfolio(cutoff) : view ? [{ ticker: view.ticker, weight: 1, claims: view.claims }] : []), [sample, cutoff, view]);
@@ -88,7 +66,6 @@ export function NetworkPageView() {
   function apply(e: React.FormEvent) {
     e.preventDefault();
     const t = input.trim();
-    setLive(null);
     if (t === "") {
       setError(undefined);
       setTicker(null);
@@ -99,6 +76,7 @@ export function NetworkPageView() {
     setError(undefined);
     setCutoff(until);
     setTicker(t.toUpperCase());
+    setNonce((n) => n + 1); // the same inputs still refetch
   }
 
   return (
@@ -109,6 +87,8 @@ export function NetworkPageView() {
         description="Who a company says it sells to and buys from, how much of its revenue that is, and what is still unknown. Only confirmed claims carry numbers."
         aside={<span>{ticker ?? SAMPLE_DEP_TICKER} · as known on {formatDay(new Date(cutoff).toISOString())}</span>}
       />
+
+      <ReleaseNotice page="network" />
 
       {sample ? (
         <p role="note" className="border border-dashed border-border bg-surface-muted px-3 py-2 text-sm">
@@ -148,27 +128,27 @@ export function NetworkPageView() {
       <SectionNav sections={SECTIONS} />
 
       <Panel id="graph" title="Who it depends on" description="The company in the middle, with an arrow for each way money flows. Line weight is the reported share.">
-        {view ? <DependencyGraph ticker={view.ticker} claims={view.claims} /> : <p className="text-sm text-text-muted">Loading claims…</p>}
+        {view ? <DependencyGraph ticker={view.ticker} claims={view.claims} /> : <p className="text-sm text-text-muted">{failure ? "Not loaded." : "Loading claims…"}</p>}
       </Panel>
 
       <Panel id="concentration" title="Concentration" description="Customers ranked by reported share. The open bar is what no confirmed claim accounts for.">
-        {view ? <ConcentrationBars groups={view.concentration} /> : <p className="text-sm text-text-muted">Loading…</p>}
+        {view ? <ConcentrationBars groups={view.concentration} /> : <p className="text-sm text-text-muted">{failure ? "Not loaded." : "Loading…"}</p>}
       </Panel>
 
       <Panel id="scenario" title="If a customer shrinks" description="How far a fall in one customer’s revenue could reach, over confirmed shares only and at most two steps.">
-        {view ? <ScenarioView scenarios={view.scenarios} shock={shock} onShock={setShock} names={sample ? SAMPLE_NAMES : {}} /> : <p className="text-sm text-text-muted">Loading…</p>}
+        {view ? <ScenarioView scenarios={view.scenarios} shock={shock} onShock={setShock} names={sample ? SAMPLE_NAMES : {}} /> : <p className="text-sm text-text-muted">{failure ? "Not loaded." : "Loading…"}</p>}
       </Panel>
 
       <Panel id="review" title="Waiting for review" description="Claims a machine found that nobody has confirmed. Each shows the passage it came from.">
-        {view ? <SuggestedEdges ticker={view.ticker} claims={view.claims} editable={!sample} onChanged={() => setNonce((n) => n + 1)} /> : <p className="text-sm text-text-muted">Loading…</p>}
+        {view ? <SuggestedEdges ticker={view.ticker} claims={view.claims} editable={!sample} onChanged={() => setNonce((n) => n + 1)} /> : <p className="text-sm text-text-muted">{failure ? "Not loaded." : "Loading…"}</p>}
       </Panel>
 
       <Panel id="conflicts" title="Where reporters disagree" description="When the company and one of its counterparties tell different stories, both are kept.">
-        {view ? <ConflictList conflicts={view.conflicts} claims={view.claims} inbound={view.inbound_claims} /> : <p className="text-sm text-text-muted">Loading…</p>}
+        {view ? <ConflictList conflicts={view.conflicts} claims={view.claims} inbound={view.inbound_claims} /> : <p className="text-sm text-text-muted">{failure ? "Not loaded." : "Loading…"}</p>}
       </Panel>
 
       <Panel id="weights" title="Your own estimates" description="Weights you assign where no filing gives one. Kept apart from reported figures.">
-        {view ? <OwnerWeights ticker={view.ticker} weights={view.owner_weights} editable={!sample} onChanged={() => setNonce((n) => n + 1)} /> : <p className="text-sm text-text-muted">Loading…</p>}
+        {view ? <OwnerWeights ticker={view.ticker} weights={view.owner_weights} editable={!sample} onChanged={() => setNonce((n) => n + 1)} /> : <p className="text-sm text-text-muted">{failure ? "Not loaded." : "Loading…"}</p>}
       </Panel>
 
       <Panel id="portfolio" title="Across the portfolio" description="Where portfolio weight reaches a confirmed customer.">
@@ -177,7 +157,7 @@ export function NetworkPageView() {
         ) : portfolio ? (
           <LivePortfolio data={portfolio} />
         ) : (
-          <p className="text-sm text-text-muted">Loading the portfolio…</p>
+          portfolioFailure ? <p role="alert" className="border border-warning-signal/40 bg-warning-signal-subtle px-3 py-2 text-sm">{portfolioFailure}</p> : <p className="text-sm text-text-muted">Loading the portfolio…</p>
         )}
       </Panel>
     </div>

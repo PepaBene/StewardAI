@@ -30,7 +30,25 @@ GATES: Mapping[str, tuple[int, Decimal]] = {
     "ownership_match": (50, Decimal("0.98")),
     "statement_note": (30, Decimal("0.98")),
     "document_sample": (10, Decimal("0.98")),
+    "deal_state": (30, Decimal("0.95")),
 }
+
+#: Who made a label. The gate reads a person's own labels and suggestions a person accepted; a
+#: label written by a model alone never counts.
+GATE_KINDS = ("person", "accepted_suggestion")
+ADJUDICATOR_KINDS = (*GATE_KINDS, "model")
+
+#: A deal-state label: the state the document supports, or that it is not a deal at all.
+DEAL_STATE_LABELS = (
+    "rumored",
+    "announced",
+    "definitive",
+    "approved",
+    "closed",
+    "terminated",
+    "contested",
+    "not_a_deal",
+)
 
 #: Passages that are NOT current reported relationships. They go into a relationship sample unmarked
 #: so a reviewer who labels one `true_relationship` is caught.
@@ -81,11 +99,15 @@ def shuffle_in(items: list[SampleItem], planted: list[SampleItem], seed: str) ->
 
 
 async def relationship_sample(pool: Pool, n: int = 100, seed: str = "p5.1") -> list[SampleItem]:
+    """`n` real claims plus the planted false positives on top, so a sample of the gate's size
+    can meet it. Claims a person already rejected are not drawn: the machine no longer asserts
+    them, so labelling one would count a known miss twice."""
     rows = await pool.fetch(
-        "select id, passage, status from public.relationship_disclosure order by id"
+        "select id, passage, status from public.relationship_disclosure"
+        " where status <> 'rejected' order by id"
     )
     by_id = {str(r["id"]): r for r in rows}
-    real = pick(list(by_id), max(0, n - 7), seed)
+    real = pick(list(by_id), max(0, n), seed)
     items = [
         SampleItem(
             f"claim:{i}",
@@ -158,6 +180,31 @@ async def ownership_sample(pool: Pool, n: int = 50, seed: str = "p3.7") -> list[
     ]
 
 
+async def deal_state_sample(pool: Pool, n: int = 30, seed: str = "p6.8") -> list[SampleItem]:
+    """Stored deal states with the passage each one rests on. The person reads the passage and
+    names the state it supports (or says it is not a deal); the chronology is shown so an
+    out-of-order state can be caught."""
+    rows = await pool.fetch(
+        """select t.id, t.state, t.effective_at, t.known_at, e.quote, d.title,
+                  (select string_agg(p.state, ' > ' order by p.known_at, p.id)
+                     from public.deal_state_transition p where p.deal_id = t.deal_id) as chain
+             from public.deal_state_transition t
+             join public.deal_event d on d.id = t.deal_id
+             join public.source_evidence e on e.id = t.evidence_id
+            order by t.id"""
+    )
+    by_ref = {f"transition:{r['id']}": r for r in rows}
+    return [
+        SampleItem(
+            ref,
+            f"{r['title'] or 'Deal'}: “{(r['quote'] or '').strip()[:600]}”",
+            r["state"],
+            (f"effective {r['effective_at']:%Y-%m-%d}", f"states: {r['chain'] or r['state']}"),
+        )
+        for ref, r in ((ref, by_ref[ref]) for ref in pick(list(by_ref), n, seed))
+    ]
+
+
 def valid_label(dataset: str, human_value: str) -> bool:
     if dataset == "relationship_claim":
         return human_value in AUDIT_LABELS
@@ -165,6 +212,8 @@ def valid_label(dataset: str, human_value: str) -> bool:
         return human_value in ECONOMIC_CLASSES
     if dataset == "ownership_match":
         return human_value in OWNERSHIP_LABELS
+    if dataset == "deal_state":
+        return human_value in DEAL_STATE_LABELS
     return bool(human_value.strip())
 
 
@@ -189,20 +238,25 @@ async def record(
     human_value: str,
     by: str,
     note: str | None = None,
+    kind: str = "person",
 ) -> int:
+    """Store one label. `kind` says who made it: `person` (their own reading),
+    `accepted_suggestion` (they accepted a model's label in bulk) or `model` (no person)."""
     if dataset not in GATES:
         raise ValueError(f"unknown dataset {dataset!r}")
     if not valid_label(dataset, human_value):
         raise ValueError(f"{human_value!r} is not a label for {dataset}")
+    if kind not in ADJUDICATOR_KINDS:
+        raise ValueError(f"unknown adjudicator kind {kind!r}")
     planted = item_ref.startswith("planted:")
     row_id = await pool.fetchval(
         """insert into public.disclosure_adjudication
              (dataset, sample_key, item_ref, machine_value, human_value, correct,
-              planted_false_positive, note, adjudicated_by)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+              planted_false_positive, note, adjudicated_by, adjudicator_kind)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
            on conflict (dataset, sample_key, item_ref, adjudicated_by) do update set
              human_value = excluded.human_value, correct = excluded.correct, note = excluded.note,
-             adjudicated_at = now()
+             adjudicator_kind = excluded.adjudicator_kind, adjudicated_at = now()
            returning id""",
         dataset,
         sample_key,
@@ -213,6 +267,7 @@ async def record(
         planted,
         note,
         by,
+        kind,
     )
     return int(row_id)
 
@@ -332,8 +387,10 @@ async def measure(pool: Pool, dataset: str, sample_key: str) -> Gate:
     rows = await pool.fetch(
         """select item_ref, correct, planted_false_positive, human_value
              from public.disclosure_adjudication
-            where dataset = $1 and sample_key = $2 order by adjudicated_at, id""",
+            where dataset = $1 and sample_key = $2 and adjudicator_kind = any($3::text[])
+            order by adjudicated_at, id""",
         dataset,
         sample_key,
+        list(GATE_KINDS),
     )
     return measure_labels(dataset, [dict(r) for r in rows], sample_key)

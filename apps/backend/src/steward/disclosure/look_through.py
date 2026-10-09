@@ -39,6 +39,7 @@ class FundLine:
     """The fund's share in this company as a fraction (0.05 = 5 %); None when not reported."""
     report_period_end: dt.date
     known_at: dt.datetime
+    note: str | None = None
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,88 @@ class Relationship:
     fiscal_period: str | None
     known_at: dt.datetime
     source_url: str | None = None
+    denominator_kind: str | None = None
+    period_end: dt.date | None = None
+    claim_label: str | None = None
+
+    @property
+    def revenue_share(self) -> bool:
+        """The share is a share of the reporter's total revenue. A share of segment revenue,
+        purchases or receivables is a different quantity and never meets the concentration bar."""
+        if self.denominator_kind is not None:
+            return self.denominator_kind == "total_revenue"
+        return self.share_basis == "issuer_revenue"
+
+
+def latest_relationships(rels: Sequence[Relationship]) -> list[Relationship]:
+    """Keep only the latest fiscal period per (reporter, relationship, counterparty).
+
+    An older year's customer share must not count as today's. A counterparty with no key, name or
+    label cannot be matched across periods, so each such row stays as it is."""
+    groups: dict[tuple[str, str, str], list[Relationship]] = defaultdict(list)
+    out: list[Relationship] = []
+    for r in rels:
+        ident = r.counterparty_key or r.counterparty_name or r.claim_label
+        if ident is None:
+            out.append(r)
+        else:
+            groups[(r.ticker, r.relationship, ident.lower())].append(r)
+    for rows in groups.values():
+        latest = max((r.period_end or dt.date.min, r.fiscal_period or "") for r in rows)
+        out.extend(
+            r for r in rows if (r.period_end or dt.date.min, r.fiscal_period or "") == latest
+        )
+    out.sort(key=lambda r: (r.ticker, r.relationship, r.known_at))
+    return out
+
+
+def assign_fund_lines(rows: Sequence[Mapping[str, Any]], held: set[str]) -> list[FundLine]:
+    """One FundLine per fund holding line, however many held instruments share the issuer.
+
+    `rows` are LATEST_FUND_SQL rows: one per (fund holding line, candidate instrument). A line
+    whose ISIN equals exactly one candidate's ISIN goes to that candidate; otherwise it goes to the
+    lowest ticker among the held candidates (or among all, if none is held) with a note. The line
+    is never counted twice."""
+    lines: dict[tuple[Any, Any], list[Mapping[str, Any]]] = {}
+    for r in rows:
+        lines.setdefault((r["accession"], r["row_index"]), []).append(r)
+    out: list[FundLine] = []
+    for cands in lines.values():
+        first = cands[0]
+        tickers = sorted({c["held_ticker"] for c in cands if c["held_ticker"]})
+        pool = [t for t in tickers if t in held] or tickers
+        chosen: str | None = None
+        note: str | None = None
+        if len(pool) == 1:
+            chosen = pool[0]
+        elif pool:
+            line_isin = first.get("line_isin")
+            exact = sorted(
+                {
+                    c["held_ticker"]
+                    for c in cands
+                    if c["held_ticker"] in pool
+                    and line_isin
+                    and c.get("instrument_isin") == line_isin
+                }
+            )
+            if len(exact) == 1:
+                chosen = exact[0]
+            else:
+                chosen = pool[0]
+                note = f"shared by {len(pool)} held share classes; not split"
+        out.append(
+            FundLine(
+                first["fund_ticker"],
+                chosen,
+                first["issuer_name"],
+                None if first["pct_value"] is None else Decimal(first["pct_value"]) / HUNDRED,
+                first["report_period_end"],
+                first["known_at"],
+                note,
+            )
+        )
+    return out
 
 
 def _s(v: Decimal | None) -> str | None:
@@ -91,8 +174,11 @@ def build(
                 "mapped_pct": Decimal(0),
                 "unmapped_pct": Decimal(0),
                 "unknown_lines": 0,
+                "notes": [],
             },
         )
+        if ln.note and ln.note not in view["notes"]:
+            view["notes"].append(ln.note)
         if ln.pct is None:
             view["unknown_lines"] += 1
             continue
@@ -110,6 +196,7 @@ def build(
                 "contribution": _s(contribution),
                 "report_period_end": ln.report_period_end,
                 "lag_days": view["lag_days"],
+                "note": ln.note,
             }
         )
     exposure: dict[str, dict[str, Any]] = {}
@@ -132,6 +219,7 @@ def build(
     # relationships --------------------------------------------------------------------------
     rel_rows: list[dict[str, Any]] = []
     by_ticker: dict[str, list[Relationship]] = defaultdict(list)
+    relationships = latest_relationships(relationships)
     for r in relationships:
         if r.ticker in weight_of:
             by_ticker[r.ticker].append(r)
@@ -147,6 +235,7 @@ def build(
                     "anonymous": r.anonymous,
                     "share": _s(r.share),
                     "share_basis": r.share_basis,
+                    "denominator_kind": r.denominator_kind,
                     "fiscal_period": r.fiscal_period,
                     "known_at": r.known_at,
                     "source_url": r.source_url,
@@ -155,6 +244,7 @@ def build(
                     "weight_state": "unknown" if r.share is None else "reported",
                     "concentrated_customer": (
                         r.relationship == "customer"
+                        and r.revenue_share
                         and r.share is not None
                         and r.share >= CONCENTRATION_SHARE
                     ),
@@ -167,7 +257,7 @@ def build(
     customer_known = {
         t
         for t, rs in by_ticker.items()
-        if any(r.relationship == "customer" and r.share is not None for r in rs)
+        if any(r.relationship == "customer" and r.revenue_share and r.share is not None for r in rs)
     }
 
     # deals ----------------------------------------------------------------------------------
@@ -190,7 +280,11 @@ def build(
 
     largest = {
         t: weight_of[t]
-        * max(r.share for r in rs if r.relationship == "customer" and r.share is not None)
+        * max(
+            r.share
+            for r in rs
+            if r.relationship == "customer" and r.revenue_share and r.share is not None
+        )
         for t, rs in by_ticker.items()
         if t in customer_known
     }
@@ -267,7 +361,8 @@ def build(
 
 LATEST_FUND_SQL = """
 select f.matched_ticker as fund_ticker, n.t212_ticker as held_ticker, h.issuer_name,
-       h.pct_value, f.report_period_end, f.known_at
+       h.pct_value, f.report_period_end, f.known_at, f.accession, h.row_index,
+       h.isin as line_isin, n.isin as instrument_isin
   from (select distinct on (matched_ticker)
                accession, matched_ticker, report_period_end, known_at
           from public.nport_filing
@@ -281,7 +376,8 @@ select f.matched_ticker as fund_ticker, n.t212_ticker as held_ticker, h.issuer_n
 
 REL_SQL = """
 select ticker, relationship, counterparty_key, counterparty_name, anonymous_counterparty,
-       reported_share, share_basis, fiscal_period, known_at, source_url
+       reported_share, share_basis, denominator_kind, period_end, claim_label, fiscal_period,
+       known_at, source_url
   from public.relationship_disclosure
  where ticker = any($1::text[]) and status = 'confirmed' and known_at <= $2
    and relationship in ('customer', 'supplier') order by ticker, id
@@ -293,17 +389,7 @@ async def look_through_view(pool: Pool, as_of: dt.datetime | None = None) -> dic
     holdings, snapshot = await cr.load_holdings(pool, when)
     tickers = sorted(h.ticker for h in holdings)
     fund_rows = await pool.fetch(LATEST_FUND_SQL, tickers, when) if tickers else []
-    lines = [
-        FundLine(
-            r["fund_ticker"],
-            r["held_ticker"],
-            r["issuer_name"],
-            None if r["pct_value"] is None else Decimal(r["pct_value"]) / HUNDRED,
-            r["report_period_end"],
-            r["known_at"],
-        )
-        for r in fund_rows
-    ]
+    lines = assign_fund_lines(fund_rows, set(tickers))
     reach = sorted({ln.held_ticker for ln in lines if ln.held_ticker} | set(tickers))
     rels = [
         Relationship(
@@ -317,6 +403,9 @@ async def look_through_view(pool: Pool, as_of: dt.datetime | None = None) -> dic
             r["fiscal_period"],
             r["known_at"],
             r["source_url"],
+            r["denominator_kind"],
+            r["period_end"],
+            r["claim_label"],
         )
         for r in (await pool.fetch(REL_SQL, reach, when) if reach else [])
     ]

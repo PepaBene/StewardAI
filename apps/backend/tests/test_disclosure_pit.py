@@ -170,6 +170,9 @@ class _FailingPool:
             return [{"ticker": "AAA"}]
         raise asyncpg.PostgresError("collection unavailable")
 
+    async def fetchrow(self, sql: str, *args: Any) -> Any:
+        raise asyncpg.PostgresError("collection unavailable")
+
     async def fetchval(self, sql: str, *args: Any) -> Any:
         self.writes += 1
         return 1
@@ -178,7 +181,8 @@ class _FailingPool:
 def test_a_collection_failure_counts_as_failed_and_never_alerts() -> None:
     pool = _FailingPool()
     totals = asyncio.run(alerts.scan_all(pool, at(10)))  # type: ignore[arg-type]
-    assert totals["failed"] == 1
+    # every scan fails on its own and is counted; none stops the others
+    assert totals["failed"] >= 1
     assert pool.writes == 0
     assert sum(v for k, v in totals.items() if k != "failed") == 0
 

@@ -8,8 +8,10 @@ function ItemList({ items, empty }: { items: readonly ReplayItem[]; empty: strin
       {items.map((i) => (
         <li key={`${i.ref}-${i.label}`}>
           {i.label}
+          {i.change === "changed" ? <span className="text-text-muted"> · changed since</span> : null}
           {i.known_at ? <span className="text-text-muted"> · known <span className="num">{formatDay(i.known_at)}</span></span> : null}
           {i.detail ? <span className="block text-xs text-text-muted">{i.detail}</span> : null}
+          {i.change === "changed" && i.was ? <span className="block text-xs text-text-muted">Then: {i.was}</span> : null}
         </li>
       ))}
     </ul>

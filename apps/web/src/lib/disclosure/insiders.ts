@@ -85,8 +85,9 @@ export function netFromTransactions(txs: readonly InsiderTx[], cutoffMs: number)
   for (const window of WINDOWS) {
     for (const role of ROLES) {
       const inRole = known.filter((t) => (role === "all" || t.role === role) && t.tx_date != null && Date.parse(t.tx_date) <= cutoffMs && Date.parse(t.tx_date) > cutoffMs - window * DAY);
-      const buy = inRole.filter((t) => t.economic_class === "open_market_buy" && t.countable);
-      const sell = inRole.filter((t) => t.economic_class === "open_market_sell" && t.countable);
+      const tradeRows = inRole.filter((t) => (t.economic_class === "open_market_buy" || t.economic_class === "open_market_sell") && !t.derivative);
+      const buy = inRole.filter((t) => t.economic_class === "open_market_buy" && t.countable && !t.bundled);
+      const sell = inRole.filter((t) => t.economic_class === "open_market_sell" && t.countable && !t.bundled);
       const sum = (rows: InsiderTx[]) => rows.reduce((a, t) => a + (num(t.value) ?? 0), 0);
       const people = new Set([...buy, ...sell].map((t) => t.insider));
       out.push({
@@ -97,20 +98,40 @@ export function netFromTransactions(txs: readonly InsiderTx[], cutoffMs: number)
         netValue: sum(buy) - sum(sell),
         insiders: people.size,
         trades: buy.length + sell.length,
-        planExcluded: inRole.filter((t) => t.plan === "plan" && (t.economic_class === "open_market_buy" || t.economic_class === "open_market_sell")).length,
+        // Same order as `net_by_role`: bundled is decided first, then plan, over open-market lines only.
+        planExcluded: tradeRows.filter((t) => !t.bundled && t.plan === "plan").length,
         planUnknown: [...buy, ...sell].filter((t) => t.plan === "unknown").length,
-        bundled: inRole.filter((t) => t.bundled && t.economic_class === "open_market_sell").length,
+        bundled: tradeRows.filter((t) => t.bundled).length,
       });
     }
   }
   return out;
 }
 
-/** Bars for one window: one row per role that has any discretionary trade, plus a labelled zero row for the rest. */
+/** The server's own net rows (`view.net`) as page rows, so live data does not depend on this file's copy of the rules. */
+export function netFromApi(net: readonly InsiderNet[]): NetRowOut[] {
+  return net
+    .filter((n) => (WINDOWS as readonly number[]).includes(n.window_days) && (ROLES as readonly string[]).includes(n.role))
+    .map((n) => ({
+      role: n.role as RoleKey,
+      window: n.window_days as Window,
+      netValue: num(n.net_value) ?? 0,
+      buyValue: num(n.buy_value) ?? 0,
+      sellValue: num(n.sell_value) ?? 0,
+      insiders: n.insiders,
+      trades: n.trades,
+      planExcluded: n.plan_trades_excluded,
+      planUnknown: n.plan_unknown_trades,
+      bundled: n.bundled_sales_excluded,
+    }));
+}
+
+/** Bars for one window. A role with no discretionary trade has no bar (null) and says "no trades": missing is not a zero net. */
 export function netBars(rows: readonly NetRowOut[], window: Window): DivergingBarRow[] {
   return ROLES.filter((r) => r !== "all").map((role) => {
     const r = rows.find((x) => x.role === role && x.window === window);
-    return { label: ROLE_LABEL[role], value: r && r.trades > 0 ? r.netValue : r ? 0 : null };
+    const traded = r != null && r.trades > 0;
+    return { label: traded ? ROLE_LABEL[role] : `${ROLE_LABEL[role]} (no trades)`, value: traded ? r.netValue : null };
   });
 }
 

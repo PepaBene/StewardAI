@@ -217,6 +217,18 @@ async def disclosure_alert_lines(
     return [DisclosureAlertLine(**dict(r)) for r in rows]
 
 
+async def disclosure_alert_overflow(
+    pool: asyncpg.Pool, start: dt.datetime, end: dt.datetime
+) -> int:
+    """How many alerts of the window did not fit in the digest's list."""
+    total: int = await pool.fetchval(
+        "select count(*) from public.disclosure_alert where created_at >= $1 and created_at < $2",
+        start,
+        end,
+    )
+    return max(0, int(total or 0) - MAX_DISCLOSURE_LINES)
+
+
 class DigestBody(BaseModel):
     kind: DigestKind
     window_start: dt.datetime
@@ -256,6 +268,9 @@ class DigestBody(BaseModel):
     disclosure_alerts: list[DisclosureAlertLine] = Field(
         default_factory=list,
         description="Public-disclosure alerts raised in the period (newest first, at most 30).",
+    )
+    disclosure_alerts_more: int = Field(
+        default=0, description="Alerts of the period left out of the list above."
     )
 
 
@@ -829,6 +844,8 @@ def render_text(body: DigestBody, app_url: str | None, markdown: bool) -> str:
     if body.disclosure_alerts:
         lines += ["", "## Public disclosures" if markdown else "PUBLIC DISCLOSURES"]
         lines += [f"- {a.ticker}: {a.headline}" for a in body.disclosure_alerts]
+        if body.disclosure_alerts_more:
+            lines.append(f"- and {body.disclosure_alerts_more} more on the disclosure alerts page")
     if body.holidays:
         lines += ["", "## Market holidays" if markdown else "MARKET HOLIDAYS"]
         lines += [f"- {h.date.isoformat()} {h.calendar}: {h.name}" for h in body.holidays]
@@ -891,6 +908,7 @@ async def build_digest(
         macro=await macro_figures(pool, start),
         holidays=await market_holidays(pool, start, end),
         disclosure_alerts=await disclosure_alert_lines(pool, start, end),
+        disclosure_alerts_more=await disclosure_alert_overflow(pool, start, end),
         ownership_changes=await tracked_manager_changes(pool, tracked_ciks or [], since=start)
         if tracked_ciks
         else [],

@@ -6,6 +6,8 @@
 -- apps/backend/tests/test_lifecycle_phase8.py::test_each_rollback_restores_the_schema_its_migration_changed
 -- (needs a database, STEWARD_TEST_DATABASE_URL). Rehearse on a copy before applying to production.
 
+-- quality_review_event is append-only; lift the guard for this transaction only.
+select set_config('steward.allow_append_only_changes', 'on', true);
 delete from public.quality_review_event
  where review_id in (select id from public.quality_review where subject_type = 'estimate_value');
 delete from public.quality_review where subject_type = 'estimate_value';

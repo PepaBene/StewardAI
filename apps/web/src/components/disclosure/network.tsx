@@ -276,19 +276,21 @@ export function ScenarioView({ scenarios, shock, onShock, names }: { scenarios: 
           {s.impacts.length === 0 ? <p className="text-sm text-text-muted">No confirmed supplier link with a reported share.</p> : null}
           <ul className="space-y-2">
             {s.impacts.map((i) => {
-              const lo = fraction(i.lower) ?? 0;
-              const up = fraction(i.upper) ?? 0;
+              // an unknown bound is unknown, never 0%: no bar is drawn and the text says so
+              const lo = fraction(i.lower);
+              const up = fraction(i.upper);
+              const known = lo != null && up != null;
               return (
                 <li key={`${i.entity}-${i.hop}`} className="grid grid-cols-[minmax(8rem,14rem)_1fr_9rem] items-center gap-3 text-sm">
                   <span>
                     {name(i.entity)}
                     <span className="block text-xs text-text-muted">{i.hop === 1 ? "Directly" : "Second step"}, {formatShare(i.coverage)} of its revenue is covered by confirmed claims</span>
                   </span>
-                  <span className="relative block h-4 border border-border bg-surface-raised" role="img" aria-label={`Revenue falls between ${formatShare(lo, 1)} and ${formatShare(up, 1)}`}>
-                    <span className="absolute inset-y-0 left-0" style={{ width: `${Math.min(100, up * 100)}%`, backgroundImage: HATCH }} />
-                    <span className="absolute inset-y-0 left-0" style={{ width: `${Math.min(100, lo * 100)}%`, background: "var(--chart-line)" }} />
+                  <span className="relative block h-4 border border-border bg-surface-raised" role="img" aria-label={known ? `Revenue falls between ${formatShare(lo, 1)} and ${formatShare(up, 1)}` : "The bounds on this revenue effect are unknown"}>
+                    {known ? <span className="absolute inset-y-0 left-0" style={{ width: `${Math.min(100, up * 100)}%`, backgroundImage: HATCH }} /> : null}
+                    {known ? <span className="absolute inset-y-0 left-0" style={{ width: `${Math.min(100, lo * 100)}%`, background: "var(--chart-line)" }} /> : null}
                   </span>
-                  <span className="num text-right">{formatShare(lo, 1)} to {formatShare(up, 1)}</span>
+                  <span className="num text-right">{known ? `${formatShare(lo, 1)} to ${formatShare(up, 1)}` : "bounds unknown"}</span>
                 </li>
               );
             })}

@@ -369,12 +369,18 @@ async def test_review_decision_is_audited_and_excludes_rejected_claims(
         pool, r_anon, "approved", "owner:x", "table shows Customer A 23%"
     )
     assert approved["status"] == "approved"
-    verified = {c["id"] for c in await asof.claims_as_of(pool, acme, AFTER, verified_only=True)}
+    decided = dt.datetime.now(UTC)  # decisions are stamped with the wall clock
+    verified = {c["id"] for c in await asof.claims_as_of(pool, acme, decided, verified_only=True)}
     assert verified == {anon}
+    # a decision made after the cutoff never rewrites what was known at the cutoff (audit 4.1)
+    assert await asof.claims_as_of(pool, acme, AFTER, verified_only=True) == []
 
     await review.decide(pool, r_named, "rejected", "owner:x", "different Globex entity")
-    visible = {c["id"] for c in await asof.claims_as_of(pool, acme, AFTER)}
+    later = dt.datetime.now(UTC)
+    visible = {c["id"] for c in await asof.claims_as_of(pool, acme, later)}
     assert visible == {anon}  # rejected is excluded from authoritative reads but still stored
+    before = {c["id"] for c in await asof.claims_as_of(pool, acme, AFTER)}
+    assert before == {named, anon}  # at AFTER neither had been decided
     assert await pool.fetchval("select count(*) from public.extracted_claim") == 2
     with pytest.raises(review.ReviewError, match="already decided"):
         await review.decide(pool, r_named, "approved", "owner:x", "again")

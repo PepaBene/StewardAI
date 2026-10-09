@@ -67,10 +67,35 @@ def monetary_currency(doc: ParsedDocument) -> str | None:
     return counts.most_common(1)[0][0] if counts else None
 
 
+def _stated_period_end(doc: ParsedDocument) -> dt.date | None:
+    """The cover page's `dei:DocumentPeriodEndDate`, when it was read as a fact."""
+    for f in doc.facts:
+        if not f.name.endswith("DocumentPeriodEndDate"):
+            continue
+        text = " ".join(f.raw_text.split())
+        for fmt in ("%Y-%m-%d", "%B %d, %Y", "%b %d, %Y", "%d %B %Y"):
+            try:
+                return dt.datetime.strptime(text, fmt).date()
+            except ValueError:
+                continue
+    return None
+
+
 def period_end_of(doc: ParsedDocument) -> dt.date | None:
-    """The reporting period end: the latest duration end among the contexts that carry one."""
-    ends = [c.end for c in doc.contexts.values() if c.end is not None and not c.dimensions]
-    return max(ends) if ends else None
+    """The reporting period end: the cover page's stated date, else the duration end that most
+    of the filing's facts use. Not the latest end: a forward-dated context (a commitment or a
+    guidance period) would otherwise become the reporting period."""
+    stated = _stated_period_end(doc)
+    if stated is not None:
+        return stated
+    plain = {k: c.end for k, c in doc.contexts.items() if c.end is not None and not c.dimensions}
+    used = Counter(
+        plain[ref] for f in doc.facts if (ref := f.context_ref) is not None and ref in plain
+    )
+    if used:
+        top = max(used.values())
+        return max(end for end, n in used.items() if n == top)
+    return max(plain.values()) if plain else None
 
 
 def _blocks(doc: ParsedDocument) -> list[tuple[str, TextBlock]]:

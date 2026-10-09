@@ -370,7 +370,8 @@ class Repurchase:
 
 
 def check_repurchase(r: Repurchase) -> Check:
-    """A buyback is only usable with its period and class; the implied price must be positive."""
+    """A buyback is only usable with its period and class; the implied price must be positive.
+    A reported zero (nothing bought back in the period) is a value, not a missing one."""
     tol = DEFAULT_TOLERANCE
     missing = [
         n
@@ -380,11 +381,13 @@ def check_repurchase(r: Repurchase) -> Check:
             ("period", r.period_end),
             ("class", r.share_class),
         )
-        if not v
+        if v is None or v == ""
     ]
     if missing:
         return _review("repurchase", tol, f"missing {', '.join(missing)}")
     assert r.value is not None and r.shares is not None
+    if r.value == 0 and r.shares == 0:
+        return Check("repurchase", True, None, None, tol, "no shares repurchased in the period")
     if r.value <= 0 or r.shares <= 0:
         return _review("repurchase", tol, "value and shares must both be positive")
     price = r.value / r.shares

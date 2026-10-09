@@ -71,9 +71,11 @@ async def candidates_for(
 async def pending(pool: Pool, limit: int = 50) -> list[PartySuggestion]:
     """Participants without an issuer, each with the issuers its name could belong to."""
     rows = await pool.fetch(
-        """select p.id, p.deal_id, p.role, p.name, p.known_at
+        f"""select p.id, p.deal_id, p.role, p.name, p.known_at
              from public.deal_participant p
-            where p.issuer_id is null order by p.id limit $1""",
+            where not exists (select 1 from ({effective_match_sql("now()")}) m
+                               where m.participant_id = p.id and m.decision = 'confirmed')
+            order by p.id limit $1""",  # noqa: S608 - fixed fragments, no input
         limit,
     )
     out: list[PartySuggestion] = []
@@ -81,8 +83,11 @@ async def pending(pool: Pool, limit: int = 50) -> list[PartySuggestion]:
         rejected = {
             int(x["issuer_id"])
             for x in await pool.fetch(
-                """select issuer_id from public.deal_participant_decision
-                    where participant_id = $1 and decision = 'rejected'""",
+                """select issuer_id from (
+                     select distinct on (issuer_id) issuer_id, decision
+                       from public.deal_participant_decision where participant_id = $1
+                      order by issuer_id, decided_at desc, id desc) latest
+                    where decision = 'rejected'""",
                 r["id"],
             )
         }
@@ -102,14 +107,43 @@ async def pending(pool: Pool, limit: int = 50) -> list[PartySuggestion]:
     return out
 
 
+# The issuer a participant is matched to as of a moment: the latest decision made by then, and only
+# if that decision is a confirmation. Reads use this, never `deal_participant.issuer_id`, which
+# is a convenience copy of the present and says nothing about the past. `$n` is the as-of.
+EFFECTIVE_MATCH_SQL = """
+  select distinct on (pair.participant_id) pair.participant_id, pair.issuer_id, pair.decision
+    from (select distinct on (d.participant_id, d.issuer_id)
+                 d.participant_id, d.issuer_id, d.decision, d.decided_at, d.id
+            from public.deal_participant_decision d
+           where d.decided_at <= {as_of}
+           order by d.participant_id, d.issuer_id, d.decided_at desc, d.id desc) pair
+   order by pair.participant_id, (pair.decision = 'confirmed') desc, pair.decided_at desc,
+            pair.id desc
+"""
+
+
+def effective_match_sql(as_of_param: str) -> str:
+    """SQL rows (participant_id, issuer_id, decision), one per participant, from the decisions made
+    at or before the parameter. Decisions are append-only; for each issuer the latest one stands,
+    so rejecting one issuer never clears a confirmation of another. A participant whose row says
+    `rejected` has no confirmed issuer."""
+    return EFFECTIVE_MATCH_SQL.format(as_of=as_of_param)
+
+
 async def confirm(pool: Pool, participant_id: int, issuer_id: int, by: str) -> bool:
-    """The owner says this participant is this issuer. False if the participant is unknown or
-    already matched."""
+    """The owner says this participant is this issuer. False if the participant or issuer is
+    unknown, or the participant is already matched (reject that match first). The decision is
+    what as-of reads use; `issuer_id` on the participant is kept only as today's convenience."""
+    taken: Any = await pool.fetchval(
+        f"""select count(*) from ({effective_match_sql("now()")}) m
+            where m.decision = 'confirmed' and m.participant_id = $1""",  # noqa: S608
+        participant_id,
+    )
+    if taken:
+        return False
     row: Any = await pool.fetchrow(
-        """update public.deal_participant set issuer_id = $2
-            where id = $1 and issuer_id is null
-              and exists (select 1 from public.issuer where id = $2)
-        returning id""",
+        """select p.id from public.deal_participant p
+            where p.id = $1 and exists (select 1 from public.issuer where id = $2)""",
         participant_id,
         issuer_id,
     )
@@ -118,22 +152,30 @@ async def confirm(pool: Pool, participant_id: int, issuer_id: int, by: str) -> b
     await pool.execute(
         """insert into public.deal_participant_decision
              (participant_id, issuer_id, decision, decided_by)
-           values ($1,$2,'confirmed',$3) on conflict (participant_id, issuer_id)
-           do update set decision = 'confirmed', decided_by = $3, decided_at = now()""",
+           values ($1,$2,'confirmed',$3)""",
         participant_id,
         issuer_id,
         by,
+    )
+    await pool.execute(
+        "update public.deal_participant set issuer_id = $2 where id = $1", participant_id, issuer_id
     )
     return True
 
 
 async def reject(pool: Pool, participant_id: int, issuer_id: int, by: str) -> None:
+    """Record that this participant is not this issuer. A rejection after a confirmation clears the
+    effective match, and the cached `issuer_id` when it pointed at that issuer."""
     await pool.execute(
         """insert into public.deal_participant_decision
              (participant_id, issuer_id, decision, decided_by)
-           values ($1,$2,'rejected',$3) on conflict (participant_id, issuer_id)
-           do update set decision = 'rejected', decided_by = $3, decided_at = now()""",
+           values ($1,$2,'rejected',$3)""",
         participant_id,
         issuer_id,
         by,
+    )
+    await pool.execute(
+        "update public.deal_participant set issuer_id = null where id = $1 and issuer_id = $2",
+        participant_id,
+        issuer_id,
     )

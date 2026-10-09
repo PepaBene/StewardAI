@@ -55,10 +55,10 @@ describe("insider display", () => {
     expect(classOf({ economic_class: "mystery" })).toBe("unclassified");
   });
 
-  it("bars include a null row only when the role is missing and zero when it has no trades", () => {
+  it("a role with no discretionary trades has no bar and says so, never a zero net", () => {
     const bars = netBars(netFromTransactions(SAMPLE_INSIDER_ROWS, END), 90);
-    expect(bars.map((b) => b.label)).toEqual(["Officers", "Directors", "10% owners", "Other insiders"]);
-    expect(bars.find((b) => b.label === "10% owners")!.value).toBe(0);
+    expect(bars.map((b) => b.label)).toEqual(["Officers", "Directors", "10% owners (no trades)", "Other insiders (no trades)"]);
+    expect(bars.find((b) => b.label.startsWith("10% owners"))!.value).toBeNull();
     expect(bars.find((b) => b.label === "Officers")!.value).toBeGreaterThan(0);
   });
 

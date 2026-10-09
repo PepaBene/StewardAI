@@ -64,9 +64,11 @@ export function LookThroughPageView() {
           max={dayOf(until)}
           onChange={(e) => {
             const t = endOfDayMs(e.target.value);
-            if (Number.isFinite(t)) {
+            const next = Math.min(t, until);
+            // Only show "Loading…" when the cutoff really changes; an equal cutoff re-runs no effect and would hang.
+            if (Number.isFinite(t) && next !== cutoff) {
               setLoad({ kind: "loading" });
-              setCutoff(Math.min(t, until));
+              setCutoff(next);
             }
           }}
           className="num h-9 border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30"

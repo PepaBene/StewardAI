@@ -136,6 +136,29 @@ def _entry_label(d: Dependency) -> str:
     )
 
 
+def counterparty_identity(d: Dependency) -> tuple[str, str, str, str]:
+    """Who a claim is about, independent of which filing stated it: (reporter, relationship,
+    shape, counterparty). A named party is its company key, else its name; an anonymous or group
+    claim is its own wording ("Customer A"). An unlabelled anonymous claim has nothing but its
+    share, so two filings reporting "a customer, 12%" for one period are read as one customer."""
+    who = d.counterparty_key or d.counterparty_name or d.label
+    if not who:
+        who = f"share {d.share}" if d.share is not None else f"claim {d.id}"
+    return (d.reporter, d.relationship, d.shape, " ".join(who.lower().split()))
+
+
+def one_per_counterparty(rows: Iterable[Dependency]) -> list[Dependency]:
+    """The latest-known claim per counterparty. A 10-K, a 10-Q and a 10-K/A that all report one
+    customer for one period are one customer, not three."""
+    best: dict[tuple[str, str, str, str], Dependency] = {}
+    for d in rows:
+        k = counterparty_identity(d)
+        cur = best.get(k)
+        if cur is None or (d.known_at, d.id) > (cur.known_at, cur.id):
+            best[k] = d
+    return sorted(best.values(), key=lambda d: d.id)
+
+
 def concentration(
     deps: Iterable[Dependency], as_of: dt.datetime, *, relationship: Relationship = "customer"
 ) -> list[Concentration]:
@@ -155,7 +178,8 @@ def concentration(
         elif d.status in ("suggested", "disputed"):
             pending[key] += 1
     out: list[Concentration] = []
-    for (den, period), rows in sorted(groups.items()):
+    for (den, period), all_rows in sorted(groups.items()):
+        rows = one_per_counterparty(all_rows)
         singles = sorted(
             (
                 Entry(r.id, _entry_label(r), r.shape, r.share or ZERO, r.evidence_id, r.known_at)
@@ -352,6 +376,20 @@ class Edge:
     known_at: dt.datetime
     valid_to: dt.date | None = None
     owner_assigned: bool = False  # a weight the owner set, not a reported figure
+    period_end: dt.date | None = None  # the period the share is reported for
+
+
+def latest_edges(edges: Iterable[Edge]) -> list[Edge]:
+    """One edge per (supplier, customer, reported or owner weight): the latest period, then the
+    latest known. Several years of one relationship are one link, never added together."""
+    best: dict[tuple[str, str, bool], Edge] = {}
+    for e in edges:
+        k = (e.supplier, e.customer, e.owner_assigned)
+        cur = best.get(k)
+        rank = (e.period_end or dt.date.min, e.known_at, e.id)
+        if cur is None or rank > (cur.period_end or dt.date.min, cur.known_at, cur.id):
+            best[k] = e
+    return sorted(best.values(), key=lambda e: e.id)
 
 
 @dataclass(frozen=True)
@@ -400,13 +438,13 @@ def shock_scenario(
     if not 1 <= max_hops <= 2:
         raise ValueError("a scenario runs one or two hops")
     day = as_of.date()
-    live = [
+    live = latest_edges(
         e
         for e in edges
         if e.known_at <= as_of
         and (e.valid_to is None or day <= e.valid_to)
         and e.status == "confirmed"
-    ]
+    )
     numeric = [e for e in live if e.share is not None]
     qualitative = [e for e in live if e.share is None]
     by_customer: dict[str, list[Edge]] = defaultdict(list)
@@ -647,17 +685,20 @@ def changes(
     live when it is confirmed, well formed and `visible`; it is material when its reported share is
     at least `min_share`, or when it has no share but names a customer or supplier."""
 
-    def live(deps: Sequence[Dependency], at: dt.datetime) -> dict[int, Dependency]:
-        return {
-            d.id: d
+    # Compared by counterparty, not by claim: next year's filing restating a continuing customer
+    # is a new claim about the same relationship, not a new relationship.
+    def live(deps: Sequence[Dependency], at: dt.datetime) -> dict[tuple[str, ...], Dependency]:
+        rows = [
+            d
             for d in visible(deps, at)
             if d.status == "confirmed" and d.relationship != "procurement_award" and not problems(d)
-        }
+        ]
+        return {counterparty_identity(d): d for d in one_per_counterparty(rows)}
 
     def material(d: Dependency) -> bool:
         return d.share is None or d.share >= min_share
 
     before, after = live(at_since, since), live(at_now, now)
-    out = [Change("new", d) for i, d in after.items() if i not in before and material(d)]
-    out += [Change("ended", d) for i, d in before.items() if i not in after and material(d)]
+    out = [Change("new", d) for k, d in after.items() if k not in before and material(d)]
+    out += [Change("ended", d) for k, d in before.items() if k not in after and material(d)]
     return sorted(out, key=lambda c: (c.dep.known_at, c.dep.id, c.kind))

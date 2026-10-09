@@ -2,13 +2,18 @@
 reason when a number is not stored."""
 
 import datetime as dt
+import itertools
 from decimal import Decimal as D
 
 from steward.disclosure import deal_read
 
+_known = itertools.count()
+
 
 def row(who: str, metric: str, value: str, scale: int = 0) -> dict:
-    return {"who": who, "metric": metric, "value": D(value), "scale": scale}
+    """Each row is known a minute after the one before, as the store returns them."""
+    known = dt.datetime(2026, 5, 1, tzinfo=dt.UTC) + dt.timedelta(minutes=next(_known))
+    return {"who": who, "metric": metric, "value": D(value), "scale": scale, "known_at": known}
 
 
 def test_share_counts_are_scaled_to_base_units_and_split_by_role() -> None:

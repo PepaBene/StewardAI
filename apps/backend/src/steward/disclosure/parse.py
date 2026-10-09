@@ -145,9 +145,11 @@ def parse_fact_value(
     raw: str, fmt: str | None, scale: int, sign: str
 ) -> tuple[Decimal | None, str | None]:
     """The reported number of an `ix:nonFraction`, or (None, why). Never guesses a format."""
-    lowered = (fmt or "").lower()
+    # Transformation registry 4 and later spell the names with hyphens (num-dot-decimal); earlier
+    # registries run them together (numdotdecimal). Both mean the same format.
+    lowered = (fmt or "").lower().replace("-", "")
     text = raw.strip()
-    if "zerodash" in lowered or "fixed-zero" in lowered or "fixedzero" in lowered:
+    if "zerodash" in lowered or "fixedzero" in lowered:
         number = Decimal(0)
     else:
         if "numcommadecimal" in lowered:

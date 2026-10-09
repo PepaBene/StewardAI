@@ -49,11 +49,16 @@ def role_from_position(position: str | None) -> ins.Role:
 
 def dedupe(txs: Sequence[ins.InsiderTx]) -> list[ins.InsiderTx]:
     """One row per identical trade (person, day, class, volume, price), keeping the earliest known:
-    an amendment that repeats a notice is not a second trade."""
-    seen: dict[tuple[Any, ...], ins.InsiderTx] = {}
+    an amendment that repeats a notice is not a second trade. Two identical lines inside one
+    notice are two trades (a split fill at one price) and both stay."""
+    first_notice: dict[tuple[Any, ...], str] = {}
+    kept: list[ins.InsiderTx] = []
     for t in sorted(txs, key=lambda r: (r.known_at, r.accession, r.row_index)):
-        seen.setdefault((t.insider, t.tx_date, t.economic_class, t.shares, t.price), t)
-    return sorted(seen.values(), key=lambda r: (r.accession, r.row_index))
+        key = (t.insider, t.tx_date, t.economic_class, t.shares, t.price)
+        notice = first_notice.setdefault(key, t.accession)
+        if notice == t.accession:
+            kept.append(t)
+    return sorted(kept, key=lambda r: (r.accession, r.row_index))
 
 
 def _s(v: Decimal | None) -> str | None:

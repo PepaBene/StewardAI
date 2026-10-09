@@ -204,7 +204,7 @@ export function FiveLanes({ view, choice }: { view: EstimatesView; choice: Choic
 export function PeriodRanges({ lines, metric }: { lines: readonly EstimateLine[]; metric: string }) {
   const latest = new Map<string, EstimateLine>();
   for (const l of lines) {
-    if (l.metric !== metric || l.segment) continue;
+    if (l.metric.toLowerCase() !== metric.toLowerCase() || l.segment) continue;
     const prev = latest.get(l.fiscal_period);
     if (!prev || Date.parse(l.known_at) > Date.parse(prev.known_at)) latest.set(l.fiscal_period, l);
   }

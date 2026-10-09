@@ -5,7 +5,9 @@ import { useState } from "react";
 import { callApi, DecisionForm } from "@/app/(app)/relationships/decision-form";
 import { DivergingBar } from "@/components/charts";
 import { getBrowserApiClient } from "@/lib/api/client";
+import type { Keyed } from "@/lib/disclosure/keyed";
 import { formatDay } from "@/lib/disclosure/model";
+import { validateReason, DECISION_REASON_MAX } from "@/lib/relationships/relationships";
 import {
   CLASS_META,
   classOf,
@@ -13,6 +15,7 @@ import {
   formatQty,
   formatUsd,
   netBars,
+  netFromApi,
   netFromTransactions,
   num,
   PLAN_LABEL,
@@ -108,8 +111,10 @@ function usdAxis(v: number) {
 
 export function NetPanel({ view, cutoffMs }: { view: InsiderActivity; cutoffMs: number }) {
   const [window, setWindow] = useState<Window>(90);
-  const rows = netFromTransactions(view.transactions, cutoffMs);
-  const all = rows.find((r) => r.role === "all" && r.window === window)!;
+  // live data uses the server's own net (view.net); the local copy of the rules is for the sample only
+  const fromApi = view.net.length > 0 ? netFromApi(view.net) : [];
+  const rows = fromApi.length > 0 ? fromApi : netFromTransactions(view.transactions, cutoffMs);
+  const all = rows.find((r) => r.role === "all" && r.window === window) ?? netFromTransactions([], cutoffMs).find((r) => r.role === "all" && r.window === window)!;
   const bars = netBars(rows, window);
   return (
     <div className="space-y-4">
@@ -267,9 +272,12 @@ export function InsiderTable({ txs, editable, onChanged }: { txs: readonly Insid
 }
 
 /** UK PDMR notices for the holding. A separate regime from Form 4: never added to the US figures. */
-export function PdmrPanel({ data }: { data: PdmrActivity | null | "none" }) {
-  if (data === null) return <p className="text-sm text-text-muted">Loading UK notices…</p>;
-  if (data === "none") return <p className="text-sm text-text-muted">No UK manager-dealing notice has been read for this company.</p>;
+export function PdmrPanel({ state }: { state: Keyed<PdmrActivity> | null }) {
+  if (state === null || state.state === "loading") return <p className="text-sm text-text-muted">Loading UK notices…</p>;
+  // a failed read is not "no notice": say what failed
+  if (state.state === "error") return <p role="alert" className="border border-warning-signal/40 bg-warning-signal-subtle px-3 py-2 text-sm">{state.message}</p>;
+  const data = state.data;
+  if (data.transactions.length === 0 && data.net.length === 0) return <p className="text-sm text-text-muted">No UK manager-dealing notice has been read for this company.</p>;
   const all = data.net.filter((n) => n.role === "all" && n.window_days === 90);
   return (
     <div className="space-y-3 text-sm">
@@ -389,7 +397,11 @@ function OverrideForm({ t, onChanged }: { t: InsiderTx; onChanged: () => void })
   return (
     <DecisionForm
       summary="Change the class"
-      options={CLASS_OPTIONS}
+      // an empty first choice so nothing is preselected; the current class is not offered and is rejected if chosen
+      options={[{ value: "", label: "Choose the correct class…" }, ...CLASS_OPTIONS.filter((o) => o.value !== t.economic_class)]}
+      validate={(value, reason) => ({
+        reason: value === "" ? "Choose a class." : value === t.economic_class ? "That is already the current class; choose a different one." : validateReason(reason, 10, DECISION_REASON_MAX),
+      })}
       onSubmit={async (value, reason) => {
         const r = await callApi(
           () => getBrowserApiClient().POST("/disclosures/insiders/override", { body: { accession: t.accession, row_index: t.row_index, new_class: value, reason } }),

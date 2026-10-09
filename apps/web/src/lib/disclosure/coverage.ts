@@ -63,6 +63,8 @@ export type Rollup = {
   denominator: number;
   coveredValue: number;
   share: number | null;
+  /** True when a cell had an unknown denominator or covered value: the share is then not stated. */
+  shareUnknown: boolean;
   first: string | null;
   last: string | null;
   unit: string;
@@ -74,18 +76,25 @@ export type Rollup = {
 export function rollup(cells: readonly CoverageCell[]): Rollup[] {
   const by = new Map<string, Rollup>();
   for (const c of cells) {
-    const r = by.get(c.dataset) ?? { dataset: c.dataset, label: c.label, tickers: 0, covered: 0, uncovered: 0, stale: 0, denominator: 0, coveredValue: 0, share: null, first: null, last: null, unit: c.unit, source: c.source, method: c.method };
+    const r = by.get(c.dataset) ?? { dataset: c.dataset, label: c.label, tickers: 0, covered: 0, uncovered: 0, stale: 0, denominator: 0, coveredValue: 0, share: null, shareUnknown: false, first: null, last: null, unit: c.unit, source: c.source, method: c.method };
     r.tickers += c.tickers;
     r.covered += c.covered;
     r.uncovered += c.uncovered;
     r.stale += c.stale;
-    r.denominator += num(c.denominator_value) ?? 0;
-    r.coveredValue += num(c.covered_value) ?? 0;
+    const den = num(c.denominator_value);
+    const cov = num(c.covered_value);
+    if (den == null || cov == null) {
+      // A cell with an unknown side adds to neither sum, and the share is then not stated at all.
+      if (c.tickers > 0) r.shareUnknown = true;
+    } else {
+      r.denominator += den;
+      r.coveredValue += cov;
+    }
     if (c.first_known_at && (!r.first || c.first_known_at < r.first)) r.first = c.first_known_at;
     if (c.last_known_at && (!r.last || c.last_known_at > r.last)) r.last = c.last_known_at;
     by.set(c.dataset, r);
   }
-  return [...by.values()].map((r) => ({ ...r, share: r.denominator > 0 ? r.coveredValue / r.denominator : null }));
+  return [...by.values()].map((r) => ({ ...r, share: r.shareUnknown || r.denominator <= 0 ? null : r.coveredValue / r.denominator }));
 }
 
 export const jurisdictions = (cells: readonly CoverageCell[]): string[] => [...new Set(cells.map((c) => c.jurisdiction))].sort();

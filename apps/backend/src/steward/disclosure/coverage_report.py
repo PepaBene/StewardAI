@@ -18,7 +18,7 @@ from typing import Any
 
 import asyncpg
 
-from steward.disclosure.adjudication import GATES
+from steward.disclosure.adjudication import GATE_KINDS, GATES, measure_labels
 
 type Pool = asyncpg.Pool | asyncpg.Connection
 
@@ -169,6 +169,7 @@ GATE_FOR = {
     "ownership": "ownership_match",
     "insiders": "insider_class",
     "dependencies": "relationship_claim",
+    "deals": "deal_state",
 }
 
 #: every source is free by construction (`disclosure_source.cost` is constrained to 'free')
@@ -400,37 +401,53 @@ def period_rows(
 
 
 def quality_rows(labels: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Sampled error rates from a person's labels; the latest label per item counts.
+    """Sampled error rates from a person's labels, measured exactly as the release gate measures
+    them (`adjudication.measure_labels`): labels a model wrote alone never count, planted false
+    positives test the reviewer and stay out of the relationship error rate, and each dataset is
+    read from its most recently labelled sample rather than pooled across samples.
 
-    Numerator is the incorrect labels, denominator the labelled items. A dataset with no labels has
-    a null rate (not sampled), never 0.
+    Labels must come ordered by time. Numerator is the incorrect labels, denominator the labelled
+    items. A dataset with no labels has a null rate (not sampled), never 0.
     """
-    latest: dict[tuple[str, str, str], bool] = {}
+    samples: dict[str, dict[str, list[dict[str, Any]]]] = defaultdict(dict)
+    newest: dict[str, str] = {}
     for r in labels:
-        latest[(r["dataset"], r["sample_key"], r["item_ref"])] = bool(r["correct"])
-    counts: dict[str, list[int]] = defaultdict(lambda: [0, 0])
-    for (dataset, _sample, _item), ok in latest.items():
-        counts[dataset][1] += 1
-        counts[dataset][0] += 0 if ok else 1
+        if r.get("adjudicator_kind", "person") not in GATE_KINDS:
+            continue
+        row = {
+            "item_ref": r["item_ref"],
+            "correct": bool(r["correct"]),
+            "planted_false_positive": bool(r.get("planted_false_positive", False)),
+            "human_value": r.get("human_value"),
+        }
+        samples[r["dataset"]].setdefault(r["sample_key"], []).append(row)
+        newest[r["dataset"]] = r["sample_key"]
     out: list[dict[str, Any]] = []
     for dataset, (needed, bar) in GATES.items():
-        errors, labelled = counts.get(dataset, [0, 0])
+        key = newest.get(dataset)
+        gate = measure_labels(dataset, samples[dataset][key], key) if key else None
+        labelled = gate.labelled if gate else 0
+        errors = labelled - gate.correct if gate else 0
         rate = Decimal(errors) / Decimal(labelled) if labelled else None
-        if labelled == 0:
+        if gate is None or labelled == 0:
             state = "not_sampled"
+        elif gate.met:
+            state = "meets_bar"
         elif labelled < needed:
             state = "sample_too_small"
         else:
-            state = "meets_bar" if rate is not None and (1 - rate) >= bar else "below_bar"
+            state = "below_bar"
         out.append(
             {
                 "dataset": dataset,
+                "sample_key": key,
                 "labelled": labelled,
                 "errors": errors,
                 "error_rate": _s(rate.quantize(Decimal("0.0001")) if rate is not None else None),
                 "needed": needed,
                 "bar": str(bar),
                 "state": state,
+                "reason": gate.reason if gate else "no person has labelled a sample",
             }
         )
     return out
@@ -691,8 +708,9 @@ async def coverage_view(
         )
     ]
     labels = await pool.fetch(
-        """select dataset, sample_key, item_ref, correct from public.disclosure_adjudication
-            order by adjudicated_at, id"""
+        """select dataset, sample_key, item_ref, correct, planted_false_positive, human_value,
+                  adjudicator_kind
+             from public.disclosure_adjudication order by adjudicated_at, id"""
     )
     quality = quality_rows([dict(r) for r in labels])
     sources = await pool.fetchrow(

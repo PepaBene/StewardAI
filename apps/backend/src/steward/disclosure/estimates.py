@@ -374,6 +374,10 @@ class Actual:
     released_at: dt.datetime | None = None
     evidence_id: int | None = None
     document_url: str | None = None
+    period_start: dt.date | None = None  # separates a fiscal year from its Q4 (same period_end)
+    # 'earnings_release' when released_at is a known earnings release; 'period_end_fallback' when
+    # none is known and the end of the period is the conservative cutoff. Never a 10-Q/10-K date.
+    release_basis: str | None = None
 
 
 @dataclass(frozen=True)
@@ -469,6 +473,11 @@ def surprise(
         and v.metric.lower() == metric.lower()
         and (v.segment or "").lower() == seg
         and v.period_end == actual.period_end
+        and (
+            actual.period_start is None
+            or v.period_start is None
+            or v.period_start == actual.period_start
+        )
         and not problems(v)
     ]
     release = release_at or actual.released_at

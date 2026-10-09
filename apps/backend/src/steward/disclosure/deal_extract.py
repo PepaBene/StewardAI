@@ -83,18 +83,27 @@ TYPE_HINTS: list[tuple[str, str]] = [
     (r"senior notes|notes due|term loan|credit facility|refinanc", "debt_issuance"),
     (r"joint venture", "joint_venture"),
     (r"strategic investment|minority investment", "strategic_investment"),
-    (r"merger of equals|merge with|merger agreement|plan of merger", "merger"),
+    (r"merger of equals|merge with|plan of merger", "merger"),
     (r"to sell|divest|sale of (?:its|the) ", "divestiture"),
-    (r"to acquire|acquisition of|to purchase", "acquisition"),
+    # "to acquire Y" under a "merger agreement" is still an acquisition: the sentence names who buys
+    (r"to acquire|will acquire|acquisition of|to purchase", "acquisition"),
+    (r"merger agreement", "merger"),
     (r"supply agreement|master services|commercial agreement", "material_agreement"),
 ]
 CAP = r"[A-Z][A-Za-z0-9&.'\-]*"
 NAME = rf"{CAP}(?:\s+{CAP}){{0,4}}(?:,\s+(?:Inc|Corp|Ltd|LLC|plc|N\.V|S\.A|AG|SE|Co)\b\.?)?"
 PARTIES = re.compile(
     rf"(?P<a>{NAME})\s+(?:today\s+)?(?:announced|has announced|has agreed|agreed|entered into)"
-    rf"[^.]{{0,80}}?\b(?:to acquire|to purchase|to merge with|to sell|to combine with)"
+    rf"[^.]{{0,80}}?\b(?P<verb>to acquire|to purchase|to merge with|to sell|to combine with)"
     rf"\s+(?P<b>{NAME})"
 )
+ROLES = {
+    "to acquire": ("acquirer", "target"),
+    "to purchase": ("acquirer", "target"),
+    "to sell": ("seller", "target"),
+    "to merge with": ("merger_party", "merger_party"),
+    "to combine with": ("merger_party", "merger_party"),
+}
 SUFFIX = {
     "inc",
     "corp",
@@ -144,6 +153,7 @@ class Extracted:
     terms: dict[str, FoundTerm]
     closing_conditions: FoundTerm
     skipped: tuple[Skipped, ...] = field(default_factory=tuple)
+    roles: tuple[str, ...] = ()  # role of each entry of `parties`, read from the sentence
 
     def values(self) -> dict[str, Decimal]:
         """The stated numeric terms, ready for a TermVersion; unknowns are simply absent."""
@@ -253,6 +263,15 @@ def _pct_rules() -> list[tuple[str, re.Pattern[str]]]:
 
 
 _MONEY_RULES = _money_rules()
+_PER_SHARE = re.compile(rf"{MONEY}\s+(?:in\s+cash\s+)?per\s+(?:ordinary\s+)?share", FLAGS)
+PER_SHARE_EXCLUDES = frozenset({"cash_amount", "stock_amount"})
+DEAL_WORDS = re.compile(
+    r"\b(?:offer\w*|consideration|acquir\w+|merger|tender|purchase\w*)\b", FLAGS
+)
+DEBT_WORDS = re.compile(
+    r"\b(?:notes?|debentures?|coupon|bonds?|per\s+annum|interest\s+rate|loan|credit)\b", FLAGS
+)
+STAKE_WORDS = re.compile(r"stake|equity|ownership|shares", FLAGS)
 _PCT_RULES = _pct_rules()
 _MIX = re.compile(
     r"(\d{1,3}(?:\.\d+)?)%\s+(?:in\s+)?cash(?:\s+and|,)\s+(\d{1,3}(?:\.\d+)?)%\s+(?:in\s+)?(?:stock|shares)",
@@ -282,6 +301,7 @@ def extract(text: str) -> Extracted:
     unaffected_date: dt.date | None = None
     closing = FoundTerm("closing_conditions", "not_stated")
     live: list[str] = []
+    price_in_deal_sentence = False
     for a, b in _sentences(text):
         s = text[a:b]
         for dm in DATE.finditer(s):
@@ -299,19 +319,36 @@ def extract(text: str) -> Extracted:
                 announce_dates.append(d)
             if d and re.search(r"unaffected", s, FLAGS):
                 unaffected_date = d
+        per_share = [m.span() for m in _PER_SHARE.finditer(s)]
         for name, rx in _MONEY_RULES:
-            m = rx.search(s)
-            if m and name not in found:
-                v, cur = _money(m)
-                if name == "price_per_share":
-                    v = Decimal(
-                        m.group("num").replace(",", "")
-                    )  # a per-share price is never scaled
-                found[name] = FoundTerm(
-                    name, "stated", v, cur, m.group(0), a + m.start(), a + m.end()
-                )
+            m = None
+            for cand in rx.finditer(s):
+                # a per-share price is not also a total: "$45.00 in cash per share" is no
+                # cash_amount
+                if name in PER_SHARE_EXCLUDES and any(
+                    cand.start() < pe and ps < cand.end() for ps, pe in per_share
+                ):
+                    continue
+                m = cand
+                break
+            if not m:
+                continue
+            if name == "price_per_share":
+                # the offer sentence beats an earlier incidental "$X per share"
+                deal_sentence = bool(DEAL_WORDS.search(s))
+                if name in found and (price_in_deal_sentence or not deal_sentence):
+                    continue
+                price_in_deal_sentence = deal_sentence
+            elif name in found:
+                continue
+            v, cur = _money(m)
+            if name == "price_per_share":
+                v = Decimal(m.group("num").replace(",", ""))  # a per-share price is never scaled
+            found[name] = FoundTerm(name, "stated", v, cur, m.group(0), a + m.start(), a + m.end())
         for name, rx in _PCT_RULES:
             m = rx.search(s)
+            if m and name == "stake_pct" and DEBT_WORDS.search(s) and not STAKE_WORDS.search(m[0]):
+                m = None  # "5.25% senior notes", "% interest rate": a coupon, not a stake
             if m and name not in found:
                 raw = Decimal(m.group(1))
                 v = raw / 100 if name == "stake_pct" else raw
@@ -348,6 +385,7 @@ def extract(text: str) -> Extracted:
         terms,
         closing,
         tuple(skipped),
+        ROLES.get(pm.group("verb").lower(), ()) if pm else (),
     )
 
 

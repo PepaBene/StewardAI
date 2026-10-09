@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { callApi } from "@/app/(app)/relationships/decision-form";
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,30 @@ export function PairReviewPanel({ ticker, onChanged }: { ticker: string; onChang
   const [data, setData] = useState<PairReviews | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // Only the newest request for this ticker may set state (a late answer for another ticker is dropped).
+  const seq = useRef(0);
+  useEffect(() => {
+    const mine = seq.current;
+    return () => {
+      seq.current = mine + 1000000; // unmount or ticker change: invalidate whatever is in flight
+    };
+  }, [ticker]);
 
   const load = useCallback(async () => {
+    const mine = ++seq.current;
     try {
       const r = await getBrowserApiClient().GET("/disclosures/estimates/pair-reviews", { params: { query: { ticker } } });
-      if (r.data) setData(r.data);
-      else setMessage({ ok: false, text: r.response.status === 401 || r.response.status === 403 ? "Sign in again (with MFA) and retry." : `The pair list failed to load (HTTP ${r.response.status}).` });
+      if (mine !== seq.current) return;
+      if (r.data) {
+        setData(r.data);
+        setMessage(null);
+      } else {
+        setData(null);
+        setMessage({ ok: false, text: r.response.status === 401 || r.response.status === 403 ? "Sign in again (with MFA) and retry." : `The pair list failed to load (HTTP ${r.response.status}).` });
+      }
     } catch (e) {
+      if (mine !== seq.current) return;
+      setData(null);
       setMessage({ ok: false, text: `Backend unreachable: ${e instanceof Error ? e.message : String(e)}` });
     }
   }, [ticker]);

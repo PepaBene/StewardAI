@@ -64,8 +64,9 @@ export function DisclosuresView() {
   const reviews = useApiResource(fetchReviews);
 
   const live = dataOf(issuers.state) ?? [];
+  // Sample mode only when the fetch succeeded with zero issuers; a failed fetch is an error (shown below), not a sample.
+  const sample = issuers.state.kind === "ok" && live.length === 0;
   const settled = issuers.state.kind !== "loading";
-  const sample = settled && live.length === 0;
   const [issuerId, setIssuerId] = useState<number | null>(null);
   const issuer = sample ? SAMPLE_ISSUER : (live.find((i) => i.issuer_id === issuerId) ?? live[0] ?? null);
 

@@ -111,7 +111,9 @@ async def store_esef(
             issuer_id=issuer_id,
             fiscal_period=str(filing.period_end),
             source_key=ESEF_SOURCE,
-            published_at=filing.known_at,
+            date_notes={
+                "published_at": "unknown: the registry gives only the time it processed the report"
+            },
         ),
         content,
         archive_path=archive_path,
@@ -127,13 +129,20 @@ async def collect_esef(
     fetch: Fetch,
     *,
     since: dt.datetime | None = None,
+    on_done: Callable[[str], Awaitable[None]] | None = None,
 ) -> ForeignTotals:
     """Index, then report, for every issuer given (rows with `id` and `lei`). A fetch failure is
-    counted against the issuer or entry and never stops the others."""
+    counted against the issuer or entry and never stops the others. `on_done(index_url)` is
+    awaited once every report of an issuer was handled without a failure."""
     totals = ForeignTotals()
     for issuer in issuers:
+        index_url = ENTITY_FILINGS_URL.format(lei=issuer["lei"])
+        failed_before = totals.failed
         try:
-            got = await fetch_json(ENTITY_FILINGS_URL.format(lei=issuer["lei"]))
+            got = await fetch_json(index_url)
+            if not getattr(got, "modified", True):
+                totals.skipped["index_unchanged"] = totals.skipped.get("index_unchanged", 0) + 1
+                continue
             found = discover_esef(json.loads(got.content or b"{}"), since)
         except FetchFailure as exc:
             if exc.state == "not_covered":  # the registry has no ESEF entity: a coverage fact
@@ -181,6 +190,8 @@ async def collect_esef(
                 totals.stored += 1
             else:
                 totals.unchanged += 1
+        if on_done is not None and totals.failed == failed_before:
+            await on_done(index_url)
     return totals
 
 

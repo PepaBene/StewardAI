@@ -367,6 +367,7 @@ async def dependency_view(
             d.status,
             d.known_at,
             d.valid_to,
+            period_end=d.period_end,
         )
         for d in live
         if d.relationship == "customer" and d.shape == "named" and d.id in keys
@@ -380,6 +381,7 @@ async def dependency_view(
             d.status,
             d.known_at,
             d.valid_to,
+            period_end=d.period_end,
         )
         for d in dep.visible(inbound, when)
         if d.relationship == "customer"

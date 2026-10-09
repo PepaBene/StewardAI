@@ -19,8 +19,18 @@ import httpx
 
 from steward.disclosure import estimate_extract as ex
 from steward.disclosure.fetch import FetchFailure
+from steward.sources.documents import link_public_document
 
 type Pool = asyncpg.Pool | asyncpg.Connection
+
+
+@dataclass(frozen=True)
+class SourceFile:
+    """The fetched bytes of a consensus file, stored as a document version with the snapshot."""
+
+    source_key: str
+    url: str
+    content: bytes
 
 
 @dataclass(frozen=True)
@@ -41,6 +51,7 @@ async def store_extraction(
     extraction: ex.Extraction,
     fetched_at: dt.datetime,
     document_version_id: int | None = None,
+    document: SourceFile | None = None,
 ) -> StoreOutcome:
     if fetched_at.tzinfo is None:
         fetched_at = fetched_at.replace(tzinfo=dt.UTC)
@@ -73,6 +84,19 @@ async def store_extraction(
         published,
     )
     async with _transaction(pool) as conn:
+        if document_version_id is None and document is not None:
+            # The fetched file becomes a document version in the same transaction as the snapshot,
+            # so a stored value always has a file and a quote to point back to.
+            document_version_id = await link_public_document(
+                conn,
+                regulator="consensus",
+                external_id=document.url,
+                stable_url=document.url,
+                document_type="consensus_estimate",
+                content=document.content,
+                known_at=known,
+                published_at=published if extraction.published_on else None,
+            )
         snap = int(
             await conn.fetchval(
                 """insert into public.public_estimate_snapshot
@@ -94,14 +118,33 @@ async def store_extraction(
             )
         )
         for v in storable:
+            evidence_id: int | None = None
+            if document_version_id is not None:
+                # source_evidence is append-only, so the quote is written before the value that
+                # cites it. The span is an offset into the extracted text of the file.
+                evidence_id = int(
+                    await conn.fetchval(
+                        """insert into public.source_evidence
+                             (document_version_id, table_name, quote, span_start, span_end,
+                              row_ref, extraction_method, parser_version, confidence)
+                           values($1,$2,$3,$4,$5,$6,'estimate_html_table',$7,1) returning id""",
+                        document_version_id,
+                        f"table_{v.table_index}",
+                        v.original_string,
+                        v.start,
+                        v.end,
+                        f"row_{v.row_index}",
+                        extraction.parser_version,
+                    )
+                )
             await conn.execute(
                 """insert into public.estimate_value
                      (snapshot_id, metric, segment, segment_taxonomy, non_additive, restated_prior,
                       fiscal_period, fiscal_calendar, period_start, period_end, currency, unit,
                       scale, basis, basis_definition, mean, median, high, low, analyst_count,
-                      original_string)
+                      original_string, evidence_id)
                    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-                           $21)""",
+                           $21,$22)""",
                 snap,
                 v.metric,
                 v.segment,
@@ -123,6 +166,7 @@ async def store_extraction(
                 v.low,
                 v.analyst_count,
                 v.original_string,
+                evidence_id,
             )
         if earlier is not None:
             await conn.execute(
@@ -144,10 +188,13 @@ async def collect_consensus(
     pool: Pool,
     fetch: Callable[[str], Awaitable[Any]],
     now: dt.datetime | None = None,
+    on_done: Callable[[str], Awaitable[None]] | None = None,
 ) -> dict[str, Any]:
     """Fetch every enabled consensus source once and store what changed. HTML is read; a PDF or
     spreadsheet source is counted as unsupported rather than skipped silently. A failed fetch is
-    reported against its source and never stops the others."""
+    reported against its source and never stops the others. `on_done(url)` is awaited once a
+    page was stored or found to be a duplicate; a page nothing could be read from is fetched in
+    full again next time, so a fixed extractor gets to read it."""
     when = now or dt.datetime.now(dt.UTC)
     totals: dict[str, Any] = {
         "sources": 0,
@@ -176,13 +223,24 @@ async def collect_consensus(
         if not getattr(got, "modified", True) or not got.content:
             totals["duplicate"] += 1
             continue
-        outcome = await store_extraction(
-            pool,
-            issuer_id=int(r["issuer_id"]),
-            source_id=int(r["id"]),
-            extraction=ex.extract_html(got.content),
-            fetched_at=when,
-        )
+        try:
+            # one transaction inside: a snapshot and all its values are stored or none are
+            outcome = await store_extraction(
+                pool,
+                issuer_id=int(r["issuer_id"]),
+                source_id=int(r["id"]),
+                extraction=ex.extract_html(got.content),
+                fetched_at=when,
+                document=SourceFile(
+                    r["source_key"],
+                    r["url"],
+                    got.content if isinstance(got.content, bytes) else str(got.content).encode(),
+                ),
+            )
+        except asyncpg.PostgresError as exc:
+            totals["failed"] += 1
+            totals["errors"].append(f"{r['source_key']}: {type(exc).__name__}")
+            continue
         if outcome.duplicate:
             totals["duplicate"] += 1
         elif outcome.snapshot_id is None:
@@ -190,6 +248,8 @@ async def collect_consensus(
             totals["errors"].append(f"{r['source_key']}: {'; '.join(outcome.reasons[:2])}")
         else:
             totals["stored"] += 1
+        if on_done is not None and (outcome.duplicate or outcome.snapshot_id is not None):
+            await on_done(r["url"])
     return totals
 
 

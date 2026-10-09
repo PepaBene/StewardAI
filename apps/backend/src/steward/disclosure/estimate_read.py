@@ -11,6 +11,7 @@ says "actual not loaded". Series are returned as separate lists and never merged
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -94,16 +95,66 @@ def to_value(r: Any) -> est.Value:
     )
 
 
+RELEASE_WINDOW_DAYS = 75
+EARNINGS_ITEM = "2.02"  # 8-K Item 2.02, Results of Operations and Financial Condition
+
+
+def earnings_release_at(
+    period_end: dt.date, filings: Sequence[tuple[str, dt.datetime]]
+) -> dt.datetime | None:
+    """The earliest 8-K whose items include 2.02, known after the period ended and within
+    RELEASE_WINDOW_DAYS of it. `filings` are (items text, known_at). None when there is no such
+    filing, in which case the caller keeps the period-end fallback. The filings come from
+    `sec_filing_item` (`release_filings`)."""
+    start = dt.datetime.combine(period_end, dt.time.max, dt.UTC)
+    end = start + dt.timedelta(days=RELEASE_WINDOW_DAYS)
+    known = [
+        k
+        for items, k in filings
+        if EARNINGS_ITEM in {i for i in items.replace(",", " ").replace(";", " ").split() if i}
+        and start < _aware(k) <= end
+    ]
+    return min(known, default=None)
+
+
+def release_for(
+    period_end: dt.date, filings: Sequence[tuple[str, dt.datetime]] = ()
+) -> tuple[dt.datetime, str]:
+    """(released_at, release_basis) for a period: the earnings release when one is known, else
+    the end of the period (the conservative cutoff; never the 10-Q/10-K date)."""
+    found = earnings_release_at(period_end, filings)
+    if found is not None:
+        return _aware(found), "earnings_release"
+    return dt.datetime.combine(period_end, dt.time.max, dt.UTC), "period_end_fallback"
+
+
+async def release_filings(
+    pool: Pool, issuer_id: int, when: dt.datetime
+) -> list[tuple[str, dt.datetime]]:
+    """The issuer's 8-Ks known by `when`, as (items, known_at), for `release_for`."""
+    rows = await pool.fetch(
+        """select items, known_at from public.sec_filing_item
+            where issuer_id = $1 and known_at <= $2 order by known_at""",
+        issuer_id,
+        when,
+    )
+    return [(r["items"], r["known_at"]) for r in rows]
+
+
 async def _actuals(
-    pool: Pool, issuer_id: int, metrics: set[str], when: dt.datetime
+    pool: Pool,
+    issuer_id: int,
+    metrics: set[str],
+    when: dt.datetime,
+    filings: Sequence[tuple[str, dt.datetime]] = (),
 ) -> list[est.Actual]:
     if not metrics:
         return []
     rows = await pool.fetch(
-        """select o.id, o.metric, o.segment, o.period_end, o.value, o.unit, o.scale, o.currency,
+        """select o.id, o.metric, o.segment, o.period_start, o.period_end, o.value, o.unit,
+                  o.scale, o.currency,
                   o.basis, o.dimensions, o.evidence_id, o.known_at, o.supersedes_id,
-                  coalesce(sdv.published_at, o.known_at) as released_at,
-                  sd.stable_url as url
+                  sd.stable_url as url, sd.document_type
              from public.disclosure_observation o
              join public.source_document_version sdv on sdv.id = o.document_version_id
              join public.source_document sd on sd.id = sdv.document_id
@@ -116,15 +167,29 @@ async def _actuals(
         sorted(metrics),
     )
     replaced = {r["supersedes_id"] for r in rows if r["supersedes_id"] is not None}
-    latest: dict[tuple[str, str, dt.date], Any] = {}
+    # The company's own earnings release is a release whatever channel carried it: it counts
+    # like an Item 2.02 8-K.
+    filings = [
+        *filings,
+        *((EARNINGS_ITEM, r["known_at"]) for r in rows if r["document_type"] == "earnings"),
+    ]
+    latest: dict[tuple[str, str, dt.date | None, dt.date], Any] = {}
     for r in rows:
         if r["id"] in replaced:
             continue
-        latest[(r["metric"].lower(), (r["segment"] or "").lower(), r["period_end"])] = r
+        key = (
+            r["metric"].lower(),
+            (r["segment"] or "").lower(),
+            r["period_start"],
+            r["period_end"],
+        )
+        latest[key] = r
     return [
         est.Actual(
             observation_id=int(r["id"]),
             metric=r["metric"],
+            period_start=r["period_start"],
+            release_basis=release_for(r["period_end"], filings)[1],
             period_end=r["period_end"],
             value=r["value"],
             unit=r["unit"],
@@ -132,7 +197,10 @@ async def _actuals(
             currency=r["currency"],
             basis=r["basis"],
             segment=r["segment"],
-            released_at=r["released_at"],
+            # An earnings release (8-K Item 2.02 or the company's release document) when one
+            # is known; otherwise the end of the period. The
+            # 10-Q/10-K date and the ingest time are never used (later than the real release).
+            released_at=release_for(r["period_end"], filings)[0],
             evidence_id=r["evidence_id"],
             document_url=r["url"],
         )
@@ -285,6 +353,56 @@ def _bridge(b: est.SegmentBridge) -> dict[str, Any]:
     }
 
 
+def segment_events(
+    bridge: est.SegmentBridge,
+    *,
+    release_at: dt.datetime | None,
+    release_basis: str | None,
+    known_at_by_value: Mapping[int, dt.datetime],
+) -> list[dict[str, Any]]:
+    """One event per segment line of a bridge, in the same shape as a total-level event but with
+    `segment` set. `surprise_pct` is in percent, as for every other event; only a scored line
+    carries a number."""
+    out: list[dict[str, Any]] = []
+    for ln in bridge.lines:
+        scored = ln.status == "scored"
+        out.append(
+            {
+                "status": (
+                    "scored"
+                    if scored
+                    else "no_prior_estimate"
+                    if ln.status == "estimate_missing"
+                    else "not_comparable"
+                ),
+                "metric": bridge.metric,
+                "segment": ln.segment,
+                "fiscal_period": bridge.fiscal_period,
+                "period_end": bridge.period_end,
+                "release_at": release_at,
+                "release_basis": release_basis,
+                "estimate_value_id": ln.estimate_value_id,
+                "estimate_known_at": known_at_by_value.get(ln.estimate_value_id or -1),
+                "statistic": None,
+                "estimate": _s(ln.estimate),
+                "actual": _s(ln.actual),
+                "surprise": _s(ln.delta) if scored else None,
+                "surprise_pct": _s(ln.delta_pct) if scored else None,
+                "pct_note": None,
+                "analyst_count": None,
+                "basis": None,
+                "currency": None,
+                "unit": None,
+                "later_files_only": False,
+                "warnings": list(ln.flags),
+                "actual_observation_id": ln.actual_observation_id,
+                "formula_version": est.SURPRISE_FORMULA_VERSION,
+                "formula": est.SURPRISE_FORMULA,
+            }
+        )
+    return out
+
+
 async def estimate_view(
     pool: Pool, ticker: str, as_of: dt.datetime | None = None
 ) -> dict[str, Any]:
@@ -345,26 +463,41 @@ async def estimate_view(
         v for v in values if v.series == "published_analyst_consensus" and not est.problems(v)
     ]
     metrics = {v.metric.lower() for v in consensus}
-    actuals = await _actuals(pool, issuer_id, metrics, when)
-    by_key = {(a.metric.lower(), (a.segment or "").lower(), a.period_end): a for a in actuals}
+    releases = await release_filings(pool, issuer_id, when) if metrics else []
+    actuals = await _actuals(pool, issuer_id, metrics, when, releases)
+    by_key = {
+        (a.metric.lower(), (a.segment or "").lower(), a.period_start, a.period_end): a
+        for a in actuals
+    }
 
     events: list[dict[str, Any]] = []
-    seen: set[tuple[str, dt.date | None]] = set()
-    for v in sorted(consensus, key=lambda v: (v.period_end or dt.date.min, v.metric)):
-        if v.segment or (v.metric.lower(), v.period_end) in seen:
+    seen: set[tuple[str, dt.date | None, dt.date | None]] = set()
+    for v in sorted(
+        consensus,
+        key=lambda v: (v.period_end or dt.date.min, v.period_start or dt.date.min, v.metric),
+    ):
+        if v.segment or (v.metric.lower(), v.period_start, v.period_end) in seen:
             continue
-        seen.add((v.metric.lower(), v.period_end))
-        a = by_key.get((v.metric.lower(), "", v.period_end)) if v.period_end else None
+        seen.add((v.metric.lower(), v.period_start, v.period_end))
+        a = (
+            by_key.get((v.metric.lower(), "", v.period_start, v.period_end))
+            or by_key.get((v.metric.lower(), "", None, v.period_end))
+            if v.period_end
+            else None
+        )
         events.append(
-            _event(
-                est.surprise(
-                    a,
-                    consensus_all,
-                    metric=v.metric,
-                    segment=None,
-                    release_at=a.released_at if a else None,
-                )
-            )
+            {
+                **_event(
+                    est.surprise(
+                        a,
+                        consensus_all,
+                        metric=v.metric,
+                        segment=None,
+                        release_at=a.released_at if a else None,
+                    )
+                ),
+                "release_basis": a.release_basis if a else None,
+            }
         )
 
     bridges: list[dict[str, Any]] = []
@@ -385,6 +518,19 @@ async def estimate_view(
         if not seg_actuals:
             out["notes"].append("Segment actuals are not loaded for this period.")
         bridges.append(out)
+        first_actual = min(
+            seg_actuals,
+            key=lambda a: a.released_at or dt.datetime.max.replace(tzinfo=dt.UTC),
+            default=None,
+        )
+        events.extend(
+            segment_events(
+                b,
+                release_at=release,
+                release_basis=first_actual.release_basis if first_actual else None,
+                known_at_by_value={v.id: v.known_at for v in consensus_all},
+            )
+        )
 
     notes: list[str] = []
     if not values:
@@ -451,6 +597,21 @@ async def pair_review_view(pool: Pool, ticker: str) -> dict[str, Any]:
     return {"ticker": ticker, "revision_gate": view["revision_gate"], "pairs": pairs}
 
 
+class PairRejected(ValueError):
+    """The two values are not a pair the revision view would produce."""
+
+
+def is_revision_pair(
+    values: Sequence[est.Value], when: dt.datetime, earlier_id: int, later_id: int
+) -> bool:
+    """True only when `est.revision_pairs` over the values visible at `when` yields exactly this
+    (earlier, later) pair, so a label can never attach to an arbitrary or reversed pair."""
+    return any(
+        p.earlier_id == earlier_id and p.later_id == later_id
+        for p in est.revision_pairs(est.visible(values, when))
+    )
+
+
 async def record_pair_review(
     pool: Pool,
     *,
@@ -478,6 +639,14 @@ async def record_pair_review(
         raise ValueError("the two values belong to different issuers")
     if first["known_at"] > second["known_at"]:
         raise ValueError("the earlier value became known after the later one")
+    now = dt.datetime.now(dt.UTC)
+    values = [to_value(r) for r in await pool.fetch(VALUE_SQL, int(first["issuer_id"]), now)]
+    if not is_revision_pair(values, now, earlier_value_id, later_value_id):
+        raise PairRejected(
+            "these two values are not an adjacent revision pair for this issuer: the pair must be "
+            "one the revision view would produce (same series, metric, segment and period, "
+            "consecutive snapshots)"
+        )
     new_id = await pool.fetchval(
         """insert into public.estimate_pair_review
              (earlier_value_id, later_value_id, correct, reviewer, note)

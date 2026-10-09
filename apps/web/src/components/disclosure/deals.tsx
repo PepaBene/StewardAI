@@ -572,12 +572,13 @@ export function DealFacts({ deal }: { deal: Deal }) {
 // ------------------------------------------------------------------------------------- portfolio
 export function PortfolioDealsPanel({ data, names }: { data: PortfolioDeals; names?: Record<string, string> }) {
   const label = (t: string) => names?.[t] ?? t;
-  const covered = num(data.covered_weight) ?? 0;
-  const denom = num(data.denominator) ?? 0;
+  // unknown stays unknown: a missing figure is not read as zero
+  const covered = num(data.covered_weight);
+  const denom = num(data.denominator);
   return (
     <div className="space-y-3 text-sm">
       <p>
-        Weights are shares of <strong className="num">{percent(data.denominator, 0)}</strong> of portfolio value across <span className="num">{data.holdings}</span> holdings. <span className="num">{percent(data.covered_weight)}</span> sits in {denom > 0 && covered === 0 ? "no holding" : "holdings"} with an active deal known at this date.
+        Weights are shares of <strong className="num">{percent(data.denominator, 0)}</strong> of portfolio value across <span className="num">{data.holdings}</span> holdings. <span className="num">{percent(data.covered_weight)}</span> sits in {denom != null && denom > 0 && covered === 0 ? "no holding" : "holdings"} with an active deal known at this date.
       </p>
       {data.rows.length === 0 ? <p className="text-text-muted">No held company has an active deal known at this date.</p> : (
         <div className="overflow-x-auto">

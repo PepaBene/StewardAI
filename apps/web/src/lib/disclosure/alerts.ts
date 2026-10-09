@@ -91,6 +91,18 @@ export const OWNERSHIP_MATCH_LABELS = [
   { value: "cannot_tell", label: "Cannot tell" },
 ] as const;
 
+/** The state a deal passage supports, as `adjudication.DEAL_STATE_LABELS` in the backend. */
+export const DEAL_STATE_LABELS = [
+  { value: "rumored", label: "Rumoured" },
+  { value: "announced", label: "Announced" },
+  { value: "definitive", label: "Definitive agreement" },
+  { value: "approved", label: "Approved" },
+  { value: "closed", label: "Closed" },
+  { value: "terminated", label: "Terminated" },
+  { value: "contested", label: "Contested" },
+  { value: "not_a_deal", label: "Not a deal" },
+] as const;
+
 export const INSIDER_CLASS_LABELS = [
   { value: "open_market_buy", label: "Open-market purchase" },
   { value: "open_market_sell", label: "Open-market sale" },

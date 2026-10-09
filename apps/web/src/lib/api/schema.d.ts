@@ -4671,8 +4671,9 @@ export interface paths {
         };
         /**
          * Adjudication Sample
-         * @description A reproducible sample to label. Relationship samples include unmarked deliberate false
-         *     positives: a reviewer who calls one a true relationship fails the gate.
+         * @description A reproducible sample to label, by default as large as the gate needs. Relationship
+         *     samples add unmarked deliberate false positives on top: a reviewer who calls one a true
+         *     relationship fails the gate.
          */
         get: operations["adjudication_sample"];
         put?: never;
@@ -5684,7 +5685,7 @@ export interface components {
              * Dataset
              * @enum {string}
              */
-            dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample";
+            dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample" | "deal_state";
             /** Sample Key */
             sample_key: string;
             /** Labelled */
@@ -5734,7 +5735,7 @@ export interface components {
              * Dataset
              * @enum {string}
              */
-            dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample";
+            dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample" | "deal_state";
             /** Sample Key */
             sample_key: string;
             /** Items */
@@ -7167,6 +7168,20 @@ export interface components {
             dimension: string;
             /** Bucket */
             bucket?: string | null;
+        };
+        /** ChainGroupOut */
+        ChainGroupOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "stated_group" | "stated_not_group" | "joint_filing_group_not_stated" | "single_filer";
+            /** Members */
+            members: number;
+            /** Stated Members */
+            stated_members: number;
+            /** Note */
+            note: string | null;
         };
         /** ChainHolderOut */
         ChainHolderOut: {
@@ -9348,6 +9363,17 @@ export interface components {
             ownership_changes?: components["schemas"]["ManagerChange"][];
             /** @description The claim verifier's pass over the written sentences. */
             claims?: components["schemas"]["ClaimCheckSummary"] | null;
+            /**
+             * Disclosure Alerts
+             * @description Public-disclosure alerts raised in the period (newest first, at most 30).
+             */
+            disclosure_alerts?: components["schemas"]["DisclosureAlertLine"][];
+            /**
+             * Disclosure Alerts More
+             * @description Alerts of the period left out of the list above.
+             * @default 0
+             */
+            disclosure_alerts_more: number;
         };
         /**
          * DigestFactSource
@@ -9574,6 +9600,22 @@ export interface components {
             period_end: string;
             /** Resolution */
             resolution: string | null;
+        };
+        /** DisclosureAlertLine */
+        DisclosureAlertLine: {
+            /** Ticker */
+            ticker: string;
+            /** Kind */
+            kind: string;
+            /** Headline */
+            headline: string;
+            /** Source Url */
+            source_url: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
         };
         /** DisclosureAlertOut */
         DisclosureAlertOut: {
@@ -10518,6 +10560,8 @@ export interface components {
             warnings: string[];
             /** Actual Observation Id */
             actual_observation_id: number | null;
+            /** Release Basis */
+            release_basis?: string | null;
             /** Formula Version */
             formula_version: string;
             /** Formula */
@@ -18828,6 +18872,10 @@ export interface components {
             detail: string;
             /** Ref */
             ref: string | null;
+            /** Change */
+            change?: ("new" | "changed") | null;
+            /** Was */
+            was?: string | null;
         };
         /** ReplayOut */
         ReplayOut: {
@@ -20823,6 +20871,7 @@ export interface components {
             linked_to_previous: boolean;
             /** Source Url */
             source_url: string;
+            group: components["schemas"]["ChainGroupOut"];
             /** Holders */
             holders: components["schemas"]["ChainHolderOut"][];
             /** Changes */
@@ -30227,12 +30276,12 @@ export interface operations {
     adjudication_sample: {
         parameters: {
             query?: {
-                size?: number;
+                size?: number | null;
                 seed?: string;
             };
             header?: never;
             path: {
-                dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample";
+                dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample" | "deal_state";
             };
             cookie?: never;
         };
@@ -30261,12 +30310,12 @@ export interface operations {
     adjudication_prelabel: {
         parameters: {
             query?: {
-                size?: number;
+                size?: number | null;
                 seed?: string;
             };
             header?: never;
             path: {
-                dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample";
+                dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample" | "deal_state";
             };
             cookie?: never;
         };
@@ -30299,7 +30348,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample";
+                dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample" | "deal_state";
             };
             cookie?: never;
         };
@@ -30330,7 +30379,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample";
+                dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample" | "deal_state";
             };
             cookie?: never;
         };
@@ -30367,7 +30416,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample";
+                dataset: "relationship_claim" | "insider_class" | "ownership_match" | "statement_note" | "document_sample" | "deal_state";
             };
             cookie?: never;
         };

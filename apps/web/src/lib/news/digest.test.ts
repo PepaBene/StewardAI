@@ -22,6 +22,7 @@ const body: DigestBody = {
   window_end: "2026-09-25T10:00:00Z",
   nothing_material: false,
   headline: "1 material story in the last 24 hours.",
+  disclosure_alerts_more: 0,
   overview: [{ text: "A busy day.", news_item_ids: [11], fact_ids: [] }],
   sections: [
     {

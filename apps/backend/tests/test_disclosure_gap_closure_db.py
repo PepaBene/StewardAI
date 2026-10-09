@@ -648,7 +648,8 @@ async def test_a_relationship_sample_hides_planted_items_among_the_real_ones(
             backend_pool, "AAA", f"Co {i}", "0.1", "suggested", dt.datetime(2026, 1, 10, tzinfo=UTC)
         )
     items = await adjudication.relationship_sample(backend_pool, 10, "seed")
-    assert len(items) == 3 + 7  # 10 asked for, 7 of them planted
+    # 10 real claims asked for, the 7 planted ones on top, so the sample can meet a gate of 10
+    assert len(items) == 10 + 7
     assert sum(1 for i in items if i.planted) == 7
     again = await adjudication.relationship_sample(backend_pool, 10, "seed")
     assert [i.item_ref for i in items] == [i.item_ref for i in again]

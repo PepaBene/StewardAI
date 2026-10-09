@@ -49,10 +49,14 @@ async def enqueue(
     reason: Reason,
     candidate: dict[str, Any],
 ) -> int | None:
-    """Open a review once per (subject, reason); None if one is already open or deferred."""
+    """Open a review once per (subject, reason); None if one is already open or deferred, or if
+    a person already decided one. A daily scan must not reopen what a person has closed."""
     opened: int | None = await pool.fetchval(
         """insert into public.quality_review(subject_type, subject_id, reason, candidate)
-           values($1,$2,$3,$4::jsonb)
+           select $1,$2,$3,$4::jsonb
+            where not exists (select 1 from public.quality_review
+                               where subject_type = $1 and subject_id = $2 and reason = $3
+                                 and status in ('approved','rejected','superseded'))
            on conflict (subject_type, subject_id, reason) where status in ('open','deferred')
            do nothing returning id""",
         subject_type,

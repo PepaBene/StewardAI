@@ -43,6 +43,11 @@ SYSTEM = {
         "You compare the manager-filed issuer name with the company it was matched to. Labels: "
         "same_company, different_company, cannot_tell. Use cannot_tell when unsure."
     ),
+    "deal_state": (
+        "You read one passage a deal state rests on. Name the state the passage itself supports: "
+        "rumored, announced, definitive (a signed agreement), approved, closed, terminated, "
+        "contested, or not_a_deal. Paying off a credit facility is not a terminated deal."
+    ),
 }
 
 
@@ -183,5 +188,6 @@ async def accept_unflagged(pool: Pool, dataset: str, sample_key: str, by: str) -
             human_value=r["suggested_value"],
             by=by,
             note=ACCEPT_NOTE,
+            kind="accepted_suggestion",
         )
     return len(rows)

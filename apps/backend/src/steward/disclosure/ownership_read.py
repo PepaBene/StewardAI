@@ -379,7 +379,9 @@ async def ownership(pool: Pool, ticker: str, as_of: dt.datetime | None = None) -
     when = _aware(as_of)
     den = await pool.fetchrow(
         """select shares, as_of, method from public.shares_outstanding
-            where ticker = $1 and filed is not null and filed <= $2::timestamptz::date
+            where ticker = $1 and filed is not null
+              -- a filing is known at the end of its filing day (UTC), as every other lane
+              and ((filed + 1)::timestamp at time zone 'UTC') <= $2
             order by as_of desc, id desc limit 1""",
         ticker,
         when,

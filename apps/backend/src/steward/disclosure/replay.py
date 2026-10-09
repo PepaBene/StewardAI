@@ -38,9 +38,18 @@ def item(
 def new_since(
     known: Iterable[dict[str, Any]], current: Iterable[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Items present now whose `ref` was not in the known set: what became known afterwards."""
-    seen = {i["ref"] for i in known}
-    return [i for i in current if i["ref"] not in seen]
+    """What became known afterwards: items whose `ref` was not known (`change` "new"), and items
+    whose ref was known but whose label or detail now reads differently (`change` "changed",
+    with `was`), such as a deal that moved state or a holder whose stake was amended."""
+    seen = {i["ref"]: i for i in known}
+    out: list[dict[str, Any]] = []
+    for i in current:
+        before = seen.get(i["ref"])
+        if before is None:
+            out.append({**i, "change": "new"})
+        elif (before["label"], before["detail"]) != (i["label"], i["detail"]):
+            out.append({**i, "change": "changed", "was": before["detail"] or before["label"]})
+    return out
 
 
 def drop_future(
@@ -132,7 +141,20 @@ def _deals(view: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _ownership(view: dict[str, Any]) -> list[dict[str, Any]]:
     return [
-        item(f"{ln['title']}: {e['holder']}", None, ln["basis"], f"{ln['key']}:{e['holder']}")
+        item(
+            f"{ln['title']}: {e['holder']}",
+            None,
+            "; ".join(
+                p
+                for p in (
+                    ln["basis"],
+                    e["shares"] and f"{e['shares']} shares",
+                    e["reported_percent"] and f"{e['reported_percent']}%",
+                )
+                if p
+            ),
+            f"{ln['key']}:{e['holder']}",
+        )
         for ln in view["lanes"]
         for e in ln["entries"]
     ]
@@ -143,7 +165,11 @@ def _insiders(view: dict[str, Any]) -> list[dict[str, Any]]:
         item(
             f"{t['insider']} ({t.get('role') or 'role not stated'})",
             None,
-            f"{t.get('tx_date')}",
+            "; ".join(
+                str(p)
+                for p in (t.get("tx_date"), t.get("code"), t.get("shares"), t.get("price"))
+                if p is not None
+            ),
             f"{t['accession']}:{t['row_index']}",
         )
         for t in view["transactions"]

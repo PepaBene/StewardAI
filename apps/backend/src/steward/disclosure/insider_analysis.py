@@ -102,10 +102,14 @@ async def context_for(pool: Pool, ticker: str, when: dt.datetime) -> dict[str, A
     facts that sit beside the trades, and a missing share count is said to be missing."""
     shares = await pool.fetch(
         """select shares, as_of, method from public.shares_outstanding
-            where ticker = $1 and as_of <= $2 and (filed is null or filed <= $2::date)
+            where ticker = $1 and as_of <= ($2::timestamptz at time zone 'UTC')::date
+              and filed is not null
+              -- known at the end of the filing day (UTC); an undated count cannot be placed in
+              -- time, so it is never shown in a replay
+              and ((filed + 1)::timestamp at time zone 'UTC') <= $2
             order by as_of desc limit 2""",
         ticker,
-        when.date(),
+        when,
     )
     events = await pool.fetch(
         """select event_type, event_state, announced_at, source_url from public.company_event

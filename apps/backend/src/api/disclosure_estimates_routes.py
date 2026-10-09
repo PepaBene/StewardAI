@@ -117,6 +117,7 @@ class EventComparisonOut(BaseModel):
     later_files_only: bool
     warnings: list[str]
     actual_observation_id: int | None
+    release_basis: str | None = None
     formula_version: str
     formula: str
 
@@ -260,6 +261,8 @@ async def record_pair_review(body: PairReviewIn, pool: Pool, owner: Owner) -> Pa
             reviewer=f"owner:{owner.user_id}",
             note=body.note,
         )
+    except estimate_read.PairRejected as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     return PairReviewCreatedOut(id=new_id)

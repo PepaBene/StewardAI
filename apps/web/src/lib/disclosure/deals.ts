@@ -108,7 +108,10 @@ export const num = (v: string | null | undefined): number | null => {
 export function formatTerm(name: string, value: string | null | undefined, currency: string | null | undefined): string {
   const n = num(value);
   if (n == null) return "not stated";
-  if (PCT_TERMS.has(name)) return `${(n * 100).toFixed(n * 100 % 1 === 0 ? 0 : 1)}%`;
+  if (PCT_TERMS.has(name)) {
+    const pct = Math.round(n * 1000) / 10; // by rounding: 0.07 * 100 is 7.000000000000001 in floats
+    return `${Number.isInteger(pct) ? pct.toFixed(0) : pct.toFixed(1)}%`;
+  }
   if (name === "exchange_ratio") return `${Number(n.toFixed(4))}`;
   if (PRICE_TERMS.has(name)) return `${currency ?? ""} ${n.toFixed(2)}`.trim();
   return `${currency ?? ""} ${formatCompact(n)}`.trim();
@@ -241,7 +244,7 @@ export function premiumImpact(tv: TermVersion | undefined, announcedOn: string |
   if (un == null) return nul("no unaffected price is stated");
   if (!tv.unaffected_date) return nul("the unaffected price has no date, so it cannot be called unaffected");
   if (!announcedOn) return nul("the announcement date is not known");
-  if (tv.unaffected_date >= announcedOn) return nul(`the unaffected date ${tv.unaffected_date} is on or after the announcement ${announcedOn}, so that price already reflects the deal`);
+  if (tv.unaffected_date.slice(0, 10) >= announcedOn.slice(0, 10)) return nul(`the unaffected date ${tv.unaffected_date} is on or after the announcement ${announcedOn}, so that price already reflects the deal`);
   if (!cur) return nul("the currency is not stated");
   if (un <= 0 || offer <= 0) return nul("a price must be positive");
   const age = (Date.parse(announcedOn) - Date.parse(tv.unaffected_date)) / DAY_MS;
@@ -256,6 +259,7 @@ export function dilutionImpact(tv: TermVersion | undefined, ctx: DealContext): I
   const ids = tv ? [tv.id] : [];
   if (ratio == null) return impact({ ...base, reason: "no exchange ratio is stated (an all-cash price issues no shares we can count)" }, ids, tv?.currency ?? null);
   if (ctx.acquirerShares == null || ctx.targetShares == null) return impact({ ...base, inputs: { exchange_ratio: String(ratio) }, reason: "the share counts are not known" }, ids, tv?.currency ?? null);
+  if (ctx.acquirerShares <= 0 || ctx.targetShares <= 0) return impact({ ...base, inputs: { exchange_ratio: String(ratio) }, reason: "a share count must be positive" }, ids, tv?.currency ?? null);
   const added = ratio * ctx.targetShares;
   return impact(
     {
@@ -281,7 +285,7 @@ export function debtImpact(dealType: string, tv: TermVersion | undefined, ctx: D
   const net = gross - (repaid ?? 0);
   const inputs: Record<string, string> = { [field]: String(gross), enterprise_value_before: String(ctx.enterpriseValueBefore) };
   if (repaid != null) inputs.refinanced_amount = String(repaid);
-  return impact({ ...base, value: String(net / ctx.enterpriseValueBefore), inputs, detail: { net_new_debt: String(net) }, flags: repaid == null && dealType === "debt_issuance" ? ["gross_of_refinancing"] : [] }, ids, cur);
+  return impact({ ...base, value: String(net / ctx.enterpriseValueBefore), inputs, detail: { net_new_debt: String(net) }, flags: repaid == null ? ["gross_of_refinancing"] : [] }, ids, cur);
 }
 
 export function buybackImpact(tv: TermVersion | undefined): Impact {
@@ -291,6 +295,7 @@ export function buybackImpact(tv: TermVersion | undefined): Impact {
   const done = num(tv?.terms.find((t) => t.name === "executed_amount")?.value);
   if (auth == null) return impact({ ...base, reason: "no authorization amount is stated" }, ids, tv?.currency ?? null);
   if (done == null) return impact({ ...base, inputs: { authorized_amount: String(auth) }, reason: "no purchases are stated; an authorization is not a purchase" }, ids, tv?.currency ?? null);
+  if (auth <= 0) return impact({ ...base, inputs: { authorized_amount: String(auth), executed_amount: String(done) }, reason: "the authorization must be positive" }, ids, tv?.currency ?? null);
   return impact({ ...base, value: String(done / auth), inputs: { authorized_amount: String(auth), executed_amount: String(done) }, flags: done > auth ? ["executed_exceeds_authorization"] : [] }, ids, tv?.currency ?? null);
 }
 

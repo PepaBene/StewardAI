@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { OwnershipLanes, QuarterNote, RankFlow, StakeChain, StakeTimeline } from "@/components/disclosure/ownership";
+import { ReleaseNotice } from "@/components/disclosure/release-notice";
+import { outcomeOf } from "@/lib/disclosure/keyed";
+import { useKeyedLoad } from "@/lib/disclosure/use-keyed-load";
 import { Panel, SectionNav } from "@/components/oversight/panel";
 import { PageHeader } from "@/components/page-header";
 import { Field } from "@/components/reference/form-bits";
@@ -34,57 +37,30 @@ export function OwnershipPageView() {
   const [input, setInput] = useState("");
   const [ticker, setTicker] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>();
-  const [live, setLive] = useState<OwnershipView | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
   const [cikInput, setCikInput] = useState("");
   const [cikError, setCikError] = useState<string | undefined>();
   const [filerCik, setFilerCik] = useState<string | null>(null);
-  // The result is keyed by the inputs that produced it, so a stale result is never shown for new ones.
-  const [chainResult, setChainResult] = useState<{ key: string; data: StakeChainView | null; failure: string | null } | null>(null);
+  // "Show" bumps this so the same inputs fetch again
+  const [nonce, setNonce] = useState(0);
 
   const sample = ticker === null;
+  // Results are keyed by the inputs that produced them, so a failed refetch never shows old data under new inputs.
   const chainKey = ticker && filerCik ? `${ticker}:${filerCik}:${cutoff}` : null;
-  const chain = chainResult && chainResult.key === chainKey ? chainResult.data : null;
-  const chainFailure = chainResult && chainResult.key === chainKey ? chainResult.failure : null;
+  const chainState = useKeyedLoad<StakeChainView>(chainKey, "The filing history", async () => {
+    const r = await getBrowserApiClient().GET("/disclosures/holdings/{ticker}/control-stakes/{filer_cik}/chain", { params: { path: { ticker: ticker as string, filer_cik: filerCik as string }, query: { as_of: new Date(cutoff).toISOString() } } });
+    return outcomeOf("The filing history", r);
+  });
+  const chain = chainState?.state === "ready" ? chainState.data : null;
+  const chainFailure = chainState?.state === "error" ? chainState.message : null;
 
-  useEffect(() => {
-    if (!ticker || !filerCik || !chainKey) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await getBrowserApiClient().GET("/disclosures/holdings/{ticker}/control-stakes/{filer_cik}/chain", { params: { path: { ticker, filer_cik: filerCik }, query: { as_of: new Date(cutoff).toISOString() } } });
-        if (cancelled) return;
-        if (r.data) setChainResult({ key: chainKey, data: r.data, failure: null });
-        else setChainResult({ key: chainKey, data: null, failure: r.response.status === 401 || r.response.status === 403 ? "Sign in again (with MFA) and retry." : `The filing history failed to load (HTTP ${r.response.status}).` });
-      } catch (e) {
-        if (!cancelled) setChainResult({ key: chainKey, data: null, failure: `Backend unreachable: ${e instanceof Error ? e.message : String(e)}` });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [ticker, filerCik, cutoff, chainKey]);
-
-  useEffect(() => {
-    if (!ticker) return;
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const r = await getBrowserApiClient().GET("/disclosures/holdings/{ticker}/ownership", { params: { path: { ticker }, query: { as_of: new Date(cutoff).toISOString() } } });
-        if (cancelled) return;
-        if (r.data) {
-          setFailure(null);
-          setLive(r.data);
-        } else setFailure(r.response.status === 401 || r.response.status === 403 ? "Sign in again (with MFA) and retry." : `The ownership read failed (HTTP ${r.response.status}).`);
-      } catch (e) {
-        if (!cancelled) setFailure(`Backend unreachable: ${e instanceof Error ? e.message : String(e)}`);
-      }
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [ticker, cutoff]);
+  const liveKey = ticker ? `${ticker}:${cutoff}` : null;
+  const liveState = useKeyedLoad<OwnershipView>(liveKey, "The ownership read", async () => {
+    const r = await getBrowserApiClient().GET("/disclosures/holdings/{ticker}/ownership", { params: { path: { ticker: ticker as string }, query: { as_of: new Date(cutoff).toISOString() } } });
+    return outcomeOf("The ownership read", r);
+  }, nonce, 250);
+  const live = liveState?.state === "ready" ? liveState.data : null;
+  const failure = liveState?.state === "error" ? liveState.message : null;
+  const loadingText = failure ? "Not loaded." : "Loading…";
 
   const view = useMemo(() => (sample ? sampleOwnership(cutoff) : live), [sample, cutoff, live]);
   const trend = view?.trend ?? null;
@@ -95,13 +71,12 @@ export function OwnershipPageView() {
     if (t === "") {
       setError(undefined);
       setTicker(null);
-      setLive(null);
       return;
     }
     if (!TICKER.test(t)) return setError("Use letters, digits, dot, dash or underscore, up to 32 characters.");
     setError(undefined);
-    setLive(null);
     setTicker(t.toUpperCase());
+    setNonce((n) => n + 1); // the same inputs still refetch
   }
 
   const book = (b: Record<string, string>) => Object.fromEntries(Object.entries(b).map(([k, v]) => [k, Number(v)]));
@@ -114,6 +89,8 @@ export function OwnershipPageView() {
         description="Who reports owning a company's shares, by source, with the date each figure was measured and filed. The sources are never added together."
         aside={<span>{ticker ?? SAMPLE_TICKER} · as known on {formatDay(new Date(cutoff).toISOString())}</span>}
       />
+
+      <ReleaseNotice page="ownership" />
 
       {sample ? (
         <p role="note" className="border border-dashed border-border bg-surface-muted px-3 py-2 text-sm">
@@ -148,18 +125,18 @@ export function OwnershipPageView() {
       <SectionNav sections={SECTIONS} />
 
       <Panel id="lanes" title="Who reports owning shares" description="Each bar is one source measured against the same share count. The hatched part is what that source does not account for; it is not assumed to be anyone's.">
-        {view ? <OwnershipLanes view={view} /> : <p className="text-sm text-text-muted">Loading ownership…</p>}
+        {view ? <OwnershipLanes view={view} /> : <p className="text-sm text-text-muted">{failure ? "Not loaded." : "Loading ownership…"}</p>}
       </Panel>
 
       <Panel id="quarter" title="Which quarter, and who is missing" description="The quarter the manager lane uses, and what each manager’s own report says about its size.">
-        {view ? <QuarterNote view={view} /> : <p className="text-sm text-text-muted">Loading…</p>}
+        {view ? <QuarterNote view={view} /> : <p className="text-sm text-text-muted">{loadingText}</p>}
       </Panel>
 
       <Panel id="movement" title="Manager movement" description="The largest managers' reported holdings, quarter to quarter.">
         {trend ? (
           <RankFlow prev={book(trend.prev)} cur={book(trend.cur)} prevLabel={formatDay(trend.prev_period)} curLabel={formatDay(trend.cur_period)} />
         ) : (
-          <p className="text-sm text-text-muted">{view ? "Fewer than two quarters of manager reports are known at this date, so there is no movement to show." : "Loading…"}</p>
+          <p className="text-sm text-text-muted">{view ? "Fewer than two quarters of manager reports are known at this date, so there is no movement to show." : loadingText}</p>
         )}
       </Panel>
 
@@ -185,7 +162,7 @@ export function OwnershipPageView() {
               <Button type="submit" size="sm">Show this filer’s filings</Button>
             </form>
             {chainFailure ? <p role="alert" className="border border-warning-signal/40 bg-warning-signal-subtle px-3 py-2 text-sm">{chainFailure}</p> : null}
-            {chain ? <StakeChain chain={chain} /> : filerCik ? <p className="text-sm text-text-muted">Loading filings…</p> : null}
+            {chain ? <StakeChain chain={chain} /> : filerCik ? <p className="text-sm text-text-muted">{chainFailure ? "Not loaded." : "Loading filings…"}</p> : null}
           </div>
         )}
       </Panel>

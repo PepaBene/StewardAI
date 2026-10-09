@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { BasisWarnings, CoverageList, FiveLanes, GateNote, PeriodRanges, RevisionSlopes, SegmentMultiples, SurpriseBridge } from "@/components/disclosure/estimates";
 import { PairReviewPanel } from "@/components/disclosure/pair-reviews";
+import { ReleaseNotice } from "@/components/disclosure/release-notice";
+import { outcomeOf } from "@/lib/disclosure/keyed";
+import { useKeyedLoad } from "@/lib/disclosure/use-keyed-load";
 import { Panel, SectionNav } from "@/components/oversight/panel";
 import { PageHeader } from "@/components/page-header";
 import { Field, SELECT_CLASS } from "@/components/reference/form-bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
-import { allLines, choices, type EstimatesView } from "@/lib/disclosure/estimates";
+import { allLines, choices, defaultChoice, type EstimatesView } from "@/lib/disclosure/estimates";
 import { SAMPLE_EST_DAY, SAMPLE_EST_TICKER, sampleEstimates } from "@/lib/disclosure/fixtures-estimates";
 import { dayOf, endOfDayMs, formatDay } from "@/lib/disclosure/model";
 
@@ -27,7 +30,6 @@ const SECTIONS = [
 
 const TICKER = /^[A-Za-z0-9._-]{1,32}$/;
 const DAY_MS = 86_400_000;
-const LOADING = <p className="text-sm text-text-muted">Loading…</p>;
 
 /**
  * Published consensus, named analyst estimates, company guidance, event-calendar estimates and your
@@ -40,44 +42,31 @@ export function EstimatesPageView() {
   const [input, setInput] = useState("");
   const [ticker, setTicker] = useState<string | null>(null);
   const [error, setError] = useState<string | undefined>();
-  const [live, setLive] = useState<EstimatesView | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
   const [pick, setPick] = useState<string>("");
   const [segPick, setSegPick] = useState(0);
+  // "Show" bumps this so the same inputs fetch again
+  const [nonce, setNonce] = useState(0);
 
   const sample = ticker === null;
 
-  useEffect(() => {
-    if (!ticker) return;
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const r = await getBrowserApiClient().GET("/disclosures/holdings/{ticker}/estimates", { params: { path: { ticker }, query: { as_of: new Date(cutoff).toISOString() } } });
-        if (cancelled) return;
-        if (r.data) {
-          setFailure(null);
-          setLive(r.data);
-        } else setFailure(r.response.status === 401 || r.response.status === 403 ? "Sign in again (with MFA) and retry." : `The estimates read failed (HTTP ${r.response.status}).`);
-      } catch (e) {
-        if (!cancelled) setFailure(`Backend unreachable: ${e instanceof Error ? e.message : String(e)}`);
-      }
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [ticker, cutoff]);
+  // keyed by the inputs that produced it: a failed refetch never shows the old ticker or date under new inputs
+  const liveState = useKeyedLoad<EstimatesView>(ticker ? `${ticker}:${cutoff}` : null, "The estimates read", async () => {
+    const r = await getBrowserApiClient().GET("/disclosures/holdings/{ticker}/estimates", { params: { path: { ticker: ticker as string }, query: { as_of: new Date(cutoff).toISOString() } } });
+    return outcomeOf("The estimates read", r);
+  }, nonce, 250);
+  const live = liveState?.state === "ready" ? liveState.data : null;
+  const failure = liveState?.state === "error" ? liveState.message : null;
 
+  const loading = <p className="text-sm text-text-muted">{failure ? "Not loaded." : "Loading…"}</p>;
   const view = useMemo(() => (sample ? sampleEstimates(cutoff) : live), [sample, cutoff, live]);
   const lines = useMemo(() => (view ? allLines(view) : []), [view]);
   const options = useMemo(() => choices(lines), [lines]);
   const segIndex = view && segPick < view.segment_bridges.length ? segPick : 0;
-  const choice = options.find((o) => o.key === pick) ?? options.find((o) => o.metric === "Revenue" && o.period === "FY2026Q3") ?? options[0];
+  const choice = options.find((o) => o.key === pick) ?? defaultChoice(options, lines);
 
   function apply(e: React.FormEvent) {
     e.preventDefault();
     const t = input.trim();
-    setLive(null);
     setPick("");
     setSegPick(0);
     if (t === "") {
@@ -90,6 +79,7 @@ export function EstimatesPageView() {
     setError(undefined);
     setCutoff(until);
     setTicker(t.toUpperCase());
+    setNonce((n) => n + 1); // the same inputs still refetch
   }
 
   return (
@@ -100,6 +90,8 @@ export function EstimatesPageView() {
         description="What a company and the analysts it publishes said to expect, how that moved, and how the result compared. Five kinds of number, kept in five lanes."
         aside={<span>{ticker ?? SAMPLE_EST_TICKER} · as known on {formatDay(new Date(cutoff).toISOString())}</span>}
       />
+
+      <ReleaseNotice page="estimates" />
 
       {sample ? (
         <p role="note" className="border border-dashed border-border bg-surface-muted px-3 py-2 text-sm">
@@ -153,19 +145,19 @@ export function EstimatesPageView() {
       <SectionNav sections={SECTIONS} />
 
       <Panel id="lanes" title="Five lanes" description="One metric and fiscal period. Each lane has its own mark and is never overlaid on, or averaged with, another.">
-        {view ? choice ? <FiveLanes view={view} choice={choice} /> : <p className="text-sm text-text-muted">No estimate of any kind is known for this holding at this date.</p> : LOADING}
+        {view ? choice ? <FiveLanes view={view} choice={choice} /> : <p className="text-sm text-text-muted">No estimate of any kind is known for this holding at this date.</p> : loading}
       </Panel>
 
       <Panel id="ranges" title="Range by period" description="Published consensus for each fiscal period: low to high, mean and median, with the size of the panel.">
-        {view && choice ? <PeriodRanges lines={view.lanes.published_analyst_consensus} metric={choice.metric} /> : view ? <p className="text-sm text-text-muted">No published consensus at this date.</p> : LOADING}
+        {view && choice ? <PeriodRanges lines={view.lanes.published_analyst_consensus} metric={choice.metric} /> : view ? <p className="text-sm text-text-muted">No published consensus at this date.</p> : loading}
       </Panel>
 
       <Panel id="revisions" title="Revisions" description="How an estimate moved between files. Only snapshots measured the same way are compared; otherwise the chain shows a break and the reason.">
-        {view ? <RevisionSlopes pairs={view.pairs} lines={lines} /> : LOADING}
+        {view ? <RevisionSlopes pairs={view.pairs} lines={lines} /> : loading}
       </Panel>
 
       <Panel id="surprise" title="Earnings surprise" description="The estimate known before the release, the reported actual, and the formula. A file published later is never used.">
-        {view ? <SurpriseBridge events={view.events} lines={lines} /> : LOADING}
+        {view ? <SurpriseBridge events={view.events} lines={lines} /> : loading}
       </Panel>
 
       <Panel id="segments" title="Segments" description="Reported segment against the segment estimate the company published. A segment with no estimate is left blank.">
@@ -179,19 +171,19 @@ export function EstimatesPageView() {
             </select>
           </label>
         ) : null}
-        {view ? <SegmentMultiples bridge={view.segment_bridges[segIndex]} /> : LOADING}
+        {view ? <SegmentMultiples bridge={view.segment_bridges[segIndex]} /> : loading}
       </Panel>
 
       <Panel id="warnings" title="Basis and panel warnings" description="Adjusted definitions, unstated panel sizes and corrected files for the lines shown.">
-        {view ? <BasisWarnings lines={lines} /> : LOADING}
+        {view ? <BasisWarnings lines={lines} /> : loading}
       </Panel>
 
       <Panel id="review" title="Review pairs" description="Say whether each comparison was handled correctly. Revision alerts and revision-based screens stay off until enough pairs are labelled correct.">
-        {ticker ? <PairReviewPanel ticker={ticker} onChanged={() => setCutoff((c) => c + 1)} /> : <p className="text-sm text-text-muted">Enter a ticker you hold to review its real consensus pairs. The sample company has none to label.</p>}
+        {ticker ? <PairReviewPanel key={ticker} ticker={ticker} onChanged={() => setNonce((n) => n + 1)} /> : <p className="text-sm text-text-muted">Enter a ticker you hold to review its real consensus pairs. The sample company has none to label.</p>}
       </Panel>
 
       <Panel id="coverage" title="Coverage" description="What is not covered, and where the files come from.">
-        {view ? <CoverageList gaps={view.coverage} sources={view.sources} /> : LOADING}
+        {view ? <CoverageList gaps={view.coverage} sources={view.sources} /> : loading}
       </Panel>
     </div>
   );

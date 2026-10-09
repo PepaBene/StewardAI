@@ -19,6 +19,7 @@ from typing import Any
 import asyncpg
 
 from steward.disclosure import deals as dl
+from steward.disclosure.deal_parties import effective_match_sql
 
 type Pool = asyncpg.Pool | asyncpg.Connection
 
@@ -119,13 +120,14 @@ def _group(rows: Sequence[Any]) -> dict[int, list[Any]]:
 
 FACT_METRICS = ("shares_outstanding", "total_debt", "cash", "revenue")
 
-FACTS_SQL = """
-select x.deal_id, x.who, lower(o.metric) as metric, o.value, o.scale, o.known_at, o.id,
-       o.segment, o.period_end, o.currency
+FACTS_SQL = f"""
+select x.deal_id, x.who, x.issuer_id, lower(o.metric) as metric, o.value, o.scale, o.known_at,
+       o.id, o.segment, o.period_end, o.currency, o.dimensions
   from (
-    select p.deal_id, p.role as who, p.issuer_id
+    select p.deal_id, p.role as who, m.issuer_id
       from public.deal_participant p
-     where p.deal_id = any($1::bigint[]) and p.known_at <= $2 and p.issuer_id is not null
+      join ({effective_match_sql("$2")}) m on m.participant_id = p.id and m.decision = 'confirmed'
+     where p.deal_id = any($1::bigint[]) and p.known_at <= $2
     union all
     select e.id, 'held', i.id
       from public.deal_event e
@@ -137,7 +139,7 @@ select x.deal_id, x.who, lower(o.metric) as metric, o.value, o.scale, o.known_at
  where o.known_at <= $2 and o.value_state = 'reported' and o.value is not null
    and o.review_state <> 'rejected' and lower(o.metric) = any($3::text[])
  order by o.known_at, o.id
-"""
+"""  # noqa: S608 - fixed fragments, no input
 
 
 # The held company's closing price on or before the announcement (never after the as-of date), in
@@ -149,7 +151,8 @@ select e.id as deal_id, b.close, n.currency, b.date as price_date
   join lateral (
     select close, date from public.price_bar
      where symbol = coalesce(n.price_symbol, n.t212_ticker)
-       and date <= least(coalesce(e.announced_at, $2)::date, $2::date)
+       and date < least((coalesce(e.announced_at, $2::timestamptz) at time zone 'UTC')::date,
+                        ($2::timestamptz at time zone 'UTC')::date)
      order by date desc limit 1
   ) b on true
  where e.id = any($1::bigint[])
@@ -162,8 +165,19 @@ def _scaled(r: Any) -> Decimal:
     return Decimal(r["value"]) * (Decimal(10) ** int(r["scale"] or 0))
 
 
-def _segments(rows: Sequence[Any], roles: Sequence[str]) -> dict[str, Decimal] | None:
-    """Revenue by segment for the latest period that has any, for the first role that has rows."""
+def _has_dimensions(r: Any) -> bool:
+    d = r.get("dimensions")
+    if isinstance(d, str):
+        d = d.strip()
+        return d not in ("", "{}", "null")
+    return bool(d)
+
+
+def _segments(
+    rows: Sequence[Any], roles: Sequence[str], exclude_issuers: frozenset[int] = frozenset()
+) -> dict[str, Decimal] | None:
+    """Revenue by segment for the latest period that has any, for the first role that has rows.
+    Rows of `exclude_issuers` are skipped, so an acquirer never borrows the target's segments."""
     for role in roles:
         mine = [
             r
@@ -172,6 +186,7 @@ def _segments(rows: Sequence[Any], roles: Sequence[str]) -> dict[str, Decimal] |
             and r["metric"] == "revenue"
             and r.get("segment")
             and r.get("period_end")
+            and r.get("issuer_id") not in exclude_issuers
         ]
         if not mine:
             continue
@@ -193,13 +208,22 @@ def context_from_facts(
     stays unknown rather than mixing currencies. `price` is a row with `close` and `currency`."""
     latest: dict[tuple[str, str], Decimal] = {}
     currency: dict[tuple[str, str], str | None] = {}
+    newest: dict[tuple[str, str], tuple[dt.date, dt.datetime, int]] = {}
     for r in rows:
-        if r["metric"] == "revenue" or r.get("segment"):
-            continue  # segment revenue is read below; a segment's own count is not the firm's
+        if r["metric"] == "revenue" or r.get("segment") or _has_dimensions(r):
+            continue  # segment revenue is read below; a class or segment count is not the firm's
         key = (r["who"], r["metric"])
+        # the latest period wins, then the latest-known restatement of it (not the order of rows)
+        rank = (r.get("period_end") or dt.date.min, r["known_at"], int(r.get("id") or 0))
+        if key in newest and rank < newest[key]:
+            continue
+        newest[key] = rank
         latest[key] = _scaled(r)
         cur = r.get("currency")
         currency[key] = cur.upper() if cur else None
+    target_issuers = frozenset(
+        int(r["issuer_id"]) for r in rows if r["who"] == "target" and r.get("issuer_id") is not None
+    )
 
     def pick(roles: Sequence[str], metric: str) -> Decimal | None:
         for role in roles:
@@ -224,7 +248,7 @@ def context_from_facts(
         parent_shares=pick(("issuer", "held"), "shares_outstanding"),
         net_debt_before=net_debt,
         enterprise_value_before=ev,
-        acquirer_segments=_segments(rows, (*ACQUIRER, "held")),
+        acquirer_segments=_segments(rows, (*ACQUIRER, "held"), target_issuers),
         target_segments=_segments(rows, ("target",)),
     )
 
@@ -237,9 +261,12 @@ async def _children(
         "prices": _group(await pool.fetch(PRICES_SQL, ids, when)),
         "participants": await _rows(
             pool,
-            """select deal_id, role, name, issuer_id, ticker, share_class from
-            public.deal_participant
-                where deal_id = any($1::bigint[]) and known_at <= $2 order by id""",
+            """select p.deal_id, p.role, p.name, m.issuer_id, p.ticker, p.share_class from
+            public.deal_participant p
+                left join ("""
+            + effective_match_sql("$2")
+            + """) m on m.participant_id = p.id and m.decision = 'confirmed'
+                where p.deal_id = any($1::bigint[]) and p.known_at <= $2 order by p.id""",
             ids,
             when,
         ),
@@ -302,7 +329,7 @@ def _deal_json(
     prices = kids.get("prices", {}).get(did, [])
     ctx = context_from_facts(
         kids.get("facts", {}).get(did, []),
-        announced.date() if announced else None,
+        announced.astimezone(dt.UTC).date() if announced else None,
         prices[0] if prices else None,
     )
     snap = dl.snapshot(
@@ -513,8 +540,9 @@ async def portfolio_view(pool: Pool, as_of: dt.datetime | None = None) -> dict[s
     when = _aware(as_of)
     held = await pool.fetch(
         """select ticker, value_account from public.position_snapshot
-            where snapshot_date = (select max(snapshot_date) from public.account_snapshot
-                                    where snapshot_date <= $1::date)""",
+            where snapshot_date = (
+                  select max(snapshot_date) from public.account_snapshot
+                   where snapshot_date <= ($1::timestamptz at time zone 'UTC')::date)""",
         when,
     )
     total = sum((Decimal(r["value_account"]) for r in held), Decimal(0))

@@ -19,6 +19,7 @@ import asyncpg
 
 from steward.disclosure import coverage_report as cr
 from steward.disclosure import deal_read, estimate_read
+from steward.disclosure.note_store import CONCEPT_PREFIX, NOTE_SOURCE
 
 type Pool = asyncpg.Pool | asyncpg.Connection
 
@@ -77,11 +78,18 @@ class FieldValue:
 
 
 @dataclass(frozen=True)
+class Missing:
+    """A field that could not be computed, and why. Never scored, never zero."""
+
+    reason: str
+
+
+@dataclass(frozen=True)
 class Universe:
     ticker: str
     weight: Decimal
     value: Decimal
-    fields: Mapping[str, FieldValue] = field(default_factory=dict)
+    fields: Mapping[str, FieldValue | Missing] = field(default_factory=dict)
 
 
 def _num(v: Decimal | int | bool) -> Decimal:
@@ -113,13 +121,14 @@ def screen(
         for key, bar in active.items():
             fld, kind, label, _unit = CRITERIA[key]
             fv = u.fields.get(fld)
-            if fv is None:
+            if fv is None or isinstance(fv, Missing):
                 data_counts[key][1] += 1
+                why = "" if fv is None else f" ({fv.reason})"
                 reasons.append(
                     {
                         "criterion": key,
                         "kind": "missing",
-                        "reason": f"No verified value for {label.lower()}; not scored.",
+                        "reason": f"No verified value for {label.lower()}{why}; not scored.",
                         "value": None,
                         "threshold": str(bar),
                     }
@@ -156,13 +165,14 @@ def screen(
                         {
                             "criterion": k,
                             "label": CRITERIA[k][2],
-                            "value": str(u.fields[CRITERIA[k][0]].value),
+                            "value": str(fv.value),
                             "unit": CRITERIA[k][3],
-                            "period": u.fields[CRITERIA[k][0]].period,
-                            "known_at": u.fields[CRITERIA[k][0]].known_at,
-                            "source": u.fields[CRITERIA[k][0]].source,
+                            "period": fv.period,
+                            "known_at": fv.known_at,
+                            "source": fv.source,
                         }
                         for k in active
+                        if isinstance(fv := u.fields[CRITERIA[k][0]], FieldValue)
                     ],
                 }
             )
@@ -206,45 +216,135 @@ def screen(
 # ------------------------------------------------------------------------------------- fields
 
 
+def _base(row: Mapping[str, Any]) -> Decimal:
+    """The row's value in base units: `scale` is a power of ten (6 = millions) when present."""
+    return Decimal(row["value"]) * Decimal(10) ** int(row.get("scale") or 0)
+
+
 def ratio_field(
     rows: Sequence[Mapping[str, Any]], numerator: str, denominator: str, source: str
-) -> FieldValue | None:
-    """Latest period with both inputs: numerator / denominator, only for a positive denominator.
+) -> FieldValue | Missing:
+    """Numerator / denominator for the LATEST period that has a numerator, in base units.
 
     `rows` are verified observations for one ticker (metric, period_start, period_end, value,
-    known_at). When a period has several versions the latest-known one is used.
+    known_at, optional scale). When a period has several versions the latest-known one is used.
+    If that latest period's denominator is missing or not positive the result is Missing with a
+    reason: an older period is never used instead, because that would present stale data as
+    current.
     """
     best: dict[tuple[str, Any, Any], Mapping[str, Any]] = {}
     for r in rows:
         key = (r["metric"], r["period_start"], r["period_end"])
         if key not in best or r["known_at"] > best[key]["known_at"]:
             best[key] = r
-    periods = sorted(
-        {(s, e) for (m, s, e) in best if m == numerator}
-        & {(s, e) for (m, s, e) in best if m == denominator},
-        key=lambda p: p[1],
+    nums = sorted(
+        {(e, s) for (m, s, e) in best if m == numerator},
+        key=lambda p: (p[0], str(p[1])),
         reverse=True,
     )
-    for start, end in periods:
-        num, den = best[(numerator, start, end)], best[(denominator, start, end)]
-        if Decimal(den["value"]) > 0:
-            return FieldValue(
-                (Decimal(num["value"]) / Decimal(den["value"])).quantize(Decimal("0.0001")),
-                end.isoformat(),
-                max(num["known_at"], den["known_at"]),
-                source,
-            )
-    return None
+    if not nums:
+        return Missing(f"no verified {numerator}")
+    end, start = nums[0]
+    num = best[(numerator, start, end)]
+    den = best.get((denominator, start, end))
+    if den is None:
+        return Missing(f"{denominator} is not reported for the latest period {end.isoformat()}")
+    d = _base(den)
+    if d <= 0:
+        return Missing(
+            f"{denominator} is {d} in the latest period {end.isoformat()}; the ratio is undefined"
+        )
+    return FieldValue(
+        (_base(num) / d).quantize(Decimal("0.0001")),
+        end.isoformat(),
+        max(num["known_at"], den["known_at"]),
+        source,
+    )
+
+
+def debt_maturity_field(
+    cash_rows: Sequence[Mapping[str, Any]], note_rows: Sequence[Mapping[str, Any]]
+) -> FieldValue | Missing:
+    """Cash / debt due in year 1, from the latest debt-maturity note known.
+
+    `note_rows` are the year_1 bucket rows of the debt_maturity note table for one ticker
+    (accession, known_at, period_end, value, status, dash), `cash_rows` verified `cash`
+    observations. The latest filing decides: a year-1 bucket awaiting review makes the field
+    Missing rather than falling back to an older filing. Zero or dashed year-1 debt is Missing with
+    the reason "no debt due in year 1", never 0 and never silently dropped."""
+    if not note_rows:
+        return Missing("no debt maturity note is stored")
+    latest = max(note_rows, key=lambda r: (r["known_at"], r["accession"]))
+    note = [r for r in note_rows if r["accession"] == latest["accession"]][-1]
+    if note.get("status") == "review":
+        return Missing("the year-1 debt bucket of the latest filing is awaiting review")
+    value = note["value"]
+    if value is None:
+        if note.get("dash") in (True, "true"):
+            return Missing("no debt due in year 1")
+        return Missing("the year-1 debt bucket of the latest filing is not readable")
+    due = Decimal(value)
+    if due == 0:
+        return Missing("no debt due in year 1")
+    if due < 0:
+        return Missing("the year-1 debt bucket is negative; the ratio is undefined")
+    cash_here = [
+        r for r in cash_rows if r["metric"] == "cash" and r["period_end"] == note["period_end"]
+    ]
+    if not cash_here:
+        return Missing(f"no verified cash for the note's period {note['period_end']}")
+    cash = max(cash_here, key=lambda r: r["known_at"])
+    return FieldValue(
+        (_base(cash) / due).quantize(Decimal("0.0001")),
+        note["period_end"].isoformat(),
+        max(cash["known_at"], note["known_at"]),
+        "verified cash and debt maturity note",
+    )
+
+
+def segment_surprise_field(events: Sequence[Mapping[str, Any]]) -> FieldValue | None:
+    """Latest scored segment surprise as a FRACTION (0.05 = 5 %). The events carry percent; the
+    latest period wins and, within it, the segment with the largest absolute surprise (ties by
+    segment name), so the choice is deterministic."""
+    scored = [
+        e
+        for e in events
+        if e.get("segment") and e.get("status") == "scored" and e.get("surprise_pct") is not None
+    ]
+    if not scored:
+        return None
+    latest = max(e["period_end"] or dt.date.min for e in scored)
+    pick = max(
+        (e for e in scored if (e["period_end"] or dt.date.min) == latest),
+        key=lambda e: (abs(Decimal(e["surprise_pct"])), str(e["segment"])),
+    )
+    return FieldValue(
+        Decimal(pick["surprise_pct"]) / Decimal(100),
+        pick["fiscal_period"],
+        pick["estimate_known_at"],
+        f"published estimate against reported actual ({pick['segment']})",
+    )
 
 
 OBS_SQL = """
-select n.t212_ticker as ticker, o.metric, o.period_start, o.period_end, o.value, o.known_at
+select n.t212_ticker as ticker, o.metric, o.period_start, o.period_end, o.value, o.scale,
+       o.known_at
   from public.instrument n
   join public.issuer i on i.cik = n.cik
   join public.disclosure_observation o on o.issuer_id = i.id
  where n.t212_ticker = any($1::text[]) and o.known_at <= $2 and o.review_state = 'verified'
    and o.value_state = 'reported' and o.segment is null and o.dimensions = '{}'::jsonb
-   and o.metric in ('operating_cash_flow', 'net_income', 'cash', 'debt_due_year_1')
+   and o.metric in ('operating_cash_flow', 'net_income', 'cash')
+"""
+
+# The year-1 bucket of the debt maturity note table, as scan_debt_maturity reads it.
+DEBT_NOTE_SQL = """
+select ticker, accession, known_at, period_end, value,
+       dimensions #>> '{note,status}' as status, dimensions #>> '{note,dash}' as dash
+  from public.financial_statement_fact
+ where ticker = any($1::text[]) and statement = 'note' and source = $2 and concept = $3
+   and known_at <= $4 and dimensions #>> '{note,bucket}' = 'year_1'
+ order by known_at, id
 """
 
 INSIDER_SQL = """
@@ -273,30 +373,41 @@ select n.t212_ticker as ticker, c.stake_percent, p.stake_percent as prior_percen
 
 CUSTOMER_SQL = """
 select distinct on (ticker) ticker, reported_share, fiscal_period, known_at
-  from public.relationship_disclosure
- where ticker = any($1::text[]) and status = 'confirmed' and relationship = 'customer'
-   and reported_share is not null and known_at <= $2
+  from (select *, rank() over (
+                    partition by ticker,
+                      coalesce(counterparty_key, counterparty_name, claim_label, id::text)
+                    order by period_end desc nulls last, fiscal_period desc nulls last) as rk
+          from public.relationship_disclosure
+         where ticker = any($1::text[]) and status = 'confirmed' and relationship = 'customer'
+           and known_at <= $2) r
+ where rk = 1 and reported_share is not null
+   and (denominator_kind = 'total_revenue'
+        or (denominator_kind is null and share_basis = 'issuer_revenue'))
  order by ticker, reported_share desc, id
 """
 
 
 async def load_fields(
     pool: Pool, universe: Sequence[cr.Holding], when: dt.datetime, insider_window_days: int
-) -> dict[str, dict[str, FieldValue]]:
+) -> dict[str, dict[str, FieldValue | Missing]]:
     tickers = [h.ticker for h in universe]
-    out: dict[str, dict[str, FieldValue]] = defaultdict(dict)
+    out: dict[str, dict[str, FieldValue | Missing]] = defaultdict(dict)
     if not tickers:
         return out
     obs: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
     for r in await pool.fetch(OBS_SQL, tickers, when):
         obs[r["ticker"]].append(dict(r))
+    notes: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+    for r in await pool.fetch(
+        DEBT_NOTE_SQL, tickers, NOTE_SOURCE, CONCEPT_PREFIX + "debt_maturity", when
+    ):
+        notes[r["ticker"]].append(dict(r))
     for t, rows in obs.items():
-        cc = ratio_field(rows, "operating_cash_flow", "net_income", "verified observations")
-        if cc:
-            out[t]["cash_conversion"] = cc
-        dm = ratio_field(rows, "cash", "debt_due_year_1", "verified observations and note table")
-        if dm:
-            out[t]["debt_maturity_coverage"] = dm
+        out[t]["cash_conversion"] = ratio_field(
+            rows, "operating_cash_flow", "net_income", "verified observations"
+        )
+    for t in notes.keys() | obs.keys():
+        out[t]["debt_maturity_coverage"] = debt_maturity_field(obs.get(t, []), notes.get(t, []))
     for r in await pool.fetch(INSIDER_SQL, tickers, when, insider_window_days):
         out[r["ticker"]]["discretionary_buys"] = FieldValue(
             int(r["buys"]), f"last {insider_window_days} days", r["known_at"], "Form 4 filings"
@@ -318,17 +429,9 @@ async def load_fields(
         )
     for t in tickers:
         view = await estimate_read.estimate_view(pool, t, when)
-        events = [
-            e for e in view["events"] if e.get("segment") and e.get("surprise_pct") is not None
-        ]
-        if events:
-            e = max(events, key=lambda x: x["period_end"] or dt.date.min)
-            out[t]["segment_surprise_pct"] = FieldValue(
-                Decimal(e["surprise_pct"]),
-                e["fiscal_period"],
-                e["estimate_known_at"],
-                "published estimate against reported actual",
-            )
+        seg = segment_surprise_field(view["events"])
+        if seg is not None:
+            out[t]["segment_surprise_pct"] = seg
     for d in (await deal_read.portfolio_view(pool, when))["rows"]:
         out[d["ticker"]]["deal_exposure"] = FieldValue(True, None, None, "public deal documents")
     return out

@@ -266,11 +266,25 @@ def panel_method_of(description: str | None) -> str | None:
     return re.sub(r"[^a-z]+", " ", s).strip() or None
 
 
+def range_problems(nums: dict[str, Decimal | None]) -> list[str]:
+    """Why a line breaks low <= mean <= high or low <= median <= high (the stored CHECK). A line
+    with such an issue is reported as skipped, so the database check never fires on it."""
+    low, high = nums.get("low"), nums.get("high")
+    out: list[str] = []
+    if low is not None and high is not None and low > high:
+        out.append("low is above high")
+    for name in ("mean", "median"):
+        v = nums.get(name)
+        if v is not None and ((low is not None and v < low) or (high is not None and v > high)):
+            out.append(f"{name} is outside the low-high range")
+    return out
+
+
 def _unit_for(metric: str, header_text: str) -> tuple[str, int]:
     low = metric.lower()
     if "per share" in low or re.search(r"\beps\b", low) or "dividend" in low:
         return "per_share", 0
-    if "margin" in low or "growth" in low or "%" in low or "rate" in low:
+    if "margin" in low or "growth" in low or "%" in low or re.search(r"\brate\b", low):
         return "percent", 0
     m = re.search(r"\b(thousands?|millions?|billions?|mn|bn)\b", header_text, re.I)
     return "amount", SCALES[m[1].lower()] if m else 0
@@ -432,6 +446,7 @@ def _extract(
                     row_issues.append(prob)
             if all(v is None for v in nums.values()):
                 row_issues.append("no value is stated")
+            row_issues.extend(range_problems(nums))
             unit, scale = _unit_for(metric, head_text)
             row_basis = _basis(metric) or table_basis or doc_standard
             if row_basis is None:

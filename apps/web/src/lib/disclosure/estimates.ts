@@ -230,7 +230,7 @@ export const allLines = (v: EstimatesView): EstimateLine[] => SERIES.flatMap((s)
 
 /** The latest line of one lane for one metric and period (no segment). */
 export function latestFor(lane: readonly EstimateLine[], metric: string, period: string): EstimateLine | null {
-  return lane.filter((l) => l.metric === metric && l.fiscal_period === period && !l.segment).sort((a, b) => t(b.known_at) - t(a.known_at) || b.id - a.id)[0] ?? null;
+  return lane.filter((l) => l.metric.toLowerCase() === metric.toLowerCase() && l.fiscal_period === period && !l.segment).sort((a, b) => t(b.known_at) - t(a.known_at) || b.id - a.id)[0] ?? null;
 }
 
 export type Choice = { key: string; metric: string; period: string; label: string };
@@ -240,10 +240,30 @@ export function choices(lines: readonly EstimateLine[]): Choice[] {
   const seen = new Map<string, Choice & { end: string }>();
   for (const l of lines) {
     if (l.segment) continue;
-    const key = `${l.metric}¦${l.fiscal_period}`;
+    const key = `${l.metric.toLowerCase()}¦${l.fiscal_period}`; // metric names match case-insensitively, as in `group_key`
     if (!seen.has(key)) seen.set(key, { key, metric: l.metric, period: l.fiscal_period, label: `${l.metric}, ${l.fiscal_period}`, end: l.period_end ?? "" });
   }
   return [...seen.values()].sort((a, b) => a.metric.localeCompare(b.metric) || a.end.localeCompare(b.end));
+}
+
+/** The choice shown before the owner picks one: the metric and period with the most published
+ * consensus lines (the most to compare), the later period on a tie; never a fixed name. */
+export function defaultChoice(options: readonly Choice[], lines: readonly EstimateLine[]): Choice | undefined {
+  const count = new Map<string, number>();
+  const end = new Map<string, string>();
+  for (const l of lines) {
+    if (l.segment || l.series !== "published_analyst_consensus") continue;
+    const key = `${l.metric.toLowerCase()}¦${l.fiscal_period}`;
+    count.set(key, (count.get(key) ?? 0) + 1);
+    end.set(key, l.period_end ?? "");
+  }
+  let best: Choice | undefined;
+  for (const o of options) {
+    if (!best) { best = o; continue; }
+    const [n, m] = [count.get(o.key) ?? 0, count.get(best.key) ?? 0];
+    if (n > m || (n === m && (end.get(o.key) ?? "") > (end.get(best.key) ?? ""))) best = o;
+  }
+  return best;
 }
 
 /** Lines of the other lanes that the shared axis cannot carry because their currency, unit or scale differs. */

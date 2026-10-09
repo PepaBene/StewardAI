@@ -225,8 +225,8 @@ async def record_observation(
     supersedes_id: int | None = None,
     source_precedence: int = 100,
 ) -> int | None:
-    """Insert one observation; None when this exact (version, metric, period, dimensions,
-    parser version) already exists."""
+    """Insert one observation; None when this exact (version, metric, period start and end, unit,
+    currency, dimensions, parser version) already exists."""
     inserted: int | None = await pool.fetchval(
         """insert into public.disclosure_observation
              (metric, issuer_id, security_id, segment, period_start, period_end, is_instant,
@@ -235,8 +235,9 @@ async def record_observation(
               event_effective_at, known_at, supersedes_id)
            values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18,$19,$20,
                   $21,$22,$23)
-           on conflict (document_version_id, metric, coalesce(segment,''), period_end,
-                        md5(dimensions::text), parser_version) do nothing
+           on conflict (document_version_id, metric, coalesce(segment,''),
+                        coalesce(period_start, date '0001-01-01'), period_end, unit,
+                        coalesce(currency,''), md5(dimensions::text), parser_version) do nothing
            returning id""",
         metric,
         issuer_id,
@@ -323,3 +324,46 @@ async def record_claim(
     )
     assert row is not None
     return int(row["id"])
+
+
+#: After this many failed reads by one parser version a filing is left alone until the parser
+#: changes; an empty read is final for that parser at once.
+MAX_FAILED_ATTEMPTS = 3
+
+ATTEMPTS_DONE_SQL = """
+  exists (select 1 from public.disclosure_backfill_attempt a
+           where a.version_id = {version} and a.step = '{step}' and a.parser_version = {parser}
+             and (a.outcome = 'empty' or a.attempts >= {max_failed}))
+"""
+
+
+def attempts_done_sql(version: str, step: str, parser: str) -> str:
+    """SQL true when a step has finished with a version for this parser: it gave nothing, or it
+    failed `MAX_FAILED_ATTEMPTS` times. `step` is a fixed name, never input."""
+    return ATTEMPTS_DONE_SQL.format(
+        version=version, step=step, parser=parser, max_failed=MAX_FAILED_ATTEMPTS
+    )
+
+
+async def record_attempt(
+    pool: asyncpg.Pool | asyncpg.Connection,
+    version_id: int,
+    step: str,
+    parser_version: str,
+    outcome: str,
+    detail: str | None = None,
+) -> None:
+    """Remember that a step read a version and got nothing (`empty`) or failed (`failed`)."""
+    await pool.execute(
+        """insert into public.disclosure_backfill_attempt
+             (version_id, step, parser_version, outcome, detail)
+           values ($1,$2,$3,$4,$5)
+           on conflict (version_id, step, parser_version) do update set
+             outcome = excluded.outcome, detail = excluded.detail, attempted_at = now(),
+             attempts = public.disclosure_backfill_attempt.attempts + 1""",
+        version_id,
+        step,
+        parser_version,
+        outcome,
+        detail,
+    )

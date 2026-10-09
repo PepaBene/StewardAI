@@ -22,6 +22,37 @@ type Pool = asyncpg.Pool | asyncpg.Connection
 AUTHORITATIVE_STATES = ("verified",)
 
 
+def state_at_sql(
+    subject_type: str, alias: str, cutoff_param: str, *, decided_at_col: bool = False
+) -> str:
+    """SQL for a row's review state as it stood at the cutoff, not today's.
+
+    The latest review decided by the cutoff wins. A row whose current state came from a decision
+    made after the cutoff reads as it was before that decision: `under_review` if its review was
+    already open, else `machine`. A row that records its own decision time (`decided_at`) and
+    was decided after the cutoff without a review reads as `machine`. Otherwise a state set
+    without a review (by a rule at insert) is kept.
+    """
+    own = (
+        f"case when {alias}.decided_at > {cutoff_param} then 'machine' end,"
+        if decided_at_col
+        else ""
+    )
+    decided = f"""public.quality_review qr
+                   where qr.subject_type = '{subject_type}' and qr.subject_id = {alias}.id
+                     and qr.status in ('approved','rejected','superseded')"""
+    return f"""coalesce(
+      (select case qr.status when 'approved' then 'verified' else qr.status end
+         from {decided} and qr.decided_at <= {cutoff_param}
+        order by qr.decided_at desc, qr.id desc limit 1),
+      (select case when bool_or(qr.created_at <= {cutoff_param}) then 'under_review'
+                   else 'machine' end
+         from {decided} and qr.decided_at > {cutoff_param}
+       having count(*) > 0),
+      {own}
+      {alias}.review_state)"""  # noqa: S608 - fixed fragments from callers, no input
+
+
 def _aware(value: dt.datetime | None) -> dt.datetime:
     if value is None:
         return dt.datetime.now(dt.UTC)
@@ -64,32 +95,36 @@ async def observations_as_of(
     offset: int = 0,
 ) -> list[dict[str, Any]]:
     cutoff = _aware(as_of)
+    # One value per (metric, segment, period start and end, unit, currency, dimensions): a 10-Q's
+    # 3-month and 9-month values share a period end and are two values, not one.
     rows = await pool.fetch(
-        """select * from (
-             select distinct on (o.metric, coalesce(o.segment,''), o.period_end,
-                                 md5(o.dimensions::text))
+        f"""select * from (
+             select distinct on (o.metric, coalesce(o.segment,''), o.period_start, o.period_end,
+                                 o.unit, coalesce(o.currency,''), md5(o.dimensions::text))
                     o.id, o.metric, o.segment, o.period_start, o.period_end, o.is_instant,
                     o.value_state, o.value, o.text_value, o.original_string, o.unit, o.scale,
                     o.currency, o.basis, o.dimensions, o.parser_version, o.known_at,
-                    o.event_effective_at, o.review_state, o.supersedes_id, o.evidence_id,
-                    o.document_version_id, v.accepted_at, v.filed_at, v.published_at,
-                    d.regulator, d.external_id, d.stable_url, d.form,
+                    o.event_effective_at, st.state as review_state, o.supersedes_id,
+                    o.evidence_id, o.document_version_id, v.accepted_at, v.filed_at,
+                    v.published_at, d.regulator, d.external_id, d.stable_url, d.form,
                     e.quote, e.span_start, e.span_end, e.section
                from public.disclosure_observation o
+               cross join lateral (select {state_at_sql("observation", "o", "$2")} as state) st
                join public.source_document_version v on v.id = o.document_version_id
                join public.source_document d on d.id = v.document_id
                join public.source_evidence e on e.id = o.evidence_id
               where o.issuer_id = $1 and o.known_at <= $2
-                and o.review_state not in ('rejected','superseded')
+                and st.state not in ('rejected','superseded')
                 and ($3::text is null or o.metric = $3)
-                and (not $4 or o.review_state = 'verified')
+                and (not $4 or st.state = 'verified')
                 and not exists (select 1 from public.disclosure_observation s
                                  where s.supersedes_id = o.id and s.known_at <= $2
-                                   and s.review_state <> 'rejected')
-              order by o.metric, coalesce(o.segment,''), o.period_end, md5(o.dimensions::text),
+                                   and {state_at_sql("observation", "s", "$2")} <> 'rejected')
+              order by o.metric, coalesce(o.segment,''), o.period_start, o.period_end, o.unit,
+                       coalesce(o.currency,''), md5(o.dimensions::text),
                        o.known_at desc, o.source_precedence, o.id desc) latest
-           order by metric, period_end desc, id
-           limit $5 offset $6""",
+           order by metric, period_end desc, period_start nulls last, id
+           limit $5 offset $6""",  # noqa: S608 - fragments are fixed SQL, no input
         issuer_id,
         cutoff,
         metric,
@@ -119,27 +154,31 @@ async def claims_as_of(
     with their review state so a caller can never show them as verified fact."""
     cutoff = _aware(as_of)
     rows = await pool.fetch(
-        """select c.id, c.claim_type, c.subject_issuer_id, c.subject_label, c.object_issuer_id,
+        f"""select c.id, c.claim_type, c.subject_issuer_id, c.subject_label, c.object_issuer_id,
                   c.object_label, c.object_anonymous, c.direction, c.polarity, c.payload,
-                  c.review_state, c.confidence, c.method_version, c.valid_from, c.valid_to,
+                  st.state as review_state, c.confidence, c.method_version, c.valid_from,
+                  c.valid_to,
                   c.event_effective_at, c.known_at, c.supersedes_claim_id, c.evidence_id,
                   c.document_version_id, v.accepted_at, v.filed_at, v.published_at,
                   d.regulator, d.external_id, d.stable_url, d.form,
                   e.quote, e.span_start, e.span_end, e.section
              from public.extracted_claim c
+             cross join lateral (
+               select {state_at_sql("claim", "c", "$2", decided_at_col=True)} as state) st
              join public.source_document_version v on v.id = c.document_version_id
              join public.source_document d on d.id = v.document_id
              join public.source_evidence e on e.id = c.evidence_id
             where (c.subject_issuer_id = $1 or c.object_issuer_id = $1) and c.known_at <= $2
-              and c.review_state not in ('rejected','superseded')
+              and st.state not in ('rejected','superseded')
               and c.polarity <> 'superseded'
               and ($3::text is null or c.claim_type = $3)
-              and (not $4 or c.review_state = 'verified')
+              and (not $4 or st.state = 'verified')
               and not exists (select 1 from public.extracted_claim s
                                where s.supersedes_claim_id = c.id and s.known_at <= $2
-                                 and s.review_state <> 'rejected')
+                                 and {state_at_sql("claim", "s", "$2", decided_at_col=True)}
+                                     <> 'rejected')
             order by c.valid_from nulls last, c.id
-            limit $5 offset $6""",
+            limit $5 offset $6""",  # noqa: S608 - fragments are fixed SQL, no input
         issuer_id,
         cutoff,
         claim_type,
@@ -214,8 +253,9 @@ async def provenance(
     cutoff = _aware(as_of)
     table = {"observation": "disclosure_observation", "claim": "extracted_claim"}[kind]
     method_col = "parser_version" if kind == "observation" else "method_version"
+    state = state_at_sql(kind, "r", "$2", decided_at_col=kind == "claim")
     row = await pool.fetchrow(
-        f"""select r.id, r.known_at, r.review_state, r.{method_col} as method_version,
+        f"""select r.id, r.known_at, {state} as review_state, r.{method_col} as method_version,
                    r.document_version_id, r.evidence_id, r.event_effective_at,
                    v.content_hash, v.accepted_at, v.filed_at, v.published_at, v.archive_path,
                    d.regulator, d.external_id, d.stable_url, d.form, d.fiscal_period,
