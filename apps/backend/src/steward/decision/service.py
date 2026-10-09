@@ -39,6 +39,7 @@ from steward.performance.service import lots_report
 from steward.performance.settings import load_latest_settings
 from steward.portfolio.drift import HoldingValue, compute_drift
 from steward.portfolio.risk import _risk_free
+from steward.portfolio.risk_tier import with_saved_tiers
 from steward.reference import risk as ref_risk
 from steward.reference.price_series import choose_series, holding_symbols
 from steward.reference.read import load_series
@@ -318,7 +319,7 @@ async def load_strategy(pool: asyncpg.Pool) -> StrategyConfig:
     stored = await load_active(pool, "strategy", StrategyConfig)
     if stored is None:
         raise NoStrategy
-    return stored.body
+    return await with_saved_tiers(pool, stored.body)
 
 
 async def _latest_positions(pool: asyncpg.Pool) -> dict[str, asyncpg.Record]:

@@ -138,6 +138,20 @@ async def portfolio_sync(ctx: JobContext, deps: SyncDeps) -> None:
     async with ctx.step("transactions") as step:
         step.detail.update(await sync_transactions(pool, deps.t212, ctx.job_id))
 
+    sync_book = None
+    if strategy.risk.auto_tiers:
+        async with ctx.step("risk_tiers") as step:
+            from steward.portfolio.exante import book_from_positions, with_book_tiers
+
+            try:
+                sync_book = await book_from_positions(pool, list(snapshot.positions))
+                strategy = await with_book_tiers(pool, sync_book, strategy)
+                step.detail["tiers"] = len(
+                    [b for b in strategy.classifications.values() if "risk" in b]
+                )
+            except Exception as exc:  # a missing price history must not fail the sync
+                step.detail["unavailable"] = str(exc)
+
     async with ctx.step("drift") as step:
         report = compute_drift(
             [
@@ -155,7 +169,9 @@ async def portfolio_sync(ctx: JobContext, deps: SyncDeps) -> None:
         )
 
     async with ctx.step("breaches") as step:
-        risk_inputs = await gather_risk_inputs(pool, strategy, list(snapshot.positions))
+        risk_inputs = await gather_risk_inputs(
+            pool, strategy, list(snapshot.positions), book=sync_book
+        )
         if risk_inputs.unavailable:
             step.detail["risk_unavailable"] = risk_inputs.unavailable
         theses = await load_active(pool, "theses", ThesesConfig)

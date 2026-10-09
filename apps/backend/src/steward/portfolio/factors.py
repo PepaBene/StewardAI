@@ -33,6 +33,7 @@ from pydantic import BaseModel, Field
 from steward.fx.convert import normalise_currency
 from steward.fx.history import load_fx_history
 from steward.portfolio import exante as ea
+from steward.portfolio.risk_snapshots import save_snapshot
 from steward.quant import factors as fc
 from steward.quant import french, french_store
 from steward.quant import proxy as px
@@ -45,12 +46,18 @@ FACTOR_WEEKS = 104  # two years of weekly returns
 TILT_FLAG = 0.3
 STYLE_FACTORS = ("MKT_RF", "SMB", "HML", "RMW", "CMA", "MOM")
 CURRENCY_FACTORS = ("USD", "EUR")
+MAX_EXTRA_CURRENCIES = 4
+RATES_FACTOR = "RATE10"
+YIELD_SERIES = "us_10y"  # macro_series key of the US 10-year Treasury yield (FRED DGS10)
+MACRO_FACTORS = (*CURRENCY_FACTORS, RATES_FACTOR)
 
 METHOD = (
     "Weekly base-currency log returns over the last two years, minus the US risk-free rate, "
     "regressed on the Ken French factors for the chosen region (market, size, value, "
-    "profitability, investment, momentum) and the weekly change of the US dollar and the euro "
-    "against the base currency. Standard errors are Newey-West with four lags."
+    "profitability, investment, momentum), the weekly change of the US dollar and the euro "
+    "against the base currency and the weekly change of the US 10-year yield in percentage "
+    "points (its loading is the return for a one-point rise). Standard errors are Newey-West "
+    "with four lags."
 )
 
 # factor -> (name, what a high loading means, what a low one means)
@@ -75,6 +82,11 @@ FACTOR_TEXT: dict[str, tuple[str, str, str]] = {
     "MOM": ("Momentum", "leans to recent winners", "leans to recent losers"),
     "USD": ("US dollar", "gains when the dollar rises", "gains when the dollar falls"),
     "EUR": ("Euro", "gains when the euro rises", "gains when the euro falls"),
+    "RATE10": (
+        "US 10-year yield",
+        "gains when yields rise by one point",
+        "gains when yields fall by one point",
+    ),
 }
 
 
@@ -122,6 +134,8 @@ class FactorExposures(BaseModel):
     region: str
     regions: list[str]
     as_of: dt.date | None
+    base_currency: str | None = None
+    total_value: float | None = None
     method_version: str
     method: str
     window_start: dt.date | None
@@ -193,6 +207,8 @@ def build_exposures(
     daily: Mapping[str, Sequence[tuple[dt.date, float]]],
     fx: rt.FxLookup,
     region: str,
+    preferences: Mapping[str, Sequence[str]] | None = None,
+    yields: Sequence[tuple[dt.date, float]] | None = None,
 ) -> FactorExposures:
     """Factor exposures of a loaded book (pure given the loaded data)."""
     if not book.positions or book.total_value <= 0:
@@ -214,15 +230,24 @@ def build_exposures(
         k: fw[k] for k in STYLE_FACTORS if k in fw and not np.isnan(fw[k]).all()
     }
     base = normalise_currency(book.base_currency)[0]
-    for ccy in CURRENCY_FACTORS:
+    # USD and EUR always; any other currency a position is quoted in gets a factor of its own
+    # (a handful at most), so a GBP or CHF holding's currency move is not left in its residual.
+    held_currencies = {normalise_currency(p.currency)[0] for p in book.positions}
+    extra = sorted(held_currencies - set(CURRENCY_FACTORS))[:MAX_EXTRA_CURRENCIES]
+    for ccy in [*CURRENCY_FACTORS, *extra]:
         if ccy == base:
             continue
         m = rt.build_return_matrix([currency_series(ccy, start, end)], fx, "weekly", start, end)
         if m.dates == dates:
             regressors[ccy] = m.values[:, 0]
 
+    if yields:
+        changes = fc.weekly_level_changes(yields, dates)
+        if not np.isnan(changes).all():
+            regressors[RATES_FACTOR] = changes
+
     candidates = [k for k in weekly.keys if k == ea.BENCHMARK_KEY or k.startswith(ea.PROXY_PREFIX)]
-    filled, status = px.backfill(weekly, candidates)
+    filled, status = px.backfill(weekly, candidates, preferred=preferences)
     total = book.total_value
 
     positions: list[PositionFactors] = []
@@ -240,7 +265,7 @@ def build_exposures(
             )  # fmt: skip
             continue
         included.append(p)
-        fit = fc.regress(weekly.column(p.ticker) - rf, regressors)
+        fit = fc.regress(weekly.column(p.ticker) - rf, regressors, px.MIN_FIT_WEEKS)
         positions.append(
             PositionFactors(
                 ticker=p.ticker, name=p.name, weight=weight,
@@ -289,6 +314,11 @@ def build_exposures(
             "Holdings with a short history are regressed on their own weeks only; the portfolio "
             "line also uses their proxy-backfilled weeks."
         )
+    if RATES_FACTOR not in regressors:
+        warnings.append(
+            "No rates factor: the US 10-year yield is not stored yet. Run the macro collection "
+            "(the series us_10y) to add it."
+        )
     if benchmark is None:
         warnings.append("The benchmark has no usable history, so there is nothing to compare with.")
     if portfolio is None:
@@ -297,6 +327,8 @@ def build_exposures(
         region=region,
         regions=list(french.REGIONS),
         as_of=dates[-1],
+        base_currency=book.base_currency,
+        total_value=book.total_value,
         method_version=METHOD_VERSION,
         method=METHOD,
         window_start=dates[0],
@@ -318,19 +350,39 @@ def build_exposures(
     )
 
 
+async def load_yields(pool: asyncpg.Pool, since: dt.date) -> list[tuple[dt.date, float]]:
+    """The stored US 10-year yield, percentage points, oldest first (empty until the macro
+    collection has run with the `us_10y` series)."""
+    rows = await pool.fetch(
+        "select period, value from public.macro_series where series_id = $1 and source = 'fred'"
+        " and period >= $2 order by period",
+        YIELD_SERIES,
+        since - dt.timedelta(days=14),
+    )
+    return [(r["period"], float(r["value"])) for r in rows]
+
+
 async def factor_exposures(pool: asyncpg.Pool, region: str = "developed") -> FactorExposures:
     """Factor exposures of the latest synced book for one region's factors."""
     if region not in french.REGIONS:
         return _empty("developed", f"unknown region {region!r}")
-    book, _ = await ea.book_from_snapshot(pool)
-    if book is None:
+    book, strategy = await ea.book_from_snapshot(pool)
+    if book is None or strategy is None:
         return _empty(region, "no portfolio snapshot yet; run the portfolio sync")
     since = dt.date.today() - dt.timedelta(weeks=ea.WINDOW_WEEKS + 4)
     daily = await french_store.load_factors(pool, region, since)
-    currencies = {"USD", "EUR", book.base_currency}
+    currencies = {"USD", "EUR", book.base_currency} | {p.currency for p in book.positions}
     fx = await load_fx_history(pool, ea.FX_SOURCE, currencies, since, dt.date.today())
     lookup = ea.fx_lookup(fx, normalise_currency(book.base_currency)[0])
-    return build_exposures(book, daily, lookup, region)
+    yields = await load_yields(pool, since)
+    report = build_exposures(
+        book, daily, lookup, region, ea.proxy_preferences(book, strategy), yields
+    )
+    if report.portfolio is not None:
+        await save_snapshot(
+            pool, "factors", report, report.as_of, report.method_version, scope=region
+        )
+    return report
 
 
 __all__ = ["METHOD_VERSION", "FactorExposures", "build_exposures", "factor_exposures"]

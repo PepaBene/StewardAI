@@ -7,9 +7,11 @@ export type FactorBeta = S["FactorBeta"];
 export type PositionFactors = S["PositionFactors"];
 export type Tilt = S["Tilt"];
 
+const STYLE_FACTORS = new Set(["SMB", "HML", "RMW", "CMA", "MOM"]);
+
 /** The style factors first, then the currencies, as the report returns them. */
 export function isCurrency(factor: string): boolean {
-  return factor === "USD" || factor === "EUR";
+  return factor === "RATE10" || (/^[A-Z]{3}$/.test(factor) && !STYLE_FACTORS.has(factor));
 }
 
 /** A loading counts as measured when its t-statistic is at least 2 either way. */

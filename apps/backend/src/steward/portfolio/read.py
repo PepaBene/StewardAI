@@ -24,6 +24,7 @@ from steward.portfolio.history import (
     flow_adjusted_index,
     position_organic_gain,
 )
+from steward.portfolio.risk_tier import with_saved_tiers
 from steward.portfolio.snapshot import SNAPSHOT_TIMEZONE
 from steward.reference.read import PricePoint, index_series
 
@@ -184,7 +185,7 @@ async def portfolio_overview(pool: asyncpg.Pool) -> PortfolioOverview:
         )
 
     positions = await _positions(pool, account["snapshot_date"])
-    strategy = _strategy_for(stored.body if stored else None, account)
+    strategy = await with_saved_tiers(pool, _strategy_for(stored.body if stored else None, account))
     cash_base: Decimal = account["cash_base"]
     invested_base: Decimal = account["invested_base"]
     denominator = weight_denominator(invested_base, cash_base, strategy.weight_basis)
@@ -270,7 +271,7 @@ async def portfolio_holdings(pool: asyncpg.Pool) -> HoldingsResponse:
             freshness=None, base_currency=None, account_currency=None, holdings=[]
         )
     stored = await load_active(pool, "strategy", StrategyConfig)
-    strategy = _strategy_for(stored.body if stored else None, account)
+    strategy = await with_saved_tiers(pool, _strategy_for(stored.body if stored else None, account))
     positions = await _positions(pool, account["snapshot_date"])
     report = compute_drift(
         [HoldingValue(p["ticker"], p["instrument_currency"], p["value_base"]) for p in positions],

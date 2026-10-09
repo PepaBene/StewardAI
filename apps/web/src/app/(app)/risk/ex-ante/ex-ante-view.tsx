@@ -24,6 +24,9 @@ const fetchExAnte = () => getBrowserApiClient().GET("/portfolio/risk/ex-ante");
 
 const pct = (v: number | null | undefined, decimals = 1) => formatPercent(v, { decimals });
 
+/** Warnings that change how far to trust the forecast: left-out risk and a stalled price feed. */
+const isProminent = (w: string) => w.includes("understates") || w.includes("price feed may have stalled");
+
 export function ExAnteView() {
   const { state } = useApiResource(fetchExAnte);
   return (
@@ -51,7 +54,7 @@ function Report({ report }: { report: ExAnteRisk }) {
   const coverage = coverageSentence(report.coverage);
   return (
     <div className="flex flex-col gap-5">
-      <Warnings warnings={report.warnings.filter((w) => w.includes("understates"))} />
+      <Warnings warnings={report.warnings.filter(isProminent)} />
       <VolatilityStrip report={report} />
       <Ledger report={report} />
       <div className="grid gap-5 lg:grid-cols-2">
@@ -68,7 +71,7 @@ function Report({ report }: { report: ExAnteRisk }) {
         notes={[
           report.method,
           `Window ${formatDate(report.window_start ?? "")} to ${formatDate(report.window_end ?? "")}, ${report.weeks} weekly returns. Method ${report.method_version}.`,
-          ...report.warnings.filter((w) => !w.includes("understates")),
+          ...report.warnings.filter((w) => !isProminent(w)),
         ]}
       />
     </div>
@@ -109,6 +112,14 @@ function VolatilityStrip({ report }: { report: ExAnteRisk }) {
             : `Inside your ${pct(limit, 0)} limit.`}{" "}
         The forecast shown is the higher of the two models. Cash counts as no volatility.
       </p>
+      {report.volatility_forecast_scaled != null &&
+      report.volatility_forecast != null &&
+      report.volatility_forecast_scaled > report.volatility_forecast * 1.005 ? (
+        <p className="mt-1 max-w-prose text-sm text-warning-signal">
+          Holdings left out for lack of history are not in that figure. If they carried the average risk of the rest it would be about{" "}
+          <span className="num font-semibold">{pct(report.volatility_forecast_scaled)}</span>. This is shown, not tested against the limit.
+        </p>
+      ) : null}
       <ul className="mt-4 flex flex-col gap-3">
         {rows.map((r) => (
           <li key={r.id} className="grid grid-cols-[minmax(0,13rem)_1fr_4rem] items-center gap-3 text-sm max-sm:grid-cols-[1fr_4rem]">
@@ -154,14 +165,14 @@ function Ledger({ report }: { report: ExAnteRisk }) {
       </p>
       <ul className="mt-3">
         {report.positions.map((p) => (
-          <LedgerRow key={p.ticker} p={p} scale={scale} invested={invested} />
+          <LedgerRow key={p.ticker} p={p} scale={scale} invested={invested} basis={report.weight_basis} />
         ))}
       </ul>
     </Blueprint>
   );
 }
 
-function LedgerRow({ p, scale, invested }: { p: PositionExAnte; scale: number; invested: number }) {
+function LedgerRow({ p, scale, invested, basis }: { p: PositionExAnte; scale: number; invested: number; basis: "total" | "invested" }) {
   const multiple = p.risk_share === null || p.risk_share === undefined ? null : riskMultiple(p.weight / (invested || 1), p.risk_share);
   const heavy = multiple !== null && multiple >= 1.5;
   return (
@@ -185,7 +196,7 @@ function LedgerRow({ p, scale, invested }: { p: PositionExAnte; scale: number; i
       </div>
       <dl className="num grid grid-cols-[auto_auto] justify-end gap-x-3 text-right text-sm">
         <dt className="text-text-muted">size</dt>
-        <dd>{pct(p.weight)}</dd>
+        <dd>{pct(basis === "invested" && p.weight_of_invested != null ? p.weight_of_invested : p.weight)}</dd>
         <dt className="text-text-muted">risk</dt>
         <dd className="font-semibold">{p.risk_share === null || p.risk_share === undefined ? "left out" : pct(p.risk_share)}</dd>
       </dl>

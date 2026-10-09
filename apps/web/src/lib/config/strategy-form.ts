@@ -73,6 +73,9 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
     max_valuation_terminal_growth: null,
     max_valuation_growth: null,
     on_breach: "severity_2",
+    auto_tiers: false,
+    tier_speculative_market_cap: 2e9,
+    tier_core_min_market_cap: 1e10,
   },
   hard_limit_severity: "severity_3",
   band_breach_severity: "severity_1",
@@ -202,7 +205,30 @@ export type StrategyForm = {
   /** Pre-trade thresholds. The editor has no fields for them; they are kept as loaded so a
    *  save never resets them to the defaults. */
   pretrade?: StrategyConfig["pretrade"];
+  /** Risk settings the editor has no fields for (tier budgets and thresholds, derived tiers,
+   *  extra stress episodes, the effective-bets floor); kept as loaded so a save never drops them. */
+  risk_extra: RiskExtra;
 };
+
+const RISK_EXTRA_KEYS = [
+  "tier_risk_budgets",
+  "min_effective_bets",
+  "tier_speculative_volatility",
+  "tier_core_max_volatility",
+  "auto_tiers",
+  "tier_speculative_market_cap",
+  "tier_core_min_market_cap",
+  "stress_episodes",
+] as const;
+
+type RiskBody = NonNullable<StrategyConfig["risk"]>;
+type RiskExtra = Partial<Pick<RiskBody, (typeof RISK_EXTRA_KEYS)[number]>>;
+
+function pickRiskExtra(risk: Partial<RiskBody> | undefined): RiskExtra {
+  const out: Record<string, unknown> = {};
+  for (const key of RISK_EXTRA_KEYS) if (risk?.[key] !== undefined) out[key] = risk[key];
+  return out as RiskExtra;
+}
 
 export const newCategory = (name = ""): CategoryForm => ({ key: nextKey(), name });
 export const newClassification = (ticker = ""): ClassificationForm => ({ key: nextKey(), ticker, buckets: {} });
@@ -266,6 +292,7 @@ export function strategyFromBody(body: StrategyConfig | null): StrategyForm {
     hard_limit_severity: b.hard_limit_severity ?? "severity_3",
     band_breach_severity: b.band_breach_severity ?? "severity_1",
     pretrade: b.pretrade,
+    risk_extra: pickRiskExtra(b.risk),
     risk_max_volatility: fractionToPercent(b.risk?.max_volatility),
     risk_max_beta: b.risk?.max_beta == null ? "" : String(b.risk.max_beta),
     risk_position_loss_review: fractionToPercent(b.risk?.position_loss_review),
@@ -401,6 +428,10 @@ export function strategyToBody(form: StrategyForm): StrategyConfig {
       max_valuation_terminal_growth: optionalPercent(form.risk_max_valuation_terminal_growth) as number | null,
       max_valuation_growth: optionalPercent(form.risk_max_valuation_growth) as number | null,
       on_breach: form.risk_on_breach,
+      auto_tiers: false,
+      tier_speculative_market_cap: 2e9,
+      tier_core_min_market_cap: 1e10,
+      ...form.risk_extra,
     },
     hard_limit_severity: form.hard_limit_severity,
     band_breach_severity: form.band_breach_severity,

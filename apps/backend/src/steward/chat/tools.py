@@ -129,6 +129,34 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
+        "name": "risk_forecast",
+        "description": "The volatility forecast from today's holdings (not from past returns "
+        "of the old mix), the holdings that bring most of the risk, the diversification, and "
+        "the weight the model had to leave out. Use for 'how risky is my portfolio' or 'what "
+        "drives my risk'. Report the left-out weight and the warnings.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "past_episodes",
+        "description": "What today's holdings would have lost in past market episodes (2008, "
+        "2011, the end of the CZK floor, 2020, 2022 and any the owner added). Use for 'how "
+        "would I have done in 2008'. Quote the caution when a loss leans on a proxy estimate; "
+        "such a loss is probably understated.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "factor_tilts",
+        "description": "What the portfolio leans on beyond the market: size, value, "
+        "profitability, investment, momentum, currencies and the US 10-year yield, against a "
+        "world-equity benchmark. Use for 'am I really diversified' or 'what is my hidden bet'. "
+        "A loading counts as measured only when its t-statistic is at least 2.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"region": {"type": "string", "enum": ["developed", "europe", "us"]}},
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "theme_exposure",
         "description": "How much of the portfolio is exposed to one sector, industry, country, "
         "currency, revenue country, commodity, trade product or issuer, directly and through "
@@ -254,6 +282,15 @@ class ChatTools:
         if owner is None:
             return {"error": "this conversation has no owner"}
         return await analytics_tools.stress_test(self.pool, self.registry, owner)
+
+    async def _tool_risk_forecast(self) -> dict[str, Any]:
+        return await analytics_tools.risk_forecast(self.pool, self.registry)
+
+    async def _tool_past_episodes(self) -> dict[str, Any]:
+        return await analytics_tools.past_episodes(self.pool, self.registry)
+
+    async def _tool_factor_tilts(self, region: str = "developed") -> dict[str, Any]:
+        return await analytics_tools.factor_tilts(self.pool, self.registry, region)
 
     async def _tool_theme_exposure(self, kind: str, value: str) -> dict[str, Any]:
         owner = await self._owner()

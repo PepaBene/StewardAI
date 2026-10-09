@@ -1,5 +1,6 @@
 """Strategy config: goals, target allocation with bands, and the structured rules code evaluates."""
 
+import datetime as dt
 from typing import Annotated, Literal, Self
 
 from pydantic import Field, model_validator
@@ -114,6 +115,20 @@ class PretradeThresholds(ConfigModel):
         description="Largest share of portfolio volatility one stock may account for (null: "
         "shown but not judged).",
     )
+
+
+class StressEpisodeConfig(ConfigModel):
+    key: Annotated[str, Field(pattern=r"^[a-z0-9_]{2,30}$", examples=["brexit_vote"])]
+    label: Annotated[str, Field(min_length=1, max_length=60)]
+    start: dt.date = Field(description="The peak, or the last day before the shock.")
+    end: dt.date = Field(description="The trough.")
+    note: Annotated[str, Field(max_length=200)] = ""
+
+    @model_validator(mode="after")
+    def _ordered(self) -> Self:
+        if self.end <= self.start:
+            raise ValueError("an episode must end after it starts")
+        return self
 
 
 class RiskLimits(ConfigModel):
@@ -236,9 +251,32 @@ class RiskLimits(ConfigModel):
         description="A core-tier holding whose annualised volatility is above this (0.25 = 25 %) "
         "no longer meets the core criterion and needs a review.",
     )
+    auto_tiers: bool = Field(
+        default=False,
+        description="Work out each holding's risk tier from its own numbers instead of listing "
+        "holdings in the strategy: speculative if volatility is above "
+        "`tier_speculative_volatility`, market cap is below `tier_speculative_market_cap` or "
+        "it is not profitable; core only if market cap is above `tier_core_min_market_cap`, volatility is at or below "
+        "`tier_core_max_volatility` and it is profitable; growth otherwise. A fund has no market "
+        "cap or profit and is tiered by volatility alone. A classification entered by the owner "
+        "still wins.",
+    )
+    tier_speculative_market_cap: float = Field(
+        default=2e9, gt=0, description="Market cap in USD below which a stock is speculative."
+    )
+    tier_core_min_market_cap: float = Field(
+        default=1e10, gt=0, description="Market cap in USD a core stock must exceed."
+    )
     on_breach: Severity = Field(
         default="severity_2",
         description="Severity of a risk-limit breach (alerted when it opens).",
+    )
+    stress_episodes: list[StressEpisodeConfig] = Field(
+        default_factory=list,
+        max_length=12,
+        description="Past episodes replayed on today's holdings in addition to the built-in "
+        "ones (2008, 2011, the end of the CZK floor, 2020, 2022). Use the market peak and "
+        "trough dates. An entry with the key of a built-in one replaces it.",
     )
 
 

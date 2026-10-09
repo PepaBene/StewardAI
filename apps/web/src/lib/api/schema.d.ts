@@ -788,6 +788,136 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/risk/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Risk Snapshots
+         * @description Saved copies of the risk reports with their method version, newest first. A report is
+         *     saved once per data date and method version, so a later change to a model does not rewrite
+         *     what was shown.
+         */
+        get: operations["get_risk_snapshots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/risk/snapshots/{snapshot_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Risk Snapshot
+         * @description One saved risk report exactly as it was shown.
+         */
+        get: operations["get_risk_snapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/risk/factor-shock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Factor Shock
+         * @description What today's holdings would do if the stated factors moved: the equity market, the
+         *     size, value, profitability, investment and momentum styles, the US dollar and the euro
+         *     against the base currency, and the US 10-year yield. Each holding is moved by its measured
+         *     loadings; an owner beta replaces only the market loading. Holdings without loadings use the
+         *     owner's fallback beta, else stay flat and are listed. Nothing is saved.
+         */
+        post: operations["post_factor_shock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/risk/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Risk Scenarios
+         * @description The saved what-if scenarios, by name.
+         */
+        get: operations["get_risk_scenarios"];
+        put?: never;
+        /**
+         * Post Risk Scenario
+         * @description Save a scenario under a name, replacing the one with that name.
+         */
+        post: operations["post_risk_scenario"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/risk/scenarios/{scenario_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Risk Scenario
+         * @description Delete a saved scenario. Its saved runs are kept.
+         */
+        delete: operations["delete_risk_scenario"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/risk/scenarios/{scenario_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Risk Scenario
+         * @description Run a saved scenario on today's holdings; the run is saved with the loadings it used.
+         */
+        post: operations["run_risk_scenario"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/risk/factors": {
         parameters: {
             query?: never;
@@ -15030,6 +15160,18 @@ export interface components {
             /** Forecast Model */
             forecast_model: ("ewma" | "ledoit_wolf") | null;
             /**
+             * Volatility Forecast Scaled
+             * @description The forecast divided by the covered share of the invested weight: what it would be if the positions left out for lack of history carried the average risk of the rest. Equal to the forecast when nothing is left out. Shown, not tested.
+             */
+            volatility_forecast_scaled?: number | null;
+            /**
+             * Weight Basis
+             * @description The strategy's weight basis, which the page uses to show sizes. Risk shares are always computed on total value.
+             * @default total
+             * @enum {string}
+             */
+            weight_basis: "total" | "invested";
+            /**
              * Shrinkage Intensity
              * @description Weight Ledoit-Wolf puts on the constant-correlation target.
              */
@@ -15833,6 +15975,10 @@ export interface components {
             regions: string[];
             /** As Of */
             as_of: string | null;
+            /** Base Currency */
+            base_currency?: string | null;
+            /** Total Value */
+            total_value?: number | null;
             /** Method Version */
             method_version: string;
             /** Method */
@@ -24408,6 +24554,16 @@ export interface components {
             /** Real Weeks */
             real_weeks: number;
             proxy: components["schemas"]["ProxyFitOut"] | null;
+            /**
+             * Weight Of Invested
+             * @description Share of the invested part (positions without cash).
+             */
+            weight_of_invested?: number | null;
+            /**
+             * Last Price
+             * @description Date of the latest stored close of this position's series.
+             */
+            last_price?: string | null;
         };
         /** PositionFactors */
         PositionFactors: {
@@ -24849,10 +25005,16 @@ export interface components {
             benchmark_symbols?: string[];
             /**
              * History Years
-             * @description Years of daily closes (and ECB FX rates) fetched for holdings, benchmarks and proxy ETFs. The covariance model needs three years of weekly returns; stress replays need more.
+             * @description Years of daily closes fetched for holdings. The covariance model needs three years of weekly returns. Benchmarks, proxy ETFs and FX use `reference_history_years`.
              * @default 10
              */
             history_years: number;
+            /**
+             * Reference History Years
+             * @description Years of daily closes fetched for benchmarks, the market strip and proxy ETFs, and of ECB FX rates. Longer than the holdings' history so that stress replays can reach the 2008 and 2011 episodes through proxies.
+             * @default 20
+             */
+            reference_history_years: number;
             /**
              * Proxy Series
              * @description Sector and region ETFs collected as stand-ins for holdings with under three years of history (the ex-ante risk model regresses a recent listing on the best-fitting one).
@@ -25237,6 +25399,11 @@ export interface components {
              * @enum {string}
              */
             kind: "sector" | "region" | "market";
+            /**
+             * Match
+             * @description Lower-case words that, found in a holding's sector or country label, make this ETF the preferred stand-in for it (when its fit is within 0.10 R-squared of the best one).
+             */
+            match?: string[];
         };
         /**
          * PublicDataSettings
@@ -26223,6 +26390,17 @@ export interface components {
              * @description Whether the loss reaches the drawdown limit; null without a limit or result.
              */
             breaches_limit: boolean | null;
+            /**
+             * Caution
+             * @description Set when part of the result is estimated through a proxy beta: that loss is probably understated.
+             */
+            caution?: string | null;
+            /**
+             * Custom
+             * @description An episode the owner added in the strategy.
+             * @default false
+             */
+            custom: boolean;
             /** Worst */
             worst: components["schemas"]["ReplayPosition"][];
             /** Positions */
@@ -26914,6 +27092,11 @@ export interface components {
              * @description How past journal decisions turned out (price change since the decision, each with its sample size; sections with too few decisions are not summarised).
              */
             decision_scorecard?: string[];
+            /**
+             * Risk Notes
+             * @description The forecast volatility from today's holdings, the factor tilts worth a look and the hardest past episode, each as a plain sentence.
+             */
+            risk_notes?: string[];
             /** Sources */
             sources: components["schemas"]["Source"][];
             /** Model */
@@ -27342,12 +27525,35 @@ export interface components {
              */
             tier_core_max_volatility?: number | null;
             /**
+             * Auto Tiers
+             * @description Work out each holding's risk tier from its own numbers instead of listing holdings in the strategy: speculative if volatility is above `tier_speculative_volatility`, market cap is below `tier_speculative_market_cap` or it is not profitable; core only if market cap is above `tier_core_min_market_cap`, volatility is at or below `tier_core_max_volatility` and it is profitable; growth otherwise. A fund has no market cap or profit and is tiered by volatility alone. A classification entered by the owner still wins.
+             * @default false
+             */
+            auto_tiers: boolean;
+            /**
+             * Tier Speculative Market Cap
+             * @description Market cap in USD below which a stock is speculative.
+             * @default 2000000000
+             */
+            tier_speculative_market_cap: number;
+            /**
+             * Tier Core Min Market Cap
+             * @description Market cap in USD a core stock must exceed.
+             * @default 10000000000
+             */
+            tier_core_min_market_cap: number;
+            /**
              * On Breach
              * @description Severity of a risk-limit breach (alerted when it opens).
              * @default severity_2
              * @enum {string}
              */
             on_breach: "severity_1" | "severity_2" | "severity_3";
+            /**
+             * Stress Episodes
+             * @description Past episodes replayed on today's holdings in addition to the built-in ones (2008, 2011, the end of the CZK floor, 2020, 2022). Use the market peak and trough dates. An entry with the key of a built-in one replaces it.
+             */
+            stress_episodes?: components["schemas"]["StressEpisodeConfig"][];
         };
         /** RiskReport */
         RiskReport: {
@@ -27687,6 +27893,19 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** Scenario */
+        Scenario: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            spec: components["schemas"]["ShockSpec"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** ScenarioImpactOut */
         ScenarioImpactOut: {
             /** Entity */
@@ -27708,6 +27927,12 @@ export interface components {
              * @description A hop on this path is an owner-assigned weight.
              */
             uses_owner_assigned: boolean;
+        };
+        /** ScenarioIn */
+        ScenarioIn: {
+            /** Name */
+            name: string;
+            spec: components["schemas"]["ShockSpec"];
         };
         /** ScenarioMacroContext */
         ScenarioMacroContext: {
@@ -28617,10 +28842,78 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** ShockDriver */
+        ShockDriver: {
+            /** Factor */
+            factor: string;
+            /** Label */
+            label: string;
+            /**
+             * Contribution
+             * @description Part of the holding's move from this factor.
+             */
+            contribution: number;
+        };
+        /** ShockPosition */
+        ShockPosition: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Weight */
+            weight: number;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "measured" | "owner" | "fallback" | "unshocked";
+            /** Move */
+            move: number | null;
+            /** Pnl */
+            pnl: number;
+            /** Drivers */
+            drivers: components["schemas"]["ShockDriver"][];
+        };
         /** ShockRequest */
         ShockRequest: {
             shocks?: components["schemas"]["ShockSet"];
             assumptions?: components["schemas"]["ShockAssumptions"];
+        };
+        /** ShockResult */
+        ShockResult: {
+            /** Region */
+            region: string;
+            /** As Of */
+            as_of: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Method Version */
+            method_version: string;
+            /** Method */
+            method: string;
+            spec: components["schemas"]["ShockSpec"];
+            /** Before */
+            before: number;
+            /** After */
+            after: number | null;
+            /** Pnl */
+            pnl: number | null;
+            /** Loss */
+            loss: number | null;
+            /** Breaches Limit */
+            breaches_limit: boolean | null;
+            /** Drawdown Limit */
+            drawdown_limit: number | null;
+            /** Unshocked Weight */
+            unshocked_weight: number;
+            /** Positions */
+            positions: components["schemas"]["ShockPosition"][];
+            /** Worst */
+            worst: components["schemas"]["ShockPosition"][];
+            /** Warnings */
+            warnings: string[];
+            /** Reason */
+            reason: string | null;
         };
         /** ShockRun */
         ShockRun: {
@@ -28726,6 +29019,68 @@ export interface components {
             country?: {
                 [key: string]: number;
             };
+        };
+        /**
+         * ShockSpec
+         * @description The factor moves of one scenario. Every move is optional; an empty set shocks nothing.
+         */
+        ShockSpec: {
+            /**
+             * Market
+             * @description Equity market move, fraction (-0.2 = -20 %).
+             */
+            market?: number | null;
+            /**
+             * Size
+             * @description Small minus big.
+             */
+            size?: number | null;
+            /**
+             * Value
+             * @description Value minus growth.
+             */
+            value?: number | null;
+            /** Profitability */
+            profitability?: number | null;
+            /** Investment */
+            investment?: number | null;
+            /** Momentum */
+            momentum?: number | null;
+            /**
+             * Usd
+             * @description US dollar against the base currency.
+             */
+            usd?: number | null;
+            /**
+             * Eur
+             * @description Euro against the base currency.
+             */
+            eur?: number | null;
+            /**
+             * Rates Pp
+             * @description Change in the US 10-year yield, points.
+             */
+            rates_pp?: number | null;
+            /**
+             * Other Fx
+             * @description Any other currency code (GBP, CHF) -> move against the base currency, fraction. Applies to holdings with a measured loading on that currency.
+             */
+            other_fx?: {
+                [key: string]: number;
+            };
+            /**
+             * Owner Betas
+             * @description Held ticker -> market beta the owner assumes.
+             */
+            owner_betas?: {
+                [key: string]: number;
+            };
+            /**
+             * Unmeasured Beta
+             * @description Market beta for a holding with no measured loadings; null leaves it flat.
+             * @default 1
+             */
+            unmeasured_beta: number | null;
         };
         /** ShockedPosition */
         ShockedPosition: {
@@ -28880,6 +29235,30 @@ export interface components {
             members: number;
             /** Active */
             active: number;
+        };
+        /** SnapshotRow */
+        SnapshotRow: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "ex_ante" | "replay" | "factors" | "shock";
+            /** Scope */
+            scope: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Method Version */
+            method_version: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** SnapshotValues */
         SnapshotValues: {
@@ -29914,6 +30293,33 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["StrategyConfig"];
+        };
+        /** StressEpisodeConfig */
+        StressEpisodeConfig: {
+            /**
+             * Key
+             * @example brexit_vote
+             */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Start
+             * Format: date
+             * @description The peak, or the last day before the shock.
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             * @description The trough.
+             */
+            end: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** StressReplay */
         StressReplay: {
@@ -33833,6 +34239,221 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExAnteRisk"];
+                };
+            };
+        };
+    };
+    get_risk_snapshots: {
+        parameters: {
+            query?: {
+                kind?: ("ex_ante" | "replay" | "factors" | "shock") | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_risk_snapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                snapshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_factor_shock: {
+        parameters: {
+            query?: {
+                region?: "developed" | "europe" | "us";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShockSpec"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShockResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_risk_scenarios: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scenario"][];
+                };
+            };
+        };
+    };
+    post_risk_scenario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scenario"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_risk_scenario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_risk_scenario: {
+        parameters: {
+            query?: {
+                region?: "developed" | "europe" | "us";
+            };
+            header?: never;
+            path: {
+                scenario_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShockResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

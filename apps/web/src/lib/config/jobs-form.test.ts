@@ -148,6 +148,7 @@ const FULL: JobsConfig = {
   prices: {
     benchmark_symbols: ["^spx", "^dax", "^ukx"],
     history_years: 5,
+    reference_history_years: 20,
     plausibility_tolerance_pct: 1.5,
     market_strip: [{ symbol: "^spx", label: "S&P 500", yahoo_symbol: "^GSPC" }, { symbol: "^ndx", label: "Nasdaq 100" }],
     yahoo_daily_fallback: false,
@@ -408,7 +409,7 @@ describe("jobs form: escalation, macro and monitoring", () => {
   it("starts from the backend's macro series", () => {
     const form = jobsFromBody(null);
     expect(form.macroSeries.eurostat.map((r) => r.key)).toEqual(["hicp", "unemployment", "gdp", "industrial_production", "sentiment"]);
-    expect(form.macroSeries.fred.map((r) => r.ref)).toEqual(["CPIAUCSL", "UNRATE", "DFF"]);
+    expect(form.macroSeries.fred.map((r) => r.ref)).toEqual(["CPIAUCSL", "UNRATE", "DFF", "DGS10"]);
     expect(form.macroSeries.ecb[0].policy_rate).toBe(true);
   });
 

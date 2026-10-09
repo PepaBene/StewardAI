@@ -969,7 +969,7 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
                 pool,
                 deps,
                 symbols,
-                settings.history_years,
+                settings.history_years if ticker else settings.reference_history_years,
                 settings.yahoo_daily_fallback,
                 restated,
                 counts,
@@ -1088,7 +1088,7 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
             step.detail["split_skipped"] = splits
 
     async with ctx.step("fx_history") as step:
-        await fx_history(pool, deps, settings.history_years, step.detail)
+        await fx_history(pool, deps, settings.reference_history_years, step.detail)
 
 
 async def price_history_handler(ctx: JobContext) -> None:

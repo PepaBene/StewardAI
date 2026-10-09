@@ -542,6 +542,7 @@ export const DEFAULT_JOBS: JobsConfig = {
       { key: "us_cpi", label: "US CPI inflation, annual rate", series_id: "CPIAUCSL", units: "pc1", unit: "%", policy_rate: false },
       { key: "us_unemployment", label: "US unemployment rate", series_id: "UNRATE", units: "lin", unit: "%", policy_rate: false },
       { key: "fed_funds", label: "Fed funds effective rate", series_id: "DFF", units: "lin", unit: "%", policy_rate: true },
+      { key: "us_10y", label: "US 10-year Treasury yield (the rates factor of the risk model)", series_id: "DGS10", units: "lin", unit: "%", policy_rate: false },
     ],
     ecb: [
       { key: "ecb_deposit_rate", label: "ECB deposit facility rate", flow_key: "FM/D.U2.EUR.4F.KR.DFR.LEV", unit: "%", policy_rate: true },
@@ -575,7 +576,8 @@ export const DEFAULT_JOBS: JobsConfig = {
   },
   prices: {
     benchmark_symbols: ["^spx"],
-    history_years: 2,
+    history_years: 10,
+    reference_history_years: 20,
     plausibility_tolerance_pct: 1,
     market_strip: [
       { symbol: "^spx", label: "S&P 500", yahoo_symbol: "^GSPC" },
@@ -851,7 +853,8 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       "Daily closes from Stooq (Yahoo Finance as the fallback) and the risk figures computed from them; intraday prices from Yahoo Finance (unofficial).",
     fields: [
       { key: "benchmark_symbols", label: "Benchmark symbols", kind: "lines", hint: "Stooq symbols, one per line: ^spx S&P 500, ^dax DAX, ^ukx FTSE 100. The first is used for beta and the holding charts." },
-      { key: "history_years", label: "Years of history", kind: "int", min: 1, max: 10 },
+      { key: "history_years", label: "Years of history for holdings", kind: "int", min: 1, max: 10, hint: "The risk model needs at least three years of weekly returns." },
+      { key: "reference_history_years", label: "Years of history for benchmarks, proxies and FX", kind: "int", min: 1, max: 30, hint: "Longer than the holdings' history so past-episode replays can reach 2008 and 2011 through proxies." },
       { key: "plausibility_tolerance_pct", label: "Plausibility tolerance (%)", kind: "number", hint: "Largest gap between Stooq's close and Trading212's price on a sync day before it is flagged. Above 0, up to 20." },
       { key: "market_strip", label: "Market strip indices", kind: "symbol-lines", hint: "One per line: the Stooq symbol, a space, the label shown in the header, and optionally \" | \" and the Yahoo symbol of the same index, e.g. ^spx S&P 500 | ^GSPC. Stooq's close first, else Yahoo's (intraday while the market is open); PX (^px) falls back to the Prague Stock Exchange's page, read once a day. An index no source has shows as empty." },
       { key: "yahoo_daily_fallback", label: "Daily closes from Yahoo Finance when Stooq has none", kind: "bool", hint: "Unofficial source, used only for a symbol Stooq refuses, cannot be reached for or does not know. Stooq stays the source of record." },

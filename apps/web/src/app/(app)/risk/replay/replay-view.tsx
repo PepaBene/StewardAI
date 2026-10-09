@@ -88,7 +88,10 @@ function EpisodeRow({
           )}
         >
           <div className="min-w-0">
-            <div className="text-sm font-semibold">{e.label}</div>
+            <div className="text-sm font-semibold">
+              {e.label}
+              {e.custom ? <span className="ml-2 border border-border px-1.5 py-0.5 text-xs font-normal text-text-muted">your episode</span> : null}
+            </div>
             <div className="text-xs text-text-muted">{episodeSpan(e)}</div>
           </div>
           <div aria-hidden="true" className="relative h-3 bg-border-soft max-md:col-span-2 max-md:row-start-2">
@@ -119,6 +122,7 @@ function EpisodeDetail({ episode: e, currency, limit }: { episode: ReplayEpisode
   return (
     <div className="flex flex-col gap-3 pb-4">
       <p className="max-w-prose text-sm text-text-muted">{e.note}</p>
+      {e.caution ? <p className="max-w-prose text-sm text-warning-signal">{e.caution}</p> : null}
       <p className="text-sm">
         {basisSentence(e)}
         {e.breaches_limit && limit !== null ? <span className="text-warning-signal"> That reaches your {pct(limit, 0)} limit, which asks for a review.</span> : null}

@@ -21,7 +21,7 @@ every figure that rests on it can say so.
 
 import datetime as dt
 import zlib
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
@@ -31,6 +31,7 @@ import numpy.typing as npt
 from steward.quant.returns import ReturnMatrix, coverage_of
 
 MIN_FIT_WEEKS = 26
+PREFERRED_MARGIN = 0.10
 SEED = 20261005
 
 Status = Literal["real", "proxied", "excluded"]
@@ -76,11 +77,17 @@ def ols(
 
 
 def backfill(
-    matrix: ReturnMatrix, candidates: Sequence[str], min_fit_weeks: int = MIN_FIT_WEEKS
+    matrix: ReturnMatrix,
+    candidates: Sequence[str],
+    min_fit_weeks: int = MIN_FIT_WEEKS,
+    preferred: Mapping[str, Sequence[str]] | None = None,
 ) -> tuple[ReturnMatrix, dict[str, ColumnStatus]]:
     """Fill the NaN weeks of every non-candidate column from its best-fitting candidate.
 
-    Candidate columns are never altered. Returns the filled matrix and one status per column.
+    Candidate columns are never altered. `preferred` maps a column to the candidates that match
+    its sector or region: the best of those is used when its R-squared is within
+    `PREFERRED_MARGIN` of the best overall. Returns the filled matrix and one status per
+    column.
     """
     values = matrix.values.copy()
     usable = [c for c in candidates if c in matrix.keys]
@@ -103,9 +110,9 @@ def backfill(
                 "to fit a proxy",
             )
             continue
-        best: (
-            tuple[float, str, float, float, npt.NDArray[np.float64], npt.NDArray[np.bool_]] | None
-        ) = None
+        fits: list[
+            tuple[float, str, float, float, npt.NDArray[np.float64], npt.NDArray[np.bool_]]
+        ] = []
         for cand in usable:
             if cand == key:
                 continue
@@ -118,8 +125,14 @@ def backfill(
             if fit is None:
                 continue
             alpha, beta, r2, resid = fit
-            if best is None or r2 > best[0]:
-                best = (r2, cand, alpha, beta, resid, overlap)
+            fits.append((r2, cand, alpha, beta, resid, overlap))
+        best = max(fits, key=lambda f: f[0], default=None)
+        if best is not None and preferred and preferred.get(key):
+            # A proxy of the holding's own sector or region wins unless it fits clearly worse.
+            near = [
+                f for f in fits if f[1] in preferred[key] and f[0] >= best[0] - PREFERRED_MARGIN
+            ]
+            best = max(near, key=lambda f: f[0], default=best)
         if best is None:
             statuses[key] = ColumnStatus(
                 key, "excluded", real, 0, None, "no proxy with enough overlapping history"

@@ -21,6 +21,7 @@ from steward.config.strategy import StrategyConfig
 from steward.fx.convert import normalise_currency
 from steward.fx.history import load_fx_history
 from steward.portfolio import exante as ea
+from steward.portfolio.risk_snapshots import save_snapshot
 from steward.quant import returns as rt
 from steward.quant import stress as st
 from steward.reference.price_series import PriceSymbols, choose_one, choose_series, holding_symbols
@@ -35,6 +36,12 @@ METHOD = (
     "by its beta (weekly regression, last three years) on the best-fitting proxy that does "
     "cover the episode; those results are approximations and are labelled proxied. Positions "
     "with neither stay flat and are listed as unavailable. Cash is flat."
+)
+
+
+CAUTION = (
+    "Part of this result is estimated from a proxy. The beta was measured over ordinary weeks "
+    "and betas usually rise in a crash, so those losses are probably understated."
 )
 
 
@@ -70,6 +77,12 @@ class ReplayEpisode(BaseModel):
     breaches_limit: bool | None = Field(
         description="Whether the loss reaches the drawdown limit; null without a limit or result."
     )
+    caution: str | None = Field(
+        default=None,
+        description="Set when part of the result is estimated through a proxy beta: that loss "
+        "is probably understated.",
+    )
+    custom: bool = Field(default=False, description="An episode the owner added in the strategy.")
     worst: list[ReplayPosition]
     positions: list[ReplayPosition]
 
@@ -170,6 +183,7 @@ def build_replay(
     fx: rt.FxLookup,
     drawdown_limit: float | None,
     episodes: Sequence[st.Episode] = st.EPISODES,
+    custom_keys: frozenset[str] = frozenset(),
 ) -> StressReplay:
     """Replay every episode on the book. Pure given the loaded data."""
     by_key = {s.key: s for s in inputs}
@@ -219,6 +233,8 @@ def build_replay(
                 proxied_weight=res.proxied_weight,
                 unavailable_weight=res.unavailable_weight,
                 breaches_limit=res.breaches_limit,
+                caution=CAUTION if res.proxied_weight > 0.0005 and res.loss is not None else None,
+                custom=ep.key in custom_keys,
                 worst=[_out(r, names, labels) for r in res.worst],
                 positions=[
                     _out(r, names, labels)
@@ -254,13 +270,26 @@ async def stress_replay(pool: asyncpg.Pool) -> StressReplay:
     limit = _drawdown_limit(strategy)
     if not book.positions:
         return _empty(book.base_currency, "the portfolio holds no positions", limit)
-    since = min(e.start for e in st.EPISODES) - dt.timedelta(days=14)
+    episodes = episodes_for(strategy)
+    since = min(e.start for e in episodes) - dt.timedelta(days=14)
     inputs, labels = await _long_inputs(pool, book, since)
     today = dt.date.today()
     currencies = {s.currency for s in inputs} | {book.base_currency}
     fx = await load_fx_history(pool, ea.FX_SOURCE, currencies, since, today)
     lookup = ea.fx_lookup(fx, normalise_currency(book.base_currency)[0])
-    return build_replay(book, inputs, labels, lookup, limit)
+    custom = frozenset(c.key for c in strategy.risk.stress_episodes)
+    report = build_replay(book, inputs, labels, lookup, limit, episodes, custom)
+    await save_snapshot(pool, "replay", report, report.as_of, report.method_version)
+    return report
+
+
+def episodes_for(strategy: StrategyConfig) -> list[st.Episode]:
+    """The built-in episodes with the owner's own added; an owner entry with a built-in key
+    replaces it. Sorted by start date."""
+    by_key = {e.key: e for e in st.EPISODES}
+    for c in strategy.risk.stress_episodes:
+        by_key[c.key] = st.Episode(c.key, c.label, c.start, c.end, c.note)
+    return sorted(by_key.values(), key=lambda e: e.start)
 
 
 def _drawdown_limit(strategy: StrategyConfig) -> float | None:

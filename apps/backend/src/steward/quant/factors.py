@@ -60,6 +60,23 @@ def weekly_factor_returns(
     return out
 
 
+def weekly_level_changes(
+    series: Sequence[tuple[dt.date, float]], dates: Sequence[dt.date], max_age_days: int = 7
+) -> npt.NDArray[np.float64]:
+    """Change in a level series (a yield in percentage points) over each week ending on
+    `dates`. A week needs a stored level within `max_age_days` before both of its ends."""
+    days = [d for d, _ in series]
+    values = [v for _, v in series]
+
+    def level(day: dt.date) -> float:
+        i = bisect.bisect_right(days, day) - 1
+        if i < 0 or (day - days[i]).days > max_age_days:
+            return float("nan")
+        return values[i]
+
+    return np.array([level(d) - level(d - dt.timedelta(days=7)) for d in dates], dtype=np.float64)
+
+
 @dataclass(frozen=True)
 class FactorFit:
     alpha: float  # per week

@@ -653,6 +653,13 @@ class ProxySeries(ConfigModel):
         default="USD", description="Quote currency of the ETF's closes."
     )
     kind: Literal["sector", "region", "market"] = "sector"
+    match: list[Annotated[str, Field(min_length=2, max_length=30)]] = Field(
+        default_factory=list,
+        max_length=20,
+        description="Lower-case words that, found in a holding's sector or country label, make "
+        "this ETF the preferred stand-in for it (when its fit is within 0.10 R-squared of the "
+        "best one).",
+    )
 
     def yahoo(self) -> str | None:
         ticker, _, suffix = self.symbol.rpartition(".")
@@ -661,21 +668,34 @@ class ProxySeries(ConfigModel):
 
 def _default_proxy_series() -> list[ProxySeries]:
     sectors = {
-        "xlk.us": "US technology",
-        "xlv.us": "US health care",
-        "xlf.us": "US financials",
-        "xle.us": "US energy",
-        "xly.us": "US consumer discretionary",
-        "xlp.us": "US consumer staples",
-        "xli.us": "US industrials",
-        "xlb.us": "US materials",
-        "xlu.us": "US utilities",
-        "xlc.us": "US communication services",
+        "xlk.us": ("US technology", ["tech", "software", "semiconductor", "it services"]),
+        "xlv.us": ("US health care", ["health", "pharma", "biotech", "medical"]),
+        "xlf.us": ("US financials", ["financ", "bank", "insurance", "asset manage"]),
+        "xle.us": ("US energy", ["energy", "oil", "gas"]),
+        "xly.us": ("US consumer discretionary", ["discretionary", "retail", "auto", "leisure"]),
+        "xlp.us": ("US consumer staples", ["staples", "food", "beverage", "household"]),
+        "xli.us": ("US industrials", ["industrial", "aerospace", "defen", "transport"]),
+        "xlb.us": ("US materials", ["material", "chemical", "mining", "metals"]),
+        "xlu.us": ("US utilities", ["utilit", "electric", "water"]),
+        "xlc.us": ("US communication services", ["communication", "media", "telecom"]),
     }
-    out = [ProxySeries(symbol=s, label=name, kind="sector") for s, name in sectors.items()]
+    out = [
+        ProxySeries(symbol=s, label=name, kind="sector", match=words)
+        for s, (name, words) in sectors.items()
+    ]
     out += [
-        ProxySeries(symbol="vgk.us", label="Europe", kind="region"),
-        ProxySeries(symbol="vwo.us", label="Emerging markets", kind="region"),
+        ProxySeries(
+            symbol="vgk.us",
+            label="Europe",
+            kind="region",
+            match=["europe", "germany", "france", "netherlands", "czech", "spain", "italy", "uk"],
+        ),
+        ProxySeries(
+            symbol="vwo.us",
+            label="Emerging markets",
+            kind="region",
+            match=["emerging", "china", "india", "brazil", "taiwan", "korea"],
+        ),
         ProxySeries(symbol="vt.us", label="World equities", kind="market"),
     ]
     return out
@@ -705,9 +725,17 @@ class PriceSettings(ConfigModel):
         default=10,
         ge=1,
         le=10,
-        description="Years of daily closes (and ECB FX rates) fetched for holdings, benchmarks "
-        "and proxy ETFs. The covariance model needs three years of weekly returns; stress "
-        "replays need more.",
+        description="Years of daily closes fetched for holdings. The covariance model needs "
+        "three years of weekly returns. Benchmarks, proxy ETFs and FX use "
+        "`reference_history_years`.",
+    )
+    reference_history_years: int = Field(
+        default=20,
+        ge=1,
+        le=30,
+        description="Years of daily closes fetched for benchmarks, the market strip and proxy "
+        "ETFs, and of ECB FX rates. Longer than the holdings' history so that stress replays "
+        "can reach the 2008 and 2011 episodes through proxies.",
     )
     proxy_series: list[ProxySeries] = Field(
         default_factory=_default_proxy_series,
@@ -925,6 +953,11 @@ class MacroSettings(ConfigModel):
             ),
             FredSeries(
                 key="fed_funds", label="Fed funds effective rate", series_id="DFF", policy_rate=True
+            ),
+            FredSeries(
+                key="us_10y",
+                label="US 10-year Treasury yield (the rates factor of the risk model)",
+                series_id="DGS10",
             ),
             *(
                 FredSeries(key=key, label=label, series_id=series_id, unit=unit)

@@ -231,7 +231,8 @@ class TestChatTools:
         declared = {t["name"] for t in TOOL_DEFINITIONS}
         wanted = {
             "stress_test", "theme_exposure", "decision_scorecard", "fund_overlap",
-            "performance_explain", "event_paths",
+            "performance_explain", "event_paths", "risk_forecast", "past_episodes",
+            "factor_tilts",
         }  # fmt: skip
         assert wanted <= declared
         assert all(hasattr(ChatTools, f"_tool_{name}") for name in wanted)

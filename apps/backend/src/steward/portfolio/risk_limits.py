@@ -18,7 +18,7 @@ from steward.config.strategy import RiskLimits, StrategyConfig
 from steward.portfolio.breaches import Finding
 
 if TYPE_CHECKING:
-    from steward.portfolio.exante import LoadedBook
+    from steward.portfolio.exante import ExAnteRisk, LoadedBook
 from steward.portfolio.snapshot import PositionRow
 from steward.settings import get_settings
 
@@ -178,24 +178,30 @@ def evaluate_risk(inputs: RiskInputs, limits: RiskLimits) -> list[Finding]:
                 limits.min_effective_bets,
             )
         )
+    # One finding per ticker, even when it breaches both tier rules (a core stock above 35 %).
+    by_ticker: dict[str, list[TierFlag]] = {}
     for tf in inputs.tier_flags:
-        what = (
-            f"is above {_pct(tf.threshold)}, so it is not a "
-            f"{tf.tier} stock by the tier criteria (speculative above that volatility)"
-            if tf.rule == "speculative_above"
-            else f"is above the core ceiling of {_pct(tf.threshold)}"
+        by_ticker.setdefault(tf.ticker, []).append(tf)
+    for ticker, flags in by_ticker.items():
+        first = min(flags, key=lambda f: f.threshold)
+        what = " and ".join(
+            f"is above {_pct(f.threshold)}, so it is not a {f.tier} stock by the tier criteria "
+            "(speculative above that volatility)"
+            if f.rule == "speculative_above"
+            else f"is above the core ceiling of {_pct(f.threshold)}"
+            for f in sorted(flags, key=lambda f: f.threshold)
         )
         findings.append(
             Finding(
-                f"risk:tier:{tf.rule}:{tf.ticker}",
+                f"risk:tier:{ticker}",
                 "rule",
-                tf.ticker,
+                ticker,
                 severity,
-                f"Tier criterion: {tf.ticker} ({tf.tier}) has annualised volatility "
-                f"{_pct(tf.volatility)} over the last year, which {what}. Re-check its tier "
+                f"Tier criterion: {ticker} ({first.tier}) has annualised volatility "
+                f"{_pct(first.volatility)} over the last year, which {what}. Re-check its tier "
                 "at the thesis review; reclassify by hand",
-                tf.volatility,
-                tf.threshold,
+                first.volatility,
+                max(f.threshold for f in flags),
             )
         )
     if limits.max_beta is not None and inputs.beta is not None and inputs.beta > limits.max_beta:
@@ -384,7 +390,10 @@ def position_losses(positions: list[PositionRow]) -> list[PositionLoss]:
 
 
 async def gather_risk_inputs(
-    pool: asyncpg.Pool, strategy: StrategyConfig, positions: list[PositionRow]
+    pool: asyncpg.Pool,
+    strategy: StrategyConfig,
+    positions: list[PositionRow],
+    book: "LoadedBook | None" = None,
 ) -> RiskInputs:
     """Measure only what an enabled limit needs. A failed measurement is noted, never raised:
     a missing price history must not fail the sync."""
@@ -427,8 +436,14 @@ async def gather_risk_inputs(
         try:
             from steward.portfolio.exante import book_from_positions
 
-            book = await book_from_positions(pool, positions)
-            _book_inputs(book, strategy, inputs)
+            book = book or await book_from_positions(pool, positions)
+            risk_report = _book_inputs(book, strategy, inputs)
+            if risk_report.volatility_forecast is not None:
+                from steward.portfolio.risk_snapshots import save_snapshot
+
+                await save_snapshot(
+                    pool, "ex_ante", risk_report, risk_report.as_of, risk_report.method_version
+                )
         except Exception as exc:
             log.warning("ex-ante measurement failed: %s", exc)
             for name in ("correlation", "volatility_forecast", "tier_risk", "effective_bets"):
@@ -578,8 +593,9 @@ async def _xray_inputs(
         inputs.exposures += [Exposure("country", b.label, b.weight) for b in classified("country")]
 
 
-def _book_inputs(book: "LoadedBook", strategy: StrategyConfig, inputs: RiskInputs) -> None:
-    """Fill the weekly-correlation and ex-ante inputs from a loaded book."""
+def _book_inputs(book: "LoadedBook", strategy: StrategyConfig, inputs: RiskInputs) -> "ExAnteRisk":
+    """Fill the weekly-correlation and ex-ante inputs from a loaded book; returns the report
+    they came from."""
     # Imported here: portfolio.exante imports portfolio.snapshot, as this module's callers do.
     from steward.portfolio.exante import build_report, weekly_pair_correlations
 
@@ -606,3 +622,4 @@ def _book_inputs(book: "LoadedBook", strategy: StrategyConfig, inputs: RiskInput
         for c in report.tier_checks
         if c.breached
     ]
+    return report

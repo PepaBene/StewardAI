@@ -76,6 +76,119 @@ async def stress_test(pool: asyncpg.Pool, registry: Registry, owner_id: str) -> 
     }
 
 
+async def risk_forecast(pool: asyncpg.Pool, registry: Registry) -> dict[str, Any]:
+    """The forecast volatility of today's holdings, where it comes from and what was left out."""
+    from steward.portfolio.exante import ex_ante_risk
+
+    report = await ex_ante_risk(pool)
+    if report.volatility_forecast is None:
+        return {"unavailable": report.reason or "the model has nothing to work from"}
+    sid = registry.add(
+        "observation",
+        f"exante:{report.as_of}",
+        f"Forecast risk of {report.as_of}",
+        app_path="/risk/ex-ante",
+        tier=1,
+        snippet=f"forecast volatility {report.volatility_forecast:.1%} a year",
+        as_of=str(report.as_of),
+    )
+    top = sorted(
+        (p for p in report.positions if p.risk_share is not None),
+        key=lambda p: p.risk_share or 0,
+        reverse=True,
+    )[:5]
+    return {
+        "source_id": sid,
+        "as_of": str(report.as_of),
+        "method": report.method,
+        "volatility_forecast": report.volatility_forecast,
+        "volatility_forecast_if_left_out_were_average": report.volatility_forecast_scaled,
+        "realized_volatility_last_year": report.realized_volatility,
+        "effective_bets": report.effective_bets,
+        "diversification_ratio": report.diversification_ratio,
+        "largest_risk_contributors": [
+            {"ticker": p.ticker, "risk_share": p.risk_share, "weight": p.weight} for p in top
+        ],
+        "by_tier": [g.model_dump() for g in report.by_tier],
+        "left_out_weight": report.coverage.uncovered_weight if report.coverage else None,
+        "warnings": report.warnings,
+    }
+
+
+async def past_episodes(pool: asyncpg.Pool, registry: Registry) -> dict[str, Any]:
+    """Today's holdings run through past market episodes."""
+    from steward.portfolio.replay import stress_replay
+
+    report = await stress_replay(pool)
+    if report.reason:
+        return {"unavailable": report.reason}
+    sid = registry.add(
+        "observation",
+        f"replay:{report.as_of}",
+        f"Past episodes replayed on holdings of {report.as_of}",
+        app_path="/risk/replay",
+        tier=1,
+        snippet="; ".join(
+            f"{e.label}: {e.loss:+.1%}" for e in report.episodes if e.loss is not None
+        )[:500],
+        as_of=str(report.as_of),
+    )
+    return {
+        "source_id": sid,
+        "method": report.method,
+        "drawdown_limit": report.drawdown_limit,
+        "episodes": [
+            {
+                "label": e.label,
+                "from": str(e.start),
+                "to": str(e.end),
+                "status": e.status,
+                "loss": e.loss,
+                "pnl": e.pnl,
+                "breaches_limit": e.breaches_limit,
+                "unavailable_weight": e.unavailable_weight,
+                "caution": e.caution,
+                "reason": e.reason,
+            }
+            for e in report.episodes
+        ],
+        "warnings": report.warnings,
+    }
+
+
+async def factor_tilts(pool: asyncpg.Pool, registry: Registry, region: str) -> dict[str, Any]:
+    """What the portfolio is leaning on: market, size, value, momentum, currency and rates."""
+    from steward.portfolio.factors import factor_exposures
+
+    report = await factor_exposures(pool, region)
+    if report.portfolio is None:
+        return {"unavailable": report.reason or "no factor data yet"}
+    sid = registry.add(
+        "observation",
+        f"factors:{region}:{report.as_of}",
+        f"Factor exposures of {report.as_of} ({region})",
+        app_path="/risk/factors",
+        tier=1,
+        snippet=f"R² {report.portfolio.r_squared:.2f} over {report.portfolio.observations} weeks",
+        as_of=str(report.as_of),
+    )
+    return {
+        "source_id": sid,
+        "region": region,
+        "method": report.method,
+        "r_squared": report.portfolio.r_squared,
+        "weeks": report.portfolio.observations,
+        "loadings": [
+            {"factor": b.label, "beta": b.beta, "t_stat": b.t_stat} for b in report.portfolio.betas
+        ],
+        "tilts_against_benchmark": [
+            {"factor": t.label, "tilt": t.tilt, "flagged": t.flagged, "note": t.note}
+            for t in report.tilts
+        ],
+        "warnings": report.warnings,
+    }
+
+
 async def theme(
     pool: asyncpg.Pool, registry: Registry, owner_id: str, kind: str, value: str
 ) -> dict[str, Any]:

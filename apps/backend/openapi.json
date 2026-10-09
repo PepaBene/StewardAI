@@ -2158,6 +2158,381 @@
         ]
       }
     },
+    "/portfolio/risk/snapshots": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Risk Snapshots",
+        "description": "Saved copies of the risk reports with their method version, newest first. A report is\nsaved once per data date and method version, so a later change to a model does not rewrite\nwhat was shown.",
+        "operationId": "get_risk_snapshots",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ex_ante",
+                    "replay",
+                    "factors",
+                    "shock"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SnapshotRow"
+                  },
+                  "title": "Response Get Risk Snapshots"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/risk/snapshots/{snapshot_id}": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Risk Snapshot",
+        "description": "One saved risk report exactly as it was shown.",
+        "operationId": "get_risk_snapshot",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Snapshot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Risk Snapshot"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/risk/factor-shock": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Post Factor Shock",
+        "description": "What today's holdings would do if the stated factors moved: the equity market, the\nsize, value, profitability, investment and momentum styles, the US dollar and the euro\nagainst the base currency, and the US 10-year yield. Each holding is moved by its measured\nloadings; an owner beta replaces only the market loading. Holdings without loadings use the\nowner's fallback beta, else stay flat and are listed. Nothing is saved.",
+        "operationId": "post_factor_shock",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "region",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "developed",
+                "europe",
+                "us"
+              ],
+              "type": "string",
+              "default": "developed",
+              "title": "Region"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShockSpec"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShockResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/risk/scenarios": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Risk Scenarios",
+        "description": "The saved what-if scenarios, by name.",
+        "operationId": "get_risk_scenarios",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Scenario"
+                  },
+                  "type": "array",
+                  "title": "Response Get Risk Scenarios"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Post Risk Scenario",
+        "description": "Save a scenario under a name, replacing the one with that name.",
+        "operationId": "post_risk_scenario",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scenario"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/portfolio/risk/scenarios/{scenario_id}": {
+      "delete": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Delete Risk Scenario",
+        "description": "Delete a saved scenario. Its saved runs are kept.",
+        "operationId": "delete_risk_scenario",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/risk/scenarios/{scenario_id}/run": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Run Risk Scenario",
+        "description": "Run a saved scenario on today's holdings; the run is saved with the loadings it used.",
+        "operationId": "run_risk_scenario",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Scenario Id"
+            }
+          },
+          {
+            "name": "region",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "developed",
+                "europe",
+                "us"
+              ],
+              "type": "string",
+              "default": "developed",
+              "title": "Region"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShockResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/risk/factors": {
       "get": {
         "tags": [
@@ -45991,6 +46366,28 @@
             ],
             "title": "Forecast Model"
           },
+          "volatility_forecast_scaled": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility Forecast Scaled",
+            "description": "The forecast divided by the covered share of the invested weight: what it would be if the positions left out for lack of history carried the average risk of the rest. Equal to the forecast when nothing is left out. Shown, not tested."
+          },
+          "weight_basis": {
+            "type": "string",
+            "enum": [
+              "total",
+              "invested"
+            ],
+            "title": "Weight Basis",
+            "description": "The strategy's weight basis, which the page uses to show sizes. Risk shares are always computed on total value.",
+            "default": "total"
+          },
           "shrinkage_intensity": {
             "anyOf": [
               {
@@ -48152,6 +48549,28 @@
               }
             ],
             "title": "As Of"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "total_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Value"
           },
           "method_version": {
             "type": "string",
@@ -73299,6 +73718,31 @@
                 "type": "null"
               }
             ]
+          },
+          "weight_of_invested": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Of Invested",
+            "description": "Share of the invested part (positions without cash)."
+          },
+          "last_price": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Price",
+            "description": "Date of the latest stored close of this position's series."
           }
         },
         "type": "object",
@@ -74397,8 +74841,16 @@
             "maximum": 10.0,
             "minimum": 1.0,
             "title": "History Years",
-            "description": "Years of daily closes (and ECB FX rates) fetched for holdings, benchmarks and proxy ETFs. The covariance model needs three years of weekly returns; stress replays need more.",
+            "description": "Years of daily closes fetched for holdings. The covariance model needs three years of weekly returns. Benchmarks, proxy ETFs and FX use `reference_history_years`.",
             "default": 10
+          },
+          "reference_history_years": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Reference History Years",
+            "description": "Years of daily closes fetched for benchmarks, the market strip and proxy ETFs, and of ECB FX rates. Longer than the holdings' history so that stress replays can reach the 2008 and 2011 episodes through proxies.",
+            "default": 20
           },
           "proxy_series": {
             "items": {
@@ -75392,6 +75844,17 @@
             ],
             "title": "Kind",
             "default": "sector"
+          },
+          "match": {
+            "items": {
+              "type": "string",
+              "maxLength": 30,
+              "minLength": 2
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Match",
+            "description": "Lower-case words that, found in a holding's sector or country label, make this ETF the preferred stand-in for it (when its fit is within 0.10 R-squared of the best one)."
           }
         },
         "additionalProperties": false,
@@ -78313,6 +78776,24 @@
             "title": "Breaches Limit",
             "description": "Whether the loss reaches the drawdown limit; null without a limit or result."
           },
+          "caution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caution",
+            "description": "Set when part of the result is estimated through a proxy beta: that loss is probably understated."
+          },
+          "custom": {
+            "type": "boolean",
+            "title": "Custom",
+            "description": "An episode the owner added in the strategy.",
+            "default": false
+          },
           "worst": {
             "items": {
               "$ref": "#/components/schemas/ReplayPosition"
@@ -80115,6 +80596,14 @@
             "title": "Decision Scorecard",
             "description": "How past journal decisions turned out (price change since the decision, each with its sample size; sections with too few decisions are not summarised)."
           },
+          "risk_notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Risk Notes",
+            "description": "The forecast volatility from today's holdings, the factor tilts worth a look and the hardest past episode, each as a plain sentence."
+          },
           "sources": {
             "items": {
               "$ref": "#/components/schemas/Source"
@@ -81231,6 +81720,26 @@
             "title": "Tier Core Max Volatility",
             "description": "A core-tier holding whose annualised volatility is above this (0.25 = 25 %) no longer meets the core criterion and needs a review."
           },
+          "auto_tiers": {
+            "type": "boolean",
+            "title": "Auto Tiers",
+            "description": "Work out each holding's risk tier from its own numbers instead of listing holdings in the strategy: speculative if volatility is above `tier_speculative_volatility`, market cap is below `tier_speculative_market_cap` or it is not profitable; core only if market cap is above `tier_core_min_market_cap`, volatility is at or below `tier_core_max_volatility` and it is profitable; growth otherwise. A fund has no market cap or profit and is tiered by volatility alone. A classification entered by the owner still wins.",
+            "default": false
+          },
+          "tier_speculative_market_cap": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Tier Speculative Market Cap",
+            "description": "Market cap in USD below which a stock is speculative.",
+            "default": 2000000000.0
+          },
+          "tier_core_min_market_cap": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Tier Core Min Market Cap",
+            "description": "Market cap in USD a core stock must exceed.",
+            "default": 10000000000.0
+          },
           "on_breach": {
             "type": "string",
             "enum": [
@@ -81241,6 +81750,15 @@
             "title": "On Breach",
             "description": "Severity of a risk-limit breach (alerted when it opens).",
             "default": "severity_2"
+          },
+          "stress_episodes": {
+            "items": {
+              "$ref": "#/components/schemas/StressEpisodeConfig"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Stress Episodes",
+            "description": "Past episodes replayed on today's holdings in addition to the built-in ones (2008, 2011, the end of the CZK floor, 2020, 2022). Use the market peak and trough dates. An entry with the key of a built-in one replaces it."
           }
         },
         "additionalProperties": false,
@@ -82335,6 +82853,34 @@
         ],
         "title": "SavedScenario"
       },
+      "Scenario": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/ShockSpec"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "spec",
+          "created_at"
+        ],
+        "title": "Scenario"
+      },
       "ScenarioImpactOut": {
         "properties": {
           "entity": {
@@ -82386,6 +82932,25 @@
           "uses_owner_assigned"
         ],
         "title": "ScenarioImpactOut"
+      },
+      "ScenarioIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/ShockSpec"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "spec"
+        ],
+        "title": "ScenarioIn"
       },
       "ScenarioMacroContext": {
         "properties": {
@@ -84922,6 +85487,96 @@
         "title": "ShockAssumptions",
         "description": "Sensitivities the owner sets. A measured value is used unless the owner overrides it."
       },
+      "ShockDriver": {
+        "properties": {
+          "factor": {
+            "type": "string",
+            "title": "Factor"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "contribution": {
+            "type": "number",
+            "title": "Contribution",
+            "description": "Part of the holding's move from this factor."
+          }
+        },
+        "type": "object",
+        "required": [
+          "factor",
+          "label",
+          "contribution"
+        ],
+        "title": "ShockDriver"
+      },
+      "ShockPosition": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "measured",
+              "owner",
+              "fallback",
+              "unshocked"
+            ],
+            "title": "Basis"
+          },
+          "move": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Move"
+          },
+          "pnl": {
+            "type": "number",
+            "title": "Pnl"
+          },
+          "drivers": {
+            "items": {
+              "$ref": "#/components/schemas/ShockDriver"
+            },
+            "type": "array",
+            "title": "Drivers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "weight",
+          "basis",
+          "move",
+          "pnl",
+          "drivers"
+        ],
+        "title": "ShockPosition"
+      },
       "ShockRequest": {
         "properties": {
           "shocks": {
@@ -84933,6 +85588,164 @@
         },
         "type": "object",
         "title": "ShockRequest"
+      },
+      "ShockResult": {
+        "properties": {
+          "region": {
+            "type": "string",
+            "title": "Region"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/ShockSpec"
+          },
+          "before": {
+            "type": "number",
+            "title": "Before"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          },
+          "pnl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnl"
+          },
+          "loss": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loss"
+          },
+          "breaches_limit": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Breaches Limit"
+          },
+          "drawdown_limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawdown Limit"
+          },
+          "unshocked_weight": {
+            "type": "number",
+            "title": "Unshocked Weight"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/ShockPosition"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "worst": {
+            "items": {
+              "$ref": "#/components/schemas/ShockPosition"
+            },
+            "type": "array",
+            "title": "Worst"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "region",
+          "as_of",
+          "base_currency",
+          "method_version",
+          "method",
+          "spec",
+          "before",
+          "after",
+          "pnl",
+          "loss",
+          "breaches_limit",
+          "drawdown_limit",
+          "unshocked_weight",
+          "positions",
+          "worst",
+          "warnings",
+          "reason"
+        ],
+        "title": "ShockResult"
       },
       "ShockRun": {
         "properties": {
@@ -85169,6 +85982,167 @@
         "type": "object",
         "title": "ShockSet",
         "description": "The factor moves of one scenario. Every field is optional; an empty set shocks nothing."
+      },
+      "ShockSpec": {
+        "properties": {
+          "market": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": -0.95
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market",
+            "description": "Equity market move, fraction (-0.2 = -20 %)."
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.5,
+                "minimum": -0.5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size",
+            "description": "Small minus big."
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.5,
+                "minimum": -0.5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "Value minus growth."
+          },
+          "profitability": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.5,
+                "minimum": -0.5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profitability"
+          },
+          "investment": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.5,
+                "minimum": -0.5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Investment"
+          },
+          "momentum": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.5,
+                "minimum": -0.5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Momentum"
+          },
+          "usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.5,
+                "minimum": -0.5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd",
+            "description": "US dollar against the base currency."
+          },
+          "eur": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.5,
+                "minimum": -0.5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eur",
+            "description": "Euro against the base currency."
+          },
+          "rates_pp": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 5.0,
+                "minimum": -5.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rates Pp",
+            "description": "Change in the US 10-year yield, points."
+          },
+          "other_fx": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Other Fx",
+            "description": "Any other currency code (GBP, CHF) -> move against the base currency, fraction. Applies to holdings with a measured loading on that currency."
+          },
+          "owner_betas": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Owner Betas",
+            "description": "Held ticker -> market beta the owner assumes."
+          },
+          "unmeasured_beta": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 4.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unmeasured Beta",
+            "description": "Market beta for a holding with no measured loadings; null leaves it flat.",
+            "default": 1.0
+          }
+        },
+        "type": "object",
+        "title": "ShockSpec",
+        "description": "The factor moves of one scenario. Every move is optional; an empty set shocks nothing."
       },
       "ShockedPosition": {
         "properties": {
@@ -85637,6 +86611,52 @@
           "active"
         ],
         "title": "SnapshotCreated"
+      },
+      "SnapshotRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ex_ante",
+              "replay",
+              "factors",
+              "shock"
+            ],
+            "title": "Kind"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "scope",
+          "as_of",
+          "method_version",
+          "created_at"
+        ],
+        "title": "SnapshotRow"
       },
       "SnapshotValues": {
         "properties": {
@@ -88612,6 +89632,51 @@
           "body"
         ],
         "title": "StrategyConfigVersion"
+      },
+      "StressEpisodeConfig": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{2,30}$",
+            "title": "Key",
+            "examples": [
+              "brexit_vote"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start",
+            "description": "The peak, or the last day before the shock."
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End",
+            "description": "The trough."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "start",
+          "end"
+        ],
+        "title": "StressEpisodeConfig"
       },
       "StressReplay": {
         "properties": {

@@ -190,7 +190,19 @@ def test_new_limits_default_to_off() -> None:
         tier_flags=[TierFlag("X", "core", 0.9, 0.25, "core_above")],
     )
     keys = {f.key for f in evaluate_risk(inputs, RiskLimits())}
-    assert keys == {"risk:tier:core_above:X"}  # a tier flag is only produced when its limit is set
+    assert keys == {"risk:tier:X"}  # a tier flag is only produced when its limit is set
+
+
+def test_a_holding_that_breaches_both_tier_rules_opens_one_finding() -> None:
+    inputs = RiskInputs(
+        tier_flags=[
+            TierFlag("X", "core", 0.5, 0.25, "core_above"),
+            TierFlag("X", "core", 0.5, 0.35, "speculative_above"),
+        ]
+    )
+    found = evaluate_risk(inputs, RiskLimits())
+    assert [f.key for f in found] == ["risk:tier:X"]
+    assert "core ceiling" in found[0].detail and "speculative" in found[0].detail
 
 
 def test_forecast_volatility_has_its_own_finding_key() -> None:

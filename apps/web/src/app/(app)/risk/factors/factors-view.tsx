@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { Notes, Warnings } from "../../xray/shared";
+import { ShockPanel } from "./shock-panel";
 
 type Region = "developed" | "europe" | "us";
 
@@ -56,6 +57,7 @@ export function FactorsView() {
         ))}
       </div>
       <RegionReport key={region} region={region} />
+      <ShockPanel region={region} />
     </div>
   );
 }
@@ -128,7 +130,7 @@ function Tilts({ report }: { report: FactorExposures }) {
       </ul>
       {currency.length > 0 ? (
         <>
-          <h4 className="mt-4 text-xs font-medium text-text-muted">Currencies, against the base currency</h4>
+          <h4 className="mt-4 text-xs font-medium text-text-muted">Currencies and rates, against the base currency</h4>
           <ul className="mt-1">
             {currency.map((t) => (
               <TiltRow key={t.factor} tilt={t} scale={scale} report={report} flag={report.tilt_flag} />

@@ -224,6 +224,24 @@ Code: `quant/{stress,factors,french,french_store}.py`, `portfolio/{replay,factor
 - G41. The tilt note appears on the page. The monthly review does not include it yet (Q7.1), and the factor table has no coverage tracking beyond first and last date in the response (no source-status row in the existing macro status screens, since the data is stored outside the macro tables).
 - G42. Per-holding regressions use the holding's own weeks only, so a holding with 26 to 39 weeks has no fit (`MIN_OBSERVATIONS` = 40); the portfolio line uses backfilled weeks, so a short-history holding contributes proxy loadings to it (labelled in the warnings).
 
+### Gap closure (9 October 2026)
+
+**Closed in code:** G4, G9, G10, G11, G12, G14, G15, G16, G17, G18, G24, G26, G27 (glossary), G28, G29 (chat tools `risk_forecast`, `past_episodes`, `factor_tilts`), G30 (factor-shock tool on the Factors page), G31 (saved scenarios, append-only report snapshots with `method_version`), G34 (US 10-year yield factor and extra held-currency factors), G35, G36, G37 (owner episodes in `risk.stress_episodes`), G38, G41 (a "Risk" section in the monthly review), G42. G2 is covered by `tests/test_quant_db.py` (real database).
+
+**G20, changed:** the strategy names no holding. `risk.auto_tiers` plus the thresholds make the backend work out each holding's tier from its own numbers (volatility, market cap, profit; a fund by volatility alone), store it in `holding_risk_tier` and use it wherever a page or limit groups by tier. An owner entry in `classifications` still wins. Profit is judged on the current margin, not five years of history (G23 stays open).
+
+**Done on the live database (9 October 2026):** G7, `prices.history_years` 2 → 10 (jobs config version 59). A tier list naming holdings was saved as strategy version 60 and undone as version 61 once the rule above was set.
+
+**Not done, with reasons**
+
+- G1, G33, partly done: the four quant migrations are applied to the live database, `factor_returns` ran there (144,319 rows, all three regions, 2000 to 31 August 2026) and `macro_collect` ran after `us_10y` was added to the jobs config (version 62). `price_history` was interrupted twice (a network drop, then a stop for low memory) and must be run again to fetch the 10- and 20-year histories. Still to do after that: run the ex-ante, replay and factor reports on the live book, a portfolio sync from the deployed branch, and compare one holding's CZK return with Trading212.
+- G3: pages were not rendered; check them in a browser at phone width and by keyboard.
+- G5: no published reference output is available offline; add a fixture from a published implementation.
+- G13: a final partial week has a different length from the others, so it stays out.
+- G32: ranking candidates by tilt relief needs price history for candidates that are not held; do it with the discovery ranking.
+- G8, G19, G22, G23, G25, G39, G40: accepted as stated; revisit with Q2 and Q8.
+- G21: `auto_tiers` and the other new limits take effect after the updated strategy is imported, which should happen after the deploy (the running backend would reject the unknown key).
+
 ## Phase Q5 — Sizing, deposits and the pre-trade check
 
 **Outcome:** the decisions the owner already makes, with risk numbers attached before acting in Trading212.

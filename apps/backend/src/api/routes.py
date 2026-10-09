@@ -45,6 +45,17 @@ from steward.earnings.review_stats import ReviewStats, review_stats
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 from steward.portfolio.exante import ExAnteRisk, ex_ante_risk
+from steward.portfolio.factor_shock import (
+    Scenario,
+    ScenarioIn,
+    ShockResult,
+    ShockSpec,
+    delete_scenario,
+    get_scenario,
+    list_scenarios,
+    run_shock,
+    save_scenario,
+)
 from steward.portfolio.factors import FactorExposures, factor_exposures
 from steward.portfolio.read import (
     ContributionReport,
@@ -60,6 +71,7 @@ from steward.portfolio.read import (
 )
 from steward.portfolio.replay import StressReplay, stress_replay
 from steward.portfolio.risk import PortfolioRisk, portfolio_risk
+from steward.portfolio.risk_snapshots import SnapshotRow, get_snapshot, list_snapshots
 from steward.portfolio.transactions import (
     TransactionFilters,
     TransactionsPage,
@@ -144,6 +156,76 @@ async def get_portfolio_risk_ex_ante(pool: Pool, _owner: Owner) -> ExAnteRisk:
     on a proxy-backfilled history and which is left out. `volatility_forecast` is null with a
     `reason` when no position has enough history."""
     return await ex_ante_risk(pool)
+
+
+@router.get("/portfolio/risk/snapshots", tags=["portfolio"])
+async def get_risk_snapshots(
+    pool: Pool,
+    _owner: Owner,
+    kind: Literal["ex_ante", "replay", "factors", "shock"] | None = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[SnapshotRow]:
+    """Saved copies of the risk reports with their method version, newest first. A report is
+    saved once per data date and method version, so a later change to a model does not rewrite
+    what was shown."""
+    return await list_snapshots(pool, kind, limit)
+
+
+@router.get("/portfolio/risk/snapshots/{snapshot_id}", tags=["portfolio"])
+async def get_risk_snapshot(pool: Pool, _owner: Owner, snapshot_id: int) -> dict[str, Any]:
+    """One saved risk report exactly as it was shown."""
+    payload = await get_snapshot(pool, snapshot_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="no such saved report")
+    return payload
+
+
+@router.post("/portfolio/risk/factor-shock", tags=["portfolio"])
+async def post_factor_shock(
+    pool: Pool,
+    _owner: Owner,
+    spec: ShockSpec,
+    region: Literal["developed", "europe", "us"] = "developed",
+) -> ShockResult:
+    """What today's holdings would do if the stated factors moved: the equity market, the
+    size, value, profitability, investment and momentum styles, the US dollar and the euro
+    against the base currency, and the US 10-year yield. Each holding is moved by its measured
+    loadings; an owner beta replaces only the market loading. Holdings without loadings use the
+    owner's fallback beta, else stay flat and are listed. Nothing is saved."""
+    return await run_shock(pool, spec, region)
+
+
+@router.get("/portfolio/risk/scenarios", tags=["portfolio"])
+async def get_risk_scenarios(pool: Pool, _owner: Owner) -> list[Scenario]:
+    """The saved what-if scenarios, by name."""
+    return await list_scenarios(pool)
+
+
+@router.post("/portfolio/risk/scenarios", tags=["portfolio"], status_code=201)
+async def post_risk_scenario(pool: Pool, _owner: Owner, body: ScenarioIn) -> Scenario:
+    """Save a scenario under a name, replacing the one with that name."""
+    return await save_scenario(pool, body)
+
+
+@router.delete("/portfolio/risk/scenarios/{scenario_id}", tags=["portfolio"], status_code=204)
+async def delete_risk_scenario(pool: Pool, _owner: Owner, scenario_id: IdPath) -> None:
+    """Delete a saved scenario. Its saved runs are kept."""
+    if not await delete_scenario(pool, scenario_id):
+        raise HTTPException(status_code=404, detail="no such scenario")
+
+
+@router.post("/portfolio/risk/scenarios/{scenario_id}/run", tags=["portfolio"])
+async def run_risk_scenario(
+    pool: Pool,
+    _owner: Owner,
+    scenario_id: IdPath,
+    region: Literal["developed", "europe", "us"] = "developed",
+) -> ShockResult:
+    """Run a saved scenario on today's holdings; the run is saved with the loadings it used."""
+    scenario = await get_scenario(pool, scenario_id)
+    if scenario is None:
+        raise HTTPException(status_code=404, detail="no such scenario")
+    return await run_shock(pool, scenario.spec, region, scenario_id)
 
 
 @router.get("/portfolio/risk/factors", tags=["portfolio"])

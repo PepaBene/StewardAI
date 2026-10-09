@@ -27,6 +27,7 @@ risk by roughly their weight; `coverage` says how much that is.
 
 import datetime as dt
 import logging
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cache
@@ -43,6 +44,8 @@ from steward.config.strategy import StrategyConfig
 from steward.fx.convert import FxSourceName, normalise_currency
 from steward.fx.history import FxHistory, load_fx_history
 from steward.portfolio.drift import UNCLASSIFIED
+from steward.portfolio.risk_snapshots import save_snapshot
+from steward.portfolio.risk_tier import apply_tiers, derive_for_book, with_saved_tiers
 from steward.portfolio.snapshot import PositionRow
 from steward.quant import covariance as cv
 from steward.quant import decompose as dc
@@ -55,7 +58,13 @@ from steward.reference.read import index_series, load_series
 log = logging.getLogger(__name__)
 
 METHOD_VERSION = "exante-1"
-WINDOW_WEEKS = 156  # three years of weekly returns
+WINDOW_WEEKS = 156  # three years of weekly returns, the Ledoit-Wolf window
+EWMA_WEEKS = 104  # the EWMA looks at the last two years; older weeks weigh under 7 %
+STALE_DAYS = 14  # a series whose last return is older than this is flagged
+BOOK_CACHE_SECONDS = 60.0
+_BOOK_CACHE: dict[tuple[int, object, float, tuple[str, ...]], tuple[float, "LoadedBook"]] = {}
+DAILY_ROWS = 756  # three years of weekdays
+DAILY_MIN_FIT = 130  # twenty-six weeks of weekdays, the daily counterpart of the weekly minimum
 CORRELATION_WEEKS = 104  # the pair-correlation limit looks at the last two years
 CORRELATION_MIN_WEEKS = 40
 FX_SOURCE: FxSourceName = "ecb"
@@ -94,10 +103,36 @@ class LoadedBook:
     daily_closes: dict[str, list[tuple[dt.date, float]]]  # local currency, held tickers
     proxy_labels: dict[str, str]
     unavailable: dict[str, str] = field(default_factory=dict)  # ticker -> why it has no series
+    # proxy key -> lower-case words that make it the preferred stand-in for a sector or region
+    proxy_matches: dict[str, list[str]] = field(default_factory=dict)
+    # What the daily matrix is built from; empty on a synthetic book.
+    inputs: list[rt.SeriesInput] = field(default_factory=list)
+    fx: rt.FxLookup | None = None
+    start: dt.date | None = None
+    end: dt.date | None = None
 
     @property
     def as_of(self) -> dt.date | None:
         return self.weekly.dates[-1] if self.weekly.dates else None
+
+    def daily(self, rows: int = DAILY_ROWS) -> rt.ReturnMatrix:
+        """Daily base-currency log returns of the same series over the last `rows` weekdays
+        (not backfilled; see `daily_filled`). Built on demand: it costs a rate lookup per series
+        per day. Empty when the book carries no price inputs."""
+        if self.fx is None or self.start is None or self.end is None or not self.inputs:
+            return rt.build_return_matrix([], lambda c, d: None, "daily", dt.date.min, dt.date.min)
+        return rt.build_return_matrix(self.inputs, self.fx, "daily", self.start, self.end).last(
+            rows
+        )
+
+    def daily_filled(
+        self, rows: int = DAILY_ROWS
+    ) -> tuple[rt.ReturnMatrix, dict[str, px.ColumnStatus]]:
+        """The daily matrix with short histories backfilled from the best proxy, as the weekly
+        one is (at least `DAILY_MIN_FIT` days of own history to fit)."""
+        matrix = self.daily(rows)
+        candidates = [k for k in matrix.keys if k == BENCHMARK_KEY or k.startswith(PROXY_PREFIX)]
+        return px.backfill(matrix, candidates, DAILY_MIN_FIT)
 
 
 def fx_lookup(fx: FxHistory, base: str) -> rt.FxLookup:
@@ -150,6 +185,7 @@ async def load_book(
         inputs.append(rt.SeriesInput(ticker, closes, currency_of[ticker]))
 
     labels: dict[str, str] = {}
+    matches: dict[str, list[str]] = {}
     if settings.benchmark_symbols:
         symbol = settings.benchmark_symbols[0]
         quote = benchmark_currency(symbol)
@@ -166,13 +202,13 @@ async def load_book(
             key = PROXY_PREFIX + proxy.symbol
             inputs.append(rt.SeriesInput(key, closes, proxy.currency))
             labels[key] = proxy.label
+            matches[key] = list(proxy.match)
 
     currencies = {s.currency for s in inputs} | {base_currency}
     end = max((c[-1][0] for s in inputs if (c := list(s.closes))), default=today)
     fx = await load_fx_history(pool, FX_SOURCE, currencies, start, end)
-    weekly = rt.build_return_matrix(
-        inputs, fx_lookup(fx, normalise_currency(base_currency)[0]), "weekly", start, end
-    )
+    lookup = fx_lookup(fx, normalise_currency(base_currency)[0])
+    weekly = rt.build_return_matrix(inputs, lookup, "weekly", start, end)
     return LoadedBook(
         base_currency,
         total_value,
@@ -181,7 +217,25 @@ async def load_book(
         daily,
         labels,
         unavailable,
+        matches,
+        inputs,
+        lookup,
+        start,
+        end,
     )
+
+
+def proxy_preferences(book: LoadedBook, strategy: StrategyConfig) -> dict[str, list[str]]:
+    """For each position, the proxies whose match words appear in its sector or country label."""
+    out: dict[str, list[str]] = {}
+    for p in book.positions:
+        text = " ".join(
+            _bucket(strategy, p, dim).lower() for dim in ("sector", "geography")
+        ).replace("unclassified", "")
+        hits = [k for k, words in book.proxy_matches.items() if any(w in text for w in words)]
+        if hits:
+            out[p.ticker] = hits
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +275,12 @@ class PositionExAnte(BaseModel):
     )
     real_weeks: int
     proxy: ProxyFitOut | None
+    weight_of_invested: float | None = Field(
+        default=None, description="Share of the invested part (positions without cash)."
+    )
+    last_price: dt.date | None = Field(
+        default=None, description="Date of the latest stored close of this position's series."
+    )
 
 
 class GroupRisk(BaseModel):
@@ -269,6 +329,17 @@ class ExAnteRisk(BaseModel):
         description="The higher of the two, tested against the volatility limit."
     )
     forecast_model: Literal["ewma", "ledoit_wolf"] | None
+    volatility_forecast_scaled: float | None = Field(
+        default=None,
+        description="The forecast divided by the covered share of the invested weight: what it "
+        "would be if the positions left out for lack of history carried the average risk of "
+        "the rest. Equal to the forecast when nothing is left out. Shown, not tested.",
+    )
+    weight_basis: Literal["total", "invested"] = Field(
+        default="total",
+        description="The strategy's weight basis, which the page uses to show sizes. Risk "
+        "shares are always computed on total value.",
+    )
     shrinkage_intensity: float | None = Field(
         description="Weight Ledoit-Wolf puts on the constant-correlation target."
     )
@@ -402,7 +473,9 @@ def build_report(
         return _empty(book.base_currency, "no open positions", limits)
 
     candidates = [k for k in book.weekly.keys if k == BENCHMARK_KEY or k.startswith(PROXY_PREFIX)]
-    filled, status = px.backfill(book.weekly, candidates)
+    filled, status = px.backfill(
+        book.weekly, candidates, preferred=proxy_preferences(book, strategy)
+    )
     total = book.total_value
     warnings: list[str] = []
     rows: list[PositionExAnte] = []
@@ -456,6 +529,20 @@ def build_report(
         uncovered_weight=invested - real - proxied,
         covered_share=(real + proxied) / invested if invested > 0 else 0.0,
     )
+    invested_value = sum(p.value_base for p in book.positions)
+    last_return = {k: c.last_return for k, c in book.weekly.coverage.items()}
+    for r in rows:
+        r.weight_of_invested = r.weight * total / invested_value if invested_value > 0 else None
+        r.last_price = last_return.get(r.ticker)
+        if (
+            r.last_price is not None
+            and book.as_of is not None
+            and (book.as_of - r.last_price).days > STALE_DAYS
+        ):
+            warnings.append(
+                f"{r.ticker}: the latest stored price is from {r.last_price:%d %b %Y}, so the "
+                "price feed may have stalled; its recent weeks are estimated, not observed"
+            )
     for r in rows:
         if r.status == "excluded":
             warnings.append(f"{r.ticker} is left out of the model: {r.reason}")
@@ -467,7 +554,8 @@ def build_report(
     if coverage.uncovered_weight > 0.005:
         warnings.append(
             f"{coverage.uncovered_weight:.1%} of the portfolio is left out of the model, so the "
-            "forecast understates the risk by about that much"
+            "forecast understates the risk by about that much (scaled up for the missing "
+            "weight it would be higher; see volatility_forecast_scaled)"
         )
 
     base = _build_base(book, strategy, filled, usable, rows, coverage, warnings, limits)
@@ -494,7 +582,7 @@ def _build_base(
     keys = [p.ticker for p in usable]
     data = np.column_stack([filled.column(k) for k in keys])
     weights = np.array([p.value_base / book.total_value for p in usable])
-    ewma = cv.ewma_covariance(data)
+    ewma = cv.ewma_covariance(data[-EWMA_WEEKS:])
     shrunk = cv.ledoit_wolf(data)
     vol_ewma = cv.portfolio_volatility(weights, ewma)
     vol_lw = cv.portfolio_volatility(weights, shrunk.covariance)
@@ -521,6 +609,10 @@ def _build_base(
         volatility_ledoit_wolf=vol_lw,
         volatility_forecast=max(vol_ewma, vol_lw),
         forecast_model="ewma" if use_ewma else "ledoit_wolf",
+        volatility_forecast_scaled=(
+            max(vol_ewma, vol_lw) / coverage.covered_share if coverage.covered_share > 0 else None
+        ),
+        weight_basis=strategy.weight_basis,
         shrinkage_intensity=shrunk.intensity,
         realized_volatility=None,
         diversification_ratio=d.diversification_ratio,
@@ -568,8 +660,29 @@ async def book_from_snapshot(
         for r in rows
     ]
     total = float(account["total_base"])
+    # Loading three years of closes and rates for every holding, the benchmark and the proxy
+    # ETFs is the slow part, and the ex-ante, factor and replay pages each ask for it. One copy
+    # serves them for a minute, for the same snapshot.
+    key = (id(pool), account["snapshot_date"], total, tuple(sorted(p.ticker for p in positions)))
+    now = time.monotonic()
+    hit = _BOOK_CACHE.get(key)
+    if hit is not None and now - hit[0] < BOOK_CACHE_SECONDS:
+        return hit[1], await with_saved_tiers(pool, strategy)
     book = await load_book(pool, positions, total, account["base_currency"])
-    return book, strategy
+    _BOOK_CACHE.clear()
+    _BOOK_CACHE[key] = (now, book)
+    return book, await with_book_tiers(pool, book, strategy)
+
+
+async def with_book_tiers(
+    pool: asyncpg.Pool, book: LoadedBook, strategy: StrategyConfig
+) -> StrategyConfig:
+    """The strategy with each holding's derived risk tier filled in (and stored), when the
+    strategy asks for derived tiers."""
+    tiers = await derive_for_book(
+        pool, book.daily_closes, [p.ticker for p in book.positions], strategy
+    )
+    return apply_tiers(strategy, {t: d.tier for t, d in tiers.items()})
 
 
 async def book_from_positions(
@@ -609,7 +722,10 @@ async def ex_ante_risk(pool: asyncpg.Pool) -> ExAnteRisk:
         ).portfolio.annualised_volatility
     except Exception as exc:  # a missing history must not hide the forecast
         log.warning("realized volatility unavailable: %s", exc)
-    return build_report(book, strategy, realized)
+    report = build_report(book, strategy, realized)
+    if report.volatility_forecast is not None:
+        await save_snapshot(pool, "ex_ante", report, report.as_of, report.method_version)
+    return report
 
 
 def weekly_pair_correlations(

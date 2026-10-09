@@ -121,6 +121,11 @@ class ReviewBody(BaseModel):
         description="How past journal decisions turned out (price change since the decision, "
         "each with its sample size; sections with too few decisions are not summarised).",
     )
+    risk_notes: list[str] = Field(
+        default_factory=list,
+        description="The forecast volatility from today's holdings, the factor tilts worth a "
+        "look and the hardest past episode, each as a plain sentence.",
+    )
     sources: list[Source]
     model: str | None = None
     notes: list[str] = Field(default_factory=list)
@@ -627,6 +632,7 @@ def review_material(body: ReviewBody, strategy: StrategyConfig) -> str:
             ],
             "theses_due_for_review": body.reviews_due,
             "flags": [f.text for f in body.flags],
+            "risk": body.risk_notes,
             "citable": {
                 "rule_ids": [r.id for r in strategy.enabled_rules],
                 "kpis": [k.ref for k in body.kpis],
@@ -692,6 +698,43 @@ async def decision_scorecard_lines(pool: asyncpg.Pool, notes: list[str]) -> list
     return lines
 
 
+async def risk_note_lines(pool: asyncpg.Pool, notes: list[str]) -> list[str]:
+    """Forecast risk, flagged factor tilts and the hardest past episode. A part that cannot be
+    computed is left out and noted; it never stops the review."""
+    from steward.portfolio.exante import ex_ante_risk
+    from steward.portfolio.factors import factor_exposures
+    from steward.portfolio.replay import stress_replay
+
+    lines: list[str] = []
+    try:
+        risk = await ex_ante_risk(pool)
+        if risk.volatility_forecast is not None:
+            limit = risk.limits.max_volatility
+            tail = "" if limit is None else f", against a limit of {limit:.0%}"
+            lines.append(
+                f"Forecast volatility from today's holdings: {risk.volatility_forecast:.1%}{tail}."
+            )
+            if risk.effective_bets is not None:
+                lines.append(f"About {risk.effective_bets:.1f} independent bets.")
+            lines += [w for w in risk.warnings if "understates" in w]
+        factors = await factor_exposures(pool)
+        lines += [t.note for t in factors.tilts if t.flagged and t.note]
+        replay = await stress_replay(pool)
+        worst = min(
+            (e for e in replay.episodes if e.loss is not None),
+            key=lambda e: e.loss or 0,
+            default=None,
+        )
+        if worst is not None and worst.loss is not None:
+            lines.append(
+                f"Hardest past episode on today's holdings: {worst.label}, {worst.loss:+.1%}."
+            )
+    except Exception:
+        logger.exception("risk notes failed")
+        notes.append("Forecast risk, factor tilts and past episodes could not be computed.")
+    return lines
+
+
 async def build_review(
     pool: asyncpg.Pool,
     now: dt.datetime,
@@ -742,6 +785,7 @@ async def build_review(
         actions=[],
         holding_periods=holding_periods,
         decision_scorecard=scorecard_lines,
+        risk_notes=await risk_note_lines(pool, notes),
         sources=[],
     )
     usage: Usage | None = None
@@ -785,6 +829,8 @@ def render_md(body: ReviewBody) -> str:
     if body.decision_scorecard:
         lines += ["", "## Decision scorecard", ""]
         lines += [f"- {line}" for line in body.decision_scorecard]
+    if body.risk_notes:
+        lines += ["", "## Risk", ""] + [f"- {n}" for n in body.risk_notes]
     lines += ["", "## Thesis KPIs", ""]
     lines += [f"- [{k.status}] {k.ref}: {k.description}" for k in body.kpis]
     if body.reviews_due:
