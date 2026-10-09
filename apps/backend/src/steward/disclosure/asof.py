@@ -214,12 +214,21 @@ async def filing_timeline(
                   v.known_at, v.date_notes, v.quarantined, v.quarantine_reason, v.byte_length,
                   v.parser_version,
                   case when a.known_at <= $2 then v.amends_version_id end as amends_version_id,
-                  case when s.known_at <= $2 then v.superseded_by_id end as superseded_by_id,
-                  (s.id is null or s.known_at > $2) as is_current
+                  coalesce(case when s.known_at <= $2 then v.superseded_by_id end,
+                           m.id) as superseded_by_id,
+                  ((s.id is null or s.known_at > $2) and m.id is null) as is_current
              from public.source_document d
              join public.source_document_version v on v.document_id = d.id
              left join public.source_document_version s on s.id = v.superseded_by_id
              left join public.source_document_version a on a.id = v.amends_version_id
+             -- a full amendment (one that carries its own figures) known by the cutoff replaces
+             -- the original, which is a different document and so has no superseded_by_id
+             left join lateral (
+                select am.id from public.source_document_version am
+                 where am.amends_version_id = v.id and am.known_at <= $2
+                   and exists (select 1 from public.disclosure_observation o
+                                where o.document_version_id = am.id)
+                 order by am.known_at desc, am.id desc limit 1) m on true
             where d.issuer_id = $1 and v.known_at <= $2 and ($3::text is null or d.form = $3)
             order by coalesce(v.accepted_at, v.filed_at, v.published_at, v.known_at) desc, v.id desc
             limit $4 offset $5""",

@@ -11,6 +11,7 @@ figures are quoted from the filing as stored.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import re
 from collections.abc import Iterable
 from decimal import Decimal
@@ -247,6 +248,16 @@ async def phrase(
     return text
 
 
+def _dimensions(observation: dict[str, Any]) -> dict[str, Any]:
+    dims = observation.get("dimensions") or {}
+    if isinstance(dims, str):
+        try:
+            dims = json.loads(dims)
+        except ValueError:
+            return {"unreadable": dims}
+    return dict(dims) if isinstance(dims, dict) else {"unreadable": dims}
+
+
 async def answer(
     pool: Pool, ticker: str, issuer_id: int | None, question: str, as_of: dt.datetime
 ) -> dict[str, Any]:
@@ -259,6 +270,8 @@ async def answer(
         }
     claims = await asof.claims_as_of(pool, issuer_id, as_of, verified_only=True, limit=200)
     obs = await asof.observations_as_of(pool, issuer_id, as_of, verified_only=True, limit=200)
+    # A segment or dimensional value is not the company total: "Revenue" must not quote one.
+    obs = [o for o in obs if not o.get("segment") and not _dimensions(o)]
     rows = [_evidence_row("claim", c) for c in claims] + [
         _evidence_row("observation", o) for o in obs
     ]

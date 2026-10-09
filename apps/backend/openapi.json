@@ -74798,6 +74798,14 @@
             },
             "type": "array",
             "title": "Reports"
+          },
+          "unapplied_reports": {
+            "items": {
+              "$ref": "#/components/schemas/UnappliedReportOut"
+            },
+            "type": "array",
+            "title": "Unapplied Reports",
+            "description": "Reports with only an amendment of no stated type: not read, not counted."
           }
         },
         "type": "object",
@@ -90309,6 +90317,34 @@
         "type": "object",
         "title": "TrustSettings",
         "description": "Source trust (layer 1): owner feedback moves a source's score between 0 and 1."
+      },
+      "UnappliedReportOut": {
+        "properties": {
+          "cik": {
+            "type": "string",
+            "title": "Cik"
+          },
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags",
+            "description": "Why no filing of this report could be applied."
+          }
+        },
+        "type": "object",
+        "required": [
+          "cik",
+          "period",
+          "flags"
+        ],
+        "title": "UnappliedReportOut"
       },
       "UnbridgedAxisOut": {
         "properties": {

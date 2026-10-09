@@ -103,7 +103,7 @@ async def candidates_for(
 ) -> list[Candidate]:
     cutoff = as_of or dt.datetime.now(dt.UTC)
     found: list[Candidate] = []
-    if cik:
+    if cik and str(cik).strip().isdigit():  # a non-numeric CIK matches nothing
         for row in await pool.fetch(
             "select id from public.issuer where cik=$1", str(int(cik)).zfill(10)
         ) + await pool.fetch("select id from public.issuer where cik=$1", str(int(cik))):

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections import defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Hashable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from itertools import pairwise
@@ -189,7 +189,36 @@ _BY_KEY = {m.key: m for m in METRICS}
 
 def metric_for(concept: str) -> Metric | None:
     """The metric a taxonomy concept maps to. A company extension never maps by guess."""
-    return _BY_CONCEPT.get(concept.removeprefix("us-gaap:"))
+    return _BY_CONCEPT.get(concept.removeprefix("us-gaap:").removeprefix("dei:"))
+
+
+# Metrics whose concepts are parts of the total (operating and finance lease): with more than one
+# concept filed for a period, none of them is the whole, so none is picked.
+PARTS_METRICS = frozenset({"lease_liability"})
+
+
+def concept_choice(facts: Iterable[tuple[str, Hashable]]) -> dict[Hashable, str | None]:
+    """For each slot (metric, period, unit, dimensions) that several concepts of one metric fill,
+    the concept to keep: the first in the metric's own list (`NetIncomeLoss` before `ProfitLoss`),
+    or None when the concepts are parts of a total. A slot with one concept is not listed."""
+    found: dict[Hashable, set[str]] = defaultdict(set)
+    for concept, slot in facts:
+        found[slot].add(concept)
+    out: dict[Hashable, str | None] = {}
+    for slot, concepts in found.items():
+        if len(concepts) < 2:
+            continue
+        metrics = {metric_for(c) for c in concepts}
+        if len(metrics) != 1 or None in metrics:
+            continue
+        (metric,) = metrics
+        assert metric is not None
+        if metric.key in PARTS_METRICS:
+            out[slot] = None
+        else:
+            bare = {c.removeprefix("us-gaap:").removeprefix("dei:"): c for c in concepts}
+            out[slot] = bare[min(bare, key=metric.concepts.index)]
+    return out
 
 
 def metric_by_key(key: str) -> Metric | None:
@@ -715,7 +744,7 @@ def statement_history(
         kind = period_kind(start, end)
         if kind not in kinds:
             continue
-        rows.sort(key=lambda r: r.known_at)
+        rows.sort(key=lambda r: (r.known_at, r.accession, r.fact_id or 0))
         first, last = rows[0], rows[-1]
         changed = len(rows) > 1 and first.value != last.value
         out.append(

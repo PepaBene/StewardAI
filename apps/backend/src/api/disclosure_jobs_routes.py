@@ -274,18 +274,28 @@ async def decide_identifier_suggestion(
         }
         try:
             if body.decision == "confirmed":
+                target = None
                 if row["identifier_type"] == "lei" and row["issuer_id"] is not None:
-                    await conn.execute(
-                        "update public.issuer set lei=$2 where id=$1 and lei is null",
-                        row["issuer_id"],
-                        row["identifier"],
-                    )
+                    target = ("issuer", "lei", row["issuer_id"])
                 elif row["identifier_type"] == "figi" and row["security_id"] is not None:
-                    await conn.execute(
-                        "update public.security set figi=$2 where id=$1 and figi is null",
-                        row["security_id"],
+                    target = ("security", "figi", row["security_id"])
+                if target is not None:
+                    table, column, record_id = target
+                    changed = await conn.execute(
+                        f"update public.{table} set {column}=$2 where id=$1 and {column} is null",  # noqa: S608 - fixed names
+                        record_id,
                         row["identifier"],
                     )
+                    held = await conn.fetchval(
+                        f"select {column} from public.{table} where id=$1",  # noqa: S608
+                        record_id,
+                    )
+                    if changed == "UPDATE 0" and held != row["identifier"]:
+                        raise HTTPException(
+                            status.HTTP_409_CONFLICT,
+                            f"The record already holds a different {column.upper()} ({held}); "
+                            "reject this suggestion or clear the stored one first",
+                        )
             await conn.execute(
                 "update public.provider_identifier set match_status=$2, evidence=$3::jsonb"
                 " where id=$1",

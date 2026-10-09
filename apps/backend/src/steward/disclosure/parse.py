@@ -21,7 +21,7 @@ from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 from typing import Any
 
-PARSER_VERSION = "disclosure-html-1"
+PARSER_VERSION = "disclosure-html-2"
 
 _BLOCK = {
     "address", "article", "aside", "blockquote", "br", "dd", "div", "dl", "dt", "figcaption",
@@ -246,7 +246,7 @@ class _Parser(HTMLParser):
             self._ctx = {"id": attrs.get("id", ""), "dims": []}
         elif tag in ("xbrli:startdate", "xbrli:enddate", "xbrli:instant", "xbrli:measure"):
             self._capture = (tag, [])
-        elif tag == "xbrldi:explicitmember" and self._ctx is not None:
+        elif tag in ("xbrldi:explicitmember", "xbrldi:typedmember") and self._ctx is not None:
             self._capture = (tag + "|" + attrs.get("dimension", ""), [])
         elif tag == "xbrli:unit":
             self._unit = {"id": attrs.get("id", ""), "measures": []}
@@ -266,7 +266,7 @@ class _Parser(HTMLParser):
             text = "".join(parts).strip()
             self._capture = None
             if self._ctx is not None:
-                if name.startswith("xbrldi:explicitmember"):
+                if name.startswith(("xbrldi:explicitmember", "xbrldi:typedmember")):
                     self._ctx["dims"].append((name.split("|", 1)[1], text))
                 else:
                     self._ctx[name] = text

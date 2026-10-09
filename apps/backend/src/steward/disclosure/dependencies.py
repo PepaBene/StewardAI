@@ -147,6 +147,17 @@ def counterparty_identity(d: Dependency) -> tuple[str, str, str, str]:
     return (d.reporter, d.relationship, d.shape, " ".join(who.lower().split()))
 
 
+def period_rank(period_end: dt.date | None, fiscal_period: str | None) -> tuple[dt.date, str]:
+    """A sortable period. A date is itself; a label such as "FY2025" is placed at the end of that
+    year, so a dated period and a labelled one compare as periods, not as text."""
+    if period_end is not None:
+        return period_end, ""
+    match = re.search(r"(20\d\d)", fiscal_period or "")
+    if match:
+        return dt.date(int(match.group(1)), 12, 31), fiscal_period or ""
+    return dt.date.min, fiscal_period or ""
+
+
 def one_per_counterparty(rows: Iterable[Dependency]) -> list[Dependency]:
     """The latest-known claim per counterparty. A 10-K, a 10-Q and a 10-K/A that all report one
     customer for one period are one customer, not three."""
@@ -445,7 +456,17 @@ def shock_scenario(
         and (e.valid_to is None or day <= e.valid_to)
         and e.status == "confirmed"
     )
-    numeric = [e for e in live if e.share is not None]
+    # A pair with a reported share and an owner-assigned weight is one link: the reported figure
+    # stands, the owner's weight is only used where nothing was reported.
+    reported_pairs = {
+        (e.supplier, e.customer) for e in live if e.share is not None and not e.owner_assigned
+    }
+    numeric = [
+        e
+        for e in live
+        if e.share is not None
+        and not (e.owner_assigned and (e.supplier, e.customer) in reported_pairs)
+    ]
     qualitative = [e for e in live if e.share is None]
     by_customer: dict[str, list[Edge]] = defaultdict(list)
     by_supplier: dict[str, list[Edge]] = defaultdict(list)
@@ -553,13 +574,13 @@ def portfolio_exposure(
             by_holding[d.reporter].append(d)
     flows: list[Flow] = []
     for holding, rows in sorted(by_holding.items()):
-        latest = max(
-            r.period_end.isoformat() if r.period_end else r.fiscal_period or "" for r in rows
+        latest = max(period_rank(r.period_end, r.fiscal_period) for r in rows)
+        # A 10-K, a 10-K/A and a table row for one customer are one customer, not several.
+        current = one_per_counterparty(
+            r for r in rows if period_rank(r.period_end, r.fiscal_period) == latest
         )
-        for r in sorted(rows, key=lambda x: x.id):
+        for r in sorted(current, key=lambda x: x.id):
             period = r.period_end.isoformat() if r.period_end else r.fiscal_period or ""
-            if period != latest:
-                continue
             share = r.share or ZERO
             flows.append(
                 Flow(

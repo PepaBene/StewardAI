@@ -12,7 +12,7 @@ from __future__ import annotations
 import hashlib
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import Any
 
@@ -205,6 +205,64 @@ async def deal_state_sample(pool: Pool, n: int = 30, seed: str = "p6.8") -> list
     ]
 
 
+async def machine_value_for(pool: Pool, dataset: str, sample_key: str, item_ref: str) -> str | None:
+    """What the machine said about an item, read from the server's own data and never from the
+    client, so a label cannot be made "correct" by sending a convenient machine value. Raises
+    ValueError for an item that does not exist."""
+    stored = await pool.fetchrow(
+        """select machine_value from public.disclosure_adjudication_suggestion
+            where dataset = $1 and sample_key = $2 and item_ref = $3""",
+        dataset,
+        sample_key,
+        item_ref,
+    )
+    if stored is not None:
+        return stored["machine_value"]
+    kind, _, ident = item_ref.partition(":")
+    if dataset == "relationship_claim":
+        if kind == "planted" and ident.isdigit() and int(ident) < len(PLANTED_RELATIONSHIP_PHRASES):
+            return "true_relationship"
+        status = (
+            await pool.fetchval(
+                "select status from public.relationship_disclosure where id = $1", int(ident)
+            )
+            if kind == "claim" and ident.isdigit()
+            else None
+        )
+        if status is None:
+            raise ValueError(f"no such item {item_ref!r}")
+        return "true_relationship" if status == "confirmed" else "suggested"
+    if dataset == "insider_class":
+        accession, _, row_index = item_ref.rpartition(":")
+        found = (
+            await pool.fetchrow(
+                "select economic_class from public.insider_transaction"
+                " where accession = $1 and row_index = $2",
+                accession,
+                int(row_index),
+            )
+            if row_index.isdigit()
+            else None
+        )
+        if found is None:
+            raise ValueError(f"no such item {item_ref!r}")
+        return found["economic_class"]
+    if dataset == "ownership_match":
+        return "same_company"
+    if dataset == "deal_state":
+        state = (
+            await pool.fetchval(
+                "select state from public.deal_state_transition where id = $1", int(ident)
+            )
+            if kind == "transition" and ident.isdigit()
+            else None
+        )
+        if state is None:
+            raise ValueError(f"no such item {item_ref!r}")
+        return state
+    return None
+
+
 def valid_label(dataset: str, human_value: str) -> bool:
     if dataset == "relationship_claim":
         return human_value in AUDIT_LABELS
@@ -287,8 +345,29 @@ class Gate:
     reason: str
 
 
+#: At most this share of the labels the gate reads may be suggestions accepted in bulk. Items on
+#: which the model and the extractor agree are the easy ones, so counting them without a look
+#: would lift the rate; the rest must be the reviewer's own reading.
+MAX_ACCEPTED_SHARE = Decimal("0.5")
+
+
 def measure_labels(dataset: str, rows: Sequence[Mapping[str, Any]], sample_key: str = "") -> Gate:
-    """The gate for one dataset from labelled rows. One label per item: the latest wins."""
+    """The gate for one dataset from labelled rows. One label per item: the latest wins. A gate
+    that would be met only because most labels were bulk-accepted suggestions is not met."""
+    gate = _measure_labels(dataset, rows, sample_key)
+    latest = {r["item_ref"]: r for r in rows}
+    accepted = sum(1 for r in latest.values() if r.get("adjudicator_kind") == "accepted_suggestion")
+    if gate.met and latest and Decimal(accepted) / len(latest) > MAX_ACCEPTED_SHARE:
+        return replace(
+            gate,
+            met=False,
+            reason=f"{accepted} of {len(latest)} labels were accepted suggestions; "
+            "the reviewer's own readings must be at least half",
+        )
+    return gate
+
+
+def _measure_labels(dataset: str, rows: Sequence[Mapping[str, Any]], sample_key: str = "") -> Gate:
     needed, bar = GATES[dataset]
     latest: dict[str, Mapping[str, Any]] = {}
     for r in rows:
@@ -385,7 +464,7 @@ def measure_labels(dataset: str, rows: Sequence[Mapping[str, Any]], sample_key: 
 
 async def measure(pool: Pool, dataset: str, sample_key: str) -> Gate:
     rows = await pool.fetch(
-        """select item_ref, correct, planted_false_positive, human_value
+        """select item_ref, correct, planted_false_positive, human_value, adjudicator_kind
              from public.disclosure_adjudication
             where dataset = $1 and sample_key = $2 and adjudicator_kind = any($3::text[])
             order by adjudicated_at, id""",

@@ -16,7 +16,9 @@ import datetime as dt
 import re
 from dataclasses import dataclass
 from typing import Any
+from zoneinfo import ZoneInfo
 
+_NEW_YORK = ZoneInfo("America/New_York")
 ARCHIVE = "https://www.sec.gov/Archives/edgar/data/{cik}/{folder}/{name}"
 _XBRL_SIDE = re.compile(
     r"(_cal|_def|_lab|_pre)\.xml$|\.xsd$|^R\d+\.htm$|^FilingSummary\.xml$|\.paper$|\.json$"
@@ -71,13 +73,23 @@ def known_at_for(
 
 
 def _accepted(value: str) -> dt.datetime | None:
+    """The feed's `acceptanceDateTime` as a true UTC instant.
+
+    The feed's `Z` is not UTC. Checked against the `ACCEPTANCE-DATETIME` header (Eastern wall
+    time) of Apple's filings 0000320193-23-000106 (header 2023-11-02 18:08:27, feed
+    2023-11-03T02:08:27Z), -24-000006 (2024-02-01 18:03:38, feed 2024-02-02T04:03:38Z) and
+    -24-000081 (2024-08-01 18:03:34, feed 2024-08-02T02:03:34Z): the feed is the Eastern wall time
+    shifted by the New York offset twice. Reading the feed instant in New York time and taking
+    that wall clock as UTC gives the true instant in all three."""
     if not value:
         return None
     try:
         parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.UTC)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=dt.UTC)
+    return parsed.astimezone(_NEW_YORK).replace(tzinfo=dt.UTC)
 
 
 def _date(value: str) -> dt.date | None:
@@ -150,6 +162,10 @@ def link_amendments(filings: list[DiscoveredFiling]) -> list[DiscoveredFiling]:
             and f.known_at < filing.known_at
             and f.accession != filing.accession
         ]
+        mine = set(filter(None, filing.items.split(",")))
+        if mine:  # same-day 8-Ks: an 8-K/A belongs to the filing that reported the same items
+            same_items = [c for c in candidates if mine & set(filter(None, c.items.split(",")))]
+            candidates = same_items if same_items or filing.base_form != "8-K" else []
         target = max(candidates, key=lambda f: (f.known_at, f.accession), default=None)
         linked.append(
             DiscoveredFiling(

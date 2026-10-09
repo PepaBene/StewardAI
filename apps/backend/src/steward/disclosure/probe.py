@@ -87,7 +87,10 @@ async def probe_sec(http: httpx.AsyncClient, settings: Settings) -> list[ProbeRe
         "last_modified": sub.headers.get("Last-Modified"),
     }
     if sub.status_code == 200:
-        recent = sub.json().get("filings", {}).get("recent", {})
+        try:
+            recent = (sub.json().get("filings") or {}).get("recent") or {}
+        except (ValueError, AttributeError):
+            return [_failed("sec.submissions", "the submissions answer is not JSON")]
         facts["recent_filings"] = len(recent.get("form", []))
         facts["has_acceptance_time"] = bool(recent.get("acceptanceDateTime"))
         validators = {
@@ -348,9 +351,7 @@ async def probe_issuer_ir(http: httpx.AsyncClient, settings: Settings) -> list[P
         ("shell", "https://www.shell.com/investors/results-and-reporting/consensus-estimates.html"),
         ("lseg", "https://www.lseg.com/en/investor-relations/consensus"),
     ):
-        resp, err = await _get(
-            http, url, headers={"User-Agent": settings.sec_user_agent or "steward-probe"}
-        )
+        resp, err = await _get(http, url)
         if resp is None:
             out.append(_failed("issuer_ir.consensus", f"{name}: {err}"))
             continue
@@ -390,8 +391,9 @@ PROBES: tuple[Probe, ...] = (
 
 async def run_probes(settings: Settings | None = None) -> list[ProbeResult]:
     settings = settings or get_settings()
-    agent = settings.sec_user_agent or "steward-probe"
-    async with httpx.AsyncClient(timeout=30.0, headers={"User-Agent": agent}) as http:
+    # The SEC probe sets its own User-Agent (with the contact address); every other host only
+    # sees this neutral one.
+    async with httpx.AsyncClient(timeout=30.0, headers={"User-Agent": "steward-probe"}) as http:
         results: list[ProbeResult] = []
         for probe in PROBES:
             results.extend(await probe(http, settings))

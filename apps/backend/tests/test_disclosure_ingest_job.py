@@ -180,7 +180,8 @@ async def test_each_filing_is_stored_with_its_own_dates_parsed_and_mirrored(
     assert urls == [f.primary_url for f in FILINGS]  # oldest first
     first, amendment = rec.ingested[0][0], rec.ingested[2][0]
     assert first.regulator == "SEC" and first.external_id == "0000000001-26-000001"
-    assert first.known_at == dt.datetime(2026, 2, 20, 21, 0, tzinfo=dt.UTC)
+    # the feed's 21:00 "Z" is 16:00 UTC (see sec_discovery._accepted)
+    assert first.known_at == dt.datetime(2026, 2, 20, 16, 0, tzinfo=dt.UTC)
     assert first.accepted_at == first.known_at and first.source_key == "sec.archive"
     assert first.issuer_id == 7 and first.amends_external_id is None
     assert "published_at" in first.date_notes

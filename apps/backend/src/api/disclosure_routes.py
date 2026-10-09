@@ -618,6 +618,12 @@ class ReportCheckOut(BaseModel):
     confidential_treatment: Literal["none_indicated", "requested", "unknown"]
 
 
+class UnappliedReportOut(BaseModel):
+    cik: str
+    period: dt.date
+    flags: list[str] = Field(description="Why no filing of this report could be applied.")
+
+
 class QuarterOut(BaseModel):
     period: dt.date | None = Field(description="The one quarter the manager lane shows.")
     managers_filed: int
@@ -625,6 +631,10 @@ class QuarterOut(BaseModel):
     fell_back: bool = Field(description="No quarter reached the bar; the best-covered is shown.")
     not_yet_filed: list[str] = Field(description="Managers named, not carried forward.")
     reports: list[ReportCheckOut]
+    unapplied_reports: list[UnappliedReportOut] = Field(
+        default_factory=list,
+        description="Reports with only an amendment of no stated type: not read, not counted.",
+    )
 
 
 class OwnershipOut(BaseModel):
@@ -1427,12 +1437,16 @@ async def adjudication_label(
     dataset: Dataset, body: LabelIn, pool: Pool, owner: Owner
 ) -> DisclosureCreatedOut:
     try:
+        # The machine's value comes from the server's own data, not from the request.
+        machine_value = await adjudication.machine_value_for(
+            pool, dataset, body.sample_key, body.item_ref
+        )
         new_id = await adjudication.record(
             pool,
             dataset=dataset,
             sample_key=body.sample_key,
             item_ref=body.item_ref,
-            machine_value=body.machine_value,
+            machine_value=machine_value,
             human_value=body.human_value,
             by=f"owner:{owner.user_id}",
             note=body.note,

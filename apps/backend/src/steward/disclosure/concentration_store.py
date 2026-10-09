@@ -44,6 +44,7 @@ async def store_drafts(
             fiscal_period=d.fiscal_period,
             origin="structured_extract",
             claim_label=d.label if anonymous else None,
+            denominator_kind=d.denominator,  # "23% of revenue" and "18% of receivables" differ
         )
         # A decided claim keeps its figures, so only a still-suggested one takes the new shape.
         await pool.execute(

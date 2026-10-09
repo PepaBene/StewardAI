@@ -31,6 +31,7 @@ import asyncpg
 
 from steward.disclosure.fact_evidence import mirror_document_facts, mirror_fact
 from steward.disclosure.fetch import FetchFailure, FetchOutcome, extension_for
+from steward.disclosure.financials import concept_choice, metric_for
 from steward.disclosure.ingest import DocumentRecord, ingest_document_version, quarantine_review
 from steward.disclosure.note_job import extract_notes_for_document
 from steward.disclosure.parse import ParsedDocument, ParseError, parse_html
@@ -175,9 +176,25 @@ async def mirror_stored_facts(
         issuer_id,
         accession,
     )
+    facts = [_fact_row(r) for r in rows]
+
+    def slot_of(row: Mapping[str, Any]) -> tuple[Any, ...] | None:
+        metric = metric_for(str(row["concept"]))
+        if metric is None:
+            return None
+        dims = json.dumps(row.get("dimensions") or {}, sort_keys=True)
+        return (metric.key, row["period_start"], row["period_end"], row["unit"], dims)
+
+    # One metric from several concepts in the same period: the observation key has no concept,
+    # so the first row would win. Keep the metric's preferred concept, or none for lease parts.
+    choice = concept_choice(
+        (str(f["concept"]), slot) for f in facts if (slot := slot_of(f)) is not None
+    )
     mirrored = 0
-    for row in rows:
-        if await mirror_fact(pool, version_id, doc, _fact_row(row)) is not None:
+    for row in facts:
+        if choice.get(slot_of(row), str(row["concept"])) != str(row["concept"]):
+            continue
+        if await mirror_fact(pool, version_id, doc, row) is not None:
             mirrored += 1
     known_at = await pool.fetchval(
         "select known_at from public.source_document_version where id=$1", version_id

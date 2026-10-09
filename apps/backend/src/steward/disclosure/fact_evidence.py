@@ -22,7 +22,7 @@ from typing import Any
 
 import asyncpg
 
-from steward.disclosure.financials import metric_for
+from steward.disclosure.financials import concept_choice, metric_for
 from steward.disclosure.ingest import record_observation, store_span
 from steward.disclosure.parse import IxFact, ParsedDocument
 
@@ -134,6 +134,22 @@ async def mirror_document_facts(
     offsets is skipped, and a company-extension concept is never mapped by guess. Safe to repeat:
     an existing observation, and an existing span, are reused. Returns the new observations."""
     written = 0
+
+    def slot_of(fact: Any) -> tuple[Any, ...] | None:
+        metric = metric_for(fact.name)
+        ctx = doc.contexts.get(fact.context_ref or "")
+        unit = doc.units.get(fact.unit_ref or "")
+        if metric is None or ctx is None or unit is None:
+            return None
+        return (metric.key, ctx.start, ctx.end, ctx.instant, unit, tuple(ctx.dimensions))
+
+    # Several concepts of one metric in one period (net income, debt, leases): the observation
+    # key has no concept, so the first in document order would win. Pick by the metric's order.
+    choice = concept_choice(
+        (f.name, slot)
+        for f in doc.facts
+        if not f.nil and f.value is not None and (slot := slot_of(f)) is not None
+    )
     for index, fact in enumerate(doc.facts):
         if fact.nil or fact.value is None or fact.start is None or fact.end is None:
             continue
@@ -141,6 +157,8 @@ async def mirror_document_facts(
         ctx = doc.contexts.get(fact.context_ref or "")
         unit = doc.units.get(fact.unit_ref or "")
         if metric is None or ctx is None or unit is None:
+            continue
+        if choice.get(slot_of(fact), fact.name) != fact.name:
             continue
         period_end = ctx.instant if ctx.instant is not None else ctx.end
         if period_end is None:

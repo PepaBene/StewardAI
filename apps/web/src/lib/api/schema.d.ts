@@ -25037,6 +25037,11 @@ export interface components {
             not_yet_filed: string[];
             /** Reports */
             reports: components["schemas"]["ReportCheckOut"][];
+            /**
+             * Unapplied Reports
+             * @description Reports with only an amendment of no stated type: not read, not counted.
+             */
+            unapplied_reports?: components["schemas"]["UnappliedReportOut"][];
         };
         /** QueueContradiction */
         QueueContradiction: {
@@ -30608,6 +30613,21 @@ export interface components {
              * @default 0.6
              */
             demote_below: number;
+        };
+        /** UnappliedReportOut */
+        UnappliedReportOut: {
+            /** Cik */
+            cik: string;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /**
+             * Flags
+             * @description Why no filing of this report could be applied.
+             */
+            flags: string[];
         };
         /** UnbridgedAxisOut */
         UnbridgedAxisOut: {

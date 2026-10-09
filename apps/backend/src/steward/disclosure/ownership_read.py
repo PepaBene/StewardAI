@@ -22,6 +22,7 @@ from steward.disclosure.ownership import (
     effective_positions,
     effective_reports,
     manager_name_changes,
+    one_stake_per_position,
     reported_stake_delta,
 )
 
@@ -56,14 +57,24 @@ async def _lane_13f(
     # Every filing of every manager that has ever held the ticker, so a later report that no
     # longer lists it (an exit) is seen and replaces the older holding instead of hiding behind it.
     filings = [Filing13F(**dict(r)) for r in rows]
-    reports = effective_reports(filings, when)
+    all_reports = effective_reports(filings, when)
+    # A report with no applied filing (only a 13F-HR/A that names no amendment type) has no
+    # holdings to read. It does not count as filed; its flag is shown instead.
+    unapplied = [
+        {"cik": cik, "period": period, "flags": list(rep.flags)}
+        for (cik, period), rep in sorted(all_reports.items())
+        if not rep.accessions
+    ]
+    reports = {k: rep for k, rep in all_reports.items() if rep.accessions}
     # One common quarter for the whole lane: the latest that enough managers have filed. A manager
     # that has not filed it yet is named, never carried forward from an older quarter.
     choice = choose_common_quarter(reports)
     latest: dict[str, Any] = {
         cik: rep for (cik, period), rep in reports.items() if period == choice.period
     }
-    periods = sorted({p for (_, p) in reports})
+    # The trend compares the chosen quarter with the one before it, never with a newer quarter
+    # that only the early filers have reported (that would read as a mass exit).
+    periods = sorted({p for (_, p) in reports if choice.period is None or p <= choice.period})
     trend_periods = periods[-2:]
     accessions = sorted(
         {a for rep in latest.values() for a in rep.accessions}
@@ -150,6 +161,7 @@ async def _lane_13f(
         "fell_back": choice.fell_back,
         "not_yet_filed": [names[c] for c in choice.not_yet_filed],
         "reports": checks,
+        "unapplied_reports": unapplied,
     }
     return entries, manager_name_changes(filings), trend, info
 
@@ -166,8 +178,19 @@ async def _lane_13dg(pool: Pool, ticker: str, when: dt.datetime) -> list[LaneEnt
         ticker,
         when,
     )
+    # A parent and its subsidiary (or the members of a group) can each file the same stake:
+    # count it once.
+    keep = one_stake_per_position(
+        [
+            (r["filer_cik"] or r["accession"], r["stake_shares"], r["stake_percent"],
+             r["event_date"], r["known_at"])
+            for r in rows
+        ]
+    )  # fmt: skip
     out = []
-    for r in rows:
+    for i, r in enumerate(rows):
+        if i not in keep:
+            continue
         holder = await pool.fetchval(
             """select person_name from public.control_stake_holder where accession = $1
                order by aggregate_shares desc nulls last, row_index limit 1""",
@@ -396,6 +419,7 @@ async def ownership(pool: Pool, ticker: str, as_of: dt.datetime | None = None) -
         den["shares"] if den else None,
         den["as_of"] if den else None,
         not_covered=["national_voting"],
+        as_of=when.date(),
     )
     return {
         "ticker": ticker,

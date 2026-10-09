@@ -21,6 +21,8 @@ import asyncpg
 
 from steward.disclosure import coverage_report as cr
 from steward.disclosure import deal_read
+from steward.disclosure.dependencies import period_rank
+from steward.free_source_reads import status_as_of_sql
 
 type Pool = asyncpg.Pool | asyncpg.Connection
 
@@ -57,6 +59,7 @@ class Relationship:
     denominator_kind: str | None = None
     period_end: dt.date | None = None
     claim_label: str | None = None
+    claim_shape: str | None = None
 
     @property
     def revenue_share(self) -> bool:
@@ -65,6 +68,12 @@ class Relationship:
         if self.denominator_kind is not None:
             return self.denominator_kind == "total_revenue"
         return self.share_basis == "issuer_revenue"
+
+    @property
+    def single_party(self) -> bool:
+        """The claim is about one counterparty. "Three customers 45 %" is a group figure: it is
+        not the largest single customer, and neither is a segment-only line."""
+        return self.claim_shape in (None, "named", "anonymous")
 
 
 def latest_relationships(rels: Sequence[Relationship]) -> list[Relationship]:
@@ -81,10 +90,8 @@ def latest_relationships(rels: Sequence[Relationship]) -> list[Relationship]:
         else:
             groups[(r.ticker, r.relationship, ident.lower())].append(r)
     for rows in groups.values():
-        latest = max((r.period_end or dt.date.min, r.fiscal_period or "") for r in rows)
-        out.extend(
-            r for r in rows if (r.period_end or dt.date.min, r.fiscal_period or "") == latest
-        )
+        latest = max(period_rank(r.period_end, r.fiscal_period) for r in rows)
+        out.extend(r for r in rows if period_rank(r.period_end, r.fiscal_period) == latest)
     out.sort(key=lambda r: (r.ticker, r.relationship, r.known_at))
     return out
 
@@ -242,8 +249,10 @@ def build(
                     "holding_weight": str(w),
                     "weighted_share": _s(None if r.share is None else w * r.share),
                     "weight_state": "unknown" if r.share is None else "reported",
+                    "claim_shape": r.claim_shape,
                     "concentrated_customer": (
                         r.relationship == "customer"
+                        and r.single_party
                         and r.revenue_share
                         and r.share is not None
                         and r.share >= CONCENTRATION_SHARE
@@ -257,7 +266,13 @@ def build(
     customer_known = {
         t
         for t, rs in by_ticker.items()
-        if any(r.relationship == "customer" and r.revenue_share and r.share is not None for r in rs)
+        if any(
+            r.relationship == "customer"
+            and r.single_party
+            and r.revenue_share
+            and r.share is not None
+            for r in rs
+        )
     }
 
     # deals ----------------------------------------------------------------------------------
@@ -283,7 +298,10 @@ def build(
         * max(
             r.share
             for r in rs
-            if r.relationship == "customer" and r.revenue_share and r.share is not None
+            if r.relationship == "customer"
+            and r.single_party
+            and r.revenue_share
+            and r.share is not None
         )
         for t, rs in by_ticker.items()
         if t in customer_known
@@ -374,14 +392,18 @@ select f.matched_ticker as fund_ticker, n.t212_ticker as held_ticker, h.issuer_n
   left join public.instrument n on n.cik = i.cik
 """
 
-REL_SQL = """
+# Confirmed as of the date, not as of today: a claim confirmed after `as_of` is not yet one.
+_STATUS_AT = status_as_of_sql("relationship_disclosure", "d", "$2", log=True, decided=True)
+REL_SQL = f"""
 select ticker, relationship, counterparty_key, counterparty_name, anonymous_counterparty,
        reported_share, share_basis, denominator_kind, period_end, claim_label, fiscal_period,
-       known_at, source_url
-  from public.relationship_disclosure
- where ticker = any($1::text[]) and status = 'confirmed' and known_at <= $2
-   and relationship in ('customer', 'supplier') order by ticker, id
-"""
+       known_at, source_url, claim_shape
+  from (select d.*, {_STATUS_AT} as status_at
+          from public.relationship_disclosure d
+         where d.ticker = any($1::text[]) and d.known_at <= $2
+           and d.relationship in ('customer', 'supplier')) r
+ where status_at = 'confirmed' order by ticker, id
+"""  # noqa: S608 - the only interpolated part is a fixed SQL fragment
 
 
 async def look_through_view(pool: Pool, as_of: dt.datetime | None = None) -> dict[str, Any]:
@@ -406,6 +428,7 @@ async def look_through_view(pool: Pool, as_of: dt.datetime | None = None) -> dic
             r["denominator_kind"],
             r["period_end"],
             r["claim_label"],
+            r["claim_shape"],
         )
         for r in (await pool.fetch(REL_SQL, reach, when) if reach else [])
     ]

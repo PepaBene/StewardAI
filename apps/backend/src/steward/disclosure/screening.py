@@ -18,8 +18,9 @@ from typing import Any
 import asyncpg
 
 from steward.disclosure import coverage_report as cr
-from steward.disclosure import deal_read, estimate_read
+from steward.disclosure import deal_read, estimate_read, insider_analysis
 from steward.disclosure.note_store import CONCEPT_PREFIX, NOTE_SOURCE
+from steward.free_source_reads import status_as_of_sql
 
 type Pool = asyncpg.Pool | asyncpg.Connection
 
@@ -347,44 +348,53 @@ select ticker, accession, known_at, period_end, value,
  order by known_at, id
 """
 
-INSIDER_SQL = """
-select f.ticker,
-       count(*) filter (where t.economic_class = 'open_market_buy'
-                          and t.rule_10b5_1_plan is false and not t.derivative
-                          and t.transaction_date > $2::date - $3::int
-                          and t.transaction_date <= $2::date) as buys,
-       max(f.known_at) as known_at
-  from public.insider_filing f
-  left join public.insider_transaction t on t.accession = f.accession
- where f.ticker = any($1::text[]) and f.known_at <= $2 and f.superseded_by_accession is null
- group by f.ticker
-"""
-
+# The latest control-stake filing that is about the held share class (CUSIP matched). A prior
+# filing of another class, or one not yet known, gives no prior figure: a class change is not a
+# stake change.
 STAKE_SQL = """
-select n.t212_ticker as ticker, c.stake_percent, p.stake_percent as prior_percent, c.filed,
-       c.known_at
+select n.t212_ticker as ticker, c.stake_percent,
+       case when p.known_at <= $2
+             and lower(btrim(coalesce(p.class_title, '')))
+                 = lower(btrim(coalesce(c.class_title, '')))
+            then p.stake_percent end as prior_percent,
+       c.filed, c.known_at
   from public.instrument n
-  join lateral (select * from public.control_stake_filing
-                 where issuer_cik = n.cik and known_at <= $2
-                 order by filed desc, accession desc limit 1) c on true
+  join lateral (select f.* from public.control_stake_filing f
+                  join public.control_stake_issuer_link l on l.accession = f.accession
+                 where f.issuer_cik = n.cik and f.known_at <= $2
+                   and l.ticker = n.t212_ticker and l.class_status = 'cusip_match'
+                 order by f.filed desc, f.accession desc limit 1) c on true
   left join public.control_stake_filing p on p.accession = c.prior_accession
  where n.t212_ticker = any($1::text[])
 """
 
-CUSTOMER_SQL = """
+_STATUS_AT = status_as_of_sql("relationship_disclosure", "d", "$2", log=True, decided=True)
+
+# The largest single customer's share of total revenue. Only claims about one counterparty count
+# (a group such as "three customers 45 %" is not the largest customer), only confirmed ones as
+# they stood at the date, and the latest period is picked AFTER the denominator filter, so a newer
+# receivables line cannot hide the revenue share.
+CUSTOMER_SQL = f"""
 select distinct on (ticker) ticker, reported_share, fiscal_period, known_at
-  from (select *, rank() over (
-                    partition by ticker,
-                      coalesce(counterparty_key, counterparty_name, claim_label, id::text)
-                    order by period_end desc nulls last, fiscal_period desc nulls last) as rk
-          from public.relationship_disclosure
-         where ticker = any($1::text[]) and status = 'confirmed' and relationship = 'customer'
-           and known_at <= $2) r
+  from (select s.*, rank() over (
+                    partition by s.ticker,
+                      coalesce(s.counterparty_key, s.counterparty_name, s.claim_label, s.id::text)
+                    order by s.period_end desc nulls last, s.fiscal_period desc nulls last) as rk
+          from (select d.id, d.ticker, d.counterparty_key, d.counterparty_name, d.claim_label,
+                       d.period_end, d.fiscal_period, d.reported_share, d.known_at,
+                       {_STATUS_AT} as status_at
+                  from public.relationship_disclosure d
+                 where d.ticker = any($1::text[]) and d.relationship = 'customer'
+                   and d.known_at <= $2
+                   and coalesce(d.claim_shape, case when d.anonymous_counterparty
+                                                    then 'anonymous' else 'named' end)
+                       in ('named', 'anonymous')
+                   and (d.denominator_kind = 'total_revenue'
+                        or (d.denominator_kind is null and d.share_basis = 'issuer_revenue'))) s
+         where s.status_at = 'confirmed') r
  where rk = 1 and reported_share is not null
-   and (denominator_kind = 'total_revenue'
-        or (denominator_kind is null and share_basis = 'issuer_revenue'))
  order by ticker, reported_share desc, id
-"""
+"""  # noqa: S608 - the only interpolated part is a fixed SQL fragment
 
 
 async def load_fields(
@@ -408,10 +418,16 @@ async def load_fields(
         )
     for t in notes.keys() | obs.keys():
         out[t]["debt_maturity_coverage"] = debt_maturity_field(obs.get(t, []), notes.get(t, []))
-    for r in await pool.fetch(INSIDER_SQL, tickers, when, insider_window_days):
-        out[r["ticker"]]["discretionary_buys"] = FieldValue(
-            int(r["buys"]), f"last {insider_window_days} days", r["known_at"], "Form 4 filings"
+    for t in tickers:
+        # The same count the insider view makes: overrides, supersession as of the date, bundled
+        # exercise-and-sell lines left out, and a buy with no plan indicator counted.
+        buys, filed_at = await insider_analysis.discretionary_buys(
+            pool, t, when, insider_window_days
         )
+        if filed_at is not None:
+            out[t]["discretionary_buys"] = FieldValue(
+                buys, f"last {insider_window_days} days", filed_at, "Form 4 filings"
+            )
     for r in await pool.fetch(STAKE_SQL, tickers, when):
         if r["stake_percent"] is not None and r["prior_percent"] is not None:
             out[r["ticker"]]["stake_change_pct"] = FieldValue(
