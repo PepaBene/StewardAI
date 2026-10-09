@@ -2587,6 +2587,95 @@
         }
       }
     },
+    "/portfolio/risk/factors/ideas": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Idea Factor Fit",
+        "description": "Rank candidate ideas (comma-separated price symbols with stored daily prices) by how much\neach would reduce the portfolio's dominant style tilt if held at `weight`, paid for from\ncash. A tie-breaker between comparable ideas (strategy principle 7c), not a recommendation;\nan idea without stored prices is listed with the reason.",
+        "operationId": "get_idea_factor_fit",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "symbols",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 400,
+              "title": "Symbols"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3,
+              "default": "USD",
+              "title": "Currency"
+            }
+          },
+          {
+            "name": "region",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "developed",
+                "europe",
+                "us"
+              ],
+              "type": "string",
+              "default": "developed",
+              "title": "Region"
+            }
+          },
+          {
+            "name": "weight",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 0.2,
+              "minimum": 0.005,
+              "default": 0.05,
+              "title": "Weight"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdeaFitReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/risk/stress-replay": {
       "get": {
         "tags": [
@@ -56989,6 +57078,251 @@
           "warnings"
         ],
         "title": "HoldingsView"
+      },
+      "IdeaFit": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "no_prices",
+              "no_fit"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "history_weeks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "History Weeks"
+          },
+          "imbalance_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imbalance Before",
+            "description": "Distance of the style tilts from the benchmark, before."
+          },
+          "imbalance_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imbalance After"
+          },
+          "relief": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relief",
+            "description": "Before minus after: positive means the idea moves the book towards the benchmark's style."
+          },
+          "dominant_factor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dominant Factor",
+            "description": "The style factor with the largest tilt before the idea."
+          },
+          "dominant_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dominant Label"
+          },
+          "dominant_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dominant Before"
+          },
+          "dominant_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dominant After"
+          },
+          "tilts": {
+            "items": {
+              "$ref": "#/components/schemas/IdeaTilt"
+            },
+            "type": "array",
+            "title": "Tilts"
+          },
+          "own_betas": {
+            "items": {
+              "$ref": "#/components/schemas/FactorBeta"
+            },
+            "type": "array",
+            "title": "Own Betas"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "status"
+        ],
+        "title": "IdeaFit"
+      },
+      "IdeaFitReport": {
+        "properties": {
+          "region": {
+            "type": "string",
+            "title": "Region"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version",
+            "default": "idea-fit-1"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": "The idea is added to a copy of today's holdings at the stated weight, paid for from cash, and the factor regressions of the Factors page are run again. Relief is the distance of the style tilts from the benchmark before minus after (the Euclidean norm of the market, size, value, profitability, investment and momentum tilts). Positive relief means the idea moves the book towards the benchmark's style."
+          },
+          "ideas": {
+            "items": {
+              "$ref": "#/components/schemas/IdeaFit"
+            },
+            "type": "array",
+            "title": "Ideas"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "region",
+          "as_of",
+          "weight",
+          "ideas"
+        ],
+        "title": "IdeaFitReport"
+      },
+      "IdeaTilt": {
+        "properties": {
+          "factor": {
+            "type": "string",
+            "title": "Factor"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "before": {
+            "type": "number",
+            "title": "Before"
+          },
+          "after": {
+            "type": "number",
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "factor",
+          "label",
+          "before",
+          "after"
+        ],
+        "title": "IdeaTilt"
       },
       "IdentifierDecisionIn": {
         "properties": {

@@ -157,6 +157,29 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "idea_factor_fit",
+        "description": "For candidate ideas with stored daily prices, how much each would "
+        "reduce the portfolio's largest style tilt (size, value, profitability, investment, "
+        "momentum or market) if held at a stated weight. A tie-breaker between comparable "
+        "ideas, not a reason to take a weaker one. An idea without stored prices comes back "
+        "with the reason; do not estimate it.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "symbols": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "maxItems": 10,
+                    "description": "Price symbols as stored, e.g. MSFT or msft.us.",
+                },
+                "currency": {"type": "string", "description": "Quote currency, default USD."},
+                "weight": {"type": "number", "description": "Portfolio share, 0.005 to 0.2."},
+            },
+            "required": ["symbols"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "theme_exposure",
         "description": "How much of the portfolio is exposed to one sector, industry, country, "
         "currency, revenue country, commodity, trade product or issuer, directly and through "
@@ -291,6 +314,13 @@ class ChatTools:
 
     async def _tool_factor_tilts(self, region: str = "developed") -> dict[str, Any]:
         return await analytics_tools.factor_tilts(self.pool, self.registry, region)
+
+    async def _tool_idea_factor_fit(
+        self, symbols: list[str], currency: str = "USD", weight: float = 0.05
+    ) -> dict[str, Any]:
+        return await analytics_tools.idea_factor_fit(
+            self.pool, self.registry, symbols, currency.upper(), weight
+        )
 
     async def _tool_theme_exposure(self, kind: str, value: str) -> dict[str, Any]:
         owner = await self._owner()

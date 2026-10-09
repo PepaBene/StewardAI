@@ -195,6 +195,31 @@ async def test_the_replay_and_the_factor_exposures_run_and_are_saved(
 
 
 @pytest.mark.db
+async def test_an_idea_with_stored_prices_is_scored_and_one_without_is_listed(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    from steward.portfolio.idea_fit import idea_fit
+
+    await _seed(backend_pool)
+    await _seed_factors(backend_pool)
+    idea = _walk(9, 80, 0.0002, 0.012, np.random.default_rng(5).normal(0, 0.009, len(DAYS)), 0.5)
+    await backend_pool.executemany(
+        "insert into public.price_bar (symbol, date, close, source) values ('ccc.us', $1, $2,"
+        " 'stooq')",
+        [(d, float(c)) for d, c in zip(DAYS, idea, strict=True)],
+    )
+    report = await idea_fit(backend_pool, ["ccc.us", "nope.us"], "USD", "developed", 0.1)
+    assert report.reason is None
+    by = {i.symbol: i for i in report.ideas}
+    assert by["nope.us"].status == "no_prices" and by["nope.us"].relief is None
+    scored = by["ccc.us"]
+    assert scored.status == "ok" and scored.relief is not None
+    assert scored.relief == pytest.approx(scored.imbalance_before - scored.imbalance_after)
+    assert scored.dominant_factor is not None and scored.tilts
+    assert report.ideas[0].symbol == "ccc.us"  # scored ideas come before unpriced ones
+
+
+@pytest.mark.db
 async def test_derived_tiers_come_from_the_stocks_own_numbers_and_are_stored(
     backend_pool: asyncpg.Pool,
 ) -> None:

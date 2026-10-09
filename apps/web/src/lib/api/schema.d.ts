@@ -943,6 +943,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/risk/factors/ideas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Idea Factor Fit
+         * @description Rank candidate ideas (comma-separated price symbols with stored daily prices) by how much
+         *     each would reduce the portfolio's dominant style tilt if held at `weight`, paid for from
+         *     cash. A tie-breaker between comparable ideas (strategy principle 7c), not a recommendation;
+         *     an idea without stored prices is listed with the reason.
+         */
+        get: operations["get_idea_factor_fit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/risk/stress-replay": {
         parameters: {
             query?: never;
@@ -18868,6 +18891,85 @@ export interface components {
             /** Input Hash */
             input_hash?: string | null;
         };
+        /** IdeaFit */
+        IdeaFit: {
+            /** Symbol */
+            symbol: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "no_prices" | "no_fit";
+            /** Reason */
+            reason?: string | null;
+            /** History Weeks */
+            history_weeks?: number | null;
+            /**
+             * Imbalance Before
+             * @description Distance of the style tilts from the benchmark, before.
+             */
+            imbalance_before?: number | null;
+            /** Imbalance After */
+            imbalance_after?: number | null;
+            /**
+             * Relief
+             * @description Before minus after: positive means the idea moves the book towards the benchmark's style.
+             */
+            relief?: number | null;
+            /**
+             * Dominant Factor
+             * @description The style factor with the largest tilt before the idea.
+             */
+            dominant_factor?: string | null;
+            /** Dominant Label */
+            dominant_label?: string | null;
+            /** Dominant Before */
+            dominant_before?: number | null;
+            /** Dominant After */
+            dominant_after?: number | null;
+            /** Tilts */
+            tilts?: components["schemas"]["IdeaTilt"][];
+            /** Own Betas */
+            own_betas?: components["schemas"]["FactorBeta"][];
+            /** Note */
+            note?: string | null;
+        };
+        /** IdeaFitReport */
+        IdeaFitReport: {
+            /** Region */
+            region: string;
+            /** As Of */
+            as_of: string | null;
+            /** Weight */
+            weight: number;
+            /**
+             * Method Version
+             * @default idea-fit-1
+             */
+            method_version: string;
+            /**
+             * Method
+             * @default The idea is added to a copy of today's holdings at the stated weight, paid for from cash, and the factor regressions of the Factors page are run again. Relief is the distance of the style tilts from the benchmark before minus after (the Euclidean norm of the market, size, value, profitability, investment and momentum tilts). Positive relief means the idea moves the book towards the benchmark's style.
+             */
+            method: string;
+            /** Ideas */
+            ideas: components["schemas"]["IdeaFit"][];
+            /** Warnings */
+            warnings?: string[];
+            /** Reason */
+            reason?: string | null;
+        };
+        /** IdeaTilt */
+        IdeaTilt: {
+            /** Factor */
+            factor: string;
+            /** Label */
+            label: string;
+            /** Before */
+            before: number;
+            /** After */
+            after: number;
+        };
         /** IdentifierDecisionIn */
         IdentifierDecisionIn: {
             /**
@@ -34476,6 +34578,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FactorExposures"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_idea_factor_fit: {
+        parameters: {
+            query: {
+                symbols: string;
+                currency?: string;
+                region?: "developed" | "europe" | "us";
+                weight?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeaFitReport"];
                 };
             };
             /** @description Validation Error */

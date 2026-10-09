@@ -122,7 +122,7 @@ Code: `steward/quant/{returns,proxy,covariance,decompose}.py`, `steward/portfoli
 - G2. Nothing ran against a database. `load_book`, `_book_from_snapshot`, `book_from_positions` and `gather_risk_inputs` with the new limits are untested; the tests use a synthetic `LoadedBook`. Needs a `db`-marked test that runs a sync and checks the findings open, alert once and clear.
 - G3. The web page was typechecked, linted and its helpers unit-tested, but never rendered: no screenshot, no mobile-width check, no keyboard or contrast check, no component test.
 - G4. No measurement of cost. Each API call and each sync loads up to ~3 years of daily closes for every holding, the benchmark and 13 proxy ETFs and builds the matrix with per-day FX lookups, uncached. Time it on the live book; cache per sync if slow.
-- G5. The Ledoit-Wolf "golden test against the reference implementation" (engineering rule 4) is a test against a line-by-line transcription of the authors' published `covCor` formulas, not against their code or a library output. The EWMA test is likewise against a loop written for the test. Add a fixture with output from a published implementation.
+- G5. The Ledoit-Wolf "golden test against the reference implementation" (engineering rule 4) is a test against a line-by-line transcription of the authors' published `covCor` formulas, not against their code or a library output. The EWMA test is likewise against a loop written for the test. Add a fixture with output from a published implementation. **Closed:** `tests/fixtures/ledoit_wolf_cc.json` holds PyPortfolioOpt 1.6.0 output (constant correlation); our `ledoit_wolf` agrees to 1e-9 (`test_ledoit_wolf_matches_pyportfolioopt_output`).
 
 **Data gaps**
 
@@ -206,7 +206,7 @@ Code: `quant/{stress,factors,french,french_store}.py`, `portfolio/{replay,factor
 
 - G30. `Q3.2` hypothetical shocks through the factor betas: not started. `decision/shocks.py` (M6.2) already applies owner-stated shocks with measured market betas; routing equity, currency and rates shocks through the Q4 loadings is the change, and needs the rates factor (G34).
 - G31. `Q3.3` saved scenarios and snapshots: not started. The replay report is computed live and not stored (engineering rule 5, same as G26).
-- G32. `Q4.4` factor-aware idea ranking (principle 7c): not started; the tilt is available per factor in the API response.
+- G32. `Q4.4` factor-aware idea ranking (principle 7c): done as `portfolio/idea_fit.py`, `GET /portfolio/risk/factors/ideas` and the `idea_factor_fit` chat tool (idea added to a copy of the book at a stated weight, factor regressions rerun, relief = drop in distance of style tilts from the benchmark).
 
 **Not verified**
 
@@ -236,9 +236,8 @@ Code: `quant/{stress,factors,french,french_store}.py`, `portfolio/{replay,factor
 
 - G1, G33, partly done: the four quant migrations are applied to the live database, `factor_returns` ran there (144,319 rows, all three regions, 2000 to 31 August 2026) and `macro_collect` ran after `us_10y` was added to the jobs config (version 62). `price_history` was interrupted twice (a network drop, then a stop for low memory) and must be run again to fetch the 10- and 20-year histories. Still to do after that: run the ex-ante, replay and factor reports on the live book, a portfolio sync from the deployed branch, and compare one holding's CZK return with Trading212.
 - G3: pages were not rendered; check them in a browser at phone width and by keyboard.
-- G5: no published reference output is available offline; add a fixture from a published implementation.
 - G13: a final partial week has a different length from the others, so it stays out.
-- G32: ranking candidates by tilt relief needs price history for candidates that are not held; do it with the discovery ranking.
+- G32, partly: the ranking needs stored daily prices for each candidate; a symbol without them is listed as "no_prices". The web page has no panel for it yet (API and chat tool only).
 - G8, G19, G22, G23, G25, G39, G40: accepted as stated; revisit with Q2 and Q8.
 - G21: `auto_tiers` and the other new limits take effect after the updated strategy is imported, which should happen after the deploy (the running backend would reject the unknown key).
 

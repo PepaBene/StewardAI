@@ -23,6 +23,7 @@ Choices that matter when reading the numbers:
 import datetime as dt
 import logging
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Literal
 
 import asyncpg
@@ -362,22 +363,49 @@ async def load_yields(pool: asyncpg.Pool, since: dt.date) -> list[tuple[dt.date,
     return [(r["period"], float(r["value"])) for r in rows]
 
 
-async def factor_exposures(pool: asyncpg.Pool, region: str = "developed") -> FactorExposures:
-    """Factor exposures of the latest synced book for one region's factors."""
+@dataclass
+class FactorContext:
+    """Everything `build_exposures` needs, loaded once."""
+
+    book: ea.LoadedBook
+    daily: dict[str, list[tuple[dt.date, float]]]
+    fx: rt.FxLookup
+    yields: list[tuple[dt.date, float]]
+    preferences: dict[str, list[str]]
+
+
+async def load_factor_context(
+    pool: asyncpg.Pool, region: str, extra_currencies: Sequence[str] = ()
+) -> tuple[FactorContext | None, str | None]:
+    """The book, factors, FX and yields for a region, or (None, why not)."""
     if region not in french.REGIONS:
-        return _empty("developed", f"unknown region {region!r}")
+        return None, f"unknown region {region!r}"
     book, strategy = await ea.book_from_snapshot(pool)
     if book is None or strategy is None:
-        return _empty(region, "no portfolio snapshot yet; run the portfolio sync")
+        return None, "no portfolio snapshot yet; run the portfolio sync"
     since = dt.date.today() - dt.timedelta(weeks=ea.WINDOW_WEEKS + 4)
     daily = await french_store.load_factors(pool, region, since)
-    currencies = {"USD", "EUR", book.base_currency} | {p.currency for p in book.positions}
+    currencies = (
+        {"USD", "EUR", book.base_currency}
+        | {p.currency for p in book.positions}
+        | set(extra_currencies)
+    )
     fx = await load_fx_history(pool, ea.FX_SOURCE, currencies, since, dt.date.today())
     lookup = ea.fx_lookup(fx, normalise_currency(book.base_currency)[0])
     yields = await load_yields(pool, since)
-    report = build_exposures(
-        book, daily, lookup, region, ea.proxy_preferences(book, strategy), yields
+    ctx = FactorContext(
+        book, dict(daily), lookup, yields, dict(ea.proxy_preferences(book, strategy))
     )
+    return ctx, None
+
+
+async def factor_exposures(pool: asyncpg.Pool, region: str = "developed") -> FactorExposures:
+    """Factor exposures of the latest synced book for one region's factors."""
+    ctx, why = await load_factor_context(pool, region)
+    if ctx is None:
+        return _empty(region if region in french.REGIONS else "developed", why or "no data")
+    book = ctx.book
+    report = build_exposures(book, ctx.daily, ctx.fx, region, ctx.preferences, ctx.yields)
     if report.portfolio is not None:
         await save_snapshot(
             pool, "factors", report, report.as_of, report.method_version, scope=region

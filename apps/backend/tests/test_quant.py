@@ -256,6 +256,17 @@ def test_ledoit_wolf_hand_computed_two_assets() -> None:
     assert out.covariance == pytest.approx(np.cov(r, rowvar=False), rel=1e-12)
 
 
+def test_ledoit_wolf_matches_pyportfolioopt_output() -> None:
+    """Golden test: output of a published implementation (PyPortfolioOpt, constant correlation)."""
+    import json
+    from pathlib import Path
+
+    fixture = json.loads((Path(__file__).parent / "fixtures" / "ledoit_wolf_cc.json").read_text())
+    out = cv.ledoit_wolf(np.array(fixture["returns"]))
+    assert out.intensity == pytest.approx(fixture["delta"], rel=1e-9)
+    np.testing.assert_allclose(out.covariance, np.array(fixture["covariance"]), rtol=1e-9)
+
+
 def test_portfolio_volatility_annualises_by_52() -> None:
     cov = np.array([[0.0004]])  # weekly sd 2 %
     assert cv.portfolio_volatility(np.array([1.0]), cov) == pytest.approx(0.02 * math.sqrt(52))

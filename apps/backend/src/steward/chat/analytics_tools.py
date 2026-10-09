@@ -189,6 +189,40 @@ async def factor_tilts(pool: asyncpg.Pool, registry: Registry, region: str) -> d
     }
 
 
+async def idea_factor_fit(
+    pool: asyncpg.Pool,
+    registry: Registry,
+    symbols: list[str],
+    currency: str,
+    weight: float,
+) -> dict[str, Any]:
+    """Which candidate ideas would reduce the portfolio's dominant style tilt."""
+    from steward.portfolio.idea_fit import idea_fit
+
+    report = await idea_fit(pool, symbols, currency, "developed", weight)
+    if report.reason:
+        return {"unavailable": report.reason}
+    sid = registry.add(
+        "observation",
+        f"ideafit:{report.as_of}:{','.join(symbols)}",
+        f"Factor fit of ideas against holdings of {report.as_of}",
+        app_path="/risk/factors",
+        tier=1,
+        snippet="; ".join(
+            f"{i.symbol}: relief {i.relief:+.2f}" for i in report.ideas if i.relief is not None
+        )[:500],
+        as_of=str(report.as_of),
+    )
+    return {
+        "source_id": sid,
+        "method": report.method,
+        "weight": report.weight,
+        "ideas": [i.model_dump(exclude={"tilts", "own_betas"}) for i in report.ideas],
+        "use": "A tie-breaker between comparable ideas (principle 7c). Never take a weaker idea "
+        "only because its relief is higher.",
+    }
+
+
 async def theme(
     pool: asyncpg.Pool, registry: Registry, owner_id: str, kind: str, value: str
 ) -> dict[str, Any]:

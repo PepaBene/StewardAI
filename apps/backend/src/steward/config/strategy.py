@@ -256,7 +256,8 @@ class RiskLimits(ConfigModel):
         description="Work out each holding's risk tier from its own numbers instead of listing "
         "holdings in the strategy: speculative if volatility is above "
         "`tier_speculative_volatility`, market cap is below `tier_speculative_market_cap` or "
-        "it is not profitable; core only if market cap is above `tier_core_min_market_cap`, volatility is at or below "
+        "it is not profitable; core only if market cap is above `tier_core_min_market_cap`, "
+        "volatility is at or below "
         "`tier_core_max_volatility` and it is profitable; growth otherwise. A fund has no market "
         "cap or profit and is tiered by volatility alone. A classification entered by the owner "
         "still wins.",

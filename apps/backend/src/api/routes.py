@@ -57,6 +57,7 @@ from steward.portfolio.factor_shock import (
     save_scenario,
 )
 from steward.portfolio.factors import FactorExposures, factor_exposures
+from steward.portfolio.idea_fit import IdeaFitReport, idea_fit
 from steward.portfolio.read import (
     ContributionReport,
     HoldingsResponse,
@@ -239,6 +240,24 @@ async def get_portfolio_factor_exposures(
     portfolio with the benchmark; a style tilt beyond 0.3 is `flagged` as a concentration note,
     not a breach. `reason` is set when no factor data is stored yet."""
     return await factor_exposures(pool, region)
+
+
+@router.get("/portfolio/risk/factors/ideas", tags=["portfolio"])
+async def get_idea_factor_fit(
+    pool: Pool,
+    _owner: Owner,
+    symbols: Annotated[str, Query(min_length=1, max_length=400)],
+    currency: Annotated[str, Query(min_length=3, max_length=3)] = "USD",
+    region: Literal["developed", "europe", "us"] = "developed",
+    weight: Annotated[float, Query(ge=0.005, le=0.2)] = 0.05,
+) -> IdeaFitReport:
+    """Rank candidate ideas (comma-separated price symbols with stored daily prices) by how much
+    each would reduce the portfolio's dominant style tilt if held at `weight`, paid for from
+    cash. A tie-breaker between comparable ideas (strategy principle 7c), not a recommendation;
+    an idea without stored prices is listed with the reason."""
+    return await idea_fit(
+        pool, [s for s in symbols.split(",") if s.strip()], currency.upper(), region, weight
+    )
 
 
 @router.get("/portfolio/risk/stress-replay", tags=["portfolio"])
