@@ -179,10 +179,10 @@ Code: `steward/quant/{returns,proxy,covariance,decompose}.py`, `steward/portfoli
 
 **Outcome:** named events in CZK on today's portfolio, completing `M6.2` and the risk side of `M6.5`.
 
-- [ ] `Q3.1` `quant/stress.py`: historical replay of the episodes in the method table on current weights, using real series where they exist and proxies otherwise; result per position and in total, with proxied share shown.
+- [x] `Q3.1` `quant/stress.py`: historical replay of the episodes in the method table on current weights, using real series where they exist and proxies otherwise; result per position and in total, with proxied share shown.
 - [ ] `Q3.2` Hypothetical shocks through the factor betas of Q4 (equity, USD/CZK, EUR/CZK, rates, sector); owner-set sensitivities allowed where history is inadequate, labelled as owner assumptions.
 - [ ] `Q3.3` Saved scenarios with their assumptions; each scenario run is snapshotted.
-- [ ] `Q3.4` Frontend stress table: scenario, portfolio loss, worst three contributors, whether the 20 % drawdown limit would be hit.
+- [x] `Q3.4` Frontend stress table: scenario, portfolio loss, worst three contributors, whether the 20 % drawdown limit would be hit.
 
 **Exit check:** shocked position values sum to the shocked portfolio total; every proxied loss is labelled.
 
@@ -190,13 +190,39 @@ Code: `steward/quant/{returns,proxy,covariance,decompose}.py`, `steward/portfoli
 
 **Outcome:** hidden common bets made visible.
 
-- [ ] `Q4.1` Ingest the Ken French Data Library factor files (Developed, Europe, US: 5 factors + momentum, daily and weekly) as a macro source with the existing source-status and coverage tracking.
-- [ ] `Q4.2` `quant/factors.py`: rolling (2-year weekly) regressions per holding and for the portfolio, with t-statistics, R² and Newey-West standard errors; currency and rates factors added.
-- [ ] `Q4.3` Portfolio factor tilt vs the benchmark's tilt; flag a tilt beyond ±0.3 as a concentration note in the monthly review (not a breach).
+- [x] `Q4.1` Ingest the Ken French Data Library factor files (Developed, Europe, US: 5 factors + momentum, daily and weekly) as a macro source with the existing source-status and coverage tracking.
+- [x] `Q4.2` `quant/factors.py`: rolling (2-year weekly) regressions per holding and for the portfolio, with t-statistics, R² and Newey-West standard errors; currency and rates factors added.
+- [x] `Q4.3` Portfolio factor tilt vs the benchmark's tilt; flag a tilt beyond ±0.3 as a concentration note in the monthly review (not a breach).
 - [ ] `Q4.4` Use factor exposures in "propose new ideas" (principle 7c): rank candidates partly by how much they reduce the dominant factor tilt.
-- [ ] `Q4.5` Frontend: factor exposure chart for portfolio vs benchmark, per-holding table.
+- [x] `Q4.5` Frontend: factor exposure chart for portfolio vs benchmark, per-holding table.
 
 **Exit check:** the benchmark ETF regressed on its own region's market factor gives beta ≈ 1 and R² > 0.9.
+
+### Status of Q3 and Q4 (implemented 9 October 2026) and the gaps that remain
+
+Code: `quant/{stress,factors,french,french_store}.py`, `portfolio/{replay,factors}.py`, migration `20261024100000_factor_return.sql`, job `factor_returns` (Mondays 05:30), `GET /portfolio/risk/stress-replay` and `GET /portfolio/risk/factors?region=`, web tabs "Past episodes" (`/risk/replay`) and "Factors" (`/risk/factors`). Tests: `tests/test_stress.py`, `tests/test_factors.py`, `lib/risk/{replay,factors}.test.ts`. Built: `Q3.1`, `Q3.4`, `Q4.1`, `Q4.2`, `Q4.3`, `Q4.5`. Not built: `Q3.2`, `Q3.3`, `Q4.4` (below). The Q4 exit check is met on synthetic data (benchmark = market plus noise gives beta 1.0 ± 0.05 and R² > 0.9); the Q3 exit check holds by construction (`after = before + Σ position results`, tested) and every proxied position is labelled.
+
+**Not built**
+
+- G30. `Q3.2` hypothetical shocks through the factor betas: not started. `decision/shocks.py` (M6.2) already applies owner-stated shocks with measured market betas; routing equity, currency and rates shocks through the Q4 loadings is the change, and needs the rates factor (G34).
+- G31. `Q3.3` saved scenarios and snapshots: not started. The replay report is computed live and not stored (engineering rule 5, same as G26).
+- G32. `Q4.4` factor-aware idea ranking (principle 7c): not started; the tilt is available per factor in the API response.
+
+**Not verified**
+
+- G33. Nothing ran against a database or live prices. The factor job, `load_factors`, `factor_exposures` and `stress_replay` are tested only on synthetic data; the six Data Library URLs were checked by downloading each file and parsing it with the production parser (all six parse; the files end on 31 Aug 2026), but the job itself has not run. The pages were typechecked and linted but not rendered or checked visually, at mobile width or by keyboard.
+
+**Data and method gaps**
+
+- G34. No rates factor: Q4.2 asked for a change-in-10-year-yield factor and the report has only the six style factors plus USD and EUR against the base currency. Needs a stored 10-year yield series.
+- G35. Stored price history starts where `history_years` reaches (10 years from the first price run), so the 2008 and 2011 episodes come back `no_data` and the 2017 CZK-floor episode needs a base-currency series from April 2017. ECB FX is backfilled only over `history_years` as well (G8). To replay 2008 and 2011, give the proxy ETFs, the benchmark and FX a longer history than the holdings (a separate setting).
+- G36. A proxied replay uses a weekly-return beta on a proxy applied to a peak-to-trough move, with alpha ignored. A beta fitted on calm weeks understates a crash (betas rise in stress), so proxied losses are probably too small; each is labelled, but not flagged as likely understated.
+- G37. Episode dates are approximate (peak and trough chosen by hand) and fixed in code; the owner cannot add an episode.
+- G38. The Data Library publishes in US dollars and a month or more late (the stored files end 31 Aug 2026 on 9 Oct 2026), so the latest weeks are left out of the regressions (reported as `weeks_without_factors`). Regressing base-currency returns on dollar factors leans on the USD and EUR terms to absorb the currency part; a holding in a third currency (GBP, CHF) has that part left in its residual.
+- G39. One region is used for the whole book and every holding; the page lets the owner switch. A per-holding region (European names on the Europe factors) is not chosen automatically, and Q4.3 compares the portfolio with the first benchmark only.
+- G40. The risk-free rate is the US one for every currency; the difference is small at weekly frequency but not zero for CZK.
+- G41. The tilt note appears on the page. The monthly review does not include it yet (Q7.1), and the factor table has no coverage tracking beyond first and last date in the response (no source-status row in the existing macro status screens, since the data is stored outside the macro tables).
+- G42. Per-holding regressions use the holding's own weeks only, so a holding with 26 to 39 weeks has no fit (`MIN_OBSERVATIONS` = 40); the portfolio line uses backfilled weeks, so a short-history holding contributes proxy loadings to it (labelled in the warnings).
 
 ## Phase Q5 — Sizing, deposits and the pre-trade check
 

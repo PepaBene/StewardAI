@@ -100,7 +100,7 @@ class LoadedBook:
         return self.weekly.dates[-1] if self.weekly.dates else None
 
 
-def _fx_lookup(fx: FxHistory, base: str) -> rt.FxLookup:
+def fx_lookup(fx: FxHistory, base: str) -> rt.FxLookup:
     @cache
     def lookup(currency: str, day: dt.date) -> float | None:
         rate = fx.conversion(currency, base, day)
@@ -171,7 +171,7 @@ async def load_book(
     end = max((c[-1][0] for s in inputs if (c := list(s.closes))), default=today)
     fx = await load_fx_history(pool, FX_SOURCE, currencies, start, end)
     weekly = rt.build_return_matrix(
-        inputs, _fx_lookup(fx, normalise_currency(base_currency)[0]), "weekly", start, end
+        inputs, fx_lookup(fx, normalise_currency(base_currency)[0]), "weekly", start, end
     )
     return LoadedBook(
         base_currency,
@@ -546,7 +546,7 @@ _DIMENSIONS = ("risk", "sector", "geography", "currency")
 # ---------------------------------------------------------------------------
 
 
-async def _book_from_snapshot(
+async def book_from_snapshot(
     pool: asyncpg.Pool,
 ) -> tuple[LoadedBook | None, StrategyConfig | None]:
     account = await pool.fetchrow(
@@ -595,7 +595,7 @@ async def ex_ante_risk(pool: asyncpg.Pool) -> ExAnteRisk:
     """The report for the latest synced book."""
     from steward.portfolio.risk import portfolio_risk
 
-    book, strategy = await _book_from_snapshot(pool)
+    book, strategy = await book_from_snapshot(pool)
     if book is None or strategy is None:
         return _empty(
             None,

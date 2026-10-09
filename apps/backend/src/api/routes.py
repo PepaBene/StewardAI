@@ -45,6 +45,7 @@ from steward.earnings.review_stats import ReviewStats, review_stats
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 from steward.portfolio.exante import ExAnteRisk, ex_ante_risk
+from steward.portfolio.factors import FactorExposures, factor_exposures
 from steward.portfolio.read import (
     ContributionReport,
     HoldingsResponse,
@@ -57,6 +58,7 @@ from steward.portfolio.read import (
     portfolio_holdings,
     portfolio_overview,
 )
+from steward.portfolio.replay import StressReplay, stress_replay
 from steward.portfolio.risk import PortfolioRisk, portfolio_risk
 from steward.portfolio.transactions import (
     TransactionFilters,
@@ -142,6 +144,30 @@ async def get_portfolio_risk_ex_ante(pool: Pool, _owner: Owner) -> ExAnteRisk:
     on a proxy-backfilled history and which is left out. `volatility_forecast` is null with a
     `reason` when no position has enough history."""
     return await ex_ante_risk(pool)
+
+
+@router.get("/portfolio/risk/factors", tags=["portfolio"])
+async def get_portfolio_factor_exposures(
+    pool: Pool, _owner: Owner, region: Literal["developed", "europe", "us"] = "developed"
+) -> FactorExposures:
+    """Factor exposures of the portfolio, the first benchmark and each holding, from two years
+    of weekly base-currency returns regressed on the Ken French factors of the chosen region
+    (market, size, value, profitability, investment, momentum) and the US dollar and euro
+    against the base currency. Each loading has a Newey-West t-statistic. `tilts` compare the
+    portfolio with the benchmark; a style tilt beyond 0.3 is `flagged` as a concentration note,
+    not a breach. `reason` is set when no factor data is stored yet."""
+    return await factor_exposures(pool, region)
+
+
+@router.get("/portfolio/risk/stress-replay", tags=["portfolio"])
+async def get_portfolio_stress_replay(pool: Pool, _owner: Owner) -> StressReplay:
+    """Named past episodes (2008, 2011, the end of the CZK floor, 2020, 2022) replayed on
+    today's weights in the base currency: the portfolio loss, the three worst contributors and
+    whether the drawdown limit would be reached. A position without prices in the episode is
+    moved by its beta on the best-fitting proxy and labelled `proxied`; one with neither stays
+    flat and is listed as `unavailable`. Episodes before the stored price history return
+    `no_data`."""
+    return await stress_replay(pool)
 
 
 @router.get("/portfolio/transactions", tags=["portfolio"])

@@ -2158,6 +2158,87 @@
         ]
       }
     },
+    "/portfolio/risk/factors": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Factor Exposures",
+        "description": "Factor exposures of the portfolio, the first benchmark and each holding, from two years\nof weekly base-currency returns regressed on the Ken French factors of the chosen region\n(market, size, value, profitability, investment, momentum) and the US dollar and euro\nagainst the base currency. Each loading has a Newey-West t-statistic. `tilts` compare the\nportfolio with the benchmark; a style tilt beyond 0.3 is `flagged` as a concentration note,\nnot a breach. `reason` is set when no factor data is stored yet.",
+        "operationId": "get_portfolio_factor_exposures",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "region",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "developed",
+                "europe",
+                "us"
+              ],
+              "type": "string",
+              "default": "developed",
+              "title": "Region"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactorExposures"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/risk/stress-replay": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Stress Replay",
+        "description": "Named past episodes (2008, 2011, the end of the CZK floor, 2020, 2022) replayed on\ntoday's weights in the base currency: the portfolio loss, the three worst contributors and\nwhether the drawdown limit would be reached. A position without prices in the episode is\nmoved by its beta on the best-fitting proxy and labelled `proxied`; one with neither stays\nflat and is listed as `unavailable`. Episodes before the stored price history return\n`no_data`.",
+        "operationId": "get_portfolio_stress_replay",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StressReplay"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/portfolio/transactions": {
       "get": {
         "tags": [
@@ -31679,6 +31760,7 @@
                 "ir_discovery",
                 "gap_research",
                 "exposure_build",
+                "factor_returns",
                 "disclosure_sources",
                 "disclosure_ingest",
                 "disclosure_identifiers",
@@ -31752,6 +31834,7 @@
                 "ir_discovery",
                 "gap_research",
                 "exposure_build",
+                "factor_returns",
                 "disclosure_sources",
                 "disclosure_ingest",
                 "disclosure_identifiers",
@@ -47973,6 +48056,234 @@
         ],
         "title": "FactReviewResult"
       },
+      "FactorBeta": {
+        "properties": {
+          "factor": {
+            "type": "string",
+            "title": "Factor"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "beta": {
+            "type": "number",
+            "title": "Beta"
+          },
+          "t_stat": {
+            "type": "number",
+            "title": "T Stat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "factor",
+          "label",
+          "beta",
+          "t_stat"
+        ],
+        "title": "FactorBeta"
+      },
+      "FactorCoverage": {
+        "properties": {
+          "first_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Date"
+          },
+          "last_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Date"
+          },
+          "window_weeks": {
+            "type": "integer",
+            "title": "Window Weeks"
+          },
+          "weeks_without_factors": {
+            "type": "integer",
+            "title": "Weeks Without Factors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "first_date",
+          "last_date",
+          "window_weeks",
+          "weeks_without_factors"
+        ],
+        "title": "FactorCoverage"
+      },
+      "FactorExposures": {
+        "properties": {
+          "region": {
+            "type": "string",
+            "title": "Region"
+          },
+          "regions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Regions"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "window_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Start"
+          },
+          "window_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window End"
+          },
+          "tilt_flag": {
+            "type": "number",
+            "title": "Tilt Flag"
+          },
+          "portfolio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FitOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FitOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "benchmark_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Label"
+          },
+          "tilts": {
+            "items": {
+              "$ref": "#/components/schemas/Tilt"
+            },
+            "type": "array",
+            "title": "Tilts"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/PositionFactors"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FactorCoverage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "region",
+          "regions",
+          "as_of",
+          "method_version",
+          "method",
+          "window_start",
+          "window_end",
+          "tilt_flag",
+          "portfolio",
+          "benchmark",
+          "benchmark_label",
+          "tilts",
+          "positions",
+          "coverage",
+          "warnings",
+          "reason"
+        ],
+        "title": "FactorExposures"
+      },
       "FactsheetRow": {
         "properties": {
           "id": {
@@ -49485,6 +49796,38 @@
           "facts"
         ],
         "title": "FinancialHistory"
+      },
+      "FitOut": {
+        "properties": {
+          "r_squared": {
+            "type": "number",
+            "title": "R Squared"
+          },
+          "observations": {
+            "type": "integer",
+            "title": "Observations"
+          },
+          "alpha_annual": {
+            "type": "number",
+            "title": "Alpha Annual",
+            "description": "Intercept, annualised (x52), log return."
+          },
+          "betas": {
+            "items": {
+              "$ref": "#/components/schemas/FactorBeta"
+            },
+            "type": "array",
+            "title": "Betas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "r_squared",
+          "observations",
+          "alpha_annual",
+          "betas"
+        ],
+        "title": "FitOut"
       },
       "FormulaCoverageOut": {
         "properties": {
@@ -60531,6 +60874,10 @@
           "exposure_build": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Builds each holding's revenue-by-country exposure from its latest annual SEC XBRL filing (reported basis). Your own exposure entries are never changed. Default: Tuesdays 05:50."
+          },
+          "factor_returns": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Downloads the Ken French Data Library daily factor returns (market, size, value, profitability, investment, momentum) for the Developed, Europe and US markets, which the factor exposures use. The library adds a month at a time. Default: Mondays 05:30."
           },
           "disclosure_sources": {
             "$ref": "#/components/schemas/JobSchedule",
@@ -72970,6 +73317,69 @@
         ],
         "title": "PositionExAnte"
       },
+      "PositionFactors": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "real",
+              "proxied",
+              "excluded"
+            ],
+            "title": "Basis"
+          },
+          "fit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FitOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "weight",
+          "basis",
+          "fit",
+          "reason"
+        ],
+        "title": "PositionFactors"
+      },
       "PositionTarget": {
         "properties": {
           "target_weight": {
@@ -77798,6 +78208,148 @@
         ],
         "title": "ReplayDatasetOut"
       },
+      "ReplayEpisode": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "replayed",
+              "no_data"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "before": {
+            "type": "number",
+            "title": "Before"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          },
+          "pnl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnl"
+          },
+          "loss": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loss",
+            "description": "pnl / total value; null when nothing could be replayed."
+          },
+          "real_weight": {
+            "type": "number",
+            "title": "Real Weight"
+          },
+          "proxied_weight": {
+            "type": "number",
+            "title": "Proxied Weight"
+          },
+          "unavailable_weight": {
+            "type": "number",
+            "title": "Unavailable Weight"
+          },
+          "breaches_limit": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Breaches Limit",
+            "description": "Whether the loss reaches the drawdown limit; null without a limit or result."
+          },
+          "worst": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayPosition"
+            },
+            "type": "array",
+            "title": "Worst"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayPosition"
+            },
+            "type": "array",
+            "title": "Positions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "start",
+          "end",
+          "note",
+          "status",
+          "reason",
+          "before",
+          "after",
+          "pnl",
+          "loss",
+          "real_weight",
+          "proxied_weight",
+          "unavailable_weight",
+          "breaches_limit",
+          "worst",
+          "positions"
+        ],
+        "title": "ReplayEpisode"
+      },
       "ReplayHoldingOut": {
         "properties": {
           "ticker": {
@@ -78014,6 +78566,103 @@
           "channels"
         ],
         "title": "ReplayOutcome"
+      },
+      "ReplayPosition": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Share of total portfolio value."
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "real",
+              "proxied",
+              "unavailable"
+            ],
+            "title": "Basis"
+          },
+          "move": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Move",
+            "description": "The position's move over the episode, fraction."
+          },
+          "proxy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy",
+            "description": "Label of the proxy the move came from."
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta"
+          },
+          "r_squared": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R Squared"
+          },
+          "pnl": {
+            "type": "number",
+            "title": "Pnl",
+            "description": "Gain or loss in the base currency."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "weight",
+          "basis",
+          "move",
+          "proxy",
+          "beta",
+          "r_squared",
+          "pnl"
+        ],
+        "title": "ReplayPosition"
       },
       "ReplayPreview": {
         "properties": {
@@ -87964,6 +88613,108 @@
         ],
         "title": "StrategyConfigVersion"
       },
+      "StressReplay": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "total_value": {
+            "type": "number",
+            "title": "Total Value"
+          },
+          "drawdown_limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawdown Limit"
+          },
+          "history_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "History Start",
+            "description": "Earliest date any series used here has a stored close."
+          },
+          "episodes": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayEpisode"
+            },
+            "type": "array",
+            "title": "Episodes"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "base_currency",
+          "method_version",
+          "method",
+          "total_value",
+          "drawdown_limit",
+          "history_start",
+          "episodes",
+          "warnings",
+          "reason"
+        ],
+        "title": "StressReplay"
+      },
       "StyleBand": {
         "properties": {
           "label": {
@@ -89754,6 +90505,73 @@
           "breached"
         ],
         "title": "TierCheck"
+      },
+      "Tilt": {
+        "properties": {
+          "factor": {
+            "type": "string",
+            "title": "Factor"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "portfolio": {
+            "type": "number",
+            "title": "Portfolio"
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark"
+          },
+          "tilt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tilt",
+            "description": "Portfolio loading minus benchmark loading."
+          },
+          "flagged": {
+            "type": "boolean",
+            "title": "Flagged",
+            "description": "A style factor with a tilt beyond 0.3 either way."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Plain sentence for a flagged tilt."
+          }
+        },
+        "type": "object",
+        "required": [
+          "factor",
+          "label",
+          "portfolio",
+          "benchmark",
+          "tilt",
+          "flagged",
+          "note"
+        ],
+        "title": "Tilt"
       },
       "TimelineMonth": {
         "properties": {

@@ -788,6 +788,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/risk/factors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Factor Exposures
+         * @description Factor exposures of the portfolio, the first benchmark and each holding, from two years
+         *     of weekly base-currency returns regressed on the Ken French factors of the chosen region
+         *     (market, size, value, profitability, investment, momentum) and the US dollar and euro
+         *     against the base currency. Each loading has a Newey-West t-statistic. `tilts` compare the
+         *     portfolio with the benchmark; a style tilt beyond 0.3 is `flagged` as a concentration note,
+         *     not a breach. `reason` is set when no factor data is stored yet.
+         */
+        get: operations["get_portfolio_factor_exposures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/risk/stress-replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Stress Replay
+         * @description Named past episodes (2008, 2011, the end of the CZK floor, 2020, 2022) replayed on
+         *     today's weights in the base currency: the portfolio loss, the three worst contributors and
+         *     whether the drawdown limit would be reached. A position without prices in the episode is
+         *     moved by its beta on the best-fitting proxy and labelled `proxied`; one with neither stays
+         *     flat and is listed as `unavailable`. Episodes before the stored price history return
+         *     `no_data`.
+         */
+        get: operations["get_portfolio_stress_replay"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/transactions": {
         parameters: {
             query?: never;
@@ -10065,7 +10115,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -15753,6 +15803,60 @@ export interface components {
             corrected_fact_id: number | null;
             verdict_job: components["schemas"]["JobSummary"];
         };
+        /** FactorBeta */
+        FactorBeta: {
+            /** Factor */
+            factor: string;
+            /** Label */
+            label: string;
+            /** Beta */
+            beta: number;
+            /** T Stat */
+            t_stat: number;
+        };
+        /** FactorCoverage */
+        FactorCoverage: {
+            /** First Date */
+            first_date: string | null;
+            /** Last Date */
+            last_date: string | null;
+            /** Window Weeks */
+            window_weeks: number;
+            /** Weeks Without Factors */
+            weeks_without_factors: number;
+        };
+        /** FactorExposures */
+        FactorExposures: {
+            /** Region */
+            region: string;
+            /** Regions */
+            regions: string[];
+            /** As Of */
+            as_of: string | null;
+            /** Method Version */
+            method_version: string;
+            /** Method */
+            method: string;
+            /** Window Start */
+            window_start: string | null;
+            /** Window End */
+            window_end: string | null;
+            /** Tilt Flag */
+            tilt_flag: number;
+            portfolio: components["schemas"]["FitOut"] | null;
+            benchmark: components["schemas"]["FitOut"] | null;
+            /** Benchmark Label */
+            benchmark_label: string | null;
+            /** Tilts */
+            tilts: components["schemas"]["Tilt"][];
+            /** Positions */
+            positions: components["schemas"]["PositionFactors"][];
+            coverage: components["schemas"]["FactorCoverage"] | null;
+            /** Warnings */
+            warnings: string[];
+            /** Reason */
+            reason: string | null;
+        };
         /**
          * FactsheetRow
          * @description A `fund_factsheet` row (minus the raw `evidence` blob) with the evidence-derived
@@ -16272,6 +16376,20 @@ export interface components {
             };
             /** Facts */
             facts: components["schemas"]["FinancialFactOut"][];
+        };
+        /** FitOut */
+        FitOut: {
+            /** R Squared */
+            r_squared: number;
+            /** Observations */
+            observations: number;
+            /**
+             * Alpha Annual
+             * @description Intercept, annualised (x52), log return.
+             */
+            alpha_annual: number;
+            /** Betas */
+            betas: components["schemas"]["FactorBeta"][];
         };
         /** FormulaCoverageOut */
         FormulaCoverageOut: {
@@ -20069,6 +20187,8 @@ export interface components {
             gap_research?: components["schemas"]["JobSchedule"];
             /** @description Builds each holding's revenue-by-country exposure from its latest annual SEC XBRL filing (reported basis). Your own exposure entries are never changed. Default: Tuesdays 05:50. */
             exposure_build?: components["schemas"]["JobSchedule"];
+            /** @description Downloads the Ken French Data Library daily factor returns (market, size, value, profitability, investment, momentum) for the Developed, Europe and US markets, which the factor exposures use. The library adds a month at a time. Default: Mondays 05:30. */
+            factor_returns?: components["schemas"]["JobSchedule"];
             /** @description Re-test every disclosure source, store the result, switch a failing one off and the SEC sources on when they pass. Default: daily 06:00. */
             disclosure_sources?: components["schemas"]["JobSchedule"];
             /** @description Fetch, store and parse the newest SEC annual and quarterly filings of held issuers. Skips itself until the SEC sources pass their access test. Default: weekdays 06:40. */
@@ -24289,6 +24409,23 @@ export interface components {
             real_weeks: number;
             proxy: components["schemas"]["ProxyFitOut"] | null;
         };
+        /** PositionFactors */
+        PositionFactors: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Weight */
+            weight: number;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "real" | "proxied" | "excluded";
+            fit: components["schemas"]["FitOut"] | null;
+            /** Reason */
+            reason: string | null;
+        };
         /** PositionTarget */
         PositionTarget: {
             /** Target Weight */
@@ -26039,6 +26176,58 @@ export interface components {
             /** Error */
             error: string | null;
         };
+        /** ReplayEpisode */
+        ReplayEpisode: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Note */
+            note: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "replayed" | "no_data";
+            /** Reason */
+            reason: string | null;
+            /** Before */
+            before: number;
+            /** After */
+            after: number | null;
+            /** Pnl */
+            pnl: number | null;
+            /**
+             * Loss
+             * @description pnl / total value; null when nothing could be replayed.
+             */
+            loss: number | null;
+            /** Real Weight */
+            real_weight: number;
+            /** Proxied Weight */
+            proxied_weight: number;
+            /** Unavailable Weight */
+            unavailable_weight: number;
+            /**
+             * Breaches Limit
+             * @description Whether the loss reaches the drawdown limit; null without a limit or result.
+             */
+            breaches_limit: boolean | null;
+            /** Worst */
+            worst: components["schemas"]["ReplayPosition"][];
+            /** Positions */
+            positions: components["schemas"]["ReplayPosition"][];
+        };
         /** ReplayHoldingOut */
         ReplayHoldingOut: {
             /** Ticker */
@@ -26108,6 +26297,42 @@ export interface components {
             held_until?: string | null;
             /** Suppressed */
             suppressed?: string | null;
+        };
+        /** ReplayPosition */
+        ReplayPosition: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Weight
+             * @description Share of total portfolio value.
+             */
+            weight: number;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "real" | "proxied" | "unavailable";
+            /**
+             * Move
+             * @description The position's move over the episode, fraction.
+             */
+            move: number | null;
+            /**
+             * Proxy
+             * @description Label of the proxy the move came from.
+             */
+            proxy: string | null;
+            /** Beta */
+            beta: number | null;
+            /** R Squared */
+            r_squared: number | null;
+            /**
+             * Pnl
+             * @description Gain or loss in the base currency.
+             */
+            pnl: number;
         };
         /** ReplayPreview */
         ReplayPreview: {
@@ -29690,6 +29915,32 @@ export interface components {
             note: string | null;
             body: components["schemas"]["StrategyConfig"];
         };
+        /** StressReplay */
+        StressReplay: {
+            /** As Of */
+            as_of: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Method Version */
+            method_version: string;
+            /** Method */
+            method: string;
+            /** Total Value */
+            total_value: number;
+            /** Drawdown Limit */
+            drawdown_limit: number | null;
+            /**
+             * History Start
+             * @description Earliest date any series used here has a stored close.
+             */
+            history_start: string | null;
+            /** Episodes */
+            episodes: components["schemas"]["ReplayEpisode"][];
+            /** Warnings */
+            warnings: string[];
+            /** Reason */
+            reason: string | null;
+        };
         /** StyleBand */
         StyleBand: {
             /** Label */
@@ -30406,6 +30657,32 @@ export interface components {
             rule: "speculative_above" | "core_above";
             /** Breached */
             breached: boolean;
+        };
+        /** Tilt */
+        Tilt: {
+            /** Factor */
+            factor: string;
+            /** Label */
+            label: string;
+            /** Portfolio */
+            portfolio: number;
+            /** Benchmark */
+            benchmark: number | null;
+            /**
+             * Tilt
+             * @description Portfolio loading minus benchmark loading.
+             */
+            tilt: number | null;
+            /**
+             * Flagged
+             * @description A style factor with a tilt beyond 0.3 either way.
+             */
+            flagged: boolean;
+            /**
+             * Note
+             * @description Plain sentence for a flagged tilt.
+             */
+            note: string | null;
         };
         /** TimelineMonth */
         TimelineMonth: {
@@ -33556,6 +33833,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExAnteRisk"];
+                };
+            };
+        };
+    };
+    get_portfolio_factor_exposures: {
+        parameters: {
+            query?: {
+                region?: "developed" | "europe" | "us";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactorExposures"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_stress_replay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StressReplay"];
                 };
             };
         };

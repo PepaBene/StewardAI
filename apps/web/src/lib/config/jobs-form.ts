@@ -310,6 +310,12 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Builds each holding's revenue-by-country exposure from its latest annual SEC filing. Only single countries are mapped; your own exposure entries are never changed, and a row you delete is not rebuilt.",
     cron: "50 5 * * 2",
   },
+  factor_returns: {
+    label: "Factor returns",
+    description:
+      "Downloads the Ken French Data Library daily factor returns (market, size, value, profitability, investment, momentum) for the Developed, Europe and US markets. The factor exposures on the risk pages use them. The library adds a month at a time.",
+    cron: "30 5 * * 1",
+  },
   disclosure_sources: {
     label: "Disclosure source tests",
     description:

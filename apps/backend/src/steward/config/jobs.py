@@ -1966,6 +1966,13 @@ class JobsConfig(ConfigModel):
         "SEC XBRL filing (reported basis). Your own exposure entries are never changed. "
         "Default: Tuesdays 05:50.",
     )
+    factor_returns: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="30 5 * * 1"),
+        description="Downloads the Ken French Data Library daily factor returns (market, size, "
+        "value, profitability, investment, momentum) for the Developed, Europe and US markets, "
+        "which the factor exposures use. The library adds a month at a time. Default: Mondays "
+        "05:30.",
+    )
     disclosure_sources: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="0 6 * * *"),
         description="Re-test every disclosure source, store the result, switch a failing one off "
@@ -2072,6 +2079,7 @@ class JobsConfig(ConfigModel):
             "ir_discovery": self.ir_discovery,
             "gap_research": self.gap_research,
             "exposure_build": self.exposure_build,
+            "factor_returns": self.factor_returns,
             "disclosure_sources": self.disclosure_sources,
             "disclosure_ingest": self.disclosure_ingest,
             "disclosure_identifiers": self.disclosure_identifiers,
