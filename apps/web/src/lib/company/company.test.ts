@@ -6,12 +6,37 @@ import {
   formatRatio,
   fractionToPercent,
   gridMatrix,
+  percentileLabel,
   percentToFraction,
   rangePosition,
   sortScenarios,
   splitReason,
   toNumber,
 } from "./company";
+
+describe("percentileLabel", () => {
+  it("uses the right ordinal suffix", () => {
+    const label = (p: number) => percentileLabel(String(p / 100));
+    expect(label(1)).toBe("1st percentile");
+    expect(label(2)).toBe("2nd percentile");
+    expect(label(3)).toBe("3rd percentile");
+    expect(label(11)).toBe("11th percentile");
+    expect(label(21)).toBe("21st percentile");
+    expect(label(50)).toBe("50th percentile");
+    expect(percentileLabel(null)).toBeNull();
+  });
+});
+
+describe("gridMatrix", () => {
+  it("leaves out a cell whose shift is unknown instead of placing it at zero", () => {
+    const grid = gridMatrix([
+      { growth_shift: "0.01", rate_shift: "0", value: "10" },
+      { growth_shift: null, rate_shift: "0", value: "99" },
+    ]);
+    expect(grid.rowShifts).toEqual([0.01]);
+    expect(grid.at(0, 0)).toBe(10);
+  });
+});
 
 describe("company helpers", () => {
   it("treats missing and unparsable decimals as unknown, never zero", () => {

@@ -37,7 +37,7 @@ export function AllocationView({ ticker }: { ticker: string }) {
               <div className="overflow-x-auto border border-border">
                 <table className="w-full border-collapse text-sm">
                   <thead>
-                    <tr className="bg-surface-sunken text-right">
+                    <tr className="bg-surface-muted text-right">
                       <th scope="col" className="px-2 py-1.5 text-left font-medium">Year</th>
                       {["Free cash flow", "Capex", "Dividends", "Buybacks", "Debt issued", "Debt repaid", "Net debt change", "Acquisitions", "Divestitures", "Returned / FCF", "Shares", "FCF per share growth"].map((h) => (
                         <th key={h} scope="col" className="px-2 py-1.5 font-medium">{h}</th>
@@ -109,7 +109,7 @@ export function EstimatesView({ ticker }: { ticker: string }) {
             <div className="overflow-x-auto border border-border">
               <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="bg-surface-sunken text-left">
+                  <tr className="bg-surface-muted text-left">
                     {["Kind", "Metric", "Period", "Value", "Low to high", "Analysts", "Provider", "Known at", "Source"].map((h) => (
                       <th key={h} scope="col" className="px-2 py-1.5 font-medium">{h}</th>
                     ))}
@@ -178,7 +178,7 @@ export function NetworkView({ ticker }: { ticker: string }) {
                   <div className="overflow-x-auto border border-border">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-surface-sunken text-left">
+                        <tr className="bg-surface-muted text-left">
                           {["Counterparty", "Type", "Direction", "Evidence", "Valid", "Known at", "Source"].map((h) => (
                             <th key={h} scope="col" className="px-2 py-1.5 font-medium">{h}</th>
                           ))}
@@ -274,7 +274,7 @@ export function GovernanceView({ ticker }: { ticker: string }) {
                 <div className="overflow-x-auto border border-border">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-surface-sunken text-left">
+                      <tr className="bg-surface-muted text-left">
                         {["Person", "From", "To", "Status", "Source"].map((h) => (
                           <th key={h} scope="col" className="px-2 py-1.5 font-medium">{h}</th>
                         ))}
@@ -302,7 +302,7 @@ export function GovernanceView({ ticker }: { ticker: string }) {
                 <div className="overflow-x-auto border border-border">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-surface-sunken text-left">
+                      <tr className="bg-surface-muted text-left">
                         <th scope="col" className="px-2 py-1.5 font-medium">Executive</th>
                         <th scope="col" className="px-2 py-1.5 text-right font-medium">Year</th>
                         <th scope="col" className="px-2 py-1.5 text-right font-medium">Salary</th>

@@ -100,6 +100,33 @@ end $$;
 alter table public.disclosure_adjudication_history drop column adjudicator_kind;
 alter table public.disclosure_adjudication drop column adjudicator_kind;
 
+-- The narrower indexes cannot hold rows the widened ones allowed (for example a year-to-date and a
+-- quarter figure with the same period_end). Rows are never deleted by a rollback, so stop here with
+-- a message that says what to resolve, instead of failing inside create unique index.
+do $$
+declare
+  clashes bigint;
+begin
+  select count(*) into clashes from (
+    select 1 from public.estimate_value
+     group by snapshot_id, metric, coalesce(segment, ''), period_end, basis having count(*) > 1
+  ) c;
+  if clashes > 0 then
+    raise exception 'cannot roll back: % estimate_value groups share snapshot, metric, segment, '
+      'period_end and basis; resolve them first', clashes;
+  end if;
+  select count(*) into clashes from (
+    select 1 from public.disclosure_observation
+     group by document_version_id, metric, coalesce(segment, ''), period_end,
+              md5(dimensions::text), parser_version
+    having count(*) > 1
+  ) c;
+  if clashes > 0 then
+    raise exception 'cannot roll back: % disclosure_observation groups share the narrower '
+      'identity; resolve them first', clashes;
+  end if;
+end $$;
+
 drop index public.estimate_value_identity;
 create unique index estimate_value_identity on public.estimate_value
   (snapshot_id, metric, coalesce(segment, ''), period_end, basis);

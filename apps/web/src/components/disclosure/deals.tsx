@@ -29,6 +29,7 @@ import {
   type PortfolioDeals,
   type TermVersion,
 } from "@/lib/disclosure/deals";
+import { safeHref } from "@/lib/reference/identity";
 import { cn } from "@/lib/utils";
 
 const TH = "py-1.5 pr-3 text-left font-medium";
@@ -301,7 +302,7 @@ function StateDetail({ t }: { t: DealTransition }) {
         {t.rumor_source ? <> Source of the rumor: {t.rumor_source}.</> : null}
       </p>
       {t.quote ? <blockquote className="border-l-2 border-border pl-3 text-text-muted">“{t.quote}”</blockquote> : <p className="text-text-muted">No passage is stored for this change.</p>}
-      {t.source_url ? <a href={t.source_url} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2">Open the filing</a> : null}
+      {safeHref(t.source_url) ? <a href={safeHref(t.source_url) ?? undefined} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2">Open the filing</a> : null}
     </div>
   );
 }
@@ -320,7 +321,7 @@ function VersionDetail({ v }: { v: TermVersion }) {
         <p>Unaffected price {formatTerm("unaffected_price", un.value, v.currency)} dated <span className="num">{v.unaffected_date ? formatDay(v.unaffected_date) : "no date given"}</span>{v.unaffected_source ? ` (${v.unaffected_source})` : ""}.</p>
       ) : <p className="text-text-muted">No unaffected price is stated in this version.</p>}
       {v.quote ? <blockquote className="border-l-2 border-border pl-3 text-text-muted">“{v.quote}”</blockquote> : null}
-      {v.source_url ? <a href={v.source_url} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2">Open the filing</a> : null}
+      {safeHref(v.source_url) ? <a href={safeHref(v.source_url) ?? undefined} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2">Open the filing</a> : null}
     </div>
   );
 }
@@ -349,7 +350,7 @@ export function TransitionTable({ deal }: { deal: Deal }) {
                 <td className={TD}>
                   {t.quote ? <span className="text-text-muted">“{t.quote}” </span> : null}
                   {t.rumor_source ? <span className="block text-xs">Rumor source: {t.rumor_source}</span> : null}
-                  {t.source_url ? <a href={t.source_url} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2">Filing</a> : null}
+                  {safeHref(t.source_url) ? <a href={safeHref(t.source_url) ?? undefined} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2">Filing</a> : null}
                 </td>
               </tr>
             ))}
@@ -561,7 +562,7 @@ export function DealFacts({ deal }: { deal: Deal }) {
             {deal.documents.map((d) => (
               <li key={d.document_version_id}>
                 {d.role[0].toUpperCase() + d.role.slice(1)}, known <span className="num">{formatDay(d.known_at)}</span>{" "}
-                {d.source_url ? <a href={d.source_url} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2">open</a> : null}
+                {safeHref(d.source_url) ? <a href={safeHref(d.source_url) ?? undefined} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2">open</a> : null}
               </li>
             ))}
           </ul>

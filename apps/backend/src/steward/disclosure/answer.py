@@ -216,6 +216,35 @@ def _judgement_words(text: str) -> set[str]:
     return {m.lower() for m in _JUDGEMENT.findall(text)}
 
 
+# Words a rewrite may add freely: they join facts and carry none.
+_GLUE = frozenset(
+    "a an the and or but of in on at to for from by with as is are was were be been being it its "
+    "this that these those which who whom whose has have had also then than so such not no per "
+    "about after before during over under into out up down within while when where there their "
+    "they he she his her we our you your i".split()
+)
+_APOSTROPHES = "'" + chr(0x2019)
+_PROSE_WORD = re.compile(f"[A-Za-z][A-Za-z{_APOSTROPHES}-]*")
+
+
+def _stem(word: str) -> str:
+    w = word.lower().strip(_APOSTROPHES + "-")
+    for suffix in ("'s", chr(0x2019) + "s", "ies", "es", "s"):
+        if len(w) > len(suffix) + 3 and w.endswith(suffix):
+            return w[: -len(suffix)]
+    return w
+
+
+def _added_words(text: str, allowed_text: str) -> set[str]:
+    """Content words in `text` that the facts it was written from do not contain."""
+    known = {_stem(w) for w in _PROSE_WORD.findall(allowed_text)}
+    return {
+        _stem(w)
+        for w in _PROSE_WORD.findall(text)
+        if w.lower() not in _GLUE and _stem(w) not in known
+    }
+
+
 PHRASE_SYSTEM = (
     "You rewrite a short factual answer so it reads smoothly. Use only the facts, numbers, dates "
     "and sources in the text you are given. Do not add, infer, compute or round any figure, and do "
@@ -261,6 +290,10 @@ async def phrase(
         return None
     # Numbers alone do not make a rewrite faithful: "beat", "grew" or "record" are claims too.
     if _judgement_words(text) - _judgement_words(template + " " + " ".join(quoted)):
+        return None
+    # A rewrite may reorder and connect the facts but not bring new words of its own: a word the
+    # template and evidence lack is a claim nobody checked. Such a rewrite is dropped.
+    if _added_words(text, template + " " + " ".join(quoted)):
         return None
     return text
 

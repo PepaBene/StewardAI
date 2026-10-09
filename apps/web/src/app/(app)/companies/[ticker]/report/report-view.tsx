@@ -35,7 +35,7 @@ function Body({ report, conclusion, onConclusion, readOnly }: { report: CompanyR
         <div className="overflow-x-auto border border-border">
           <table className="w-full border-collapse text-sm">
             <thead>
-              <tr className="bg-surface-sunken text-xs">
+              <tr className="bg-surface-muted text-xs">
                 <th scope="col" className="px-3 py-1.5 text-left font-medium">Figure</th>
                 <th scope="col" className="px-2 py-1.5 text-right font-medium">Period</th>
                 <th scope="col" className="px-2 py-1.5 text-right font-medium">Value</th>
@@ -270,7 +270,7 @@ export function ReportView({ ticker }: { ticker: string }) {
           <ul className="space-y-2 text-sm">
             {list.map((v) => (
               <li key={v.version}>
-                <button type="button" onClick={() => setOpen(v.version)} className={cn("w-full border border-border px-2 py-1.5 text-left hover:border-accent", open === v.version && "bg-surface-sunken")}>
+                <button type="button" onClick={() => setOpen(v.version)} className={cn("w-full border border-border px-2 py-1.5 text-left hover:border-accent", open === v.version && "bg-surface-muted")}>
                   <span className="font-medium">Version {v.version}</span>
                   <span className="block text-xs text-text-muted">{when(v.created_at)}</span>
                   {v.conclusion_excerpt ? <span className="mt-1 block text-xs">{v.conclusion_excerpt}</span> : null}

@@ -37,9 +37,19 @@ def _gate(n: int, minimum: int, unit: str, what: str) -> AnalyticsResult | None:
     return None
 
 
+def _frequency_problem(unit: str, frequency: str) -> AnalyticsResult | None:
+    """An unknown frequency is reported as unavailable, not raised as a KeyError."""
+    if frequency not in ANNUALISATION:
+        known = ", ".join(ANNUALISATION)
+        return unavailable(unit, version("risk"), f"unknown frequency {frequency!r}; use {known}")
+    return None
+
+
 def volatility(returns: Sequence[Decimal], frequency: str = "daily") -> AnalyticsResult:
     """Sample standard deviation x sqrt(periods per year)."""
-    blocked = _gate(len(returns), THRESHOLDS.min_obs_volatility, "fraction", "volatility")
+    blocked = _frequency_problem("fraction", frequency) or _gate(
+        len(returns), THRESHOLDS.min_obs_volatility, "fraction", "volatility"
+    )
     if blocked:
         return blocked
     factor = Decimal(ANNUALISATION[frequency]).sqrt()
@@ -50,7 +60,9 @@ def downside_deviation(
     returns: Sequence[Decimal], frequency: str = "daily", mar: Decimal = ZERO
 ) -> AnalyticsResult:
     """`sqrt(sum(min(r - MAR, 0)^2) / n) x sqrt(periods per year)`, over all n observations."""
-    blocked = _gate(len(returns), THRESHOLDS.min_obs_volatility, "fraction", "downside deviation")
+    blocked = _frequency_problem("fraction", frequency) or _gate(
+        len(returns), THRESHOLDS.min_obs_volatility, "fraction", "downside deviation"
+    )
     if blocked:
         return blocked
     shortfall = sum((min(r - mar, ZERO) ** 2 for r in returns), ZERO) / len(returns)
@@ -88,6 +100,11 @@ def var_es(
     k = max(1, math.ceil(len(ordered) * (ONE - confidence)))
     tail = ordered[:k]
     note = ["historical estimate over the sample, not a forecast"]
+    if tail[-1] > 0:
+        note.append(
+            "no losing period at this confidence level, so the figure is negative: "
+            "the worst returns in the sample were gains"
+        )
     return (
         result(-tail[-1], "fraction", method, warnings=note, inputs=list(returns)),
         result(-mean(tail), "fraction", method, warnings=note, inputs=list(returns)),
@@ -116,7 +133,9 @@ def sharpe(
     risk-free series must be aligned period by period."""
     if len(returns) != len(risk_free):
         return unavailable("ratio", version("risk"), "risk-free series is not aligned")
-    blocked = _gate(len(returns), THRESHOLDS.min_obs_volatility, "ratio", "Sharpe ratio")
+    blocked = _frequency_problem("ratio", frequency) or _gate(
+        len(returns), THRESHOLDS.min_obs_volatility, "ratio", "Sharpe ratio"
+    )
     if blocked:
         return blocked
     excess = [r - f for r, f in zip(returns, risk_free, strict=True)]
@@ -146,7 +165,9 @@ def sortino(
     same excess returns (`sqrt(mean(min(excess, 0)^2))`). Undefined with no losing period."""
     if len(returns) != len(risk_free):
         return unavailable("ratio", version("risk"), "risk-free series is not aligned")
-    blocked = _gate(len(returns), THRESHOLDS.min_obs_volatility, "ratio", "Sortino ratio")
+    blocked = _frequency_problem("ratio", frequency) or _gate(
+        len(returns), THRESHOLDS.min_obs_volatility, "ratio", "Sortino ratio"
+    )
     if blocked:
         return blocked
     excess = [r - f for r, f in zip(returns, risk_free, strict=True)]
@@ -198,7 +219,9 @@ def tracking_error(
     """Annualised sample standard deviation of the active return (portfolio minus benchmark)."""
     if len(returns) != len(benchmark):
         return unavailable("fraction", version("risk"), "series are not aligned")
-    blocked = _gate(len(returns), THRESHOLDS.min_obs_tracking_error, "fraction", "tracking error")
+    blocked = _frequency_problem("fraction", frequency) or _gate(
+        len(returns), THRESHOLDS.min_obs_tracking_error, "fraction", "tracking error"
+    )
     if blocked:
         return blocked
     active = [r - b for r, b in zip(returns, benchmark, strict=True)]
@@ -221,6 +244,9 @@ def diversification_benefit(
     blocked = _gate(n, THRESHOLDS.min_obs_diversification, "fraction", "diversification benefit")
     if blocked:
         return blocked
+    if any(x < 0 for x in weights):
+        reason = "a weight is negative; short positions are not blended"
+        return unavailable("fraction", version("risk"), reason)
     total = sum(weights, ZERO)
     if total <= 0:
         return unavailable("fraction", version("risk"), "no positive weight")

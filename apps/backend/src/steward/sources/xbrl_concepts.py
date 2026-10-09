@@ -783,6 +783,16 @@ TEXT_BLOCK_TOPICS: tuple[str, ...] = (
     "fairvalue",
 )
 
+# Equity tags that already include the non-controlling interest. A filer that tags only these
+# has no parent-only equity, so the canonical `equity` must have the interest taken out before
+# it is added or subtracted again.
+EQUITY_INCLUDING_NCI: frozenset[str] = frozenset(
+    {
+        "us-gaap:StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+        "ifrs-full:Equity",
+    }
+)
+
 # Unit for monetary amounts: iso4217 code as the reader writes it, with an optional per-share
 # or per-unit denominator ("USD/shares").
 _CURRENCY = re.compile(r"^([A-Z]{3})(?:/[A-Za-z]+)?$")

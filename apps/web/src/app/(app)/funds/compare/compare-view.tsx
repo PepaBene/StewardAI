@@ -106,7 +106,7 @@ function SaveComparison({ isins }: { isins: readonly string[] }) {
           <span className="mb-1 block text-xs text-text-muted">Note (optional)</span>
           <input value={note} onChange={(e) => setNote(e.target.value)} className="w-72 border border-border bg-surface px-2 py-1.5" />
         </label>
-        <button type="submit" disabled={busy} className="border border-accent px-4 py-1.5 text-sm font-semibold hover:bg-surface-sunken disabled:opacity-50">Save this comparison</button>
+        <button type="submit" disabled={busy} className="border border-accent px-4 py-1.5 text-sm font-semibold hover:bg-surface-muted disabled:opacity-50">Save this comparison</button>
         {error ? <p role="alert" className="text-sm text-loss">{error}</p> : null}
         {saved ? (
           <p role="status" className="text-sm text-text-muted">
@@ -130,8 +130,8 @@ function Comparison({ c }: { c: FundComparison }) {
         <div className="overflow-x-auto border border-border">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-surface-sunken">
-                <th scope="col" className="sticky left-0 min-w-44 bg-surface-sunken px-3 py-1.5 text-left font-medium">Measure</th>
+              <tr className="bg-surface-muted">
+                <th scope="col" className="sticky left-0 min-w-44 bg-surface-muted px-3 py-1.5 text-left font-medium">Measure</th>
                 <FundHeads funds={c.funds} />
               </tr>
             </thead>
@@ -199,7 +199,7 @@ function Comparison({ c }: { c: FundComparison }) {
                   <div className="overflow-x-auto border border-border">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-surface-sunken text-right">
+                        <tr className="bg-surface-muted text-right">
                           <th scope="col" className="px-3 py-1 text-left font-medium">Shared issuer</th>
                           <th scope="col" className="px-2 py-1 font-medium">{a ? label(a) : p.fund_a}</th>
                           <th scope="col" className="px-2 py-1 font-medium">{b ? label(b) : p.fund_b}</th>
@@ -232,7 +232,7 @@ function Comparison({ c }: { c: FundComparison }) {
             <div className="overflow-x-auto border border-border">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-surface-sunken">
+                  <tr className="bg-surface-muted">
                     <th scope="col" className="px-3 py-1 text-left font-medium">{title}</th>
                     <FundHeads funds={c.funds} />
                   </tr>

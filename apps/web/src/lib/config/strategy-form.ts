@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type { StrategyConfig, StrategyRule } from "@/lib/api/client";
 import type { FieldErrors } from "@/lib/api/validation-errors";
 
@@ -112,7 +113,7 @@ export function fractionToPercent(value: number | null | undefined): string {
 
 /** "7" -> 0.07, "3,5 %" -> 0.035. Anything else is returned as typed, for the backend to reject. */
 export function percentToFraction(text: string): number | string {
-  const cleaned = text.trim().replace(/\s*%$/, "").replace(",", ".");
+  const cleaned = normaliseSeparators(text.trim().replace(/\s*%$/, ""));
   if (!/^[+-]?(\d+\.?\d*|\.\d+)$/.test(cleaned)) return text.trim();
   const shifted = shiftDecimal(cleaned, -2);
   return shifted === null ? text.trim() : Number(shifted);
@@ -125,7 +126,7 @@ function optionalPercent(text: string): number | string | null {
 
 /** Blank -> null (limit off); otherwise a plain number, or the text as typed for the backend to reject. */
 function optionalNumber(text: string): number | string | null {
-  const trimmed = text.trim().replace(",", ".");
+  const trimmed = normaliseSeparators(text);
   if (trimmed === "") return null;
   const n = Number(trimmed);
   return Number.isFinite(n) ? n : trimmed;

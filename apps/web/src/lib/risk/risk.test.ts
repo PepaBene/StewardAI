@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildShock, EMPTY_SHOCK_FORM, ladderShare, parseKeyed, parseLegs, parsePercent, sortChecks, type PretradeCheck } from "./risk";
+import { buildShock, EMPTY_SHOCK_FORM, ladderShare, normaliseSeparators, parseKeyed, parseLegs, parseNumber, parsePercent, sortChecks, type PretradeCheck } from "./risk";
 
 describe("parsePercent", () => {
   it("reads a typed percentage as a fraction", () => {
@@ -11,6 +11,21 @@ describe("parsePercent", () => {
   it("tells blank from junk", () => {
     expect(parsePercent("  ")).toBeNull();
     expect(parsePercent("abc")).toBeUndefined();
+  });
+});
+
+describe("normaliseSeparators", () => {
+  it("reads a comma as thousands only in groups of three", () => {
+    expect(normaliseSeparators("1,500")).toBe("1500");
+    expect(normaliseSeparators("1,000,000")).toBe("1000000");
+    expect(normaliseSeparators("12,5")).toBe("12.5");
+    expect(normaliseSeparators("1.234,5")).toBe("1234.5");
+    expect(normaliseSeparators("1,234.5")).toBe("1234.5");
+  });
+  it("lets a trade amount and a basis-point rate keep their size", () => {
+    expect(parseNumber("1,500")).toBe(1500);
+    expect(parseNumber("1,000")).toBe(1000);
+    expect(parseNumber("1,5")).toBe(1.5);
   });
 });
 

@@ -108,7 +108,7 @@ function StatementTable({ data }: { data: PerformanceData }) {
                   ) : null}
                 </th>
                 <td className={TD}><ReturnCell figure={w.twr} /></td>
-                <td className={TD}>{w.twr_annualized !== null && w.twr_annualized !== undefined ? <PlainReturn value={w.twr_annualized} /> : <span className="text-text-muted">under a year</span>}</td>
+                <td className={TD}>{w.twr_annualized !== null && w.twr_annualized !== undefined ? <PlainReturn value={w.twr_annualized} /> : <span className="text-text-muted">{w.twr.value !== null && w.twr.value !== undefined ? "under a year" : "not available"}</span>}</td>
                 <td className={TD}>
                   <ReturnCell figure={w.xirr} />
                   {w.xirr_annualized === false && w.xirr.value !== null && w.xirr.value !== undefined ? (

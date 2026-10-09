@@ -41,11 +41,19 @@ export function RebalanceView() {
     if (typeof body === "string") return setProblem(body);
     setBusy(true);
     setProblem(null);
-    const res = await getBrowserApiClient().POST("/portfolio/rebalance", { body });
-    setBusy(false);
-    if (!res.response.ok || !res.data) return setProblem(problemText(res.error, "The plan could not be built."));
-    setData(res.data);
-    setUsed(body);
+    // the previous plan was built from other inputs, so it is not left standing beside a new request
+    setData(null);
+    setUsed(null);
+    try {
+      const res = await getBrowserApiClient().POST("/portfolio/rebalance", { body });
+      if (!res.response.ok || !res.data) return setProblem(problemText(res.error, "The plan could not be built."));
+      setData(res.data);
+      setUsed(body);
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : "The plan could not be built.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function save(name: string): Promise<string | null> {

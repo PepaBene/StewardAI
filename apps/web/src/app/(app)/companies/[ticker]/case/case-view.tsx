@@ -235,7 +235,7 @@ export function CaseTab({ ticker }: { ticker: string }) {
             </select>
           </label>
           <div className="flex items-center gap-3 sm:col-span-2">
-            <button type="submit" className="border border-accent px-4 py-1.5 text-sm font-semibold hover:bg-surface-sunken">
+            <button type="submit" className="border border-accent px-4 py-1.5 text-sm font-semibold hover:bg-surface-muted">
               {form.id === null ? "Add assessment" : "Save changes"}
             </button>
             {form.id !== null ? (

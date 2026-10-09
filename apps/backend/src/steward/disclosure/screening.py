@@ -424,6 +424,16 @@ async def load_fields(
         buys, filed_at = await insider_analysis.discretionary_buys(
             pool, t, when, insider_window_days
         )
+        if filed_at is None:
+            # a Form 4 known by the date with no readable transaction line is a stated zero, not an
+            # unknown; only a holding with no known filing at all has no figure
+            filed_at = await pool.fetchval(
+                "select max(known_at) from public.insider_filing"
+                " where ticker = $1 and known_at <= $2 and superseded_by_accession is null",
+                t,
+                when,
+            )
+            buys = 0
         if filed_at is not None:
             out[t]["discretionary_buys"] = FieldValue(
                 buys, f"last {insider_window_days} days", filed_at, "Form 4 filings"

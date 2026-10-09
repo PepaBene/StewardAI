@@ -1,5 +1,6 @@
 import { datasetCounts, datasetLabel, answerState, type EvidenceAnswer, type ReplayHolding, type ReplayItem } from "@/lib/disclosure/replay";
 import { formatDay } from "@/lib/disclosure/model";
+import { safeHref } from "@/lib/reference/identity";
 
 function ItemList({ items, empty }: { items: readonly ReplayItem[]; empty: string }) {
   if (items.length === 0) return <p className="text-text-muted">{empty}</p>;
@@ -87,7 +88,7 @@ export function EvidenceAnswerView({ answer }: { answer: EvidenceAnswer }) {
                 {e.document_url ? (
                   <>
                     {" "}
-                    <a href={e.document_url} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">Open the filing</a>
+                    <a href={safeHref(e.document_url) ?? undefined} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">Open the filing</a>
                   </>
                 ) : null}
               </p>

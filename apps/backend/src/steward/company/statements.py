@@ -34,7 +34,7 @@ from steward.company.series import (
     nearest_end,
 )
 from steward.company.standard import CHART, INSTANT_STATEMENTS, STATEMENT_LABEL
-from steward.sources.xbrl_concepts import STATEMENT_ITEMS, classify
+from steward.sources.xbrl_concepts import EQUITY_INCLUDING_NCI, STATEMENT_ITEMS, classify
 
 Basis = Literal["standardized", "reported"]
 Frequency = Literal["annual", "quarterly"]
@@ -303,6 +303,32 @@ def _concepts_of(line_item: str) -> list[str]:
     return [c for c, (_s, item) in STATEMENT_ITEMS.items() if item == line_item]
 
 
+def _equity_without_nci(
+    columns: Sequence[Column],
+    resolved: dict[str, dict[str, Decimal | None]],
+    cells: dict[str, dict[str, Cell]],
+) -> None:
+    """Make `equity` the parent's equity. A filer that tags only total equity (parent plus
+    non-controlling interest) would otherwise have the interest counted twice wherever it is added
+    to equity (invested capital) or taken out of liabilities-and-equity. With no interest filed,
+    the total is the whole equity and is left as filed."""
+    for col in columns:
+        values = resolved[col.id]
+        cell = cells.get("equity", {}).get(col.id)
+        nci = values.get("noncontrolling_interest")
+        if cell is None or cell.value is None or nci is None:
+            continue
+        if cell.concept not in EQUITY_INCLUDING_NCI:
+            continue
+        values["equity"] = values["equity_resolved"] = cell.value - nci
+        cells["equity"][col.id] = cell.model_copy(
+            update={
+                "value": cell.value - nci,
+                "derived": "total equity less non-controlling interest",
+            }
+        )
+
+
 def _standardized(
     obs: Sequence[Obs], columns: list[Column], view: View, series: dict[str, Series]
 ) -> tuple[list[StatementTable], list[StatementCheck]]:
@@ -315,6 +341,8 @@ def _standardized(
         # Pass one reads what was filed (or its fallback); pass two derives the "other" lines,
         # which need the reported totals whatever order the chart lists them in.
         for derive_pass in (False, True):
+            if derive_pass and statement == "balance_sheet":
+                _equity_without_nci(columns, resolved, cells)
             for row in CHART[statement]:
                 if (row.derive is not None) is not derive_pass:
                     continue

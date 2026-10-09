@@ -49,7 +49,14 @@ async function settle<T>(fetcher: () => Promise<ApiResult<T>>): Promise<Resource
  */
 export function useApiResource<T>(fetcher: () => Promise<ApiResult<T>>) {
   const { lastSuccessJobId } = useSyncStatus();
-  const [state, setState] = useState<ResourceState<T>>({ kind: "loading" });
+  // The state belongs to the fetcher that produced it: a new fetcher (a changed query) starts at
+  // "loading", so the old query's data is never shown as the answer to the new one. Only a
+  // refetch of the same fetcher (a sync, a reload) keeps the previous data next to an error.
+  const [held, setHeld] = useState<{ fetcher: typeof fetcher; state: ResourceState<T> }>({
+    fetcher,
+    state: { kind: "loading" },
+  });
+  const state: ResourceState<T> = held.fetcher === fetcher ? held.state : { kind: "loading" };
   // Only the newest request's result is applied.
   const sequence = useRef(0);
 
@@ -57,9 +64,13 @@ export function useApiResource<T>(fetcher: () => Promise<ApiResult<T>>) {
     const mine = ++sequence.current;
     const next = await settle(fetcher);
     if (mine !== sequence.current) return;
-    setState((prev) =>
-      next.kind === "error" && prev.kind === "ok" ? { ...next, previous: prev.data } : next,
-    );
+    setHeld((prev) => {
+      const before = prev.fetcher === fetcher ? prev.state : null;
+      return {
+        fetcher,
+        state: next.kind === "error" && before?.kind === "ok" ? { ...next, previous: before.data } : next,
+      };
+    });
   }, [fetcher]);
 
   useEffect(() => {
@@ -67,9 +78,11 @@ export function useApiResource<T>(fetcher: () => Promise<ApiResult<T>>) {
   }, [fetchAndApply, lastSuccessJobId]);
 
   const reload = useCallback(() => {
-    setState((prev) => (prev.kind === "ok" ? prev : { kind: "loading" }));
+    setHeld((prev) =>
+      prev.fetcher === fetcher && prev.state.kind === "ok" ? prev : { fetcher, state: { kind: "loading" } },
+    );
     void fetchAndApply();
-  }, [fetchAndApply]);
+  }, [fetcher, fetchAndApply]);
 
   return { state, reload };
 }

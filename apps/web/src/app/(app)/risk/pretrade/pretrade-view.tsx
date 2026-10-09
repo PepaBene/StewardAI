@@ -24,10 +24,17 @@ export function PretradeView() {
     if (cash === undefined) return setProblem("The deposit must be a number, or blank.");
     setBusy(true);
     setProblem(null);
-    const res = await getBrowserApiClient().POST("/portfolio/pretrade", { body: { trades: legs.legs, deposit: cash ?? 0 } });
-    setBusy(false);
-    if (!res.response.ok || !res.data) return setProblem(problemText(res.error, "The trade could not be checked."));
-    setResult(res.data);
+    // the previous check described other trades, so it is not left standing beside a new request
+    setResult(null);
+    try {
+      const res = await getBrowserApiClient().POST("/portfolio/pretrade", { body: { trades: legs.legs, deposit: cash ?? 0 } });
+      if (!res.response.ok || !res.data) return setProblem(problemText(res.error, "The trade could not be checked."));
+      setResult(res.data);
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : "The trade could not be checked.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

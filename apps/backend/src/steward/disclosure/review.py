@@ -6,6 +6,11 @@ an audit event, and applies its effect to the subject: an approved claim/observa
 `verified`; a rejected or superseded one is excluded from every authoritative read (`asof.py`)
 but stays in the table. A relationship whose counterparty is unresolved cannot become a verified
 named edge.
+
+Only claims, observations and identity mappings have a state to change. A review of any other
+subject (an estimate value or a document version, which alerts raise) is closed with its audit
+event and nothing else, and a mapping cannot be "superseded". `decide` says so in the audit
+detail and the result (`applied: False`), so a closed review is never mistaken for a fix.
 """
 
 from __future__ import annotations
@@ -113,10 +118,11 @@ async def _apply(
     reviewer: str,
     reason: str,
     now: dt.datetime,
-) -> None:
+) -> bool:
+    """Apply the decision to its subject; False when there was nothing to change."""
     state = _STATE_FOR.get(decision)
     if state is None:
-        return
+        return False
     if subject_type == "claim":
         claim = await conn.fetchrow(
             "select claim_type, object_issuer_id, object_anonymous from public.extracted_claim"
@@ -140,12 +146,14 @@ async def _apply(
             reviewer,
             now,
         )
+        return True
     elif subject_type == "observation":
         await conn.execute(
             "update public.disclosure_observation set review_state=$2 where id=$1",
             subject_id,
             state,
         )
+        return True
     elif subject_type == "identity_mapping":
         if decision == "approved":
             mapping = await conn.fetchrow(
@@ -164,6 +172,7 @@ async def _apply(
                 reviewer,
                 now,
             )
+            return True
         elif decision == "rejected":
             await conn.execute(
                 "update public.disclosure_entity_mapping set status='rejected',"
@@ -173,6 +182,8 @@ async def _apply(
                 reviewer,
                 now,
             )
+            return True
+    return False
 
 
 async def decide(
@@ -200,7 +211,9 @@ async def decide(
             raise ReviewError(f"review {review_id} does not exist")
         if row["status"] not in ("open", "deferred"):
             raise ReviewError(f"review {review_id} was already decided ({row['status']})")
-        await _apply(conn, row["subject_type"], row["subject_id"], decision, reviewer, reason, at)
+        applied = await _apply(
+            conn, row["subject_type"], row["subject_id"], decision, reviewer, reason, at
+        )
         if decision == "deferred":
             await conn.execute(
                 "update public.quality_review set status='deferred', decision_reason=$2"
@@ -225,11 +238,12 @@ async def decide(
             at,
             reviewer,
             decision,
-            json.dumps({"reason": reason}),
+            json.dumps({"reason": reason, "applied": applied}),
         )
         return {
             "id": review_id,
             "status": decision,
+            "applied": applied,
             "subject_type": row["subject_type"],
             "subject_id": row["subject_id"],
             "candidate": row["candidate"],

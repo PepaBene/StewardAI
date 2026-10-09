@@ -30,6 +30,7 @@ import {
   type SideConflict,
 } from "@/lib/disclosure/dependencies";
 import { DECISION_LABEL, DECISION_RESULT, decisionBody, decisionsFor, toStatus, type GraphDecision } from "@/lib/relationships/relationships";
+import { safeHref } from "@/lib/reference/identity";
 import { cn } from "@/lib/utils";
 
 const SCREEN_LABEL: Record<string, string> = {
@@ -342,7 +343,7 @@ export function SuggestedEdges({ ticker, claims, editable = false, onChanged }: 
           <p className="text-xs text-text-muted">
             Known from <span className="num">{formatDay(c.known_at)}</span>.{" "}
             {c.source_url ? (
-              <a href={c.source_url} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">Open the source</a>
+              <a href={safeHref(c.source_url) ?? undefined} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">Open the source</a>
             ) : null}
           </p>
           <EntityNote claim={c} />

@@ -168,8 +168,9 @@ def effective_positions(
             acc[(h.cusip, h.title_of_class, h.put_call)].append(h)
     lines: list[PositionLine] = []
     for (cusip, title, pc), rows in sorted(acc.items(), key=lambda kv: (kv[0][0], str(kv[0]))):
-        has_shares = any(r.shares is not None for r in rows)
-        has_value = any(r.value_usd is not None for r in rows)
+        # a total with a missing part is not a total, so it is not published
+        has_shares = all(r.shares is not None for r in rows)
+        has_value = all(r.value_usd is not None for r in rows)
         lines.append(
             PositionLine(
                 cusip,

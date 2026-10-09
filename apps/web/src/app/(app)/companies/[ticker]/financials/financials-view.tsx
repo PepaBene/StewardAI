@@ -47,7 +47,7 @@ function Choice<T extends string>({ label, value, options, onChange }: { label: 
             key={v}
             className={cn(
               "cursor-pointer border-r border-border px-2.5 py-1 text-sm last:border-r-0 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus/30",
-              value === v ? "bg-surface-sunken font-semibold" : "text-text-muted hover:text-text",
+              value === v ? "bg-surface-muted font-semibold" : "text-text-muted hover:text-text",
             )}
           >
             <input type="radio" name={label} value={v} checked={value === v} onChange={() => onChange(v)} className="sr-only" />
@@ -69,7 +69,7 @@ function CellView({ cell, line, onPick }: { cell: StatementCell | undefined; lin
     <button
       type="button"
       onClick={onPick}
-      className="num inline-flex items-baseline gap-1 px-1 text-right hover:bg-surface-sunken focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none"
+      className="num inline-flex items-baseline gap-1 px-1 text-right hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none"
       aria-label={`${text}${cell.derived ? ", derived" : ""}${cell.restated ? ", restated" : ""}${cell.reconciled === false ? ", does not reconcile" : ""}. Open source`}
     >
       {text}
@@ -88,7 +88,7 @@ function Inspector({ pick, onClose }: { pick: Picked; onClose: () => void }) {
           <p className="font-semibold">{line.label}</p>
           <p className="text-xs text-text-muted">{column.label} · period ending {formatDate(column.end)}</p>
         </div>
-        <button type="button" onClick={onClose} aria-label="Close source" className="p-1 hover:bg-surface-sunken">
+        <button type="button" onClick={onClose} aria-label="Close source" className="p-1 hover:bg-surface-muted">
           <XIcon aria-hidden="true" className="size-4" />
         </button>
       </div>
@@ -174,8 +174,8 @@ function Table({ view, onPick, headlineOnly }: { view: StatementsView; onPick: (
             <div className="overflow-x-auto border border-border">
               <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="bg-surface-sunken">
-                    <th scope="col" className="sticky left-0 z-10 min-w-56 bg-surface-sunken px-3 py-1.5 text-left font-medium">
+                  <tr className="bg-surface-muted">
+                    <th scope="col" className="sticky left-0 z-10 min-w-56 bg-surface-muted px-3 py-1.5 text-left font-medium">
                       {UNIT_LABEL[String(view.units)] ?? ""} {view.currency ?? ""}
                     </th>
                     {view.columns.map((c) => (

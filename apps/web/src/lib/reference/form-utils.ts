@@ -1,5 +1,7 @@
 /** Shared helpers for owner-entry forms: error text from API responses and field parsing. */
 
+import { normaliseSeparators } from "@/lib/number-input";
+
 export type FieldErrors<K extends string = string> = Partial<Record<K, string>>;
 
 /** A readable message from a FastAPI error body (string detail, or a list of validation items). */
@@ -20,7 +22,7 @@ export function apiErrorText(error: unknown, status: number): string {
 
 /** An optional decimal: blank is null (not entered), anything else must be a finite number. */
 export function parseOptionalNumber(text: string): number | null | "invalid" {
-  const t = text.trim().replace(",", ".");
+  const t = normaliseSeparators(text);
   if (t === "") return null;
   const n = Number(t);
   return Number.isFinite(n) ? n : "invalid";

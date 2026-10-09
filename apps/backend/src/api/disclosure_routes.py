@@ -1159,14 +1159,16 @@ async def add_owner_weight(
 
 @router.delete("/holdings/{ticker}/dependency-weights/{weight_id}", status_code=204)
 async def retire_owner_weight(
-    ticker: TickerPath, weight_id: IdPath, pool: Pool, _owner: Owner
+    ticker: TickerPath, weight_id: IdPath, pool: Pool, owner: Owner
 ) -> None:
-    """Retire a weight. It stops applying from now; replays before now still see it."""
+    """Retire a weight you assigned. It stops applying from now; replays before now still see it."""
     done = await pool.fetchval(
         """update public.owner_dependency_weight set retired_at = now()
-            where id = $1 and ticker = $2 and retired_at is null returning id""",
+            where id = $1 and ticker = $2 and assigned_by = $3 and retired_at is null
+        returning id""",
         weight_id,
         ticker.upper(),
+        f"owner:{owner.user_id}",
     )
     if done is None:
         raise HTTPException(404, "no active weight with that id for this holding")
@@ -1530,14 +1532,17 @@ async def version_span(
     storage: Storage,
     _owner: Owner,
     context: Annotated[int, Query(ge=0, le=2000)] = 400,
+    as_of: AsOf = None,
 ) -> SpanText:
     """The archived document text around a cited span. The archived bytes are re-parsed with the
     parser version that produced the offsets; `stale_parser` flags a version mismatch."""
     if end < start:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "end must not precede start")
     row = await pool.fetchrow(
-        "select archive_path, parser_version from public.source_document_version where id=$1",
+        "select archive_path, parser_version from public.source_document_version"
+        " where id=$1 and ($2::timestamptz is null or known_at <= $2)",
         version_id,
+        as_of,
     )
     if row is None or not row["archive_path"]:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No archived copy of that version")
@@ -1555,7 +1560,8 @@ async def version_span(
     return SpanText(
         version_id=version_id,
         parser_version=doc.parser_version,
-        stale_parser=row["parser_version"] not in (None, doc.parser_version),
+        # an unrecorded parser version cannot be shown to match, so it is flagged too
+        stale_parser=row["parser_version"] != doc.parser_version,
         before=doc.text[max(0, start - context) : start],
         span=doc.text[start:end],
         after=doc.text[end : end + context],

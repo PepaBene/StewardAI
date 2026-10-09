@@ -113,8 +113,8 @@ function SizeTable({ data }: { data: PeerCompare }) {
       <div className="overflow-x-auto border border-border">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-surface-sunken">
-              <th scope="col" className="sticky left-0 min-w-48 bg-surface-sunken px-3 py-1.5 text-left font-medium">Figure</th>
+            <tr className="bg-surface-muted">
+              <th scope="col" className="sticky left-0 min-w-48 bg-surface-muted px-3 py-1.5 text-left font-medium">Figure</th>
               {data.companies.map((c) => (
                 <th key={c.ticker} scope="col" className={cn("px-2 py-1.5 text-right font-medium", c.is_subject && "text-accent-ink")}>
                   {c.ticker}
@@ -313,8 +313,8 @@ export function PeersView({ ticker }: { ticker: string }) {
                 <div className="overflow-x-auto border border-border">
                   <table className="w-full border-collapse text-sm">
                     <thead>
-                      <tr className="bg-surface-sunken">
-                        <th scope="col" className="sticky left-0 min-w-48 bg-surface-sunken px-3 py-1.5 text-left font-medium">Metric</th>
+                      <tr className="bg-surface-muted">
+                        <th scope="col" className="sticky left-0 min-w-48 bg-surface-muted px-3 py-1.5 text-left font-medium">Metric</th>
                         {data.companies.map((c) => (
                           <th key={c.ticker} scope="col" className={cn("px-2 py-1.5 text-right font-medium", c.is_subject && "text-accent-ink")}>
                             {c.is_subject ? c.ticker : <Link className="hover:underline" href={companyHref(c.ticker, "ratios")}>{c.ticker}</Link>}

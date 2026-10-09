@@ -30,6 +30,7 @@ import {
   type SegmentBridge,
   type Series,
 } from "@/lib/disclosure/estimates";
+import { safeHref } from "@/lib/reference/identity";
 import { cn } from "@/lib/utils";
 
 const W = 760;
@@ -162,7 +163,7 @@ export function FiveLanes({ view, choice }: { view: EstimatesView; choice: Choic
                         {l.document_url ? (
                           <>
                             {" "}
-                            · <a className={LINK} href={l.document_url} target="_blank" rel="noopener noreferrer">source file</a>
+                            · <a className={LINK} href={safeHref(l.document_url) ?? undefined} target="_blank" rel="noopener noreferrer">source file</a>
                           </>
                         ) : null}
                         {lineWarnings(l).length ? <span className="block text-text-faint">{lineWarnings(l).join("; ")}.</span> : null}
@@ -411,7 +412,7 @@ export function SurpriseBridge({ events, lines }: { events: readonly EventCompar
               {link ? (
                 <>
                   {" "}
-                  <a className={LINK} href={link} target="_blank" rel="noopener noreferrer">IR file used</a>
+                  <a className={LINK} href={safeHref(link) ?? undefined} target="_blank" rel="noopener noreferrer">IR file used</a>
                 </>
               ) : null}
             </p>
@@ -493,7 +494,7 @@ export function CoverageList({ gaps, sources }: { gaps: readonly CoverageGap[]; 
       <ul className="space-y-1 text-sm text-text-muted">
         {sources.map((s) => (
           <li key={s.source_key}>
-            <a className={LINK} href={s.url} target="_blank" rel="noopener noreferrer">{s.publisher}</a> · {s.format.toUpperCase()} · {s.origin === "third_party_brokers" ? "values come from third-party brokers" : s.origin === "issuer_compiled" ? "compiled by the issuer" : "origin not stated"} · {ACCESS_LABEL[s.access_state] ?? s.access_state}
+            <a className={LINK} href={safeHref(s.url) ?? undefined} target="_blank" rel="noopener noreferrer">{s.publisher}</a> · {s.format.toUpperCase()} · {s.origin === "third_party_brokers" ? "values come from third-party brokers" : s.origin === "issuer_compiled" ? "compiled by the issuer" : "origin not stated"} · {ACCESS_LABEL[s.access_state] ?? s.access_state}
             {s.cadence ? ` · ${s.cadence}` : ""}
             {s.selected_metrics_only ? " · only selected metrics" : ""}
             {s.selected_brokers_only ? " · only selected brokers" : ""}

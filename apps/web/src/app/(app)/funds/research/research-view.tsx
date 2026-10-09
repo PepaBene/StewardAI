@@ -32,7 +32,7 @@ export function ResearchView() {
         description="Funds the app holds issuer data for. Open one for its profile, holdings, performance and due diligence, or pick two to five to compare."
         aside={
           picked.length >= 2 ? (
-            <Link href={compareHref(picked)} className="border border-accent px-3 py-1.5 text-sm font-semibold text-text hover:bg-surface-sunken">
+            <Link href={compareHref(picked)} className="border border-accent px-3 py-1.5 text-sm font-semibold text-text hover:bg-surface-muted">
               Compare {picked.length} funds
             </Link>
           ) : (
@@ -105,7 +105,7 @@ function Catalog({ rows, filter, picked, onToggle }: { rows: CatalogRow[]; filte
       <div className="overflow-x-auto border border-border">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-surface-sunken text-left">
+            <tr className="bg-surface-muted text-left">
               <th scope="col" className="w-10 px-3 py-1.5"><span className="sr-only">Compare</span></th>
               <th scope="col" className="px-2 py-1.5 font-medium">Fund</th>
               <th scope="col" className="px-2 py-1.5 font-medium">Issuer</th>
@@ -119,7 +119,7 @@ function Catalog({ rows, filter, picked, onToggle }: { rows: CatalogRow[]; filte
               const lag = lagDays(r.holdings_as_of);
               const on = picked.includes(r.isin);
               return (
-                <tr key={r.isin} className={cn("border-t border-border-soft", on && "bg-surface-sunken")}>
+                <tr key={r.isin} className={cn("border-t border-border-soft", on && "bg-surface-muted")}>
                   <td className="px-3 py-1.5">
                     <input type="checkbox" checked={on} onChange={() => onToggle(r.isin)} disabled={!on && picked.length >= MAX_COMPARE} aria-label={`Compare ${r.name ?? r.isin}`} />
                   </td>

@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type {
   ThesesConfig,
   ThesisConfig,
@@ -297,7 +298,7 @@ export function thesesFromBody(body: ThesesConfig | null): ThesisForm[] {
 
 /** Empty or non-numeric thresholds are sent as null, which the API rejects with a 422. */
 export function parseThreshold(text: string): number | null {
-  const trimmed = text.trim().replace(",", ".");
+  const trimmed = normaliseSeparators(text);
   if (!trimmed) return null;
   const value = Number(trimmed);
   return Number.isFinite(value) ? value : null;

@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type { HoldingProfile, ManualSegmentRow } from "@/lib/api/client";
 
 import { lines } from "./theses-form";
@@ -94,7 +95,7 @@ export function fundamentalsFromProfile(
 
 /** "1 234,5" -> 1234.5; "" -> null. Invalid text stays a NaN the API rejects with a message. */
 export function parseAmount(text: string): number | null {
-  const clean = text.trim().replace(/[\s ]/g, "").replace(",", ".");
+  const clean = normaliseSeparators(text.replace(/[\s ]/g, ""));
   return clean ? Number(clean) : null;
 }
 

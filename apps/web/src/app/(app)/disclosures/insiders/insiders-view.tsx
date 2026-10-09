@@ -123,7 +123,7 @@ export function InsidersPageView() {
       </Panel>
 
       <Panel id="net" title="Net buying and selling" description="Discretionary open-market trades only, by role. Zero is the centre line.">
-        {view ? <NetPanel view={view} cutoffMs={cutoff} /> : <p className="text-sm text-text-muted">{loadingText}</p>}
+        {view ? <NetPanel view={view} cutoffMs={cutoff} sample={sample} /> : <p className="text-sm text-text-muted">{loadingText}</p>}
       </Panel>
 
       <Panel id="detail" title="Every transaction" description="The full list, including lines that are not in the net, each with the filing it came from.">

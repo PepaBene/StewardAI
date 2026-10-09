@@ -667,15 +667,19 @@ def segment_bridge(
         and v.period_end == period_end
         and not problems(v)
     }
+    # Also keyed by basis: a segment reported both as filed and adjusted is two actuals, each
+    # compared (or refused) on its own basis, never one overwriting the other.
     act = {
-        (a.segment.lower(), a.period_start): a
+        (a.segment.lower(), a.period_start, basis_class(a.basis) or ""): a
         for a in actuals
         if a.segment and a.metric.lower() == metric.lower() and a.period_end == period_end
     }
     lines: list[SegmentLine] = []
     used: set[str] = set()
     inputs: list[str] = []
-    for (key, _start), a in sorted(act.items(), key=lambda kv: (kv[0][0], kv[0][1] or dt.date.min)):
+    for (key, _start, _basis), a in sorted(
+        act.items(), key=lambda kv: (kv[0][0], kv[0][1] or dt.date.min, kv[0][2])
+    ):
         e = next(
             (
                 v

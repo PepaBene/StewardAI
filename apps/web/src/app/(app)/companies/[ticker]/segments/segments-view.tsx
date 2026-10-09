@@ -41,8 +41,8 @@ function BreakdownTable({ b, currency }: { b: SegmentBreakdown; currency: string
       <div className="overflow-x-auto border border-border">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-surface-sunken text-xs">
-              <th scope="col" className="sticky left-0 min-w-48 bg-surface-sunken px-3 py-1.5 text-left font-medium">Member</th>
+            <tr className="bg-surface-muted text-xs">
+              <th scope="col" className="sticky left-0 min-w-48 bg-surface-muted px-3 py-1.5 text-left font-medium">Member</th>
               {b.periods.map((p) => (
                 <th key={p} scope="col" className="px-2 py-1.5 text-right font-medium">
                   {p}
@@ -204,7 +204,7 @@ export function SegmentsView({ ticker }: { ticker: string }) {
                 ["quarter", "Quarterly"],
               ] as const
             ).map(([v, t]) => (
-              <label key={v} className={cn("cursor-pointer border-r border-border px-2.5 py-1 text-sm last:border-r-0 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus/30", basis === v ? "bg-surface-sunken font-semibold" : "text-text-muted hover:text-text")}>
+              <label key={v} className={cn("cursor-pointer border-r border-border px-2.5 py-1 text-sm last:border-r-0 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus/30", basis === v ? "bg-surface-muted font-semibold" : "text-text-muted hover:text-text")}>
                 <input type="radio" name="segment-basis" checked={basis === v} onChange={() => setBasis(v)} className="sr-only" />
                 {t}
               </label>

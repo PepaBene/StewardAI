@@ -117,6 +117,32 @@ def test_balance_sheet_balances_and_other_is_the_residual() -> None:
     assert totals and all(c.passed for c in totals)
 
 
+def test_total_equity_has_the_non_controlling_interest_taken_out_once() -> None:
+    data = rows()
+    data += [
+        fact(
+            "equity",
+            "us-gaap:StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "balance_sheet",
+            FY24[1],
+            "1500",
+        ),
+        bal("noncontrolling_interest", FY24[1], "100"),
+    ]
+    v = build_view("AAA", data, units=1)
+    col = v.columns[1].id
+    equity = line(v, "balance_sheet", "equity").cells[col]
+    assert equity.value == D("1400")
+    assert equity.derived == "total equity less non-controlling interest"
+    parent_only = [
+        *rows(),
+        bal("equity", FY24[1], "1400"),
+        bal("noncontrolling_interest", FY24[1], "100"),
+    ]
+    kept = line(build_view("AAA", parent_only, units=1), "balance_sheet", "equity").cells[col]
+    assert kept.value == D("1400") and kept.derived is None
+
+
 def test_an_unbalanced_period_fails_the_check() -> None:
     data = rows()
     for r in data:

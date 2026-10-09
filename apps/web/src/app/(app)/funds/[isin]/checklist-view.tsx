@@ -122,7 +122,7 @@ function FactForm({ isin, onSaved }: { isin: string; onSaved: () => void }) {
         <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} className="w-full border border-border bg-surface px-2 py-1.5" />
       </label>
       <div className="flex items-center gap-3 sm:col-span-2">
-        <button type="submit" disabled={busy} className="border border-accent px-4 py-1.5 text-sm font-semibold hover:bg-surface-sunken disabled:opacity-50">{busy ? "Saving…" : "Record fact"}</button>
+        <button type="submit" disabled={busy} className="border border-accent px-4 py-1.5 text-sm font-semibold hover:bg-surface-muted disabled:opacity-50">{busy ? "Saving…" : "Record fact"}</button>
         {error ? <p role="alert" className="text-sm text-loss">{error}</p> : null}
       </div>
     </form>

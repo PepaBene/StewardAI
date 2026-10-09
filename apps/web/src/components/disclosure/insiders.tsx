@@ -29,6 +29,7 @@ import {
   type Mark,
   type Window,
 } from "@/lib/disclosure/insiders";
+import { safeHref } from "@/lib/reference/identity";
 import { cn } from "@/lib/utils";
 
 /** One mark per class, drawn at a point. Shape and fill carry the class; colour never does alone. */
@@ -109,11 +110,11 @@ function usdAxis(v: number) {
   return formatUsd(v);
 }
 
-export function NetPanel({ view, cutoffMs }: { view: InsiderActivity; cutoffMs: number }) {
+export function NetPanel({ view, cutoffMs, sample = false }: { view: InsiderActivity; cutoffMs: number; sample?: boolean }) {
   const [window, setWindow] = useState<Window>(90);
-  // live data uses the server's own net (view.net); the local copy of the rules is for the sample only
+  // live data uses the server's own net (view.net) and never the local copy of the rules, which is for the sample only
   const fromApi = view.net.length > 0 ? netFromApi(view.net) : [];
-  const rows = fromApi.length > 0 ? fromApi : netFromTransactions(view.transactions, cutoffMs);
+  const rows = fromApi.length > 0 ? fromApi : sample ? netFromTransactions(view.transactions, cutoffMs) : [];
   const all = rows.find((r) => r.role === "all" && r.window === window) ?? netFromTransactions([], cutoffMs).find((r) => r.role === "all" && r.window === window)!;
   const bars = netBars(rows, window);
   return (
@@ -131,7 +132,9 @@ export function NetPanel({ view, cutoffMs }: { view: InsiderActivity; cutoffMs: 
           </button>
         ))}
       </div>
-      {all.trades === 0 ? (
+      {!sample && fromApi.length === 0 ? (
+        <p className="text-sm text-text-muted">The server returned no net figures for this date, so none are shown.</p>
+      ) : all.trades === 0 ? (
         <p className="text-sm text-text-muted">No discretionary open-market trades fall in the {window} days before this date.</p>
       ) : (
         <DivergingBar rows={bars} colorMode="direction" formatValue={usdAxis} label={`Net open-market purchases less sales, last ${window} days`} />
@@ -259,7 +262,7 @@ export function InsiderTable({ txs, editable, onChanged }: { txs: readonly Insid
                     <span key={c} className="block text-xs text-text-muted">{c}</span>
                   ))}
                   {t.source_url ? (
-                    <a href={t.source_url} target="_blank" rel="noreferrer" className="text-xs text-accent-ink hover:underline">Open the filing</a>
+                    <a href={safeHref(t.source_url) ?? undefined} target="_blank" rel="noreferrer" className="text-xs text-accent-ink hover:underline">Open the filing</a>
                   ) : null}
                 </td>
               </tr>
@@ -312,7 +315,7 @@ export function PdmrPanel({ state }: { state: Keyed<PdmrActivity> | null }) {
                 <td className="py-1.5 pr-3">
                   {t.economic_class.replaceAll("_", " ")}
                   {t.amendment ? <span className="block text-xs text-text-muted">An amendment</span> : null}
-                  {t.source_url ? <a href={t.source_url} target="_blank" rel="noreferrer" className="block text-xs text-accent-ink hover:underline">Open the notice</a> : null}
+                  {t.source_url ? <a href={safeHref(t.source_url) ?? undefined} target="_blank" rel="noreferrer" className="block text-xs text-accent-ink hover:underline">Open the notice</a> : null}
                 </td>
                 <td className="num py-1.5 pr-3 text-right">{formatQty(t.shares)}</td>
                 <td className="num py-1.5 text-right">{t.price == null ? "—" : `${formatQty(t.price)} ${t.currency ?? ""}`}</td>
@@ -382,7 +385,7 @@ export function ContextPanel({ view }: { view: InsiderActivity }) {
               <span>{e.event_type.replaceAll("_", " ")} <span className="text-text-muted">({e.event_state.replaceAll("_", " ")})</span></span>
               <span className="num text-xs text-text-muted">
                 {formatDay(e.announced_at)}
-                {e.source_url ? <> · <a href={e.source_url} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">source</a></> : null}
+                {e.source_url ? <> · <a href={safeHref(e.source_url) ?? undefined} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">source</a></> : null}
               </span>
             </li>
           ))}

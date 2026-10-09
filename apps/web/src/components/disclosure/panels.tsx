@@ -25,6 +25,7 @@ import {
   type SourceRow,
   type SpanText,
 } from "@/lib/disclosure/model";
+import { safeHref } from "@/lib/reference/identity";
 import { cn } from "@/lib/utils";
 
 const STATE_ICON: Record<CoverageState, typeof CheckCircle2Icon> = {
@@ -171,7 +172,7 @@ export function DatesTable({ filing }: { filing: Filing }) {
           </div>
         ))}
       </dl>
-      <a href={filing.stable_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-accent-ink hover:underline">
+      <a href={safeHref(filing.stable_url) ?? undefined} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-accent-ink hover:underline">
         Open the original filing <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
       </a>
     </div>
@@ -294,7 +295,7 @@ export function EvidencePanel({ provenance, span, onClose }: { provenance: Prove
           ))}
         </ol>
       </div>
-      <a href={provenance.stable_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-accent-ink hover:underline">
+      <a href={safeHref(provenance.stable_url) ?? undefined} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-accent-ink hover:underline">
         Open the original filing <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
       </a>
     </div>

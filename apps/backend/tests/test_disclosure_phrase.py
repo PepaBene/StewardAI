@@ -34,6 +34,14 @@ async def test_a_grounded_rewrite_is_used() -> None:
     assert await answer.phrase(llm, "gpt-x", COMPOSED, EVIDENCE) == llm._text
 
 
+async def test_a_rewrite_with_words_of_its_own_keeps_the_template() -> None:
+    for text in (
+        "ACME reported revenue of 1,250.5 per sec, known 2026-05-01, a healthy result.",
+        "ACME reported revenue of 1,250.5 per sec, known 2026-05-01, driven by cloud demand.",
+    ):
+        assert await answer.phrase(FakeLLM(text), "gpt-x", COMPOSED, EVIDENCE) is None
+
+
 async def test_an_invented_number_keeps_the_template() -> None:
     llm = FakeLLM("ACME reported revenue of 1,300 per sec.")
     assert await answer.phrase(llm, "gpt-x", COMPOSED, EVIDENCE) is None

@@ -1,4 +1,5 @@
 import type { components } from "@/lib/api/schema";
+import { normaliseSeparators } from "@/lib/number-input";
 
 type S = components["schemas"];
 export type RiskReport = S["RiskReport"];
@@ -19,9 +20,11 @@ export type WhatIfResult = S["WhatIfResult"];
 export type SavedItem = S["SavedAnalysisItem"];
 export type SavedKind = SavedItem["kind"];
 
+export { normaliseSeparators };
+
 /** A typed percentage ("-12.5", "12,5 %") as a fraction; blank is `null`, junk is `undefined`. */
 export function parsePercent(text: string): number | null | undefined {
-  const cleaned = text.trim().replace(/%$/, "").trim().replace(",", ".");
+  const cleaned = normaliseSeparators(text.trim().replace(/%$/, "").trim());
   if (cleaned === "") return null;
   if (!/^[-+−]?\d*\.?\d+$/.test(cleaned) && !/^[-+−]?\d+\.$/.test(cleaned)) return undefined;
   const value = Number(cleaned.replace("−", "-"));
@@ -30,7 +33,7 @@ export function parsePercent(text: string): number | null | undefined {
 
 /** A typed plain number; blank is `null`, junk is `undefined`. */
 export function parseNumber(text: string): number | null | undefined {
-  const cleaned = text.trim().replace(/\s/g, "").replace(",", ".").replace("−", "-");
+  const cleaned = normaliseSeparators(text.replace(/\s/g, "")).replace("−", "-");
   if (cleaned === "") return null;
   const value = Number(cleaned);
   return Number.isFinite(value) ? value : undefined;

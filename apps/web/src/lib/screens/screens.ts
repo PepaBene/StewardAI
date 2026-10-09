@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type { components } from "@/lib/api/schema";
 
 type Schemas = components["schemas"];
@@ -58,7 +59,7 @@ export function buildRequest(input: {
   for (const d of input.drafts) {
     const info = metricInfo(d.metric);
     const label = info?.label ?? d.metric;
-    const typed = d.value.trim().replace(",", ".");
+    const typed = normaliseSeparators(d.value);
     const n = typed === "" ? NaN : Number(typed);
     if (!Number.isFinite(n)) {
       errors.push(`${label}: enter a number.`);

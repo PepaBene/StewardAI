@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type { JobsConfig, JobSchedule } from "@/lib/api/client";
 
 /*
@@ -1208,7 +1209,7 @@ export function jobsToBody(form: JobsForm): JobsConfig {
       const v = values[field.key];
       if (field.kind === "bool") out[field.key] = Boolean(v);
       else if (field.kind === "int" || field.kind === "severity") out[field.key] = numberOrText(String(v));
-      else if (field.kind === "number") out[field.key] = numberOrText(String(v).replace(",", "."));
+      else if (field.kind === "number") out[field.key] = numberOrText(normaliseSeparators(String(v)));
       else if (field.kind === "lines") out[field.key] = list(String(v), /\n/);
       else if (field.kind === "symbol-lines") out[field.key] = parseSymbolLines(String(v));
       else if (field.kind === "codes") out[field.key] = list(String(v), /[\s,;]+/).map((c) => c.toUpperCase());

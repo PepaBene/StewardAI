@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type { components } from "@/lib/api/schema";
 
 export type OwnerInputItem = components["schemas"]["OwnerInput"];
@@ -43,7 +44,7 @@ export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 const ISIN = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
 
 function percent(raw: string): number | null {
-  const n = Number(raw.replace("%", "").replace(",", ".").trim());
+  const n = Number(normaliseSeparators(raw.replace("%", "")));
   return raw.trim() !== "" && Number.isFinite(n) ? n : null;
 }
 

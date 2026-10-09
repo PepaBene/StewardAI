@@ -473,7 +473,9 @@ async def collect_fmp_compensation(
                 text_value=r.name_and_position,
                 unit="USD",
                 currency="USD",
-                published_at=dt.datetime.combine(r.filing_date, dt.time(), dt.UTC)
+                # the provider gives a date, not a time: the end of that day, so the figure is never
+                # treated as public before the filing could have been
+                published_at=dt.datetime.combine(r.filing_date, dt.time(23, 59, 59), dt.UTC)
                 if r.filing_date
                 else None,
                 source_url=r.source_url or f"{COMPENSATION_URL}?symbol={symbol}",

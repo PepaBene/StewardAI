@@ -82,7 +82,8 @@ async def _lane_13f(
     )
     held = await pool.fetch(
         """select accession, cusip, shares, value_usd, put_call, title_of_class
-             from public.institutional_holding where ticker = $1 and accession = any($2::text[])""",
+             from public.institutional_holding
+            where ticker = $1 and accession = any($2::text[]) and shares_type = 'SH'""",
         ticker,
         accessions,
     )
