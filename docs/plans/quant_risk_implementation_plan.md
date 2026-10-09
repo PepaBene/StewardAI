@@ -273,7 +273,26 @@ Code: `quant/sizing.py` (equilibrium and shrunk returns, quarter-Kelly, bisectio
 - G47. A fund is recognised by the instrument type `ETF`. A core stock that passes principle 8a is eligible for the "core" stage only through its derived or entered tier and its thesis.
 - G48. Expected deposits for Q5.5 default to the last twelve months' average of `DEPOSIT` cash movements; there is no plan of future deposits.
 - G49. The pre-trade check runs the ex-ante model for every request (a few seconds on a large book); nothing is cached beyond the one-minute book cache.
-- G50. The pages were typechecked and unit-tested but, as before (G3), not rendered in a browser.
+- G50. The pages were typechecked and unit-tested but, as before (G3), not rendered in a browser (phone width, keyboard, contrast). There are no component tests for the new panels, only for the helpers in `lib/risk/sizing.ts`.
+
+**Not verified**
+
+- G51. Nothing in Q5 ran against the live database or a live book. The database tests use a synthetic two-stock book; the real book (many currencies, proxied and excluded holdings, ETFs, GBX quotes) is untested. The Q5 exit check ("an allocation never breaches a cap in the post-trade evaluation") is tested on synthetic books only.
+- G52. The new routes (`/portfolio/risk/{sizing,deposit,over-cap}`) and the four chat tool handlers have no test of their own; the underlying functions and the tool declarations are tested. Ticker resolution through `resolve_tickers` in the routes and tools is not tested.
+- G53. The full backend suite has still not been run to completion; only the files touching this work were.
+
+**Method gaps**
+
+- G54. The deposit allocator ignores the cash floor and cash target (principle 2c: cash 5 %, above 10 % for 3 months is put to work): it spends as much of the amount as it can place. Sale proceeds, tax and trading or FX costs are not modelled; a deposit is the only input. No minimum order size or lot size is applied.
+- G55. Rule and band evaluation in the allocator uses the strategy's classification dimensions and target bands only. The sector and country caps that the X-Ray enforces through look-through (principles 2c and 4c) are not part of the per-purchase test; a purchase can pass here and still raise the look-through finding. The pre-trade check does include the look-through limit, the allocator does not.
+- G56. The risk-aware size (Q5.2) tests the whole book for new or deeper ex-ante breaches, so a standing breach elsewhere does not block a new position unless the position makes it worse; it also does not cap by event risk (binary events, principle 8b), which is `Q8.6`.
+- G57. In Q5.2 the "per-stock share of volatility" cap is only the optional `pretrade.risk_contribution_cap`; the strategy's 8 % rule (principle 4e) is not yet a limit evaluated after each sync (`Q8.6`), so the size does not use it unless the owner sets that field.
+- G58. Beta in the Kelly inputs is a weekly regression on the first benchmark over the stock's own weeks (at least 40); a short-history stock falls back to beta 1 with a note. The volatility is the stock's standalone volatility from the ex-ante model (EWMA or Ledoit-Wolf, whichever the forecast chose), not the 1-year realised figure the older pre-trade check uses, so the two checks can quote slightly different volatilities.
+- G59. The tier of a candidate not held is derived on the fly (never stored) and only when `auto_tiers` is on; with it off and no classification the stock has no tier, and sizing says so instead of guessing.
+- G60. A new stock's history comes from stored daily prices only (about 4 years); one with less than 26 weeks is left out of the model like a holding would be, and the before and after then understate its risk (the warning says so).
+- G61. Q5.5 assumes no price moves while deposits dilute a position and that all deposits go elsewhere; a rising stock dilutes more slowly than shown. It reads the cap from the strictest all-stock position rule and does not see per-ticker rules, the look-through cap or the exempt-fund list in `max-single-position` (`Q8.0`); funds are exempt by instrument type only.
+- G62. The pre-trade `risk` block degrades to "unavailable" with the error text if the ex-ante model fails; the rule checks still come back. The failure is logged, not alerted.
+- G63. `PretradeResponse` adds a field to an existing response; clients generated before this change ignore it, but the web build must be regenerated (`npm run gen:api`) with each backend change.
 
 ## Phase Q6 — Process evaluation and model validation
 
