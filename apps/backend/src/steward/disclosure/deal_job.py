@@ -40,7 +40,7 @@ SOURCE_KEY = "sec.archive"
 REGULATOR = "SEC"
 DEAL_FORMS = {"8-K", "6-K", "S-4", "DEFM14A", "SC TO-T", "SC 14D9"}
 # 8-K items worth reading; a filing with other items only (earnings, Reg FD) is not a deal.
-DEAL_ITEMS = ("1.01", "1.02", "2.01", "8.01")
+DEAL_ITEMS = ("1.01", "1.02", "2.01", "2.03", "3.02", "8.01")
 JOIN_WINDOW_DAYS = 14
 METHOD = "deal_extract"
 SWAP_ROLES = ("seller", "buyer")
@@ -224,6 +224,20 @@ async def _deal_for(conn: Pool, parties: Sequence[str], announced: dt.date) -> t
     return -1, True
 
 
+async def _sole_open_deal(conn: Pool, issuer_id: int) -> int | None:
+    """The issuer's only deal that is neither closed nor terminated; None when there are none or
+    several, because a completion cannot then be attributed."""
+    rows = await conn.fetch(
+        """select e.id from public.deal_event e
+            where e.issuer_id = $1
+              and not exists (select 1 from public.deal_state_transition t
+                               where t.deal_id = e.id and t.state in ('closed', 'terminated'))
+            order by e.id limit 2""",
+        issuer_id,
+    )
+    return int(rows[0]["id"]) if len(rows) == 1 else None
+
+
 async def _new_deal(
     conn: Pool,
     found: dx.Extracted,
@@ -277,9 +291,18 @@ async def _term_version(
     stated = found.values()
     if not stated and found.closing_conditions.state != "stated":
         return None
+    # The version this filing follows is the newest one KNOWN by its date, not the highest number:
+    # a filing processed late (the target's after the acquirer's, or a retry) must neither carry
+    # newer terms backwards nor displace them.
     previous = await conn.fetchrow(
         """select * from public.deal_term_version
-            where deal_id = $1 and terms_origin = 'announced' order by version_no desc limit 1""",
+            where deal_id = $1 and terms_origin = 'announced' and known_at <= $2
+            order by known_at desc, version_no desc limit 1""",
+        deal_id,
+        known_at,
+    )
+    last_no = await conn.fetchval(
+        "select coalesce(max(version_no), 0) from public.deal_term_version where deal_id = $1",
         deal_id,
     )
     values = dict(stated)
@@ -308,7 +331,7 @@ async def _term_version(
     cols += ["document_version_id", "evidence_id", "currency", "unaffected_date"]
     args: list[Any] = [
         deal_id,
-        1 if previous is None else int(previous["version_no"]) + 1,
+        int(last_no) + 1,
         None if previous is None else int(previous["id"]),
         known_at,
         effective,
@@ -360,27 +383,34 @@ async def store_deal_filing(
         )
 
 
-async def _current_state(conn: Pool, deal_id: int, deal_type: str) -> str | None:
+async def _transition_problem(
+    conn: Pool, deal_id: int, deal_type: str, candidate: dl.Transition
+) -> tuple[str | None, bool]:
+    """(why the reader would reject `candidate`, whether the deal is already in that state).
+    The same `resolve_state` the reader uses decides, so a transition is stored only when it
+    will be shown; a repeat of the current state is no change and no rejection."""
     rows = await conn.fetch(
         """select id, state, effective_at, known_at, evidence_id, document_version_id
              from public.deal_state_transition where deal_id = $1""",
         deal_id,
     )
-    return dl.resolve_state(
-        deal_type,
-        [
-            dl.Transition(
-                r["id"],
-                r["state"],
-                r["effective_at"],
-                r["known_at"],
-                r["evidence_id"],
-                r["document_version_id"],
-            )
-            for r in rows
-        ],
-        dl.FAR_FUTURE,
-    ).state
+    existing = [
+        dl.Transition(
+            r["id"],
+            r["state"],
+            r["effective_at"],
+            r["known_at"],
+            r["evidence_id"],
+            r["document_version_id"],
+        )
+        for r in rows
+    ]
+    current = dl.resolve_state(deal_type, existing, dl.FAR_FUTURE).state
+    if current == candidate.state:
+        return None, True
+    resolved = dl.resolve_state(deal_type, [*existing, candidate], dl.FAR_FUTURE)
+    why = next((reason for t, reason in resolved.rejected if t.id == candidate.id), None)
+    return why, False
 
 
 async def _store_deal_filing(
@@ -425,16 +455,29 @@ async def _store_deal_filing(
     if doc is None:
         return DealOutcome(skipped="unreadable")
     found = dx.extract(doc.text)
-    if found.deal_type is None:
-        return DealOutcome(skipped="no_deal_type")
-    if len(found.parties) < 2:
-        return DealOutcome(skipped="parties_unclear")
+    unreadable = (
+        "no_deal_type"
+        if found.deal_type is None
+        else "parties_unclear"
+        if len(found.parties) < 2
+        else None
+    )
+    closing_deal: int | None = None
+    if unreadable and "2.01" in declared_items(filing, doc.text):
+        # A closing 8-K rarely repeats the sentence that names the parties; when the issuer has
+        # exactly one open deal, the completion belongs to it.
+        closing_deal = await _sole_open_deal(conn, issuer_id)
+    if unreadable and closing_deal is None:
+        return DealOutcome(skipped=unreadable)
     announced = found.announced_date or filing.filed_at
     effective = dt.datetime.combine(announced, dt.time(), dt.UTC)
     start, end = _evidence_range(found, doc.text)
     async with conn.transaction():
         evidence_id = await store_span(conn, stored.version_id, doc, start, end, method=METHOD)
-        deal_id, is_new = await _deal_for(conn, found.parties, announced)
+        if closing_deal is not None:
+            deal_id, is_new = closing_deal, False
+        else:
+            deal_id, is_new = await _deal_for(conn, found.parties, announced)
         if is_new:
             deal_id = await _new_deal(conn, found, announced, filing.known_at, ticker, issuer_id)
         deal_type = await conn.fetchval(
@@ -444,10 +487,15 @@ async def _store_deal_filing(
         state_effective = dt.datetime.combine(
             effective_date_for(state, filing, found, doc.text), dt.time(), dt.UTC
         )
-        problem = dl.transition_problem(
-            deal_type, await _current_state(conn, deal_id, deal_type), state
+        problem, already = await _transition_problem(
+            conn,
+            deal_id,
+            deal_type,
+            dl.Transition(
+                0, state, state_effective, filing.known_at, evidence_id, stored.version_id
+            ),
         )
-        if problem is None:
+        if problem is None and not already:
             await conn.execute(
                 """insert into public.deal_state_transition
                      (deal_id, state, effective_at, known_at, document_version_id, evidence_id)

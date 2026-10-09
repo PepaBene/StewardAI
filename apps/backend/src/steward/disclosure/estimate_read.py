@@ -11,6 +11,7 @@ says "actual not loaded". Series are returned as separate lists and never merged
 from __future__ import annotations
 
 import datetime as dt
+import json
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any
@@ -141,6 +142,18 @@ async def release_filings(
     return [(r["items"], r["known_at"]) for r in rows]
 
 
+def _dimension_key(raw: Any) -> str:
+    """The observation's dimensions as a stable text; '' when it has none."""
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except ValueError:
+            return raw
+    if isinstance(raw, dict) and "members" in raw:
+        raw = raw["members"]
+    return json.dumps(raw, sort_keys=True) if raw else ""
+
+
 async def _actuals(
     pool: Pool,
     issuer_id: int,
@@ -173,17 +186,31 @@ async def _actuals(
         *filings,
         *((EARNINGS_ITEM, r["known_at"]) for r in rows if r["document_type"] == "earnings"),
     ]
-    latest: dict[tuple[str, str, dt.date | None, dt.date], Any] = {}
+    latest: dict[tuple[Any, ...], Any] = {}
+    seen_values: dict[tuple[Any, ...], set[Any]] = {}
     for r in rows:
         if r["id"] in replaced:
             continue
+        if not r["segment"] and _dimension_key(r["dimensions"]):
+            continue  # a member of an axis is not the consolidated figure
+        # A later adjusted, dimensioned or other-unit row is another figure, not a replacement.
         key = (
             r["metric"].lower(),
             (r["segment"] or "").lower(),
             r["period_start"],
             r["period_end"],
+            r["basis"],
+            r["unit"],
+            r["currency"],
+            _dimension_key(r["dimensions"]),
         )
         latest[key] = r
+        seen_values.setdefault(key, set()).add(r["value"])
+    # Without a start date a fiscal year and its Q4 look alike. Two different values under one
+    # such key cannot be told apart, so neither is offered as the actual.
+    for key, values in seen_values.items():
+        if key[2] is None and len(values) > 1:
+            del latest[key]
     return [
         est.Actual(
             observation_id=int(r["id"]),
@@ -465,10 +492,22 @@ async def estimate_view(
     metrics = {v.metric.lower() for v in consensus}
     releases = await release_filings(pool, issuer_id, when) if metrics else []
     actuals = await _actuals(pool, issuer_id, metrics, when, releases)
-    by_key = {
-        (a.metric.lower(), (a.segment or "").lower(), a.period_start, a.period_end): a
-        for a in actuals
-    }
+    by_key: dict[tuple[str, str, dt.date | None, dt.date], list[est.Actual]] = {}
+    for a_ in actuals:
+        by_key.setdefault(
+            (a_.metric.lower(), (a_.segment or "").lower(), a_.period_start, a_.period_end), []
+        ).append(a_)
+
+    def pick(options: list[est.Actual] | None, estimate_basis: str | None) -> est.Actual | None:
+        """The actual on the estimate's basis class; failing that the reported one."""
+        if not options:
+            return None
+        want = est.basis_class(estimate_basis)
+        for rank in (want, "reported", None):
+            for o in options:
+                if est.basis_class(o.basis) == rank:
+                    return o
+        return options[0]
 
     events: list[dict[str, Any]] = []
     seen: set[tuple[str, dt.date | None, dt.date | None]] = set()
@@ -480,8 +519,8 @@ async def estimate_view(
             continue
         seen.add((v.metric.lower(), v.period_start, v.period_end))
         a = (
-            by_key.get((v.metric.lower(), "", v.period_start, v.period_end))
-            or by_key.get((v.metric.lower(), "", None, v.period_end))
+            pick(by_key.get((v.metric.lower(), "", v.period_start, v.period_end)), v.basis)
+            or pick(by_key.get((v.metric.lower(), "", None, v.period_end)), v.basis)
             if v.period_end
             else None
         )

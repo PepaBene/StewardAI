@@ -53,6 +53,7 @@ CONTROL_THRESHOLD = Decimal(25)
 CLUSTER_MIN_INSIDERS = 3
 REVISION_MIN_PCT = Decimal(5)
 DEBT_SHIFT_MIN_POINTS = Decimal(10)
+LOOKBACK_DAYS = 30
 
 
 def why(rule: str, threshold: str, inputs: dict[str, Any]) -> dict[str, Any]:
@@ -239,7 +240,7 @@ async def scan_major_holders(
              join public.control_stake_issuer_link l on l.accession = f.accession
              left join public.control_stake_filing p on p.accession = f.prior_accession
             where l.ticker = $1 and l.class_status = 'cusip_match'
-              and f.known_at > $2 and f.known_at <= $3
+              and (f.known_at > $2 or f.loaded_at > $2) and f.known_at <= $3
             order by f.known_at, f.accession""",
         ticker,
         since,
@@ -325,7 +326,7 @@ async def scan_controlling_stakes(
                 order by (q.accession = f.prior_accession) desc, q.known_at desc
                 limit 1) prior on true
             where l.ticker = $1 and l.class_status = 'cusip_match'
-              and f.known_at > $2 and f.known_at <= $3
+              and (f.known_at > $2 or f.loaded_at > $2) and f.known_at <= $3
             order by f.known_at, f.accession""",
         ticker,
         since,
@@ -509,9 +510,12 @@ async def scan_debt_maturity(
         now,
     )
     by_filing: dict[str, dict[str, Any]] = {}
+    # A schedule with a bucket awaiting review is incomplete: the near-term share of what is left
+    # could read "due within a year" for a schedule whose long maturities are the missing part.
+    incomplete = {r["accession"] for r in rows if r["status"] == "review" or r["bucket"] is None}
     for r in rows:
-        if r["status"] == "review" or r["bucket"] is None:
-            continue  # a bucket awaiting review is not evidence
+        if r["accession"] in incomplete:
+            continue
         f = by_filing.setdefault(
             r["accession"],
             {"known_at": r["known_at"], "url": r["source_url"], "buckets": {}},
@@ -598,7 +602,7 @@ async def scan_deals(pool: Pool, ticker: str, since: dt.datetime, now: dt.dateti
              left join public.source_document_version v on v.id = t.document_version_id
              left join public.source_document d on d.id = v.document_id
             where e.ticker = $1 and t.state <> 'rumored'
-              and t.known_at > $2 and t.known_at <= $3
+              and (t.known_at > $2 or t.created_at > $2) and t.known_at <= $3
               and t.state is distinct from (
                 select p.state from public.deal_state_transition p
                  where p.deal_id = t.deal_id and (p.known_at, p.id) < (t.known_at, t.id)
@@ -638,9 +642,13 @@ async def held_tickers(pool: Pool) -> list[str]:
 
 
 async def scan_all(
-    pool: Pool, now: dt.datetime | None = None, *, lookback_days: int = 7
+    pool: Pool, now: dt.datetime | None = None, *, lookback_days: int = LOOKBACK_DAYS
 ) -> dict[str, int]:
-    """Run every scan for every held ticker. A failure in one ticker is counted, never fatal."""
+    """Run every scan for every held ticker. A failure in one ticker is counted, never fatal.
+    Holder and deal scans window on either the time a filing became known (SEC acceptance) or the
+    time we stored it, so a filing ingested late still alerts; the lookback is long enough that
+    an alert held back by the daily throttle gets raised later too. `record` dedupes, so a wide
+    window repeats nothing."""
     end = now or dt.datetime.now(dt.UTC)
     start = end - dt.timedelta(days=lookback_days)
     totals = {

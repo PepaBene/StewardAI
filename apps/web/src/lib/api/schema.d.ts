@@ -5815,7 +5815,8 @@ export interface paths {
         };
         /**
          * List Journal
-         * @description Journal entries, newest decision first, optionally for one security.
+         * @description Journal entries, newest decision first, optionally for one security. `offset` skips that
+         *     many newer entries so older ones can be read in pages.
          */
         get: operations["list_journal"];
         put?: never;
@@ -8081,6 +8082,16 @@ export interface components {
             must_review: boolean;
             /** Review Reasons */
             review_reasons?: string[];
+            /**
+             * Saved Value
+             * @description The label already saved for this item and counted by the gate.
+             */
+            saved_value?: string | null;
+            /**
+             * Saved Kind
+             * @description Who made it: person or accepted_suggestion.
+             */
+            saved_kind?: string | null;
         };
         /** AdjudicationSampleOut */
         AdjudicationSampleOut: {
@@ -12852,7 +12863,7 @@ export interface components {
             /** Evidence Id */
             evidence_id: number;
             /** Document Version Id */
-            document_version_id: number;
+            document_version_id: number | null;
             /** Source Url */
             source_url: string | null;
             /** Quote */
@@ -42312,6 +42323,7 @@ export interface operations {
             query?: {
                 ticker?: string | null;
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;

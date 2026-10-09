@@ -190,16 +190,30 @@ def compose(
     for e in evidence:
         who = "an undisclosed counterparty" if e["anonymous"] else (e["counterparty"] or "")
         val = f" reported as {e['value']}" if e["value"] else ""
-        subject = f"{e['label']}{(' with ' + who) if who else ''}"
-        lines.append(f"{subject}{val}, from {e['source']}, known {e['known_at'].date()}.")
+        period = f" for the period ended {e['period_end']}" if e.get("period_end") else ""
+        part = f" ({e['segment']})" if e.get("segment") else ""
+        subject = f"{e['label']}{part}{(' with ' + who) if who else ''}"
+        lines.append(f"{subject}{val}{period}, from {e['source']}, known {e['known_at'].date()}.")
     text = f"For {ticker} as of {as_of.date()}: " + " ".join(lines)
     quoted = [
         " ".join(str(e[k] or "") for k in ("value", "quote", "counterparty", "label", "source"))
         for e in evidence
     ]
-    dates = [f"{e['known_at'].date()} {as_of.date()}" for e in evidence]
+    dates = [f"{e['known_at'].date()} {as_of.date()} {e.get('period_end') or ''}" for e in evidence]
     grounded = numbers_grounded(text, [*quoted, *dates, ticker])
     return {"text": text if grounded else None, "limits": limits, "grounded": grounded}
+
+
+_JUDGEMENT = re.compile(
+    r"\b(beat|beats|missed?|misses|exceed\w*|surpass\w*|outperform\w*|underperform\w*|grew|grow\w*"
+    r"|rose|rise\w*|fell|fall\w*|drop\w*|declin\w*|increas\w*|decreas\w*|surg\w*|plung\w*"
+    r"|record|strong\w*|weak\w*|improv\w*|deteriorat\w*|better|worse|higher|lower|up|down)\b",
+    re.IGNORECASE,
+)
+
+
+def _judgement_words(text: str) -> set[str]:
+    return {m.lower() for m in _JUDGEMENT.findall(text)}
 
 
 PHRASE_SYSTEM = (
@@ -244,6 +258,9 @@ async def phrase(
         for e in evidence
     ]
     if not numbers_grounded(text, [template, *quoted]):
+        return None
+    # Numbers alone do not make a rewrite faithful: "beat", "grew" or "record" are claims too.
+    if _judgement_words(text) - _judgement_words(template + " " + " ".join(quoted)):
         return None
     return text
 

@@ -146,9 +146,9 @@ export function AdjudicationPageView() {
       return rest;
     });
     if (r.ok) {
-      const labelled = Object.keys(labels).filter((k) => k !== itemRef).length + 1;
+      const labelled = new Set([...Object.keys(labels), ...sample.items.filter((i) => i.saved_value).map((i) => i.item_ref), itemRef]).size;
       setLabels((l) => ({ ...l, [itemRef]: value }));
-      setNote({ ok: true, text: `Saved. ${labelled} of ${sample.items.length} labelled this session.` });
+      setNote({ ok: true, text: `Saved. ${labelled} of ${sample.items.length} labelled.` });
       await loadGate(dataset, sample.sample_key);
     } else setNote({ ok: false, text: `Not saved, so the choice was rolled back: ${r.text}` });
   }
@@ -202,7 +202,10 @@ export function AdjudicationPageView() {
                   <p className="max-w-[72ch] text-sm">{it.text}</p>
                   {it.hints.length ? <p className="text-xs text-text-muted">{it.hints.join(" · ")}</p> : null}
                   {reveal ? <p className="text-xs text-text-muted">Machine said: {(it.machine_value ?? "nothing").replaceAll("_", " ")}</p> : null}
-                  {it.must_review && !reveal ? <p className="text-xs text-text-muted">Label this yourself.</p> : null}
+                  {it.must_review && !reveal && !it.saved_value ? <p className="text-xs text-text-muted">Label this yourself.</p> : null}
+                  {it.saved_value && !labels[it.item_ref] ? (
+                    <p className="text-xs text-text-muted">{it.saved_kind === "accepted_suggestion" ? "Saved as an accepted suggestion; choose a label to replace it." : "Saved earlier; choose another label to change it."}</p>
+                  ) : null}
                   {reveal && it.suggested_value ? (
                     <p className="text-xs text-text-muted">
                       Model suggests {it.suggested_value.replaceAll("_", " ")}
@@ -213,7 +216,7 @@ export function AdjudicationPageView() {
                 </div>
                 <select
                   aria-label={`Your label for item ${it.item_ref}`}
-                  value={labels[it.item_ref] ?? ""}
+                  value={labels[it.item_ref] ?? it.saved_value ?? ""}
                   disabled={saving[it.item_ref] === true}
                   onChange={(e) => void label(it.item_ref, it.machine_value, e.target.value)}
                   className={SELECT_CLASS}

@@ -87,7 +87,18 @@ export function CaseTab({ ticker }: { ticker: string }) {
   }
 
   async function archive(id: number) {
-    await getBrowserApiClient().DELETE("/companies/{ticker}/case/{item_id}", { params: { path: { ticker, item_id: id } } });
+    let failed = false;
+    try {
+      const { error: err } = await getBrowserApiClient().DELETE("/companies/{ticker}/case/{item_id}", { params: { path: { ticker, item_id: id } } });
+      failed = Boolean(err);
+    } catch {
+      failed = true;
+    }
+    if (failed) {
+      setError("The assessment could not be archived, so it is still listed. Try again.");
+      return;
+    }
+    setError(null);
     if (form.id === id) setForm(EMPTY);
     reload();
   }

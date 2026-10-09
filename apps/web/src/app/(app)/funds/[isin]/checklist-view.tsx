@@ -41,18 +41,28 @@ function FactForm({ isin, onSaved }: { isin: string; onSaved: () => void }) {
   const [passage, setPassage] = useState("");
   const [asOf, setAsOf] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (busy) return; // a double click must not append the same fact twice
     const checked = checkFactValue(key, value);
     if ("error" in checked) return setError(checked.error);
     if (!/^https?:\/\//.test(sourceUrl.trim())) return setError("A source is required: paste the web address of the document that states it.");
     setError(null);
-    const { error: err } = await getBrowserApiClient().PUT("/funds/{isin}/facts", {
-      params: { path: { isin } },
-      body: { key, value: checked.value, source_url: sourceUrl.trim(), passage: passage.trim() || null, as_of: asOf || null },
-    });
-    if (err) return setError("The fact could not be saved. Check the value and the address.");
+    setBusy(true);
+    let failed = false;
+    try {
+      const { error: err } = await getBrowserApiClient().PUT("/funds/{isin}/facts", {
+        params: { path: { isin } },
+        body: { key, value: checked.value, source_url: sourceUrl.trim(), passage: passage.trim() || null, as_of: asOf || null },
+      });
+      failed = Boolean(err);
+    } catch {
+      failed = true;
+    }
+    setBusy(false);
+    if (failed) return setError("The fact could not be saved. Check the value and the address.");
     setSourceUrl("");
     setPassage("");
     onSaved();
@@ -112,7 +122,7 @@ function FactForm({ isin, onSaved }: { isin: string; onSaved: () => void }) {
         <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} className="w-full border border-border bg-surface px-2 py-1.5" />
       </label>
       <div className="flex items-center gap-3 sm:col-span-2">
-        <button type="submit" className="border border-accent px-4 py-1.5 text-sm font-semibold hover:bg-surface-sunken">Record fact</button>
+        <button type="submit" disabled={busy} className="border border-accent px-4 py-1.5 text-sm font-semibold hover:bg-surface-sunken disabled:opacity-50">{busy ? "Saving…" : "Record fact"}</button>
         {error ? <p role="alert" className="text-sm text-loss">{error}</p> : null}
       </div>
     </form>
@@ -150,7 +160,14 @@ export function ChecklistTab({ isin }: { isin: string }) {
       <Blueprint aria-labelledby="cl-facts" className="space-y-4 px-[22px] py-5">
         <PanelHeading kicker="Not in the issuer data; you record it with a source" title={<span id="cl-facts">Facts about this fund</span>} />
         <FactForm isin={isin} onSaved={() => { reload(); reloadHistory(); }} />
-        {facts.length === 0 ? (
+        {history.kind === "loading" ? (
+          <p className="text-sm text-text-muted">Loading the recorded facts…</p>
+        ) : history.kind === "error" ? (
+          <p role="alert" className="text-sm text-loss">
+            The recorded facts could not be loaded, so they are unknown, not empty.{" "}
+            <button type="button" className="underline underline-offset-2" onClick={() => reloadHistory()}>Try again</button>
+          </p>
+        ) : facts.length === 0 ? (
           <p className="text-sm text-text-muted">Nothing recorded yet.</p>
         ) : (
           <ul className="divide-y divide-border-soft text-sm">

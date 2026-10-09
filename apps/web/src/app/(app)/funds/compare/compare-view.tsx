@@ -39,12 +39,6 @@ export function CompareView() {
   const raw = useSearchParams().get("isins") ?? "";
   const isins = raw.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
   const valid = isins.length >= 2 && isins.length <= 5 && isins.every((i) => ISIN.test(i));
-  const fetcher = useCallback(
-    () => getBrowserApiClient().GET("/funds/compare", { params: { query: { isins: isins.join(",") } } }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [raw],
-  );
-  const { state } = useApiResource(fetcher);
 
   return (
     <div className="flex flex-col gap-5">
@@ -61,12 +55,22 @@ export function CompareView() {
       ) : (
         <>
           <SaveComparison isins={isins} />
-          <ResourceGate state={state} label="the comparison">
-            {(c: FundComparison) => <Comparison c={c} />}
-          </ResourceGate>
+          <LoadedComparison isins={isins} />
         </>
       )}
     </div>
+  );
+}
+
+/** Mounted only for a valid choice, so nothing is requested for one fund or a malformed address. */
+function LoadedComparison({ isins }: { isins: readonly string[] }) {
+  const joined = isins.join(",");
+  const fetcher = useCallback(() => getBrowserApiClient().GET("/funds/compare", { params: { query: { isins: joined } } }), [joined]);
+  const { state } = useApiResource(fetcher);
+  return (
+    <ResourceGate state={state} label="the comparison">
+      {(c: FundComparison) => <Comparison c={c} />}
+    </ResourceGate>
   );
 }
 

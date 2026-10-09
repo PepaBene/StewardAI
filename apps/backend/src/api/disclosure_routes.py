@@ -1291,6 +1291,12 @@ class AdjudicationItemOut(BaseModel):
     suggestion_reason: str | None = None
     must_review: bool = True
     review_reasons: list[str] = Field(default_factory=list)
+    saved_value: str | None = Field(
+        default=None, description="The label already saved for this item and counted by the gate."
+    )
+    saved_kind: str | None = Field(
+        default=None, description="Who made it: person or accepted_suggestion."
+    )
 
 
 class PrelabelOut(BaseModel):
@@ -1355,6 +1361,7 @@ async def adjudication_sample(
         raise HTTPException(422, f"no sampler exists yet for {dataset}")
     sample_key = f"{dataset}:{seed}:{size}"
     given = await adjudication_assist.suggestions(pool, dataset, sample_key)
+    saved = await adjudication.saved_labels(pool, dataset, sample_key)
     return AdjudicationSampleOut(
         dataset=dataset,
         sample_key=sample_key,
@@ -1368,6 +1375,8 @@ async def adjudication_sample(
                 suggestion_reason=s["rationale"] if s else None,
                 must_review=s["must_review"] if s else True,
                 review_reasons=list(s["review_reasons"]) if s else [],
+                saved_value=saved[i.item_ref][0] if i.item_ref in saved else None,
+                saved_kind=saved[i.item_ref][1] if i.item_ref in saved else None,
             )
             for i in items
         ],

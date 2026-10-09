@@ -256,11 +256,17 @@ def own_problem(t: Transition) -> str | None:
     return None
 
 
+# An agreement is often dated a few days before the press release that announces it, so a state
+# whose effective date is that close to the earlier one's is not out of order.
+EFFECTIVE_SLACK = dt.timedelta(days=7)
+
+
 def resolve_state(
     deal_type: str, transitions: Sequence[Transition], as_of: dt.datetime
 ) -> StateResolution:
     """The state at `as_of` from the transitions KNOWN by then, with every rejection and its reason.
-    A later-known transition never changes an earlier view."""
+    A later-known transition never changes an earlier view. The deal job stores a transition only
+    when this function would apply it, so the reader and the writer agree."""
     rejected: list[tuple[Transition, str]] = []
     known: list[Transition] = []
     for t in transitions:
@@ -274,7 +280,11 @@ def resolve_state(
     current: str | None = None
     for t in known:
         problem = own_problem(t) or transition_problem(deal_type, current, t.state)
-        if problem is None and applied and t.effective_at < applied[-1].effective_at:
+        if (
+            problem is None
+            and applied
+            and t.effective_at < applied[-1].effective_at - EFFECTIVE_SLACK
+        ):
             problem = "effective date is before the previous state's"
         if problem:
             rejected.append((t, problem))
@@ -350,13 +360,14 @@ def version_problems(tv: TermVersion) -> list[str]:
 def latest_version(
     versions: Sequence[TermVersion], as_of: dt.datetime, origin: Origin | None = "announced"
 ) -> TermVersion | None:
-    """The newest version known by `as_of` (an amendment supersedes by version number)."""
+    """The newest version known by `as_of`. Newest means latest known; the version number breaks a
+    tie, because a filing processed late gets a higher number but is not newer."""
     seen = [v for v in versions if v.known_at <= as_of and (origin is None or v.origin == origin)]
-    return max(seen, key=lambda v: (v.version_no, v.known_at, v.id), default=None)
+    return max(seen, key=lambda v: (v.known_at, v.version_no, v.id), default=None)
 
 
 def versions_known(versions: Sequence[TermVersion], as_of: dt.datetime) -> list[TermVersion]:
-    return sorted((v for v in versions if v.known_at <= as_of), key=lambda v: (v.version_no, v.id))
+    return sorted((v for v in versions if v.known_at <= as_of), key=lambda v: (v.known_at, v.id))
 
 
 def term_changes(old: TermVersion | None, new: TermVersion) -> list[TermChange]:
@@ -564,14 +575,22 @@ def dilution(
     tv: TermVersion | None, ctx: DealContext, origin: ImpactOrigin = "announced"
 ) -> Impact:
     """Share of the combined company the target's holders own after a stated exchange ratio:
-    new / (acquirer + new), new = ratio x target shares. Needs both share counts."""
+    new / (acquirer + new), new = ratio x target shares x the stock share of the consideration
+    (a stated stock share, else one minus a stated cash share, else all). Needs both share
+    counts."""
     ratio = tv.values.get("exchange_ratio") if tv else None
+    stock_share = ONE
+    if tv and "stock_pct" in tv.values:
+        stock_share = tv.values["stock_pct"]
+    elif tv and "cash_pct" in tv.values:
+        stock_share = ONE - tv.values["cash_pct"]
     inputs: dict[str, Decimal | str | None] = {
         "exchange_ratio": ratio,
         "acquirer_shares": ctx.acquirer_shares,
         "target_shares": ctx.target_shares,
+        "stock_share": stock_share if stock_share != ONE else None,
     }
-    formula = "ratio * target / (acquirer + ratio * target)"
+    formula = "ratio * target * stock share / (acquirer + ratio * target * stock share)"
     if tv is None or ratio is None:
         why = "no exchange ratio is stated (an all-cash price issues no shares we can count)"
     elif ctx.acquirer_shares is None or ctx.target_shares is None:
@@ -579,7 +598,7 @@ def dilution(
     elif ctx.acquirer_shares <= 0 or ctx.target_shares <= 0:
         why = "a share count must be positive"
     else:
-        new = ratio * ctx.target_shares
+        new = ratio * ctx.target_shares * stock_share
         return _impact(
             "dilution",
             "Dilution from new shares",
@@ -763,7 +782,7 @@ def synergy_projection(versions: Sequence[TermVersion], as_of: dt.datetime) -> I
     """Expected synergies are what management says it expects, from whichever known version states
     them. Always labelled as a management projection, never added to announced terms."""
     having = [v for v in versions if v.known_at <= as_of and "expected_synergies" in v.values]
-    tv = max(having, key=lambda v: (v.version_no, v.known_at, v.id), default=None)
+    tv = max(having, key=lambda v: (v.known_at, v.version_no, v.id), default=None)
     if tv is None:
         return _impact(
             "synergies",

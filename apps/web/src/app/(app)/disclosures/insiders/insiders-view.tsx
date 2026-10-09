@@ -12,6 +12,7 @@ import { Field } from "@/components/reference/form-bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { useUrlTicker } from "@/lib/disclosure/url-ticker";
 import { SAMPLE_INSIDER_DAY, SAMPLE_INSIDER_TICKER, sampleInsiders } from "@/lib/disclosure/fixtures-insiders";
 import type { InsiderActivity, PdmrActivity } from "@/lib/disclosure/insiders";
 import { dayOf, endOfDayMs, formatDay } from "@/lib/disclosure/model";
@@ -33,10 +34,11 @@ const DAY_MS = 86_400_000;
  * holdings after the trade and caveats. With no ticker entered the page shows a labelled sample.
  */
 export function InsidersPageView() {
+  const fromUrl = useUrlTicker();
   const [until] = useState(() => Date.now());
-  const [cutoff, setCutoff] = useState(() => endOfDayMs(SAMPLE_INSIDER_DAY));
-  const [input, setInput] = useState("");
-  const [ticker, setTicker] = useState<string | null>(null);
+  const [cutoff, setCutoff] = useState(() => (fromUrl ? until : endOfDayMs(SAMPLE_INSIDER_DAY)));
+  const [input, setInput] = useState(fromUrl ?? "");
+  const [ticker, setTicker] = useState<string | null>(fromUrl);
   const [error, setError] = useState<string | undefined>();
   // bumped by "Show" and after an override, so the same inputs fetch again
   const [nonce, setNonce] = useState(0);

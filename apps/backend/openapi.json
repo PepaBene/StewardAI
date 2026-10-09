@@ -18338,7 +18338,7 @@
           "journal"
         ],
         "summary": "List Journal",
-        "description": "Journal entries, newest decision first, optionally for one security.",
+        "description": "Journal entries, newest decision first, optionally for one security. `offset` skips that\nmany newer entries so older ones can be read in pages.",
         "operationId": "list_journal",
         "security": [
           {
@@ -18373,6 +18373,18 @@
               "minimum": 1,
               "default": 200,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
             }
           }
         ],
@@ -25665,6 +25677,30 @@
             },
             "type": "array",
             "title": "Review Reasons"
+          },
+          "saved_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved Value",
+            "description": "The label already saved for this item and counted by the gate."
+          },
+          "saved_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved Kind",
+            "description": "Who made it: person or accepted_suggestion."
           }
         },
         "type": "object",
@@ -39980,7 +40016,14 @@
             "title": "Evidence Id"
           },
           "document_version_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Document Version Id"
           },
           "source_url": {
@@ -90632,7 +90675,7 @@
         "properties": {
           "path": {
             "type": "string",
-            "pattern": "^/[A-Za-z0-9/_-]{0,120}$",
+            "pattern": "^/[A-Za-z0-9/_.-]{0,120}$",
             "title": "Path"
           }
         },

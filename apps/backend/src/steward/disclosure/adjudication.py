@@ -462,6 +462,21 @@ def _measure_labels(dataset: str, rows: Sequence[Mapping[str, Any]], sample_key:
     )
 
 
+async def saved_labels(pool: Pool, dataset: str, sample_key: str) -> dict[str, tuple[str, str]]:
+    """Each item's newest gate-counting label as (human_value, adjudicator_kind), so a reloaded
+    page shows what the gate already counts instead of asking for the label again."""
+    rows = await pool.fetch(
+        """select item_ref, human_value, adjudicator_kind
+             from public.disclosure_adjudication
+            where dataset = $1 and sample_key = $2 and adjudicator_kind = any($3::text[])
+            order by adjudicated_at, id""",
+        dataset,
+        sample_key,
+        list(GATE_KINDS),
+    )
+    return {r["item_ref"]: (r["human_value"], r["adjudicator_kind"]) for r in rows}
+
+
 async def measure(pool: Pool, dataset: str, sample_key: str) -> Gate:
     rows = await pool.fetch(
         """select item_ref, correct, planted_false_positive, human_value, adjudicator_kind

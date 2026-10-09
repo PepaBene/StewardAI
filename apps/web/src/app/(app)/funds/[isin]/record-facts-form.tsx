@@ -50,15 +50,33 @@ export function RecordFactsForm({
     if (!/^https?:\/\//.test(sourceUrl.trim())) return setError("A source is required: paste the web address of the document that states it.");
     setError(null);
     setBusy(true);
+    const done: string[] = [];
     for (const [key, value] of entries) {
-      const { error: err } = await getBrowserApiClient().PUT("/funds/{isin}/facts", {
-        params: { path: { isin } },
-        body: { key, value, source_url: sourceUrl.trim() },
-      });
-      if (err) {
-        setBusy(false);
-        return setError(`${FACT_LABEL[key] ?? key} could not be saved. Check the value and the address.`);
+      let failed = false;
+      try {
+        const { error: err } = await getBrowserApiClient().PUT("/funds/{isin}/facts", {
+          params: { path: { isin } },
+          body: { key, value, source_url: sourceUrl.trim() },
+        });
+        failed = Boolean(err);
+      } catch {
+        failed = true;
       }
+      if (failed) {
+        setBusy(false);
+        // The history is append-only: what is already stored must not be sent again on a retry.
+        if (done.length > 0) {
+          setValues((v) => {
+            const rest = { ...v };
+            for (const k of done) delete rest[k];
+            return rest;
+          });
+          onSaved();
+        }
+        const stored = done.length > 0 ? ` ${done.map((k) => FACT_LABEL[k] ?? k).join(", ")} ${done.length === 1 ? "was" : "were"} already recorded and removed from the form.` : "";
+        return setError(`${FACT_LABEL[key] ?? key} could not be saved. Check the value and the address.${stored}`);
+      }
+      done.push(key);
     }
     setBusy(false);
     setSaved(`Recorded ${entries.length} ${entries.length === 1 ? "entry" : "entries"}.`);

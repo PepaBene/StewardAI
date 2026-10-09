@@ -27,9 +27,11 @@ async def list_journal(
     owner: Owner,
     ticker: Annotated[str | None, Query(max_length=40)] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 200,
+    offset: Annotated[int, Query(ge=0, le=100_000)] = 0,
 ) -> list[JournalEntry]:
-    """Journal entries, newest decision first, optionally for one security."""
-    return await entries.list_entries(pool, owner.user_id, ticker, limit)
+    """Journal entries, newest decision first, optionally for one security. `offset` skips that
+    many newer entries so older ones can be read in pages."""
+    return await entries.list_entries(pool, owner.user_id, ticker, limit, offset)
 
 
 @router.post("/journal", status_code=201)

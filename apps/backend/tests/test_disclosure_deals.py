@@ -97,10 +97,15 @@ def test_a_rumor_must_name_its_source_and_cannot_skip_to_closed():
 
 
 def test_state_chronology_cannot_run_backwards():
-    ts = [tr(1, "announced", at(10, 5)), tr(2, "definitive", at(10, 1), at(10, 6))]
+    ts = [tr(1, "announced", at(10, 15)), tr(2, "definitive", at(10, 1), at(10, 16))]
     r = dl.resolve_state("acquisition", ts, at(11, 1))
     assert r.state == "announced"
     assert "effective date is before" in r.rejected[0][1]
+
+
+def test_an_agreement_dated_days_before_the_announcement_still_applies():
+    ts = [tr(1, "announced", at(10, 5)), tr(2, "definitive", at(10, 1), at(10, 6))]
+    assert dl.resolve_state("acquisition", ts, at(11, 1)).state == "definitive"
 
 
 def test_multiple_bids_a_contest_resolves_to_the_winning_terms():
@@ -298,7 +303,7 @@ def test_unit_scale_and_currency_survive_into_the_impact():
         "in cash."
     )
     assert ex1.terms["cash_amount"].value == D("2500000000") and ex1.currency == "USD"
-    ex2 = ex.extract("The notes total €2.0bn in cash and a term loan of £400 million.")
+    ex2 = ex.extract("The acquisition consideration is€2.0bn in cash and a term loan of £400 million.")
     assert ex2.currency is None and ex2.currency_conflict
 
 

@@ -138,7 +138,9 @@ export function DealFilters({ value, onChange, types, currencies = [] }: { value
 
 export function staleDays(deal: Deal, asOf: string): number | null {
   if (!deal.state || !ACTIVE.has(deal.state)) return null;
-  const last = Math.max(...deal.transitions.map((t) => Date.parse(t.known_at)), ...deal.term_versions.map((v) => Date.parse(v.known_at)));
+  const known = [...deal.transitions.map((t) => Date.parse(t.known_at)), ...deal.term_versions.map((v) => Date.parse(v.known_at))].filter((n) => Number.isFinite(n));
+  if (known.length === 0) return null; // nothing recorded: no age can be stated
+  const last = Math.max(...known);
   const days = Math.floor((Date.parse(asOf) - last) / 86_400_000);
   return days > STALE_AFTER_DAYS ? days : null;
 }

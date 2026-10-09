@@ -206,23 +206,6 @@ export function PeersView({ ticker }: { ticker: string }) {
   const { state: groups, reload: reloadGroups } = useApiResource(groupsFetcher);
   const saved: PeerGroup[] = useMemo(() => (groups.kind === "ok" ? groups.data : []), [groups]);
 
-  const fetcher = useCallback(
-    () =>
-      getBrowserApiClient().GET("/companies/{ticker}/peers", {
-        params: {
-          path: { ticker },
-          query: {
-            scope,
-            index_metric: indexMetric,
-            ...(scope === "group" && groupId !== null ? { group_id: groupId } : {}),
-            ...(baseCurrency ? { base_currency: baseCurrency, fx_rates: fxRates } : {}),
-          },
-        },
-      }),
-    [ticker, scope, groupId, indexMetric, baseCurrency, fxRates],
-  );
-  const { state } = useApiResource(fetcher);
-
   async function remove(id: number) {
     await getBrowserApiClient().DELETE("/companies/{ticker}/peer-groups/{group_id}", { params: { path: { ticker, group_id: id } } });
     if (groupId === id) setGroupId(null);
@@ -308,7 +291,12 @@ export function PeersView({ ticker }: { ticker: string }) {
         </details>
       </Blueprint>
 
-      <ResourceGate state={state} label="the peer comparison">
+      {scope === "group" && groupId === null ? (
+        <AlertMessage title="Choose a saved group">
+          {saved.length > 0 ? "Pick one of your saved peer groups above to compare against." : "You have no saved peer group yet. Save one above, then choose it here."}
+        </AlertMessage>
+      ) : (
+      <PeerFetch ticker={ticker} scope={scope} groupId={groupId} indexMetric={indexMetric} baseCurrency={baseCurrency} fxRates={fxRates}>
         {(data: PeerCompare) => (
           <>
             <Blueprint aria-labelledby="peers-table" className="space-y-4 px-[22px] py-5">
@@ -382,7 +370,49 @@ export function PeersView({ ticker }: { ticker: string }) {
             </Blueprint>
           </>
         )}
-      </ResourceGate>
+      </PeerFetch>
+      )}
     </div>
+  );
+}
+
+/** Requests the comparison only for a settled choice of peer set. */
+function PeerFetch({
+  ticker,
+  scope,
+  groupId,
+  indexMetric,
+  baseCurrency,
+  fxRates,
+  children,
+}: {
+  ticker: string;
+  scope: Scope;
+  groupId: number | null;
+  indexMetric: IndexMetric;
+  baseCurrency: string;
+  fxRates: "period_end" | "average";
+  children: (data: PeerCompare) => React.ReactNode;
+}) {
+  const fetcher = useCallback(
+    () =>
+      getBrowserApiClient().GET("/companies/{ticker}/peers", {
+        params: {
+          path: { ticker },
+          query: {
+            scope,
+            index_metric: indexMetric,
+            ...(scope === "group" && groupId !== null ? { group_id: groupId } : {}),
+            ...(baseCurrency ? { base_currency: baseCurrency, fx_rates: fxRates } : {}),
+          },
+        },
+      }),
+    [ticker, scope, groupId, indexMetric, baseCurrency, fxRates],
+  );
+  const { state } = useApiResource(fetcher);
+  return (
+    <ResourceGate state={state} label="the peer comparison">
+      {children}
+    </ResourceGate>
   );
 }
