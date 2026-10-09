@@ -37,8 +37,8 @@ Not yet verified: the acceptance criteria that need live data or time (consecuti
 scheduled runs on an always-on host, the Realtime 2-second update, the uptime alert,
 Overview totals against the Trading212 app, 48-hour ingest runs, source figures matched
 by hand), and the live-model evals (golden extraction 98 %, classification 85 %, claim
-verifier 20/20), which need an API key: add the `ANTHROPIC_API_KEY` repository secret and
-run `uv run python -m steward.verify.evals_gate --write-baseline` once. Run
+verifier 20/20), which run on Gemini and need a key: add the `GOOGLE_API_KEY` repository
+secret and run `uv run python -m steward.verify.evals_gate --write-baseline` once. Run
 `uv run python -m steward.signoff` on the host for the phase 1 checks. Phase 6 is not
 started.
 

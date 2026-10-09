@@ -167,7 +167,8 @@ def discovered() -> list[Any]:
                     "accessionNumber": [ACCESSION],
                     "form": ["10-K"],
                     "filingDate": ["2026-02-20"],
-                    "acceptanceDateTime": ["2026-02-20T21:00:00.000Z"],
+                    # the feed's "Z" is the true instant shifted by the New York offset (EST: +5h)
+                    "acceptanceDateTime": ["2026-02-21T02:00:00.000Z"],
                     "reportDate": ["2025-12-31"],
                     "primaryDocument": ["a.htm"],
                     "items": [""],

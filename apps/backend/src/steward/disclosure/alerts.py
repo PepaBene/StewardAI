@@ -240,7 +240,8 @@ async def scan_major_holders(
              join public.control_stake_issuer_link l on l.accession = f.accession
              left join public.control_stake_filing p on p.accession = f.prior_accession
             where l.ticker = $1 and l.class_status = 'cusip_match'
-              and (f.known_at > $2 or f.loaded_at > $2) and f.known_at <= $3
+              and (f.known_at > $2 or (f.loaded_at > $2 and f.loaded_at <= $3))
+              and f.known_at <= $3
             order by f.known_at, f.accession""",
         ticker,
         since,
@@ -326,7 +327,8 @@ async def scan_controlling_stakes(
                 order by (q.accession = f.prior_accession) desc, q.known_at desc
                 limit 1) prior on true
             where l.ticker = $1 and l.class_status = 'cusip_match'
-              and (f.known_at > $2 or f.loaded_at > $2) and f.known_at <= $3
+              and (f.known_at > $2 or (f.loaded_at > $2 and f.loaded_at <= $3))
+              and f.known_at <= $3
             order by f.known_at, f.accession""",
         ticker,
         since,
@@ -602,7 +604,8 @@ async def scan_deals(pool: Pool, ticker: str, since: dt.datetime, now: dt.dateti
              left join public.source_document_version v on v.id = t.document_version_id
              left join public.source_document d on d.id = v.document_id
             where e.ticker = $1 and t.state <> 'rumored'
-              and (t.known_at > $2 or t.created_at > $2) and t.known_at <= $3
+              and (t.known_at > $2 or (t.created_at > $2 and t.created_at <= $3))
+              and t.known_at <= $3
               and t.state is distinct from (
                 select p.state from public.deal_state_transition p
                  where p.deal_id = t.deal_id and (p.known_at, p.id) < (t.known_at, t.id)

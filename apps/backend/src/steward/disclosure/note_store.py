@@ -65,6 +65,7 @@ def build_note_fact_rows(
         if sched is None:
             continue
         mult = sched.unit.multiplier
+        table_start = shift(min((r.start for r in sched.rows), default=0))
         for r in sched.rows:
             out.append(
                 {
@@ -79,6 +80,7 @@ def build_note_fact_rows(
                         "reasons": list(r.reasons),
                         "start": shift(r.start),
                         "end": shift(r.end),
+                        "table_start": table_start,
                         "raw": r.raw,
                         "columns": list(r.columns),
                         "dash": r.dash,
@@ -217,7 +219,7 @@ async def load_note_rows(
         newest = max(str(n.get("extractor") or "") for _, n in mine)
         mine = [it for it in mine if str(it[1].get("extractor") or "") == newest]
         # Two tables of one schedule in a filing would merge bucket by bucket: send them to review.
-        tables = len({str(n.get("start")) for _, n in mine})
+        tables = len({str(n.get("table_start")) for _, n in mine})
         for r, note in mine:
             status = str(note.get("status", "review"))
             reasons = tuple(note.get("reasons") or ())
