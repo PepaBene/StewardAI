@@ -1,4 +1,4 @@
--- Rollback for supabase/migrations/20261007100000_discovery_universe_screens.sql.
+-- Rollback for supabase/migrations/20261007100100_discovery_universe_screens.sql.
 -- Run it in a transaction, newest migration first. The migration file itself is never edited.
 -- DATA LOSS: deletes every saved screen, screen version, screen run, column set and universe
 -- snapshot. Later migrations that reference these tables must be rolled back first.

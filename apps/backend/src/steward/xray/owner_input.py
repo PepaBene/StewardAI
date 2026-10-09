@@ -164,11 +164,15 @@ async def current(
     pool: asyncpg.Pool, owner_id: str, kind: InputKind | None = None
 ) -> list[OwnerInput]:
     """The row in force for each (kind, key): the newest that is not archived."""
+    # Region names are read case-insensitively (`region_splits`), so "Europe" and "europe" are one
+    # key and the newest of them is the one in force.
     rows = await pool.fetch(
-        "select distinct on (kind, key) id, kind, key, payload, source_url, as_of, note, origin,"
+        "select distinct on (kind, case when kind = 'region_split' then lower(key) else key end)"
+        " id, kind, key, payload, source_url, as_of, note, origin,"
         " derived_from, created_at from public.xray_owner_input"
         " where owner_id=$1 and not archived and ($2::text is null or kind=$2)"
-        " order by kind, key, created_at desc, id desc",
+        " order by kind, case when kind = 'region_split' then lower(key) else key end,"
+        " created_at desc, id desc",
         owner_id,
         kind,
     )

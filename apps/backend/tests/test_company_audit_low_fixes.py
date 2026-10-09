@@ -25,11 +25,11 @@ D = Decimal
 # --------------------------------------------------------------------------------- D23
 
 
-def test_net_debt_without_a_debt_concept_carries_its_date_and_says_it_is_an_assumption() -> None:
+def test_net_debt_without_a_debt_concept_is_withheld_and_carries_its_date() -> None:
     filed = {"cash": D("50"), "total_assets": D("500")}
     value, note = val._net_debt(filed, dt.date(2024, 12, 31))
-    assert value == D("-50")
-    assert "taken as zero" in note and "2024-12-31" in note
+    assert value is None
+    assert "withheld" in note and "2024-12-31" in note
     assert "unmapped" in val.NO_DEBT_LIMITATION
 
 
@@ -63,15 +63,15 @@ def div(ex: dt.date, amount: str, listing: int = 1, currency: str | None = "USD"
 
 
 def test_announced_dividends_follow_the_fiscal_year_not_the_calendar_year() -> None:
-    got = announced_by_fiscal_year(
+    got, notes = announced_by_fiscal_year(
         [div(dt.date(2023, 9, 1), "0.25"), div(dt.date(2024, 3, 1), "0.25")], ENDS, "USD"
     )
     # Both fall in the year ending June 2024; a calendar-year key would split them 2023/2024.
-    assert got == {dt.date(2024, 6, 30): D("0.50")}
+    assert got == {dt.date(2024, 6, 30): D("0.50")} and notes == []
 
 
-def test_announced_dividends_ignore_other_currencies_and_second_listings() -> None:
-    got = announced_by_fiscal_year(
+def test_announced_dividends_use_the_primary_listing_and_the_statement_currency() -> None:
+    got, notes = announced_by_fiscal_year(
         [
             div(dt.date(2024, 3, 1), "0.25", listing=1),
             div(dt.date(2024, 3, 1), "0.23", listing=2),  # the same dividend on a dual listing
@@ -79,8 +79,33 @@ def test_announced_dividends_ignore_other_currencies_and_second_listings() -> No
         ],
         ENDS,
         "USD",
+        primary_listing=1,
     )
-    assert got == {dt.date(2024, 6, 30): D("0.25")}
+    assert got == {dt.date(2024, 6, 30): D("0.25")} and notes == []
+
+
+def test_announced_dividends_deduplicate_identical_rows_across_listings() -> None:
+    got, notes = announced_by_fiscal_year(
+        [
+            div(dt.date(2024, 3, 1), "0.25", listing=1),
+            div(dt.date(2024, 3, 1), "0.25", listing=2),
+        ],
+        ENDS,
+        "USD",
+    )
+    assert got == {dt.date(2024, 6, 30): D("0.25")} and notes == []
+
+
+def test_announced_dividends_flag_listings_that_disagree_instead_of_choosing() -> None:
+    got, notes = announced_by_fiscal_year(
+        [
+            div(dt.date(2024, 3, 1), "0.25", listing=1),
+            div(dt.date(2024, 3, 1), "0.23", listing=2),
+        ],
+        ENDS,
+        "USD",
+    )
+    assert got == {} and len(notes) == 1 and "differ between listings" in notes[0]
 
 
 # --------------------------------------------------------------------------------- D27

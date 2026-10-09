@@ -67,6 +67,8 @@ class WindowReturn:
     xirr: AnalyticsResult
     reason: str | None
     xirr_annualized: bool = True  # False: `xirr` is the period return of a window under a year
+    # Days between the window's nominal start and the stored day it opens on (0 = exact).
+    opening_gap_days: int = 0
 
 
 def _unavailable(label: WindowLabel, reason: str, end: dt.date | None) -> WindowReturn:
@@ -90,6 +92,7 @@ def window_return(
     end = ordered[-1].date
     wanted = window_start(label, end)
     first = ordered[0].date
+    opening_gap = 0
     if wanted is None:
         opening = ordered[0]
     else:
@@ -100,7 +103,8 @@ def window_return(
                 f"{wanted.isoformat()}", end,
             )  # fmt: skip
         opening = before[-1]
-        if (wanted - opening.date).days > MAX_OPENING_GAP_DAYS:
+        opening_gap = (wanted - opening.date).days
+        if opening_gap > MAX_OPENING_GAP_DAYS:
             return _unavailable(
                 label, f"no value stored within {MAX_OPENING_GAP_DAYS} days before "
                 f"{wanted.isoformat()} (last {opening.date.isoformat()})", end,
@@ -157,6 +161,7 @@ def window_return(
         xirr_result,
         None,
         annual_xirr,
+        opening_gap,
     )
 
 

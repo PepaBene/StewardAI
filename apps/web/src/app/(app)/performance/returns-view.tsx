@@ -101,6 +101,11 @@ function StatementTable({ data }: { data: PerformanceData }) {
                   <span className="block text-[11px] text-text-muted">
                     {w.start && w.end ? `${formatDate(w.start)} to ${formatDate(w.end)}` : (w.reason ?? "no data")}
                   </span>
+                  {w.opening_gap_days > 0 ? (
+                    <span className="block text-[11px] text-text-muted">
+                      opens {w.opening_gap_days} {w.opening_gap_days === 1 ? "day" : "days"} before its start, the nearest stored day
+                    </span>
+                  ) : null}
                 </th>
                 <td className={TD}><ReturnCell figure={w.twr} /></td>
                 <td className={TD}>{w.twr_annualized !== null && w.twr_annualized !== undefined ? <PlainReturn value={w.twr_annualized} /> : <span className="text-text-muted">under a year</span>}</td>

@@ -25433,6 +25433,23 @@
             "type": "string",
             "format": "date-time",
             "title": "Since"
+          },
+          "needs_switch_off": {
+            "type": "boolean",
+            "title": "Needs Switch Off",
+            "description": "Switched on, but the release gate no longer allows it (an input went stale, an audit mismatch was entered, ...). Switch it off; nothing does so for you.",
+            "default": false
+          },
+          "gate_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gate Note"
           }
         },
         "type": "object",
@@ -69651,7 +69668,8 @@
           },
           "peers": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$"
             },
             "type": "array",
             "maxItems": 40,
@@ -86962,6 +86980,17 @@
           "rumour": {
             "type": "boolean",
             "title": "Rumour"
+          },
+          "cluster_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Id"
           }
         },
         "type": "object",
@@ -92311,6 +92340,12 @@
             "title": "Xirr Annualized",
             "description": "False when the window is under a year: `xirr` is then the money-weighted return over the window itself, not an annual rate.",
             "default": true
+          },
+          "opening_gap_days": {
+            "type": "integer",
+            "title": "Opening Gap Days",
+            "description": "Days between the window's nominal start and the stored day it opens on; above 0 the window is slightly longer than its label.",
+            "default": 0
           },
           "reason": {
             "anyOf": [

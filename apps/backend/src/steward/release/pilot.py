@@ -153,9 +153,13 @@ async def build_report(pool: asyncpg.Pool, owner_id: str) -> PilotReport | None:
     rated = await pool.fetchrow(
         "select count(*) as rated,"
         " count(*) filter (where f.rating in ('wrong', 'irrelevant')) as bad"
-        " from (select distinct on (target_id) target_id, rating from public.feedback"
-        "       where target_kind = 'alert' and created_at >= $1 and created_at < $2"
-        "       order by target_id, created_at desc, id desc) f",
+        " from (select distinct on (fb.target_id) fb.target_id, fb.rating"
+        "       from public.feedback fb"
+        # Only alerts sent in the window, the same set `sent` counts, so rated <= sent.
+        "       join public.alert a on a.id = fb.target_id"
+        "       where fb.target_kind = 'alert' and a.status = 'sent' and a.kind <> 'test'"
+        "       and a.created_at >= $1 and a.created_at < $2"
+        "       order by fb.target_id, fb.created_at desc, fb.id desc) f",
         lo,
         hi,
     )

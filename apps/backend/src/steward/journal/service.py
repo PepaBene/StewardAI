@@ -116,7 +116,7 @@ async def scorecard(
     reason: str | None = None,
 ) -> Scorecard:
     today = dt.date.today()
-    entries = await list_entries(pool, owner_id, limit=2000)
+    entries = await list_entries(pool, owner_id, limit=None)
     return build_scorecard(
         await outcomes(pool, entries),
         since=since or today - dt.timedelta(days=365),

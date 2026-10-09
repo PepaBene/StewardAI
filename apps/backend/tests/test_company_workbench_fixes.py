@@ -10,7 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from steward.company.evidence import Citation, segment_lines
-from steward.company.service import PeerGroupIn, clean_peers
+from steward.company.service import PeerGroupIn, clean_peers, match_universe
 
 D = Decimal
 KNOWN = dt.datetime(2025, 3, 1, tzinfo=dt.UTC)
@@ -19,6 +19,14 @@ KNOWN = dt.datetime(2025, 3, 1, tzinfo=dt.UTC)
 def test_peer_tickers_keep_their_case_and_drop_the_company_itself() -> None:
     peers = clean_peers([" VUSAl_EQ", "AAA", "aaa", "MSFT_US_EQ", "MSFT_US_EQ", " "], "AAA")
     assert peers == ["MSFT_US_EQ", "VUSAl_EQ"]  # Trading212 tickers are case-sensitive
+
+
+def test_stored_peers_resolve_to_the_universe_ticker_case_insensitively() -> None:
+    universe = ["VUSAl_EQ", "MSFT_US_EQ", "ABCa_EQ", "ABCA_EQ"]
+    # exact match first, then a unique case-insensitive match; ambiguous is dropped with a note
+    out, notes = match_universe(["VUSAL_EQ", "MSFT_US_EQ", "ABCa_EQ", "abca_eq", "ZZZ"], universe)
+    assert out == ["VUSAl_EQ", "MSFT_US_EQ", "ABCa_EQ", "ZZZ"]
+    assert [n.ticker for n in notes] == ["abca_eq"] and "ambiguous" in notes[0].reason
 
 
 @pytest.mark.parametrize("bad", ["", "a b", "x;drop", "../etc", "A" * 33])

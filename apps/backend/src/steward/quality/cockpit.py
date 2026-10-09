@@ -12,6 +12,7 @@ import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.config.store import load_active
+from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig
 from steward.decision.service import volatility_and_price
 
@@ -287,8 +288,14 @@ async def _providers(pool: asyncpg.Pool) -> tuple[list[QualityIssue], list[Quali
 async def _theses(pool: asyncpg.Pool, weights: dict[str, float]) -> list[QualityIssue]:
     stored = await load_active(pool, "theses", ThesesConfig)
     by = {t.ticker: t for t in (stored.body.theses if stored else [])}
+    # The pre-trade check exempts core holdings (the core ETFs) from the thesis requirement, so
+    # they are not gaps here either; counting them would inflate the affected weight.
+    strategy = await load_active(pool, "strategy", StrategyConfig)
+    classes = strategy.body.classifications if strategy else {}
     out: list[QualityIssue] = []
     for ticker, weight in weights.items():
+        if classes.get(ticker, {}).get("risk") == "core":
+            continue
         thesis = by.get(ticker)
         if thesis is None:
             out.append(

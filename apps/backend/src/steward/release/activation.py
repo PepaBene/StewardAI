@@ -24,6 +24,12 @@ class Activation(BaseModel):
     active: bool
     note: str | None
     since: dt.datetime
+    needs_switch_off: bool = Field(
+        default=False,
+        description="Switched on, but the release gate no longer allows it (an input went "
+        "stale, an audit mismatch was entered, ...). Switch it off; nothing does so for you.",
+    )
+    gate_note: str | None = None
 
 
 class ActivationRefused(Exception):
@@ -41,6 +47,22 @@ def check(body: ActivationIn, readiness: Readiness) -> None:
         raise ActivationRefused(
             f"{state.title} stays off: {state.reason}; source audit {state.audit}."
         )
+
+
+def with_gate(items: list[Activation], readiness: Readiness) -> list[Activation]:
+    """Re-check the gate for features that are already on: the gate is enforced at switch-on, so
+    a feature whose inputs or audit have since failed is flagged here as needing to be switched
+    off."""
+    states = {f.id: f for f in readiness.features}
+    out: list[Activation] = []
+    for item in items:
+        state = states.get(item.feature)
+        if item.active and state is not None and not state.can_activate:
+            note = f"{state.title} no longer passes the gate: {state.reason}; source audit "
+            note += f"{state.audit}."
+            item = item.model_copy(update={"needs_switch_off": True, "gate_note": note})
+        out.append(item)
+    return out
 
 
 async def record(pool: asyncpg.Pool, owner_id: str, body: ActivationIn) -> None:

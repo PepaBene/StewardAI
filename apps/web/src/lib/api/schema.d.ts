@@ -7997,6 +7997,14 @@ export interface components {
              * Format: date-time
              */
             since: string;
+            /**
+             * Needs Switch Off
+             * @description Switched on, but the release gate no longer allows it (an input went stale, an audit mismatch was entered, ...). Switch it off; nothing does so for you.
+             * @default false
+             */
+            needs_switch_off: boolean;
+            /** Gate Note */
+            gate_note?: string | null;
         };
         /** ActivationIn */
         ActivationIn: {
@@ -29327,6 +29335,8 @@ export interface components {
             tier: number;
             /** Rumour */
             rumour: boolean;
+            /** Cluster Id */
+            cluster_id?: string | null;
         };
         /** StoryOut */
         StoryOut: {
@@ -31292,6 +31302,12 @@ export interface components {
              * @default true
              */
             xirr_annualized: boolean;
+            /**
+             * Opening Gap Days
+             * @description Days between the window's nominal start and the stored day it opens on; above 0 the window is slightly longer than its label.
+             * @default 0
+             */
+            opening_gap_days: number;
             /** Reason */
             reason: string | null;
             benchmark: components["schemas"]["BenchmarkOut"] | null;

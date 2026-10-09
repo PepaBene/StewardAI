@@ -247,8 +247,9 @@ async def record(pool: asyncpg.Pool, owner_id: str, body: JournalEntryIn) -> Jou
 
 
 async def list_entries(
-    pool: asyncpg.Pool, owner_id: str, ticker: str | None = None, limit: int = 200
+    pool: asyncpg.Pool, owner_id: str, ticker: str | None = None, limit: int | None = 200
 ) -> list[JournalEntry]:
+    """Newest first. `limit=None` returns every entry (an export must not cut the list off)."""
     rows = await pool.fetch(
         f"select {_COLUMNS} from public.decision_journal"  # noqa: S608 - constant column list
         " where owner_id=$1 and ($2::text is null or ticker=$2)"

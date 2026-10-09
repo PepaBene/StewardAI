@@ -91,6 +91,9 @@ class SleeveReturn:
     annualized: Decimal | None
     reason: str | None
     covers_lookback: bool = True  # False: history is shorter than the lookback asked for
+    # Days the sleeve held something: the intervals that open on a positive value. `days` is the
+    # whole span, so a sleeve that sat empty for part of it has fewer invested days than `days`.
+    invested_days: int = 0
 
 
 def sleeve_return(
@@ -111,10 +114,13 @@ def sleeve_return(
     series_used = [DayValue(window[0].date, window[0].value, ZERO), *window[1:]]
     outcome = twr(series_used)
     span = (series_used[-1].date - series_used[0].date).days
+    # `twr` skips an interval that opens on an empty sleeve, so the return compounds over the
+    # invested days only; annualising it over the whole span would understate a part-time sleeve.
+    invested = sum((b.date - a.date).days for a, b in pairwise(series_used) if a.value > 0)
     if outcome.value is None:
         return SleeveReturn(
             name, series_used[0].date, end, span, None, None,
-            outcome.warnings[0] if outcome.warnings else "no return", bool(before),
+            outcome.warnings[0] if outcome.warnings else "no return", bool(before), invested,
         )  # fmt: skip
     return SleeveReturn(
         name,
@@ -122,9 +128,10 @@ def sleeve_return(
         end,
         span,
         outcome.value,
-        annualize(outcome.value, span),
+        annualize(outcome.value, invested),
         None,
         bool(before),
+        invested,
     )
 
 
@@ -173,6 +180,8 @@ def compare_sleeves(
     starts = [r.start for r in (core_return, stock_return) if r.start]
     ends = [r.end for r in (core_return, stock_return) if r.end]
     history = (min(ends) - max(starts)).days if starts and ends else 0
+    # A sleeve that held nothing for part of the span has not been judged over all of it.
+    history = min(history, core_return.invested_days, stock_return.invested_days)
     error = reconciliation_error(core, stocks)
     if core_return.total_return is None or stock_return.total_return is None:
         why = core_return.reason or stock_return.reason or "no return"

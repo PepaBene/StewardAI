@@ -140,6 +140,35 @@ def clean_peers(peers: list[str], ticker: str) -> list[str]:
     return sorted({p for p in (p.strip() for p in peers) if p and p.casefold() != own})
 
 
+def match_universe(stored: list[str], universe: list[str]) -> tuple[list[str], list[PeerExcluded]]:
+    """Map stored peers to the covered universe's actual-cased tickers: an exact match first, else
+    the single case-insensitive match. An ambiguous one is dropped with a note; a peer with no match
+    is kept as stored, so the loader reports it as not covered."""
+    known = set(universe)
+    by_fold: dict[str, list[str]] = {}
+    for u in sorted(known):
+        by_fold.setdefault(u.casefold(), []).append(u)
+    out: list[str] = []
+    notes: list[PeerExcluded] = []
+    for p in stored:
+        if p in known:
+            hit = p
+        else:
+            cands = by_fold.get(p.casefold(), [])
+            if len(cands) > 1:
+                notes.append(
+                    PeerExcluded(
+                        ticker=p,
+                        reason=f"ambiguous: matches {', '.join(cands)} when case is ignored; re-save the group with the exact ticker",
+                    )
+                )
+                continue
+            hit = cands[0] if cands else p
+        if hit not in out:
+            out.append(hit)
+    return out, notes
+
+
 async def list_groups(pool: asyncpg.Pool, owner_id: Any, ticker: str) -> list[PeerGroup]:
     rows = await pool.fetch(
         "select id, ticker, name, peers from public.company_peer_group where owner_id=$1 and ticker=$2 order by name",
@@ -200,7 +229,21 @@ async def resolve_peers(
             owner_id,
             company.ticker,
         )
-        rows = [{"t": p} for p in (row["peers"] if row else [])]
+        stored = list(row["peers"]) if row else []
+        universe = (
+            [
+                r["ticker"]
+                for r in await pool.fetch(
+                    "select ticker from public.investment_universe where lower(ticker) = any($1::text[])",
+                    [p.casefold() for p in stored],
+                )
+            ]
+            if stored
+            else []
+        )
+        resolved, unresolved = match_universe(stored, universe)
+        excluded.extend(unresolved)
+        rows = [{"t": p} for p in resolved]
         label = f"saved group {row['name']}" if row else "saved group (not found)"
     else:
         if not company.sector:

@@ -16,11 +16,13 @@ from steward.decision.themes import ThemeDefinition, ThemeSelector, theme_exposu
 from steward.events import feed as events_feed
 from steward.events.paths import event_paths
 from steward.journal import service as journal_service
+from steward.lookthrough.read import UNCLASSIFIED
 from steward.performance import service as performance_service
 from steward.performance.settings import load_settings
 from steward.research.sources import Registry
 from steward.xray import reports as xray_reports
 from steward.xray import service as xray_service
+from steward.xray.views import build_view
 
 SELECTOR_KINDS = [
     "sector", "industry", "country", "domicile", "listing", "currency", "revenue_country",
@@ -86,11 +88,31 @@ async def theme(
     loaded = await xray_service.load_cached(pool, owner_id)
     if loaded.data.portfolio is None:
         return UNAVAILABLE
+    # A value the portfolio does not carry would read as 0 % exposure at "high" confidence; check
+    # it against the labels the portfolio has, as the theme picker does.
+    ctx = xray_service.view_context(loaded)
+    labels = {
+        b.key: b.label
+        for b in build_view(kind, ctx).buckets  # type: ignore[arg-type]
+        if b.kind == "classified" and b.key != UNCLASSIFIED
+    }
+    wanted = value.strip().casefold()
+    match = next(
+        (k for k, label in labels.items() if wanted in (str(k).casefold(), str(label).casefold())),
+        None,
+    )
+    if match is None:
+        sample = ", ".join(str(k) for k in list(labels)[:15])
+        return {
+            "error": f"The portfolio has no {kind} labelled {value!r}, so no exposure was "
+            f"computed. Values it carries: {sample or 'none'}."
+        }
+    value = str(match)
     definition = ThemeDefinition(
         name=f"{kind}: {value}",
         selectors=[ThemeSelector(kind=kind, value=value)],
     )
-    result = theme_exposure(definition, xray_service.view_context(loaded))
+    result = theme_exposure(definition, ctx)
     sid = registry.add(
         "observation",
         f"theme:{kind}:{value}",

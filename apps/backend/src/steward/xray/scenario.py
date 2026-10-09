@@ -92,7 +92,7 @@ def apply_proposal(
     for w in request.weights:
         if w.ticker not in by_ticker:
             raise ProposalError(f"{w.ticker} is not a held position; add it under additions.")
-        wanted[w.ticker] = w.weight
+        wanted[w.ticker] = wanted.get(w.ticker, 0.0) + w.weight  # as with additions: adds up
     positions: list[PositionIn] = []
     for p in portfolio.positions:
         value = wanted[p.ticker] * total if p.ticker in wanted else p.value_base

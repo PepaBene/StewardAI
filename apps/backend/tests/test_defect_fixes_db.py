@@ -50,7 +50,9 @@ async def test_one_source_can_be_backed_out_and_nothing_else_is_touched(
     with pytest.raises(asyncpg.PostgresError):
         await backend_pool.execute("delete from public.source_document where regulator = 'ESEF'")
     report = json.loads(await backend_pool.fetchval("select public.purge_source_documents('ESEF')"))
-    assert report["source_document"] == 1 and report["source_document_version"] >= 1
+    # The report keys are schema-qualified table names (purge_rows runs with an empty search path).
+    assert report["public.source_document"] == 1
+    assert report["public.source_document_version"] >= 1
     left = await backend_pool.fetchval(
         "select count(*) from public.source_document where regulator = 'ESEF'"
     )

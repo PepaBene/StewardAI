@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from decimal import Decimal
 
 import asyncpg
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from steward.analytics import risk as stats
 from steward.config.holding_profiles import HoldingProfilesConfig
@@ -512,6 +512,9 @@ async def run_rebalance(
         rec = positions.get(t.ticker)
         if t.action != "sell" or rec is None or not rec["quantity"]:
             continue
+        if not rec["value_base"] or not rec["value_account"]:
+            notes.append(f"{t.ticker}: the position has no value; no tax-lot consequence shown.")
+            continue
         mine = lots.get(t.ticker)
         if not mine:
             notes.append(f"{t.ticker}: no open lots in the ledger; no tax-lot consequence shown.")
@@ -564,6 +567,23 @@ class PretradeRequest(BaseModel):
     deposit: float = Field(
         default=0, ge=-1e12, le=1e12, description="Cash added (or taken out) alongside the trades."
     )
+
+    @field_validator("trades")
+    @classmethod
+    def _one_leg_per_side_and_ticker(cls, trades: list[pt.TradeLeg]) -> list[pt.TradeLeg]:
+        """Legs on the same side of one ticker are one trade: the lot consequence of a sale is
+        computed once per ticker, so a second leg must not overwrite the first."""
+        merged: dict[tuple[str, str], pt.TradeLeg] = {}
+        for leg in trades:
+            key = (leg.side, leg.ticker)
+            first = merged.get(key)
+            if first is None:
+                merged[key] = leg
+            else:
+                merged[key] = first.model_copy(
+                    update={"value_base": first.value_base + leg.value_base}
+                )
+        return list(merged.values())
 
 
 async def volatility_and_price(
@@ -736,6 +756,8 @@ async def _attach_covariance(
         if ref is not None:
             series[ticker] = [(d, float(p)) for d, p in await load_series(pool, ref) if d >= since]
     model = covariance.build(series)
+    # A holding with no stored price series never reaches the model, so it is not in `left_out`.
+    ctx.unmodelled = [t for t in tickers if t not in series and after.get(t, 0.0) > 0]
     total = ctx.total_value
     if model is None or total <= 0:
         ctx.notes.append(
@@ -745,10 +767,11 @@ async def _attach_covariance(
     ctx.cov = model
     ctx.weights_before = {k: v / total for k, v in before.items() if v > 0}
     ctx.weights_after = {k: v / total for k, v in after.items() if v > 0}
-    if model.left_out:
+    left_out = sorted(set(model.left_out) | set(ctx.unmodelled))
+    if left_out:
         ctx.notes.append(
             "Left out of the covariance model for lack of shared history: "
-            + ", ".join(model.left_out)
+            + ", ".join(left_out)
             + "."
         )
 
@@ -785,6 +808,11 @@ async def _attach_sales(
         mine = lots.get(t.ticker)
         if rec is None or not rec["quantity"] or not mine:
             continue
+        if not rec["value_base"] or not rec["value_account"]:
+            ctx.notes.append(
+                f"{t.ticker}: the position has no value; no tax-lot consequence shown."
+            )
+            continue
         units = min(
             Decimal(str(t.value_base)) / Decimal(str(rec["value_base"] / rec["quantity"])),
             rec["quantity"],
@@ -801,6 +829,9 @@ async def _attach_sales(
             average_cost=settings.cost_method == "average",
         )
         ctx.sale_impacts[t.ticker] = impact
+        # Base currency per account currency, from the position itself, to carry the lot gains
+        # (account currency) into the base currency the hurdle is stated in.
+        ctx.sale_base_per_account[t.ticker] = float(rec["value_base"]) / float(rec["value_account"])
         account = rec["account_currency"]
         if normalise_currency(account)[0] == normalise_currency(settings.exemption_currency)[0]:
             rate: Decimal | None = Decimal(1)

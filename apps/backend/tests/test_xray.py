@@ -336,6 +336,39 @@ def test_revenue_geography_only_covers_companies_with_data() -> None:
     assert build_view("commodity", ctx_for(d)).classified_weight == 0
 
 
+def test_revenue_slices_above_the_whole_are_scaled_back_not_over_counted() -> None:
+    d = data(
+        revenue={
+            AAPL: {
+                "revenue_country": [
+                    RevenueSlice("US", 0.8, "owner"),
+                    RevenueSlice("DE", 0.4, "reported"),
+                ]
+            }
+        }
+    )
+    view = build_view("revenue_country", ctx_for(d))
+    assert bucket(view, "US").weight == pytest.approx(0.25 * 0.8 / 1.2)
+    assert bucket(view, "DE").weight == pytest.approx(0.25 * 0.4 / 1.2)
+    assert view.reconciles
+
+
+def test_a_dropped_leaf_of_one_per_mille_no_longer_reads_as_reconciled() -> None:
+    assert data().tolerance < 0.001
+
+
+def test_duplicate_tickers_in_what_if_weights_add_up_like_additions() -> None:
+    pf = portfolio()
+    both = ProposedRequest(
+        weights=[
+            ProposedWeight(ticker="AAPL_US_EQ", weight=0.04),
+            ProposedWeight(ticker="AAPL_US_EQ", weight=0.06),
+        ]
+    )
+    new_pf, _ = apply_proposal(pf, both, CANDIDATES)
+    assert {p.ticker: p.value_base for p in new_pf.positions}["AAPL_US_EQ"] == pytest.approx(100)
+
+
 def test_revenue_slices_use_reported_country_names_and_never_regions() -> None:
     def member(label: str, share: str) -> MemberLine:
         return MemberLine(

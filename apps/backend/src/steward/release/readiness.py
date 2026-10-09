@@ -223,7 +223,14 @@ def assess(
         inputs=inputs,
         audit=audit_state,
         audited_facts=matches,
-        can_activate=status == "ready" and audit_state == "passed" and zero_cost_passed,
+        # The ledger as a whole must also be complete (its sample targets and region spread met):
+        # a few self-entered matched facts on two subjects do not release a feature on their own.
+        can_activate=(
+            status == "ready"
+            and audit_state == "passed"
+            and zero_cost_passed
+            and audit_ledger.summarize(audit_rows).complete
+        ),
     )
 
 

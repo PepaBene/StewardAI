@@ -247,6 +247,7 @@ def twr(
 XIRR_LOWER = Decimal("-0.9999")
 XIRR_UPPER = Decimal(100)
 XIRR_TOLERANCE = Decimal("1e-12")
+XIRR_MAX_REPORTABLE = Decimal("1e12")  # beyond this the rate cannot be rounded or read
 
 
 def _npv(rate: Decimal, flows: Sequence[tuple[dt.date, Decimal]]) -> Decimal:
@@ -315,6 +316,10 @@ def xirr(
             else:
                 high = mid
         root = (low + high) / 2
+    if root > XIRR_MAX_REPORTABLE:
+        return unavailable(
+            "fraction", method, "the annual rate is too large to be meaningful", inputs=inputs
+        )
     return result(root, "fraction", method, as_of=ordered[-1][0], inputs=inputs)
 
 
@@ -344,7 +349,6 @@ def attribution_bridge(
     """
     method = version("attribution")
     gain = end_value - start_value - net_flows
-    residual = gain - sum(components.values(), ZERO)
     inputs = {
         "start": start_value,
         "end": end_value,
@@ -373,8 +377,12 @@ def attribution_bridge(
         warnings=warnings,
         inputs=inputs,
     )
+    shown = {k: rounded(v, "money") or ZERO for k, v in components.items()}
+    # Round the components first and derive the residual from the rounded gain, so the figures
+    # that are displayed add up to the displayed gain to the cent.
+    shown_residual = (rounded(gain, "money") or ZERO) - sum(shown.values(), ZERO)
     return Bridge(
         **base.model_dump(),
-        components={k: rounded(v, "money") or ZERO for k, v in components.items()},
-        residual=rounded(residual, "money") or ZERO,
+        components=shown,
+        residual=shown_residual,
     )

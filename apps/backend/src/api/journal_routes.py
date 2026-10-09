@@ -98,7 +98,7 @@ async def export_report_pdf(
 @router.get("/journal/export/entries.csv", response_class=PlainTextResponse)
 async def export_entries_csv(pool: Pool, owner: Owner) -> PlainTextResponse:
     """Every journal entry as CSV, oldest decision last."""
-    rows = await entries.list_entries(pool, owner.user_id, limit=2000)
+    rows = await entries.list_entries(pool, owner.user_id, limit=None)
     return PlainTextResponse(
         owner_export.journal_csv(rows),
         media_type="text/csv",

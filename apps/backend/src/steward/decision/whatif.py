@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Literal
 
 import asyncpg
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from steward.decision import pretrade as pt
 from steward.decision import service as svc
@@ -55,6 +55,18 @@ class WhatIfCase(BaseModel):
     move: float | None = Field(default=None, ge=-0.9, le=2, description="FX move against base.")
     benchmark_symbol: str | None = Field(default=None, max_length=32)
     name: str | None = Field(default=None, max_length=120)
+
+    @field_validator("split")
+    @classmethod
+    def _split_shares(cls, split: dict[str, float]) -> dict[str, float]:
+        """Each share is a fraction of the amount: a negative one would turn a purchase into a
+        sale (or a withdrawal into a purchase)."""
+        for ticker, share in split.items():
+            if not 0 < share <= 1:
+                raise ValueError(f"The share for {ticker} must be above 0 and at most 1.")
+        if sum(split.values()) > 1 + 1e-9:
+            raise ValueError("The split adds to more than 100%.")
+        return split
 
 
 class WhatIfResult(BaseModel):
@@ -101,6 +113,29 @@ def withdrawal_sales(
         for t, v in left.items():
             sales[t] = sales.get(t, 0.0) + rest * v / remaining
     return sales, max(0.0, rest)
+
+
+def pro_rata_purchase(
+    ticker: str, spend: float, values: dict[str, float]
+) -> tuple[dict[str, float], list[pt.TradeLeg], float]:
+    """Values after buying `spend` of `ticker`, funded by trimming every holding by the same
+    factor, the trade legs, and that factor. The trim comes first and the purchase is added on
+    top, so a ticker that is already held ends at its trimmed value plus the spend and gets one
+    net leg, never a buy and a sell of the same ticker."""
+    invested = sum(values.values())
+    if spend >= invested:
+        raise CaseError("The new weight is larger than all current positions together.")
+    factor = (invested - spend) / invested
+    after = {t: v * factor for t, v in values.items()}
+    after[ticker] = after.get(ticker, 0.0) + spend
+    legs: list[pt.TradeLeg] = []
+    for t, value in after.items():
+        net = value - values.get(t, 0.0)
+        if net > 1e-6:
+            legs.append(pt.TradeLeg(side="buy", ticker=t, value_base=net))
+        elif net < -1e-6:
+            legs.append(pt.TradeLeg(side="sell", ticker=t, value_base=-net))
+    return after, legs, factor
 
 
 async def run_case(pool: asyncpg.Pool, owner_id: str, case: WhatIfCase) -> WhatIfResult:
@@ -164,17 +199,8 @@ async def run_case(pool: asyncpg.Pool, owner_id: str, case: WhatIfCase) -> WhatI
         _need(case.weight, "a weight")
         assert case.ticker is not None and case.weight is not None
         spend = case.weight * total
-        after[case.ticker] = after.get(case.ticker, 0.0) + spend
-        legs.append(pt.TradeLeg(side="buy", ticker=case.ticker, value_base=spend))
         if case.fund_from == "pro_rata":
-            invested = sum(values.values())
-            if spend >= invested:
-                raise CaseError("The new weight is larger than all current positions together.")
-            factor = (invested - spend) / invested
-            for t, v in values.items():
-                after[t] = v * factor
-                if v - after[t] > 1e-6:
-                    legs.append(pt.TradeLeg(side="sell", ticker=t, value_base=v - after[t]))
+            after, legs, factor = pro_rata_purchase(case.ticker, spend, values)
             summary.append(
                 f"Buy {case.ticker} at {case.weight:.1%}, funded by trimming every position by "
                 f"{1 - factor:.1%}."
@@ -184,6 +210,8 @@ async def run_case(pool: asyncpg.Pool, owner_id: str, case: WhatIfCase) -> WhatI
                 raise CaseError(
                     f"Cash is {portfolio.cash_base:,.0f} {base}; the purchase needs {spend:,.0f}."
                 )
+            after[case.ticker] = after.get(case.ticker, 0.0) + spend
+            legs.append(pt.TradeLeg(side="buy", ticker=case.ticker, value_base=spend))
             summary.append(f"Buy {case.ticker} at {case.weight:.1%} of the portfolio, from cash.")
 
     elif case.kind in ("contribution", "reinvest_dividends"):
@@ -201,6 +229,8 @@ async def run_case(pool: asyncpg.Pool, owner_id: str, case: WhatIfCase) -> WhatI
         if sum(split.values()) > 1 + 1e-9:
             raise CaseError("The split adds to more than 100%.")
         for t, share in split.items():
+            if deposit * share <= 1e-6:
+                continue
             after[t] = after.get(t, 0.0) + deposit * share
             legs.append(pt.TradeLeg(side="buy", ticker=t, value_base=deposit * share))
         kept = deposit * (1 - sum(split.values()))

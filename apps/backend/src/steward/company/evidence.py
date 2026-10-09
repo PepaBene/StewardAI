@@ -163,7 +163,10 @@ def segment_lines(rows: list[dict[str, Any]]) -> list[SegmentLine]:
         if axis is None or start is None or not 330 <= (end - start).days <= 380:
             continue
         key = (*axis, start, end)
-        if key not in latest or (r["known_at"], r["id"]) > (latest[key]["known_at"], latest[key]["id"]):
+        if key not in latest or (r["known_at"], r["id"]) > (
+            latest[key]["known_at"],
+            latest[key]["id"],
+        ):
             latest[key] = r
     if not latest:
         return []
@@ -174,7 +177,9 @@ def segment_lines(rows: list[dict[str, Any]]) -> list[SegmentLine]:
             by_axis.setdefault(axis, []).append((member, r))
 
     def rank(axis: str) -> tuple[int, Decimal]:
-        order = next((i for i, p in enumerate(_AXIS_PREFERENCE) if p in axis), len(_AXIS_PREFERENCE))
+        order = next(
+            (i for i, p in enumerate(_AXIS_PREFERENCE) if p in axis), len(_AXIS_PREFERENCE)
+        )
         return order, -sum((r["value"] for _, r in by_axis[axis] if r["value"] > 0), Decimal(0))
 
     chosen = by_axis[min(by_axis, key=rank)]
@@ -464,7 +469,9 @@ def _eps_known_at(annual: StatementsView | None) -> dict[dt.date, dt.datetime | 
     for table in annual.statements:
         for line in table.lines:
             if line.key == "eps_diluted":
-                out.update({ends[cid]: cell.known_at for cid, cell in line.cells.items() if cid in ends})
+                out.update(
+                    {ends[cid]: cell.known_at for cid, cell in line.cells.items() if cid in ends}
+                )
     return out
 
 
@@ -794,11 +801,19 @@ def _growth(now: Decimal | None, before: Decimal | None) -> Decimal | None:
 
 
 def announced_by_fiscal_year(
-    rows: Sequence[Mapping[str, Any]], period_ends: Sequence[dt.date], currency: str | None
-) -> dict[dt.date, Decimal]:
+    rows: Sequence[Mapping[str, Any]],
+    period_ends: Sequence[dt.date],
+    currency: str | None,
+    primary_listing: int | None = None,
+) -> tuple[dict[dt.date, Decimal], list[str]]:
     """Confirmed cash dividends per share, summed by the fiscal year (keyed by its period end) that
-    contains the ex-date, to sit beside that year's cash paid. Only the statement currency counts
-    (an unlabelled amount is kept), and only one listing, so a dual listing is not counted twice."""
+    contains the ex-date, to sit beside that year's cash paid, plus notes on what was left out.
+
+    Only the statement currency counts (an unlabelled amount is kept). With the company's primary
+    listing known, only that listing counts. Without it, identical ex-date and amount rows are
+    de-duplicated across listings and sources; if the listings still disagree, the announced figure
+    is withheld and the ambiguity is flagged rather than one listing silently chosen."""
+    notes: list[str] = []
     usable = [
         r
         for r in rows
@@ -806,22 +821,33 @@ def announced_by_fiscal_year(
         or currency is None
         or str(r["currency"]).upper() == currency.upper()
     ]
-    counts: dict[Any, int] = {}
-    for r in usable:
-        counts[r.get("listing_id")] = counts.get(r.get("listing_id"), 0) + 1
-    if counts:
-        keep = max(counts, key=lambda k: (counts[k], -(k if isinstance(k, int) else 0)))
-        usable = [r for r in usable if r.get("listing_id") == keep]
+    if primary_listing is not None:
+        usable = [r for r in usable if r.get("listing_id") == primary_listing]
+    else:
+        per_listing: dict[Any, set[tuple[dt.date, Decimal]]] = {}
+        for r in usable:
+            per_listing.setdefault(r.get("listing_id"), set()).add((r["ex_date"], r["cash_amount"]))
+        if len({frozenset(s) for s in per_listing.values()}) > 1:
+            notes.append(
+                "Announced dividends differ between listings and no primary listing is recorded, "
+                "so no announced figure is shown."
+            )
+            return {}, notes
+    seen: set[tuple[dt.date, Decimal]] = set()
     ends = sorted(period_ends)
     out: dict[dt.date, Decimal] = {}
-    for r in usable:
+    for r in sorted(usable, key=lambda r: r["ex_date"]):
+        key = (r["ex_date"], r["cash_amount"])
+        if key in seen:  # the same dividend carried by another listing or source
+            continue
+        seen.add(key)
         ex = r["ex_date"]
         for i, end in enumerate(ends):
             start = ends[i - 1] if i else end - dt.timedelta(days=366)
             if start < ex <= end:
                 out[end] = out.get(end, Decimal(0)) + r["cash_amount"]
                 break
-    return out
+    return out, notes
 
 
 async def capital_allocation(
@@ -830,13 +856,18 @@ async def capital_allocation(
     fig = figures_by_column(annual)
     cols = [c for c in annual.columns if c.kind == "annual"]
     div_rows = await pool.fetch(
-        """select a.ex_date, a.cash_amount, a.currency, a.listing_id from public.corporate_action a join public.security_listing l on l.id=a.listing_id
+        """select a.ex_date, a.cash_amount, a.currency, a.listing_id, k.listing_id as primary_listing
+           from public.corporate_action a join public.security_listing l on l.id=a.listing_id
            join public.instrument_security_link k on k.listing_id=l.id
            where k.ticker=$1 and a.action_type='cash_dividend' and a.status='confirmed' and a.cash_amount is not null""",
         ticker,
     )
-    paid_per_share = announced_by_fiscal_year(
-        [dict(r) for r in div_rows], [c.end for c in cols], annual.currency
+    # `instrument_security_link` holds one listing per ticker: it is the company's own (primary) one.
+    primary = next(
+        (r["primary_listing"] for r in div_rows if r["primary_listing"] is not None), None
+    )
+    paid_per_share, dividend_notes = announced_by_fiscal_year(
+        [dict(r) for r in div_rows], [c.end for c in cols], annual.currency, primary
     )
     # Repurchases the equity note reports as made in the year, to set beside the cash paid.
     note_repurchased: dict[dt.date, Decimal] = {}
@@ -937,7 +968,7 @@ async def capital_allocation(
                 source_url=r["source_url"],
             )
         )
-    warnings = []
+    warnings = list(dividend_notes)
     if not any(y.fcf is not None for y in years):
         warnings.append(
             "No filed operating cash flow and capital expenditure, so free cash flow is not available."

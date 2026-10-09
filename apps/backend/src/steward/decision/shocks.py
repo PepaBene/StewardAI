@@ -23,10 +23,11 @@ sensitivity by themselves.
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 from steward.analytics.versions import version
 from steward.lookthrough.read import CASH, NOT_LOOKED, UNKNOWN_FUND
@@ -61,6 +62,31 @@ class ShockSet(BaseModel):
         default_factory=dict,
         description="Country (ISO code) -> demand move on top of the market, fraction.",
     )
+
+    @field_validator("fx", "sector", "country")
+    @classmethod
+    def _bounded_moves(cls, moves: dict[str, float], info: ValidationInfo) -> dict[str, float]:
+        """Moves share the equity bounds (a total loss is -100 %, so nothing below -95 %); keys are
+        normalised so that `usd` or `us` match what the leaves carry."""
+        out: dict[str, float] = {}
+        for key, move in moves.items():
+            name = key.strip()
+            if info.field_name == "fx":
+                name = name.upper()
+                if not re.fullmatch(r"[A-Z]{3}", name):
+                    raise ValueError(f"{key!r} is not a three-letter currency code.")
+            elif info.field_name == "country":
+                name = name.upper()
+                if not re.fullmatch(r"[A-Z]{2,3}", name):
+                    raise ValueError(f"{key!r} is not an ISO country code.")
+            if not name:
+                raise ValueError("A shock key cannot be empty.")
+            if not -0.95 <= move <= 2:
+                raise ValueError(f"The move for {key!r} must be between -95 % and +200 %.")
+            if name in out:
+                raise ValueError(f"{key!r} is given twice.")
+            out[name] = move
+        return out
 
 
 class ShockAssumptions(BaseModel):
@@ -296,6 +322,22 @@ def apply_shocks(
             "applied and stays at its current value; the result is a floor on the exposure "
             "that was measurable, not a full stress."
         )
+    seen = {
+        "fx": {(leaf.currency or "").upper() for leaf in leafset.leaves},
+        "sector": {(leaf.sector or "").casefold() for leaf in leafset.leaves},
+        "country": {(leaf.country or "").upper() for leaf in leafset.leaves},
+    }
+    for factor, moves in (
+        ("fx", shocks.fx),
+        ("sector", shocks.sector),
+        ("country", shocks.country),
+    ):
+        for name in moves:
+            probe = name.casefold() if factor == "sector" else name
+            if probe not in seen[factor]:
+                warnings.append(
+                    f"No holding carries the {factor} {name!r}; that move applies to nothing."
+                )
     if shocks.model_dump(exclude_defaults=True) == {}:
         warnings.append("No shock was set; nothing moved.")
     return ShockScenarioResult(
@@ -374,7 +416,8 @@ def _leaf_effects(
                 )
                 return None, used, reason
     if is_equity:
-        sector_move = shocks.sector.get(leaf.sector or "")
+        by_sector = {k.casefold(): v for k, v in shocks.sector.items()}
+        sector_move = by_sector.get(leaf.sector.casefold()) if leaf.sector else None
         if sector_move is not None:
             effects["sector"] = sector_move
             effects["_local"] += sector_move

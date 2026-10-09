@@ -121,35 +121,66 @@ def facts_for(report: CompanyReport) -> list[str]:
     return out + conflicts
 
 
-_NUMBER = re.compile(r"(?<![\w.])-?\d[\d,]*(?:\.\d+)?")
+_NUMBER = re.compile(
+    r"(?<![\w.])-?\d[\d,]*(?:\.\d+)?"
+    r"(?:(?:k|m|mn|bn|b|tn)\b|\s?(?:thousand|million|billion|trillion)\b)?",
+    re.IGNORECASE,
+)
+_SCALES = {
+    "k": Decimal(10) ** 3,
+    "thousand": Decimal(10) ** 3,
+    "m": Decimal(10) ** 6,
+    "mn": Decimal(10) ** 6,
+    "million": Decimal(10) ** 6,
+    "b": Decimal(10) ** 9,
+    "bn": Decimal(10) ** 9,
+    "billion": Decimal(10) ** 9,
+    "tn": Decimal(10) ** 12,
+    "trillion": Decimal(10) ** 12,
+}
 _ALLOWED_NUMBERS = {Decimal(40)}  # the pre-mortem loss level the instructions themselves state
 
 
-def _numbers(text: str) -> list[tuple[Decimal, int]]:
-    found: list[tuple[Decimal, int]] = []
+def _numbers(text: str) -> list[tuple[Decimal, int, Decimal]]:
+    """(value as written, decimal places written, unit multiplier) for each figure in `text`.
+    Thousands separators are removed; a k/m/bn/billion suffix sets the multiplier."""
+    found: list[tuple[Decimal, int, Decimal]] = []
     for m in _NUMBER.finditer(text):
-        raw = m.group().replace(",", "").rstrip(".")
+        token = m.group()
+        suffix = re.search(r"[a-z]+$", token, re.IGNORECASE)
+        scale = _SCALES[suffix.group().lower()] if suffix else Decimal(1)
+        raw = (token[: suffix.start()] if suffix else token).strip().replace(",", "").rstrip(".")
         try:
             value = Decimal(raw)
         except InvalidOperation:
             continue
-        found.append((value, len(raw.split(".")[1]) if "." in raw else 0))
+        found.append((value, len(raw.split(".")[1]) if "." in raw else 0, scale))
     return found
 
 
 def numbers_supported(text: str, facts: list[str]) -> bool:
-    """True when every figure in `text` appears in the facts (as written, or as a percentage of
-    a fraction the facts give). Bare whole numbers up to ten are ordinary words, not figures."""
-    pool = [value for fact in facts for value, _ in _numbers(fact)]
-    for value, places in _numbers(text):
-        if value in _ALLOWED_NUMBERS or (value == value.to_integral_value() and abs(value) <= 10):
+    """True when every figure in `text` is a fact's figure, allowing for: thousands separators,
+    a percentage of a fraction (x100, either way), rounding to the precision the text shows, and
+    a scaled unit (1.2bn for 1,200,000,000). Bare whole numbers up to ten are ordinary words,
+    not figures. A figure no fact supports makes the line unsupported."""
+    pool = [
+        v for fact in facts for value, _, scale in _numbers(fact) for v in {value, value * scale}
+    ]
+    for value, places, scale in _numbers(text):
+        if scale == 1 and (
+            value in _ALLOWED_NUMBERS or (value == value.to_integral_value() and abs(value) <= 10)
+        ):
             continue
         quantum = Decimal(1).scaleb(-places)
-        if not any(
-            value
-            in (p.quantize(quantum, ROUND_HALF_UP), (p * 100).quantize(quantum, ROUND_HALF_UP))
-            for p in pool
-        ):
+        supported = False
+        for p in pool:
+            for factor in (Decimal(1), Decimal(100), Decimal("0.01")):
+                if (p * factor / scale).quantize(quantum, ROUND_HALF_UP) == value:
+                    supported = True
+                    break
+            if supported:
+                break
+        if not supported:
             return False
     return True
 
