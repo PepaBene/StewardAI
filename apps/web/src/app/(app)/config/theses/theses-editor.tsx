@@ -23,14 +23,18 @@ import {
   BASES,
   KNOWN_METRICS,
   KPI_PERIODS,
+  MAIN_REASONS,
   newKpi,
   newThesis,
   OPERATORS,
+  preMortemAsExits,
+  rigorGaps,
   slugFromMetric,
   thesesFromBody,
   thesesToBody,
   UNIT_EXAMPLES,
   type KpiForm,
+  type RigorForm,
   type TargetForm,
   type ThesisForm,
 } from "@/lib/config/theses-form";
@@ -241,6 +245,77 @@ function ThesisCard({
     }));
   const setTarget = (change: Partial<TargetForm>) =>
     onChange((f) => ({ ...f, target: { ...f.target, ...change } }));
+  const setRigor = (change: Partial<RigorForm>) =>
+    onChange((f) => ({ ...f, rigor: { ...f.rigor, ...change } }));
+  const gaps = rigorGaps(form.rigor);
+  const [prefillBusy, setPrefillBusy] = useState(false);
+  const [prefillNote, setPrefillNote] = useState<string | null>(null);
+
+  /** Fills "growth the price implies" from the valuation tab's reverse DCF. Nothing is saved until you save the thesis. */
+  async function fillImplied() {
+    setPrefillBusy(true);
+    setPrefillNote(null);
+    const res = await api().GET("/companies/{ticker}/thesis-prefill", {
+      params: { path: { ticker: form.ticker.split("_")[0] } },
+    });
+    setPrefillBusy(false);
+    if (!res.response.ok || !res.data) return setPrefillNote("The valuation could not be read for this ticker.");
+    if (res.data.implied_growth === null || res.data.implied_growth === undefined) {
+      return setPrefillNote(res.data.reason ?? "The valuation gives no figure.");
+    }
+    setRigor({ implied_growth: (res.data.implied_growth * 100).toFixed(1) });
+    setPrefillNote("Filled from the base-case reverse DCF. Check it before you save.");
+  }
+
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [draftNote, setDraftNote] = useState<string | null>(null);
+  const [draftFacts, setDraftFacts] = useState<string[]>([]);
+
+  /** Drafts the text fields from the stored research and figures. It fills only fields that are empty and saves nothing. */
+  async function draftText() {
+    setDraftBusy(true);
+    setDraftNote(null);
+    setDraftFacts([]);
+    const res = await api().POST("/companies/{ticker}/thesis-draft", {
+      params: { path: { ticker: form.ticker.split("_")[0] } },
+    });
+    setDraftBusy(false);
+    if (!res.response.ok || !res.data) {
+      const detail = (res.error as { detail?: unknown } | undefined)?.detail;
+      return setDraftNote(typeof detail === "string" ? detail : "The draft could not be made.");
+    }
+    const d = res.data;
+    const lines = (items: { text: string }[]) => items.map((i) => i.text).join("\n");
+    onChange((f) => {
+      const next = { ...f, rigor: { ...f.rigor } };
+      if (!f.why_owned.trim() && d.why_owned) {
+        next.why_owned = d.why_owned.text;
+      }
+      if (!f.exit_conditions.trim() && d.exit_conditions.length > 0) {
+        next.exit_conditions = lines(d.exit_conditions);
+      }
+      if (!f.rigor.pre_mortem.trim() && d.pre_mortem.length > 0) {
+        next.rigor.pre_mortem = lines(d.pre_mortem);
+      }
+      if (!f.rigor.belief.trim() && !f.rigor.disproof.trim() && d.variant_perception) {
+        next.rigor.belief = d.variant_perception.belief;
+        next.rigor.disproof = d.variant_perception.disproof;
+      }
+      return next;
+    });
+    const facts = [
+      d.why_owned,
+      ...d.exit_conditions,
+      ...d.pre_mortem,
+      d.variant_perception,
+    ].flatMap((x) => (x ? x.facts : []));
+    setDraftFacts([...new Set(facts)]);
+    setDraftNote(
+      `Draft written into the empty fields. Check every line against the facts below, then edit and save. ${
+        d.dropped > 0 ? `${d.dropped} line(s) with no supporting fact were removed. ` : ""
+      }Left for you: ${d.left_to_owner.join("; ")}. ${d.notes.join(" ")}`,
+    );
+  }
 
   return (
     <section
@@ -280,6 +355,30 @@ function ThesisCard({
           Remove thesis
         </Button>
       </div>
+      <div className="flex flex-col gap-1">
+        <div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!form.ticker || draftBusy}
+            onClick={() => void draftText()}
+          >
+            {draftBusy ? "Drafting…" : "Draft from research"}
+          </Button>
+        </div>
+        {draftNote ? <p className="max-w-prose text-xs text-text-muted">{draftNote}</p> : null}
+        {draftFacts.length > 0 ? (
+          <details className="max-w-prose text-xs">
+            <summary className="cursor-pointer">Facts the draft rests on ({draftFacts.length})</summary>
+            <ul className="mt-1 list-disc pl-5">
+              {draftFacts.map((f) => (
+                <li key={f}>{f}</li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
+      </div>
       <TextAreaField
         label="Why it is owned"
         path={`${path}.why_owned`}
@@ -304,7 +403,7 @@ function ThesisCard({
           unless the new thesis raises the target. At or below the buy target,
           the holding is a candidate to add to. Leave all blank for none.
         </p>
-        <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-3 lg:grid-cols-[0.8fr_0.8fr_0.6fr_1.6fr_0.9fr]">
+        <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-3 lg:grid-cols-[0.8fr_0.8fr_0.8fr_0.6fr_1.6fr_0.9fr]">
           <TextField
             label="Sell target"
             path={`${path}.price_target.sell_target`}
@@ -322,6 +421,16 @@ function ThesisCard({
             inputMode="decimal"
             className="num"
             onChange={(v) => setTarget({ buy_target: v })}
+          />
+          <TextField
+            label="Bear-case price"
+            path={`${path}.price_target.bear_case`}
+            errors={errors}
+            value={form.target.bear_case}
+            inputMode="decimal"
+            className="num"
+            hint="If the thesis fails"
+            onChange={(v) => setTarget({ bear_case: v })}
           />
           <TextField
             label="Currency"
@@ -357,6 +466,136 @@ function ThesisCard({
             {m}
           </p>
         ))}
+      </fieldset>
+
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-medium">Before you rely on it</legend>
+        <p className="text-sm text-text-muted">
+          What the price already assumes, how often that has happened, how it
+          could fail and what you know that the market does not.
+          {gaps.length > 0
+            ? ` Still missing: ${gaps.join("; ")}.`
+            : " Every requirement is filled in."}
+        </p>
+        <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-4">
+          <TextField
+            label="Growth the price implies"
+            path={`${path}.implied_growth`}
+            errors={errors}
+            value={form.rigor.implied_growth}
+            inputMode="decimal"
+            className="num"
+            hint="% a year, from the reverse DCF"
+            onChange={(v) => setRigor({ implied_growth: v })}
+          />
+          <div className="col-span-2 flex flex-col justify-end gap-1 pb-1 sm:col-span-1">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!form.ticker || prefillBusy}
+              onClick={() => void fillImplied()}
+            >
+              {prefillBusy ? "Reading…" : "Fill from valuation"}
+            </Button>
+            {prefillNote ? <p className="text-xs text-text-muted">{prefillNote}</p> : null}
+          </div>
+          <TextField
+            label="Companies that achieved it"
+            path={`${path}.base_rate.share_achieved`}
+            errors={errors}
+            value={form.rigor.base_share}
+            inputMode="decimal"
+            className="num"
+            hint="% of comparable companies"
+            onChange={(v) => setRigor({ base_share: v })}
+          />
+          <TextField
+            className="col-span-2"
+            label="Which companies were compared"
+            path={`${path}.base_rate.comparison`}
+            errors={errors}
+            value={form.rigor.base_comparison}
+            placeholder="US software, 5-10 bn revenue, 10-year growth"
+            onChange={(v) => setRigor({ base_comparison: v })}
+          />
+          <TextField
+            className="col-span-2 sm:col-span-4"
+            label="Source of the base rate"
+            path={`${path}.base_rate.source`}
+            errors={errors}
+            value={form.rigor.base_source}
+            onChange={(v) => setRigor({ base_source: v })}
+          />
+        </div>
+        <TextAreaField
+          label="Pre-mortem: the three likeliest reasons it loses 40%"
+          path={`${path}.pre_mortem`}
+          errors={errors}
+          value={form.rigor.pre_mortem}
+          onChange={(v) => setRigor({ pre_mortem: v })}
+          hint="One per line, at most three."
+          rows={3}
+        />
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={form.rigor.pre_mortem.trim() === ""}
+            onClick={() =>
+              set(
+                "exit_conditions",
+                preMortemAsExits(form.exit_conditions, form.rigor.pre_mortem),
+              )
+            }
+          >
+            Add these as exit conditions
+          </Button>
+        </div>
+        <div className="grid gap-2 lg:grid-cols-2">
+          <TextAreaField
+            label="What you believe that the market does not"
+            path={`${path}.variant_perception.belief`}
+            errors={errors}
+            value={form.rigor.belief}
+            onChange={(v) => setRigor({ belief: v })}
+            rows={2}
+          />
+          <TextAreaField
+            label="The evidence that would prove you wrong"
+            path={`${path}.variant_perception.disproof`}
+            errors={errors}
+            value={form.rigor.disproof}
+            onChange={(v) => setRigor({ disproof: v })}
+            rows={2}
+          />
+        </div>
+        <div className="grid grid-cols-2 items-start gap-2 sm:max-w-md">
+          <SelectField
+            label="Conviction"
+            path={`${path}.conviction`}
+            errors={errors}
+            value={form.rigor.conviction}
+            options={[
+              { value: "", label: "Not stated" },
+              ...[1, 2, 3, 4, 5].map((n) => ({
+                value: String(n),
+                label: `${n} of 5`,
+              })),
+            ]}
+            onChange={(v) => setRigor({ conviction: v })}
+          />
+          <SelectField
+            label="Main reason for owning it"
+            path={`${path}.main_reason`}
+            errors={errors}
+            value={form.rigor.main_reason}
+            options={[
+              { value: "", label: "Not stated" },
+              ...MAIN_REASONS.map((r) => ({ value: r.value, label: r.label })),
+            ]}
+            onChange={(v) => setRigor({ main_reason: v })}
+          />
+        </div>
       </fieldset>
 
       <fieldset className="space-y-2">

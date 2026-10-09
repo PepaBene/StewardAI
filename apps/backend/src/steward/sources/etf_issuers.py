@@ -405,6 +405,28 @@ async def _get_json(
         raise IssuerSchemaError(f"{source}: response is not JSON") from exc
 
 
+async def fetch_ishares_component(
+    http: httpx.AsyncClient,
+    portfolio_id: str,
+    component: str,
+    *,
+    api_url: str = ISHARES_API,
+    site: str = "ishares-uk",
+    locale: str = "en_GB",
+    retries: int = 1,
+    retry_delay: float = 2.0,
+) -> Any:
+    """One product-data component as the issuer sends it (e.g. `keyFundFacts`, `fundHeader`)."""
+    return await _get_json(
+        http,
+        "iShares product-data API",
+        f"{api_url.rstrip('/')}/api/v2/get-product-data",
+        _ishares_params(portfolio_id, component, site, locale),
+        retries,
+        retry_delay,
+    )
+
+
 async def fetch_ishares(
     http: httpx.AsyncClient,
     portfolio_id: str,

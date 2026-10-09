@@ -17,7 +17,7 @@ import asyncio
 import datetime as dt
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Literal, Protocol, cast
 
 import anthropic
@@ -40,10 +40,14 @@ from steward.config.strategy import (
 )
 from steward.config.thesis import ThesesConfig
 from steward.jobs.runner import JobContext
+from steward.journal.service import scorecard as journal_scorecard
 from steward.llm.client import LLM, create_llm
 from steward.llm.routing import routing_client
 from steward.llm.types import Message, Request, provider_of
 from steward.ownership.read import holding_ownership
+from steward.performance.alerts import PerformanceBreach, alert_performance
+from steward.performance.review import performance_review
+from steward.performance.settings import PerformanceSettings, load_latest_settings
 from steward.portfolio.breaches import _holds, evaluate
 from steward.portfolio.drift import DriftReport
 from steward.portfolio.read import portfolio_overview
@@ -57,7 +61,7 @@ Status = Literal["pass", "breach", "unknown"]
 
 class ComplianceRow(BaseModel):
     id: str = Field(description="The strategy rule id, or hard_limit:/band: keys.")
-    kind: Literal["rule", "hard_limit", "band"]
+    kind: Literal["rule", "hard_limit", "band", "performance"]
     description: str
     status: Status
     detail: str
@@ -83,6 +87,18 @@ class ProposedAction(BaseModel):
     kpis: list[str] = Field(description="Thesis KPIs it rests on, as TICKER:kpi_id.")
 
 
+class HoldingPeriodRow(BaseModel):
+    """An open purchase lot with both dates of the holding-period test (plan M4.8)."""
+
+    ticker: str
+    bought_on: dt.date
+    passes_on: dt.date
+    months_remaining: float
+    passed: bool
+    quantity: float
+    forfeits_exemption_warning: bool
+
+
 class ReviewBody(BaseModel):
     month: str
     headline: str
@@ -95,6 +111,16 @@ class ReviewBody(BaseModel):
     flags: list[CitedSentence]
     actions: list[ProposedAction]
     dropped_actions: int = Field(default=0, description="Proposed actions citing nothing valid.")
+    holding_periods: list[HoldingPeriodRow] = Field(
+        default_factory=list,
+        description="Open lots with the date each passes the holding-period test; facts, not "
+        "tax advice.",
+    )
+    decision_scorecard: list[str] = Field(
+        default_factory=list,
+        description="How past journal decisions turned out (price change since the decision, "
+        "each with its sample size; sections with too few decisions are not summarised).",
+    )
     sources: list[Source]
     model: str | None = None
     notes: list[str] = Field(default_factory=list)
@@ -638,6 +664,34 @@ def keep_cited(
     return kept, dropped
 
 
+async def decision_scorecard_lines(pool: asyncpg.Pool, notes: list[str]) -> list[str]:
+    """The journal scorecard as plain lines. A failure adds a note and never stops the review."""
+    try:
+        # The worker has no signed-in user; the app has one owner, whose journal this reads.
+        owner_id = await pool.fetchval(
+            "select owner_id::text from public.decision_journal order by id limit 1"
+        )
+        if owner_id is None:
+            return []
+        card = await journal_scorecard(pool, owner_id)
+    except Exception:
+        logger.exception("decision scorecard failed")
+        notes.append("The decision scorecard could not be computed.")
+        return []
+    lines: list[str] = []
+    for section in card.sections:
+        if section.status != "ok":
+            lines.append(f"{section.title}: {section.note}")
+            continue
+        for row in section.rows:
+            change = (
+                f", median change {row.median_change:+.1%}" if row.median_change is not None else ""
+            )
+            share = f", {row.share:.0%}" if row.share is not None else ""
+            lines.append(f"{section.title} / {row.label}: n={row.n}{change}{share}")
+    return lines
+
+
 async def build_review(
     pool: asyncpg.Pool,
     now: dt.datetime,
@@ -651,7 +705,28 @@ async def build_review(
     notes: list[str] = []
     strategy = strategy or StrategyConfig(base_currency="EUR")
     rows, as_of, total, currency = await compliance(pool, reg, strategy, strategy_version)
+    holding_periods: list[HoldingPeriodRow] = []
+    try:
+        # Never lets a performance error stop the review: the rows are added or the gap is noted.
+        findings, lots = await performance_review(pool)
+        rows += [
+            ComplianceRow(
+                id=f.id,
+                kind="performance",
+                description=f.description,
+                status=f.status,
+                detail=f.detail,
+            )
+            for f in findings
+        ]
+        holding_periods = [HoldingPeriodRow(**asdict(lot)) for lot in lots]
+    except Exception:
+        logger.exception("performance review rows failed")
+        notes.append(
+            "Performance checks (core versus stocks, holding periods) could not be computed."
+        )
     kpis = await kpi_rows(pool, reg, theses)
+    scorecard_lines = await decision_scorecard_lines(pool, notes)
     today = now.date()
     due = [t.ticker for t in theses.theses if t.review_date is not None and t.review_date <= today]
     body = ReviewBody(
@@ -665,6 +740,8 @@ async def build_review(
         reviews_due=due,
         flags=await flags(pool, reg, settings),
         actions=[],
+        holding_periods=holding_periods,
+        decision_scorecard=scorecard_lines,
         sources=[],
     )
     usage: Usage | None = None
@@ -693,6 +770,21 @@ async def build_review(
 def render_md(body: ReviewBody) -> str:
     lines = [f"# Monthly review {body.month}", "", body.headline, "", "## Compliance", ""]
     lines += [f"- [{r.status}] {r.id}: {r.description} ({r.detail})" for r in body.compliance]
+    if body.holding_periods:
+        lines += ["", "## Holding periods", ""]
+        lines += [
+            f"- {h.ticker}: bought {h.bought_on}, passes the test on {h.passes_on} "
+            f"({'passed' if h.passed else f'{h.months_remaining:.1f} months left'})"
+            + (
+                " - sell target reached: a full sale would give up the exemption"
+                if h.forfeits_exemption_warning
+                else ""
+            )
+            for h in body.holding_periods
+        ]
+    if body.decision_scorecard:
+        lines += ["", "## Decision scorecard", ""]
+        lines += [f"- {line}" for line in body.decision_scorecard]
     lines += ["", "## Thesis KPIs", ""]
     lines += [f"- [{k.status}] {k.ref}: {k.description}" for k in body.kpis]
     if body.reviews_due:
@@ -720,8 +812,11 @@ async def run_review(ctx: JobContext, deps: ReviewDeps) -> int | None:
         jobs = await load_active(pool, "jobs", JobsConfig)
         strategy = await load_active(pool, "strategy", StrategyConfig)
         theses = await load_active(pool, "theses", ThesesConfig)
-        for v in (jobs, strategy, theses):
+        performance = await load_active(pool, "performance", PerformanceSettings)
+        for v in (jobs, strategy, theses, performance):
             await ctx.record_config_version(v.id if v else None)
+        # The sleeve gap, time test and alert severity come from these settings.
+        step.detail["performance_config_version"] = performance.id if performance else "defaults"
         settings = (jobs.body if jobs else JobsConfig()).review
         today = deps.now.date()
         if ctx.trigger == "schedule" and today != first_weekday(today):
@@ -761,6 +856,26 @@ async def run_review(ctx: JobContext, deps: ReviewDeps) -> int | None:
             ctx.job_id,
         )
         step.detail["report_id"] = report_id
+    async with ctx.step("performance_alerts") as step:
+        # Alerts follow the stored review so a failure here never costs the report.
+        try:
+            breaches = [
+                PerformanceBreach(r.id, r.description, r.detail)
+                for r in body.compliance
+                if r.kind == "performance" and r.status == "breach"
+            ]
+            alerts = await alert_performance(
+                pool,
+                breaches,
+                severity=(await load_latest_settings(pool)).alert_severity,
+                now=deps.now,
+                job_id=ctx.job_id,
+                app_url=get_settings().app_url,
+            )
+            step.detail.update(breaches=len(breaches), alerts=alerts)
+        except Exception:
+            logger.exception("performance alerts failed")
+            step.detail["error"] = "performance alerts could not be raised"
     return report_id
 
 

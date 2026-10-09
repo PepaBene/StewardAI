@@ -1,0 +1,651 @@
+{
+  "_note": "Expected figures were derived by hand (derivation given per case) and never produced by the production calculators. Decimals are strings.",
+  "price_return": [
+    {
+      "name": "plain",
+      "start": [
+        "2024-01-02",
+        "100"
+      ],
+      "end": [
+        "2024-12-31",
+        "125"
+      ],
+      "currency": "USD",
+      "splits": [],
+      "expected": "0.25000000",
+      "derivation": "125/100 - 1"
+    },
+    {
+      "name": "gbx_to_gbp_pence",
+      "start": [
+        "2024-01-02",
+        "1250"
+      ],
+      "end": [
+        "2024-12-31",
+        "1500"
+      ],
+      "currency": "GBX",
+      "splits": [],
+      "expected": "0.20000000",
+      "derivation": "1500/1250 - 1; GBX 1250 = GBP 12.50, GBX 1500 = GBP 15.00, same ratio",
+      "major": [
+        "12.5",
+        "GBP"
+      ]
+    },
+    {
+      "name": "two_for_one_split",
+      "start": [
+        "2024-01-02",
+        "100"
+      ],
+      "end": [
+        "2024-12-31",
+        "60"
+      ],
+      "currency": "USD",
+      "splits": [
+        [
+          "2024-06-03",
+          "2"
+        ]
+      ],
+      "expected": "0.20000000",
+      "derivation": "start 100 / 2 = 50 on the end share basis; 60/50 - 1; the unadjusted figure -0.40 is wrong"
+    },
+    {
+      "name": "reverse_split_one_for_ten",
+      "start": [
+        "2024-01-02",
+        "5"
+      ],
+      "end": [
+        "2024-12-31",
+        "60"
+      ],
+      "currency": "USD",
+      "splits": [
+        [
+          "2024-06-03",
+          "0.1"
+        ]
+      ],
+      "expected": "0.20000000",
+      "derivation": "start 5 / 0.1 = 50; 60/50 - 1"
+    }
+  ],
+  "total_return": [
+    {
+      "name": "dividend_reinvested_at_ex_close",
+      "closes": [
+        [
+          "2024-01-02",
+          "100"
+        ],
+        [
+          "2024-03-01",
+          "98"
+        ],
+        [
+          "2024-06-03",
+          "110"
+        ]
+      ],
+      "dividends": [
+        [
+          "2024-03-01",
+          "2"
+        ]
+      ],
+      "splits": [],
+      "complete": true,
+      "expected": "0.12244898",
+      "price_return": "0.10",
+      "derivation": "(98+2)/100 = 1.0; 110/98 = 1.12244898; product - 1"
+    },
+    {
+      "name": "incomplete_distribution_history",
+      "closes": [
+        [
+          "2024-01-02",
+          "100"
+        ],
+        [
+          "2024-06-03",
+          "110"
+        ]
+      ],
+      "dividends": [],
+      "splits": [],
+      "complete": false,
+      "expected": null,
+      "derivation": "no total return when distribution history is incomplete"
+    }
+  ],
+  "twr": [
+    {
+      "name": "mid_period_deposit_not_a_gain",
+      "days": [
+        [
+          "2024-01-01",
+          "1000",
+          "0"
+        ],
+        [
+          "2024-01-02",
+          "1100",
+          "0"
+        ],
+        [
+          "2024-01-03",
+          "2155",
+          "1000"
+        ],
+        [
+          "2024-01-04",
+          "1939.5",
+          "0"
+        ]
+      ],
+      "expected": "0.03950000",
+      "naive_end_over_start": "0.9395",
+      "derivation": "1.10 x ((2155-1000)/1100 = 1.05) x (1939.5/2155 = 0.90) = 1.0395; the 1000 deposit is not a return"
+    },
+    {
+      "name": "no_positive_base",
+      "days": [
+        [
+          "2024-01-01",
+          "0",
+          "0"
+        ],
+        [
+          "2024-01-02",
+          "100",
+          "100"
+        ]
+      ],
+      "expected": null,
+      "derivation": "opening value zero: nothing to measure a return on"
+    }
+  ],
+  "xirr": [
+    {
+      "name": "one_year_ten_percent",
+      "flows": [
+        [
+          "2023-01-01",
+          "-1000"
+        ],
+        [
+          "2024-01-01",
+          "1100"
+        ]
+      ],
+      "expected": "0.10000000",
+      "derivation": "365 days; 1100/1000 = 1.1"
+    },
+    {
+      "name": "two_years_ten_percent",
+      "flows": [
+        [
+          "2022-01-01",
+          "-1000"
+        ],
+        [
+          "2024-01-01",
+          "1210"
+        ]
+      ],
+      "expected": "0.10000000",
+      "derivation": "730 days = 2 years; 1.21^(1/2) = 1.1"
+    },
+    {
+      "name": "no_sign_change",
+      "flows": [
+        [
+          "2023-01-01",
+          "1000"
+        ],
+        [
+          "2024-01-01",
+          "1100"
+        ]
+      ],
+      "expected": null,
+      "derivation": "no outflow: no root"
+    }
+  ],
+  "cagr": [
+    {
+      "name": "two_years",
+      "start": "100",
+      "end": "121",
+      "years": "2",
+      "expected": "0.10000000",
+      "derivation": "121/100 = 1.21; sqrt = 1.1"
+    },
+    {
+      "name": "negative_start",
+      "start": "-5",
+      "end": "10",
+      "years": "3",
+      "expected": null,
+      "derivation": "n/m"
+    }
+  ],
+  "attribution": {
+    "start": "1000",
+    "end": "1500",
+    "net_flows": "300",
+    "components": {
+      "price": "150",
+      "income": "30",
+      "fx": "10",
+      "fees": "-5"
+    },
+    "expected_gain": "200.00",
+    "expected_residual": "15.00",
+    "derivation": "gain = 1500 - 1000 - 300 = 200; components sum 185; residual 15"
+  },
+  "look_through": {
+    "direct": {
+      "AAA": "1000"
+    },
+    "funds": [
+      {
+        "fund_id": "F1",
+        "market_value": "2000",
+        "as_of": "2024-06-30",
+        "weights": {
+          "AAA": "0.5",
+          "BBB": "0.4"
+        },
+        "cash_weight": "0.05",
+        "derivative_weight": "0"
+      },
+      {
+        "fund_id": "F2",
+        "market_value": "500",
+        "as_of": "2024-06-30",
+        "weights": null
+      }
+    ],
+    "expected": {
+      "total": "3500",
+      "AAA": "2000",
+      "BBB": "800",
+      "cash": "100",
+      "unknown": "600",
+      "AAA_weight": "0.5714285714",
+      "AAA_paths": {
+        "F1": "1000"
+      },
+      "unavailable_funds": [
+        "F2"
+      ]
+    },
+    "derivation": "AAA 1000 direct + 2000x0.5 via F1; BBB 2000x0.4; F1 cash 2000x0.05; F1 unknown 2000x(1-0.95)=100 plus F2 wholly unknown 500 = 600; 2000+800+100+600=3500"
+  },
+  "overlap": [
+    {
+      "name": "partial_overlap",
+      "a": {
+        "X": "0.30",
+        "Y": "0.20",
+        "Z": "0.10"
+      },
+      "b": {
+        "X": "0.10",
+        "Y": "0.25",
+        "W": "0.40"
+      },
+      "expected": "0.30000000",
+      "covered": [
+        "0.60",
+        "0.75"
+      ],
+      "derivation": "min(.30,.10) + min(.20,.25) = .10 + .20"
+    },
+    {
+      "name": "missing_holdings_is_not_zero",
+      "a": {
+        "X": "0.30"
+      },
+      "b": null,
+      "expected": null,
+      "derivation": "unavailable, never 0"
+    },
+    {
+      "name": "stale_fund",
+      "a": {
+        "X": "0.30"
+      },
+      "b": {
+        "X": "0.30"
+      },
+      "as_of": [
+        "2024-06-30",
+        "2024-01-31"
+      ],
+      "expected": "0.30000000",
+      "warns": [
+        "differ",
+        "stale"
+      ],
+      "derivation": "B is 151 days older than A, beyond the 45-day limit"
+    }
+  ],
+  "concentration": [
+    {
+      "name": "three_names",
+      "weights": {
+        "A": "0.5",
+        "B": "0.3",
+        "C": "0.2"
+      },
+      "unknown": "0",
+      "hhi": "0.38",
+      "effective": "2.6315789474",
+      "derivation": ".25+.09+.04 = .38; 1/.38"
+    },
+    {
+      "name": "with_unknown_bucket",
+      "weights": {
+        "A": "0.45",
+        "B": "0.27",
+        "C": "0.18"
+      },
+      "unknown": "0.10",
+      "hhi": "0.3078",
+      "derivation": ".2025+.0729+.0324"
+    }
+  ],
+  "earnings_yield": {
+    "items": [
+      {
+        "key": "A",
+        "weight": "0.4",
+        "ey": "0.05"
+      },
+      {
+        "key": "B",
+        "weight": "0.3",
+        "ey": "0.10"
+      },
+      {
+        "key": "C",
+        "weight": "0.2",
+        "ey": "-0.02"
+      },
+      {
+        "key": "CASH",
+        "weight": "0.1",
+        "ey": null,
+        "excluded": "cash"
+      }
+    ],
+    "expected_yield": "0.07142857",
+    "expected_pe": "14",
+    "coverage": [
+      "0.7",
+      "1.0"
+    ],
+    "derivation": "(0.4x0.05 + 0.3x0.10) / 0.7 = 0.05/0.7; P/E 0.7/0.05 = 14; negative earnings and cash excluded, not zero"
+  },
+  "dcf": {
+    "fcf": [
+      "100",
+      "100"
+    ],
+    "rate": "0.10",
+    "terminal_growth": "0",
+    "net_debt": "200",
+    "minorities": "0",
+    "shares": "80",
+    "expected_ev": "1000",
+    "expected_per_share": "10.0000",
+    "price": "8",
+    "expected_mos": "0.2",
+    "derivation": "a flat 100 at 10 % is a perpetuity worth 1000; (1000-200)/80 = 10; (10-8)/10 = 0.2",
+    "reverse": {
+      "price": "10",
+      "base_fcf": "100",
+      "years": 2,
+      "expected_growth": "0"
+    }
+  },
+  "risk": {
+    "alternating_60": {
+      "expected_vol": "0.1600847",
+      "expected_downside": "0.1122497",
+      "expected_drawdown": "-0.0128670",
+      "derivation": "30 x +1 % and 30 x -1 %: stdev = 0.01 x sqrt(60/59), x sqrt(252); downside sqrt(30 x 0.0001 / 60) x sqrt(252); drawdown 0.9999^30/1.01 - 1"
+    },
+    "tail_250": {
+      "n_big": 5,
+      "big": "-0.10",
+      "n_mid": 8,
+      "mid": "-0.02",
+      "rest": "0.001",
+      "expected_var": "0.02",
+      "expected_es": "0.05076923",
+      "derivation": "k = ceil(250 x 0.05) = 13; 13th smallest -0.02; mean of the 13 smallest = (5x0.10 + 8x0.02)/13"
+    }
+  },
+  "pit": {
+    "revenue": [
+      {
+        "key": "ACME.revenue",
+        "period": "2023-12-31",
+        "value": "100",
+        "known_at": "2024-02-15T00:00:00+00:00",
+        "revision": 0
+      },
+      {
+        "key": "ACME.revenue",
+        "period": "2023-12-31",
+        "value": "95",
+        "known_at": "2024-11-01T00:00:00+00:00",
+        "revision": 1
+      }
+    ],
+    "expectations": [
+      [
+        "2024-01-01T00:00:00+00:00",
+        null
+      ],
+      [
+        "2024-06-30T00:00:00+00:00",
+        "100"
+      ],
+      [
+        "2025-01-01T00:00:00+00:00",
+        "95"
+      ]
+    ],
+    "macro": [
+      {
+        "key": "CPI.yoy",
+        "period": "2024-03-31",
+        "value": "2.4",
+        "known_at": "2024-04-10T00:00:00+00:00",
+        "revision": 0
+      },
+      {
+        "key": "CPI.yoy",
+        "period": "2024-03-31",
+        "value": "2.6",
+        "known_at": "2024-05-10T00:00:00+00:00",
+        "revision": 1
+      }
+    ],
+    "macro_expectations": [
+      [
+        "2024-04-30T00:00:00+00:00",
+        "2.4"
+      ],
+      [
+        "2024-06-01T00:00:00+00:00",
+        "2.6"
+      ]
+    ]
+  },
+  "adr": [
+    {
+      "name": "at_parity",
+      "adr_price": "15",
+      "ordinary_per_adr": "1",
+      "local_price": "12",
+      "usd_per_local": "1.25",
+      "expected": "0.00000000",
+      "derivation": "12 EUR x 1.25 = 15 USD; 15/15 - 1"
+    },
+    {
+      "name": "five_percent_premium",
+      "adr_price": "31.5",
+      "ordinary_per_adr": "2",
+      "local_price": "12",
+      "usd_per_local": "1.25",
+      "expected": "0.05000000",
+      "derivation": "2 ordinary = 2 x 12 x 1.25 = 30 USD; 31.5/30 - 1"
+    },
+    {
+      "name": "missing_ratio_blocks_merge",
+      "adr_price": "31.5",
+      "ordinary_per_adr": null,
+      "local_price": "12",
+      "usd_per_local": "1.25",
+      "expected": null,
+      "derivation": "no ADR ratio: no merged chart"
+    }
+  ],
+  "peers": {
+    "candidates": 8,
+    "comparable": 3,
+    "enough": false,
+    "five_comparable_enough": true
+  },
+  "delisted_universe": {
+    "members": [
+      {
+        "ticker": "LIVE",
+        "active_from": null,
+        "active_to": null,
+        "status": "active"
+      },
+      {
+        "ticker": "GONE",
+        "active_from": "2015-01-02",
+        "active_to": "2023-03-31",
+        "status": "terminated"
+      },
+      {
+        "ticker": "NEW",
+        "active_from": "2024-06-01",
+        "active_to": null,
+        "status": "active"
+      },
+      {
+        "ticker": "LOST",
+        "active_from": "2018-01-01",
+        "active_to": null,
+        "status": "terminated"
+      }
+    ],
+    "expectations": [
+      {
+        "as_of": "2022-06-30",
+        "today": "2026-10-07",
+        "tickers": [
+          "GONE",
+          "LIVE",
+          "LOST"
+        ],
+        "unknown_end_warning": true,
+        "derivation": "GONE was listed until 2023-03-31 and stays in; NEW is not yet listed; LOST has no known end so it is kept and named"
+      },
+      {
+        "as_of": "2024-01-01",
+        "today": "2026-10-07",
+        "tickers": [
+          "LIVE",
+          "LOST"
+        ],
+        "unknown_end_warning": true,
+        "derivation": "GONE ended 2023-03-31 so it is out; NEW starts 2024-06-01"
+      },
+      {
+        "as_of": "2026-10-07",
+        "today": "2026-10-07",
+        "tickers": [
+          "LIVE",
+          "NEW"
+        ],
+        "unknown_end_warning": false,
+        "derivation": "today's universe holds only listed names; GONE and LOST are counted as gone"
+      }
+    ]
+  },
+  "renamed_fund": {
+    "records": [
+      {
+        "full_name": "Alpha Global Equity ETF",
+        "status": "NEW",
+        "publication_date": "2019-03-01T00:00:00Z"
+      },
+      {
+        "full_name": "Alpha Global Equity ETF",
+        "status": "MODI",
+        "publication_date": "2020-05-01T00:00:00Z"
+      },
+      {
+        "full_name": "Alpha World Equity UCITS ETF",
+        "status": "MODI",
+        "publication_date": "2022-09-15T00:00:00Z"
+      },
+      {
+        "full_name": "Alpha Cancelled Name",
+        "status": "CANC",
+        "publication_date": "2023-01-10T00:00:00Z"
+      }
+    ],
+    "spans": [
+      [
+        "Alpha Global Equity ETF",
+        null,
+        "2022-09-14"
+      ],
+      [
+        "Alpha World Equity UCITS ETF",
+        "2022-09-15",
+        null
+      ]
+    ],
+    "derivation": "a repeated name does not open a span; the new name closes the old one the day before; a cancelled record renames nothing; the first span has no known start"
+  },
+  "stale_fund": {
+    "holdings_as_of": "2026-01-01",
+    "today": "2026-10-07",
+    "lag_days": 279,
+    "stale_after_days": 45,
+    "derivation": "2026-01-01 to 2026-10-07: 31+28+31+30+31+30+31+31+30 = 273 days to 2026-10-01, plus 6 = 279"
+  },
+  "altman": {
+    "figures": {
+      "total_assets": "1000",
+      "total_liabilities": "600",
+      "current_assets": "400",
+      "current_liabilities": "250",
+      "retained_earnings": "300",
+      "operating_income": "120",
+      "revenue": "900"
+    },
+    "market_cap": "800",
+    "expected": "2.696",
+    "derivation": "1.2 x (400-250)/1000 = 0.18; 1.4 x 300/1000 = 0.42; 3.3 x 120/1000 = 0.396; 0.6 x 800/600 = 0.8; 900/1000 = 0.9; sum 2.696",
+    "missing_retained_earnings_is_unavailable": true
+  }
+}

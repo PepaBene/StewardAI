@@ -383,3 +383,14 @@ async def etf_look_through_handler(ctx: JobContext) -> None:
         await run_look_through(
             ctx, LookThroughDeps(http=http), config, force=bool(ctx.params.get("force"))
         )
+    # New holdings are in: recompute the X-Ray inputs derived from them (index weights, regional
+    # splits). A failure here is recorded and never fails the collection.
+    from steward.xray.derive import (
+        refresh_all,
+    )  # local: keeps the X-Ray out of the collector's imports
+
+    async with ctx.step("refresh_derived_xray_inputs") as step:
+        try:
+            step.detail.update(await refresh_all(ctx.pool))
+        except Exception as err:
+            step.detail["error"] = f"{type(err).__name__}: {err}"

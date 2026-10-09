@@ -304,6 +304,10 @@ function Results({ run }: { run: Run }) {
                       {row.name ?? row.ticker}
                     </Link>
                     <span className="block font-mono text-xs text-text-muted">{row.ticker}</span>
+                    <span className="mt-0.5 flex gap-2 text-xs">
+                      <Link href={`/companies/${encodeURIComponent(row.ticker)}/financials`} className="text-text-muted hover:text-accent-ink hover:underline">Financials</Link>
+                      <Link href={`/companies/${encodeURIComponent(row.ticker)}/ratios`} className="text-text-muted hover:text-accent-ink hover:underline">Ratios</Link>
+                    </span>
                   </th>
                   <td className="num px-3 py-2 text-xs">
                     {formatDate(row.period_end)}

@@ -173,6 +173,58 @@ def test_debt_is_the_sum_of_components_not_the_last_alphabetical_concept() -> No
     assert period["net_debt_to_equity"] == D("0.9")
 
 
+def test_peer_roic_is_the_shared_definition_with_non_controlling_interest() -> None:
+    from steward.analytics.ratio_set import nopat_roic
+
+    y24 = dt.date(2024, 1, 1), dt.date(2024, 12, 31)
+
+    def year(
+        span: tuple[dt.date, dt.date], equity: int, nci: int | None
+    ) -> list[dict[str, object]]:
+        start, end = span
+        out = [
+            row("us-gaap:Revenues", 1000, start=start, end=end),
+            row("us-gaap:OperatingIncomeLoss", 200, start=start, end=end),
+            row("us-gaap:IncomeTaxExpenseBenefit", 60, start=start, end=end),
+            row(
+                "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+                150,
+                start=start,
+                end=end,
+            ),
+            row("us-gaap:LongTermDebt", 300, start=None, end=end),
+            row("us-gaap:StockholdersEquity", equity, start=None, end=end),
+            row("us-gaap:CashAndCashEquivalentsAtCarryingValue", 100, start=None, end=end),
+        ]
+        if nci is not None:
+            out.append(row("us-gaap:MinorityInterest", nci, start=None, end=end))
+        return out
+
+    periods = financial_peer_metrics(year(Y25, 800, 50) + year(y24, 600, None))["AAA"]["periods"]
+    latest = periods[0]  # type: ignore[index]
+    # NOPAT 200 x (1 - 0.4) = 120 over the average of (800 + 50 + 300 - 100) and (600 + 300 - 100).
+    expected = nopat_roic(D(200), D(150), D(60), D(1050), D(800)).value
+    assert latest["roic"] == expected == D(120) / D(925)
+    assert latest["inputs"]["noncontrolling_interest"]["value"] == D(50)
+    # The earliest year has no year-earlier capital, so no ROIC.
+    assert periods[-1]["roic"] is None  # type: ignore[index]
+    assert "a year earlier" in periods[-1]["not_meaningful"]["roic"]  # type: ignore[index]
+
+    # Equity that already includes the interest is not topped up again.
+    total = [
+        r
+        if r["concept"] != "us-gaap:StockholdersEquity"
+        else {
+            **r,
+            "concept": "us-gaap:StockholdersEquity"
+            "IncludingPortionAttributableToNoncontrollingInterest",
+        }
+        for r in year(Y25, 850, 50) + year(y24, 600, None)
+    ]
+    again = financial_peer_metrics(total)["AAA"]["periods"][0]  # type: ignore[index]
+    assert again["roic"] == expected
+
+
 def test_non_positive_denominators_are_not_meaningful_with_a_reason() -> None:
     end = Y25[1]
     rows = [
@@ -195,7 +247,7 @@ def test_non_positive_denominators_are_not_meaningful_with_a_reason() -> None:
     assert period["net_debt_to_equity"] is None and "equity" in reasons["net_debt_to_equity"]
     assert period["free_cash_flow_conversion"] is None
     assert "net income" in reasons["free_cash_flow_conversion"]
-    assert period["roic"] is None and "pretax" in reasons["roic"]
+    assert period["roic"] is None and "pre-tax" in reasons["roic"]
 
 
 def test_roic_needs_a_full_year() -> None:

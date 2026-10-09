@@ -17,6 +17,7 @@ export const CONFIG_DOMAINS: Record<ConfigDomainSlug, { label: string; editor: s
   "research-profiles": { label: "Research profiles", editor: "/config/research-profiles" },
   budget: { label: "Budget", editor: "/config/budget" },
   prompts: { label: "Prompts", editor: "/config/prompts" },
+  performance: { label: "Performance", editor: "/performance/ledger", note: "Edited on the Performance pages." },
 };
 
 export const DOMAIN_SLUGS = Object.keys(CONFIG_DOMAINS) as ConfigDomainSlug[];

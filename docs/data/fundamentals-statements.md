@@ -59,7 +59,7 @@ skipped. Every ratio has a guard and an "n/m" reason in `not_meaningful`:
 | revenue_growth | revenue / prior-year revenue of the same length and unit - 1 | both > 0 |
 | net_debt_to_equity | (debt - cash) / equity | equity > 0 |
 | free_cash_flow_conversion | (cash from operations - abs(capex)) / net income | net income > 0 |
-| roic | operating income x (1 - tax / pretax) / (debt + equity - cash) | full-year period, pretax > 0, rate 0-100%, capital > 0 |
+| roic | operating income x (1 - tax rate) / average of invested capital now and a year earlier; invested capital = equity + non-controlling interest + debt - cash (`ratio_set.nopat_roic`, the one definition used everywhere) | full-year period with a year-earlier full-year period, pretax > 0, tax rate capped to 0-50%, average capital > 0 |
 
 Debt is the total element (`LongTermDebt` / IFRS `Borrowings`), else non-current + current
 portion, plus short-term borrowings and commercial paper (US GAAP); leases are excluded.

@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import { SectionNav } from "@/components/oversight/panel";
+import { Panel, SectionNav } from "@/components/oversight/panel";
 import { PageHeader } from "@/components/page-header";
 import { ISIN_RE } from "@/lib/funds/funds";
 
-import { AggregatePanel } from "./aggregate-panel";
 import { CharacteristicsAuditPanel } from "./characteristics-audit-panel";
 import { FactsheetPanel } from "./factsheet-panel";
 import { LedgerPanel } from "./ledger-panel";
@@ -22,6 +21,24 @@ const SECTIONS = [
   { id: "ledger", label: "Where data comes from" },
   { id: "audit", label: "P/E and P/B audit" },
 ] as const;
+
+/** Combined exposure now lives in the X-Ray, which also takes a date, so it is not drawn twice. */
+function XrayPointer() {
+  return (
+    <Panel
+      id="aggregate"
+      title="Combined exposure"
+      description="Direct shares plus each fund's weight times its published rows, merged by issuer, with fees and the weight no row accounts for, now sits in the X-Ray."
+    >
+      <p className="text-sm">
+        <Link href="/xray" className="text-accent-ink hover:underline">Open the X-Ray</Link>
+        <span className="text-text-muted"> for exposure by issuer, sector and country, or </span>
+        <Link href="/xray/overlap" className="text-accent-ink hover:underline">its overlap view</Link>
+        <span className="text-text-muted"> to see which companies two of your funds share.</span>
+      </p>
+    </Panel>
+  );
+}
 
 /**
  * Funds: how much your funds duplicate each other, what you own once direct stocks and funds
@@ -40,7 +57,7 @@ export function FundsView() {
       />
       <SectionNav sections={SECTIONS} />
       <OverlapPanel selectedIsin={isin} />
-      <AggregatePanel />
+      <XrayPointer />
       <LookThroughPanel />
       <FactsheetPanel isin={isin} />
       <LedgerPanel />

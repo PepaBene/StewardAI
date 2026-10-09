@@ -60,9 +60,18 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
     max_beta: null,
     position_loss_review: null,
     max_look_through_weight: null,
+    max_sector_weight: null,
+    max_country_weight: null,
     max_drawdown: null,
     max_pair_correlation: null,
     correlation_min_combined_weight: 0.1,
+    max_var_95: null,
+    max_tracking_error: null,
+    max_stress_loss: null,
+    stress_equity_fall: 0.2,
+    credit_spread_alert_bp: null,
+    max_valuation_terminal_growth: null,
+    max_valuation_growth: null,
     on_breach: "severity_2",
   },
   hard_limit_severity: "severity_3",
@@ -173,14 +182,26 @@ export type StrategyForm = {
   risk_max_beta: string;
   risk_position_loss_review: string;
   risk_max_look_through_weight: string;
+  risk_max_sector_weight: string;
+  risk_max_country_weight: string;
   risk_max_drawdown: string;
   risk_max_pair_correlation: string;
   risk_correlation_min_combined_weight: string;
+  risk_max_var_95: string;
+  risk_max_tracking_error: string;
+  risk_max_stress_loss: string;
+  risk_stress_equity_fall: string;
+  risk_credit_spread_alert_bp: string;
+  risk_max_valuation_terminal_growth: string;
+  risk_max_valuation_growth: string;
   risk_on_breach: OnBreach;
   /** Severity of a position above its hard limit. */
   hard_limit_severity: OnBreach;
   /** Severity of a weight outside its band (1: digest only; 2 or 3 also alert). */
   band_breach_severity: OnBreach;
+  /** Pre-trade thresholds. The editor has no fields for them; they are kept as loaded so a
+   *  save never resets them to the defaults. */
+  pretrade?: StrategyConfig["pretrade"];
 };
 
 export const newCategory = (name = ""): CategoryForm => ({ key: nextKey(), name });
@@ -244,13 +265,23 @@ export function strategyFromBody(body: StrategyConfig | null): StrategyForm {
     notes: b.notes ?? "",
     hard_limit_severity: b.hard_limit_severity ?? "severity_3",
     band_breach_severity: b.band_breach_severity ?? "severity_1",
+    pretrade: b.pretrade,
     risk_max_volatility: fractionToPercent(b.risk?.max_volatility),
     risk_max_beta: b.risk?.max_beta == null ? "" : String(b.risk.max_beta),
     risk_position_loss_review: fractionToPercent(b.risk?.position_loss_review),
     risk_max_look_through_weight: fractionToPercent(b.risk?.max_look_through_weight),
+    risk_max_sector_weight: fractionToPercent(b.risk?.max_sector_weight),
+    risk_max_country_weight: fractionToPercent(b.risk?.max_country_weight),
     risk_max_drawdown: fractionToPercent(b.risk?.max_drawdown),
     risk_max_pair_correlation: b.risk?.max_pair_correlation == null ? "" : String(b.risk.max_pair_correlation),
     risk_correlation_min_combined_weight: fractionToPercent(b.risk?.correlation_min_combined_weight ?? 0.1),
+    risk_max_var_95: fractionToPercent(b.risk?.max_var_95),
+    risk_max_tracking_error: fractionToPercent(b.risk?.max_tracking_error),
+    risk_max_stress_loss: fractionToPercent(b.risk?.max_stress_loss),
+    risk_stress_equity_fall: fractionToPercent(b.risk?.stress_equity_fall ?? 0.2),
+    risk_credit_spread_alert_bp: b.risk?.credit_spread_alert_bp == null ? "" : String(b.risk.credit_spread_alert_bp),
+    risk_max_valuation_terminal_growth: fractionToPercent(b.risk?.max_valuation_terminal_growth),
+    risk_max_valuation_growth: fractionToPercent(b.risk?.max_valuation_growth),
     risk_on_breach: b.risk?.on_breach ?? "severity_2",
     categories,
     classifications,
@@ -357,13 +388,23 @@ export function strategyToBody(form: StrategyForm): StrategyConfig {
       max_beta: optionalNumber(form.risk_max_beta) as number | null,
       position_loss_review: optionalPercent(form.risk_position_loss_review) as number | null,
       max_look_through_weight: optionalPercent(form.risk_max_look_through_weight) as number | null,
+      max_sector_weight: optionalPercent(form.risk_max_sector_weight) as number | null,
+      max_country_weight: optionalPercent(form.risk_max_country_weight) as number | null,
       max_drawdown: optionalPercent(form.risk_max_drawdown) as number | null,
       max_pair_correlation: optionalNumber(form.risk_max_pair_correlation) as number | null,
       correlation_min_combined_weight: percentToFraction(form.risk_correlation_min_combined_weight) as number,
+      max_var_95: optionalPercent(form.risk_max_var_95) as number | null,
+      max_tracking_error: optionalPercent(form.risk_max_tracking_error) as number | null,
+      max_stress_loss: optionalPercent(form.risk_max_stress_loss) as number | null,
+      stress_equity_fall: percentToFraction(form.risk_stress_equity_fall) as number,
+      credit_spread_alert_bp: optionalNumber(form.risk_credit_spread_alert_bp) as number | null,
+      max_valuation_terminal_growth: optionalPercent(form.risk_max_valuation_terminal_growth) as number | null,
+      max_valuation_growth: optionalPercent(form.risk_max_valuation_growth) as number | null,
       on_breach: form.risk_on_breach,
     },
     hard_limit_severity: form.hard_limit_severity,
     band_breach_severity: form.band_breach_severity,
+    ...(form.pretrade ? { pretrade: form.pretrade } : {}),
   };
 }
 

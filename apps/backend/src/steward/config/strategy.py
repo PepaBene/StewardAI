@@ -94,6 +94,28 @@ StrategyRule = Annotated[
 ]
 
 
+class PretradeThresholds(ConfigModel):
+    """The thresholds the pre-trade check uses for principles 8, 9 and 10. The defaults are the
+    strategy's stated values; a check run without its own rules reads these."""
+
+    return_hurdle: float = Field(default=0.30, ge=0, le=5)
+    asymmetry_gate: float = Field(default=2.0, ge=0, le=20)
+    start_size_core: float = Field(default=0.05, ge=0, le=1)
+    start_size_growth: float = Field(default=0.03, ge=0, le=1)
+    start_size_speculative: float = Field(default=0.015, ge=0, le=1)
+    switch_safety_margin: float = Field(default=0.05, ge=0, le=1)
+    short_term_tax_rate: float = Field(default=0.15, ge=0, le=1)
+    trade_cost_bps: float = Field(default=0, ge=0, le=500)
+    fx_cost_bps: float = Field(default=15, ge=0, le=500)
+    risk_contribution_cap: float | None = Field(
+        default=None,
+        gt=0,
+        le=1,
+        description="Largest share of portfolio volatility one stock may account for (null: "
+        "shown but not judged).",
+    )
+
+
 class RiskLimits(ConfigModel):
     """Portfolio risk limits, checked after each sync. Every limit is optional (null = off).
 
@@ -123,6 +145,16 @@ class RiskLimits(ConfigModel):
         description="Ceiling on the effective weight of one underlying company reached "
         "through funds/ETFs (plus any direct holding of it): the overlap limit.",
     )
+    max_sector_weight: Weight | None = Field(
+        default=None,
+        description="Ceiling on one sector's share of the whole portfolio, counting funds' "
+        "holdings (X-Ray). Weight with no sector is left out, not counted as a sector.",
+    )
+    max_country_weight: Weight | None = Field(
+        default=None,
+        description="Ceiling on one country's share of the whole portfolio, counting funds' "
+        "holdings (X-Ray). Weight with no country is left out, not counted as a country.",
+    )
     max_drawdown: Weight | None = Field(
         default=None,
         description="Ceiling on the portfolio's current drawdown: its fall from the highest "
@@ -139,6 +171,42 @@ class RiskLimits(ConfigModel):
         default=0.10,
         description="Combined weight, of the invested value, a correlated pair must reach "
         "before `max_pair_correlation` applies.",
+    )
+    max_var_95: Weight | None = Field(
+        default=None,
+        description="Ceiling on the portfolio's one-day historical 95 % value at risk, as a share "
+        "of the portfolio (0.03 = 3 %), from the last year of daily returns. A descriptive "
+        "estimate of the sample, not a forecast.",
+    )
+    max_tracking_error: Weight | None = Field(
+        default=None,
+        description="Ceiling on the annualised tracking error against the configured benchmark "
+        "(0.08 = 8 %), from the last year of daily returns.",
+    )
+    max_stress_loss: Weight | None = Field(
+        default=None,
+        description="Ceiling on the portfolio's loss when equities fall by `stress_equity_fall` "
+        "(scenario engine: measured betas where valid, 1.0 otherwise).",
+    )
+    stress_equity_fall: Weight = Field(
+        default=0.20, description="Size of the equity fall the stress loss is measured against."
+    )
+    credit_spread_alert_bp: float | None = Field(
+        default=None,
+        gt=0,
+        le=3000,
+        description="Alert when the stored US high-yield credit spread (series us_hy_spread) is "
+        "at or above this level, in basis points. A market signal, not a portfolio measure.",
+    )
+    max_valuation_terminal_growth: Weight | None = Field(
+        default=None,
+        description="Flag a saved valuation scenario of a held stock whose terminal growth "
+        "exceeds this rate (0.03 = 3 %): an unusual assumption to re-check.",
+    )
+    max_valuation_growth: Weight | None = Field(
+        default=None,
+        description="Flag a saved valuation scenario of a held stock whose explicit-year free "
+        "cash flow growth exceeds this rate in any year.",
     )
     on_breach: Severity = Field(
         default="severity_2",
@@ -188,6 +256,7 @@ class StrategyConfig(ConfigModel):
     target_categories: list[CategoryTarget] = Field(default_factory=list)
     rules: list[StrategyRule] = Field(default_factory=list)
     risk: RiskLimits = Field(default_factory=RiskLimits)
+    pretrade: PretradeThresholds = Field(default_factory=PretradeThresholds)
     hard_limit_severity: Severity = Field(
         default="severity_3",
         description="Severity of a position above its hard limit (alerted when it opens, "

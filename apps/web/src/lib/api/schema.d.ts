@@ -3515,6 +3515,1009 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/discover/catalogue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Catalogue
+         * @description Every metric with its definition, whether a filter on it is enabled, and how many members
+         *     of the universe have a value, so coverage is visible before a filter is applied.
+         */
+        get: operations["catalogue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/stocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discover Stocks */
+        post: operations["discover_stocks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/funds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discover Funds */
+        post: operations["discover_funds"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Csv
+         * @description CSV of the whole result (up to 200 rows per call; a `# truncated` line says if more match),
+         *     with method version, hashes, data date and filters as header comments.
+         */
+        post: operations["export_csv"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/baselines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Peer Baselines
+         * @description Median and range of covered securities for each metric, with count, geographic scope and
+         *     every exclusion (stale, other accounting basis, no value).
+         */
+        get: operations["peer_baselines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/universe/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Freeze Universe
+         * @description Freeze today's covered universe (delisted members stay in later reads of past dates).
+         */
+        post: operations["freeze_universe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/backtest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Backtest Screen */
+        post: operations["backtest_screen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/screens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Screens */
+        get: operations["list_screens"];
+        put?: never;
+        /** Save Screen */
+        post: operations["save_screen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/screens/{screen_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Screen Detail */
+        get: operations["screen_detail"];
+        /**
+         * Save Screen Version
+         * @description A changed definition becomes a new immutable version; an unchanged one is a no-op.
+         */
+        put: operations["save_screen_version"];
+        post?: never;
+        /**
+         * Archive Screen
+         * @description Archive, never delete: saved runs keep their definition.
+         */
+        delete: operations["archive_screen"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/screens/{screen_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Saved Screen
+         * @description Run a saved version (default: latest) and record what the run saw.
+         */
+        post: operations["run_saved_screen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/column-sets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Column Sets */
+        get: operations["list_column_sets"];
+        put?: never;
+        /** Save Column Set */
+        post: operations["save_column_set"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/column-sets/{set_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Column Set */
+        delete: operations["delete_column_set"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Overview
+         * @description Issuer facts, the other listings of the same issuer, provider profile, latest segments,
+         *     what the company sells and where (as it reports them), legal group, confirmed competitors and
+         *     peers, upcoming events and a coverage score that says what is missing.
+         */
+        get: operations["get_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Statements
+         * @description Income statement, balance sheet and cash-flow statement, built from stored filed facts.
+         *     Every cell names its filing and concept or how it was derived; restated figures keep the original.
+         */
+        get: operations["get_statements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/statements.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Statements Csv */
+        get: operations["get_statements_csv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/ratios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ratios
+         * @description Every ratio from the shared library per fiscal year and TTM, with the company's own
+         *     medians, the peer median and percentile (withheld below five comparable peers) and the inputs.
+         */
+        get: operations["get_ratios"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/thesis-prefill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Thesis Prefill
+         * @description The figure the thesis editor's "growth the price implies" field can be filled from, so
+         *     it is not typed from memory. Nothing is saved: you decide whether to keep it.
+         */
+        get: operations["get_thesis_prefill"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/thesis-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Thesis Draft
+         * @description A first draft of the thesis text from the stored research, computed figures and report
+         *     conflicts. Every line names the facts it rests on; a line with none is removed. One model
+         *     call (the chat model); nothing is saved, so you edit the draft and save it yourself.
+         */
+        post: operations["post_thesis_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Segments
+         * @description Reported segments, geography and products with eliminations and unallocated revenue kept
+         *     visible, changed definitions flagged, and your own estimate mapping to other contexts.
+         */
+        get: operations["get_segments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/segment-map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Segment Map
+         * @description Records one mapping of a reported member to a country, commodity, patent technology or
+         *     trade product as a new row (a share of 0 removes it). It is an estimate, labelled as one.
+         */
+        put: operations["save_segment_map"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/assessment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Assessment
+         * @description StewardAI's own compact rubric: four component scores from published indicators, thresholds
+         *     and weights, a stated missing-data penalty, abstention when evidence is thin, and no rating.
+         */
+        get: operations["get_assessment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Report
+         * @description The report as it stands now: code-computed tables, the assessment rubric, the latest verified
+         *     research prose with its citations, your cited case items and the conflicts between them.
+         */
+        get: operations["get_report"];
+        put?: never;
+        /**
+         * Save Report
+         * @description Stores the report as it stands with your conclusion as a new version; nothing is overwritten.
+         */
+        post: operations["save_report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/report/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Report Versions */
+        get: operations["list_report_versions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/report/versions/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Report Version */
+        get: operations["get_report_version"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/peers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Peer Compare
+         * @description The company beside its peers on the same ratios and fiscal basis, with median and range,
+         *     fiscal-date distance, comparability warnings and an indexed history relative to each first year.
+         */
+        get: operations["get_peer_compare"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/peer-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Peer Groups */
+        get: operations["list_peer_groups"];
+        put?: never;
+        /** Save Peer Group */
+        post: operations["save_peer_group"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/peer-groups/{group_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Peer Group */
+        delete: operations["delete_peer_group"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/valuation/defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Valuation Defaults
+         * @description Starting scenarios built from the company's own filed growth. They are assumptions to edit.
+         */
+        get: operations["valuation_defaults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/valuation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Valuation
+         * @description Scenario DCF with an explicit discount-rate build-up, a sensitivity grid, a reverse DCF and
+         *     reference multiples. No single value: a margin of safety is computed only for `selected`.
+         */
+        post: operations["run_valuation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/valuation/saved": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Saved Scenarios */
+        get: operations["list_saved_scenarios"];
+        put?: never;
+        /**
+         * Save Scenarios
+         * @description Saves an immutable version of the scenario set with the method version it was valued under.
+         */
+        post: operations["save_scenarios"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/estimates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Estimates
+         * @description Forward consensus (only with provider access and a full metadata record), event-calendar
+         *     estimates and company guidance, kept apart; a surprise only when the basis matches the actual.
+         */
+        get: operations["get_estimates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/network": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Network
+         * @description Confirmed relationships and deal events, and the patent-family mix, with ownership-mapping caveats.
+         */
+        get: operations["get_network"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/capital-allocation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Capital Allocation
+         * @description Observed free cash flow, dividends, buybacks, debt and share count per fiscal year, with
+         *     per-share growth beside aggregate growth, and the company's stated actions listed separately.
+         */
+        get: operations["get_capital_allocation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/governance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Governance
+         * @description Dated executive and board roles from confirmed graph edges and disclosed concentration.
+         *     Insider transactions and 13F holders are served by their own endpoints and linked in the tab.
+         */
+        get: operations["get_governance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/case": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Case
+         * @description Your cited items, plus concentration and capital-allocation figures the app computed from
+         *     filings (kept apart from your items).
+         */
+        get: operations["get_case"];
+        put?: never;
+        /** Add Case Item */
+        post: operations["add_case_item"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{ticker}/case/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Case Item */
+        put: operations["update_case_item"];
+        post?: never;
+        /** Archive Case */
+        delete: operations["archive_case"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Catalog
+         * @description Every fund with a stored factsheet or holdings snapshot: the covered fund universe, not all funds.
+         */
+        get: operations["fund_catalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare Funds
+         * @description Costs, overlap (sum of the smaller issuer weight, plus the shared holdings), geography, sector,
+         *     concentration, return and look-through completeness. Share classes of one portfolio are not compared with each other.
+         */
+        get: operations["compare_funds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fund Profile */
+        get: operations["fund_profile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/holdings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Holdings
+         * @description Issuer-normalised top holdings with asset-class, sector, country and currency weights; the weight
+         *     the published rows do not account for stays its own unknown bucket.
+         */
+        get: operations["fund_holdings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/holdings.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Holdings Csv
+         * @description The derived exposure table with provenance on every row (not the issuer's own file).
+         */
+        get: operations["fund_holdings_csv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/style": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Style
+         * @description FundConcentration, size mix and weighted valuation and profitability proxies from the holdings.
+         */
+        get: operations["fund_style"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Performance
+         * @description FundListing price return, total return where distributions are recorded, and tracking difference against a
+         *     benchmark only when both are on the same basis and currency.
+         */
+        get: operations["fund_performance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/bond": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Bond
+         * @description Maturity, duration and credit quality only where the issuer data provide them; otherwise unavailable.
+         */
+        get: operations["fund_bond"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/checklist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Checklist
+         * @description Each due-diligence criterion with its rule and source; no score, and no summary when a critical input is missing.
+         */
+        get: operations["fund_checklist"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/facts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Facts
+         * @description The owner's current sourced facts about the fund (newest per key).
+         */
+        get: operations["fund_facts"];
+        /**
+         * Put Fund Fact
+         * @description Record a sourced fact. The record is append-only: a correction is a new entry and the newest wins.
+         */
+        put: operations["put_fund_fact"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/facts/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fund Fact History */
+        get: operations["fund_fact_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/funds/{isin}/nav": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fund Nav
+         * @description The net asset values you entered, newest entry per date.
+         */
+        get: operations["fund_nav"];
+        /**
+         * Put Fund Nav
+         * @description Record NAV points from the issuer's own page. No provider supplies NAV, so these are the only source; the
+         *     count saved is returned. Append-only: re-entering a date replaces it as the newest.
+         */
+        put: operations["put_fund_nav"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fund-comparisons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Saved Comparisons */
+        get: operations["saved_comparisons"];
+        put?: never;
+        /**
+         * Create Saved Comparison
+         * @description Keep a set of two to five funds to reopen later; the figures are recomputed each time, not stored.
+         */
+        post: operations["create_saved_comparison"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fund-comparisons/{comparison_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Archive Saved Comparison */
+        delete: operations["archive_saved_comparison"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs/insider-trades": {
         parameters: {
             query?: never;
@@ -3863,6 +4866,1325 @@ export interface paths {
          *     methodology change vs parser drift) with the shape fingerprint and stated rules.
          */
         get: operations["get_characteristics_audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Performance
+         * @description Time- and money-weighted return over 1M, YTD, 1Y, 3Y, 5Y and since inception, each with
+         *     its benchmark comparison, plus the ledger health that decides whether a precise figure is
+         *     shown.
+         */
+        get: operations["get_performance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/performance/lots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Lots
+         * @description Open tax lots with their holding-period dates, realized gains, dividends, fees and the
+         *     year's exemption headroom. Facts and your own thresholds, not tax advice.
+         */
+        get: operations["get_lots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/performance/attribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Attribution
+         * @description Where the gain over the last `days` came from: price, FX, income and fees per holding and
+         *     per group, reconciled to the total with a disclosed residual.
+         */
+        get: operations["get_attribution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/performance/sleeves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Sleeves
+         * @description Stocks against the core ETFs, each as a rolling time-weighted return after fees, over
+         *     `years` (default: your saved comparison window).
+         */
+        get: operations["get_sleeves"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/performance/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Performance
+         * @description One table as CSV: the dated ledger, open lots, realized gains or attribution (the last
+         *     over `days`). The same rows the pages show.
+         */
+        get: operations["export_performance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/performance/saved": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Saved Performance Reports
+         * @description Performance reports you kept, newest first.
+         */
+        get: operations["list_saved_performance_reports"];
+        put?: never;
+        /**
+         * Save Performance Report
+         * @description Keep today's report as it is now (the server builds it, so a saved figure is never one the
+         *     browser supplied). Open it later to see the figures as they stood.
+         */
+        post: operations["save_performance_report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/performance/saved/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open Saved Performance Report */
+        get: operations["open_saved_performance_report"];
+        put?: never;
+        post?: never;
+        /** Archive Saved Performance Report */
+        delete: operations["archive_saved_performance_report"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/performance/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Performance Settings */
+        get: operations["get_performance_settings"];
+        /**
+         * Put Performance Settings
+         * @description Save new settings as a new version; earlier versions are kept.
+         */
+        put: operations["put_performance_settings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Xray
+         * @description Selectable look-through views of the whole portfolio (asset class, sector, industry,
+         *     country, region, currency, issuer, fund, style proxy, market-cap band, fees, and country of
+         *     revenue, commodity and trade product where data exist). Each view adds up to the whole
+         *     portfolio with cash and unknown weight as their own buckets; each bucket names its
+         *     contributors and how it was classified.
+         */
+        get: operations["get_xray"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Xray
+         * @description The X-Ray buckets as CSV, one lens or all of them.
+         */
+        get: operations["export_xray"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/overlap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Overlap
+         * @description Stock intersection: issuers reached through more than one channel, each fund's
+         *     contribution and the trail to the securities, and the concentration if a fund were removed.
+         */
+        get: operations["get_overlap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/concentration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Concentration
+         * @description Top-10, HHI and effective holdings at security, issuer, sector, country and fund level,
+         *     with benchmark-relative over- and underweights where the classification is like-for-like.
+         */
+        get: operations["get_concentration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/fundamentals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fundamentals
+         * @description Weighted earnings yield and P/E, price to book, dividend yield, profitability, leverage
+         *     and fee drag, each with its coverage; meaningless aggregates are withheld with the reason.
+         */
+        get: operations["get_fundamentals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/benchmark": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Benchmark
+         * @description Equity X-Ray against the configured benchmark proxy (an ETF's holdings today, not the
+         *     index's historical membership); only like-for-like classifications are compared.
+         */
+        get: operations["get_benchmark"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/funds-vs-benchmark": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Funds Vs Benchmark
+         * @description Each held fund's annualised tracking difference against the benchmark you recorded for it,
+         *     same basis and currency only, plus the benchmark proxy fund against its own benchmark.
+         */
+        get: operations["get_funds_vs_benchmark"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/supply-chain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Supply Chain
+         * @description The supply-chain graph from the edges you entered, each company placed against what the
+         *     portfolio holds in it, and the edges where you hold both ends.
+         */
+        get: operations["get_supply_chain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/event-paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Event Paths
+         * @description Where an event at one company reaches the portfolio along the supply-chain links, with
+         *     each link's source and confidence, the weight at the end of each path and the thesis
+         *     indicators to watch. A path is only as confident as its weakest link.
+         */
+        get: operations["get_event_paths"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/event-feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Event Feed
+         * @description Recent classified news about a company, followed along the supply-chain links to what you
+         *     hold. Only stories that reach another holding are listed; nothing is sent as an alert.
+         */
+        get: operations["get_event_feed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/index-weights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Index Weights
+         * @description Active share against each list of index weights you entered.
+         */
+        get: operations["get_index_weights"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Owner Inputs
+         * @description Everything you entered by hand for the X-Ray: regional splits, supply-chain edges and index
+         *     weights, each with its source and date. The newest entry for each name is the one in force.
+         */
+        get: operations["list_owner_inputs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs/regions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Region Split
+         * @description Spread a region such as "Europe" over countries, so a company's reported "Europe" revenue
+         *     reaches the revenue-country view. It is your estimate, labelled as yours there.
+         */
+        post: operations["save_region_split"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs/supply-edges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Supply Edge
+         * @description One supplier-to-customer link, with the product and where you read it.
+         */
+        post: operations["save_supply_edge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs/index-weights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Index Weights
+         * @description The constituents and weights of an index, pasted from its provider's factsheet.
+         */
+        post: operations["save_index_weights"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs/derive/index-weights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Derive Index Weights
+         * @description Fill an index's weights from the stored holdings of a fund that tracks it (equity rows,
+         *     renormalised), with the fund's data address and snapshot date. Recomputed whenever the fund's
+         *     holdings are refreshed.
+         */
+        post: operations["derive_index_weights"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs/derive/regions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Derive Region
+         * @description Spread a region over countries the way a fund you name for it spreads its equity.
+         */
+        post: operations["derive_region"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs/derive/benchmarks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Derive Benchmarks
+         * @description Index weights for every configured benchmark proxy that has stored holdings.
+         */
+        post: operations["derive_benchmarks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/inputs/{input_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Archive Owner Input */
+        delete: operations["archive_owner_input"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Candidates
+         * @description Watchlist securities, and a search of the investable universe, that can be added to a
+         *     proposed portfolio.
+         */
+        get: operations["get_candidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Xray Scenarios
+         * @description Your saved what-if scenarios, newest first.
+         */
+        get: operations["list_xray_scenarios"];
+        put?: never;
+        /**
+         * Save Xray Scenario
+         * @description Keep a what-if. Only the proposed weights are stored; opening it runs them against the
+         *     holdings you have then.
+         */
+        post: operations["save_xray_scenario"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/scenarios/{scenario_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open Xray Scenario */
+        get: operations["open_xray_scenario"];
+        put?: never;
+        post?: never;
+        /** Archive Xray Scenario */
+        delete: operations["archive_xray_scenario"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/xray/proposed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Proposed
+         * @description Before and after X-Ray of hypothetical weights and added securities. Applied to a copy:
+         *     nothing is written and the saved holdings are untouched.
+         */
+        post: operations["post_proposed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/risk/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Risk Report
+         * @description Volatility, downside deviation, Sortino and Sharpe, historical VaR and expected shortfall,
+         *     drawdown, beta, tracking error, rolling correlation with the benchmark, a correlation matrix of
+         *     the largest holdings and a diversification benefit. Each figure carries its sample size and is
+         *     withheld below the minimum.
+         */
+        get: operations["get_risk_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/standard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Standard Shocks
+         * @description The named starting shocks run on today's holdings: an equity fall, a rate rise, wider
+         *     credit spreads and a fall in each foreign currency.
+         */
+        get: operations["get_standard_shocks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/shock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Shock
+         * @description Move every part of the portfolio by the sensitivities that apply to it and reconcile to a
+         *     complete shocked portfolio. Measured betas where the history supports them, your values
+         *     otherwise; a holding with no valid sensitivity stays put and is listed.
+         */
+        post: operations["post_shock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/themes/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Theme Options
+         * @description The values you can pick for a theme, taken from what the portfolio actually holds.
+         */
+        get: operations["get_theme_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/themes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Theme
+         * @description Exposure to a theme or event through issuer, fund, sector, country, trade and currency
+         *     paths, each holding counted once, with the unknown weight and a stated confidence.
+         */
+        post: operations["post_theme"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/whatif": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Whatif
+         * @description A named case on today's holdings: a new security, a contribution or withdrawal, dividend
+         *     reinvestment, an FX move, a benchmark change or a thesis-triggered exit. Applied to a copy.
+         */
+        post: operations["post_whatif"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/rebalance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Rebalance
+         * @description Proposed buys and sells to bring positions back to the strategy's targets, with cash,
+         *     assumed costs, tax-lot consequences of each sale and the drift and X-Ray after. Read-only:
+         *     nothing is sent to Trading212.
+         */
+        post: operations["post_rebalance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/pretrade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Pretrade
+         * @description A pass/flag list for a proposed buy, add, sale or switch, citing the strategy's principles
+         *     8, 9 and 10 and your own caps. It never blocks and never places a trade.
+         */
+        post: operations["post_pretrade"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/shock/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Shock
+         * @description Keep a shock scenario: the server runs it now and stores the inputs with the result.
+         */
+        post: operations["save_shock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/themes/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Theme */
+        post: operations["save_theme"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/scenarios/whatif/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Whatif */
+        post: operations["save_whatif"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/rebalance/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Rebalance */
+        post: operations["save_rebalance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/decision/saved": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Decision Saved
+         * @description Saved shock scenarios, themes, what-if cases or rebalance plans, newest first.
+         */
+        get: operations["list_decision_saved"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/decision/saved/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open Decision Saved
+         * @description A saved item as it stood: the inputs and the result, not a recomputation.
+         */
+        get: operations["open_decision_saved"];
+        put?: never;
+        post?: never;
+        /** Archive Decision Saved */
+        delete: operations["archive_decision_saved"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Journal
+         * @description Journal entries, newest decision first, optionally for one security.
+         */
+        get: operations["list_journal"];
+        put?: never;
+        /**
+         * Add Journal Entry
+         * @description Record a decision with the reasons written now. The thesis, holding, price and the config
+         *     and method versions in force are stored with it, so a later outcome can be judged against what
+         *     was known. An entry is never edited; to revisit one, add a review that names it.
+         */
+        post: operations["add_journal_entry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journal/scorecard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Scorecard
+         * @description Sell targets reached, returns by conviction and reason, bought against passed, and what
+         *     stocks did after they were sold, each with its sample size. Below five decisions a section
+         *     says so instead of reporting a figure. `ticker` and `reason` limit it to one security or one
+         *     main reason, which usually leaves too few decisions to summarise; the sections say so.
+         */
+        get: operations["get_scorecard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journal/export/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Report
+         * @description The journal, scorecard and data-quality checks in one file with a manifest of sources,
+         *     coverage and calculation versions. Private: returned to you and stored nowhere.
+         */
+        get: operations["export_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journal/export/report.html": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Report Html
+         * @description The same report as a print-ready page; use Print > Save as PDF.
+         */
+        get: operations["export_report_html"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journal/export/report.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Report Pdf
+         * @description The same report as a PDF file.
+         */
+        get: operations["export_report_pdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journal/export/entries.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Entries Csv
+         * @description Every journal entry as CSV, oldest decision last.
+         */
+        get: operations["export_entries_csv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journal/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Journal Entry */
+        get: operations["get_journal_entry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quality/cockpit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cockpit
+         * @description What is wrong with the data behind the portfolio, largest affected weight first, with the
+         *     checks that ran, their denominators, and the checks that are not covered yet.
+         */
+        get: operations["get_cockpit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quality/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Snooze Issue
+         * @description Set one data-quality issue aside until a date, or bring it back early. The check keeps
+         *     running; the issue returns on its own when the date passes.
+         */
+        post: operations["snooze_issue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/release/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Readiness
+         * @description Each marketed feature as ready, partial, unavailable or untested, with the free-access
+         *     state of its inputs, its source audit and whether it may be switched on.
+         */
+        get: operations["get_readiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/release/activation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Activation
+         * @description Which features you have switched on (the newest decision per feature).
+         */
+        get: operations["get_activation"];
+        put?: never;
+        /**
+         * Set Activation
+         * @description Switch a feature on or off. Switching on is refused while the release gate says no.
+         */
+        post: operations["set_activation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/release/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Audit
+         * @description The sampled source-to-screen checks, with progress against the plan's sample.
+         */
+        get: operations["get_audit"];
+        put?: never;
+        /**
+         * Add Audit
+         * @description Record one displayed fact checked against its source. Append-only: to correct a result,
+         *     record the fact again and the newest row stands.
+         */
+        post: operations["add_audit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/release/pilot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Pilot */
+        get: operations["get_pilot"];
+        put?: never;
+        /**
+         * Start Pilot
+         * @description Start a new pilot window today. An earlier window is kept but no longer reported.
+         */
+        post: operations["start_pilot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/release/defects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Defects
+         * @description Problems you logged while using the app, open ones first, largest affected holding first.
+         */
+        get: operations["get_defects"];
+        put?: never;
+        /**
+         * Add Defect
+         * @description Log a problem no automatic check sees. Append-only; close it with the update route.
+         */
+        post: operations["add_defect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/release/defects/{defect_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update Defect
+         * @description Mark a logged problem fixed or not going to be fixed (a new row; the report stays).
+         */
+        post: operations["update_defect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/release/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log Usage
+         * @description Note that a page was opened. Only the path is stored, and only while a pilot window is
+         *     open; with none running this does nothing.
+         */
+        post: operations["log_usage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/insights/sectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Sector Map
+         * @description Sectors and industries of the companies with a stored profile: company and market counts,
+         *     growth, margin and valuation spread, each with the sample behind it.
+         */
+        get: operations["get_sector_map"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/insights/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Changes
+         * @description What differs between the app's knowledge at the earlier day and now, largest portfolio
+         *     weight first, each item pointing at the old and new records.
+         */
+        get: operations["get_changes"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5662,6 +7984,29 @@ export interface components {
             /** Decided At */
             decided_at: string | null;
         };
+        /** Activation */
+        Activation: {
+            /** Feature */
+            feature: string;
+            /** Active */
+            active: boolean;
+            /** Note */
+            note: string | null;
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+        };
+        /** ActivationIn */
+        ActivationIn: {
+            /** Feature */
+            feature: string;
+            /** Active */
+            active: boolean;
+            /** Note */
+            note?: string | null;
+        };
         /** ActivityCoverage */
         ActivityCoverage: {
             /**
@@ -5935,6 +8280,23 @@ export interface components {
              */
             created_at: string;
         };
+        /** AlertRate */
+        AlertRate: {
+            /** Sent */
+            sent: number;
+            /**
+             * Rated
+             * @description Sent alerts the owner marked.
+             */
+            rated: number;
+            /** Wrong Or Irrelevant */
+            wrong_or_irrelevant: number;
+            /**
+             * False Rate
+             * @description Wrong or irrelevant over rated alerts; None when none were rated.
+             */
+            false_rate: number | null;
+        };
         /** AlertScanOut */
         AlertScanOut: {
             /** Insider Trade */
@@ -5981,6 +8343,17 @@ export interface components {
             /** Source */
             source: string;
         };
+        /** Alignment */
+        Alignment: {
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+            /** Sessions */
+            sessions: number;
+            /** Note */
+            note: string;
+        };
         /** AllocationSlice */
         AllocationSlice: {
             /**
@@ -5994,6 +8367,45 @@ export interface components {
             value_base: number;
             /** Weight */
             weight: number | null;
+        };
+        /** AllocationYear */
+        AllocationYear: {
+            /** Column */
+            column: string;
+            /** Label */
+            label: string;
+            /** Fcf */
+            fcf: number | string | null;
+            /** Capex */
+            capex: number | string | null;
+            /** Dividends */
+            dividends: number | string | null;
+            /** Buybacks */
+            buybacks: number | string | null;
+            /** Debt Issued */
+            debt_issued: number | string | null;
+            /** Debt Repaid */
+            debt_repaid: number | string | null;
+            /** Net Debt Change */
+            net_debt_change: number | string | null;
+            /** Acquisitions */
+            acquisitions?: number | string | null;
+            /** Divestitures */
+            divestitures?: number | string | null;
+            /** Returned Share Of Fcf */
+            returned_share_of_fcf: number | string | null;
+            /** Share Count */
+            share_count: number | string | null;
+            /** Share Change */
+            share_change: number | string | null;
+            /** Fcf Per Share */
+            fcf_per_share: number | string | null;
+            /** Fcf Per Share Growth */
+            fcf_per_share_growth: number | string | null;
+            /** Fcf Growth */
+            fcf_growth: number | string | null;
+            /** Reconciliation */
+            reconciliation?: string | null;
         };
         /** AlphaExposureRefreshResponse */
         AlphaExposureRefreshResponse: {
@@ -6460,6 +8872,31 @@ export interface components {
              */
             state: "gates_met" | "gates_open" | "not_started";
         };
+        /** AnalyticsResult */
+        AnalyticsResult: {
+            /** Value */
+            value: number | string | null;
+            /** Unit */
+            unit: string;
+            /** As Of */
+            as_of?: string | null;
+            /** Known At */
+            known_at?: string | null;
+            /** Method Version */
+            method_version: string;
+            status: components["schemas"]["Status"];
+            /** Sources */
+            sources?: components["schemas"]["SourceRef"][];
+            coverage?: components["schemas"]["ResultCoverage"] | null;
+            /** Warnings */
+            warnings?: string[];
+            /**
+             * Input Hash
+             * @description Immutable hash of the inputs the figure was computed from.
+             */
+            input_hash?: string | null;
+            explain?: components["schemas"]["Explain"] | null;
+        };
         /** AnalyticsScreenExcludedOut */
         AnalyticsScreenExcludedOut: {
             /** Ticker */
@@ -6656,6 +9093,237 @@ export interface components {
              */
             phrase: boolean;
         };
+        /** AreaCount */
+        AreaCount: {
+            /**
+             * Area
+             * @enum {string}
+             */
+            area: "fundamentals" | "estimates" | "price" | "fund_holdings" | "graph" | "macro" | "ownership" | "insiders" | "patents";
+            /** Items */
+            items: number;
+            /**
+             * Compared
+             * @description Records looked at in the area.
+             */
+            compared: number;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * Assumptions
+         * @description One scenario's explicit inputs. Everything here is the owner's assumption, not a fact.
+         */
+        Assumptions: {
+            /** Name */
+            name: string;
+            /**
+             * Years
+             * @description Explicit forecast years.
+             * @default 5
+             */
+            years: number;
+            /**
+             * Base Fcf
+             * @description Starting free cash flow; null uses the trailing twelve months.
+             */
+            base_fcf?: number | string | null;
+            /**
+             * Growth
+             * @description Free-cash-flow growth for each explicit year, as fractions.
+             */
+            growth: (number | string)[];
+            /**
+             * Terminal Growth
+             * @default 0.02
+             */
+            terminal_growth: number | string;
+            /**
+             * Risk Free
+             * @default 0.04
+             */
+            risk_free: number | string;
+            /**
+             * Equity Risk Premium
+             * @default 0.05
+             */
+            equity_risk_premium: number | string;
+            /**
+             * Beta
+             * @default 1
+             */
+            beta: number | string;
+            /**
+             * Extra Premium
+             * @description Size, country or company-specific.
+             * @default 0
+             */
+            extra_premium: number | string;
+            /**
+             * Discount Rate
+             * @description Overrides the build-up.
+             */
+            discount_rate?: number | string | null;
+            /**
+             * Net Debt
+             * @description Overrides the filed debt − cash.
+             */
+            net_debt?: number | string | null;
+            /**
+             * Minorities
+             * @description Overrides the filed non-controlling interest.
+             */
+            minorities?: number | string | null;
+            /** Diluted Shares */
+            diluted_shares?: number | string | null;
+        };
+        /** AttributionResponse */
+        AttributionResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable" | "paid_only" | "disputed";
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Days */
+            days: number;
+            /** Gap */
+            gap: string | null;
+            bridge: components["schemas"]["BridgeOut"] | null;
+            /** Holdings */
+            holdings: components["schemas"]["ContributionOut"][];
+            /** Groups */
+            groups: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            benchmark?: components["schemas"]["BenchmarkRelativeOut"] | null;
+            freshness?: components["schemas"]["FreshnessOut"] | null;
+            explain: components["schemas"]["PerformanceExplain"];
+        };
+        /** AuditIn */
+        AuditIn: {
+            /**
+             * Subject Kind
+             * @enum {string}
+             */
+            subject_kind: "security" | "etf" | "corporate_action" | "cash_flow_window";
+            /**
+             * Subject
+             * @description Ticker, ISIN or window name.
+             */
+            subject: string;
+            /** Region */
+            region?: string | null;
+            /**
+             * Feature
+             * @description Release-gate feature id.
+             */
+            feature: string;
+            /**
+             * Field
+             * @description The fact that was compared.
+             */
+            field: string;
+            /**
+             * Displayed
+             * @description What the screen showed.
+             */
+            displayed: string;
+            /** Source Value */
+            source_value?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "match" | "mismatch" | "not_checkable";
+            /** Note */
+            note?: string | null;
+            /**
+             * Audited On
+             * @description Defaults to today.
+             */
+            audited_on?: string | null;
+        };
+        /** AuditOverview */
+        AuditOverview: {
+            summary: components["schemas"]["AuditSummary"];
+            /** Rows */
+            rows: components["schemas"]["AuditRow"][];
+        };
+        /** AuditRow */
+        AuditRow: {
+            /** Id */
+            id: number;
+            /**
+             * Subject Kind
+             * @enum {string}
+             */
+            subject_kind: "security" | "etf" | "corporate_action" | "cash_flow_window";
+            /** Subject */
+            subject: string;
+            /** Region */
+            region: string | null;
+            /** Feature */
+            feature: string;
+            /** Field */
+            field: string;
+            /** Displayed */
+            displayed: string;
+            /** Source Value */
+            source_value: string | null;
+            /** Source Url */
+            source_url: string | null;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "match" | "mismatch" | "not_checkable";
+            /** Note */
+            note: string | null;
+            /**
+             * Audited On
+             * Format: date
+             */
+            audited_on: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** AuditSummary */
+        AuditSummary: {
+            /** Facts Checked */
+            facts_checked: number;
+            /** Facts Matching */
+            facts_matching: number;
+            /** Facts Mismatched */
+            facts_mismatched: number;
+            /** Facts Not Checkable */
+            facts_not_checkable: number;
+            /** Targets */
+            targets: components["schemas"]["TargetProgress"][];
+            /** Regions */
+            regions: string[];
+            /** Regions Needed */
+            regions_needed: number;
+            /**
+             * Complete
+             * @description Every target and the region spread are met.
+             */
+            complete: boolean;
+            /** Open Mismatches */
+            open_mismatches: components["schemas"]["AuditRow"][];
+        };
         /** AwardDetailOut */
         AwardDetailOut: {
             /** Notice Number */
@@ -6679,6 +9347,142 @@ export interface components {
             /** Published */
             published: string | null;
         };
+        /** BacktestName */
+        BacktestName: {
+            /** Ticker */
+            ticker: string;
+            /** Entry */
+            entry: number | string;
+            /** Exit */
+            exit: number | string;
+            /** Period Return */
+            period_return: number | string | null;
+            /** Weight */
+            weight: number | string;
+            /** Ended Early */
+            ended_early: boolean;
+        };
+        /** BacktestPeriod */
+        BacktestPeriod: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Universe Size */
+            universe_size: number;
+            /** Matched */
+            matched: number;
+            /** Picked */
+            picked: string[];
+            /** Held */
+            held: components["schemas"]["BacktestName"][];
+            /** Dropped No Price */
+            dropped_no_price: string[];
+            /** Gross Return */
+            gross_return: number | string | null;
+            /** Turnover */
+            turnover: number | string;
+            /** Cost */
+            cost: number | string;
+            /** Net Return */
+            net_return: number | string | null;
+            /** Benchmark Return */
+            benchmark_return: number | string | null;
+            /** Note */
+            note: string | null;
+        };
+        /** BacktestRequest */
+        BacktestRequest: {
+            /** Filters */
+            filters?: components["schemas"]["DiscoverFilter"][];
+            /** Sort By */
+            sort_by?: string | null;
+            /** Descending */
+            descending?: boolean | null;
+            /**
+             * Missing
+             * @default exclude
+             * @enum {string}
+             */
+            missing: "exclude" | "keep_unknown";
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /**
+             * Frequency
+             * @default annual
+             * @enum {string}
+             */
+            frequency: "quarterly" | "semiannual" | "annual";
+            /**
+             * Max Names
+             * @default 10
+             */
+            max_names: number;
+            /**
+             * Cost Bps
+             * @default 10
+             */
+            cost_bps: number;
+            /** Benchmark Ticker */
+            benchmark_ticker?: string | null;
+        };
+        /** BacktestResponse */
+        BacktestResponse: {
+            /** Method Version */
+            method_version: string;
+            /** Fingerprint */
+            fingerprint: string;
+            /** Definition Hash */
+            definition_hash: string;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Frequency */
+            frequency: string;
+            /** Max Names */
+            max_names: number;
+            /** Cost Bps */
+            cost_bps: number;
+            /** Periods */
+            periods: components["schemas"]["BacktestPeriod"][];
+            /** Cumulative Net */
+            cumulative_net: number | string | null;
+            /** Cumulative Gross */
+            cumulative_gross: number | string | null;
+            /** Cost Drag */
+            cost_drag: number | string | null;
+            /** Annualised Net */
+            annualised_net: number | string | null;
+            /** Benchmark Ticker */
+            benchmark_ticker: string | null;
+            /** Benchmark Cumulative */
+            benchmark_cumulative: number | string | null;
+            /** Warnings */
+            warnings: string[];
+            /** Caveats */
+            caveats: string[];
+        };
         /** BaseTotals */
         BaseTotals: {
             /** Base Currency */
@@ -6695,6 +9499,42 @@ export interface components {
             /** Invested */
             invested: number;
         };
+        /** Baseline */
+        Baseline: {
+            /** Metric */
+            metric: string;
+            /** Label */
+            label: string;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "home_market" | "global" | "saved_set";
+            /** Scope Detail */
+            scope_detail: string;
+            /** Members */
+            members: number;
+            /** Comparable */
+            comparable: number;
+            /** Median */
+            median: number | string | null;
+            /** P25 */
+            p25: number | string | null;
+            /** P75 */
+            p75: number | string | null;
+            /** Low */
+            low: number | string | null;
+            /** High */
+            high: number | string | null;
+            /** Median Withheld Reason */
+            median_withheld_reason: string | null;
+            /** Countries */
+            countries: {
+                [key: string]: number;
+            };
+            /** Excluded */
+            excluded: components["schemas"]["Excluded"][];
+        };
         /** BenchmarkBucket */
         BenchmarkBucket: {
             /** Key */
@@ -6703,6 +9543,44 @@ export interface components {
             label: string;
             /** Weight */
             weight: number;
+        };
+        /** BenchmarkComponent */
+        BenchmarkComponent: {
+            /**
+             * Symbol
+             * @description Price series symbol.
+             */
+            symbol: string;
+            /** Weight */
+            weight: number | string;
+            /**
+             * Currency
+             * @description Quote currency of the series (ISO code).
+             */
+            currency: string;
+            /**
+             * Basis
+             * @description Whether the series includes dividends (total) or not.
+             * @default unknown
+             * @enum {string}
+             */
+            basis: "total" | "price" | "unknown";
+        };
+        /** BenchmarkInfo */
+        BenchmarkInfo: {
+            /** Symbol */
+            symbol: string;
+            /** Label */
+            label: string;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "price" | "total" | "unknown";
+            /** Currency */
+            currency: string | null;
+            /** Note */
+            note: string;
         };
         /** BenchmarkLookThrough */
         BenchmarkLookThrough: {
@@ -6738,6 +9616,41 @@ export interface components {
              */
             foreign_share: number | null;
         };
+        /** BenchmarkOption */
+        BenchmarkOption: {
+            /** Symbol */
+            symbol: string;
+            /** Label */
+            label: string;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "price" | "total" | "unknown";
+            /** Currency */
+            currency?: string | null;
+            /**
+             * Has Prices
+             * @default true
+             */
+            has_prices: boolean;
+        };
+        /** BenchmarkOut */
+        BenchmarkOut: {
+            /** Symbol */
+            symbol: string;
+            /** Label */
+            label: string;
+            /** Benchmark Return */
+            benchmark_return: number | null;
+            active_return: components["schemas"]["Figure"];
+            /** Basis */
+            basis: string;
+            /** Currency */
+            currency: string | null;
+            /** Missing Share */
+            missing_share: number | null;
+        };
         /**
          * BenchmarkProxy
          * @description Which fund's holdings stand in for a benchmark index's constituents.
@@ -6759,6 +9672,46 @@ export interface components {
              * @example S&P 500
              */
             label: string;
+        };
+        /** BenchmarkRelativeOut */
+        BenchmarkRelativeOut: {
+            /** Label */
+            label: string;
+            /**
+             * Benchmark Return
+             * @description Benchmark return over the same dates.
+             */
+            benchmark_return: number;
+            /**
+             * Basis
+             * @description total, price or unknown: whether dividends are included.
+             */
+            basis: string;
+            /** Currency */
+            currency: string | null;
+            /**
+             * Like For Like
+             * @description The benchmark is quoted in the base currency and includes dividends.
+             */
+            like_for_like: boolean;
+            /**
+             * Active Total
+             * @description Sum of the holdings' active contributions.
+             */
+            active_total: number;
+            /** Notes */
+            notes: string[];
+        };
+        /** BenchmarkSpec */
+        BenchmarkSpec: {
+            /** Components */
+            components: components["schemas"]["BenchmarkComponent"][];
+            /**
+             * Rebalance
+             * @default none
+             * @enum {string}
+             */
+            rebalance: "none" | "monthly" | "quarterly" | "annual";
         };
         /** BenchmarkValuation */
         BenchmarkValuation: {
@@ -6864,6 +9817,73 @@ export interface components {
              */
             state: "intact" | "watch" | "at_risk" | "unjudged";
         };
+        /** BondMix */
+        BondMix: {
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number | string;
+        };
+        /** BondView */
+        BondView: {
+            /** Isin */
+            isin: string;
+            /** Applicable */
+            applicable: boolean | null;
+            /** Applicability Reason */
+            applicability_reason: string;
+            weighted_maturity: components["schemas"]["AnalyticsResult"];
+            duration: components["schemas"]["AnalyticsResult"];
+            credit_quality: components["schemas"]["AnalyticsResult"];
+            /** Stated */
+            stated: components["schemas"]["ProfileField"][];
+            /** Asset Mix */
+            asset_mix: components["schemas"]["BondMix"][];
+            /** Asset Mix Source */
+            asset_mix_source: string | null;
+            /** Rate Buckets */
+            rate_buckets?: components["schemas"]["RateBucket"][];
+            /** Credit Spread */
+            credit_spread?: components["schemas"]["SpreadBucket"][];
+            /** Credit Note */
+            credit_note?: string | null;
+            /**
+             * Method Version
+             * @default 1.0.0
+             */
+            method_version: string;
+            /** Warnings */
+            warnings: string[];
+        };
+        /** Breakdown */
+        Breakdown: {
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Periods */
+            periods: string[];
+            /** Latest Period */
+            latest_period: string | null;
+            /** Members */
+            members: components["schemas"]["MemberLine"][];
+            /** Operating Total */
+            operating_total: number | string | null;
+            /** Eliminations */
+            eliminations: number | string | null;
+            /** Unallocated */
+            unallocated: number | string | null;
+            /** After Eliminations */
+            after_eliminations: number | string | null;
+            /** Reported Total */
+            reported_total: number | string | null;
+            /** Difference */
+            difference: number | string | null;
+            /** Difference Note */
+            difference_note: string | null;
+            /** Notes */
+            notes: string[];
+        };
         /** BridgeAxisOut */
         BridgeAxisOut: {
             /** Axis */
@@ -6887,6 +9907,26 @@ export interface components {
             value: string;
             /** Eliminations */
             eliminations: boolean;
+        };
+        /** BridgeOut */
+        BridgeOut: {
+            gain: components["schemas"]["Figure"];
+            /** Start Value */
+            start_value: number;
+            /** End Value */
+            end_value: number;
+            /** Net External Flows */
+            net_external_flows: number;
+            /** Net Trading */
+            net_trading: number;
+            /** Components */
+            components: {
+                [key: string]: number;
+            };
+            /** Residual */
+            residual: number;
+            /** Unattributed Tickers */
+            unattributed_tickers: string[];
         };
         /** Bucket */
         Bucket: {
@@ -6999,7 +10039,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "free_source_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -7041,6 +10081,126 @@ export interface components {
              * @description Days an exchange is closed (public holidays are not exchange calendars; confirm the suggestions on the calendar page). Used without a deploy.
              */
             exchange_closures?: components["schemas"]["ExchangeClosure"][];
+        };
+        /** Calibration */
+        Calibration: {
+            /**
+             * Status
+             * @default uncalibrated
+             * @constant
+             */
+            status: "uncalibrated";
+            /** Note */
+            note: string;
+        };
+        /** CapitalAllocation */
+        CapitalAllocation: {
+            /** Ticker */
+            ticker: string;
+            /** Years */
+            years: components["schemas"]["AllocationYear"][];
+            /** Stated */
+            stated: components["schemas"]["StatedAction"][];
+            /** Observed Note */
+            observed_note: string;
+            /** Method Version */
+            method_version: string;
+            /** Warnings */
+            warnings: string[];
+        };
+        /** CaseItem */
+        CaseItem: {
+            /** Kind */
+            kind: string;
+            /** Moat Type */
+            moat_type?: string | null;
+            /** Statement */
+            statement: string;
+            /** Evidence */
+            evidence?: components["schemas"]["Citation"][];
+            /**
+             * Confidence
+             * @default low
+             */
+            confidence: string;
+            /**
+             * Status
+             * @default draft
+             */
+            status: string;
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CaseItemIn */
+        CaseItemIn: {
+            /** Kind */
+            kind: string;
+            /** Moat Type */
+            moat_type?: string | null;
+            /** Statement */
+            statement: string;
+            /** Evidence */
+            evidence?: components["schemas"]["Citation"][];
+            /**
+             * Confidence
+             * @default low
+             */
+            confidence: string;
+            /**
+             * Status
+             * @default draft
+             */
+            status: string;
+        };
+        /** CaseWithObserved */
+        CaseWithObserved: {
+            /** Ticker */
+            ticker: string;
+            /** Items */
+            items: components["schemas"]["CaseItem"][];
+            /** Concentration */
+            concentration: {
+                [key: string]: unknown;
+            }[];
+            /** Note */
+            note: string;
+            /**
+             * Observed
+             * @description Figures the app computed from filings and disclosures, kept apart from your items.
+             */
+            observed?: components["schemas"]["Observed"][];
+            /**
+             * Observed Note
+             * @default Observed figures are computed by the app from filed statements and confirmed disclosures. They are evidence to cite, not a verdict; an empty one says what is missing.
+             */
+            observed_note: string;
+        };
+        /** CashBreakOut */
+        CashBreakOut: {
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /** Difference */
+            difference: number;
+            /** Explanation */
+            explanation: string;
         };
         /** CashDrift */
         CashDrift: {
@@ -7100,6 +10260,67 @@ export interface components {
             type: "cash_weight";
             /** Value */
             value: number;
+        };
+        /** CatalogRow */
+        CatalogRow: {
+            /** Isin */
+            isin: string;
+            /** Name */
+            name: string | null;
+            /** Provider */
+            provider: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Holdings As Of */
+            holdings_as_of: string | null;
+            /** Expense Ratio */
+            expense_ratio: number | string | null;
+            /** Total Assets */
+            total_assets: number | string | null;
+            /** Total Assets Currency */
+            total_assets_currency: string | null;
+            /** Has Holdings */
+            has_holdings: boolean;
+            /** Listing Count */
+            listing_count: number;
+            /** Tickers */
+            tickers: string[];
+        };
+        /** CatalogueResponse */
+        CatalogueResponse: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stock" | "fund";
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Universe */
+            universe: {
+                [key: string]: unknown;
+            };
+            /** Metrics */
+            metrics: components["schemas"]["MetricInfo"][];
+            /** Snapshots */
+            snapshots: {
+                [key: string]: unknown;
+            }[];
+            /** Warnings */
+            warnings: string[];
+            /** Method Version */
+            method_version: string;
+            /** Keyless Note */
+            keyless_note: string;
+            /** Providers */
+            providers?: components["schemas"]["ProviderNeed"][];
+            /**
+             * Keyless Count
+             * @default 0
+             */
+            keyless_count: number;
         };
         /** CategoryTarget */
         CategoryTarget: {
@@ -7169,6 +10390,48 @@ export interface components {
             /** Bucket */
             bucket?: string | null;
         };
+        /** Cell */
+        Cell: {
+            /** Value */
+            value?: number | string | null;
+            /**
+             * Reason
+             * @description Why there is no value, or a note.
+             */
+            reason?: string | null;
+            /** Concept */
+            concept?: string | null;
+            /** Accession */
+            accession?: string | null;
+            /** Form */
+            form?: string | null;
+            /** Filing Url */
+            filing_url?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** Known At */
+            known_at?: string | null;
+            /**
+             * Derived
+             * @description How the value was computed, if not filed.
+             */
+            derived?: string | null;
+            /**
+             * Restated
+             * @default false
+             */
+            restated: boolean;
+            /** Original Value */
+            original_value?: number | string | null;
+            /** Reconciled */
+            reconciled?: boolean | null;
+            /**
+             * Unit
+             * @description money, per_share, shares or fraction (after a transform).
+             * @default money
+             */
+            unit: string;
+        };
         /** ChainGroupOut */
         ChainGroupOut: {
             /**
@@ -7201,6 +10464,79 @@ export interface components {
             sole_dispositive: string | null;
             /** Shared Dispositive */
             shared_dispositive: string | null;
+        };
+        /** ChangeFeed */
+        ChangeFeed: {
+            /**
+             * Since
+             * Format: date
+             */
+            since: string;
+            /**
+             * Compared With
+             * Format: date
+             */
+            compared_with: string;
+            /** Items */
+            items: components["schemas"]["ChangeItem"][];
+            /** Areas */
+            areas: components["schemas"]["AreaCount"][];
+            /**
+             * Not Covered
+             * @default [
+             *       "Ownership and insiders are compared by period (the two latest 13F quarters, the last 90 days of insider trades against the 90 before), not by what the app knew on a date.",
+             *       "Patents: only new families are listed; a change inside a family is not tracked.",
+             *       "Trade exposures: trade series are not compared between dates here."
+             *     ]
+             */
+            not_covered: string[];
+            /**
+             * Method
+             * @default Each area is compared as the app knew it at the end of the earlier day and as it knows it now. Items are sorted by a 0-100 relevance score: 60 points for the share of the portfolio in the company or fund they concern (full at 10%) and 40 for how much that kind of change in that area usually matters (fixed factors, not learned). A first-time record is 'new'; only a changed value for the same period is 'revised'. Prices compare the two portfolio snapshots and show moves of 3% or more.
+             */
+            method: string;
+        };
+        /** ChangeItem */
+        ChangeItem: {
+            /**
+             * Area
+             * @enum {string}
+             */
+            area: "fundamentals" | "estimates" | "price" | "fund_holdings" | "graph" | "macro" | "ownership" | "insiders" | "patents";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "new" | "revised" | "moved" | "added" | "removed" | "dropped";
+            /**
+             * Subject
+             * @description Ticker, fund or series.
+             */
+            subject: string;
+            /** What */
+            what: string;
+            /** Before */
+            before: string | null;
+            /** After */
+            after: string | null;
+            before_ref: components["schemas"]["Ref"] | null;
+            after_ref: components["schemas"]["Ref"] | null;
+            /**
+             * Weight
+             * @description Share of the portfolio concerned; null if none.
+             */
+            weight: number | null;
+            /**
+             * Relevance
+             * @description 0-100 score; see the method for its parts.
+             * @default 0
+             */
+            relevance: number;
+            /**
+             * Relevance Reason
+             * @default
+             */
+            relevance_reason: string;
         };
         /** ChannelWeight */
         ChannelWeight: {
@@ -7374,6 +10710,36 @@ export interface components {
             actual: string | null;
             /** Tolerance */
             tolerance: string;
+        };
+        /** Checklist */
+        Checklist: {
+            /** Isin */
+            isin: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Criteria */
+            criteria: components["schemas"]["Criterion"][];
+            /** Summary Available */
+            summary_available: boolean;
+            /** Summary */
+            summary: string;
+            /** Abstain Reason */
+            abstain_reason: string | null;
+            /**
+             * Method Version
+             * @default 1.0.0
+             */
+            method_version: string;
+        };
+        /** Citation */
+        Citation: {
+            /** Url */
+            url: string;
+            /** Passage */
+            passage?: string | null;
         };
         /** CitedSentence */
         CitedSentence: {
@@ -7641,6 +11007,66 @@ export interface components {
              */
             policy_rate: boolean;
         };
+        /** Cockpit */
+        Cockpit: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Portfolio Value Base */
+            portfolio_value_base: number | null;
+            /** Issues */
+            issues: components["schemas"]["QualityIssue"][];
+            /**
+             * Snoozed
+             * @description Issues set aside until a date; they return on it.
+             */
+            snoozed?: components["schemas"]["SnoozedIssue"][];
+            /** Checks */
+            checks: components["schemas"]["steward__quality__cockpit__Check"][];
+            /** Not Covered */
+            not_covered: components["schemas"]["NotCovered"][];
+            /**
+             * Affected Weight
+             * @description Share of the portfolio touched by at least one issue (holdings counted once).
+             */
+            affected_weight: number;
+        };
+        /** Column */
+        Column: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "annual" | "quarter" | "ttm";
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Label */
+            label: string;
+            /** Notes */
+            notes?: string[];
+        };
+        /** ColumnSet */
+        ColumnSet: {
+            /** Id */
+            id?: number | null;
+            /**
+             * Kind
+             * @default stock
+             * @enum {string}
+             */
+            kind: "stock" | "fund";
+            /** Name */
+            name: string;
+            /** Columns */
+            columns: string[];
+        };
         /** CompanyEdgeInput */
         CompanyEdgeInput: {
             /** Subject Key */
@@ -7728,6 +11154,41 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** CompanyReport */
+        CompanyReport: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Key Figures */
+            key_figures: components["schemas"]["KeyFigure"][];
+            /** Key Figure Warnings */
+            key_figure_warnings: string[];
+            rubric: components["schemas"]["Rubric"];
+            /** Segments */
+            segments: components["schemas"]["SegmentMix"][];
+            /** Case Items */
+            case_items: {
+                [key: string]: unknown;
+            }[];
+            research: components["schemas"]["ResearchExcerpt"] | null;
+            /** Conflicts */
+            conflicts: components["schemas"]["Conflict"][];
+            /**
+             * Conclusion
+             * @default
+             */
+            conclusion: string;
+            /** Method Version */
+            method_version: string;
+            /** Input Hash */
+            input_hash: string;
+        };
         /**
          * CompanyResearchObservation
          * @description One `company_research_observation` row; `raw` is the decoded jsonb payload.
@@ -7781,6 +11242,187 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** CompanyValuation */
+        CompanyValuation: {
+            /** Ticker */
+            ticker: string;
+            /** Currency */
+            currency: string | null;
+            /** Price */
+            price: number | string | null;
+            /** Price Date */
+            price_date: string | null;
+            /** Inputs */
+            inputs: components["schemas"]["FiledInput"][];
+            /** Scenarios */
+            scenarios: components["schemas"]["ScenarioResult"][];
+            /** Range Low */
+            range_low: number | string | null;
+            /** Range High */
+            range_high: number | string | null;
+            /** Sensitivity */
+            sensitivity: components["schemas"]["GridCell"][];
+            reverse_dcf: components["schemas"]["AnalyticsResult"] | null;
+            /** Reverse Dcf Rate */
+            reverse_dcf_rate: number | string | null;
+            /** Reference */
+            reference: components["schemas"]["ReferenceValue"][];
+            /** Normalized */
+            normalized: components["schemas"]["FiledInput"][];
+            /** Warnings */
+            warnings: string[];
+            /** Method Version */
+            method_version: string;
+            /** Sources */
+            sources: components["schemas"]["SourceRef"][];
+            /**
+             * Note
+             * @default Scenarios are assumptions you set, not forecasts the app makes. The range spans your scenarios; no single value is offered, and a margin of safety is shown only against the scenario you select.
+             */
+            note: string;
+        };
+        /** CompareCell */
+        CompareCell: {
+            /** Value */
+            value: number | string | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** CompareCompany */
+        CompareCompany: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Is Subject */
+            is_subject: boolean;
+            /** Fiscal End */
+            fiscal_end: string | null;
+            /** Fiscal Distance Days */
+            fiscal_distance_days: number | null;
+            /** Currency */
+            currency: string | null;
+            /** Financial */
+            financial: boolean;
+        };
+        /** CompareExposureRow */
+        CompareExposureRow: {
+            /** Label */
+            label: string;
+            /** Weights */
+            weights: {
+                [key: string]: number | string | null;
+            };
+            /**
+             * Kind
+             * @default known
+             */
+            kind: string;
+        };
+        /** CompareFund */
+        CompareFund: {
+            /** Isin */
+            isin: string;
+            /** Name */
+            name: string | null;
+            /** Provider */
+            provider: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Distribution Policy */
+            distribution_policy: string | null;
+            /** Expense Ratio */
+            expense_ratio: number | string | null;
+            /** Total Assets */
+            total_assets: number | string | null;
+            /** Total Assets Currency */
+            total_assets_currency: string | null;
+            /** Holdings As Of */
+            holdings_as_of: string | null;
+            /** Holdings Lag Days */
+            holdings_lag_days: number | null;
+            /** Stale */
+            stale: boolean;
+            /** Portfolio Id */
+            portfolio_id: string | null;
+            /** Duplicate Of */
+            duplicate_of: string | null;
+            /** Duplicate Basis */
+            duplicate_basis?: ("portfolio_id" | "identical_holdings") | null;
+            /** Equity Weight */
+            equity_weight: number | string | null;
+            /** Residual Weight */
+            residual_weight: number | string | null;
+            /** Unidentified Equity Weight */
+            unidentified_equity_weight: number | string | null;
+            /** Issuers */
+            issuers: number | null;
+            /** Top10 Weight */
+            top10_weight: number | string | null;
+            /** Effective Issuers */
+            effective_issuers: number | string | null;
+            /** Returns */
+            returns: components["schemas"]["ReturnCell"][];
+        };
+        /** CompareRow */
+        CompareRow: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Group */
+            group: string;
+            /** Unit */
+            unit: string;
+            /** Cells */
+            cells: {
+                [key: string]: components["schemas"]["CompareCell"];
+            };
+            /** Median */
+            median: number | string | null;
+            /** Low */
+            low: number | string | null;
+            /** High */
+            high: number | string | null;
+            /** Count */
+            count: number;
+            /** Members */
+            members: number;
+            /** Withheld Reason */
+            withheld_reason: string | null;
+            /** Percentile */
+            percentile: number | string | null;
+        };
+        /** Compensation */
+        Compensation: {
+            /**
+             * Person
+             * @description Name and position as the proxy statement gives them.
+             */
+            person: string;
+            /** Fiscal Year */
+            fiscal_year: number;
+            /** Total */
+            total: number | string;
+            /**
+             * Currency
+             * @default USD
+             */
+            currency: string;
+            /**
+             * Components
+             * @description Only the components the provider sent; an absent one is not zero.
+             */
+            components: {
+                [key: string]: number | string;
+            };
+            /** Filed */
+            filed: string | null;
+            /** Source Url */
+            source_url: string;
+            /** Provider */
+            provider: string;
+        };
         /** ComplianceRow */
         ComplianceRow: {
             /**
@@ -7792,7 +11434,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "rule" | "hard_limit" | "band";
+            kind: "rule" | "hard_limit" | "band" | "performance";
             /** Description */
             description: string;
             /**
@@ -7804,6 +11446,29 @@ export interface components {
             detail: string;
             /** Source Ids */
             source_ids?: string[];
+        };
+        /** Component */
+        Component: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number | string;
+            /** Description */
+            description: string;
+            /** Score */
+            score: number | string | null;
+            /** Raw Score */
+            raw_score: number | string | null;
+            /** Coverage */
+            coverage: number | string;
+            /** Abstained */
+            abstained: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Indicators */
+            indicators: components["schemas"]["Indicator"][];
         };
         /** ComtradeSlice */
         ComtradeSlice: {
@@ -8010,6 +11675,18 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** Conflict */
+        Conflict: {
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "review" | "note";
+            /** Area */
+            area: string;
+            /** Text */
+            text: string;
+        };
         /** Consensus */
         Consensus: {
             coverage: components["schemas"]["SectionCoverage"];
@@ -8163,6 +11840,42 @@ export interface components {
             resolution: "resolved" | "dismissed";
             /** Note */
             note: string;
+        };
+        /** ContributionOut */
+        ContributionOut: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Price */
+            price: number;
+            /** Fx */
+            fx: number;
+            /** Income */
+            income: number;
+            /** Fees */
+            fees: number;
+            /** Total */
+            total: number;
+            /** Pct Of Start */
+            pct_of_start: number | null;
+            /** Attributed */
+            attributed: boolean;
+            /**
+             * Benchmark Equivalent
+             * @description What this holding's opening value would have gained in the benchmark.
+             */
+            benchmark_equivalent?: number | null;
+            /**
+             * Active
+             * @description Total contribution minus the benchmark equivalent.
+             */
+            active?: number | null;
+            /**
+             * Active Reason
+             * @description Why there is no active figure for this holding.
+             */
+            active_reason?: string | null;
         };
         /** ContributionReport */
         ContributionReport: {
@@ -8379,12 +12092,39 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** Correction */
+        Correction: {
+            /** Target Kind */
+            target_kind: string;
+            /** Count */
+            count: number;
+        };
         /** Correlation */
         Correlation: {
             /** Ticker */
             ticker: string;
             /** Correlation */
             correlation: number | null;
+        };
+        /** CorrelationMatrix */
+        CorrelationMatrix: {
+            /** Tickers */
+            tickers: string[];
+            /** Values */
+            values: (number | null)[][];
+            /** Observations */
+            observations: number[][];
+            /**
+             * Average
+             * @description Mean of the pairs that have enough observations.
+             */
+            average: number | null;
+            /** Pairs Measured */
+            pairs_measured: number;
+            /** Pairs Total */
+            pairs_total: number;
+            /** Min Observations */
+            min_observations: number;
         };
         /**
          * CorroborationRules
@@ -8443,6 +12183,23 @@ export interface components {
             by_job_type: components["schemas"]["JobTypeCost"][];
             /** By Model */
             by_model: components["schemas"]["ModelCost"][];
+        };
+        /** CostsOut */
+        CostsOut: {
+            /** Currency */
+            currency: string | null;
+            /** Fill Fees */
+            fill_fees: number;
+            /** Cash Fees */
+            cash_fees: number;
+            /** Total */
+            total: number;
+            /** Fraction Of Average Value */
+            fraction_of_average_value: number | null;
+            /** Window Start */
+            window_start: string | null;
+            /** Note */
+            note: string;
         };
         /** Coverage */
         Coverage: {
@@ -8513,6 +12270,15 @@ export interface components {
              */
             coverage_ratio?: number | string | null;
         };
+        /** CoverageItem */
+        CoverageItem: {
+            /** Area */
+            area: string;
+            /** Present */
+            present: boolean;
+            /** Detail */
+            detail: string;
+        };
         /** CoverageLedger */
         CoverageLedger: {
             /** Entries */
@@ -8546,6 +12312,13 @@ export interface components {
              */
             checked_at: string;
         };
+        /** CoverageScore */
+        CoverageScore: {
+            /** Have */
+            have: number;
+            /** Of */
+            of: number;
+        };
         /** CoverageSummary */
         CoverageSummary: {
             /** Group By */
@@ -8558,6 +12331,23 @@ export interface components {
              * Note
              * @default Counts are of stored coverage-ledger entries, not of the global universe. An entity with no ledger entry is unknown, not covered or uncovered.
              */
+            note: string;
+        };
+        /**
+         * CreditContext
+         * @description The market-wide US high-yield spread. It is not a sector figure.
+         */
+        CreditContext: {
+            /** Latest */
+            latest: number;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Median 1Y */
+            median_1y: number | null;
+            /** Note */
             note: string;
         };
         /**
@@ -8597,6 +12387,31 @@ export interface components {
              * @default true
              */
             enabled: boolean;
+        };
+        /** Criterion */
+        Criterion: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "good" | "watch" | "concern" | "info" | "unknown";
+            /** Observed */
+            observed: string;
+            /** Rule */
+            rule: string;
+            /** Source */
+            source?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /**
+             * Critical
+             * @default false
+             */
+            critical: boolean;
         };
         /** CrossAxisOut */
         CrossAxisOut: {
@@ -9080,6 +12895,64 @@ export interface components {
             /** Limitations */
             limitations: string[];
         };
+        /** Defect */
+        Defect: {
+            /**
+             * Id
+             * @description The id of the first report.
+             */
+            id: number;
+            /** Title */
+            title: string;
+            /** Detail */
+            detail: string | null;
+            /** Ticker */
+            ticker: string | null;
+            /** Feature */
+            feature: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "open" | "fixed" | "wont_fix";
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /**
+             * Weight
+             * @description Share of the portfolio held in the affected ticker today; None when no ticker is named or it is not held.
+             */
+            weight: number | null;
+        };
+        /** DefectIn */
+        DefectIn: {
+            /** Title */
+            title: string;
+            /** Detail */
+            detail?: string | null;
+            /**
+             * Ticker
+             * @description The holding it affects.
+             */
+            ticker?: string | null;
+            /**
+             * Feature
+             * @description Release-gate feature id.
+             */
+            feature?: string | null;
+        };
+        /** DefectUpdate */
+        DefectUpdate: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "open" | "fixed" | "wont_fix";
+            /** Detail */
+            detail?: string | null;
+        };
         /** Dependencies */
         Dependencies: {
             coverage: components["schemas"]["SectionCoverage"];
@@ -9232,6 +13105,39 @@ export interface components {
             inbound_claims: number;
             /** Notes */
             notes: string[];
+        };
+        /** DeriveIndexRequest */
+        DeriveIndexRequest: {
+            /** Fund Isin */
+            fund_isin: string;
+            /**
+             * Label
+             * @description Defaults to the fund's label.
+             */
+            label?: string | null;
+        };
+        /** DeriveRegionRequest */
+        DeriveRegionRequest: {
+            /** Region */
+            region: string;
+            /** Fund Isin */
+            fund_isin: string;
+        };
+        /** DeriveResult */
+        DeriveResult: {
+            item?: components["schemas"]["OwnerInput"] | null;
+            /**
+             * Changed
+             * @default false
+             */
+            changed: boolean;
+            /**
+             * Saved
+             * @default 0
+             */
+            saved: number;
+            /** Message */
+            message?: string | null;
         };
         /** DerivedListingResponse */
         DerivedListingResponse: {
@@ -9556,6 +13462,19 @@ export interface components {
             /** Buckets */
             buckets: components["schemas"]["BucketDrift"][];
         };
+        /** DimensionDetail */
+        DimensionDetail: {
+            /** Column */
+            column: string;
+            /** Members */
+            members: {
+                [key: string]: string;
+            };
+            /** Value */
+            value: number | string;
+            /** Accession */
+            accession?: string | null;
+        };
         /** Disagreement */
         Disagreement: {
             /** Conflict Id */
@@ -9681,6 +13600,111 @@ export interface components {
             splits_applied: number;
             /** Transactions */
             transactions: components["schemas"]["InsiderTxOut"][];
+        };
+        /** DiscoverExcluded */
+        DiscoverExcluded: {
+            /** Reason */
+            reason: string;
+            /** Count */
+            count: number;
+            /** Keys */
+            keys: string[];
+        };
+        /** DiscoverFilter */
+        DiscoverFilter: {
+            /** Metric */
+            metric: string;
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "gte" | "lte" | "in";
+            /**
+             * Value
+             * @description Threshold, or the allowed categories for `in`.
+             */
+            value: number | string | string[];
+            /**
+             * Definition Version
+             * @description Pin the definition; a mismatch is rejected.
+             */
+            definition_version?: string | null;
+            /**
+             * Period
+             * @description Pin the period rule; a mismatch is rejected.
+             */
+            period?: string | null;
+        };
+        /** DiscoveryResult */
+        DiscoveryResult: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stock" | "fund";
+            /** Method Version */
+            method_version: string;
+            /** Definition Hash */
+            definition_hash: string;
+            /** Result Hash */
+            result_hash: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Universe Key */
+            universe_key: string;
+            /** Universe Label */
+            universe_label: string;
+            /** Universe Definition */
+            universe_definition: string;
+            /** Universe Size */
+            universe_size: number;
+            /**
+             * Evaluated
+             * @description Records with at least one metric value.
+             */
+            evaluated: number;
+            /** Matched */
+            matched: number;
+            /** Failed Filter */
+            failed_filter: number;
+            /**
+             * Unknown Excluded
+             * @description Left out because a filtered metric had no value.
+             */
+            unknown_excluded: number;
+            /**
+             * No Data
+             * @description Records with no data to test at all.
+             */
+            no_data: number;
+            /** Kept Unknown */
+            kept_unknown: number;
+            /**
+             * Missing Treatment
+             * @enum {string}
+             */
+            missing_treatment: "exclude" | "keep_unknown";
+            /** Filters */
+            filters: components["schemas"]["DiscoverFilter"][];
+            /** Filter Coverage */
+            filter_coverage: components["schemas"]["FilterCoverage"][];
+            /** Excluded */
+            excluded: components["schemas"]["DiscoverExcluded"][];
+            /** Rows */
+            rows: components["schemas"]["ResultRow"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Formula Definitions */
+            formula_definitions: {
+                [key: string]: string;
+            };
+            /** Warnings */
+            warnings: string[];
+            /** Caveats */
+            caveats: string[];
         };
         /** DisputedStory */
         DisputedStory: {
@@ -10416,6 +14440,48 @@ export interface components {
             /** Problems */
             problems: string[];
         };
+        /** EstimatePoint */
+        EstimatePoint: {
+            /** Kind */
+            kind: string;
+            /** Kind Label */
+            kind_label: string;
+            /** Metric */
+            metric: string;
+            /** Fiscal Period */
+            fiscal_period: string;
+            /** Period End */
+            period_end: string | null;
+            /** Provider */
+            provider: string | null;
+            /** Basis */
+            basis: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Value */
+            value: number | string | null;
+            /** Low */
+            low: number | string | null;
+            /** High */
+            high: number | string | null;
+            /** Analyst Count */
+            analyst_count: number | null;
+            /** Vintage */
+            vintage: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Source Url */
+            source_url: string;
+            /** Metadata Complete */
+            metadata_complete: boolean;
+            /** Surprise */
+            surprise?: number | string | null;
+            /** Surprise Note */
+            surprise_note?: string | null;
+        };
         /** EstimateSegmentBridgeOut */
         EstimateSegmentBridgeOut: {
             /** Metric */
@@ -10439,6 +14505,21 @@ export interface components {
             notes: string[];
             /** Inputs */
             inputs: string[];
+        };
+        /** Estimates */
+        Estimates: {
+            /** Ticker */
+            ticker: string;
+            /** Access */
+            access: string;
+            /** Access Note */
+            access_note: string;
+            /** Points */
+            points: components["schemas"]["EstimatePoint"][];
+            /** Notes */
+            notes: string[];
+            /** Method Version */
+            method_version: string;
         };
         /** EstimatesOut */
         EstimatesOut: {
@@ -10566,6 +14647,98 @@ export interface components {
             formula_version: string;
             /** Formula */
             formula: string;
+        };
+        /** EventFeed */
+        EventFeed: {
+            /**
+             * Since
+             * Format: date
+             */
+            since: string;
+            /** Stories Read */
+            stories_read: number;
+            /** Items */
+            items: components["schemas"]["FeedItem"][];
+            /** Note */
+            note: string;
+        };
+        /** EventImpact */
+        EventImpact: {
+            /** Symbol */
+            symbol: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "downstream" | "upstream";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "confirmed" | "reported" | "rumoured";
+            /** Paths */
+            paths: components["schemas"]["EventPath"][];
+            /**
+             * Reached Weight
+             * @description Portfolio weight in the companies reached, once each.
+             */
+            reached_weight: number;
+            /** Own Weight */
+            own_weight: number;
+            /** Notes */
+            notes: string[];
+            /**
+             * Method
+             * @default A path follows confirmed supply-chain links from the company in the event. The confidence of a path is its weakest link: a link is high when it is a stated fact (owner-entered or a confirmed filing disclosure) with a stated revenue share and a date within three years, medium when it has no stated share, and low when it is older than three years. Severity is high only for a confirmed event on a path of high links that reaches at least 2% of the portfolio. A revenue share is shown only for a single customer link that states one.
+             */
+            method: string;
+        };
+        /** EventPath */
+        EventPath: {
+            /** Start */
+            start: string;
+            /** End */
+            end: string;
+            /** Edges */
+            edges: components["schemas"]["PathEdge"][];
+            /**
+             * Confidence
+             * @description The weakest link on the path.
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /**
+             * Weight
+             * @description Portfolio weight in the company at the end of the path.
+             */
+            weight: number;
+            /**
+             * Direct Weight
+             * @description Of that weight, the part held directly.
+             * @default 0
+             */
+            direct_weight: number;
+            /**
+             * Fund Weight
+             * @description Of that weight, the part held in funds.
+             * @default 0
+             */
+            fund_weight: number;
+            /**
+             * Revenue Share
+             * @description Share of the end supplier's revenue that the lost customer represents, only for a single customer link that states one.
+             */
+            revenue_share: number | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "high" | "medium" | "low" | "none";
+            /**
+             * Indicators
+             * @description Thesis indicators of the end company to watch.
+             */
+            indicators: string[];
         };
         /**
          * EventRulesConfig
@@ -10862,6 +15035,13 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** Excluded */
+        Excluded: {
+            /** Key */
+            key: string;
+            /** Reason */
+            reason: string;
+        };
         /** ExcludedGroup */
         ExcludedGroup: {
             /** Reason */
@@ -10870,6 +15050,13 @@ export interface components {
             count: number;
             /** Tickers */
             tickers: string[];
+        };
+        /** Exclusion */
+        Exclusion: {
+            /** Subject */
+            subject: string;
+            /** Reason */
+            reason: string;
         };
         /** ExclusionOut */
         ExclusionOut: {
@@ -10882,6 +15069,25 @@ export interface components {
              * @description Sum of the reported share counts of the excluded rows.
              */
             shares: number | string;
+        };
+        /** ExemptionOut */
+        ExemptionOut: {
+            /** Year */
+            year: number;
+            /** Currency */
+            currency: string;
+            /** Gross Proceeds */
+            gross_proceeds: number;
+            /** Limit */
+            limit: number;
+            /** Headroom */
+            headroom: number;
+            /** Exceeded */
+            exceeded: boolean;
+            /** Sales Counted */
+            sales_counted: number;
+            /** Sales Without Rate */
+            sales_without_rate: number;
         };
         /**
          * ExpectedSessionsResponse
@@ -10911,6 +15117,35 @@ export interface components {
             days: string[];
         } & {
             [key: string]: unknown;
+        };
+        /** Explain */
+        Explain: {
+            /** Exclusions */
+            exclusions?: components["schemas"]["Exclusion"][];
+            /** Formula Version */
+            formula_version: string;
+            /**
+             * Formula
+             * @default
+             */
+            formula: string;
+            /** Citations */
+            citations?: components["schemas"]["SourceRef"][];
+            /** Gaps */
+            gaps?: string[];
+        };
+        /** ExportRequest */
+        ExportRequest: {
+            /**
+             * Kind
+             * @default stock
+             * @enum {string}
+             */
+            kind: "stock" | "fund";
+            stock?: components["schemas"]["StockRequest"] | null;
+            fund?: components["schemas"]["FundRequest"] | null;
+            /** Columns */
+            columns: string[];
         };
         /** ExportedDomain */
         ExportedDomain: {
@@ -11118,6 +15353,15 @@ export interface components {
             /** Valid To */
             valid_to?: string | null;
         };
+        /** ExposureLine */
+        ExposureLine: {
+            /** Value */
+            value: string;
+            /** Revenue */
+            revenue: number | string;
+            /** Share */
+            share: number | string | null;
+        };
         /**
          * ExposureObservation
          * @description An exposure-context price-series observation (the research row without published_at).
@@ -11250,6 +15494,24 @@ export interface components {
              */
             reconciles: boolean;
         };
+        /** Fact */
+        Fact: {
+            /** Key */
+            key: string;
+            /** Value */
+            value: string;
+            /** Source Url */
+            source_url: string;
+            /** Passage */
+            passage?: string | null;
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Recorded At
+             * Format: date-time
+             */
+            recorded_at: string;
+        };
         /** FactCheck */
         FactCheck: {
             /** Check */
@@ -11261,6 +15523,19 @@ export interface components {
              * @default
              */
             detail: string;
+        };
+        /** FactIn */
+        FactIn: {
+            /** Key */
+            key: string;
+            /** Value */
+            value: string;
+            /** Source Url */
+            source_url: string;
+            /** Passage */
+            passage?: string | null;
+            /** As Of */
+            as_of?: string | null;
         };
         /**
          * FactIndexEntry
@@ -11500,6 +15775,38 @@ export interface components {
             /** Detail */
             detail: string;
         };
+        /** FeatureReadiness */
+        FeatureReadiness: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Plan */
+            plan: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "partial" | "unavailable" | "untested";
+            /** Reason */
+            reason: string;
+            /** Limit */
+            limit: string | null;
+            /** Inputs */
+            inputs: components["schemas"]["InputState"][];
+            /**
+             * Audit
+             * @enum {string}
+             */
+            audit: "none" | "thin" | "passed" | "mismatch";
+            /**
+             * Audited Facts
+             * @description Facts compared with a source that matched.
+             */
+            audited_facts: number;
+            /** Can Activate */
+            can_activate: boolean;
+        };
         /** FeeDrag */
         FeeDrag: {
             /**
@@ -11600,6 +15907,24 @@ export interface components {
              */
             status: "captured" | "partial" | "not_captured" | "no_fills";
         };
+        /** FeedItem */
+        FeedItem: {
+            story: components["schemas"]["Story"];
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "confirmed" | "reported" | "rumoured";
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "downstream" | "upstream";
+            impact: components["schemas"]["EventImpact"];
+            top: components["schemas"]["EventPath"];
+            /** Would Alert */
+            would_alert: boolean;
+        };
         /** FeedbackIn */
         FeedbackIn: {
             /**
@@ -11682,6 +16007,49 @@ export interface components {
              */
             created_at: string;
         };
+        /** Figure */
+        Figure: {
+            /**
+             * Value
+             * @description Null means unavailable, never zero.
+             */
+            value: number | null;
+            /** Unit */
+            unit: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable" | "paid_only" | "disputed";
+            /** Method Version */
+            method_version: string;
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Coverage
+             * @description Share of inputs that were usable.
+             */
+            coverage?: number | null;
+            /** Warnings */
+            warnings?: string[];
+            /** Input Hash */
+            input_hash?: string | null;
+        };
+        /** FiledInput */
+        FiledInput: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Detail */
+            detail?: string | null;
+            /** Accession */
+            accession?: string | null;
+            /** Filing Url */
+            filing_url?: string | null;
+        };
         /** FiledNote */
         FiledNote: {
             /** Fact Id */
@@ -11743,6 +16111,19 @@ export interface components {
             note_rows: number;
             /** Gaps */
             gaps: string[];
+        };
+        /** FilterCoverage */
+        FilterCoverage: {
+            /** Metric */
+            metric: string;
+            /** Label */
+            label: string;
+            /** Known */
+            known: number;
+            /** Total */
+            total: number;
+            /** Fraction */
+            fraction: number | string | null;
         };
         /** FinancialFactOut */
         FinancialFactOut: {
@@ -12018,6 +16399,33 @@ export interface components {
             /** Job Id */
             job_id: number;
         };
+        /**
+         * FreshnessOut
+         * @description How old the data under the charts is, so a stale price or rate is visible, not implied.
+         */
+        FreshnessOut: {
+            /**
+             * Prices As Of
+             * @description Day of the latest position snapshot: the prices and exchange rates used.
+             */
+            prices_as_of: string | null;
+            /** Prices Age Days */
+            prices_age_days: number | null;
+            /**
+             * Benchmark As Of
+             * @description Date of the benchmark's latest close.
+             */
+            benchmark_as_of: string | null;
+            /** Benchmark Age Days */
+            benchmark_age_days: number | null;
+            /**
+             * Stale
+             * @description Prices or the benchmark are older than the stale limit.
+             */
+            stale: boolean;
+            /** Stale After Days */
+            stale_after_days: number;
+        };
         /** FundAsOf */
         FundAsOf: {
             /** Isin */
@@ -12067,6 +16475,19 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /** FundBucket */
+        FundBucket: {
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number | string;
+            /**
+             * Kind
+             * @default known
+             * @enum {string}
+             */
+            kind: "known" | "unclassified" | "not_accounted";
+        };
         /** FundChannel */
         FundChannel: {
             /**
@@ -12077,6 +16498,46 @@ export interface components {
             channel: "fund_positions_nport";
             coverage: components["schemas"]["SectionCoverage"];
             positions: components["schemas"]["HoldingFundPositions"];
+        };
+        /** FundComparison */
+        FundComparison: {
+            /** Funds */
+            funds: components["schemas"]["CompareFund"][];
+            /** Pairs */
+            pairs: components["schemas"]["PairOverlap"][];
+            /** Sectors */
+            sectors: components["schemas"]["CompareExposureRow"][];
+            /** Countries */
+            countries: components["schemas"]["CompareExposureRow"][];
+            /** Warnings */
+            warnings: string[];
+            /**
+             * Method Version
+             * @default 1.0.0
+             */
+            method_version: string;
+        };
+        /** FundConcentration */
+        FundConcentration: {
+            /** Equity Weight */
+            equity_weight: number | string;
+            /** Issuers */
+            issuers: number;
+            /**
+             * Top10 Weight
+             * @description Share of net assets in the ten largest issuers.
+             */
+            top10_weight: number | string | null;
+            /** Top10 Of Equity */
+            top10_of_equity: number | string | null;
+            /** Hhi */
+            hhi: number | string | null;
+            /** Effective Issuers */
+            effective_issuers: number | string | null;
+            /** Unidentified Equity Weight */
+            unidentified_equity_weight: number | string;
+            /** Basis */
+            basis: string;
         };
         /** FundCoverage */
         FundCoverage: {
@@ -12136,6 +16597,24 @@ export interface components {
             portfolio_weight: number;
             /** Value Base */
             value_base: number;
+        };
+        /** FundListing */
+        FundListing: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name?: string | null;
+            /** Exchange */
+            exchange?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Price Symbol */
+            price_symbol?: string | null;
+            /**
+             * Has Prices
+             * @default false
+             */
+            has_prices: boolean;
         };
         /** FundLookThrough */
         FundLookThrough: {
@@ -12320,6 +16799,119 @@ export interface components {
             form: string;
             /** Source Url */
             source_url: string;
+        };
+        /** FundProfile */
+        FundProfile: {
+            /** Isin */
+            isin: string;
+            /** Name */
+            name: string | null;
+            /** Provider */
+            provider: string | null;
+            identity: components["schemas"]["Identity"];
+            /** Fields */
+            fields: components["schemas"]["ProfileField"][];
+            /** Have */
+            have: number;
+            /** Of */
+            of: number;
+            /** Charges */
+            charges?: {
+                [key: string]: unknown;
+            };
+            /** Factsheet As Of */
+            factsheet_as_of: string | null;
+            /** Holdings As Of */
+            holdings_as_of: string | null;
+            /**
+             * Method Version
+             * @default 1.0.0
+             */
+            method_version: string;
+            /** Warnings */
+            warnings?: string[];
+        };
+        /** FundRelative */
+        FundRelative: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Rows */
+            rows: components["schemas"]["FundRelativeRow"][];
+            /**
+             * Covered Weight
+             * @description Portfolio weight of the held funds with a figure.
+             */
+            covered_weight: number;
+            /**
+             * Fund Weight
+             * @description Portfolio weight of all held funds.
+             */
+            fund_weight: number;
+            /**
+             * Average
+             * @description Weight-averaged tracking difference over the funds with a figure.
+             */
+            average: number | null;
+            /** Notes */
+            notes: string[];
+        };
+        /** FundRelativeRow */
+        FundRelativeRow: {
+            /** Isin */
+            isin: string;
+            /** Ticker */
+            ticker: string | null;
+            /** Name */
+            name: string | null;
+            /**
+             * Weight
+             * @description Share of the portfolio; None for the proxy fund alone.
+             */
+            weight: number | null;
+            /** Benchmark */
+            benchmark: string | null;
+            /**
+             * Tracking Difference
+             * @description Annualised, fund minus benchmark, same basis and currency only.
+             */
+            tracking_difference: number | null;
+            /**
+             * Reason
+             * @description Why there is no figure.
+             */
+            reason: string | null;
+            /**
+             * Is Proxy
+             * @description The fund the X-Ray uses as its benchmark proxy.
+             */
+            is_proxy: boolean;
+        };
+        /** FundRequest */
+        FundRequest: {
+            /** Filters */
+            filters?: components["schemas"]["DiscoverFilter"][];
+            /**
+             * Missing
+             * @default exclude
+             * @enum {string}
+             */
+            missing: "exclude" | "keep_unknown";
+            /** Sort By */
+            sort_by?: string | null;
+            /** Descending */
+            descending?: boolean | null;
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /** Cursor */
+            cursor?: string | null;
+            /** As Of */
+            as_of?: string | null;
         };
         /** FundValuation */
         FundValuation: {
@@ -12659,6 +17251,21 @@ export interface components {
              */
             denied_domains?: string[];
         };
+        /** GeoShare */
+        GeoShare: {
+            /** Geography */
+            geography: string;
+            /**
+             * Mean Share
+             * @description Average share of revenue across reporting companies.
+             */
+            mean_share: number;
+            /**
+             * N
+             * @description Companies that report revenue for this country.
+             */
+            n: number;
+        };
         /** GoldenAccuracy */
         GoldenAccuracy: {
             /**
@@ -12700,6 +17307,91 @@ export interface components {
              * @default US
              */
             country: string;
+        };
+        /** Governance */
+        Governance: {
+            /** Ticker */
+            ticker: string;
+            /** Roles */
+            roles: components["schemas"]["Role"][];
+            /** Related Party */
+            related_party: {
+                [key: string]: unknown;
+            }[];
+            /** Related Party Figures */
+            related_party_figures?: components["schemas"]["RelatedPartyFigure"][];
+            /** Compensation */
+            compensation?: components["schemas"]["Compensation"][];
+            /** Compensation Note */
+            compensation_note: string;
+            /** Caveats */
+            caveats: string[];
+            /** Method Version */
+            method_version: string;
+        };
+        /** GraphEdge */
+        GraphEdge: {
+            /** Edge Type */
+            edge_type: string;
+            /** Counterparty */
+            counterparty: string;
+            /** Direction */
+            direction: string;
+            /** Status */
+            status: string;
+            /** Evidence Tier */
+            evidence_tier: string;
+            /** Valid From */
+            valid_from: string | null;
+            /** Valid To */
+            valid_to: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url: string;
+            /** Passage */
+            passage: string | null;
+            /**
+             * New Since
+             * @default false
+             */
+            new_since: boolean;
+        };
+        /** GraphEvent */
+        GraphEvent: {
+            /** Event Type */
+            event_type: string;
+            /** Event State */
+            event_state: string;
+            /** Counterparty */
+            counterparty: string | null;
+            /** Announced At */
+            announced_at: string | null;
+            /** Effective At */
+            effective_at: string | null;
+            /** Status */
+            status: string;
+            /** Source Url */
+            source_url: string;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+            /** Terms */
+            terms: {
+                [key: string]: unknown;
+            };
+            /**
+             * New Since
+             * @default false
+             */
+            new_since: boolean;
         };
         /**
          * GraphRow
@@ -12766,6 +17458,62 @@ export interface components {
             offset: number;
             /** Rows */
             rows: components["schemas"]["GraphRow"][];
+        };
+        /** GridCell */
+        GridCell: {
+            /** Growth Shift */
+            growth_shift: number | string;
+            /** Rate Shift */
+            rate_shift: number | string;
+            /** Value */
+            value: number | string | null;
+        };
+        /** GroupStats */
+        GroupStats: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @description sector or industry
+             */
+            kind: string;
+            /** Parent */
+            parent: string | null;
+            /** Companies */
+            companies: number;
+            /** Tickers */
+            tickers: string[];
+            /** Markets */
+            markets: string[];
+            /**
+             * Held Weight
+             * @description Share of the portfolio held in these companies.
+             */
+            held_weight: number;
+            /** Held */
+            held: number;
+            revenue_growth: components["schemas"]["Spread"];
+            operating_margin: components["schemas"]["Spread"];
+            pe: components["schemas"]["Spread"];
+            /**
+             * Confirmed Peer Links
+             * @description Confirmed peer links with both ends in the group.
+             */
+            confirmed_peer_links: number;
+            /** @description Balance-sheet leverage, latest filed year (credit signal). */
+            net_debt_to_equity?: components["schemas"]["Spread"] | null;
+            /**
+             * Leveraged
+             * @description Companies with net debt above 1x equity.
+             * @default 0
+             */
+            leveraged: number;
+            /** Top Products */
+            top_products?: components["schemas"]["ProductLine"][];
+            /** Geography */
+            geography?: components["schemas"]["GeoShare"][];
+            /** Patent Areas */
+            patent_areas?: components["schemas"]["PatentArea"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -13302,6 +18050,32 @@ export interface components {
             /** Limitations */
             limitations: string[];
         };
+        /**
+         * HoldingPeriodRow
+         * @description An open purchase lot with both dates of the holding-period test (plan M4.8).
+         */
+        HoldingPeriodRow: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Bought On
+             * Format: date
+             */
+            bought_on: string;
+            /**
+             * Passes On
+             * Format: date
+             */
+            passes_on: string;
+            /** Months Remaining */
+            months_remaining: number;
+            /** Passed */
+            passed: boolean;
+            /** Quantity */
+            quantity: number;
+            /** Forfeits Exemption Warning */
+            forfeits_exemption_warning: boolean;
+        };
         /** HoldingPrices */
         HoldingPrices: {
             /** Ticker */
@@ -13693,6 +18467,57 @@ export interface components {
              */
             holdings: components["schemas"]["Holding"][];
         };
+        /** HoldingsView */
+        HoldingsView: {
+            /** Isin */
+            isin: string;
+            /** As Of */
+            as_of: string | null;
+            /** Fetched At */
+            fetched_at: string | null;
+            /** Snapshot Id */
+            snapshot_id: number | null;
+            /** Source */
+            source: string | null;
+            /** Row Count */
+            row_count: number;
+            /** Total Weight */
+            total_weight: number | string | null;
+            /**
+             * Residual Weight
+             * @description 1 - the published rows; unknown, never spread over the known rows.
+             */
+            residual_weight: number | string | null;
+            /** Reconciles */
+            reconciles: boolean | null;
+            /** Reconcile Note */
+            reconcile_note: string;
+            /** Asset Classes */
+            asset_classes: components["schemas"]["FundBucket"][];
+            /** Sectors */
+            sectors: components["schemas"]["FundBucket"][];
+            /** Countries */
+            countries: components["schemas"]["FundBucket"][];
+            /** Currencies */
+            currencies: components["schemas"]["FundBucket"][];
+            /** Top */
+            top: components["schemas"]["IssuerLine"][];
+            /** Issuer Count */
+            issuer_count: number;
+            /** Publisher Breakdowns */
+            publisher_breakdowns: components["schemas"]["PublisherBreakdown"][];
+            /** Unidentified Equity Weight */
+            unidentified_equity_weight: number | string;
+            /** Warnings */
+            warnings: string[];
+            /**
+             * Method Version
+             * @default 1.0.0
+             */
+            method_version: string;
+            /** Input Hash */
+            input_hash?: string | null;
+        };
         /** IdentifierDecisionIn */
         IdentifierDecisionIn: {
             /**
@@ -13750,6 +18575,21 @@ export interface components {
             /** Stored */
             stored: boolean;
         };
+        /** Identity */
+        Identity: {
+            /** Fund Isin */
+            fund_isin: string;
+            /** Share Class */
+            share_class: string | null;
+            /** Portfolio Id */
+            portfolio_id: string | null;
+            /** Listings */
+            listings: components["schemas"]["FundListing"][];
+            /** Sibling Share Classes */
+            sibling_share_classes: components["schemas"]["Sibling"][];
+            /** Note */
+            note: string;
+        };
         /** IdentityGap */
         IdentityGap: {
             /** Ticker */
@@ -13786,6 +18626,80 @@ export interface components {
              * @description Domains whose body equalled the active version.
              */
             unchanged: string[];
+        };
+        /** IndexComparison */
+        IndexComparison: {
+            /** Label */
+            label: string;
+            /** Source Url */
+            source_url: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Constituents */
+            constituents: number;
+            /**
+             * Index Weight Listed
+             * @description Sum of the pasted index weights.
+             */
+            index_weight_listed: number;
+            /** Active Share */
+            active_share: number | null;
+            /**
+             * Partial
+             * @description The pasted weights cover less than the whole index.
+             */
+            partial: boolean;
+            /**
+             * Index Weight Held
+             * @description Index weight in names the portfolio also holds.
+             */
+            index_weight_held: number;
+            /**
+             * Unmatched
+             * @description Pasted constituents that no holding matched.
+             */
+            unmatched: number;
+            /** Overweights */
+            overweights: components["schemas"]["IndexDifference"][];
+            /** Underweights */
+            underweights: components["schemas"]["IndexDifference"][];
+            /** Notes */
+            notes: string[];
+        };
+        /** IndexComparisons */
+        IndexComparisons: {
+            /** Comparisons */
+            comparisons: components["schemas"]["IndexComparison"][];
+            /** Notes */
+            notes: string[];
+        };
+        /** IndexConstituent */
+        IndexConstituent: {
+            /** Name */
+            name: string;
+            /** Isin */
+            isin?: string | null;
+            /** Ticker */
+            ticker?: string | null;
+            /** Weight */
+            weight: number;
+        };
+        /** IndexDifference */
+        IndexDifference: {
+            /** Name */
+            name: string;
+            /** Portfolio Weight */
+            portfolio_weight: number;
+            /** Index Weight */
+            index_weight: number;
+            /**
+             * Difference
+             * @description Portfolio minus index, in weight.
+             */
+            difference: number;
         };
         /** IndexQuote */
         IndexQuote: {
@@ -13835,6 +18749,70 @@ export interface components {
              */
             change_pct: number | null;
         };
+        /** IndexSeries */
+        IndexSeries: {
+            /** Ticker */
+            ticker: string;
+            /** Points */
+            points: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** IndexWeightsRequest */
+        IndexWeightsRequest: {
+            /**
+             * Source Url
+             * @description Where the figures came from (a web address).
+             */
+            source_url: string;
+            /**
+             * As Of
+             * Format: date
+             * @description The date the figures describe.
+             */
+            as_of: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Label
+             * @description The index's name.
+             */
+            label: string;
+            /** Constituents */
+            constituents: components["schemas"]["IndexConstituent"][];
+        };
+        /** Indicator */
+        Indicator: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Component */
+            component: string;
+            /** Weight */
+            weight: number | string;
+            /** Value */
+            value: number | string | null;
+            /** Unit */
+            unit: string;
+            /** Direction */
+            direction: string;
+            /** Good */
+            good: number | string;
+            /** Ok */
+            ok: number | string;
+            /**
+             * Band
+             * @enum {string}
+             */
+            band: "good" | "ok" | "weak" | "missing";
+            /** Points */
+            points: number | string | null;
+            /** Source */
+            source: string;
+            /** Reason */
+            reason?: string | null;
+        };
         /** IngestOut */
         IngestOut: {
             /** Discovered */
@@ -13847,6 +18825,22 @@ export interface components {
             failed: number;
             /** Results */
             results: components["schemas"]["FilingResultOut"][];
+        };
+        /** InputState */
+        InputState: {
+            /** Label */
+            label: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "endpoint" | "store";
+            /** Required */
+            required: boolean;
+            /** Ok */
+            ok: boolean;
+            /** Detail */
+            detail: string;
         };
         /** Insider */
         Insider: {
@@ -14591,6 +19585,23 @@ export interface components {
              */
             active: boolean;
         };
+        /** IssuerLine */
+        IssuerLine: {
+            /** Issuer Key */
+            issuer_key: string;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number | string;
+            /** Rows */
+            rows: number;
+            /** Isins */
+            isins: string[];
+            /** Sector */
+            sector: string | null;
+            /** Country */
+            country: string | null;
+        };
         /** IssuerRelationshipOut */
         IssuerRelationshipOut: {
             /** Id */
@@ -14686,6 +19697,13 @@ export interface components {
             attempts: number;
             /** Steps */
             steps: components["schemas"]["JobStepOut"][];
+        };
+        /** JobFailures */
+        JobFailures: {
+            /** Runs */
+            runs: number;
+            /** Failed */
+            failed: number;
         };
         /** JobList */
         JobList: {
@@ -14913,8 +19931,12 @@ export interface components {
             fund_probes?: components["schemas"]["JobSchedule"];
             /** @description Check iShares/Vanguard fund valuation figures for parser drift. Default: daily 07:30. */
             fund_characteristics_audit?: components["schemas"]["JobSchedule"];
+            /** @description Read each held fund's own issuer data (iShares product-data API, WisdomTree factsheet): replication, launch date, domicile, UCITS status, benchmark index and the published NAV. Writes a fact only when it changed and never over a value you recorded from another source. Default: weekdays 08:15. */
+            fund_issuer_facts?: components["schemas"]["JobSchedule"];
             /** @description Evaluate credit, trade, patent and graph alerts. Default: daily 12:05. */
             free_source_alerts?: components["schemas"]["JobSchedule"];
+            /** @description Alert on a tier 1 deal story or a new patent family at a holding, once each. Default: daily 07:55. */
+            change_alerts?: components["schemas"]["JobSchedule"];
             /** @description Record the daily free-source shadow-run snapshot. Default: daily 23:50. */
             shadow_snapshot?: components["schemas"]["JobSchedule"];
             /** @description Generate the free-source shadow-run report. Default: Monday 08:00. */
@@ -15009,6 +20031,102 @@ export interface components {
             note: string | null;
             body: components["schemas"]["JobsConfig"];
         };
+        /** JournalEntry */
+        JournalEntry: {
+            /** Id */
+            id: number;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "security" | "portfolio";
+            /** Ticker */
+            ticker: string | null;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "buy" | "add" | "hold" | "trim" | "sell" | "pass" | "watch" | "review";
+            /** Parent Id */
+            parent_id: number | null;
+            /**
+             * Decided On
+             * Format: date
+             */
+            decided_on: string;
+            /** Hypothesis */
+            hypothesis: string;
+            /** Valuation Assumptions */
+            valuation_assumptions: string | null;
+            /** Catalysts */
+            catalysts: string[];
+            /** Disconfirming */
+            disconfirming: string[];
+            /** Review Date */
+            review_date: string | null;
+            /** Conviction */
+            conviction: number | null;
+            /** Main Reason */
+            main_reason: string | null;
+            /** Price At Decision */
+            price_at_decision: number | null;
+            /** Price Currency */
+            price_currency: string | null;
+            /** Snapshot */
+            snapshot: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** JournalEntryIn */
+        JournalEntryIn: {
+            /**
+             * Scope
+             * @default security
+             * @enum {string}
+             */
+            scope: "security" | "portfolio";
+            /** Ticker */
+            ticker?: string | null;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "buy" | "add" | "hold" | "trim" | "sell" | "pass" | "watch" | "review";
+            /**
+             * Parent Id
+             * @description The entry this one reviews; its reasons stay untouched.
+             */
+            parent_id?: number | null;
+            /**
+             * Decided On
+             * @description Defaults to today.
+             */
+            decided_on?: string | null;
+            /** Hypothesis */
+            hypothesis: string;
+            /** Valuation Assumptions */
+            valuation_assumptions?: string | null;
+            /** Catalysts */
+            catalysts?: string[];
+            /** Disconfirming */
+            disconfirming?: string[];
+            /** Review Date */
+            review_date?: string | null;
+            /** Conviction */
+            conviction?: number | null;
+            /** Main Reason */
+            main_reason?: ("quality" | "value" | "catalyst" | "momentum" | "other") | null;
+            /**
+             * Price At Decision
+             * @description Defaults to the latest stored price.
+             */
+            price_at_decision?: number | null;
+        };
         /** JurisdictionCoverage */
         JurisdictionCoverage: {
             /** Jurisdiction */
@@ -15019,6 +20137,25 @@ export interface components {
             access: string;
             /** Detail */
             detail: string | null;
+        };
+        /** KeyFigure */
+        KeyFigure: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Unit */
+            unit: string;
+            /** Period */
+            period: string | null;
+            /** Value */
+            value: number | string | null;
+            /** Own Median 5Y */
+            own_median_5y: number | string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Formula */
+            formula: string;
         };
         /** KpiRow */
         KpiRow: {
@@ -15171,6 +20308,48 @@ export interface components {
             /** Source Url */
             source_url?: string | null;
         };
+        /** LedgerHealth */
+        LedgerHealth: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "clean" | "breaks" | "empty";
+            /** Entries */
+            entries: number;
+            /** First */
+            first: string | null;
+            /** Last */
+            last: string | null;
+            /** By Kind */
+            by_kind: {
+                [key: string]: number;
+            };
+            /** Unsupported */
+            unsupported: string[];
+            /** Needs Fx */
+            needs_fx: number;
+            /** Fees Not Captured */
+            fees_not_captured: number;
+            /**
+             * Fees Excluded
+             * @description Fills whose fee lines in another currency than the fill were left out.
+             */
+            fees_excluded?: string[];
+            /** Position Breaks */
+            position_breaks: components["schemas"]["PositionBreakOut"][];
+            /** Cash Breaks */
+            cash_breaks: components["schemas"]["CashBreakOut"][];
+            /** Cash Breaks Total */
+            cash_breaks_total: number;
+            /**
+             * Unexplained Cash
+             * @description Sum of unexplained daily cash changes.
+             */
+            unexplained_cash: number;
+            /** Cash Tolerance */
+            cash_tolerance: number;
+        };
         /** LedgerRow */
         LedgerRow: {
             /**
@@ -15271,6 +20450,62 @@ export interface components {
             /** Source Url */
             source_url: string;
         };
+        /** LegalLink */
+        LegalLink: {
+            /**
+             * Relation
+             * @enum {string}
+             */
+            relation: "parent" | "ultimate_parent" | "subsidiary";
+            /** Name */
+            name: string;
+            /** Lei */
+            lei: string | null;
+            /**
+             * Status
+             * @description confirmed, or suggested until you confirm it
+             */
+            status: string;
+            /** Source */
+            source: string;
+            /** As Of */
+            as_of: string | null;
+        };
+        /** Line */
+        Line: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Kind */
+            kind: string;
+            /** Unit */
+            unit: string;
+            /**
+             * Concepts
+             * @description Source concepts that map here.
+             */
+            concepts?: string[];
+            /** Cells */
+            cells?: {
+                [key: string]: components["schemas"]["Cell"];
+            };
+            /** Dimensions */
+            dimensions?: components["schemas"]["DimensionDetail"][];
+        };
+        /** LinkedPair */
+        LinkedPair: {
+            /** Supplier */
+            supplier: string;
+            /** Customer */
+            customer: string;
+            /** Product */
+            product: string;
+            /** Combined Weight */
+            combined_weight: number;
+            /** Customer Share */
+            customer_share: number | null;
+        };
         /** LiquidityOut */
         LiquidityOut: {
             /** Liquid */
@@ -15285,6 +20520,24 @@ export interface components {
             most_relevant_market: string | null;
             /** Period To */
             period_to: string | null;
+        };
+        /** Listing */
+        Listing: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Mic */
+            mic: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Status */
+            status: string | null;
+            /**
+             * Selected
+             * @default false
+             */
+            selected: boolean;
         };
         /** ListingDecision */
         ListingDecision: {
@@ -15552,6 +20805,114 @@ export interface components {
              * @default 12
              */
             keep_snapshots: number;
+        };
+        /** LotOut */
+        LotOut: {
+            /** Lot Id */
+            lot_id: string;
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Bought On
+             * Format: date
+             */
+            bought_on: string;
+            /** Quantity */
+            quantity: number;
+            /** Unit Cost */
+            unit_cost: number;
+            /** Cost */
+            cost: number;
+            /**
+             * Passes On
+             * Format: date
+             */
+            passes_on: string;
+            /** Months Remaining */
+            months_remaining: number;
+            /** Passed */
+            passed: boolean;
+            /** Sell Target */
+            sell_target: number | null;
+            /** Current Price */
+            current_price: number | null;
+            /** Target Reached */
+            target_reached: boolean | null;
+            /** Forfeits Exemption Warning */
+            forfeits_exemption_warning: boolean;
+        };
+        /** LotUse */
+        LotUse: {
+            /** Lot Id */
+            lot_id: string;
+            /**
+             * Bought On
+             * Format: date
+             */
+            bought_on: string;
+            /** Quantity */
+            quantity: number;
+            /** Cost */
+            cost: number;
+            /** Proceeds */
+            proceeds: number;
+            /** Gain */
+            gain: number;
+            /**
+             * Passes On
+             * Format: date
+             */
+            passes_on: string;
+            /** Passed */
+            passed: boolean;
+            /**
+             * Months To Test
+             * @description 0 once the lot has passed the test.
+             */
+            months_to_test: number;
+            /**
+             * Near Test
+             * @description Not passed, and passes within the warning window: waiting may keep the exemption.
+             */
+            near_test: boolean;
+        };
+        /** LotsResponse */
+        LotsResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable" | "paid_only" | "disputed";
+            /** As Of */
+            as_of: string | null;
+            /** Method */
+            method: string;
+            /** Currency */
+            currency: string | null;
+            /** Lots */
+            lots: components["schemas"]["LotOut"][];
+            /** Realized */
+            realized: components["schemas"]["RealizedOut"][];
+            /** Unmatched */
+            unmatched: components["schemas"]["UnmatchedOut"][];
+            /** Realized Gain */
+            realized_gain: number;
+            /** Dividends */
+            dividends: number;
+            /** Fees */
+            fees: number;
+            /** Exemption */
+            exemption: components["schemas"]["ExemptionOut"][];
+            /** Time Test Years */
+            time_test_years: number;
+            /** Warnings */
+            warnings: string[];
+            /** Disclaimer */
+            disclaimer: string;
+            explain: components["schemas"]["PerformanceExplain"];
+            freshness?: components["schemas"]["FreshnessOut"] | null;
         };
         /** MacroComparison */
         MacroComparison: {
@@ -15834,6 +21195,41 @@ export interface components {
             /** Earlier Period */
             earlier_period?: string | null;
         };
+        /** Manifest */
+        Manifest: {
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /**
+             * Visibility
+             * @default private: returned to the owner who asked; not stored or shared
+             */
+            visibility: string;
+            /** Sources */
+            sources: string[];
+            /**
+             * Coverage
+             * @description Each part of the report and the denominator it covers.
+             */
+            coverage: {
+                [key: string]: string;
+            };
+            /**
+             * Figure Sources
+             * @description For each figure in the report, where its value comes from.
+             */
+            figure_sources?: {
+                [key: string]: string;
+            };
+            /** Method Versions */
+            method_versions: {
+                [key: string]: string;
+            };
+            /** Notes */
+            notes: string[];
+        };
         /** ManualFactsheetInput */
         ManualFactsheetInput: {
             /**
@@ -15947,6 +21343,78 @@ export interface components {
              */
             source: string;
         };
+        /** MapIn */
+        MapIn: {
+            /**
+             * Breakdown
+             * @enum {string}
+             */
+            breakdown: "geographic" | "segment" | "product";
+            /** Member Label */
+            member_label: string;
+            /**
+             * Context
+             * @enum {string}
+             */
+            context: "country" | "commodity" | "patent_tech" | "trade_hs";
+            /** Value */
+            value: string;
+            /**
+             * Share
+             * @default 1
+             */
+            share: number | string;
+            /** Note */
+            note?: string | null;
+        };
+        /** MapLine */
+        MapLine: {
+            /** Id */
+            id: number;
+            /** Breakdown */
+            breakdown: string;
+            /** Member Label */
+            member_label: string;
+            /** Context */
+            context: string;
+            /** Value */
+            value: string;
+            /** Share */
+            share: number | string;
+            /** Note */
+            note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** MappedExposure */
+        MappedExposure: {
+            /** Breakdown */
+            breakdown: string;
+            /** Context */
+            context: string;
+            /** Context Label */
+            context_label: string;
+            /** Period */
+            period: string | null;
+            /** Lines */
+            lines: components["schemas"]["ExposureLine"][];
+            /** Mapped */
+            mapped: number | string;
+            /** Unmapped */
+            unmapped: number | string;
+            /** Unallocated */
+            unallocated: number | string;
+            /**
+             * Label
+             * @default Estimate from your mapping, not a reported figure
+             */
+            label: string;
+            /** Warnings */
+            warnings: string[];
+        };
         /** MarketHoliday */
         MarketHoliday: {
             /** Calendar */
@@ -15995,6 +21463,84 @@ export interface components {
              */
             yahoo_symbol?: string | null;
         };
+        /** MeasuredLine */
+        MeasuredLine: {
+            /** Ticker */
+            ticker: string;
+            /** Label */
+            label: string | null;
+            /**
+             * Kind
+             * @description equity beta or duration
+             */
+            kind: string;
+            /** Value */
+            value: number | null;
+            /** Source */
+            source: string;
+            /** Detail */
+            detail: string;
+        };
+        /** MemberLine */
+        MemberLine: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "operating" | "elimination" | "unallocated" | "subtotal";
+            /**
+             * Values
+             * @description Revenue per period label; null = not reported that period.
+             */
+            values: {
+                [key: string]: number | string | null;
+            };
+            /** Latest Value */
+            latest_value: number | string | null;
+            /**
+             * Latest Share
+             * @description Share of operating revenue before eliminations.
+             */
+            latest_share: number | string | null;
+            /**
+             * Change
+             * @description Latest against the previous period, only when both are reported.
+             */
+            change: number | string | null;
+            /** Definition Note */
+            definition_note?: string | null;
+        };
+        /**
+         * MergerEntry
+         * @description A share-exchange merger you entered: each old share became `ratio` new shares. Earlier
+         *     fills of the old ticker are carried over to the new one with their cost and purchase date.
+         */
+        MergerEntry: {
+            /** Old Ticker */
+            old_ticker: string;
+            /** New Ticker */
+            new_ticker: string;
+            /**
+             * Day
+             * Format: date
+             * @description First day the new ticker applies.
+             */
+            day: string;
+            /**
+             * Ratio
+             * @description New shares per old share.
+             */
+            ratio: number | string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
         /** MessageOut */
         MessageOut: {
             /** Id */
@@ -16035,6 +21581,54 @@ export interface components {
             cross_axis: components["schemas"]["CrossAxisOut"][];
             /** Notes */
             notes: string[];
+        };
+        /** MetricInfo */
+        MetricInfo: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Group */
+            group: string;
+            /** Kind */
+            kind: string;
+            /** Unit */
+            unit: string;
+            /** Formula */
+            formula: string;
+            /** Period */
+            period: string;
+            /** Definition Version */
+            definition_version: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Disabled Reason */
+            disabled_reason: string | null;
+            /** Known */
+            known: number;
+            /** Total */
+            total: number;
+            /**
+             * Needs Provider
+             * @description Optional provider whose key this metric depends on; null = key-free.
+             */
+            needs_provider?: string | null;
+        };
+        /** MetricValue */
+        MetricValue: {
+            /** Value */
+            value?: number | string | null;
+            /**
+             * Reason
+             * @description Why the value is unknown or not meaningful.
+             */
+            reason?: string | null;
+            /** Period End */
+            period_end?: string | null;
+            /** Basis */
+            basis?: string | null;
+            /** Source */
+            source?: string | null;
         };
         /** MirrorOut */
         MirrorOut: {
@@ -16141,6 +21735,83 @@ export interface components {
              */
             news_coverage_hours: number;
         };
+        /** NavIn */
+        NavIn: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Nav */
+            nav: number | string;
+            /** Currency */
+            currency: string;
+            /** Source Url */
+            source_url: string;
+        };
+        /** NavPoint */
+        NavPoint: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Nav */
+            nav: number | string;
+            /** Currency */
+            currency: string;
+            /** Source Url */
+            source_url: string;
+        };
+        /** NavRow */
+        NavRow: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Nav */
+            nav: number | string;
+            /** Currency */
+            currency: string;
+            /** Source Url */
+            source_url: string;
+            /** Listing Close */
+            listing_close: number | string | null;
+            /** Listing Date */
+            listing_date: string | null;
+            /**
+             * Premium
+             * @description Listing close / NAV - 1; positive is a premium.
+             */
+            premium: number | string | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** NavView */
+        NavView: {
+            /** Points */
+            points: components["schemas"]["NavRow"][];
+            /** Count */
+            count: number;
+            /** Latest Premium */
+            latest_premium: number | string | null;
+            /** Mean Abs Premium */
+            mean_abs_premium: number | string | null;
+            /** Max Abs Premium */
+            max_abs_premium: number | string | null;
+            /**
+             * Nav Change
+             * @description Last NAV / first NAV - 1 between your entered dates; excludes distributions.
+             */
+            nav_change: number | string | null;
+            /** Nav Change Start */
+            nav_change_start: string | null;
+            /** Nav Change End */
+            nav_change_end: string | null;
+            /** Warnings */
+            warnings: string[];
+        };
         /** NetDiscretionary */
         NetDiscretionary: {
             /**
@@ -16200,6 +21871,46 @@ export interface components {
             };
             /** Exclusions */
             exclusions: components["schemas"]["ExclusionOut"][];
+        };
+        /** Network */
+        Network: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Since
+             * Format: date
+             */
+            since: string;
+            /**
+             * Since Basis
+             * @default chosen
+             * @enum {string}
+             */
+            since_basis: "chosen" | "last_review" | "last_journal_entry" | "default_90_days";
+            /** Edges */
+            edges: components["schemas"]["GraphEdge"][];
+            /** Suggested Count */
+            suggested_count: number;
+            /** Events */
+            events: components["schemas"]["GraphEvent"][];
+            /** Patent Total */
+            patent_total: number;
+            /** Patent By Year */
+            patent_by_year: components["schemas"]["PatentYear"][];
+            /** Patent By Tech */
+            patent_by_tech: components["schemas"]["PatentTech"][];
+            /** Ownership Confidence Min */
+            ownership_confidence_min: number | string | null;
+            /** Ownership Note */
+            ownership_note: string;
+            /** Patent Status */
+            patent_status: {
+                [key: string]: number;
+            };
+            /** Caveats */
+            caveats: string[];
+            /** Method Version */
+            method_version: string;
         };
         /** NewConversation */
         NewConversation: {
@@ -16516,6 +22227,13 @@ export interface components {
             /** Note */
             note: string;
         };
+        /** NotCovered */
+        NotCovered: {
+            /** Title */
+            title: string;
+            /** Reason */
+            reason: string;
+        };
         /** NoteExtractOut */
         NoteExtractOut: {
             /** Version Id */
@@ -16720,6 +22438,173 @@ export interface components {
             evidence: components["schemas"]["EvidenceSpan"];
             envelope: components["schemas"]["Envelope"];
         };
+        /** Observed */
+        Observed: {
+            /**
+             * Kind
+             * @description concentration or capital_allocation
+             */
+            kind: string;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Unit */
+            unit: string;
+            /** Period */
+            period?: string | null;
+            /**
+             * Detail
+             * @description How it was computed and from what.
+             */
+            detail: string;
+            /** Reason */
+            reason?: string | null;
+            /** Source */
+            source: string;
+        };
+        /** OperationBreakdown */
+        OperationBreakdown: {
+            /**
+             * Kind
+             * @description geographic, product or segment, as the company reports it
+             */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Period */
+            period: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Lines */
+            lines: components["schemas"]["OperationLine"][];
+            /** Note */
+            note?: string | null;
+        };
+        /** OperationLine */
+        OperationLine: {
+            /** Label */
+            label: string;
+            /** Revenue */
+            revenue: number | string | null;
+            /** Share */
+            share: number | string | null;
+        };
+        /** Overview */
+        Overview: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Legal Name */
+            legal_name: string | null;
+            /** Isin */
+            isin: string | null;
+            /** Cik */
+            cik: string | null;
+            /** Lei */
+            lei: string | null;
+            /** Website */
+            website: string | null;
+            /** Country */
+            country: string | null;
+            /** Asset Type */
+            asset_type: string | null;
+            /** Status */
+            status: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Listing Currency */
+            listing_currency: string | null;
+            /** Listings */
+            listings: components["schemas"]["Listing"][];
+            /** Profile */
+            profile: components["schemas"]["ProfileFact"][];
+            /** Segments */
+            segments: components["schemas"]["SegmentLine"][];
+            /** Operations */
+            operations?: components["schemas"]["OperationBreakdown"][];
+            /** Legal Group */
+            legal_group?: components["schemas"]["LegalLink"][];
+            /**
+             * Legal Group Note
+             * @default
+             */
+            legal_group_note: string;
+            /** Competitors */
+            competitors: string[];
+            /** Peers Confirmed */
+            peers_confirmed: string[];
+            /** Upcoming */
+            upcoming: components["schemas"]["UpcomingEvent"][];
+            /** Last Close */
+            last_close: number | string | null;
+            /** Last Close Date */
+            last_close_date: string | null;
+            /** Coverage */
+            coverage: components["schemas"]["CoverageItem"][];
+            coverage_score: components["schemas"]["CoverageScore"];
+            /** Sources */
+            sources: components["schemas"]["SourceRef"][];
+            /** Method Version */
+            method_version: string;
+        };
+        /** OwnerInput */
+        OwnerInput: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "region_split" | "supply_edge" | "index_weights";
+            /** Key */
+            key: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Source Url */
+            source_url: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Note */
+            note: string | null;
+            /**
+             * Origin
+             * @description 'derived' entries are computed from fund holdings the app stores and are recomputed when those holdings are refreshed.
+             * @default owner
+             * @enum {string}
+             */
+            origin: "owner" | "derived";
+            /** Derived From */
+            derived_from?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** OwnerReport */
+        OwnerReport: {
+            manifest: components["schemas"]["Manifest"];
+            /** Journal */
+            journal: components["schemas"]["JournalEntry"][];
+            scorecard: components["schemas"]["Scorecard"];
+            cockpit: components["schemas"]["Cockpit"];
+            /**
+             * Snoozed
+             * @description Data-quality issues you set aside, with their dates.
+             */
+            snoozed?: components["schemas"]["SnoozeRow"][];
+        };
         /** OwnerWeightIn */
         OwnerWeightIn: {
             /** Counterparty Key */
@@ -16860,6 +22745,20 @@ export interface components {
              */
             top_holders: number;
         };
+        /** PairOverlap */
+        PairOverlap: {
+            /** Fund A */
+            fund_a: string;
+            /** Fund B */
+            fund_b: string;
+            overlap: components["schemas"]["AnalyticsResult"];
+            /** Shared Issuers */
+            shared_issuers: number;
+            /** Shared */
+            shared: components["schemas"]["SharedHolding"][];
+            /** Skipped */
+            skipped?: string | null;
+        };
         /** PairReviewCreatedOut */
         PairReviewCreatedOut: {
             /** Id */
@@ -16969,6 +22868,16 @@ export interface components {
             /** Note */
             note: string;
         };
+        /** PatentArea */
+        PatentArea: {
+            /**
+             * Code
+             * @description CPC subclass, such as H01L.
+             */
+            code: string;
+            /** Families */
+            families: number;
+        };
         /** PatentFamilyInput */
         PatentFamilyInput: {
             /** Family Key */
@@ -17019,6 +22928,62 @@ export interface components {
             raw?: {
                 [key: string]: unknown;
             };
+        };
+        /** PatentTech */
+        PatentTech: {
+            /** Cpc */
+            cpc: string;
+            /** Families */
+            families: number;
+        };
+        /** PatentYear */
+        PatentYear: {
+            /** Year */
+            year: number;
+            /** Families */
+            families: number;
+        };
+        /** PathEdge */
+        PathEdge: {
+            /** Supplier */
+            supplier: string;
+            /** Customer */
+            customer: string;
+            /** Product */
+            product: string;
+            /** Customer Share */
+            customer_share: number | null;
+            /** Source Url */
+            source_url: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "owner" | "filing";
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /** Why */
+            why: string;
+        };
+        /** PathUse */
+        PathUse: {
+            /** Path */
+            path: string;
+            /** Opens */
+            opens: number;
+            /**
+             * Days
+             * @description Distinct days the page was opened.
+             */
+            days: number;
         };
         /**
          * PdlRefreshResponse
@@ -17197,6 +23162,63 @@ export interface components {
             /** Eps */
             eps: number;
         };
+        /** PeerCompare */
+        PeerCompare: {
+            /** Ticker */
+            ticker: string;
+            /** Scope */
+            scope: string;
+            /** Scope Label */
+            scope_label: string;
+            /** Base Currency */
+            base_currency?: string | null;
+            /** Companies */
+            companies: components["schemas"]["CompareCompany"][];
+            /** Rows */
+            rows: components["schemas"]["CompareRow"][];
+            /**
+             * Size Rows
+             * @description Latest annual size figures converted to the base currency; empty without one.
+             */
+            size_rows?: components["schemas"]["CompareRow"][];
+            /** Index Metric */
+            index_metric: string;
+            /** Index Series */
+            index_series: components["schemas"]["IndexSeries"][];
+            /** Excluded */
+            excluded: components["schemas"]["PeerExcluded"][];
+            /** Warnings */
+            warnings: string[];
+            /** Method Version */
+            method_version: string;
+            /** Input Hash */
+            input_hash: string;
+        };
+        /** PeerExcluded */
+        PeerExcluded: {
+            /** Ticker */
+            ticker: string;
+            /** Reason */
+            reason: string;
+        };
+        /** PeerGroup */
+        PeerGroup: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string;
+            /** Peers */
+            peers: string[];
+        };
+        /** PeerGroupIn */
+        PeerGroupIn: {
+            /** Name */
+            name: string;
+            /** Peers */
+            peers: string[];
+        };
         /** PeerInput */
         PeerInput: {
             /** Peer Ticker */
@@ -17270,6 +23292,39 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** PeerStat */
+        PeerStat: {
+            /** Scope */
+            scope: string;
+            /**
+             * Count
+             * @description Comparable peers with a value.
+             */
+            count: number;
+            /**
+             * Members
+             * @description Peers considered.
+             */
+            members: number;
+            /** Median */
+            median: number | string | null;
+            /** Low */
+            low: number | string | null;
+            /** High */
+            high: number | string | null;
+            /**
+             * Percentile
+             * @description Share of peers at or below the company, 0–1.
+             */
+            percentile: number | string | null;
+            /** Withheld Reason */
+            withheld_reason?: string | null;
+            /**
+             * Basis
+             * @description The period the company's figure is compared on.
+             */
+            basis?: string | null;
+        };
         /** PeerStatusInput */
         PeerStatusInput: {
             /**
@@ -17303,6 +23358,278 @@ export interface components {
             stale: boolean;
             /** Inputs */
             inputs?: components["schemas"]["FundamentalFactRef"][];
+        };
+        /** PerformanceExplain */
+        PerformanceExplain: {
+            /** Formula Version */
+            formula_version: string;
+            /** Formula */
+            formula: string[];
+            /** Gaps */
+            gaps?: string[];
+        };
+        /** PerformancePoint */
+        PerformancePoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Fund */
+            fund: number | string;
+            /** Fund Total */
+            fund_total?: number | string | null;
+            /** Benchmark */
+            benchmark?: number | string | null;
+        };
+        /** PerformanceResponse */
+        PerformanceResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable" | "paid_only" | "disputed";
+            /** As Of */
+            as_of: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Account Currency */
+            account_currency: string | null;
+            /** Gap */
+            gap: string | null;
+            /** Windows */
+            windows: components["schemas"]["WindowOut"][];
+            /**
+             * Index
+             * @description Portfolio value indexed to 100, flows removed (time-weighted).
+             */
+            index: components["schemas"]["PerformanceSeriesPoint"][];
+            /** Benchmark Index */
+            benchmark_index: components["schemas"]["PerformanceSeriesPoint"][];
+            /** Benchmark Label */
+            benchmark_label: string | null;
+            /** Rolling 90D */
+            rolling_90d: components["schemas"]["PerformanceSeriesPoint"][];
+            /**
+             * Values
+             * @description Total value in the base currency, flows in.
+             */
+            values: components["schemas"]["PerformanceSeriesPoint"][];
+            ledger: components["schemas"]["LedgerHealth"];
+            costs: components["schemas"]["CostsOut"];
+            /** Timeline */
+            timeline: components["schemas"]["TimelineMonth"][];
+            /** Freshness Note */
+            freshness_note: string | null;
+            freshness?: components["schemas"]["FreshnessOut"] | null;
+            explain: components["schemas"]["PerformanceExplain"];
+        };
+        /** PerformanceSavedReport */
+        PerformanceSavedReport: {
+            item: components["schemas"]["SavedAnalysisItem"];
+            report: components["schemas"]["PerformanceResponse"];
+        };
+        /** PerformanceSeriesPoint */
+        PerformanceSeriesPoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Value */
+            value: number | null;
+        };
+        /** PerformanceSettings */
+        PerformanceSettings: {
+            /**
+             * Core Tickers
+             * @description Trading212 tickers that form the core ETF sleeve; every other holding is a stock (satellite).
+             */
+            core_tickers?: string[];
+            /**
+             * Cost Method
+             * @default fifo
+             * @enum {string}
+             */
+            cost_method: "fifo" | "average";
+            /**
+             * Time Test Years
+             * @default 3
+             */
+            time_test_years: number;
+            /**
+             * Exemption Limit
+             * @default 100000
+             */
+            exemption_limit: number | string;
+            /**
+             * Exemption Currency
+             * @default CZK
+             */
+            exemption_currency: string;
+            /**
+             * Time Test Warning Months
+             * @default 6
+             */
+            time_test_warning_months: number;
+            /**
+             * Sleeve Gap Points
+             * @default 2
+             */
+            sleeve_gap_points: number | string;
+            /**
+             * Sleeve Lookback Years
+             * @default 2
+             */
+            sleeve_lookback_years: number;
+            /**
+             * Cash Tolerance
+             * @description Largest unexplained daily cash change accepted, in the account currency.
+             * @default 1
+             */
+            cash_tolerance: number | string;
+            /**
+             * Alert Severity
+             * @description Severity of the alert raised with the monthly review when stocks trail the core ETFs or a lot's sell target is reached early. It is sent when a notification rule matches that severity (the default rules send severity 3 only; otherwise it waits for the digest). 0 turns these alerts off.
+             * @default 2
+             */
+            alert_severity: number;
+            benchmark?: components["schemas"]["BenchmarkSpec"] | null;
+            /** Splits */
+            splits?: components["schemas"]["SplitEntry"][];
+            /** Mergers */
+            mergers?: components["schemas"]["MergerEntry"][];
+            /** Spin Offs */
+            spin_offs?: components["schemas"]["SpinOffEntry"][];
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** PerformanceView */
+        PerformanceView: {
+            /** Isin */
+            isin: string;
+            listing: components["schemas"]["FundListing"] | null;
+            /** Price Currency */
+            price_currency: string | null;
+            /** Fund Policy */
+            fund_policy: string | null;
+            /**
+             * Nav Available
+             * @default false
+             */
+            nav_available: boolean;
+            nav?: components["schemas"]["NavView"] | null;
+            /**
+             * Nav Note
+             * @default NAV is not provider data here. Returns are for the exchange listing's price, which differs from NAV by the daily premium or discount; enter the issuer's published NAV below to see the premium.
+             */
+            nav_note: string;
+            benchmark: components["schemas"]["BenchmarkInfo"] | null;
+            /** Benchmark Options */
+            benchmark_options: components["schemas"]["BenchmarkOption"][];
+            /** Suggested Benchmark */
+            suggested_benchmark: string | null;
+            alignment: components["schemas"]["Alignment"] | null;
+            /** Periods */
+            periods: components["schemas"]["PeriodReturn"][];
+            /** Risk */
+            risk: components["schemas"]["RiskStat"][];
+            tracking_error: components["schemas"]["AnalyticsResult"] | null;
+            /** Series */
+            series: components["schemas"]["PerformancePoint"][];
+            /** Warnings */
+            warnings: string[];
+            /** Method Version */
+            method_version?: string;
+        };
+        /** PeriodReturn */
+        PeriodReturn: {
+            /** Label */
+            label: string;
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+            fund_price: components["schemas"]["AnalyticsResult"];
+            fund_total: components["schemas"]["AnalyticsResult"] | null;
+            benchmark: components["schemas"]["AnalyticsResult"] | null;
+            /**
+             * Compared On
+             * @description Which fund return the benchmark was compared with.
+             */
+            compared_on: ("price" | "total" | "unknown") | null;
+            /**
+             * Difference
+             * @description Cumulative fund return minus benchmark return, same basis.
+             */
+            difference: number | string | null;
+            /** Difference Annualised */
+            difference_annualised: number | string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** PilotReport */
+        PilotReport: {
+            window: components["schemas"]["PilotWindow"];
+            /** Use */
+            use: components["schemas"]["PathUse"][];
+            /** Days Used */
+            days_used: number;
+            alerts: components["schemas"]["AlertRate"];
+            /** Providers */
+            providers: components["schemas"]["ProviderFailure"][];
+            jobs: components["schemas"]["JobFailures"];
+            /** Corrections */
+            corrections: components["schemas"]["Correction"][];
+            /**
+             * Affected Weight
+             * @description Today's share of the portfolio touched by an issue.
+             */
+            affected_weight: number;
+            /** Top Issues */
+            top_issues: components["schemas"]["QualityIssue"][];
+            /** Not Measured */
+            not_measured: string[];
+        };
+        /** PilotStart */
+        PilotStart: {
+            /**
+             * Length Days
+             * @default 30
+             */
+            length_days: number;
+        };
+        /** PilotState */
+        PilotState: {
+            window: components["schemas"]["PilotWindow"] | null;
+            report: components["schemas"]["PilotReport"] | null;
+        };
+        /** PilotWindow */
+        PilotWindow: {
+            /** Id */
+            id: number;
+            /**
+             * Started On
+             * Format: date
+             */
+            started_on: string;
+            /** Length Days */
+            length_days: number;
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /**
+             * Day
+             * @description Day of the pilot today, 1-based; past the length when over.
+             */
+            day: number;
+            /** Over */
+            over: boolean;
         };
         /** PinInput */
         PinInput: {
@@ -17760,6 +24087,19 @@ export interface components {
             /** Method */
             method: string;
         };
+        /** PositionBreakOut */
+        PositionBreakOut: {
+            /** Ticker */
+            ticker: string;
+            /** Ledger Quantity */
+            ledger_quantity: number;
+            /** Broker Quantity */
+            broker_quantity: number;
+            /** Difference */
+            difference: number;
+            /** Reason */
+            reason: string;
+        };
         /** PositionCountRule */
         PositionCountRule: {
             /**
@@ -17911,6 +24251,181 @@ export interface components {
             suggested: number;
             /** Left To Person */
             left_to_person: number;
+        };
+        /** PretradeCheck */
+        PretradeCheck: {
+            /** Id */
+            id: string;
+            /** Principle */
+            principle: string;
+            /** Ticker */
+            ticker: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "flag" | "unavailable" | "info";
+            /** Title */
+            title: string;
+            /** Detail */
+            detail: string;
+            /** Values */
+            values?: {
+                [key: string]: number | string | null;
+            };
+        };
+        /** PretradeRequest */
+        PretradeRequest: {
+            /** Trades */
+            trades: components["schemas"]["TradeLeg"][];
+            /** @description Thresholds for this check only; when omitted the strategy's are used. */
+            rules?: components["schemas"]["PretradeRules"] | null;
+            /**
+             * Deposit
+             * @description Cash added (or taken out) alongside the trades.
+             * @default 0
+             */
+            deposit: number;
+        };
+        /** PretradeResult */
+        PretradeResult: {
+            /** Method Version */
+            method_version: string;
+            /** Trades */
+            trades: components["schemas"]["TradeLeg"][];
+            /** Is Switch */
+            is_switch: boolean;
+            /** Checks */
+            checks: components["schemas"]["PretradeCheck"][];
+            /** Passed */
+            passed: number;
+            /** Flagged */
+            flagged: number;
+            /** Unavailable */
+            unavailable: number;
+            /** Notes */
+            notes: string[];
+            /** Disclaimer */
+            disclaimer: string;
+        };
+        /**
+         * PretradeRules
+         * @description The thresholds of principles 8, 9 and 10. Defaults are the strategy's stated values; each
+         *     can be changed for one check.
+         */
+        PretradeRules: {
+            /**
+             * Return Hurdle
+             * @default 0.3
+             */
+            return_hurdle: number;
+            /**
+             * Asymmetry Gate
+             * @default 2
+             */
+            asymmetry_gate: number;
+            /**
+             * Start Size Core
+             * @default 0.05
+             */
+            start_size_core: number;
+            /**
+             * Start Size Growth
+             * @default 0.03
+             */
+            start_size_growth: number;
+            /**
+             * Start Size Speculative
+             * @default 0.015
+             */
+            start_size_speculative: number;
+            /**
+             * Switch Safety Margin
+             * @default 0.05
+             */
+            switch_safety_margin: number;
+            /**
+             * Short Term Tax Rate
+             * @default 0.15
+             */
+            short_term_tax_rate: number;
+            /**
+             * Trade Cost Bps
+             * @default 0
+             */
+            trade_cost_bps: number;
+            /**
+             * Fx Cost Bps
+             * @default 15
+             */
+            fx_cost_bps: number;
+            /**
+             * Horizon Years
+             * @description Defaults to the strategy's horizon, else 3 years.
+             */
+            horizon_years?: number | null;
+            /**
+             * Risk Contribution Cap
+             * @description Largest share of the portfolio's volatility one stock may account for. Unset: the share is shown but not judged, because the strategy states no number.
+             */
+            risk_contribution_cap?: number | null;
+        };
+        /**
+         * PretradeThresholds
+         * @description The thresholds the pre-trade check uses for principles 8, 9 and 10. The defaults are the
+         *     strategy's stated values; a check run without its own rules reads these.
+         */
+        PretradeThresholds: {
+            /**
+             * Return Hurdle
+             * @default 0.3
+             */
+            return_hurdle: number;
+            /**
+             * Asymmetry Gate
+             * @default 2
+             */
+            asymmetry_gate: number;
+            /**
+             * Start Size Core
+             * @default 0.05
+             */
+            start_size_core: number;
+            /**
+             * Start Size Growth
+             * @default 0.03
+             */
+            start_size_growth: number;
+            /**
+             * Start Size Speculative
+             * @default 0.015
+             */
+            start_size_speculative: number;
+            /**
+             * Switch Safety Margin
+             * @default 0.05
+             */
+            switch_safety_margin: number;
+            /**
+             * Short Term Tax Rate
+             * @default 0.15
+             */
+            short_term_tax_rate: number;
+            /**
+             * Trade Cost Bps
+             * @default 0
+             */
+            trade_cost_bps: number;
+            /**
+             * Fx Cost Bps
+             * @default 15
+             */
+            fx_cost_bps: number;
+            /**
+             * Risk Contribution Cap
+             * @description Largest share of portfolio volatility one stock may account for (null: shown but not judged).
+             */
+            risk_contribution_cap?: number | null;
         };
         /**
          * PriceBarOut
@@ -18117,6 +24632,62 @@ export interface components {
              */
             intraday_cache_seconds: number;
         };
+        /** ProductLine */
+        ProductLine: {
+            /** Ticker */
+            ticker: string;
+            /** Label */
+            label: string;
+            /**
+             * Share
+             * @description Share of the company's annual revenue.
+             */
+            share: number;
+        };
+        /** ProfileFact */
+        ProfileFact: {
+            /** Metric */
+            metric: string;
+            /** Value */
+            value: string;
+            /** Provider */
+            provider: string;
+            /** Source Url */
+            source_url: string | null;
+            /**
+             * Known At
+             * Format: date-time
+             */
+            known_at: string;
+        };
+        /** ProfileField */
+        ProfileField: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: string | null;
+            /**
+             * Unit
+             * @default text
+             * @enum {string}
+             */
+            unit: "text" | "fraction" | "money" | "date";
+            /** Currency */
+            currency?: string | null;
+            /** Source */
+            source?: string | null;
+            /** Source Url */
+            source_url?: string | null;
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Reason
+             * @description Why there is no value, or a caveat.
+             */
+            reason?: string | null;
+        };
         /** PromptDefault */
         PromptDefault: {
             /**
@@ -18192,6 +24763,35 @@ export interface components {
              */
             kpis: string[];
         };
+        /**
+         * ProposedRequest
+         * @description Hypothetical weights; held positions not listed keep their weight.
+         */
+        ProposedRequest: {
+            /** Weights */
+            weights?: components["schemas"]["ProposedWeight"][];
+            /**
+             * Additions
+             * @description Securities from the investable universe or a watchlist to add.
+             */
+            additions?: components["schemas"]["ProposedWeight"][];
+            /**
+             * Deposit
+             * @description Cash added (positive) or taken out (negative), in the base currency. The weights are then shares of the total after it; a position not listed keeps its value.
+             * @default 0
+             */
+            deposit: number;
+        };
+        /** ProposedWeight */
+        ProposedWeight: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Weight
+             * @description Share of total portfolio value, 0 to 1.
+             */
+            weight: number;
+        };
         /** Provenance */
         Provenance: {
             /** Id */
@@ -18232,6 +24832,15 @@ export interface components {
             version_chain: components["schemas"]["VersionRef"][];
             envelope: components["schemas"]["Envelope"];
         };
+        /** ProviderFailure */
+        ProviderFailure: {
+            /** Provider */
+            provider: string;
+            /** Attempts */
+            attempts: number;
+            /** Failures */
+            failures: number;
+        };
         /**
          * ProviderJobSettings
          * @description Limits for a free provider. There is no on/off switch: a provider is used as soon as it is
@@ -18252,6 +24861,21 @@ export interface components {
              * @default 1
              */
             reserve_credits: number;
+        };
+        /** ProviderNeed */
+        ProviderNeed: {
+            /** Provider */
+            provider: string;
+            /**
+             * State
+             * @description Worst access state among the endpoints the metrics use.
+             */
+            state: string;
+            /**
+             * Unlocks
+             * @description Metric labels that depend on this provider.
+             */
+            unlocks: string[];
         };
         /** ProviderStatus */
         ProviderStatus: {
@@ -18331,6 +24955,53 @@ export interface components {
             definition: string;
             /** Consumer */
             consumer: string;
+        };
+        /** PublisherBreakdown */
+        PublisherBreakdown: {
+            /** Dimension */
+            dimension: string;
+            /** Scheme */
+            scheme: string;
+            /** As Of */
+            as_of: string | null;
+            /** Rows */
+            rows: components["schemas"]["PublisherRow"][];
+        };
+        /** PublisherRow */
+        PublisherRow: {
+            /** Label */
+            label: string;
+            /** Code */
+            code: string | null;
+            /** Fund Weight */
+            fund_weight: number | string | null;
+            /** Benchmark Weight */
+            benchmark_weight: number | string | null;
+        };
+        /** QualityIssue */
+        QualityIssue: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            /**
+             * Subject
+             * @description Ticker, fund or provider the issue is about.
+             */
+            subject: string;
+            /** Detail */
+            detail: string;
+            /**
+             * Weight
+             * @description Share of the portfolio this touches; None when it has no holding.
+             */
+            weight?: number | null;
+            /**
+             * Fix
+             * @description What to do about it, in plain words.
+             */
+            fix: string;
         };
         /** QuarterOut */
         QuarterOut: {
@@ -18471,6 +25142,141 @@ export interface components {
              */
             timezone: string;
         };
+        /**
+         * RateBucket
+         * @description Duration contributed by one key-rate bucket: DV01 x 10,000 / net assets, as reported.
+         */
+        RateBucket: {
+            /** Label */
+            label: string;
+            /** Years */
+            years: number | string;
+        };
+        /** RatioGroup */
+        RatioGroup: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Ratios */
+            ratios: components["schemas"]["RatioRow"][];
+        };
+        /** RatioInput */
+        RatioInput: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Column */
+            column: string;
+            /** Concept */
+            concept?: string | null;
+            /** Accession */
+            accession?: string | null;
+            /** Filing Url */
+            filing_url?: string | null;
+            /** Derived */
+            derived?: string | null;
+        };
+        /** RatioPoint */
+        RatioPoint: {
+            /** Column */
+            column: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** RatioRow */
+        RatioRow: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Group */
+            group: string;
+            /** Unit */
+            unit: string;
+            /** Formula */
+            formula: string;
+            /** Period Rule */
+            period_rule: string;
+            /** Exclusions */
+            exclusions: string;
+            /** Higher Is Better */
+            higher_is_better: boolean | null;
+            /** Points */
+            points: components["schemas"]["RatioPoint"][];
+            latest: components["schemas"]["RatioPoint"] | null;
+            /** Own Median 5Y */
+            own_median_5y: number | string | null;
+            /** Own Median 10Y */
+            own_median_10y: number | string | null;
+            /** Own Median Note */
+            own_median_note?: string | null;
+            peer?: components["schemas"]["PeerStat"] | null;
+            /** Inputs */
+            inputs?: components["schemas"]["RatioInput"][];
+        };
+        /** RatiosView */
+        RatiosView: {
+            /** Ticker */
+            ticker: string;
+            /** As Of */
+            as_of: string | null;
+            /** Price */
+            price: number | string | null;
+            /** Price Date */
+            price_date: string | null;
+            /** Price Currency */
+            price_currency: string | null;
+            /** Statement Currency */
+            statement_currency: string | null;
+            /** Sector */
+            sector: string | null;
+            /** Industry */
+            industry: string | null;
+            /** Is Financial */
+            is_financial: boolean;
+            /** Columns */
+            columns: components["schemas"]["Column"][];
+            /** Groups */
+            groups: components["schemas"]["RatioGroup"][];
+            /** Peer Scope */
+            peer_scope: string | null;
+            /** Peer Excluded */
+            peer_excluded: components["schemas"]["PeerExcluded"][];
+            /** Warnings */
+            warnings: string[];
+            /** Method Version */
+            method_version: string;
+            /** Input Hash */
+            input_hash: string;
+            /** Sources */
+            sources: components["schemas"]["SourceRef"][];
+        };
+        /** Readiness */
+        Readiness: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Features */
+            features: components["schemas"]["FeatureReadiness"][];
+            /** Zero Cost Passed */
+            zero_cost_passed: boolean;
+            /** Zero Cost Violations */
+            zero_cost_violations: number;
+            /** Ready */
+            ready: number;
+            /** Activatable */
+            activatable: number;
+        };
         /** ReadinessResponse */
         ReadinessResponse: {
             /**
@@ -18488,6 +25294,131 @@ export interface components {
             worker_last_beat: string | null;
             /** Detail */
             detail?: string | null;
+        };
+        /** RealizedOut */
+        RealizedOut: {
+            /** Sale Id */
+            sale_id: string;
+            /** Ticker */
+            ticker: string;
+            /**
+             * Sold On
+             * Format: date
+             */
+            sold_on: string;
+            /** Quantity */
+            quantity: number;
+            /** Proceeds */
+            proceeds: number;
+            /** Cost */
+            cost: number;
+            /** Gain */
+            gain: number;
+            /** Holding Days */
+            holding_days: number | null;
+            /** Gross Within Time Test */
+            gross_within_time_test: number;
+        };
+        /** RebalancePlan */
+        RebalancePlan: {
+            /** Method Version */
+            method_version: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "to_target" | "to_band";
+            /** Weight Basis */
+            weight_basis: string;
+            /** Total Now */
+            total_now: number;
+            /** Total After Costs */
+            total_after_costs: number;
+            /** Cash Now */
+            cash_now: number;
+            /** Cash After */
+            cash_after: number;
+            /** Cash Floor */
+            cash_floor: number;
+            /** Deposit */
+            deposit: number;
+            /** Trades */
+            trades: components["schemas"]["Trade"][];
+            /** Buys */
+            buys: number;
+            /** Sells */
+            sells: number;
+            /** Costs */
+            costs: number;
+            /**
+             * Unfunded
+             * @description Buy value the cash could not fund, base currency.
+             */
+            unfunded: number;
+            /**
+             * Unrelated Positions
+             * @description Positions with no target: never traded.
+             */
+            unrelated_positions: number;
+            drift_before: components["schemas"]["DriftReport"];
+            drift_after: components["schemas"]["DriftReport"];
+            /** Assumptions */
+            assumptions: {
+                [key: string]: number | string;
+            };
+            /** Warnings */
+            warnings: string[];
+            /** Method */
+            method: string;
+        };
+        /** RebalanceRequest */
+        RebalanceRequest: {
+            /**
+             * Mode
+             * @default to_target
+             * @enum {string}
+             */
+            mode: "to_target" | "to_band";
+            /**
+             * Deposit
+             * @description Cash added (positive) or taken out (negative).
+             * @default 0
+             */
+            deposit: number;
+            /**
+             * Fx Cost Bps
+             * @description Assumed cost of converting currency, basis points.
+             * @default 15
+             */
+            fx_cost_bps: number;
+            /**
+             * Trade Cost Bps
+             * @description Assumed commission and spread per trade, basis points.
+             * @default 0
+             */
+            trade_cost_bps: number;
+            /**
+             * Target Overrides
+             * @description Ticker -> target weight (0 to 1) to use instead of the strategy's (what-if only).
+             */
+            target_overrides?: {
+                [key: string]: number;
+            };
+            /** Note */
+            note?: string | null;
+        };
+        /** RebalanceResponse */
+        RebalanceResponse: {
+            /** As Of */
+            as_of: string;
+            plan: components["schemas"]["RebalancePlan"];
+            /** Lot Impacts */
+            lot_impacts: {
+                [key: string]: components["schemas"]["SaleImpact"];
+            };
+            xray: components["schemas"]["XrayProposal"] | null;
+            /** Notes */
+            notes: string[];
         };
         /** ReconcileRequest */
         ReconcileRequest: {
@@ -18639,6 +25570,17 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** Ref */
+        Ref: {
+            /** Table */
+            table: string;
+            /** Id */
+            id: string;
+            /** Known At */
+            known_at: string | null;
+            /** Url */
+            url?: string | null;
+        };
         /** ReferenceGaps */
         ReferenceGaps: {
             /** Identity */
@@ -18695,6 +25637,68 @@ export interface components {
              * @description Languages (ISO 639 codes) whose Wikidata labels and aliases are read.
              */
             wikidata_languages?: string[];
+        };
+        /** ReferenceValue */
+        ReferenceValue: {
+            /** Method */
+            method: string;
+            /** Basis */
+            basis: string;
+            /** Low */
+            low: number | string | null;
+            /** Mid */
+            mid: number | string | null;
+            /** High */
+            high: number | string | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** RegionSplitRequest */
+        RegionSplitRequest: {
+            /**
+             * Source Url
+             * @description Where the figures came from (a web address).
+             */
+            source_url: string;
+            /**
+             * As Of
+             * Format: date
+             * @description The date the figures describe.
+             */
+            as_of: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Region
+             * @description A region such as "Europe".
+             */
+            region: string;
+            /**
+             * Countries
+             * @description Country (code or name) -> share of the region.
+             */
+            countries: {
+                [key: string]: number;
+            };
+        };
+        /** RelatedPartyFigure */
+        RelatedPartyFigure: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string;
+            /** Currency */
+            currency: string | null;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /**
+             * Concept
+             * @description The filed XBRL element, so the figure can be checked.
+             */
+            concept: string;
         };
         /** RelationshipDecision */
         RelationshipDecision: {
@@ -19007,6 +26011,14 @@ export interface components {
              */
             excerpt: string;
         };
+        /** ReportIn */
+        ReportIn: {
+            /**
+             * Conclusion
+             * @default
+             */
+            conclusion: string;
+        };
         /** ReportOut */
         ReportOut: {
             /** Id */
@@ -19088,6 +26100,39 @@ export interface components {
              */
             citation_count?: number | null;
         };
+        /** ReportVersion */
+        ReportVersion: {
+            /** Version */
+            version: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Conclusion Excerpt */
+            conclusion_excerpt: string;
+            /** Input Hash */
+            input_hash: string;
+            /** Method Version */
+            method_version: string;
+            report: components["schemas"]["CompanyReport"];
+        };
+        /** ReportVersionSummary */
+        ReportVersionSummary: {
+            /** Version */
+            version: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Conclusion Excerpt */
+            conclusion_excerpt: string;
+            /** Input Hash */
+            input_hash: string;
+            /** Method Version */
+            method_version: string;
+        };
         /** ReportingExceptionOut */
         ReportingExceptionOut: {
             /** Category */
@@ -19164,6 +26209,19 @@ export interface components {
              * @default Stored observations only, latest record known by the cutoff; changes are latest minus the previous period of the same series. No figure is estimated here.
              */
             method: string;
+        };
+        /** ResearchExcerpt */
+        ResearchExcerpt: {
+            /** Report Id */
+            report_id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            body: components["schemas"]["ResearchBody"];
+            /** Older Than Latest Filing */
+            older_than_latest_filing: boolean;
         };
         /** ResearchProfile */
         ResearchProfile: {
@@ -19335,6 +26393,46 @@ export interface components {
             /** Job Id */
             job_id: number | null;
         };
+        /**
+         * ResultCoverage
+         * @description `numerator` of `denominator` inputs were usable. The denominator is always stated.
+         */
+        ResultCoverage: {
+            /** Numerator */
+            numerator: number | string;
+            /** Denominator */
+            denominator: number | string;
+            /**
+             * Basis
+             * @description count, weight or market_value
+             * @default count
+             */
+            basis: string;
+        };
+        /** ResultRow */
+        ResultRow: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string | null;
+            /** Identity */
+            identity: {
+                [key: string]: string | null;
+            };
+            /** Values */
+            values: {
+                [key: string]: components["schemas"]["MetricValue"];
+            };
+            /** Checks */
+            checks: components["schemas"]["steward__discovery__engine__Check"][];
+            /** Unknown */
+            unknown: string[];
+            /**
+             * Notes
+             * @description Extra why-it-passed lines, e.g. the idea-pipeline gate.
+             */
+            notes?: string[];
+        };
         /** ReturnBasisCoverage */
         ReturnBasisCoverage: {
             /** Adjustment Basis */
@@ -19350,6 +26448,15 @@ export interface components {
             partial_tickers: string[];
             /** Missing Tickers */
             missing_tickers: string[];
+        };
+        /** ReturnCell */
+        ReturnCell: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Reason */
+            reason?: string | null;
         };
         /** ReviewBody */
         ReviewBody: {
@@ -19382,6 +26489,16 @@ export interface components {
              * @default 0
              */
             dropped_actions: number;
+            /**
+             * Holding Periods
+             * @description Open lots with the date each passes the holding-period test; facts, not tax advice.
+             */
+            holding_periods?: components["schemas"]["HoldingPeriodRow"][];
+            /**
+             * Decision Scorecard
+             * @description How past journal decisions turned out (price change since the decision, each with its sample size; sections with too few decisions are not summarised).
+             */
+            decision_scorecard?: string[];
             /** Sources */
             sources: components["schemas"]["Source"][];
             /** Model */
@@ -19726,6 +26843,16 @@ export interface components {
              */
             max_look_through_weight?: number | null;
             /**
+             * Max Sector Weight
+             * @description Ceiling on one sector's share of the whole portfolio, counting funds' holdings (X-Ray). Weight with no sector is left out, not counted as a sector.
+             */
+            max_sector_weight?: number | null;
+            /**
+             * Max Country Weight
+             * @description Ceiling on one country's share of the whole portfolio, counting funds' holdings (X-Ray). Weight with no country is left out, not counted as a country.
+             */
+            max_country_weight?: number | null;
+            /**
              * Max Drawdown
              * @description Ceiling on the portfolio's current drawdown: its fall from the highest level of the last year (0.20 = 20 % below the peak), on the deposit- and withdrawal-adjusted value.
              */
@@ -19742,12 +26869,159 @@ export interface components {
              */
             correlation_min_combined_weight: number;
             /**
+             * Max Var 95
+             * @description Ceiling on the portfolio's one-day historical 95 % value at risk, as a share of the portfolio (0.03 = 3 %), from the last year of daily returns. A descriptive estimate of the sample, not a forecast.
+             */
+            max_var_95?: number | null;
+            /**
+             * Max Tracking Error
+             * @description Ceiling on the annualised tracking error against the configured benchmark (0.08 = 8 %), from the last year of daily returns.
+             */
+            max_tracking_error?: number | null;
+            /**
+             * Max Stress Loss
+             * @description Ceiling on the portfolio's loss when equities fall by `stress_equity_fall` (scenario engine: measured betas where valid, 1.0 otherwise).
+             */
+            max_stress_loss?: number | null;
+            /**
+             * Stress Equity Fall
+             * @description Size of the equity fall the stress loss is measured against.
+             * @default 0.2
+             */
+            stress_equity_fall: number;
+            /**
+             * Credit Spread Alert Bp
+             * @description Alert when the stored US high-yield credit spread (series us_hy_spread) is at or above this level, in basis points. A market signal, not a portfolio measure.
+             */
+            credit_spread_alert_bp?: number | null;
+            /**
+             * Max Valuation Terminal Growth
+             * @description Flag a saved valuation scenario of a held stock whose terminal growth exceeds this rate (0.03 = 3 %): an unusual assumption to re-check.
+             */
+            max_valuation_terminal_growth?: number | null;
+            /**
+             * Max Valuation Growth
+             * @description Flag a saved valuation scenario of a held stock whose explicit-year free cash flow growth exceeds this rate in any year.
+             */
+            max_valuation_growth?: number | null;
+            /**
              * On Breach
              * @description Severity of a risk-limit breach (alerted when it opens).
              * @default severity_2
              * @enum {string}
              */
             on_breach: "severity_1" | "severity_2" | "severity_3";
+        };
+        /** RiskReport */
+        RiskReport: {
+            /** Method Version */
+            method_version: string;
+            /** As Of */
+            as_of: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            window: components["schemas"]["RiskWindow"];
+            /** Benchmark Symbol */
+            benchmark_symbol: string | null;
+            /** Benchmark Note */
+            benchmark_note: string | null;
+            risk_free: components["schemas"]["RiskFree"] | null;
+            /** Stats */
+            stats: {
+                [key: string]: components["schemas"]["AnalyticsResult"];
+            };
+            /** Rolling Correlation */
+            rolling_correlation: components["schemas"]["RiskSeriesPoint"][];
+            /** Rolling Window */
+            rolling_window: number;
+            /** Drawdown Path */
+            drawdown_path: components["schemas"]["RiskSeriesPoint"][];
+            correlation: components["schemas"]["CorrelationMatrix"];
+            diversification: components["schemas"]["AnalyticsResult"];
+            holdings_covered: components["schemas"]["ResultCoverage"];
+            /** Warnings */
+            warnings: string[];
+            /** Method */
+            method: string;
+        };
+        /** RiskSeriesPoint */
+        RiskSeriesPoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Value */
+            value: number;
+        };
+        /** RiskStat */
+        RiskStat: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            fund: components["schemas"]["AnalyticsResult"];
+            benchmark?: components["schemas"]["AnalyticsResult"] | null;
+        };
+        /** RiskWindow */
+        RiskWindow: {
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+            /**
+             * Observations
+             * @description Aligned daily returns the statistics are built on.
+             */
+            observations: number;
+            /**
+             * Frequency
+             * @default daily
+             */
+            frequency: string;
+            /**
+             * Annualisation
+             * @default 252
+             */
+            annualisation: number;
+        };
+        /** Role */
+        Role: {
+            /** Person */
+            person: string;
+            /** Edge Type */
+            edge_type: string;
+            /** Valid From */
+            valid_from: string | null;
+            /** Valid To */
+            valid_to: string | null;
+            /** Status */
+            status: string;
+            /** Source Url */
+            source_url: string;
+            /** Passage */
+            passage: string | null;
+        };
+        /** Row */
+        Row: {
+            /** Label */
+            label: string;
+            /**
+             * Entry Ids
+             * @description Journal entries the figure was computed from.
+             */
+            entry_ids?: number[];
+            /** N */
+            n: number;
+            /** Median Change */
+            median_change?: number | null;
+            /**
+             * Share
+             * @description Share of the n with the stated result.
+             */
+            share?: number | null;
+            /** Detail */
+            detail?: string | null;
         };
         /** RowGate */
         RowGate: {
@@ -19758,6 +27032,35 @@ export interface components {
             usable_for_valuation: boolean | null;
             /** Reasons */
             reasons: string[];
+        };
+        /** Rubric */
+        Rubric: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Version */
+            version: string;
+            /** Overall */
+            overall: number | string | null;
+            /** Overall Coverage */
+            overall_coverage: number | string;
+            /** Abstained */
+            abstained: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Components */
+            components: components["schemas"]["Component"][];
+            /** Penalty Rule */
+            penalty_rule: string;
+            calibration: components["schemas"]["Calibration"];
+            /** Caveats */
+            caveats: string[];
+            /** Input Hash */
+            input_hash: string;
         };
         /** RuleMatch */
         RuleMatch: {
@@ -19778,6 +27081,174 @@ export interface components {
              * @description Empty: any holding.
              */
             tickers?: string[];
+        };
+        /** SaleImpact */
+        SaleImpact: {
+            /** Ticker */
+            ticker: string;
+            /** Units */
+            units: number;
+            /** Units Matched */
+            units_matched: number;
+            /** Units Unmatched */
+            units_unmatched: number;
+            /**
+             * Gross Proceeds
+             * @description Account currency, at the price given.
+             */
+            gross_proceeds: number;
+            /** Cost */
+            cost: number;
+            /** Gain */
+            gain: number;
+            /** Gross Within Time Test */
+            gross_within_time_test: number;
+            /** Lots */
+            lots: components["schemas"]["LotUse"][];
+            /** Near Test Lots */
+            near_test_lots: number;
+            /**
+             * Earliest Pass
+             * @description When the first lot that has not passed yet will pass; null if none is waiting.
+             */
+            earliest_pass: string | null;
+            /** Method Note */
+            method_note: string;
+        };
+        /** SaveRebalance */
+        SaveRebalance: {
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            request?: components["schemas"]["RebalanceRequest"];
+        };
+        /** SaveScenarioIn */
+        SaveScenarioIn: {
+            /** Name */
+            name: string;
+            request: components["schemas"]["ValuationRequest"];
+            /** Note */
+            note?: string | null;
+        };
+        /** SaveShock */
+        SaveShock: {
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            shocks: components["schemas"]["ShockSet"];
+            assumptions?: components["schemas"]["ShockAssumptions"];
+        };
+        /** SaveTheme */
+        SaveTheme: {
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            theme: components["schemas"]["ThemeDefinition"];
+        };
+        /** SaveWhatIf */
+        SaveWhatIf: {
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            case: components["schemas"]["WhatIfCase"];
+        };
+        /** SavedAnalysisItem */
+        SavedAnalysisItem: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "xray_scenario" | "performance_report" | "shock_scenario" | "whatif_case" | "rebalance_plan" | "theme_exposure";
+            /** Name */
+            name: string;
+            /** Note */
+            note: string | null;
+            /** Method Version */
+            method_version: string | null;
+            /** As Of */
+            as_of: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** SavedAnalysisRequest */
+        SavedAnalysisRequest: {
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+        };
+        /** SavedComparison */
+        SavedComparison: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Isins */
+            isins: string[];
+            /** Note */
+            note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** SavedComparisonIn */
+        SavedComparisonIn: {
+            /** Name */
+            name: string;
+            /** Isins */
+            isins: string[];
+            /** Note */
+            note?: string | null;
+        };
+        /** SavedOpen */
+        SavedOpen: {
+            item: components["schemas"]["SavedAnalysisItem"];
+            /**
+             * Payload
+             * @description {request, result}: the inputs and the result exactly as they stood when saved.
+             */
+            payload: {
+                [key: string]: unknown;
+            };
+        };
+        /** SavedScenario */
+        SavedScenario: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Version */
+            version: number;
+            /** Assumptions */
+            assumptions: components["schemas"]["Assumptions"][];
+            /** Selected */
+            selected: string | null;
+            /** Method Version */
+            method_version: string;
+            /** Input Hash */
+            input_hash: string | null;
+            /** Note */
+            note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Saved Result */
+            saved_result?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ScenarioImpactOut */
         ScenarioImpactOut: {
@@ -19801,6 +27272,30 @@ export interface components {
              */
             uses_owner_assigned: boolean;
         };
+        /** ScenarioMacroContext */
+        ScenarioMacroContext: {
+            /** Series Id */
+            series_id: string;
+            /** Label */
+            label: string;
+            /** Source */
+            source: string;
+            /** Unit */
+            unit: string | null;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Value */
+            value: number;
+            /** Year Ago */
+            year_ago: number | null;
+            /** Change */
+            change: number | null;
+            /** Url */
+            url: string | null;
+        };
         /** ScenarioOut */
         ScenarioOut: {
             /** Origin */
@@ -19814,6 +27309,28 @@ export interface components {
             /** Notes */
             notes: string[];
         };
+        /** ScenarioResult */
+        ScenarioResult: {
+            /** Name */
+            name: string;
+            assumptions: components["schemas"]["Assumptions"];
+            /** Discount Rate */
+            discount_rate: number | string;
+            /** Discount Rate Build */
+            discount_rate_build: string;
+            /** Forecast Fcf */
+            forecast_fcf: (number | string)[];
+            /** Enterprise Value */
+            enterprise_value: number | string | null;
+            value_per_share: components["schemas"]["AnalyticsResult"];
+            /** Margin Of Safety */
+            margin_of_safety?: number | string | null;
+            /**
+             * Selected
+             * @default false
+             */
+            selected: boolean;
+        };
         /** ScorePoint */
         ScorePoint: {
             /**
@@ -19823,6 +27340,77 @@ export interface components {
             date: string;
             /** Score */
             score: number;
+        };
+        /** Scorecard */
+        Scorecard: {
+            /**
+             * Since
+             * Format: date
+             */
+            since: string;
+            /**
+             * Until
+             * Format: date
+             */
+            until: string;
+            /** Entries */
+            entries: number;
+            /**
+             * Min Decisions
+             * @default 5
+             */
+            min_decisions: number;
+            /** Sections */
+            sections: components["schemas"]["Section"][];
+            /**
+             * Method
+             * @default Price change from the price written in the journal to the latest stored close, in the instrument's currency, without dividends. A section needs at least 5 decisions; fewer are listed but not summarised.
+             */
+            method: string;
+            /** Suggestions */
+            suggestions?: string[];
+            /**
+             * Filtered By
+             * @description What the decisions were limited to, if anything.
+             */
+            filtered_by?: string[];
+        };
+        /** ScreenBody */
+        ScreenBody: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @default stock
+             * @enum {string}
+             */
+            kind: "stock" | "fund";
+            stock?: components["schemas"]["StockRequest"] | null;
+            fund?: components["schemas"]["FundRequest"] | null;
+        };
+        /** ScreenDetail */
+        ScreenDetail: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+            /** Latest Version */
+            latest_version: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Definition Hash */
+            definition_hash?: string | null;
+            /** Versions */
+            versions: components["schemas"]["ScreenVersion"][];
+            /** Runs */
+            runs: {
+                [key: string]: unknown;
+            }[];
         };
         /** ScreenFilter */
         ScreenFilter: {
@@ -19952,6 +27540,63 @@ export interface components {
              */
             unknown: string[];
         };
+        /** ScreenSummary */
+        ScreenSummary: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+            /** Latest Version */
+            latest_version: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Definition Hash */
+            definition_hash?: string | null;
+        };
+        /** ScreenVersion */
+        ScreenVersion: {
+            /** Version */
+            version: number;
+            /** Definition */
+            definition: {
+                [key: string]: unknown;
+            };
+            /** Definition Hash */
+            definition_hash: string;
+            /** Method Version */
+            method_version: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** Section */
+        Section: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "too_few" | "unavailable";
+            /**
+             * N
+             * @default 0
+             */
+            n: number;
+            /** Note */
+            note: string;
+            /** Rows */
+            rows?: components["schemas"]["Row"][];
+        };
         /** SectionCoverage */
         SectionCoverage: {
             /**
@@ -19961,6 +27606,62 @@ export interface components {
             state: "covered" | "partial" | "not_covered";
             /** Reason */
             reason: string;
+        };
+        /** SectorMap */
+        SectorMap: {
+            /**
+             * Universe
+             * @description Companies with a profile.
+             */
+            universe: number;
+            credit?: components["schemas"]["CreditContext"] | null;
+            /** Sectors */
+            sectors: components["schemas"]["GroupStats"][];
+            /** Industries */
+            industries: components["schemas"]["GroupStats"][];
+            /**
+             * Unclassified
+             * @description Held tickers with no profile.
+             */
+            unclassified: string[];
+            /**
+             * Not Covered
+             * @default [
+             *       "Top products: only companies whose annual report tags revenue by product are listed.",
+             *       "Patent areas: empty until patent data is collected (EPO OPS credentials are not set).",
+             *       "Trade dependencies: shown as the countries companies report revenue in, not customs data.",
+             *       "Credit: no sector credit spread is stored. The balance-sheet leverage of the group's own companies stands in for it, and the market-wide high-yield spread is shown beside it."
+             *     ]
+             */
+            not_covered: string[];
+            /**
+             * Method
+             * @default Companies are the ones with a stored profile. Revenue growth and operating margin are the latest filed year from the peer-comparison engine; price/earnings is the provider's trailing figure. A median needs at least three companies with a value.
+             */
+            method: string;
+        };
+        /** SegmentAnalysis */
+        SegmentAnalysis: {
+            /** Ticker */
+            ticker: string;
+            /** Basis */
+            basis: string | null;
+            /** Available Bases */
+            available_bases: string[];
+            /** Currency */
+            currency: string | null;
+            /** Source Note */
+            source_note: string | null;
+            /** Breakdowns */
+            breakdowns: components["schemas"]["Breakdown"][];
+            /** Mappings */
+            mappings: components["schemas"]["MapLine"][];
+            /** Exposures */
+            exposures: components["schemas"]["MappedExposure"][];
+            /** Notes */
+            notes: string[];
+            /** Method Version */
+            method_version: string;
         };
         /** SegmentBridgeOut */
         SegmentBridgeOut: {
@@ -19985,6 +27686,19 @@ export interface components {
             period: components["schemas"]["SegmentPeriod"];
             /** Rows */
             rows: components["schemas"]["SegmentRow"][];
+        };
+        /** SegmentLine */
+        SegmentLine: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Share */
+            share: number | string | null;
+            /** Period End */
+            period_end: string | null;
+            /** Basis */
+            basis?: string | null;
         };
         /** SegmentLineOut */
         SegmentLineOut: {
@@ -20012,6 +27726,23 @@ export interface components {
             estimate_evidence_id: number | null;
             /** Actual Evidence Id */
             actual_evidence_id: number | null;
+        };
+        /** SegmentMix */
+        SegmentMix: {
+            /** Breakdown */
+            breakdown: string;
+            /** Period */
+            period: string | null;
+            /**
+             * Lines
+             * @description (label, share of operating revenue)
+             */
+            lines: [
+                string,
+                number | string | null
+            ][];
+            /** Note */
+            note?: string | null;
         };
         /** SegmentPeriod */
         SegmentPeriod: {
@@ -20191,6 +27922,12 @@ export interface components {
              */
             state: "observed" | "missing" | "disagrees";
         };
+        /** SettingsResponse */
+        SettingsResponse: {
+            settings: components["schemas"]["PerformanceSettings"];
+            /** Version */
+            version: number | null;
+        };
         /** SeverityDay */
         SeverityDay: {
             /**
@@ -20297,6 +28034,17 @@ export interface components {
              */
             as_of?: string | null;
         };
+        /** SharedHolding */
+        SharedHolding: {
+            /** Issuer */
+            issuer: string;
+            /** Weight A */
+            weight_a: number | string;
+            /** Weight B */
+            weight_b: number | string;
+            /** Overlap */
+            overlap: number | string;
+        };
         /** SharesOutstandingOut */
         SharesOutstandingOut: {
             /**
@@ -20399,6 +28147,197 @@ export interface components {
              */
             reason: string | null;
         };
+        /**
+         * ShockAssumptions
+         * @description Sensitivities the owner sets. A measured value is used unless the owner overrides it.
+         */
+        ShockAssumptions: {
+            /**
+             * Equity Beta
+             * @description Held ticker -> equity beta the owner assumes.
+             */
+            equity_beta?: {
+                [key: string]: number;
+            };
+            /**
+             * Unmeasured Equity Beta
+             * @description Beta used for a holding with no valid measurement; null leaves it unshocked.
+             * @default 1
+             */
+            unmeasured_equity_beta: number | null;
+            /**
+             * Duration Years
+             * @description Held ticker -> effective duration the owner assumes.
+             */
+            duration_years?: {
+                [key: string]: number;
+            };
+            /**
+             * Spread Duration Years
+             * @description Held ticker -> spread duration the owner assumes.
+             */
+            spread_duration_years?: {
+                [key: string]: number;
+            };
+        };
+        /** ShockRequest */
+        ShockRequest: {
+            shocks?: components["schemas"]["ShockSet"];
+            assumptions?: components["schemas"]["ShockAssumptions"];
+        };
+        /** ShockRun */
+        ShockRun: {
+            /** As Of */
+            as_of: string;
+            /** Benchmark Symbol */
+            benchmark_symbol: string | null;
+            result: components["schemas"]["ShockScenarioResult"];
+            /** Measured */
+            measured: components["schemas"]["MeasuredLine"][];
+            /** Context */
+            context: components["schemas"]["ScenarioMacroContext"][];
+            /** Foreign Currencies */
+            foreign_currencies: string[];
+            /** Notes */
+            notes: string[];
+        };
+        /** ShockScenarioResult */
+        ShockScenarioResult: {
+            /** Method Version */
+            method_version: string;
+            shocks: components["schemas"]["ShockSet"];
+            assumptions: components["schemas"]["ShockAssumptions"];
+            /**
+             * Before Total
+             * @description Total portfolio value, base currency.
+             */
+            before_total: number;
+            /** After Total */
+            after_total: number;
+            /**
+             * Pnl
+             * @description after_total - before_total, base currency.
+             */
+            pnl: number;
+            /** Pnl Pct */
+            pnl_pct: number;
+            /** Positions */
+            positions: components["schemas"]["ShockedPosition"][];
+            /**
+             * By Factor
+             * @description P&L share by factor; adds to pnl_pct.
+             */
+            by_factor: {
+                [key: string]: number;
+            };
+            /** Shocked Weight */
+            shocked_weight: number;
+            /** Unshocked Weight */
+            unshocked_weight: number;
+            /** Unshocked */
+            unshocked: components["schemas"]["Unshocked"][];
+            /** Cash Weight */
+            cash_weight: number;
+            /**
+             * Reconciles
+             * @description The factor split and the position lines add to the P&L, and cash, shocked and unshocked weight add to the whole portfolio.
+             */
+            reconciles: boolean;
+            /** Warnings */
+            warnings: string[];
+            /** Method */
+            method: string;
+        };
+        /**
+         * ShockSet
+         * @description The factor moves of one scenario. Every field is optional; an empty set shocks nothing.
+         */
+        ShockSet: {
+            /**
+             * Equity Pct
+             * @description Equity market move, fraction (-0.2 = -20 %).
+             */
+            equity_pct?: number | null;
+            /**
+             * Rate Bp
+             * @description Parallel change in rates, basis points.
+             */
+            rate_bp?: number | null;
+            /**
+             * Credit Bp
+             * @description Change in credit spreads, basis points.
+             */
+            credit_bp?: number | null;
+            /**
+             * Fx
+             * @description Currency code -> move against the base currency, fraction (USD -0.1).
+             */
+            fx?: {
+                [key: string]: number;
+            };
+            /**
+             * Sector
+             * @description Sector -> demand move on top of the market, fraction.
+             */
+            sector?: {
+                [key: string]: number;
+            };
+            /**
+             * Country
+             * @description Country (ISO code) -> demand move on top of the market, fraction.
+             */
+            country?: {
+                [key: string]: number;
+            };
+        };
+        /** ShockedPosition */
+        ShockedPosition: {
+            /**
+             * Key
+             * @description Held ticker, or the bucket name for non-position weight.
+             */
+            key: string;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+            /**
+             * Shocked Weight
+             * @description Weight of the leaves that were moved.
+             */
+            shocked_weight: number;
+            /**
+             * Pnl
+             * @description Change in value, as a share of total portfolio value.
+             */
+            pnl: number;
+            /**
+             * Return Pct
+             * @description pnl / weight; null with no weight.
+             */
+            return_pct: number | null;
+            /**
+             * Effects
+             * @description P&L by factor: equity, rates, credit, fx, sector, country (cross terms kept in `interaction`).
+             */
+            effects: {
+                [key: string]: number;
+            };
+            /**
+             * Sensitivities
+             * @description Each sensitivity used, with its source.
+             */
+            sensitivities: string[];
+        };
+        /** Sibling */
+        Sibling: {
+            /** Isin */
+            isin: string;
+            /** Name */
+            name: string | null;
+            /** As Of */
+            as_of: string | null;
+        };
         /** SideConflictOut */
         SideConflictOut: {
             /**
@@ -20410,6 +28349,68 @@ export interface components {
             claim_ids: number[];
             /** Note */
             note: string;
+        };
+        /** SizeBand */
+        SizeBand: {
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number | string;
+            /**
+             * Kind
+             * @default known
+             * @enum {string}
+             */
+            kind: "known" | "no_market_cap";
+        };
+        /** SleeveOut */
+        SleeveOut: {
+            /** Name */
+            name: string;
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+            /** Days */
+            days: number;
+            /** Total Return */
+            total_return: number | null;
+            /** Annualized */
+            annualized: number | null;
+            /** Reason */
+            reason: string | null;
+            /** Tickers */
+            tickers: string[];
+        };
+        /** SleevesResponse */
+        SleevesResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "partial" | "unavailable" | "paid_only" | "disputed";
+            /** As Of */
+            as_of: string | null;
+            /** Gap */
+            gap: string | null;
+            core: components["schemas"]["SleeveOut"] | null;
+            stocks: components["schemas"]["SleeveOut"] | null;
+            /** History Days */
+            history_days: number;
+            /** Annual Gap Points */
+            annual_gap_points: number | null;
+            /** Gap Limit Points */
+            gap_limit_points: number;
+            /** Too Early */
+            too_early: boolean;
+            /** Review Item */
+            review_item: boolean;
+            /** Message */
+            message: string;
+            /** Reconciliation Error */
+            reconciliation_error: number | null;
+            freshness?: components["schemas"]["FreshnessOut"] | null;
+            explain: components["schemas"]["PerformanceExplain"];
         };
         /** Snapshot */
         Snapshot: {
@@ -20428,6 +28429,20 @@ export interface components {
             claims: components["schemas"]["ClaimRow"][];
             /** Coverage */
             coverage: components["schemas"]["CoverageRow"][];
+        };
+        /** SnapshotCreated */
+        SnapshotCreated: {
+            /** Id */
+            id: number;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Members */
+            members: number;
+            /** Active */
+            active: number;
         };
         /** SnapshotValues */
         SnapshotValues: {
@@ -20453,6 +28468,58 @@ export interface components {
              * @description Trading212's unrealised P/L, converted from the account currency at the snapshot's own account-to-base rate.
              */
             unrealised: number;
+        };
+        /** SnoozeIn */
+        SnoozeIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            /** Subject */
+            subject: string;
+            /**
+             * Action
+             * @default snooze
+             * @enum {string}
+             */
+            action: "snooze" | "clear";
+            /** Until */
+            until?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** SnoozeRow */
+        SnoozeRow: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            /** Subject */
+            subject: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "snooze" | "clear";
+            /** Until */
+            until: string | null;
+            /** Note */
+            note: string | null;
+        };
+        /** SnoozedIssue */
+        SnoozedIssue: {
+            issue: components["schemas"]["QualityIssue"];
+            /**
+             * Until
+             * Format: date
+             */
+            until: string;
+            /** Note */
+            note: string | null;
         };
         /** Source */
         Source: {
@@ -20611,6 +28678,21 @@ export interface components {
              */
             healthy: boolean;
         };
+        /** SourceRef */
+        SourceRef: {
+            /**
+             * Kind
+             * @description e.g. filing, price_bar, etf_snapshot, owner_input
+             */
+            kind: string;
+            /**
+             * Ref
+             * @description Identifier a reader can chase: accession, symbol, snapshot id.
+             */
+            ref: string;
+            /** Url */
+            url?: string | null;
+        };
         /** SourceRow */
         SourceRow: {
             /** Source Key */
@@ -20716,6 +28798,95 @@ export interface components {
             after: string;
             /** Signed Url */
             signed_url: string | null;
+        };
+        /**
+         * SpinOffEntry
+         * @description A spin-off you entered: holders on `day` received `ratio` child shares per parent share,
+         *     and `cost_share` of the parent's cost moved to the child. The company's own notice gives the
+         *     split of cost; Steward does not look it up.
+         */
+        SpinOffEntry: {
+            /** Parent Ticker */
+            parent_ticker: string;
+            /** Child Ticker */
+            child_ticker: string;
+            /**
+             * Day
+             * Format: date
+             * @description First day the child shares exist.
+             */
+            day: string;
+            /**
+             * Ratio
+             * @description Child shares per parent share.
+             */
+            ratio: number | string;
+            /**
+             * Cost Share
+             * @description Fraction of the parent's cost that moves to the child (0 to 1).
+             */
+            cost_share: number | string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /**
+         * SplitEntry
+         * @description A split or reverse split you entered. The broker's fills are not restated for it, so
+         *     without this a split shows up as a position the fills cannot explain.
+         */
+        SplitEntry: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Day
+             * Format: date
+             * @description First day the new share count applies.
+             */
+            day: string;
+            /**
+             * Ratio
+             * @description New shares per old share: 2 for a 2-for-1 split, 0.1 for a 1-for-10 reverse split.
+             */
+            ratio: number | string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** Spread */
+        Spread: {
+            /**
+             * N
+             * @description Companies with a value.
+             */
+            n: number;
+            /**
+             * Of
+             * @description Companies in the group.
+             */
+            of: number;
+            /**
+             * Median
+             * @description Null below the minimum sample.
+             */
+            median: number | null;
+            /** Low */
+            low: number | null;
+            /** High */
+            high: number | null;
+        };
+        /** SpreadBucket */
+        SpreadBucket: {
+            /** Label */
+            label: string;
+            /** Investment Grade */
+            investment_grade: number | string | null;
+            /** Non Investment Grade */
+            non_investment_grade: number | string | null;
         };
         /** StakeChainOut */
         StakeChainOut: {
@@ -20879,6 +29050,58 @@ export interface components {
             /** Exhibits */
             exhibits: components["schemas"]["StakeExhibitOut"][];
         };
+        /** StandardLine */
+        StandardLine: {
+            /** Name */
+            name: string;
+            shocks: components["schemas"]["ShockSet"];
+            /** Pnl Pct */
+            pnl_pct: number;
+            /** Pnl */
+            pnl: number;
+            /** Unshocked Weight */
+            unshocked_weight: number;
+        };
+        /** StandardTable */
+        StandardTable: {
+            /** As Of */
+            as_of: string;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Total Value */
+            total_value: number;
+            /** Lines */
+            lines: components["schemas"]["StandardLine"][];
+            assumptions: components["schemas"]["ShockAssumptions"];
+            /** Notes */
+            notes: string[];
+        };
+        /** StatedAction */
+        StatedAction: {
+            /** Kind */
+            kind: string;
+            /** Date */
+            date: string | null;
+            /** Detail */
+            detail: string;
+            /** State */
+            state: string | null;
+            /** Source Url */
+            source_url: string;
+        };
+        /** StatementCheck */
+        StatementCheck: {
+            /** Name */
+            name: string;
+            /** Statement */
+            statement: string;
+            /** Column */
+            column: string;
+            /** Passed */
+            passed: boolean | null;
+            /** Detail */
+            detail: string;
+        };
         /** StatementGateOut */
         StatementGateOut: {
             /**
@@ -20888,6 +29111,15 @@ export interface components {
             usable_for_valuation: boolean | null;
             /** Reasons */
             reasons: string[];
+        };
+        /** StatementTable */
+        StatementTable: {
+            /** Statement */
+            statement: string;
+            /** Label */
+            label: string;
+            /** Lines */
+            lines: components["schemas"]["Line"][];
         };
         /** StatementsOut */
         StatementsOut: {
@@ -20926,6 +29158,122 @@ export interface components {
              */
             unmapped_concepts: number;
         };
+        /** StatementsView */
+        StatementsView: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "standardized" | "reported";
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "annual" | "quarterly";
+            /**
+             * Version View
+             * @enum {string}
+             */
+            version_view: "restated" | "original";
+            /** Units */
+            units: number;
+            /**
+             * Transform
+             * @enum {string}
+             */
+            transform: "none" | "common_size" | "yoy";
+            /** Per Share */
+            per_share: boolean;
+            /**
+             * Currency
+             * @description The currency of the figures shown (the converted one when a base currency was chosen).
+             */
+            currency: string | null;
+            /**
+             * Native Currency
+             * @description The currency the facts were filed in.
+             */
+            native_currency?: string | null;
+            /** Columns */
+            columns: components["schemas"]["Column"][];
+            /** Statements */
+            statements: components["schemas"]["StatementTable"][];
+            /** Checks */
+            checks: components["schemas"]["StatementCheck"][];
+            /** Missing Periods */
+            missing_periods: string[];
+            /** Warnings */
+            warnings: string[];
+            /** Method Version */
+            method_version: string;
+            /** As Of */
+            as_of: string | null;
+            /** Known At */
+            known_at: string | null;
+            /** Sources */
+            sources: components["schemas"]["SourceRef"][];
+            /** Input Hash */
+            input_hash: string;
+            /** Note */
+            note: string;
+        };
+        /**
+         * Status
+         * @enum {string}
+         */
+        Status: "complete" | "partial" | "unavailable" | "paid_only" | "disputed";
+        /** StockRequest */
+        StockRequest: {
+            /**
+             * Universe
+             * @default covered
+             * @enum {string}
+             */
+            universe: "covered" | "watchlist" | "holdings" | "snapshot";
+            /** Snapshot Id */
+            snapshot_id?: number | null;
+            /** Filters */
+            filters?: components["schemas"]["DiscoverFilter"][];
+            /**
+             * Missing
+             * @default exclude
+             * @enum {string}
+             */
+            missing: "exclude" | "keep_unknown";
+            /** Sort By */
+            sort_by?: string | null;
+            /** Descending */
+            descending?: boolean | null;
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /** Cursor */
+            cursor?: string | null;
+            /**
+             * As Of
+             * @description Data date. Past dates use interval membership and facts known by then.
+             */
+            as_of?: string | null;
+            /**
+             * Known At
+             * @description Only facts known by this time are used.
+             */
+            known_at?: string | null;
+            /**
+             * Reconciled Only
+             * @default false
+             */
+            reconciled_only: boolean;
+            /**
+             * Preset
+             * @description Apply the saved idea-pipeline rule on top of the filters.
+             */
+            preset?: "idea_pipeline" | null;
+        };
         /** StoredSuggestionOut */
         StoredSuggestionOut: {
             /** Id */
@@ -20955,6 +29303,30 @@ export interface components {
             match_status: "suggested" | "confirmed" | "rejected";
             /** Decision Note */
             decision_note: string | null;
+        };
+        /** Story */
+        Story: {
+            /** Id */
+            id: number;
+            /** Headline */
+            headline: string;
+            /** Url */
+            url: string;
+            /** Outlet */
+            outlet: string | null;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /** Event Type */
+            event_type: string;
+            /** Ticker */
+            ticker: string;
+            /** Tier */
+            tier: number;
+            /** Rumour */
+            rumour: boolean;
         };
         /** StoryOut */
         StoryOut: {
@@ -21077,6 +29449,7 @@ export interface components {
             /** Rules */
             rules?: (components["schemas"]["PositionWeightRule"] | components["schemas"]["CategoryWeightRule"] | components["schemas"]["CashWeightRule"] | components["schemas"]["PositionCountRule"])[];
             risk?: components["schemas"]["RiskLimits"];
+            pretrade?: components["schemas"]["PretradeThresholds"];
             /**
              * Hard Limit Severity
              * @description Severity of a position above its hard limit (alerted when it opens, routed by the notification rules).
@@ -21105,6 +29478,177 @@ export interface components {
             note: string | null;
             body: components["schemas"]["StrategyConfig"];
         };
+        /** StyleBand */
+        StyleBand: {
+            /** Label */
+            label: string;
+            /**
+             * Weight
+             * @description Share of the fund's identified equity weight.
+             */
+            weight: number | string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "value" | "blend" | "growth" | "no_earnings" | "not_covered";
+        };
+        /** StyleMetric */
+        StyleMetric: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Unit */
+            unit: string;
+            /** Covered Weight */
+            covered_weight: number | string;
+            /** Equity Weight */
+            equity_weight: number | string;
+            /** Excluded */
+            excluded: number;
+            /** Formula */
+            formula: string;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** StyleView */
+        StyleView: {
+            /** Isin */
+            isin: string;
+            /** As Of */
+            as_of: string | null;
+            concentration: components["schemas"]["FundConcentration"] | null;
+            /** Size */
+            size: components["schemas"]["SizeBand"][];
+            /** Size Coverage */
+            size_coverage: number | string | null;
+            /** Value Growth */
+            value_growth?: components["schemas"]["StyleBand"][];
+            /**
+             * Value Growth Rule
+             * @default Each covered holding votes: earnings yield of 6% or more and price to book of 1.5 or less each vote value; earnings yield of 3% or less and price to book of 4 or more each vote growth. More value votes make it value-leaning, more growth votes growth-leaning, otherwise blend. A holding with negative earnings is its own band, and one the app has no statements for is not classified. These thresholds are StewardAI's own and are not Morningstar's Style Box.
+             */
+            value_growth_rule: string;
+            /** Metrics */
+            metrics: components["schemas"]["StyleMetric"][];
+            /** Note */
+            note: string;
+            /** Warnings */
+            warnings: string[];
+            /**
+             * Method Version
+             * @default 1.0.0
+             */
+            method_version: string;
+        };
+        /** SupplyChain */
+        SupplyChain: {
+            /** Nodes */
+            nodes: components["schemas"]["SupplyNode"][];
+            /** Edges */
+            edges: components["schemas"]["SupplyEdge"][];
+            /**
+             * Linked
+             * @description Edges where the portfolio holds both ends, so one event can hit both.
+             */
+            linked: components["schemas"]["LinkedPair"][];
+            /**
+             * Held In Graph
+             * @description Portfolio weight in companies that appear in the graph.
+             */
+            held_in_graph: number;
+            /** Notes */
+            notes: string[];
+        };
+        /** SupplyEdge */
+        SupplyEdge: {
+            /**
+             * Id
+             * @description Set for an entry you made (it can be removed); None for a filing.
+             */
+            id: number | null;
+            /** Supplier */
+            supplier: string;
+            /** Customer */
+            customer: string;
+            /** Product */
+            product: string;
+            /** Customer Share */
+            customer_share: number | null;
+            /** Source Url */
+            source_url: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Origin
+             * @default owner
+             * @enum {string}
+             */
+            origin: "owner" | "filing";
+            /** Fiscal Period */
+            fiscal_period?: string | null;
+        };
+        /** SupplyEdgeRequest */
+        SupplyEdgeRequest: {
+            /**
+             * Source Url
+             * @description Where the figures came from (a web address).
+             */
+            source_url: string;
+            /**
+             * As Of
+             * Format: date
+             * @description The date the figures describe.
+             */
+            as_of: string;
+            /** Note */
+            note?: string | null;
+            /** Supplier */
+            supplier: string;
+            /** Customer */
+            customer: string;
+            /**
+             * Product
+             * @description What is supplied.
+             */
+            product: string;
+            /**
+             * Customer Share
+             * @description Share of the supplier's revenue this customer is.
+             */
+            customer_share?: number | null;
+        };
+        /** SupplyNode */
+        SupplyNode: {
+            /** Symbol */
+            symbol: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Weight
+             * @description Share of the portfolio held in it, directly or through funds.
+             */
+            weight: number;
+            /** Held */
+            held: boolean;
+            /**
+             * Direct Weight
+             * @description The part of the weight held directly; the rest is through funds.
+             * @default 0
+             */
+            direct_weight: number;
+            /**
+             * Level
+             * @description 0 for a company that only supplies; one more per step downstream.
+             */
+            level: number;
+        };
         /** SurpriseFormulaOut */
         SurpriseFormulaOut: {
             /** Surprise */
@@ -21122,6 +29666,28 @@ export interface components {
              * @default 0.02
              */
             band: number;
+        };
+        /** TargetProgress */
+        TargetProgress: {
+            /**
+             * Subject Kind
+             * @enum {string}
+             */
+            subject_kind: "security" | "etf" | "corporate_action" | "cash_flow_window";
+            /** Target */
+            target: number;
+            /**
+             * Audited
+             * @description Subjects with at least one fact compared.
+             */
+            audited: number;
+            /**
+             * Clean
+             * @description Subjects whose newest result is a match for every fact.
+             */
+            clean: number;
+            /** With Mismatch */
+            with_mismatch: number;
         };
         /** TestAlertRequest */
         TestAlertRequest: {
@@ -21159,6 +29725,149 @@ export interface components {
             /** Alerts */
             alerts: components["schemas"]["AlertOut"][];
         };
+        /** ThemeDefinition */
+        ThemeDefinition: {
+            /** Name */
+            name: string;
+            /** Selectors */
+            selectors: components["schemas"]["ThemeSelector"][];
+            /** Note */
+            note?: string | null;
+        };
+        /** ThemeExposure */
+        ThemeExposure: {
+            /** Method Version */
+            method_version: string;
+            theme: components["schemas"]["ThemeDefinition"];
+            /**
+             * Exposed Weight
+             * @description Known exposure, share of total portfolio value.
+             */
+            exposed_weight: number;
+            /** Direct Weight */
+            direct_weight: number;
+            /** Fund Weight */
+            fund_weight: number;
+            unknown: components["schemas"]["ThemeUnknown"];
+            /**
+             * Upper Bound
+             * @description Known plus unknown: the most the theme could reach.
+             */
+            upper_bound: number;
+            /**
+             * Inferred Share
+             * @description Share of the known exposure resting on inferred labels.
+             */
+            inferred_share: number;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /** Confidence Reason */
+            confidence_reason: string;
+            /** Issuers */
+            issuers: components["schemas"]["ThemeIssuer"][];
+            /**
+             * By Selector
+             * @description Exposed weight per selector on its own (these overlap and do not add up).
+             */
+            by_selector: {
+                [key: string]: number;
+            };
+            /** Equity Weight */
+            equity_weight: number;
+            /** Warnings */
+            warnings: string[];
+            /** Method */
+            method: string;
+        };
+        /** ThemeIssuer */
+        ThemeIssuer: {
+            /** Issuer */
+            issuer: string;
+            /** Exposed */
+            exposed: number;
+            /** Direct */
+            direct: number;
+            /** Via Funds */
+            via_funds: number;
+            /** Paths */
+            paths: components["schemas"]["ThemePath"][];
+        };
+        /** ThemeOption */
+        ThemeOption: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+        };
+        /** ThemeOptions */
+        ThemeOptions: {
+            /** Options */
+            options: {
+                [key: string]: components["schemas"]["ThemeOption"][];
+            };
+        };
+        /** ThemePath */
+        ThemePath: {
+            /**
+             * Channel
+             * @description 'Direct holdings' or the fund the exposure comes through.
+             */
+            channel: string;
+            /** Channel Kind */
+            channel_kind: string;
+            /** Issuer */
+            issuer: string;
+            /**
+             * Weight
+             * @description Leaf weight, share of total portfolio value.
+             */
+            weight: number;
+            /**
+             * Exposed
+             * @description Weight counted as exposed (leaf weight x exposed share).
+             */
+            exposed: number;
+            /**
+             * Selectors
+             * @description Every selector that matched, with its label basis.
+             */
+            selectors: string[];
+            /**
+             * Basis
+             * @description Weakest label basis among the matching selectors.
+             */
+            basis: string;
+        };
+        /** ThemeSelector */
+        ThemeSelector: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "sector" | "industry" | "country" | "domicile" | "listing" | "currency" | "revenue_country" | "commodity" | "trade_product" | "issuer";
+            /**
+             * Value
+             * @description Sector name, ISO code, issuer key…
+             */
+            value: string;
+        };
+        /** ThemeUnknown */
+        ThemeUnknown: {
+            /** Weight */
+            weight: number;
+            /**
+             * Reasons
+             * @description Reason -> unknown weight.
+             */
+            reasons: {
+                [key: string]: number;
+            };
+        };
         /**
          * ThesesConfig
          * @description All theses. Stored as the body of `config_version` rows, domain `theses`.
@@ -21185,6 +29894,28 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["ThesesConfig"];
+        };
+        /**
+         * ThesisBaseRate
+         * @description How often companies of this size and sector have achieved the growth the price assumes.
+         */
+        ThesisBaseRate: {
+            /**
+             * Share Achieved
+             * @description Share of comparable companies that reached that growth (0-1).
+             */
+            share_achieved: number;
+            /**
+             * Comparison
+             * @description Which companies, which period and which growth were compared.
+             * @example US software, 5-10 bn revenue, 10-year CAGR above 12%
+             */
+            comparison: string;
+            /**
+             * Source
+             * @description Where the figure comes from.
+             */
+            source: string;
         };
         /** ThesisBoard */
         ThesisBoard: {
@@ -21255,6 +29986,65 @@ export interface components {
             /** Review Date */
             review_date?: string | null;
             price_target?: components["schemas"]["ThesisPriceTarget"] | null;
+            /**
+             * Implied Growth
+             * @description Yearly growth the current price implies (reverse DCF), as a fraction; filled from the valuation workbench when available, otherwise entered by the owner.
+             */
+            implied_growth?: number | null;
+            base_rate?: components["schemas"]["ThesisBaseRate"] | null;
+            /**
+             * Pre Mortem
+             * @description The likeliest reasons the stock loses 40%, in plain words.
+             */
+            pre_mortem?: string[];
+            variant_perception?: components["schemas"]["ThesisVariantPerception"] | null;
+            /** Conviction */
+            conviction?: number | null;
+            /** Main Reason */
+            main_reason?: ("quality" | "value" | "catalyst" | "momentum" | "other") | null;
+        };
+        /** ThesisDraft */
+        ThesisDraft: {
+            /** Ticker */
+            ticker: string;
+            /** Model */
+            model: string | null;
+            why_owned: components["schemas"]["ThesisDraftLine"] | null;
+            /** Exit Conditions */
+            exit_conditions: components["schemas"]["ThesisDraftLine"][];
+            /** Pre Mortem */
+            pre_mortem: components["schemas"]["ThesisDraftLine"][];
+            variant_perception: components["schemas"]["ThesisDraftVariant"] | null;
+            /** Facts Used */
+            facts_used: number;
+            /**
+             * Dropped
+             * @description Lines removed because they named no fact in the list.
+             */
+            dropped: number;
+            /** Left To Owner */
+            left_to_owner: string[];
+            /** Notes */
+            notes: string[];
+        };
+        /** ThesisDraftLine */
+        ThesisDraftLine: {
+            /** Text */
+            text: string;
+            /**
+             * Facts
+             * @description The facts the line rests on, quoted as given.
+             */
+            facts: string[];
+        };
+        /** ThesisDraftVariant */
+        ThesisDraftVariant: {
+            /** Belief */
+            belief: string;
+            /** Disproof */
+            disproof: string;
+            /** Facts */
+            facts: string[];
         };
         /**
          * ThesisKPI
@@ -21304,6 +30094,21 @@ export interface components {
              */
             description: string;
         };
+        /** ThesisPrefill */
+        ThesisPrefill: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Implied Growth
+             * @description Yearly growth the current price implies (a fraction), from the reverse DCF at the valuation tab's base scenario; null when it cannot be worked out.
+             */
+            implied_growth: number | null;
+            /**
+             * Reason
+             * @description Why there is no figure, when there is none.
+             */
+            reason: string | null;
+        };
         /**
          * ThesisPriceTarget
          * @description The price levels the thesis's valuation sets, checked after each sync against the
@@ -21323,8 +30128,13 @@ export interface components {
              */
             buy_target?: number | null;
             /**
+             * Bear Case
+             * @description Price the stock would fall to if the thesis fails, in the same currency. The pre-trade asymmetry check and the scorecard's risk section read it.
+             */
+            bear_case?: number | null;
+            /**
              * Currency
-             * @description Currency of both targets, as Trading212 quotes the instrument (GBX for pence).
+             * @description Currency of all the prices, as Trading212 quotes it (GBX for pence).
              * @example CZK
              */
             currency: string;
@@ -21342,6 +30152,19 @@ export interface components {
              */
             set_on: string;
         };
+        /**
+         * ThesisVariantPerception
+         * @description What the owner believes that the market does not, and what would prove it wrong.
+         */
+        ThesisVariantPerception: {
+            /** Belief */
+            belief: string;
+            /**
+             * Disproof
+             * @description The evidence that would show the belief is wrong.
+             */
+            disproof: string;
+        };
         /** ThesisVerdictsRequest */
         ThesisVerdictsRequest: {
             /**
@@ -21349,6 +30172,19 @@ export interface components {
              * @description One holding, or all when null.
              */
             ticker?: string | null;
+        };
+        /** TimelineMonth */
+        TimelineMonth: {
+            /** Month */
+            month: string;
+            /** Deposits */
+            deposits: number;
+            /** Withdrawals */
+            withdrawals: number;
+            /** Dividends */
+            dividends: number;
+            /** Fees */
+            fees: number;
         };
         /** TopHolder */
         TopHolder: {
@@ -21406,6 +30242,55 @@ export interface components {
             cik: string;
             /** Name */
             name: string;
+        };
+        /** Trade */
+        Trade: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "buy" | "sell" | "hold";
+            /** Value Now */
+            value_now: number;
+            /** Weight Now */
+            weight_now: number;
+            /** Target Weight */
+            target_weight: number | null;
+            /** Lower */
+            lower: number | null;
+            /** Upper */
+            upper: number | null;
+            /** Status Now */
+            status_now: string;
+            /** Value After */
+            value_after: number;
+            /** Weight After */
+            weight_after: number;
+            /**
+             * Trade Value
+             * @description Signed: positive buys, negative sells (base currency).
+             */
+            trade_value: number;
+            /**
+             * Estimated Units
+             * @description Units at the last price (null without a stored quantity).
+             */
+            estimated_units: number | null;
+            /** Cost */
+            cost: number;
+            /**
+             * Funded
+             * @description Share of the wanted buy that the cash funds, 0 to 1.
+             */
+            funded: number;
+            /** Held */
+            held: boolean;
+            /** Reason */
+            reason: string;
         };
         /** TradeContext */
         TradeContext: {
@@ -21469,6 +30354,26 @@ export interface components {
             notice: string;
             /** Gap */
             gap?: string | null;
+        };
+        /** TradeLeg */
+        TradeLeg: {
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "buy" | "sell";
+            /** Ticker */
+            ticker: string;
+            /**
+             * Value Base
+             * @description Size of the trade in the base currency.
+             */
+            value_base: number;
+            /**
+             * Bear Case Price
+             * @description Buys only: the price you expect in the bear case, in the quote currency. Overrides the thesis's bear case for the asymmetry gate.
+             */
+            bear_case_price?: number | null;
         };
         /** TradeRow */
         TradeRow: {
@@ -21755,6 +30660,50 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** UnmatchedOut */
+        UnmatchedOut: {
+            /** Sale Id */
+            sale_id: string;
+            /** Ticker */
+            ticker: string;
+            /**
+             * Sold On
+             * Format: date
+             */
+            sold_on: string;
+            /** Quantity */
+            quantity: number;
+            /** Reason */
+            reason: string;
+        };
+        /** Unshocked */
+        Unshocked: {
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+            /** Reason */
+            reason: string;
+        };
+        /** UpcomingEvent */
+        UpcomingEvent: {
+            /** Kind */
+            kind: string;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Detail */
+            detail: string;
+            /** Source */
+            source?: string | null;
+        };
+        /** UsageIn */
+        UsageIn: {
+            /** Path */
+            path: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -21948,6 +30897,16 @@ export interface components {
              * @default false
              */
             force: boolean;
+        };
+        /** ValuationRequest */
+        ValuationRequest: {
+            /** Scenarios */
+            scenarios?: components["schemas"]["Assumptions"][];
+            /**
+             * Selected
+             * @description Scenario the margin of safety is measured against.
+             */
+            selected?: string | null;
         };
         /**
          * ValuationSettings
@@ -22215,6 +31174,69 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** WhatIfCase */
+        WhatIfCase: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "new_security" | "contribution" | "withdrawal" | "reinvest_dividends" | "fx_move" | "benchmark_change" | "thesis_exit";
+            /** Ticker */
+            ticker?: string | null;
+            /**
+             * Weight
+             * @description New security: share of total.
+             */
+            weight?: number | null;
+            /**
+             * Fund From
+             * @default cash
+             * @enum {string}
+             */
+            fund_from: "cash" | "pro_rata";
+            /**
+             * Amount
+             * @description Base currency, for a deposit, withdrawal or dividends.
+             */
+            amount?: number | null;
+            /**
+             * Split
+             * @description Ticker -> share of the amount (adds to at most 1); empty keeps a deposit in cash and spreads dividends over the current weights.
+             */
+            split?: {
+                [key: string]: number;
+            };
+            /** Currency */
+            currency?: string | null;
+            /**
+             * Move
+             * @description FX move against base.
+             */
+            move?: number | null;
+            /** Benchmark Symbol */
+            benchmark_symbol?: string | null;
+            /** Name */
+            name?: string | null;
+        };
+        /** WhatIfResult */
+        WhatIfResult: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "new_security" | "contribution" | "withdrawal" | "reinvest_dividends" | "fx_move" | "benchmark_change" | "thesis_exit";
+            /** Summary */
+            summary: string[];
+            proposal: components["schemas"]["XrayProposal"] | null;
+            shock: components["schemas"]["ShockScenarioResult"] | null;
+            risk: components["schemas"]["RiskReport"] | null;
+            risk_current: components["schemas"]["RiskReport"] | null;
+            pretrade: components["schemas"]["PretradeResult"] | null;
+            /** Assumptions */
+            assumptions: string[];
+            /** Notes */
+            notes: string[];
+        };
         /** WikidataSummary */
         WikidataSummary: {
             /** Qid */
@@ -22239,6 +31261,40 @@ export interface components {
              * Format: date-time
              */
             fetched_at: string;
+        };
+        /** WindowOut */
+        WindowOut: {
+            /** Label */
+            label: string;
+            /** Start */
+            start: string | null;
+            /** End */
+            end: string | null;
+            /** Calendar Days */
+            calendar_days: number | null;
+            /** Observations */
+            observations: number;
+            /** Start Value */
+            start_value: number | null;
+            /** End Value */
+            end_value: number | null;
+            /** Net Flows */
+            net_flows: number;
+            /** Gain */
+            gain: number | null;
+            twr: components["schemas"]["Figure"];
+            /** Twr Annualized */
+            twr_annualized: number | null;
+            xirr: components["schemas"]["Figure"];
+            /**
+             * Xirr Annualized
+             * @description False when the window is under a year: `xirr` is then the money-weighted return over the window itself, not an annual rate.
+             * @default true
+             */
+            xirr_annualized: boolean;
+            /** Reason */
+            reason: string | null;
+            benchmark: components["schemas"]["BenchmarkOut"] | null;
         };
         /** WorldBankIndicator */
         WorldBankIndicator: {
@@ -22294,6 +31350,698 @@ export interface components {
              * @default 40
              */
             max_document_mb: number;
+        };
+        /** XrayActive */
+        XrayActive: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Portfolio Weight
+             * @description Share of the portfolio's identified equity.
+             */
+            portfolio_weight: number;
+            /** Benchmark Weight */
+            benchmark_weight: number;
+            /**
+             * Active
+             * @description Portfolio weight minus benchmark weight.
+             */
+            active: number;
+        };
+        /** XrayBenchmark */
+        XrayBenchmark: {
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Label */
+            label: string | null;
+            /** Symbol */
+            symbol: string | null;
+            /** Proxy Fund */
+            proxy_fund: string | null;
+            /** Proxy Isin */
+            proxy_isin: string | null;
+            /** As Of */
+            as_of: string | null;
+            /** Age Days */
+            age_days: number | null;
+            /** Definition */
+            definition: string;
+            /** Dimensions */
+            dimensions: components["schemas"]["XrayBenchmarkDim"][];
+            /**
+             * Overlap
+             * @description Sum of the smaller weight per shared issuer, portfolio equity against benchmark.
+             */
+            overlap: number | null;
+            /**
+             * Portfolio Only
+             * @description Portfolio issuers absent from the proxy, as a share of portfolio equity.
+             */
+            portfolio_only: components["schemas"]["XrayMissing"][];
+            /** Portfolio Only Weight */
+            portfolio_only_weight: number;
+            /**
+             * Benchmark Only
+             * @description Proxy constituents the portfolio does not hold, as a share of the proxy.
+             */
+            benchmark_only: components["schemas"]["XrayMissing"][];
+            /** Benchmark Only Weight */
+            benchmark_only_weight: number;
+            /**
+             * Proxy Rows Weight
+             * @description The proxy's published rows as a share of its net assets.
+             */
+            proxy_rows_weight: number | null;
+            /**
+             * Proxy Unidentified Weight
+             * @description Proxy equity with neither ISIN nor name: cannot be matched to an issuer.
+             */
+            proxy_unidentified_weight: number;
+            /**
+             * Equity Weight
+             * @description Portfolio equity as a share of total value.
+             */
+            equity_weight: number;
+            /**
+             * Outside Weight
+             * @description Portfolio weight outside the comparison: cash, other assets, unknown.
+             */
+            outside_weight: number;
+            /** Notes */
+            notes: string[];
+        };
+        /** XrayBenchmarkDim */
+        XrayBenchmarkDim: {
+            /**
+             * Dimension
+             * @enum {string}
+             */
+            dimension: "sector" | "country" | "currency" | "issuer";
+            /** Like For Like */
+            like_for_like: boolean;
+            /**
+             * Reason
+             * @description Why the comparison is withheld, when it is.
+             */
+            reason: string | null;
+            /** Lines */
+            lines: components["schemas"]["XrayActive"][];
+            /**
+             * Portfolio Unlabelled
+             * @description Share of the portfolio's equity with no label here.
+             */
+            portfolio_unlabelled: number;
+            /** Benchmark Unlabelled */
+            benchmark_unlabelled: number;
+            /** Notes */
+            notes: string[];
+        };
+        /** XrayBucket */
+        XrayBucket: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "classified" | "cash" | "fund_cash" | "not_looked_through" | "unknown_fund" | "unclassified" | "other";
+            /** Weight */
+            weight: number;
+            /** Value Base */
+            value_base: number;
+            /** Direct Weight */
+            direct_weight: number;
+            /** Fund Weight */
+            fund_weight: number;
+            /** Contributors */
+            contributors: components["schemas"]["XrayContributor"][];
+            /**
+             * Basis
+             * @description Weight in this bucket by how it was classified: reported, inferred, owner.
+             */
+            basis: {
+                [key: string]: number;
+            };
+        };
+        /** XrayCandidate */
+        XrayCandidate: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /** Isin */
+            isin: string | null;
+            /** Asset Type */
+            asset_type: string | null;
+            /** Country */
+            country: string | null;
+            /** Currency */
+            currency: string | null;
+            /** Source */
+            source: string;
+            /** List Name */
+            list_name?: string | null;
+            /** Held */
+            held: boolean;
+            /** Looked Through */
+            looked_through: boolean | null;
+        };
+        /** XrayCandidates */
+        XrayCandidates: {
+            /** Items */
+            items: components["schemas"]["XrayCandidate"][];
+        };
+        /** XrayConcentration */
+        XrayConcentration: {
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "security" | "issuer" | "sector" | "country" | "fund";
+            /** Label */
+            label: string;
+            /** Basis */
+            basis: string;
+            /** Items */
+            items: number;
+            /**
+             * Known Weight
+             * @description Identified weight at this level.
+             */
+            known_weight: number;
+            /**
+             * Unknown Weight
+             * @description Unknown fund weight; outside the HHI, never redistributed.
+             */
+            unknown_weight: number;
+            /**
+             * Unclassified Weight
+             * @description Equity at this level with no label; outside the HHI.
+             */
+            unclassified_weight: number;
+            /** Top Items */
+            top_items: components["schemas"]["XrayItem"][];
+            largest: components["schemas"]["XrayItem"] | null;
+            /** Top10 Weight */
+            top10_weight: number | null;
+            /** Top10 Of Known */
+            top10_of_known: number | null;
+            /** Hhi */
+            hhi: number | null;
+            /** Effective N */
+            effective_n: number | null;
+            /** Overweights */
+            overweights?: components["schemas"]["XrayActive"][] | null;
+            /** Underweights */
+            underweights?: components["schemas"]["XrayActive"][] | null;
+            /** Active Note */
+            active_note?: string | null;
+            /** Warnings */
+            warnings: string[];
+        };
+        /** XrayConcentrationResponse */
+        XrayConcentrationResponse: {
+            /** As Of */
+            as_of: string;
+            /** Levels */
+            levels: components["schemas"]["XrayConcentration"][];
+            single_issuer: components["schemas"]["XrayItem"] | null;
+            /** Benchmark Label */
+            benchmark_label: string | null;
+            /** Benchmark Note */
+            benchmark_note: string | null;
+            /** Notes */
+            notes: string[];
+        };
+        /** XrayContributor */
+        XrayContributor: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Weight
+             * @description Share of total portfolio value.
+             */
+            weight: number;
+            /** Share Of Bucket */
+            share_of_bucket: number | null;
+        };
+        /** XrayDeltaRow */
+        XrayDeltaRow: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Kind */
+            kind: string;
+            /** Before */
+            before: number;
+            /** After */
+            after: number;
+            /** Delta */
+            delta: number;
+        };
+        /** XrayDeltaView */
+        XrayDeltaView: {
+            /** Dimension */
+            dimension: string;
+            /** Label */
+            label: string;
+            /** Rows */
+            rows: components["schemas"]["XrayDeltaRow"][];
+            /** Reconciles Before */
+            reconciles_before: boolean;
+            /** Reconciles After */
+            reconciles_after: boolean;
+        };
+        /** XrayDrop */
+        XrayDrop: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Before */
+            before: number;
+            /** After */
+            after: number;
+        };
+        /** XrayExclusion */
+        XrayExclusion: {
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+            /** Reason */
+            reason: string;
+        };
+        /** XrayFeeLine */
+        XrayFeeLine: {
+            /** Isin */
+            isin: string;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+            /** Expense Ratio */
+            expense_ratio: number | null;
+            /**
+             * Annual Drag
+             * @description weight x ongoing charge, share of portfolio a year.
+             */
+            annual_drag: number | null;
+        };
+        /** XrayFees */
+        XrayFees: {
+            /** Annual Drag */
+            annual_drag: number;
+            /** Annual Cost Base */
+            annual_cost_base: number;
+            /** Weighted Expense Ratio */
+            weighted_expense_ratio: number | null;
+            /** Funds With Ratio */
+            funds_with_ratio: number;
+            /** Funds Without Ratio */
+            funds_without_ratio: string[];
+            /** Unpriced Weight */
+            unpriced_weight: number;
+            /** Lines */
+            lines: components["schemas"]["XrayFeeLine"][];
+            /** Note */
+            note: string;
+        };
+        /** XrayFundamentals */
+        XrayFundamentals: {
+            /** Equity Weight */
+            equity_weight: number;
+            /** Covered Weight */
+            covered_weight: number;
+            /** Scored Issuers */
+            scored_issuers: number;
+            /** Financials Weight */
+            financials_weight: number;
+            /** Unknown Weight */
+            unknown_weight: number;
+            /** Metrics */
+            metrics: components["schemas"]["XrayMetric"][];
+            fees: components["schemas"]["XrayFees"] | null;
+            /** Notes */
+            notes: string[];
+        };
+        /** XrayHolding */
+        XrayHolding: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Weight
+             * @description Share of total portfolio value.
+             */
+            weight: number;
+            /** Is Fund */
+            is_fund: boolean;
+            /**
+             * Looked Through
+             * @description For a fund: whether its holdings are stored. None for a stock.
+             */
+            looked_through: boolean | null;
+        };
+        /** XrayIntersection */
+        XrayIntersection: {
+            /** As Of */
+            as_of: string;
+            /** Total Value */
+            total_value: number;
+            /** Issuer Count */
+            issuer_count: number;
+            /**
+             * Shared Count
+             * @description Issuers reached through two or more channels.
+             */
+            shared_count: number;
+            /**
+             * Shared Weight
+             * @description Combined weight of those issuers.
+             */
+            shared_weight: number;
+            /**
+             * Redundant Weight
+             * @description Exposure to shared issuers beyond the largest single channel.
+             */
+            redundant_weight: number;
+            /** Issuers */
+            issuers: components["schemas"]["IssuerExposure"][];
+            /** Funds */
+            funds: components["schemas"]["FundAsOf"][];
+            unknown: components["schemas"]["Unknown"] | null;
+            /** Removal */
+            removal: components["schemas"]["XrayRemoval"][];
+            /** Notes */
+            notes: string[];
+        };
+        /** XrayItem */
+        XrayItem: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Weight
+             * @description Share of total portfolio value.
+             */
+            weight: number;
+            /** Share Of Known */
+            share_of_known: number;
+        };
+        /** XrayMetric */
+        XrayMetric: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | null;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "fraction" | "multiple";
+            /**
+             * Covered Weight
+             * @description Share of total portfolio value the figure covers.
+             */
+            covered_weight: number;
+            /**
+             * Coverage
+             * @description Covered weight over identified equity weight.
+             */
+            coverage: number | null;
+            /** Excluded */
+            excluded: components["schemas"]["XrayExclusion"][];
+            /** Excluded Count */
+            excluded_count: number;
+            /** Formula */
+            formula: string;
+            /**
+             * Thin
+             * @description Covers under half of the equity weight: indicative only.
+             */
+            thin: boolean;
+            /**
+             * Reason
+             * @description Why there is no figure, when there is none.
+             */
+            reason: string | null;
+        };
+        /** XrayMissing */
+        XrayMissing: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Weight */
+            weight: number;
+        };
+        /** XrayPositionChange */
+        XrayPositionChange: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "held" | "added";
+            /** Before */
+            before: number;
+            /** After */
+            after: number;
+            /** Delta */
+            delta: number;
+            /**
+             * Looked Through
+             * @description For a fund: whether its holdings are stored. None for a stock.
+             */
+            looked_through: boolean | null;
+        };
+        /** XrayProposal */
+        XrayProposal: {
+            /** Base Currency */
+            base_currency: string;
+            /** As Of */
+            as_of: string;
+            /**
+             * Saved Holdings Changed
+             * @description Always false: the proposal is applied to a copy.
+             * @default false
+             */
+            saved_holdings_changed: boolean;
+            before: components["schemas"]["XraySide"];
+            after: components["schemas"]["XraySide"];
+            /** Positions */
+            positions: components["schemas"]["XrayPositionChange"][];
+            /** Views */
+            views: components["schemas"]["XrayDeltaView"][];
+            /** Issuers */
+            issuers: components["schemas"]["XrayDeltaRow"][];
+            /**
+             * Coverage
+             * @description Where the two sides differ in how much is known.
+             */
+            coverage: string[];
+            /** Notes */
+            notes: string[];
+        };
+        /** XrayRemoval */
+        XrayRemoval: {
+            /** Isin */
+            isin: string;
+            /** Label */
+            label: string;
+            /**
+             * Weight
+             * @description The fund's share of total portfolio value.
+             */
+            weight: number;
+            /** Issuers Touched */
+            issuers_touched: number;
+            /**
+             * Unknown Removed
+             * @description Unknown weight that leaves with the fund.
+             */
+            unknown_removed: number;
+            /** Hhi Before */
+            hhi_before: number | null;
+            /** Hhi After */
+            hhi_after: number | null;
+            /** Effective Before */
+            effective_before: number | null;
+            /** Effective After */
+            effective_after: number | null;
+            /** Top10 Before */
+            top10_before: number | null;
+            /** Top10 After */
+            top10_after: number | null;
+            largest_before: components["schemas"]["XrayDrop"] | null;
+            largest_after: components["schemas"]["XrayDrop"] | null;
+            /** Biggest Drops */
+            biggest_drops: components["schemas"]["XrayDrop"][];
+            /**
+             * Shared After
+             * @description Issuers still reached through two or more channels.
+             */
+            shared_after: number;
+        };
+        /** XrayResponse */
+        XrayResponse: {
+            /** As Of */
+            as_of: string;
+            /** Snapshot Date */
+            snapshot_date: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Total Value */
+            total_value: number;
+            /** Available */
+            available: boolean;
+            /** Holdings */
+            holdings: components["schemas"]["XrayHolding"][];
+            /** Cash Weight */
+            cash_weight: number;
+            /** Views */
+            views: components["schemas"]["XrayView"][];
+            /** Funds */
+            funds: components["schemas"]["FundAsOf"][];
+            /** Stale Funds */
+            stale_funds: string[];
+            unknown: components["schemas"]["Unknown"] | null;
+            fees: components["schemas"]["XrayFees"] | null;
+            /** Scored Issuers */
+            scored_issuers: number;
+            /** Issuers Total */
+            issuers_total: number;
+            /** Method */
+            method: string;
+            /** Notes */
+            notes: string[];
+        };
+        /** XraySaveScenarioRequest */
+        XraySaveScenarioRequest: {
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            scenario: components["schemas"]["ProposedRequest"];
+        };
+        /** XraySavedScenario */
+        XraySavedScenario: {
+            item: components["schemas"]["SavedAnalysisItem"];
+            scenario: components["schemas"]["ProposedRequest"];
+        };
+        /** XraySide */
+        XraySide: {
+            /** Total Value */
+            total_value: number;
+            /** Cash Weight */
+            cash_weight: number;
+            /** Equity Weight */
+            equity_weight: number;
+            /** Unknown Weight */
+            unknown_weight: number;
+            /** Not Looked Through Weight */
+            not_looked_through_weight: number;
+            /** Issuer Count */
+            issuer_count: number;
+            /** Shared Issuers */
+            shared_issuers: number;
+            /**
+             * Redundant Weight
+             * @description Exposure to issuers reached through 2+ channels beyond the largest channel.
+             */
+            redundant_weight: number;
+            /** Largest Issuer */
+            largest_issuer: string | null;
+            /** Largest Issuer Weight */
+            largest_issuer_weight: number | null;
+            /** Hhi */
+            hhi: number | null;
+            /** Effective Issuers */
+            effective_issuers: number | null;
+            /** Top10 Weight */
+            top10_weight: number | null;
+            /** Fee Drag */
+            fee_drag: number | null;
+            /** Fee Cost */
+            fee_cost: number | null;
+            /** Funds Without Ratio */
+            funds_without_ratio: string[];
+            /** Earnings Yield */
+            earnings_yield: number | null;
+            /** Earnings Yield Coverage */
+            earnings_yield_coverage: number | null;
+            /** Dividend Yield */
+            dividend_yield: number | null;
+            /** Dividend Yield Coverage */
+            dividend_yield_coverage: number | null;
+        };
+        /** XrayView */
+        XrayView: {
+            /**
+             * Dimension
+             * @enum {string}
+             */
+            dimension: "asset_class" | "sector" | "industry" | "country" | "domicile" | "listing" | "region" | "currency" | "issuer" | "fund" | "style" | "size" | "fees" | "revenue_country" | "commodity" | "trade_product";
+            /** Label */
+            label: string;
+            /** Group */
+            group: string;
+            /** Description */
+            description: string;
+            /** Buckets */
+            buckets: components["schemas"]["XrayBucket"][];
+            /** Total Weight */
+            total_weight: number;
+            /**
+             * Reconciles
+             * @description Buckets add up to the whole portfolio within tolerance.
+             */
+            reconciles: boolean;
+            /**
+             * Classified Weight
+             * @description Weight in buckets that carry a real label.
+             */
+            classified_weight: number;
+            /** Equity Weight */
+            equity_weight: number;
+            /**
+             * Bases
+             * @description Classified weight by basis across the view.
+             */
+            bases: {
+                [key: string]: number;
+            };
+            /**
+             * Country Kinds
+             * @description Country view only: weight by what kind of country it is.
+             */
+            country_kinds?: {
+                [key: string]: number;
+            } | null;
+            /**
+             * Mixed Basis
+             * @default false
+             */
+            mixed_basis: boolean;
+            /** Warnings */
+            warnings: string[];
         };
         /** StakeChangeOut */
         api__disclosure_routes__StakeChangeOut: {
@@ -22352,6 +32100,24 @@ export interface components {
             /** Reason */
             reason: string | null;
         };
+        /** Check */
+        steward__discovery__engine__Check: {
+            /** Metric */
+            metric: string;
+            /** Op */
+            op: string;
+            /** Threshold */
+            threshold: number | string | string[];
+            /** Actual */
+            actual: number | string | null;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "pass" | "fail" | "unknown";
+            /** Reason */
+            reason?: string | null;
+        };
         /** StakeChangeOut */
         steward__ownership__control_stakes_read__StakeChangeOut: {
             /** Change Type */
@@ -22364,6 +32130,27 @@ export interface components {
             new_value: string | null;
             /** Detail */
             detail: string | null;
+        };
+        /** Check */
+        steward__quality__cockpit__Check: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            /** Title */
+            title: string;
+            /** Ran */
+            ran: boolean;
+            /** Denominator */
+            denominator: string;
+            /**
+             * Issues
+             * @default 0
+             */
+            issues: number;
+            /** Note */
+            note?: string | null;
         };
     };
     responses: never;
@@ -22497,7 +32284,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance";
             };
             cookie?: never;
         };
@@ -22529,7 +32316,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance";
                 version_id: number;
             };
             cookie?: never;
@@ -22565,7 +32352,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance";
             };
             cookie?: never;
         };
@@ -22600,7 +32387,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Config domain, as in /config/<domain>. */
-                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts";
+                domain: "strategy" | "theses" | "jobs" | "holding-profiles" | "verification" | "news-sources" | "event-rules" | "notifications" | "budget" | "research-profiles" | "prompts" | "performance";
                 version_id: number;
             };
             cookie?: never;
@@ -28378,6 +38165,2029 @@ export interface operations {
             };
         };
     };
+    catalogue: {
+        parameters: {
+            query?: {
+                kind?: "stock" | "fund";
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogueResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discover_stocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveryResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discover_funds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FundRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveryResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_csv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    peer_baselines: {
+        parameters: {
+            query?: {
+                scope?: "home_market" | "global" | "saved_set";
+                country?: string | null;
+                /** @description Comma-separated tickers for saved_set. */
+                tickers?: string | null;
+                /** @description Use the confirmed peers of this ticker as the saved set. */
+                peers_of?: string | null;
+                /** @description Comma-separated metric ids. */
+                metrics?: string;
+                basis?: ("US_GAAP" | "IFRS") | null;
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Baseline"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    freeze_universe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotCreated"];
+                };
+            };
+        };
+    };
+    backtest_screen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BacktestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_screens: {
+        parameters: {
+            query?: {
+                kind?: ("stock" | "fund") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_screen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    screen_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_screen_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_screen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_saved_screen: {
+        parameters: {
+            query?: {
+                version?: number | null;
+                as_of?: string | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveryResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_column_sets: {
+        parameters: {
+            query?: {
+                kind?: ("stock" | "fund") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColumnSet"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_column_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ColumnSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColumnSet"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_column_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                set_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Overview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_statements: {
+        parameters: {
+            query?: {
+                basis?: "standardized" | "reported";
+                frequency?: "annual" | "quarterly";
+                view?: "restated" | "original";
+                units?: "1" | "1000" | "1000000";
+                transform?: "none" | "common_size" | "yoy";
+                per_share?: boolean;
+                /** @description Point-in-time cutoff on the filing date. */
+                known_by?: string | null;
+                /** @description Show the figures in this base currency at stated reference rates; omit for the filed currency. */
+                currency?: string | null;
+                fx_rates?: "period_end" | "average";
+                fx_source?: "ecb" | "cnb";
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_statements_csv: {
+        parameters: {
+            query?: {
+                basis?: "standardized" | "reported";
+                frequency?: "annual" | "quarterly";
+                view?: "restated" | "original";
+                units?: "1" | "1000" | "1000000";
+                currency?: string | null;
+                fx_rates?: "period_end" | "average";
+                fx_source?: "ecb" | "cnb";
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ratios: {
+        parameters: {
+            query?: {
+                peers?: "none" | "confirmed" | "group" | "home_market" | "global";
+                group_id?: number | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RatiosView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_thesis_prefill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThesisPrefill"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_thesis_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThesisDraft"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_segments: {
+        parameters: {
+            query?: {
+                basis?: "annual" | "quarter";
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentAnalysis"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_segment_map: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MapIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentAnalysis"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_assessment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rubric"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_report_versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportVersionSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_peer_compare: {
+        parameters: {
+            query?: {
+                scope?: "confirmed" | "group" | "home_market" | "global";
+                group_id?: number | null;
+                /** @description Comma-separated ratio ids. */
+                metrics?: string | null;
+                index_metric?: "revenue" | "operating_income" | "net_income" | "fcf";
+                years?: number;
+                /** @description Convert size figures and the index chart to this currency; omit for native currencies. */
+                base_currency?: string | null;
+                fx_rates?: "period_end" | "average";
+                fx_source?: "ecb" | "cnb";
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeerCompare"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_peer_groups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeerGroup"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_peer_group: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeerGroupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeerGroup"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_peer_group: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+                group_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    valuation_defaults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Assumptions"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_valuation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValuationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyValuation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_saved_scenarios: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedScenario"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_scenarios: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveScenarioIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedScenario"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_estimates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Estimates"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_network: {
+        parameters: {
+            query?: {
+                /** @description Mark rows first seen on or after this date. */
+                since?: string | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Network"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_capital_allocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapitalAllocation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_governance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Governance"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_case: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseWithObserved"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_case_item: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseItemIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_case_item: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseItemIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_case: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticker: string;
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_catalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogRow"][];
+                };
+            };
+        };
+    };
+    compare_funds: {
+        parameters: {
+            query: {
+                /** @description Two to five fund ISINs, comma-separated. */
+                isins: string;
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FundComparison"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_profile: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FundProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_holdings: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+                top?: number;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HoldingsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_holdings_csv: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_style: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StyleView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_performance: {
+        parameters: {
+            query?: {
+                /** @description The exchange listing to use; default is the first with prices. */
+                ticker?: string | null;
+                /** @description A benchmark symbol from the options in the response. */
+                benchmark?: string | null;
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerformanceView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_bond: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BondView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_checklist: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Checklist"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_facts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: components["schemas"]["Fact"];
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_fund_fact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Fact"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_fact_history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Fact"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fund_nav: {
+        parameters: {
+            query?: {
+                /** @description Answer as of this date, using only data fetched by then. */
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NavPoint"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_fund_nav: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                isin: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NavIn"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": number;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saved_comparisons: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedComparison"][];
+                };
+            };
+        };
+    };
+    create_saved_comparison: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedComparisonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedComparison"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_saved_comparison: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comparison_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     run_insider_trades: {
         parameters: {
             query?: never;
@@ -28917,6 +40727,2197 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CharacteristicsAuditRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_performance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerformanceResponse"];
+                };
+            };
+        };
+    };
+    get_lots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LotsResponse"];
+                };
+            };
+        };
+    };
+    get_attribution: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttributionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sleeves: {
+        parameters: {
+            query?: {
+                years?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SleevesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_performance: {
+        parameters: {
+            query: {
+                kind: "ledger" | "lots" | "realized" | "attribution";
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_saved_performance_reports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"][];
+                };
+            };
+        };
+    };
+    save_performance_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedAnalysisRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_saved_performance_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerformanceSavedReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_saved_performance_report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_performance_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+        };
+    };
+    put_performance_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PerformanceSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_xray: {
+        parameters: {
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XrayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_xray: {
+        parameters: {
+            query?: {
+                lens?: string | null;
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_overlap: {
+        parameters: {
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XrayIntersection"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_concentration: {
+        parameters: {
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XrayConcentrationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_fundamentals: {
+        parameters: {
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XrayFundamentals"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_benchmark: {
+        parameters: {
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XrayBenchmark"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_funds_vs_benchmark: {
+        parameters: {
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FundRelative"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_supply_chain: {
+        parameters: {
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplyChain"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_event_paths: {
+        parameters: {
+            query: {
+                symbol: string;
+                direction?: "downstream" | "upstream";
+                state?: "confirmed" | "reported" | "rumoured";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventImpact"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_event_feed: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventFeed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_index_weights: {
+        parameters: {
+            query?: {
+                /** @description Show the holdings as they were on this date (the latest snapshot before). */
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndexComparisons"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_owner_inputs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerInput"][];
+                };
+            };
+        };
+    };
+    save_region_split: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegionSplitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerInput"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_supply_edge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplyEdgeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerInput"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_index_weights: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IndexWeightsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerInput"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    derive_index_weights: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeriveIndexRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeriveResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    derive_region: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeriveRegionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeriveResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    derive_benchmarks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeriveResult"];
+                };
+            };
+        };
+    };
+    archive_owner_input: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                input_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_candidates: {
+        parameters: {
+            query?: {
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XrayCandidates"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_xray_scenarios: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"][];
+                };
+            };
+        };
+    };
+    save_xray_scenario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["XraySaveScenarioRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_xray_scenario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XraySavedScenario"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_xray_scenario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_proposed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposedRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["XrayProposal"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_risk_report: {
+        parameters: {
+            query?: {
+                /** @description Look-back window, calendar days. */
+                days?: number;
+                /** @description Rolling correlation window. */
+                rolling?: number;
+                benchmark?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiskReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_standard_shocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandardTable"];
+                };
+            };
+        };
+    };
+    post_shock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShockRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShockRun"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_theme_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeOptions"];
+                };
+            };
+        };
+    };
+    post_theme: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThemeDefinition"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeExposure"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_whatif: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WhatIfCase"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatIfResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_rebalance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RebalanceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RebalanceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_pretrade: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PretradeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PretradeResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_shock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveShock"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_theme: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveTheme"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_whatif: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveWhatIf"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_rebalance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveRebalance"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_decision_saved: {
+        parameters: {
+            query: {
+                kind: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedAnalysisItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_decision_saved: {
+        parameters: {
+            query: {
+                kind: string;
+            };
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedOpen"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_decision_saved: {
+        parameters: {
+            query: {
+                kind: string;
+            };
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_journal: {
+        parameters: {
+            query?: {
+                ticker?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_journal_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JournalEntryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_scorecard: {
+        parameters: {
+            query?: {
+                /** @description Defaults to one year ago. */
+                since?: string | null;
+                /** @description One security. */
+                ticker?: string | null;
+                /** @description One main reason. */
+                reason?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scorecard"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_report: {
+        parameters: {
+            query?: {
+                /** @description Scorecard start; one year ago. */
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_report_html: {
+        parameters: {
+            query?: {
+                /** @description Scorecard start; one year ago. */
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_report_pdf: {
+        parameters: {
+            query?: {
+                /** @description Scorecard start; one year ago. */
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_entries_csv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    get_journal_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cockpit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cockpit"];
+                };
+            };
+        };
+    };
+    snooze_issue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnoozeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnoozeRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_readiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Readiness"];
+                };
+            };
+        };
+    };
+    get_activation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Activation"][];
+                };
+            };
+        };
+    };
+    set_activation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Activation"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_audit: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditOverview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_audit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pilot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotState"];
+                };
+            };
+        };
+    };
+    start_pilot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PilotStart"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PilotWindow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_defects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Defect"][];
+                };
+            };
+        };
+    };
+    add_defect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Defect"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_defect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                defect_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefectUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Defect"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    log_usage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UsageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sector_map: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectorMap"];
+                };
+            };
+        };
+    };
+    get_changes: {
+        parameters: {
+            query?: {
+                /** @description Compare with the end of this day; default is the previous snapshot. */
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeFeed"];
                 };
             };
             /** @description Validation Error */

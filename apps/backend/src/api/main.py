@@ -17,33 +17,41 @@ from api.alert_trail_routes import router as alert_trail_router
 from api.auth import Owner
 from api.budget_routes import router as budget_router
 from api.chat_routes import router as chat_router
+from api.company_routes import router as company_router
 from api.config_history_routes import router as config_history_router
 from api.control_stake_routes import router as control_stake_router
 from api.data_context_routes import router as data_context_router
 from api.db import close_pool, get_pool_or_error
+from api.decision_routes import router as decision_router
 from api.disclosure_analytics_routes import router as disclosure_analytics_router
 from api.disclosure_deals_routes import router as disclosure_deals_router
 from api.disclosure_estimates_routes import router as disclosure_estimates_router
 from api.disclosure_jobs_routes import router as disclosure_jobs_router
 from api.disclosure_replay_routes import router as disclosure_replay_router
 from api.disclosure_routes import router as disclosure_router
+from api.discover_routes import router as discover_router
 from api.escalation_routes import router as escalation_router
 from api.free_sources_routes import router as free_sources_router
+from api.fund_research_routes import router as fund_research_router
 from api.fund_routes import router as fund_router
 from api.fundamentals_routes import router as fundamentals_router
 from api.gate_routes import router as gate_router
 from api.graph_routes import router as graph_router
 from api.insider_activity_routes import router as insider_activity_router
 from api.insider_routes import router as insider_router
+from api.insight_routes import router as insight_router
 from api.investor_routes import router as investor_router
+from api.journal_routes import router as journal_router
 from api.lookthrough_routes import router as lookthrough_router
 from api.macro_routes import router as macro_router
 from api.market_routes import router as market_router
 from api.news_routes import router as news_router
 from api.nport_routes import router as nport_router
 from api.pdmr_routes import router as pdmr_router
+from api.performance_routes import router as performance_router
 from api.prompts_routes import router as prompts_router
 from api.reference_routes import router as reference_router
+from api.release_routes import router as release_router
 from api.research_context_routes import router as research_context_router
 from api.research_routes import router as research_router
 from api.routes import router
@@ -53,6 +61,7 @@ from api.valuation_routes import router as valuation_router
 from api.verify_routes import router as verify_router
 from api.watchlist_routes import router as watchlist_router
 from api.web_fact_routes import router as web_fact_router
+from api.xray_routes import router as xray_router
 from steward import __version__
 from steward.config import StrategyConfig, ThesesConfig
 from steward.heartbeat import worker_status
@@ -258,12 +267,21 @@ def create_app() -> FastAPI:
     app.include_router(free_sources_router)
     app.include_router(watchlist_router)
     app.include_router(screen_router)
+    app.include_router(discover_router)
+    app.include_router(company_router)
+    app.include_router(fund_research_router)
     app.include_router(insider_router)
     app.include_router(investor_router)
     app.include_router(control_stake_router)
     app.include_router(insider_activity_router)
     app.include_router(nport_router)
     app.include_router(fund_router)
+    app.include_router(performance_router)
+    app.include_router(xray_router)
+    app.include_router(decision_router)
+    app.include_router(journal_router)
+    app.include_router(release_router)
+    app.include_router(insight_router)
     app.include_router(pdmr_router)
     app.include_router(graph_router)
     app.include_router(disclosure_router)

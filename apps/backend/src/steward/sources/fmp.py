@@ -7,8 +7,11 @@ holding fact, and is not collected here. The free key allows 250 requests a day 
 account, and the ledger keeps one daily counter per endpoint, so each endpoint is capped at half
 of that (`ENDPOINT_DAILY_CAP`): the two together can never pass 250.
 
-Payload field names follow FMP's public `/stable` documentation and have NOT been checked against
-a live response (no key available when this was written); see tests/test_fmp.py. A symbol the
+Payload field names follow FMP's public `/stable` documentation and were checked against live
+`profile` and `analyst-estimates` responses on 7 October 2026 (symbol AAPL);
+see tests/test_provider_jobs.py.
+The estimates come newest fiscal year first and include far-future years, so the request asks for
+`ESTIMATE_FETCH` rows and `select_estimates` keeps the years that matter. A symbol the
 free plan does not cover answers 402 (premium) or an empty list; both are recorded as coverage
 gaps, never as zeros. A figure FMP omits is stored as null (or not at all), never as 0.
 """
@@ -38,11 +41,16 @@ from steward.sources.store import CoverageUpdate, record_access, update_coverage
 FMP_BASE = "https://financialmodelingprep.com/stable"
 PROFILE_URL = f"{FMP_BASE}/profile"
 ESTIMATES_URL = f"{FMP_BASE}/analyst-estimates"
-# The free account allowance is 250 requests/day shared by both endpoints; each endpoint's own
-# ledger counter may use at most half.
+COMPENSATION_URL = f"{FMP_BASE}/governance-executive-compensation"
+# The free account allowance is 250 requests/day shared by the three endpoints; each endpoint's own
+# ledger counter may use at most a third.
 ACCOUNT_DAILY_QUOTA = 250
-ENDPOINT_DAILY_CAP = ACCOUNT_DAILY_QUOTA // 2
-ESTIMATE_YEARS = 4
+ENDPOINT_DAILY_CAP = ACCOUNT_DAILY_QUOTA // 3
+COMPENSATION_YEARS = 2  # newest fiscal years kept per company
+COMPENSATION_REFRESH_DAYS = 30  # proxy-statement figures change once a year
+ESTIMATE_YEARS = 4  # fiscal years kept per company
+ESTIMATE_FETCH = 10  # rows requested: the answer is newest first and reaches years ahead
+ESTIMATE_LOOKBACK_DAYS = 200  # keep the fiscal year that just ended, for the surprise comparison
 PROFILE_TEXT_FIELDS = ("sector", "industry", "country", "exchange", "companyName", "currency")
 
 
@@ -62,6 +70,28 @@ class FmpEstimate:
     high: Decimal | None
     analyst_count: int | None
     raw: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class FmpCompensation:
+    """One executive's summary compensation for a fiscal year, as the proxy statement reports it."""
+
+    fiscal_year: int
+    name_and_position: str
+    total: Decimal
+    components: dict[str, Decimal]  # only the components FMP sent
+    filing_date: dt.date | None
+    source_url: str | None
+
+
+COMPENSATION_COMPONENTS = (
+    ("salary", "salary"),
+    ("bonus", "bonus"),
+    ("stockAward", "stock_award"),
+    ("optionAward", "option_award"),
+    ("incentivePlanCompensation", "incentive_plan"),
+    ("allOtherCompensation", "all_other"),
+)
 
 
 def _decimal(value: object) -> Decimal | None:
@@ -131,6 +161,61 @@ def parse_estimates(payload: object, symbol: str) -> list[FmpEstimate]:
                 )
             )
     return out
+
+
+def parse_compensation(payload: object, symbol: str) -> list[FmpCompensation]:
+    """Named executives with a total for a fiscal year. A row without a name, year or total is
+    dropped; a component FMP omits is absent, never 0."""
+    if not isinstance(payload, list):
+        raise FreeSourceError("FMP executive-compensation schema changed")
+    out: list[FmpCompensation] = []
+    for row in payload:
+        if not isinstance(row, dict) or str(row.get("symbol", symbol)).upper() != symbol.upper():
+            continue
+        name = " ".join(str(row.get("nameAndPosition") or "").split())
+        year = row.get("year")
+        total = _decimal(row.get("total"))
+        if not name or isinstance(year, bool) or not isinstance(year, int) or total is None:
+            continue
+        components = {
+            key: value
+            for source, key in COMPENSATION_COMPONENTS
+            if (value := _decimal(row.get(source))) is not None
+        }
+        try:
+            filed = dt.date.fromisoformat(str(row.get("filingDate")))
+        except ValueError:
+            filed = None
+        link = row.get("link")
+        out.append(
+            FmpCompensation(
+                year,
+                name,
+                total,
+                components,
+                filed,
+                link if isinstance(link, str) and link.startswith("http") else None,
+            )
+        )
+    return out
+
+
+def latest_compensation(
+    rows: list[FmpCompensation], years: int = COMPENSATION_YEARS
+) -> list[FmpCompensation]:
+    keep = set(sorted({r.fiscal_year for r in rows}, reverse=True)[:years])
+    return [r for r in rows if r.fiscal_year in keep]
+
+
+def select_estimates(
+    estimates: list[FmpEstimate], today: dt.date, years: int = ESTIMATE_YEARS
+) -> list[FmpEstimate]:
+    """The nearest `years` fiscal years that end no earlier than the lookback, so the next fiscal
+    year is always among them however far ahead FMP publishes."""
+    floor = today - dt.timedelta(days=ESTIMATE_LOOKBACK_DAYS)
+    ends = sorted({e.period_end for e in estimates if e.period_end >= floor})[:years]
+    keep = set(ends)
+    return [e for e in estimates if e.period_end in keep]
 
 
 async def _get(http: httpx.AsyncClient, url: str, params: dict[str, Any], api_key: str) -> Any:
@@ -295,12 +380,22 @@ async def collect_fmp_company(
         governor,
         endpoint="analyst_estimates",
         url=ESTIMATES_URL,
-        params={"symbol": symbol, "period": "annual", "page": 0, "limit": ESTIMATE_YEARS},
+        params={"symbol": symbol, "period": "annual", "page": 0, "limit": ESTIMATE_FETCH},
         api_key=api_key,
         budget=budget,
     )
-    estimates = parse_estimates(body, symbol) if body is not None else []
+    estimates = (
+        select_estimates(parse_estimates(body, symbol), now.date()) if body is not None else []
+    )
     source = f"{ESTIMATES_URL}?symbol={symbol}&period=annual"
+    # FMP states estimates in the reporting currency; only the filed statements tell it. Unknown
+    # stays null.
+    reporting_currency = await pool.fetchval(
+        """select coalesce(currency, unit) from public.financial_statement_fact
+           where ticker=$1 and coalesce(currency, unit) ~ '^[A-Z]{3}$'
+           order by period_end desc, known_at desc limit 1""",
+        ticker,
+    )
     for item in estimates:
         if item.analyst_count is None:
             counts["estimates_without_count"] += 1
@@ -315,6 +410,7 @@ async def collect_fmp_company(
                 basis="FMP annual analyst consensus (average)",
                 fiscal_period=f"FY{item.fiscal_year}",
                 period_end=item.period_end,
+                currency=reporting_currency,
                 value=item.value,
                 low=item.low,
                 high=item.high,
@@ -338,3 +434,67 @@ async def collect_fmp_company(
         ),
     )
     return counts
+
+
+async def collect_fmp_compensation(
+    pool: asyncpg.Pool,
+    http: httpx.AsyncClient,
+    *,
+    ticker: str,
+    symbol: str,
+    api_key: str,
+    provider_settings: Any,
+) -> int:
+    """The newest `COMPENSATION_YEARS` fiscal years of named-executive compensation into
+    `company_research_observation` (dataset `executive_compensation`, one `total_<year>` row per
+    person with the components in `raw`). One credit. Returns the rows stored."""
+    if not await provider_gate.gate_usable(pool, "fmp", "executive_compensation"):
+        return 0
+    body = await _fetch_governed(
+        pool,
+        http,
+        PostgresRequestGovernor(pool),
+        endpoint="executive_compensation",
+        url=COMPENSATION_URL,
+        params={"symbol": symbol},
+        api_key=api_key,
+        budget=endpoint_budget(provider_settings),
+    )
+    rows = latest_compensation(parse_compensation(body, symbol)) if body is not None else []
+    async with pool.acquire() as conn, conn.transaction():
+        for r in rows:
+            await store_research_observation(
+                conn,
+                ticker=ticker,
+                provider="fmp",
+                dataset="executive_compensation",
+                metric=f"total_{r.fiscal_year}",
+                value=r.total,
+                text_value=r.name_and_position,
+                unit="USD",
+                currency="USD",
+                published_at=dt.datetime.combine(r.filing_date, dt.time(), dt.UTC)
+                if r.filing_date
+                else None,
+                source_url=r.source_url or f"{COMPENSATION_URL}?symbol={symbol}",
+                match_confidence=Decimal("0.9"),
+                raw={
+                    "fiscal_year": r.fiscal_year,
+                    "components": {k: str(v) for k, v in r.components.items()},
+                },
+            )
+    await update_coverage(
+        pool,
+        CoverageUpdate(
+            "fmp",
+            "executive_compensation",
+            ticker,
+            AccessResult(AccessState.AVAILABLE, f"{len(rows)} compensation rows stored")
+            if rows
+            else AccessResult(
+                AccessState.NOT_COVERED, "no executive compensation on the free plan"
+            ),
+            available_periods=len(rows),
+        ),
+    )
+    return len(rows)
