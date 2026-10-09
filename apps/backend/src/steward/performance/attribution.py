@@ -237,6 +237,7 @@ def attribute(
         flows,
         {"price": price_total, "income": income_total, "fx": fx_total, "fees": -fee_total},
         unattributed_value=unattributed_value,
+        unattributed_count=len(unattributed),
     )
     return AttributionReport(
         start=start.day,

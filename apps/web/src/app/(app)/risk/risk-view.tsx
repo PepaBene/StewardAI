@@ -143,6 +143,8 @@ function cell(v: number | null): React.CSSProperties | undefined {
 function Matrix({ report }: { report: RiskReport }) {
   const m = report.correlation;
   const [focus, setFocus] = useState<string>("");
+  // Broker tickers are mixed-case (CSPXl_EQ), so the highlight ignores case.
+  const isFocus = (t: string) => focus.trim() !== "" && t.toUpperCase() === focus.trim().toUpperCase();
   if (m.tickers.length < 2) {
     return (
       <Blueprint className="p-4">
@@ -159,7 +161,7 @@ function Matrix({ report }: { report: RiskReport }) {
         title="How the largest holdings move together"
         action={
           <Field label="Highlight" className="w-32">
-            <Input value={focus} onChange={(e) => setFocus(e.target.value.toUpperCase())} placeholder="Ticker" />
+            <Input value={focus} onChange={(e) => setFocus(e.target.value)} placeholder="Ticker" />
           </Field>
         }
       />
@@ -175,7 +177,7 @@ function Matrix({ report }: { report: RiskReport }) {
             <tr>
               <th scope="col" className="px-2 py-1"><span className="sr-only">Holding</span></th>
               {m.tickers.map((t) => (
-                <th key={t} scope="col" className={`px-2 py-1 text-right font-medium ${t === focus ? "text-accent-ink" : ""}`}>
+                <th key={t} scope="col" className={`px-2 py-1 text-right font-medium ${isFocus(t) ? "text-accent-ink" : ""}`}>
                   {t}
                 </th>
               ))}
@@ -184,7 +186,7 @@ function Matrix({ report }: { report: RiskReport }) {
           <tbody>
             {m.tickers.map((row, i) => (
               <tr key={row}>
-                <th scope="row" className={`px-2 py-1 text-left font-medium ${row === focus ? "text-accent-ink" : ""}`}>
+                <th scope="row" className={`px-2 py-1 text-left font-medium ${isFocus(row) ? "text-accent-ink" : ""}`}>
                   {row}
                 </th>
                 {m.values[i].map((v, j) => (
@@ -192,7 +194,7 @@ function Matrix({ report }: { report: RiskReport }) {
                     key={m.tickers[j]}
                     style={cell(v)}
                     title={`${row} and ${m.tickers[j]}: ${m.observations[i][j]} shared days`}
-                    className={`num border border-border-soft px-2 py-1 text-right ${row === focus || m.tickers[j] === focus ? "font-semibold" : ""}`}
+                    className={`num border border-border-soft px-2 py-1 text-right ${isFocus(row) || isFocus(m.tickers[j]) ? "font-semibold" : ""}`}
                   >
                     {v === null ? "" : v.toFixed(2)}
                   </td>

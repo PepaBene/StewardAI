@@ -122,6 +122,15 @@ NAV_LISTING_GAP_DAYS = 4
 NAV_ROWS_SHOWN = 60
 
 
+def build_nav_for_listing(
+    points: Sequence[Any], raw_closes: Closes, listing_currency: str | None
+) -> NavView:
+    """`build_nav` on closes in the listing's quoted unit: pence (GBX) are scaled to pounds
+    first, so the premium is not 100 times too large against a NAV in the major unit."""
+    ccy, factor = normalise_currency(listing_currency) if listing_currency else (None, ONE)
+    return build_nav(points, [(d, c * factor) for d, c in raw_closes], ccy)
+
+
 def build_nav(points: Sequence[Any], closes: Closes, listing_currency: str | None) -> NavView:
     """Premium or discount of the listing close to the NAV you entered, on the same date.
     A different currency, or no close within a few days, gives no premium rather than a guess."""

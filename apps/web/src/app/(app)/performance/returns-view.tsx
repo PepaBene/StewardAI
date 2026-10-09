@@ -104,7 +104,12 @@ function StatementTable({ data }: { data: PerformanceData }) {
                 </th>
                 <td className={TD}><ReturnCell figure={w.twr} /></td>
                 <td className={TD}>{w.twr_annualized !== null && w.twr_annualized !== undefined ? <PlainReturn value={w.twr_annualized} /> : <span className="text-text-muted">under a year</span>}</td>
-                <td className={TD}><ReturnCell figure={w.xirr} /></td>
+                <td className={TD}>
+                  <ReturnCell figure={w.xirr} />
+                  {w.xirr_annualized === false && w.xirr.value !== null && w.xirr.value !== undefined ? (
+                    <span className="block text-[11px] text-text-muted">over the window, not a yearly rate</span>
+                  ) : null}
+                </td>
                 <td className={TD}><BenchmarkCell w={w} /></td>
                 <td className={TD}><ActiveCell w={w} /></td>
                 <td className={TD}><Money value={w.gain} currency={data.base_currency} signed /></td>
@@ -115,7 +120,7 @@ function StatementTable({ data }: { data: PerformanceData }) {
       </div>
       <p className="max-w-3xl text-xs text-text-muted">
         <span className="font-medium text-text">Your investments</span> removes your deposits and withdrawals, so it shows how the holdings did.{" "}
-        <span className="font-medium text-text">Your money</span> is the annual rate on what you actually paid in and when, so it depends on your timing.
+        <span className="font-medium text-text">Your money</span> is the annual rate on what you actually paid in and when, so it depends on your timing. Under a year it is the return over the window itself.
         Gain is in {data.base_currency}, after flows.
       </p>
     </div>

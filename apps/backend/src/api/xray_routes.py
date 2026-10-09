@@ -54,13 +54,13 @@ AsOf = Annotated[
 
 
 async def _loaded(pool: Pool, owner: Owner, as_of: dt.date | None) -> service.Loaded:
-    """Today's X-Ray inputs (cached for a minute), or those of a past date."""
+    """X-Ray inputs for today or a past date, cached for a minute per (owner, date)."""
     if as_of is None:
         return await service.load_cached(pool, owner.user_id)
     if as_of > dt.datetime.now(dt.UTC).date():
         raise HTTPException(422, "The date is in the future.")
     try:
-        return await service.load(pool, owner.user_id, as_of=as_of)
+        return await service.load_cached(pool, owner.user_id, as_of)
     except service.NoHoldingsThen as err:
         raise HTTPException(404, "No holdings were stored on or before that date.") from err
 

@@ -43,9 +43,15 @@ async def performance_review(
     settings = settings or await load_latest_settings(pool)
     findings: list[Finding] = []
     sleeves = await service.sleeves_report(pool, settings)
+    asked = settings.sleeve_lookback_years
+    span = (
+        f"over {asked} years"
+        if sleeves.history_days >= asked * 365
+        else f"over the {sleeves.history_days} days of history "
+        f"(shorter than the {asked} years asked for)"
+    )
     description = (
-        f"Stocks within {settings.sleeve_gap_points} points a year of the core ETFs "
-        f"over {settings.sleeve_lookback_years} years"
+        f"Stocks within {settings.sleeve_gap_points} points a year of the core ETFs {span}"
     )
     if sleeves.core is None or sleeves.stocks is None:
         findings.append(Finding("sleeves:gap", description, "unknown", sleeves.message))

@@ -259,8 +259,9 @@ async def performance_view(
         data, listing, closes, divs, ok, info, bench, options, suggested, day
     )
     if data.nav:
-        ccy = normalise_currency(listing.currency)[0] if listing and listing.currency else None
-        view.nav = performance.build_nav(data.nav, closes, ccy)
+        view.nav = performance.build_nav_for_listing(
+            data.nav, closes, listing.currency if listing else None
+        )
         view.nav_available = True
     return view
 

@@ -18,6 +18,9 @@ from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import MainReason, ThesesConfig
 from steward.decision.service import volatility_and_price
+from steward.reference.price_series import choose_series, holding_symbols
+from steward.reference.read import load_series
+from steward.reference.returns import series_currency
 
 Decision = Literal["buy", "add", "hold", "trim", "sell", "pass", "watch", "review"]
 Scope = Literal["security", "portfolio"]
@@ -159,6 +162,34 @@ async def build_snapshot(
     return snapshot, price, currency
 
 
+def last_close_on_or_before(series: list[tuple[dt.date, float]], day: dt.date) -> float | None:
+    """The close on `day`, else the last close before it."""
+    best: float | None = None
+    for d, close in series:
+        if d > day:
+            break
+        best = close
+    return best
+
+
+async def price_on_or_before(
+    pool: asyncpg.Pool, ticker: str, day: dt.date
+) -> tuple[float | None, str | None]:
+    """(close on or before `day`, its currency) from the stored series the scorecard uses."""
+    profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
+    symbols = await holding_symbols(
+        pool, [ticker], profiles.body if profiles else HoldingProfilesConfig()
+    )
+    ref = (await choose_series(pool, symbols)).get(ticker)
+    if ref is None:
+        return None, None
+    series = await load_series(pool, ref, since=day - dt.timedelta(days=14))
+    price = last_close_on_or_before(series, day)
+    if price is None:
+        return None, None
+    return price, await series_currency(pool, ref, None)
+
+
 async def record(pool: asyncpg.Pool, owner_id: str, body: JournalEntryIn) -> JournalEntry:
     if body.scope == "security" and not body.ticker:
         raise JournalError("Name the security this decision is about.")
@@ -174,8 +205,18 @@ async def record(pool: asyncpg.Pool, owner_id: str, body: JournalEntryIn) -> Jou
             raise JournalError("The entry you are reviewing does not exist.")
         if parent["ticker"] != body.ticker or parent["scope"] != body.scope:
             raise JournalError("A review must be about the same security as the entry it revisits.")
+    today = dt.date.today()
+    if body.decided_on is not None and body.decided_on > today:
+        raise JournalError("The decision date cannot be in the future.")
     snapshot, last_price, currency = await build_snapshot(pool, body.ticker)
-    price = body.price_at_decision if body.price_at_decision is not None else last_price
+    price = body.price_at_decision
+    if price is None:
+        if body.decided_on is None or body.decided_on >= today or body.ticker is None:
+            price = last_price
+        else:
+            # A back-dated entry takes the close on (or the last one before) the decision day,
+            # not today's price; with no stored series the price stays empty rather than wrong.
+            price, currency = await price_on_or_before(pool, body.ticker, body.decided_on)
     row = await pool.fetchrow(
         "insert into public.decision_journal"  # noqa: S608 - constant column list
         " (owner_id, scope, ticker, decision, parent_id, decided_on, hypothesis,"

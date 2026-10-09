@@ -10,6 +10,7 @@ Areas the stored data cannot compare are listed, not left out."""
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Literal, Self
@@ -336,23 +337,40 @@ def _items_from(
 
 
 async def _fund_changes(
-    pool: asyncpg.Pool, weights: dict[str, float], since_cut: dt.datetime
+    pool: asyncpg.Pool,
+    weights: dict[str, float],
+    since_cut: dt.datetime,
+    days: tuple[dt.date, dt.date],
 ) -> tuple[list[ChangeItem], int]:
+    """Holdings changes of the funds the owner holds (directly, on either comparison day):
+    the latest stored snapshot against the latest one fetched on or before the cutoff."""
     funds = await pool.fetch(
-        "select distinct fund_isin from public.etf_snapshot where fetched_at is not null"
+        "select distinct on (i.isin) i.isin as fund_isin, i.t212_ticker from public.instrument i"
+        " join public.position_snapshot p on p.ticker = i.t212_ticker"
+        " and p.snapshot_date = any($1::date[])"
+        " where i.isin is not null and exists (select 1 from public.etf_snapshot s"
+        "   where s.fund_isin = i.isin and s.fetched_at is not null)"
+        " order by i.isin, i.t212_ticker",
+        list(days),
     )
     out: list[ChangeItem] = []
     compared = 0
     for f in funds:
-        snaps = await pool.fetch(
-            "select id, as_of, fetched_at from public.etf_snapshot where fund_isin = $1"
-            " order by as_of desc, id desc limit 2",
+        new_s = await pool.fetchrow(
+            "select id, as_of, fetched_at from public.etf_snapshot"
+            " where fund_isin = $1 and fetched_at is not null order by as_of desc, id desc limit 1",
             f["fund_isin"],
         )
-        if len(snaps) < 2:
+        old_s = await pool.fetchrow(
+            "select id, as_of, fetched_at from public.etf_snapshot"
+            " where fund_isin = $1 and fetched_at is not null and fetched_at <= $2"
+            " order by as_of desc, id desc limit 1",
+            f["fund_isin"],
+            since_cut,
+        )
+        if new_s is None or old_s is None or new_s["id"] == old_s["id"]:
             continue
         compared += 1
-        new_s, old_s = snaps[0], snaps[1]
         rows = await pool.fetch(
             "select snapshot_id, coalesce(isin, name) k, max(name) n, sum(weight) w"
             " from public.etf_holding where snapshot_id = any($1::bigint[]) and weight is not null"
@@ -362,9 +380,7 @@ async def _fund_changes(
         by: dict[int, dict[str, float]] = {new_s["id"]: {}, old_s["id"]: {}}
         for r in rows:
             by[r["snapshot_id"]][r["n"] or r["k"]] = float(r["w"])
-        ticker = await pool.fetchval(
-            "select t212_ticker from public.instrument where isin = $1 limit 1", f["fund_isin"]
-        )
+        ticker = f["t212_ticker"]
         refs = (
             Ref(table="etf_snapshot", id=str(old_s["id"]), known_at=old_s["fetched_at"]),
             Ref(table="etf_snapshot", id=str(new_s["id"]), known_at=new_s["fetched_at"]),
@@ -381,26 +397,41 @@ async def _graph(
     pool: asyncpg.Pool, since_cut: dt.datetime, weights: dict[str, float]
 ) -> tuple[list[ChangeItem], int]:
     rows = await pool.fetch(
-        "select id, ticker, type, object_name, status, created_at, updated_at"
-        " from public.entity_relationship where updated_at > $1 or created_at > $1"
-        " order by updated_at desc limit 300",
+        "select r.id, r.ticker, r.type, r.object_name, r.status, r.created_at, r.updated_at,"
+        " p.id as prev_id, p.to_status as prev_status, p.changed_at as prev_at"
+        " from public.entity_relationship r left join lateral ("
+        "   select l.id, l.to_status, l.changed_at from public.graph_status_log l"
+        "   where l.table_name = 'entity_relationship' and l.row_id = r.id"
+        "   and l.changed_at <= $1 order by l.changed_at desc, l.id desc limit 1) p on true"
+        " where r.updated_at > $1 or r.created_at > $1"
+        " order by r.updated_at desc limit 300",
         since_cut,
     )
-    out = [
-        ChangeItem(
-            area="graph",
-            kind="new" if r["created_at"] > since_cut else "revised",
-            subject=r["ticker"] or "",
-            what=f"{r['type']}: {r['object_name']}",
-            before=None if r["created_at"] > since_cut else "earlier status",
-            after=str(r["status"]),
-            before_ref=None,
-            after_ref=Ref(table="entity_relationship", id=str(r["id"]), known_at=r["updated_at"]),
-            weight=weight_of(r["ticker"], weights) if r["ticker"] else None,
-        )
-        for r in rows
-    ]
-    return out, len(rows)
+    return [graph_item(r, since_cut, weights) for r in rows], len(rows)
+
+
+def graph_item(
+    r: Mapping[str, Any], since_cut: dt.datetime, weights: dict[str, float]
+) -> ChangeItem:
+    """A link changed since the cutoff. It is 'revised' only when an earlier status record
+    exists (the logged status at the cutoff), which then is the item's before record; with
+    none, the owner has nothing earlier to compare against, so it is 'new'."""
+    has_before = r["created_at"] <= since_cut and r["prev_id"] is not None
+    return ChangeItem(
+        area="graph",
+        kind="revised" if has_before else "new",
+        subject=r["ticker"] or "",
+        what=f"{r['type']}: {r['object_name']}",
+        before=str(r["prev_status"]) if has_before else None,
+        after=str(r["status"]),
+        before_ref=(
+            Ref(table="graph_status_log", id=str(r["prev_id"]), known_at=r["prev_at"])
+            if has_before
+            else None
+        ),
+        after_ref=Ref(table="entity_relationship", id=str(r["id"]), known_at=r["updated_at"]),
+        weight=weight_of(r["ticker"], weights) if r["ticker"] else None,
+    )
 
 
 async def _macro(pool: asyncpg.Pool, since_cut: dt.datetime) -> tuple[list[ChangeItem], int]:
@@ -587,19 +618,36 @@ async def build_feed(pool: asyncpg.Pool, since: dt.date | None = None) -> Change
     items += got
     areas.append(AreaCount(area="estimates", items=len(got), compared=len(new_e)))
 
+    # `since` need not be a snapshot day: prices are compared with the last snapshot on or
+    # before it, and the area says which day that was and how many holdings were compared.
+    price_day = await pool.fetchval(
+        "select max(snapshot_date) from public.position_snapshot where snapshot_date <= $1",
+        old_day,
+    )
     rows = await pool.fetch(
         "select snapshot_date, ticker, current_price from public.position_snapshot"
         " where snapshot_date in ($1, $2) and current_price is not null",
-        old_day, now_day,
+        price_day or old_day, now_day,
     )  # fmt: skip
-    px: dict[dt.date, dict[str, tuple[float, str]]] = {old_day: {}, now_day: {}}
+    px: dict[dt.date, dict[str, tuple[float, str]]] = {now_day: {}}
+    if price_day is not None:
+        px[price_day] = {}
     for r in rows:
         px[r["snapshot_date"]][r["ticker"]] = (float(r["current_price"]), f"{r['snapshot_date']}")
-    got = price_moves(px[old_day], px[now_day], weights) if old_day != now_day else []
+    price_note = None
+    if price_day is None:
+        price_note = f"No position snapshot on or before {old_day}; prices were not compared."
+        got, compared = [], 0
+    else:
+        both = px[price_day].keys() & px[now_day].keys() if price_day != now_day else set()
+        got = price_moves(px[price_day], px[now_day], weights) if price_day != now_day else []
+        compared = len(both)
+        if price_day != old_day:
+            price_note = f"{old_day} has no snapshot; compared with the snapshot of {price_day}."
     items += got
-    areas.append(AreaCount(area="price", items=len(got), compared=len(px[now_day])))
+    areas.append(AreaCount(area="price", items=len(got), compared=compared, note=price_note))
 
-    got, n = await _fund_changes(pool, weights, old_cut)
+    got, n = await _fund_changes(pool, weights, old_cut, (old_day, now_day))
     items += got
     areas.append(
         AreaCount(

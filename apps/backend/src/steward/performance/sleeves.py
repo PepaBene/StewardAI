@@ -90,6 +90,7 @@ class SleeveReturn:
     total_return: Decimal | None
     annualized: Decimal | None
     reason: str | None
+    covers_lookback: bool = True  # False: history is shorter than the lookback asked for
 
 
 def sleeve_return(
@@ -113,10 +114,17 @@ def sleeve_return(
     if outcome.value is None:
         return SleeveReturn(
             name, series_used[0].date, end, span, None, None,
-            outcome.warnings[0] if outcome.warnings else "no return",
+            outcome.warnings[0] if outcome.warnings else "no return", bool(before),
         )  # fmt: skip
     return SleeveReturn(
-        name, series_used[0].date, end, span, outcome.value, annualize(outcome.value, span), None
+        name,
+        series_used[0].date,
+        end,
+        span,
+        outcome.value,
+        annualize(outcome.value, span),
+        None,
+        bool(before),
     )
 
 
@@ -177,8 +185,15 @@ def compare_sleeves(
         gap = (core_return.annualized - stock_return.annualized) * 100
     else:
         gap = (core_return.total_return - stock_return.total_return) * 100
-    too_early = history < MIN_HISTORY_DAYS
-    if too_early:
+    shorter = not (core_return.covers_lookback and stock_return.covers_lookback)
+    too_early = history < MIN_HISTORY_DAYS or shorter
+    if shorter and history >= MIN_HISTORY_DAYS:
+        message = (
+            f"Only {history} days of history, shorter than the {lookback_years} years asked for. "
+            f"Gap over those {history} days {gap:+.1f} points a year; no shift is suggested until "
+            "the history reaches the requested length."
+        )
+    elif too_early:
         message = (
             f"Too early to judge: {history} days of history, a fair read needs "
             f"{MIN_HISTORY_DAYS}. Gap so far {gap:+.1f} points."

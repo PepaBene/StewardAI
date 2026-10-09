@@ -114,6 +114,22 @@ def test_regression_sensitivity_needs_a_sample_and_a_fit() -> None:
     assert fit is not None and fit < D("0.05") and unrelated.value is None
 
 
+def test_a_move_in_the_exchange_rate_is_return_not_a_trade() -> None:
+    from steward.decision.series import organic_returns
+
+    def snap(day: int, rate: str, price: str, qty: str = "10") -> dict[str, object]:
+        q, r = D(qty), D(rate)
+        return {"snapshot_date": dt.date(2026, 3, day), "quantity": q, "avg_price": D("100"),
+                "fx_rate": r, "value_base": q * D(price) * r}  # fmt: skip
+
+    # No trade; the price is flat and the rate rises 10 %: a 10 % return in the base currency.
+    got = organic_returns([snap(2, "20", "100"), snap(3, "22", "100")])
+    assert got[dt.date(2026, 3, 3)] == pytest.approx(D("0.10"))
+    # Buying 5 more at the average price is money traded, not return.
+    bought = organic_returns([snap(2, "20", "100"), snap(3, "20", "100", qty="15")])
+    assert bought[dt.date(2026, 3, 3)] == pytest.approx(D("0"))
+
+
 def test_rolling_correlation_fills_only_full_windows() -> None:
     n = 100
     a = dec([0.01 * ((i % 7) - 3) for i in range(n)])
@@ -151,6 +167,13 @@ def test_equity_shock_uses_a_measured_beta_then_the_fallback_and_leaves_unknown_
     assert {u.reason.split(":")[0] for u in res.unshocked} >= {"the fund's own cash"}
     sources = {s for p in res.positions for s in p.sensitivities}
     assert any("measured" in s for s in sources) and any("fallback" in s for s in sources)
+
+
+def test_a_leaf_set_that_misses_part_of_the_portfolio_does_not_reconcile() -> None:
+    ctx = ctx_for(data())
+    ctx.leafset.leaves = ctx.leafset.leaves[1:]
+    res = apply_shocks(ctx.leafset, ShockSet(equity_pct=-0.2), ShockAssumptions(), MeasuredInputs())
+    assert not res.reconciles
 
 
 def test_with_no_fallback_a_holding_without_a_beta_is_not_shocked() -> None:
@@ -367,6 +390,61 @@ def test_the_cash_floor_keeps_the_cash_band_before_any_buy() -> None:
     assert plan.cash_after == pytest.approx(100)
 
 
+def test_a_withdrawal_the_cash_cannot_meet_is_sold_pro_rata_from_the_targeted_positions() -> None:
+    plan = rb.plan(
+        holdings(A=500, B=400),
+        100,
+        strategy(("A", 0.50, 0.10), ("B", 0.40, 0.10)),
+        rb.RebalanceRequest(deposit=-150),
+    )
+    trades = {t.ticker: t for t in plan.trades}
+    # After the withdrawal the total is 850: A 58.8 % and B 47.1 % stay inside their bands, but
+    # cash would be -50, so 50 is sold in proportion to the holdings (500 : 400).
+    assert trades["A"].trade_value == pytest.approx(-50 * 500 / 900)
+    assert trades["B"].trade_value == pytest.approx(-50 * 400 / 900)
+    assert "withdrawal" in trades["A"].reason
+    assert plan.cash_after == pytest.approx(0)
+    assert not any("negative" in w for w in plan.warnings)
+
+
+def test_typed_tickers_match_the_broker_spelling_whatever_the_case() -> None:
+    from steward.decision.service import match_tickers
+
+    got = match_tickers(
+        ["cspxl_eq", "CSPXL_EQ", "BPl_EQ", "abc_eq", "NOPE"],
+        held=["CSPXl_EQ"],
+        instruments=["CSPXl_EQ", "BPl_EQ", "BPL_EQ", "ABC_EQ"],
+    )
+    assert got["cspxl_eq"] == "CSPXl_EQ" and got["CSPXL_EQ"] == "CSPXl_EQ"  # held wins
+    assert got["BPl_EQ"] == "BPl_EQ"  # an exact spelling is kept
+    assert got["abc_eq"] == "ABC_EQ"  # the one instrument it can only mean
+    assert got["NOPE"] == "NOPE"
+
+
+def test_a_withdrawal_split_that_falls_short_is_completed_pro_rata_and_said_so() -> None:
+    from steward.decision.whatif import CaseError, withdrawal_sales
+
+    # 300 to raise; the split asks A for 50 % (150) but A holds only 100, and leaves 50 % unsaid.
+    sales, rest = withdrawal_sales(300, {"A": 100, "B": 400, "C": 500}, {"A": 0.5})
+    assert sum(sales.values()) == pytest.approx(300)
+    assert sales["A"] == pytest.approx(100)  # all of it, nothing more
+    assert rest == pytest.approx(200)
+    assert sales["B"] == pytest.approx(200 * 400 / 900)
+    with pytest.raises(CaseError, match="Not held"):
+        withdrawal_sales(100, {"A": 100}, {"ZZZ": 1.0})
+
+
+def test_a_target_override_outside_zero_to_one_is_refused() -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        rb.RebalanceRequest(target_overrides={"A": -0.3})
+    # A request built without validation is still refused by the plan itself.
+    bad = rb.RebalanceRequest.model_construct(target_overrides={"A": 1.5})
+    with pytest.raises(ValueError, match="between 0 and 100"):
+        rb.plan(holdings(A=500), 0, strategy(("A", 0.5, 0.1)), bad)
+
+
 # --------------------------------------------------------------------------------- lot impact
 
 
@@ -476,6 +554,46 @@ def test_new_breach_after_the_trade_is_flagged_and_a_cleared_one_is_credited() -
     assert not any(c.status == "pass" for c in got.checks if c.id == "after.rules")
 
 
+def test_adding_to_a_position_already_over_its_cap_is_a_flag_not_a_pass() -> None:
+    config = StrategyConfig(
+        base_currency="EUR",
+        rules=[PositionWeightRule(id="cap", type="position_weight", operator="<=", value=0.30)],
+    )
+    facts = {"A": pt.TickerFacts("A", held=True, value_now=500)}
+    # A is 50 % against a 30 % cap and the buy takes it to 60 %.
+    ctx = pretrade_context(config, facts, {"A": 500, "B": 300}, 200, {"A": 600, "B": 300}, 100)
+    got = pt.run([pt.TradeLeg(side="buy", ticker="A", value_base=100)], ctx)
+    deeper = [c for c in got.checks if c.id.startswith("after.rule") and c.ticker == "A"]
+    assert deeper and deeper[0].status == "flag" and "further past" in deeper[0].title
+    assert "after.rules" not in by_id(got)
+
+
+def test_sales_in_one_request_share_the_exemption_headroom() -> None:
+    config = StrategyConfig(base_currency="EUR")
+    facts = {
+        "S": pt.TickerFacts("S", held=True, value_now=400),
+        "T": pt.TickerFacts("T", held=True, value_now=400),
+    }
+    ctx = pretrade_context(config, facts, {"S": 400, "T": 400}, 200, {"S": 200, "T": 200}, 600)
+    for ticker in ("S", "T"):
+        ctx.sale_impacts[ticker] = consume(
+            ticker, [OpenLot("l", dt.date(2025, 1, 1), D(10), D(30))], D(5), D(40),
+            dt.date(2026, 3, 1),
+        )  # fmt: skip
+        ctx.sale_within_test_exemption_ccy[ticker] = 6_000.0
+    ctx.exemption_limit, ctx.exemption_currency = 100_000.0, "CZK"
+    ctx.year_proceeds_so_far = 90_000.0
+    got = pt.run(
+        [pt.TradeLeg(side="sell", ticker="S", value_base=200),
+         pt.TradeLeg(side="sell", ticker="T", value_base=200)],
+        ctx,
+    )  # fmt: skip
+    exemption = [c for c in got.checks if c.id == "sell.exemption"]
+    # 100000 - 90000 - 6000 = 4000 for the first; the second also counts the first: -2000
+    assert [c.status for c in exemption] == ["pass", "flag"]
+    assert exemption[1].values["headroom"] == pytest.approx(-2000)
+
+
 def test_sale_reports_lots_the_time_test_and_exemption_headroom() -> None:
     config = StrategyConfig(base_currency="EUR")
     facts = {"S": pt.TickerFacts("S", held=True, value_now=400)}
@@ -520,10 +638,19 @@ def test_switch_compares_the_gap_with_tax_costs_and_margin_and_sizes_for_equal_r
     got = pt.run(trades, ctx)
     assert got.is_switch
     checks = by_id(got)
-    # expected returns: OLD 10 %, NEW 60 %; gap 50 points against a 5-point margin (no lots: no tax)
-    assert checks["switch.gap"].status == "pass"
+    # expected returns: OLD 10 %, NEW 60 %; gap 50 points against a 5-point margin. With no lots
+    # on record the tax is unknown, not zero, so the gap is not a pass.
+    assert checks["switch.gap"].status == "unavailable"
     assert checks["switch.gap"].values["gap"] == pytest.approx(0.5)
     assert checks["switch.gap"].values["hurdle"] == pytest.approx(0.05)
+    # The lots are on record and the year's exemption covers the sale: no tax, so it passes.
+    ctx.sale_impacts["OLD"] = consume(
+        "OLD", [OpenLot("l1", dt.date(2020, 1, 1), D(4), D(90))], D(4), D(100), dt.date(2026, 3, 1)
+    )
+    ctx.exemption_limit, ctx.exemption_currency = 100_000.0, "CZK"
+    ctx.year_proceeds_so_far = 0.0
+    ctx.sale_within_test_exemption_ccy["OLD"] = 0.0
+    assert by_id(pt.run(trades, ctx))["switch.gap"].status == "pass"
     # equal-risk size: 400 x 0.20 / 0.40 = 200, the proposed 400 carries twice the risk
     assert checks["switch.size"].values["equal_risk_value"] == pytest.approx(200)
     assert checks["switch.size"].status == "flag"

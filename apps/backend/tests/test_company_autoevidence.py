@@ -11,7 +11,7 @@ D = Decimal
 
 def year(label, fcf, div, buy, shares, issued_net, fps):
     return AllocationYear(
-        column=label,
+        column=f"a:{label[2:]}-12-31",  # statement column id carries the period end
         label=label,
         fcf=fcf,
         capex=None,
@@ -43,6 +43,19 @@ def test_capital_observations_are_computed_over_the_window_with_stated_inputs():
     assert obs["net_acquisitions"].value is None  # not filed is unknown, never zero
     cagr = obs["fcf_per_share_growth"].value
     assert cagr is not None and abs(cagr - D("0.8166")) < D("0.001")  # (0.33/0.10) ** 0.5 - 1
+
+
+def test_fcf_per_share_growth_uses_calendar_years_not_the_count_of_positive_years():
+    years = [
+        year("FY2022", D(100), None, None, None, None, D("0.10")),
+        year("FY2023", D(-5), None, None, None, None, D("-0.01")),
+        year("FY2024", D(300), None, None, None, None, D("0.40")),
+    ]
+    obs = {o.id: o for o in ae.capital_observations(years)}
+    cagr = obs["fcf_per_share_growth"].value
+    # Two years elapsed between FY2022 and FY2024:
+    # (0.40 / 0.10) ** (1/2) - 1 = 1.0, not ** (1/1) = 3.0.
+    assert cagr is not None and abs(cagr - D("1.0")) < D("0.01")
 
 
 def test_missing_inputs_leave_an_empty_figure_with_its_reason_never_zero():

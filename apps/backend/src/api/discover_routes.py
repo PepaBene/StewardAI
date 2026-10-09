@@ -982,8 +982,13 @@ async def run_saved_screen(
         req = StockRequest.model_validate(raw)
         result = await _run_stock(pool, owner.user_id, req)
         sid = req.snapshot_id
+        if req.universe == "snapshot" and sid is None:  # resolved by date, as `_scope` does
+            sid = await read.snapshot_id_for(pool, result.as_of)
     result.warnings.extend(notes)
     keys = [r.key for r in result.rows]
+    if cursor is not None:  # one run is one execution: later pages are not recorded again
+        result.warnings.append("this page continues a recorded run; no new run record was made")
+        return result
     if result.next_cursor:  # a long result: the record holds the first page's matches only
         result.warnings.append("only the first page of matches is stored in the run record")
     excluded_total = result.failed_filter + result.unknown_excluded + result.no_data

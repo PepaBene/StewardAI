@@ -134,3 +134,13 @@ def test_discount_rate_build_up_is_stated() -> None:
     )
     assert isinstance(implied_growth_value(v), RatioValue)
     assert default_scenarios(build_view("AAA", rows(), units=1))[1].name == "base"
+
+
+def test_net_debt_treats_a_filed_balance_sheet_without_debt_as_zero_debt():
+    from steward.company import valuation as val
+
+    filed = {"cash": D("50"), "total_assets": D("500"), "equity": D("300")}
+    value, note = val._net_debt(filed)
+    assert value == D("-50") and "no debt filed; taken as zero" in note
+    assert val._net_debt({"cash": D("50")})[0] is None  # no balance sheet at all stays unavailable
+    assert val._net_debt({**filed, "long_term_debt_total": D("20")})[0] == D("-30")

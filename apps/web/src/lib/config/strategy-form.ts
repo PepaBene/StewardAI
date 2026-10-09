@@ -199,6 +199,9 @@ export type StrategyForm = {
   hard_limit_severity: OnBreach;
   /** Severity of a weight outside its band (1: digest only; 2 or 3 also alert). */
   band_breach_severity: OnBreach;
+  /** Pre-trade thresholds. The editor has no fields for them; they are kept as loaded so a
+   *  save never resets them to the defaults. */
+  pretrade?: StrategyConfig["pretrade"];
 };
 
 export const newCategory = (name = ""): CategoryForm => ({ key: nextKey(), name });
@@ -262,6 +265,7 @@ export function strategyFromBody(body: StrategyConfig | null): StrategyForm {
     notes: b.notes ?? "",
     hard_limit_severity: b.hard_limit_severity ?? "severity_3",
     band_breach_severity: b.band_breach_severity ?? "severity_1",
+    pretrade: b.pretrade,
     risk_max_volatility: fractionToPercent(b.risk?.max_volatility),
     risk_max_beta: b.risk?.max_beta == null ? "" : String(b.risk.max_beta),
     risk_position_loss_review: fractionToPercent(b.risk?.position_loss_review),
@@ -400,6 +404,7 @@ export function strategyToBody(form: StrategyForm): StrategyConfig {
     },
     hard_limit_severity: form.hard_limit_severity,
     band_breach_severity: form.band_breach_severity,
+    ...(form.pretrade ? { pretrade: form.pretrade } : {}),
   };
 }
 

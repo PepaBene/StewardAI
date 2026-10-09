@@ -579,7 +579,9 @@ class PatentTech(BaseModel):
 class Network(BaseModel):
     ticker: str
     since: dt.date
-    since_basis: Literal["chosen", "last_review", "default_90_days"] = "chosen"
+    since_basis: Literal["chosen", "last_review", "last_journal_entry", "default_90_days"] = (
+        "chosen"
+    )
     edges: list[GraphEdge]
     suggested_count: int
     events: list[GraphEvent]
@@ -593,15 +595,29 @@ class Network(BaseModel):
     method_version: str
 
 
-async def network(pool: asyncpg.Pool, ticker: str, since: dt.date | None = None) -> Network:
+async def network(
+    pool: asyncpg.Pool, ticker: str, since: dt.date | None = None, owner_id: Any = None
+) -> Network:
     basis = "chosen"
     if since is None:
-        reviewed = await pool.fetchval(
-            "select max(created_at)::date from public.report where type='review' and ticker=$1",
-            ticker,
+        # The monthly review report carries no ticker, so the last review is the newer of the
+        # owner's latest journal entry for this ticker and the latest monthly review report.
+        journal = (
+            await pool.fetchval(
+                "select max(created_at)::date from public.decision_journal where owner_id=$1 and ticker=$2",
+                owner_id,
+                ticker,
+            )
+            if owner_id is not None
+            else None
         )
+        report = await pool.fetchval(
+            "select max(created_at)::date from public.report where type='review'"
+        )
+        reviewed = max((d for d in (journal, report) if d is not None), default=None)
         if reviewed is not None:
-            since, basis = reviewed, "last_review"
+            since = reviewed
+            basis = "last_review" if reviewed == report else "last_journal_entry"
         else:
             since, basis = dt.date.today() - dt.timedelta(days=90), "default_90_days"
     cutoff = dt.datetime.combine(since, dt.time.min, tzinfo=dt.UTC)

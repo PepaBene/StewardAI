@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from steward.funds.aggregate import AggregateReport, FundAsOf, IssuerExposure, Unknown
+from steward.funds.aggregate import AggregateReport, FundAsOf, IssuerExposure, Unknown, is_shared
 
 
 class XrayDrop(BaseModel):
@@ -75,7 +75,7 @@ def intersection(report: AggregateReport, *, limit: int = 100) -> XrayIntersecti
     issuers = report.issuers
     weights = [x.weight for x in issuers]
     hhi0, eff0, top0 = _stats(weights)
-    shared = [x for x in issuers if len(x.channels) > 1]
+    shared = [x for x in issuers if is_shared(x.channels)]
     largest0 = max(issuers, key=lambda x: x.weight, default=None)
     removals: list[XrayRemoval] = []
     for fund in sorted(report.funds, key=lambda f: -f.weight):
@@ -129,14 +129,13 @@ def intersection(report: AggregateReport, *, limit: int = 100) -> XrayIntersecti
                 shared_after=sum(
                     1
                     for x, _ in after
-                    if len(
+                    if is_shared(
                         [c for c in x.channels if not (c.kind == "fund" and c.isin == fund.isin)]
                     )
-                    > 1
                 ),
             )
         )
-    ordered = sorted(issuers, key=lambda x: (-(len(x.channels) > 1), -x.weight))
+    ordered = sorted(issuers, key=lambda x: (-is_shared(x.channels), -x.weight))
     notes = [
         "Issuers are merged across securities (an ADR and its ordinary share, share classes); "
         "open an issuer to see each security and the channel it comes through.",

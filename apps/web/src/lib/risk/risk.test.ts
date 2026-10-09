@@ -54,10 +54,10 @@ describe("buildShock", () => {
 });
 
 describe("parseLegs", () => {
-  it("reads buys and sells", () => {
-    expect(parseLegs("buy vuaa 1500\nSELL CSPX 800,50")).toEqual({
+  it("reads buys and sells, keeping the ticker as typed (the server matches its case)", () => {
+    expect(parseLegs("buy CSPXl_EQ 1500\nSELL CSPX 800,50")).toEqual({
       legs: [
-        { side: "buy", ticker: "VUAA", value_base: 1500 },
+        { side: "buy", ticker: "CSPXl_EQ", value_base: 1500 },
         { side: "sell", ticker: "CSPX", value_base: 800.5 },
       ],
     });

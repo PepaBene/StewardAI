@@ -105,9 +105,10 @@ export function buildShock(form: ShockForm): { body: ShockBody } | { error: stri
   const fx = parseKeyed(form.fx, { percent: true });
   const sector = parseKeyed(form.sector, { percent: true, keepCase: true });
   const country = parseKeyed(form.country, { percent: true });
-  const betas = parseKeyed(form.betas, { percent: false });
-  const durations = parseKeyed(form.durations, { percent: false });
-  const spreads = parseKeyed(form.spreadDurations, { percent: false });
+  // Ticker keys keep their case (CSPXl_EQ); the server matches it to the held ticker.
+  const betas = parseKeyed(form.betas, { percent: false, keepCase: true });
+  const durations = parseKeyed(form.durations, { percent: false, keepCase: true });
+  const spreads = parseKeyed(form.spreadDurations, { percent: false, keepCase: true });
   const problem = [fx, sector, country, betas, durations, spreads].flatMap((p) => p.problems)[0];
   if (problem) return { error: problem };
   const shocks: ShockSet = {
@@ -147,7 +148,8 @@ export function parseLegs(text: string): { legs: TradeLeg[] } | { error: string 
       return { error: `“${line}” should read like “buy VUAA 1500” (buy or sell, the ticker, an amount in your base currency), and a buy may end with “bear 80” for your bear-case price.` };
     }
     const side = match[1].toLowerCase() as TradeLeg["side"];
-    legs.push({ side, ticker: match[2].toUpperCase(), value_base: value, ...(side === "buy" && bear ? { bear_case_price: bear } : {}) });
+    // Broker tickers are case-sensitive (CSPXl_EQ); the server matches the case to a held one.
+    legs.push({ side, ticker: match[2], value_base: value, ...(side === "buy" && bear ? { bear_case_price: bear } : {}) });
   }
   if (legs.length === 0) return { error: "Add at least one trade." };
   return { legs };

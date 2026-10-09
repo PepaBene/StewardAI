@@ -75,6 +75,11 @@ class WindowOut(BaseModel):
     twr: Figure
     twr_annualized: float | None
     xirr: Figure
+    xirr_annualized: bool = Field(
+        default=True,
+        description="False when the window is under a year: `xirr` is then the money-weighted "
+        "return over the window itself, not an annual rate.",
+    )
     reason: str | None
     benchmark: BenchmarkOut | None
 
@@ -103,6 +108,10 @@ class LedgerHealth(BaseModel):
     unsupported: list[str]
     needs_fx: int
     fees_not_captured: int
+    fees_excluded: list[str] = Field(
+        default_factory=list,
+        description="Fills whose fee lines in another currency than the fill were left out.",
+    )
     position_breaks: list[PositionBreakOut]
     cash_breaks: list[CashBreakOut]
     cash_breaks_total: int

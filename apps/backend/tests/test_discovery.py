@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import pytest
 
+from steward.analytics.versions import version
 from steward.discovery import baselines, composite, universe
 from steward.discovery.build import (
     FundInputs,
@@ -353,6 +354,123 @@ def test_currency_mismatch_blocks_market_cap_and_gbx_is_converted() -> None:
     assert mismatch.values["dividend_yield"].value is None
 
 
+def test_market_cap_uses_split_adjusted_share_count_and_needs_a_known_currency() -> None:
+    # A 2-for-1 split after the filed share count: closes are on the post-split basis.
+    member = m("S", currency="USD")
+    shares = [(dt.date(2025, 12, 31), D(100))]
+    split = stock_record(
+        member,
+        StockInputs(
+            periods=[period()],
+            closes=closes(30, "10", "0"),
+            shares=shares,
+            splits=[(dt.date(2026, 3, 1), D(2)), (dt.date(2024, 1, 1), D(5))],
+        ),
+        TODAY,
+    )
+    assert split.values["market_cap"].value == D(10) * 100 * 2  # only the later split counts
+    unknown = stock_record(
+        member,
+        StockInputs(periods=[period(unit="shares")], closes=closes(30, "10", "0"), shares=shares),
+        TODAY,
+    )
+    assert unknown.values["market_cap"].value is None
+    assert "statement currency unknown" in (unknown.values["market_cap"].reason or "")
+
+
+def test_a_split_no_corporate_action_records_is_read_from_a_later_restated_filing() -> None:
+    from steward.discovery.build import split_factor
+
+    filed = (dt.date(2023, 1, 29), D("2490"))
+    # The 10-for-1 split shows in the next 10-K, which restates FY2023 at 24,940.
+    factor, how = split_factor(filed, [], [(dt.date(2023, 1, 29), D("24940"))])
+    assert factor == 10 and how is not None and "inferred" in how
+    # A 1-for-4 reverse split.
+    assert split_factor(filed, [], [(dt.date(2023, 1, 29), D("622.4"))])[0] == D(1) / 4
+    # A 3% correction is not a split; neither is an unchanged count or a missing restatement.
+    assert split_factor(filed, [], [(dt.date(2023, 1, 29), D("2565"))]) == (1, None)
+    assert split_factor(filed, [], [filed]) == (1, None)
+    assert split_factor(filed, [], []) == (1, None)
+    # A stored split wins and is not counted twice with the restatement.
+    stored = split_factor(filed, [(dt.date(2024, 6, 10), D(10))], [(filed[0], D("24940"))])
+    assert stored == (10, None)
+    # Wired into the market cap, with the inference named in the source.
+    rec = stock_record(
+        m("N", currency="USD"),
+        StockInputs(
+            periods=[period()],
+            closes=closes(30, "10", "0"),
+            shares=[(dt.date(2025, 12, 31), D(100))],
+            restated_shares=[(dt.date(2025, 12, 31), D(200))],
+        ),
+        TODAY,
+    )
+    assert rec.values["market_cap"].value == D(10) * 100 * 2
+    assert "inferred" in (rec.values["market_cap"].source or "")
+
+
+def test_volatility_is_withheld_when_the_latest_close_is_stale() -> None:
+    stale = stock_record(
+        m("V", currency="USD"),
+        StockInputs(closes=closes(260, "10", "0.01", end=TODAY - dt.timedelta(days=40))),
+        TODAY,
+    )
+    fresh = stock_record(
+        m("V", currency="USD"), StockInputs(closes=closes(260, "10", "0.01")), TODAY
+    )
+    assert stale.values["volatility_1y"].value is None
+    assert "too old" in (stale.values["volatility_1y"].reason or "")
+    assert fresh.values["volatility_1y"].value is not None
+
+
+def test_screen_roic_equals_the_ratio_page_definition_and_banks_are_not_meaningful() -> None:
+    from steward.analytics.ratio_set import nopat_roic
+
+    prior = period(
+        period_end=dt.date(2024, 12, 31),
+        inputs={
+            **period()["inputs"],
+            "equity": {"concept": "e", "value": D(700)},
+            "debt": {"concept": "d", "value": D(250)},
+            "cash": {"concept": "ca", "value": D(50)},
+        },
+    )
+    cur = period(
+        inputs={
+            **period()["inputs"],
+            "tax": {"concept": "t", "value": D(80)},
+            "pretax": {"concept": "p", "value": D(100)},  # 80 % rate: capped at 50 %
+        }
+    )
+    r = stock_record(m("R", currency="USD"), StockInputs(periods=[prior, cur]), TODAY)
+    expected = nopat_roic(D(200), D(100), D(80), D(800 + 300 - 100), D(700 + 250 - 50))
+    assert expected.value is not None and r.values["roic"].value == expected.value
+    bank = stock_record(
+        m("B", currency="USD"),
+        StockInputs(periods=[prior, cur], sector="Financial Services", industry="Banks"),
+        TODAY,
+    )
+    assert bank.values["roic"].value is None and "banks" in (bank.values["roic"].reason or "")
+    assert bank.values["ev_ebit"].value is None
+
+
+def test_forward_pe_needs_matching_consensus_currency() -> None:
+    member = m("F", currency="USD")
+    ok = stock_record(
+        member,
+        StockInputs(closes=closes(30, "10", "0"), forward_eps=D(2), forward_currency="USD"),
+        TODAY,
+    )
+    assert ok.values["forward_pe"].value == D(5)
+    bad = stock_record(
+        member,
+        StockInputs(closes=closes(30, "10", "0"), forward_eps=D(2), forward_currency="EUR"),
+        TODAY,
+    )
+    assert bad.values["forward_pe"].value is None
+    assert "differs from price currency" in (bad.values["forward_pe"].reason or "")
+
+
 def test_instrument_with_nothing_stored_is_counted_as_no_data_not_failed() -> None:
     empty = stock_record(m("E", country="US", currency="USD"), StockInputs(), TODAY)
     assert empty.no_data_reason and not any(
@@ -441,6 +559,18 @@ def test_red_flags_and_idea_pipeline_speculative_tier() -> None:
 
     records = universe_of(30)
     scores = composite.compute_qvm(records)
+    # Unchecked red flags (missing data) are not a clean bill: the row abstains with the reason.
+    unchecked = composite.idea_pipeline(records, scores)["S29"]
+    assert not unchecked.passes and "red flags not checked" in unchecked.reasons
+    for r in records:
+        for metric, value in (
+            ("share_change_1y", D(0)),
+            ("asset_growth", D(0)),
+            ("accruals_ratio", D(0)),
+            ("years_since_listing", D(10)),
+        ):
+            r.values[metric] = MetricValue(value=value)
+        r.values["cash_runway_years"] = MetricValue(value=None, reason="not burning cash")
     verdicts = composite.idea_pipeline(records, scores)
     assert verdicts["S29"].passes and not verdicts["S00"].passes
     assert sum(v.passes for v in verdicts.values()) == 10  # the top third, none flagged
@@ -585,7 +715,8 @@ def test_csv_export_carries_provenance_and_unknown_is_blank_with_reason() -> Non
     lines = text.splitlines()
     assert lines[0].startswith("# StewardAI discovery export")
     assert any(
-        f"definition_hash={out.definition_hash}" in ln and "method_version=2.0.0" in ln
+        f"definition_hash={out.definition_hash}" in ln
+        and f"method_version={version('screen')}" in ln
         for ln in lines
     )
     header = next(ln for ln in lines if not ln.startswith("#"))

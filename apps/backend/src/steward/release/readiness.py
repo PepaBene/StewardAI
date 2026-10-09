@@ -21,6 +21,7 @@ Status = Literal["ready", "partial", "unavailable", "untested"]
 AuditState = Literal["none", "thin", "passed", "mismatch"]
 
 # Access states in which an endpoint cannot be used at no cost.
+STORE_COUNT_CAP = 1000  # store row counts stop here and show as "1,000+ rows"
 DEAD_STATES = {"paid_only", "not_covered"}
 TEMPORARY_STATES = {"quota_exhausted", "temporarily_failed", "disputed"}
 
@@ -156,7 +157,9 @@ def _store_input(name: str, counts: dict[str, int]) -> InputState:
         kind="store",
         required=True,
         ok=n > 0,
-        detail=f"{n:,} rows" if n else "no data stored",
+        detail=(f"{STORE_COUNT_CAP:,}+ rows" if n > STORE_COUNT_CAP else f"{n:,} rows")
+        if n
+        else "no data stored",
     )
 
 
@@ -235,8 +238,11 @@ async def _counts(pool: asyncpg.Pool) -> dict[str, int]:
     out: dict[str, int] = {}
     for name, table in STORES.items():
         # Table names come from the constant STORES map above, never from a request.
+        # Capped count: one past the cap says "more than the cap" without scanning a big table.
         out[name] = int(
-            await pool.fetchval(f"select count(*) from (select 1 from public.{table} limit 1) t")  # noqa: S608
+            await pool.fetchval(
+                f"select count(*) from (select 1 from public.{table} limit {STORE_COUNT_CAP + 1}) t"  # noqa: S608
+            )
         )
     return out
 

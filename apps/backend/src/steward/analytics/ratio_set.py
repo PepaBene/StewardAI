@@ -173,14 +173,29 @@ def _dilution(years: int) -> Callable[[Period], RatioValue]:
 def _nopat_roic(p: Period) -> RatioValue:
     if (v := _financial(p, "ROIC")) is not None:
         return v
-    ebit, pretax, tax = _ebit(p), _num(p, "pretax_income"), _num(p, "income_tax")
+    return nopat_roic(
+        _ebit(p),
+        _num(p, "pretax_income"),
+        _num(p, "income_tax"),
+        _invested_capital(p.f),
+        _invested_capital(p.prior),
+    )
+
+
+def nopat_roic(
+    ebit: Decimal | None,
+    pretax: Decimal | None,
+    tax: Decimal | None,
+    ic_now: Decimal | None,
+    ic_before: Decimal | None,
+) -> RatioValue:
+    """The one ROIC definition (ratios page, peer compare and screen): NOPAT at the tax rate
+    capped to 0-50% over the average of invested capital now and a year earlier."""
     if ebit is None or pretax is None or tax is None:
         return _missing("operating income, pre-tax income or tax")
     if pretax <= 0:
         return _nm("negative pre-tax income: no meaningful tax rate")
     rate = min(max(tax / pretax, ZERO), Decimal("0.5"))
-    ic_now = _invested_capital(p.f)
-    ic_before = _invested_capital(p.prior)
     if ic_now is None or ic_before is None:
         return _missing("invested capital now or a year earlier")
     avg = (ic_now + ic_before) / 2

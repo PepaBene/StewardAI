@@ -78,7 +78,10 @@ function amount(label: string, raw: string, min: number, max: number, errors: st
   return n;
 }
 
-export type FormResult = { ok: true; body: Settings } | { ok: false; errors: string[] };
+/** The backend accepts weights within 1e-6 of 1, i.e. 1e-4 percentage points of 100. */
+const WEIGHT_TOLERANCE_POINTS = 1e-4;
+
+export type FormResult ={ ok: true; body: Settings } | { ok: false; errors: string[] };
 
 /** Validates the form the way the backend will, so mistakes show before saving. */
 export function formToSettings(form: SettingsForm): FormResult {
@@ -104,8 +107,8 @@ export function formToSettings(form: SettingsForm): FormResult {
     const weights = rows.map((r) => Number(r.weight));
     if (rows.some((r, i) => r.symbol.trim() === "" || !Number.isFinite(weights[i]) || weights[i] <= 0 || weights[i] > 100)) {
       errors.push("Every benchmark line needs a symbol and a weight between 0 and 100.");
-    } else if (Math.abs(weights.reduce((a, b) => a + b, 0) - 100) > 0.01) {
-      errors.push("Benchmark weights must add up to 100.");
+    } else if (Math.abs(weights.reduce((a, b) => a + b, 0) - 100) > WEIGHT_TOLERANCE_POINTS) {
+      errors.push("Benchmark weights must add up to 100 (use more decimals, such as 33.333333, for thirds).");
     }
     if (rows.some((r) => !/^[A-Za-z]{3}$/.test(r.currency.trim()))) errors.push("Every benchmark line needs a three-letter currency code.");
     if (new Set(rows.map((r) => r.symbol.trim())).size !== rows.length) errors.push("A benchmark symbol appears twice.");

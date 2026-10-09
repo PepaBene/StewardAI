@@ -784,10 +784,7 @@ def build_style(
             "no_earnings": "Negative earnings",
             "not_covered": "Not classified (no statements)",
         }
-        value_growth = [
-            StyleBand(label=names[k], weight=vg[k] / equity, kind=k)
-            for k in names
-        ]
+        value_growth = [StyleBand(label=names[k], weight=vg[k] / equity, kind=k) for k in names]
     metrics: list[StyleMetric] = []
     if equity > 0:
         ey = portfolio_earnings_yield(
@@ -1204,10 +1201,12 @@ def build_checklist(
             )
         )
     else:
-        er = D(f.get("expense_ratio")) or ZERO
-        gap = abs(tracking_difference) - er
+        er = D(f.get("expense_ratio"))  # a missing charge stays unknown, never 0
+        gap = abs(tracking_difference) - er if er is not None else None
         status: Status = (
-            "good"
+            "unknown"
+            if gap is None
+            else "good"
             if gap <= Decimal("0.005")
             else ("watch" if gap <= Decimal("0.015") else "concern")
         )
@@ -1216,7 +1215,8 @@ def build_checklist(
                 id="tracking",
                 label="Tracking evidence",
                 status=status,
-                observed=f"{tracking_difference:+.2%} a year against the benchmark",
+                observed=f"{tracking_difference:+.2%} a year against the benchmark"
+                + ("" if er is not None else "; the expense ratio is not recorded, so no verdict"),
                 rule="Annualised tracking difference within 0.50 percentage points of the charge is good, within 1.5 watch",
                 source="stored price series",
             )

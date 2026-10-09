@@ -15,9 +15,11 @@ Nothing is fetched from a provider on a request.
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from itertools import pairwise
+from typing import Any
 
 import asyncpg
 
@@ -86,6 +88,25 @@ async def _benchmark_returns(
     return {r.end: _d(r.value) for r in trading_day_returns(converted)}, None
 
 
+def organic_returns(items: Sequence[Mapping[str, Any]]) -> dict[dt.date, Decimal]:
+    """Daily returns of one holding from its snapshots (`snapshot_date`, `quantity`,
+    `avg_price`, `fx_rate`, `value_base`), net of the money traded between them."""
+    out: dict[dt.date, Decimal] = {}
+    for prev, cur in pairwise(items):
+        gap = (cur["snapshot_date"] - prev["snapshot_date"]).days
+        if gap > MAX_GAP_DAYS or cur["snapshot_date"].weekday() >= 5:
+            continue
+        if prev["value_base"] <= 0 or cur["value_base"] <= 0:
+            continue
+        # The change in cost basis is the money traded, valued at one (today's) rate: a day's
+        # move in the rate is part of the return, not a trade.
+        traded = (cur["quantity"] * cur["avg_price"] - prev["quantity"] * prev["avg_price"]) * cur[
+            "fx_rate"
+        ]
+        out[cur["snapshot_date"]] = (cur["value_base"] - traded) / prev["value_base"] - 1
+    return out
+
+
 async def holding_returns(
     pool: asyncpg.Pool, since: dt.date
 ) -> tuple[dict[str, dict[dt.date, Decimal]], dict[str, Decimal]]:
@@ -101,19 +122,7 @@ async def holding_returns(
         by_ticker.setdefault(r["ticker"], []).append(r)
     series: dict[str, dict[dt.date, Decimal]] = {}
     for ticker, items in by_ticker.items():
-        out: dict[dt.date, Decimal] = {}
-        for prev, cur in pairwise(items):
-            gap = (cur["snapshot_date"] - prev["snapshot_date"]).days
-            if gap > MAX_GAP_DAYS or cur["snapshot_date"].weekday() >= 5:
-                continue
-            if prev["value_base"] <= 0 or cur["value_base"] <= 0:
-                continue
-            traded = (
-                cur["quantity"] * cur["avg_price"] * cur["fx_rate"]
-                - prev["quantity"] * prev["avg_price"] * prev["fx_rate"]
-            )
-            out[cur["snapshot_date"]] = (cur["value_base"] - traded) / prev["value_base"] - 1
-        if out:
+        if out := organic_returns(items):
             series[ticker] = out
     latest = max((r["snapshot_date"] for r in rows), default=None)
     values = {r["ticker"]: r["value_base"] for r in rows if r["snapshot_date"] == latest}

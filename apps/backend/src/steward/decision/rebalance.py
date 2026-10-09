@@ -10,7 +10,9 @@ action there. The arithmetic is plain and every assumption is an input shown bac
   target, `to_band` to the nearest band edge, which trades less);
 - the cash the plan may spend is current cash plus a deposit (or minus a withdrawal) plus sale
   proceeds net of costs, less the cash floor (the lower edge of the cash band, if one is set);
-  buys that the cash cannot fund are scaled down pro rata and the shortfall is reported;
+  buys that the cash cannot fund are scaled down pro rata and the shortfall is reported; a
+  withdrawal the cash cannot meet is raised by selling the targeted positions pro rata;
+- bands are judged on the weight after the deposit or withdrawal;
 - a trade costs `|value| x (fx_cost_bps if the instrument is not quoted in the base currency, plus
   trade_cost_bps)`. The defaults are assumptions the owner edits; they are not read from a
   broker schedule;
@@ -22,7 +24,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -58,9 +60,10 @@ class RebalanceRequest(BaseModel):
         le=500,
         description="Assumed commission and spread per trade, basis points.",
     )
-    target_overrides: dict[str, float] = Field(
+    target_overrides: dict[str, Annotated[float, Field(ge=0, le=1)]] = Field(
         default_factory=dict,
-        description="Ticker -> target weight to use instead of the strategy's (what-if only).",
+        description="Ticker -> target weight (0 to 1) to use instead of the strategy's "
+        "(what-if only).",
     )
     note: str | None = Field(default=None, max_length=500)
 
@@ -114,8 +117,10 @@ METHOD = (
     "Weights are shares of total value. A position inside its band does not trade; one outside "
     "is moved to its target (or the nearest band edge). The cash that may be spent is cash plus "
     "deposit plus sale proceeds net of costs, less the cash floor; buys the cash cannot fund "
-    "are scaled down together and the shortfall is shown. Costs use the stated basis-point "
-    "assumptions. Nothing is sent to the broker."
+    "are scaled down together and the shortfall is shown. A withdrawal the cash cannot meet is "
+    "raised by selling the targeted positions pro rata. Bands are judged on the weights after "
+    "the deposit or withdrawal. Costs use the stated basis-point assumptions. Nothing is sent "
+    "to the broker."
 )
 
 
@@ -150,6 +155,9 @@ def plan(
 
     targets = {t.ticker: t for t in strategy.target_positions}
     for ticker, weight in request.target_overrides.items():
+        # `model_copy` below skips validation, so an override is checked here as well.
+        if not 0 <= weight <= 1:
+            raise ValueError(f"{ticker}: a target weight must be between 0 and 100%.")
         base_target = targets.get(ticker)
         if base_target is not None:
             targets[ticker] = base_target.model_copy(update={"target_weight": weight})
@@ -177,7 +185,8 @@ def plan(
     for ticker, target in targets.items():
         h = held.get(ticker)
         value = h.value_base if h else 0.0
-        weight = value / total_now
+        # The band is judged on the weight after the deposit or withdrawal moves the total.
+        weight = value / after_deposit
         lower = max(0.0, target.target_weight - target.band)
         upper = target.target_weight + target.band
         goal = value
@@ -204,9 +213,26 @@ def plan(
         rate = _cost_rate(currency, base, request)
         rows.append({"ticker": ticker, "value": value, "delta": goal - value, "rate": rate})
 
-    sells = [r for r in rows if r["delta"] < -EPS]
+    proceeds = sum(-r["delta"] * (1 - r["rate"]) for r in rows if r["delta"] < -EPS)
+    # A withdrawal the cash cannot meet (down to the floor) is raised by selling the targeted
+    # positions not being bought, pro rata to what they hold after the planned sales.
+    shortfall = max(0.0, floor - (cash_base + request.deposit + proceeds))
+    if shortfall > EPS:
+        sellable = [r for r in rows if r["delta"] <= EPS and r["value"] + r["delta"] > EPS]
+        net = sum((r["value"] + r["delta"]) * (1 - r["rate"]) for r in sellable)
+        k = min(1.0, shortfall / net) if net > EPS else 0.0
+        for r in sellable:
+            r["delta"] -= k * (r["value"] + r["delta"])
+            reasons[r["ticker"]] += "; sold pro rata to fund the withdrawal"
+        if net * k < shortfall - 1e-6:
+            warnings.append(
+                f"Selling every targeted position covers {net * k:,.0f} of the "
+                f"{shortfall:,.0f} {base} the withdrawal needs; positions with no target are "
+                "never sold here."
+            )
+        proceeds = sum(-r["delta"] * (1 - r["rate"]) for r in rows if r["delta"] < -EPS)
+
     buys = [r for r in rows if r["delta"] > EPS]
-    proceeds = sum(-r["delta"] * (1 - r["rate"]) for r in sells)
     wanted_spend = sum(r["delta"] * (1 + r["rate"]) for r in buys)
     available = max(0.0, cash_base + request.deposit + proceeds - floor)
     scale = 1.0 if wanted_spend <= EPS else min(1.0, available / wanted_spend)
@@ -216,7 +242,7 @@ def plan(
             f"The cash can fund {scale:.0%} of the wanted buys; each buy is scaled to that share "
             f"and {unfunded:,.0f} {base} stays unfunded."
         )
-    if request.deposit < 0 and cash_base + request.deposit < floor - EPS:
+    if request.deposit < 0 and cash_base + request.deposit + proceeds < floor - 1e-6:
         warnings.append("The withdrawal takes cash below the floor of the cash band.")
 
     trades: list[Trade] = []

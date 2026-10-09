@@ -13,6 +13,7 @@ import pytest
 from api.auth import AuthenticatedUser, require_owner
 from api.db import get_pool, get_pool_or_error
 from api.main import create_app
+from steward.analytics.versions import version
 from tests.conftest import MigratedDatabase
 
 OWNER = "7f0c3d4e-0000-4000-8000-0000000000aa"
@@ -95,7 +96,7 @@ async def test_universe_view_screen_accounting_and_unknown_handling(api: httpx.A
     row = out["rows"][0]
     assert Decimal(row["values"]["gross_margin"]["value"]) == Decimal("0.5")
     assert row["values"]["market_cap"]["value"] is not None and row["checks"][0]["outcome"] == "pass"
-    assert out["method_version"] == "2.0.0" and out["definition_hash"] and out["result_hash"]
+    assert out["method_version"] == version("screen") and out["definition_hash"] and out["result_hash"]
 
     # No issuer has a dividend history: the filter is refused rather than passing everyone as 0 >= -1.
     zero = await api.post("/discover/stocks", json={"filters": [f("dividend_yield", "gte", "-1")]})

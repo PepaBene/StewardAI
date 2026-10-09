@@ -20,6 +20,31 @@ LIMITS = RiskLimits(
 )
 
 
+async def test_stress_limit_measures_the_shocked_loss(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The stress limit runs the shock engine (an import error here once left it unavailable)."""
+    from types import SimpleNamespace
+
+    from steward.decision import service
+    from steward.portfolio import risk_limits
+
+    seen: dict[str, object] = {}
+
+    async def fake_run_shock(pool, owner, shocks, assumptions):  # type: ignore[no-untyped-def]
+        seen["equity_pct"] = shocks.equity_pct
+        return SimpleNamespace(result=SimpleNamespace(pnl_pct=-0.12))
+
+    monkeypatch.setattr(service, "run_shock", fake_run_shock)
+    monkeypatch.setattr(risk_limits, "get_settings", lambda: SimpleNamespace(owner_user_id="owner"))
+    strategy = StrategyConfig(
+        base_currency="CZK", risk=RiskLimits(max_stress_loss=0.2, stress_equity_fall=0.3)
+    )
+    inputs = RiskInputs()
+    await risk_limits._decision_inputs(None, strategy, [], inputs)  # type: ignore[arg-type]
+    assert "stress" not in inputs.unavailable
+    assert inputs.stress_loss == pytest.approx(0.12)
+    assert seen["equity_pct"] == pytest.approx(-0.3)
+
+
 def test_risk_limits_default_to_off() -> None:
     assert evaluate_risk(RiskInputs(volatility=5.0, beta=9.0), RiskLimits()) == []
     assert StrategyConfig(base_currency="CZK").risk == RiskLimits()

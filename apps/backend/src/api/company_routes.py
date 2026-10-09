@@ -214,7 +214,9 @@ async def get_thesis_prefill(ticker: TickerPath, pool: Pool, owner: Owner) -> Th
 
 
 @router.post("/{ticker}/thesis-draft", response_model=thesis_draft.ThesisDraft)
-async def post_thesis_draft(ticker: TickerPath, pool: Pool, owner: Owner) -> thesis_draft.ThesisDraft:
+async def post_thesis_draft(
+    ticker: TickerPath, pool: Pool, owner: Owner
+) -> thesis_draft.ThesisDraft:
     """A first draft of the thesis text from the stored research, computed figures and report
     conflicts. Every line names the facts it rests on; a line with none is removed. One model
     call (the chat model); nothing is saved, so you edit the draft and save it yourself."""
@@ -227,7 +229,10 @@ async def post_thesis_draft(ticker: TickerPath, pool: Pool, owner: Owner) -> the
     except AINotConfigured:
         llm = create_llm(get_settings(), None)
     try:
-        return await thesis_draft.draft_thesis(llm, model, built)
+        # Inside a job, so the Budget config's caps apply and the cost is recorded.
+        return await thesis_draft.draft_within_budget(pool, llm, model, built)
+    except thesis_draft.DraftBudgetRefused as err:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(err)) from err
     except thesis_draft.DraftUnavailable as err:
         raise HTTPException(status.HTTP_409_CONFLICT, str(err)) from err
 
@@ -528,6 +533,7 @@ async def save_scenarios(
                 "price": result.price,
             }
         ),
+        result.model_dump(mode="json"),
     )
 
 
@@ -543,13 +549,13 @@ async def get_estimates(ticker: TickerPath, pool: Pool, _owner: Owner) -> eviden
 async def get_network(
     ticker: TickerPath,
     pool: Pool,
-    _owner: Owner,
+    owner: Owner,
     since: Annotated[
         dt.date | None, Query(description="Mark rows first seen on or after this date.")
     ] = None,
 ) -> evidence.Network:
     """Confirmed relationships and deal events, and the patent-family mix, with ownership-mapping caveats."""
-    return await evidence.network(pool, ticker, since)
+    return await evidence.network(pool, ticker, since, owner.user_id)
 
 
 @router.get("/{ticker}/capital-allocation", response_model=evidence.CapitalAllocation)

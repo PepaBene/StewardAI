@@ -1,6 +1,7 @@
 "use client";
 
 import { LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
@@ -149,7 +150,7 @@ export function WatchlistView() {
               <div className="divide-y divide-border">
                 {items.map((item) => (
                   <form key={item.id} onSubmit={(event) => { event.preventDefault(); void saveItem(item, event.currentTarget); }} className="grid grid-cols-[130px_100px_130px_130px_minmax(190px,1fr)_minmax(190px,1fr)_88px] items-start gap-3 px-5 py-3">
-                    <div className="min-w-0 pt-1"><div className="font-mono text-sm font-semibold text-text">{item.ticker}</div><div className="mt-0.5 truncate text-xs text-text-muted">{item.list_name}</div><input type="hidden" name="list_name" value={item.list_name} /></div>
+                    <div className="min-w-0 pt-1"><Link href={`/companies/${encodeURIComponent(item.ticker)}`} className="font-mono text-sm font-semibold text-text hover:text-accent-ink hover:underline">{item.ticker}</Link><div className="mt-0.5 truncate text-xs text-text-muted">{item.list_name}</div><div className="mt-0.5 flex gap-2 text-xs"><Link href={`/companies/${encodeURIComponent(item.ticker)}/financials`} className="text-text-muted hover:text-accent-ink hover:underline">Financials</Link><Link href={`/companies/${encodeURIComponent(item.ticker)}/ratios`} className="text-text-muted hover:text-accent-ink hover:underline">Ratios</Link></div><input type="hidden" name="list_name" value={item.list_name} /></div>
                     <div className="num pt-1 text-right font-mono text-sm">{quotes.has(item.ticker.toUpperCase()) ? latestPrice(quotes.get(item.ticker.toUpperCase())!) : <span className="text-xs text-text-faint">—</span>}</div>
                     <label className="sr-only" htmlFor={`buy-${item.id}`}>Buy target for {item.ticker}</label><Input id={`buy-${item.id}`} name="buy_target" type="number" min="0" step="any" placeholder="Set target" defaultValue={item.buy_target ?? ""} />
                     <label className="sr-only" htmlFor={`sell-${item.id}`}>Sell target for {item.ticker}</label><Input id={`sell-${item.id}`} name="sell_target" type="number" min="0" step="any" placeholder="Set target" defaultValue={item.sell_target ?? ""} />

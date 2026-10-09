@@ -11,7 +11,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from steward.performance.benchmark import Basis, Rebalance
+from steward.performance.benchmark import WEIGHT_TOLERANCE, Basis, Rebalance
 from steward.performance.lots import CostMethod
 
 Ticker = str
@@ -42,10 +42,15 @@ class BenchmarkSpec(BaseModel):
 
     @model_validator(mode="after")
     def _weights_sum_to_one(self) -> BenchmarkSpec:
-        if abs(sum((c.weight for c in self.components), Decimal(0)) - 1) > Decimal("0.000001"):
+        total = sum((c.weight for c in self.components), Decimal(0))
+        if abs(total - 1) > WEIGHT_TOLERANCE:
             raise ValueError("benchmark weights must sum to 1")
         if len({c.symbol for c in self.components}) != len(self.components):
             raise ValueError("a benchmark symbol appears twice")
+        if total != 1:
+            # Rounded entries such as 33.33333 x 3 are scaled to sum to exactly 1.
+            for c in self.components:
+                c.weight = c.weight / total
         return self
 
 

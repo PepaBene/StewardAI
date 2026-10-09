@@ -11,6 +11,7 @@ import datetime as dt
 import asyncpg
 from pydantic import BaseModel, Field
 
+from steward.quality import snooze
 from steward.quality.cockpit import QualityIssue, build_cockpit
 
 DEFAULT_DAYS = 30
@@ -180,7 +181,10 @@ async def build_report(pool: asyncpg.Pool, owner_id: str) -> PilotReport | None:
         lo,
         hi,
     )
-    cockpit = await build_cockpit(pool)
+    # The same snoozes as the cockpit page, so the report lists what the page lists.
+    cockpit = snooze.with_snoozes(
+        await build_cockpit(pool), await snooze.list_rows(pool, owner_id), dt.date.today()
+    )
     return PilotReport(
         window=window,
         use=[PathUse(path=r["path"], opens=r["opens"], days=r["days"]) for r in use_rows],

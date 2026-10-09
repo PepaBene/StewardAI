@@ -77,6 +77,9 @@ class PeerStat(BaseModel):
     high: Decimal | None
     percentile: Decimal | None = Field(description="Share of peers at or below the company, 0–1.")
     withheld_reason: str | None = None
+    basis: str | None = Field(
+        default=None, description="The period the company's figure is compared on."
+    )
 
 
 class RatioRow(BaseModel):
@@ -377,11 +380,25 @@ def build_ratios(
         latest = points[-1] if points else None
         peer = None
         if peers is not None and peer_scope is not None:
+            # Peers are loaded on their last fiscal year, so a TTM company point is not compared
+            # with them: the company's latest fiscal-year point is.
+            ref, basis = latest, "latest fiscal year (company and peers)"
+            if pairs and pairs[-1][0].kind != "annual":
+                ref = next(
+                    (
+                        pt
+                        for pt, (c, _) in zip(reversed(points), reversed(pairs), strict=True)
+                        if c.kind == "annual"
+                    ),
+                    None,
+                )
+                basis = "company's latest fiscal year, not its trailing twelve months, to match the peers' fiscal year"
             peer = peer_stat(
-                latest.value if latest else None,
+                ref.value if ref else None,
                 {t: (rv.value if (rv := r.get(ratio.id)) else None) for t, r in peers.items()},
                 peer_scope,
             )
+            peer.basis = basis
         inputs: list[RatioInput] = []
         if latest_col is not None:
             for key in ratio.inputs:

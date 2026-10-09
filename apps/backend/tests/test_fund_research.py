@@ -212,6 +212,25 @@ def test_checklist_abstains_when_critical_inputs_missing():
     assert cl.summary_available is False and "Replication method" in (cl.abstain_reason or "")
 
 
+def test_tracking_criterion_stays_unknown_without_an_expense_ratio():
+    data = fund(
+        rows=[row(f"S{i}", f"US00000000{i:02d}", 0.05) for i in range(20)],
+        sheet={"total_assets": D("5e6"), "total_assets_currency": "USD", "as_of": DAY},
+    )
+    rows, hv = views(data)
+    st = analysis.build_style(
+        data.isin,
+        DAY,
+        [analysis.StyleLine(r.issuer_key, r.name, r.weight, r.sector) for r in rows],
+        D(0),
+    )
+    cl = analysis.build_checklist(
+        data, hv, st, today=DAY, tracking_difference=D("-0.003"), tracking_note=None
+    )
+    tracking = {c.id: c for c in cl.criteria}["tracking"]
+    assert tracking.status == "unknown" and "expense ratio is not recorded" in tracking.observed
+
+
 def test_value_growth_bands_vote_on_yield_and_book_and_keep_unknown_apart():
     def line(key, weight, ey, pb, covered=True):
         return analysis.StyleLine(
@@ -548,3 +567,16 @@ def test_nav_premium_needs_matching_currency_and_a_near_close():
     assert by[dt.date(2026, 9, 29)].premium == D("0.02")
     assert "EUR" in by[dt.date(2026, 9, 30)].reason
     assert "no listing close" in by[dt.date(2026, 1, 5)].reason
+
+
+def test_nav_premium_scales_pence_listing_closes_to_the_major_unit():
+    from steward.fundresearch.data import NavPoint
+
+    pts = [
+        NavPoint(
+            as_of=dt.date(2026, 9, 29), nav=D("10"), currency="GBP", source_url="https://x.test/n"
+        )
+    ]
+    view = performance.build_nav_for_listing(pts, [(dt.date(2026, 9, 29), D("1020"))], "GBX")
+    assert view.points[0].premium == D("0.02")  # GBX 1020 = GBP 10.20, not 102x the NAV
+    assert view.points[0].listing_close == D("10.20")

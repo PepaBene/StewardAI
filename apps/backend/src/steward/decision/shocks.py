@@ -133,7 +133,10 @@ class ShockScenarioResult(BaseModel):
     unshocked_weight: float
     unshocked: list[Unshocked]
     cash_weight: float
-    reconciles: bool = Field(description="after - before equals the sum of the P&L lines.")
+    reconciles: bool = Field(
+        description="The factor split and the position lines add to the P&L, and cash, shocked "
+        "and unshocked weight add to the whole portfolio."
+    )
     warnings: list[str]
     method: str
 
@@ -278,8 +281,14 @@ def apply_shocks(
     before = total_weight
     after = before * (1 + total_pnl)
     ordered = sorted(positions.values(), key=lambda p: p.pnl)
-    reconciles = abs((after - before) - before * sum(p.pnl for p in ordered)) < 1e-6 * max(
-        1.0, before
+    # Two independent tallies must agree with the total: the factor split adds to the P&L, and
+    # every leaf is counted once as cash, shocked or unshocked, adding to the whole portfolio.
+    leaf_weight = sum(leaf.weight for leaf in leafset.leaves)
+    reconciles = (
+        abs(sum(by_factor.values()) - total_pnl) < 1e-9
+        and abs(sum(p.pnl for p in ordered) - total_pnl) < 1e-9
+        and abs(cash_weight + shocked_weight + unshocked_weight - leaf_weight) < 1e-6
+        and abs(leaf_weight - 1) < 1e-4
     )
     if unshocked_weight > 0.0001:
         warnings.append(

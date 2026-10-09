@@ -490,12 +490,8 @@ def test_financial_companies_stay_out_of_profitability_and_leverage() -> None:
     )
     d = data(portfolio=portfolio(direct=False, vwce=False, cash=0.0), snapshots={CSPX_ISIN: bank})
     facts = {
-        "isin:US0000000001": covered(
-            "0.10", "1", "0.04", prof="0.05", nde="9", nde_ebitda="7"
-        ),
-        "isin:US0000000002": covered(
-            "0.05", "3", "0.02", prof="0.30", nde="1.5", nde_ebitda="2.5"
-        ),
+        "isin:US0000000001": covered("0.10", "1", "0.04", prof="0.05", nde="9", nde_ebitda="7"),
+        "isin:US0000000002": covered("0.05", "3", "0.02", prof="0.30", nde="1.5", nde_ebitda="2.5"),
     }
     out = build_fundamentals(build_leaves(d), facts)
     m = {x.id: x for x in out.metrics}
@@ -697,6 +693,42 @@ def test_proposal_cannot_exceed_the_whole_portfolio_or_name_unknown_securities()
             ProposedRequest(additions=[ProposedWeight(ticker="AAPL_US_EQ", weight=0.1)]),
             CANDIDATES,
         )
+
+
+async def test_a_past_date_is_cached_per_owner_and_date(monkeypatch: pytest.MonkeyPatch) -> None:
+    from steward.xray import service as xray_service
+
+    calls: list[object] = []
+
+    async def fake_load(_pool: object, owner: str, as_of: object = None) -> object:
+        calls.append((owner, as_of))
+        return object()
+
+    monkeypatch.setattr(xray_service, "load", fake_load)
+    xray_service.clear_cache()
+    day1, day2 = dt.date(2026, 1, 5), dt.date(2026, 1, 6)
+    first = await xray_service.load_cached(None, "o", day1)  # type: ignore[arg-type]
+    assert await xray_service.load_cached(None, "o", day1) is first  # type: ignore[arg-type]
+    await xray_service.load_cached(None, "o", day2)  # type: ignore[arg-type]
+    await xray_service.load_cached(None, "o")  # type: ignore[arg-type]
+    assert len(calls) == 3
+    xray_service.drop_cache("o")
+    await xray_service.load_cached(None, "o", day1)  # type: ignore[arg-type]
+    assert len(calls) == 4
+    xray_service.clear_cache()
+
+
+def test_the_same_addition_entered_twice_is_one_position_with_summed_weight() -> None:
+    pf = portfolio()
+    req = ProposedRequest(
+        additions=[
+            ProposedWeight(ticker="NESN_EQ", weight=0.05),
+            ProposedWeight(ticker="NESN_EQ", weight=0.05),
+        ]
+    )
+    new_pf, _ = apply_proposal(pf, req, CANDIDATES)
+    added = [p for p in new_pf.positions if p.ticker == "NESN_EQ"]
+    assert len(added) == 1 and added[0].value_base == pytest.approx(100)
 
 
 # ------------------------------------------------------------------- domicile and listing country

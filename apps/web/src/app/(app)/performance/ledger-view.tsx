@@ -52,6 +52,18 @@ function Health({ data }: { data: PerformanceData }) {
             {l.fees_not_captured} fills were stored before fees were captured; their fees count as zero until the next full history read.
           </p>
         ) : null}
+        {l.fees_excluded && l.fees_excluded.length > 0 ? (
+          <details className="mt-3 text-xs text-text-muted">
+            <summary className="cursor-pointer">
+              {l.fees_excluded.length} fills have fee lines in another currency than the fill; those fees are left out of the returns
+            </summary>
+            <ul className="mt-2 flex flex-col gap-1">
+              {l.fees_excluded.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </Blueprint>
 
       {l.cash_breaks_total > 0 ? (

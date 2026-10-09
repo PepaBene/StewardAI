@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
@@ -35,6 +36,7 @@ from steward.company.valuation import Assumptions, ValuationRequest
 from steward.discovery import read as discovery_read
 from steward.discovery.build import StockInputs
 from steward.discovery.read import _member, provider_states
+from steward.peer_metrics import ALIASES as PEER_ALIASES
 
 Scope = Literal["confirmed", "group", "home_market", "global"]
 MAX_PEERS = 30
@@ -211,21 +213,60 @@ async def resolve_peers(
             company.ticker,
             company.country if scope == "home_market" else None,
         )
-        label = f"{company.sector} issuers" + (
-            f" in {company.country}"
-            if scope == "home_market" and company.country
-            else ", all markets"
+        label = (
+            f"{company.sector} issuers"
+            + (
+                f" in {company.country}"
+                if scope == "home_market" and company.country
+                else ", all markets"
+            )
+            + ": sector-label candidates, not verified comparable"
         )
+        rows = await _rank_by_size(pool, company, [r["t"] for r in rows])
     tickers = [r["t"] for r in rows if r["t"] != company.ticker]
     if len(tickers) > MAX_PEERS:
         excluded.append(
             PeerExcluded(
                 ticker="*",
-                reason=f"{len(tickers) - MAX_PEERS} more peers not loaded; the first {MAX_PEERS} by ticker are used",
+                reason=f"{len(tickers) - MAX_PEERS} more candidates not loaded; "
+                + (
+                    f"the {MAX_PEERS} closest in revenue are used"
+                    if scope in ("home_market", "global")
+                    else f"the first {MAX_PEERS} by ticker are used"
+                ),
             )
         )
         tickers = tickers[:MAX_PEERS]
     return tickers, label, excluded
+
+
+_REVENUE_NAMES = sorted({n for basis in PEER_ALIASES.values() for n in basis.get("revenue", ())})
+
+
+async def _rank_by_size(
+    pool: asyncpg.Pool, company: Company, candidates: list[str]
+) -> list[dict[str, str]]:
+    """Sector-label candidates ordered by revenue proximity (log distance, same filing currency)
+    to the company; candidates with no comparable revenue follow, alphabetically."""
+    own: Decimal | None = None
+    cols = [c for c in company.annual.columns if c.kind == "annual"]
+    if cols:
+        own = figures_by_column(company.annual)[cols[-1].id].get("revenue")
+    if not own or own <= 0 or not candidates:
+        return [{"t": t} for t in candidates]
+    facts = await pool.fetch(
+        """select distinct on (ticker) ticker, value from public.financial_statement_fact
+           where ticker=any($1::text[]) and value > 0 and unit=$2
+             and lower(split_part(concept, ':', 2)) = any($3::text[])
+             and dimensions = '{}'::jsonb and period_end - period_start between 330 and 380
+           order by ticker, period_end desc, known_at desc""",
+        candidates,
+        company.annual.currency,
+        _REVENUE_NAMES,
+    )
+    sized = {r["ticker"]: abs(math.log(float(r["value"] / own))) for r in facts}
+    ranked = sorted((t for t in candidates if t in sized), key=lambda t: (sized[t], t))
+    return [{"t": t} for t in ranked + sorted(t for t in candidates if t not in sized)]
 
 
 async def load_peer_views(
@@ -565,6 +606,9 @@ class SavedScenario(BaseModel):
     input_hash: str | None
     note: str | None
     created_at: dt.datetime
+    # The figures the owner saw when saving (with their method version); null for versions saved
+    # before results were kept. Never recomputed: any fresh valuation is a separate response.
+    saved_result: dict[str, Any] | None = None
 
 
 class SaveScenarioIn(BaseModel):
@@ -576,7 +620,10 @@ class SaveScenarioIn(BaseModel):
 def _saved(r: asyncpg.Record) -> SavedScenario:
     a = r["assumptions"]
     a = json.loads(a) if isinstance(a, str) else a
+    stored = r["result"] if "result" in r.keys() else None
+    stored = json.loads(stored) if isinstance(stored, str) else stored
     return SavedScenario(
+        saved_result=stored,
         id=r["id"],
         name=r["name"],
         version=r["version"],
@@ -599,7 +646,12 @@ async def list_scenarios(pool: asyncpg.Pool, owner_id: Any, ticker: str) -> list
 
 
 async def save_scenario(
-    pool: asyncpg.Pool, owner_id: Any, ticker: str, body: SaveScenarioIn, hash_: str | None
+    pool: asyncpg.Pool,
+    owner_id: Any,
+    ticker: str,
+    body: SaveScenarioIn,
+    hash_: str | None,
+    result: dict[str, Any] | None = None,
 ) -> SavedScenario:
     payload = json.dumps(
         {
@@ -615,8 +667,8 @@ async def save_scenario(
             body.name.strip(),
         )
         r = await con.fetchrow(
-            """insert into public.company_valuation_scenario (owner_id, ticker, name, version, assumptions, method_version, input_hash, note)
-               values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8) returning *""",
+            """insert into public.company_valuation_scenario (owner_id, ticker, name, version, assumptions, method_version, input_hash, note, result)
+               values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9::jsonb) returning *""",
             owner_id,
             ticker,
             body.name.strip(),
@@ -625,6 +677,7 @@ async def save_scenario(
             version("valuation_scenarios"),
             hash_,
             body.note,
+            json.dumps(result) if result is not None else None,
         )
     assert r is not None
     return _saved(r)

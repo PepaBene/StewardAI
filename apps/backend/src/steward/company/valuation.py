@@ -176,8 +176,13 @@ def default_scenarios(annual: StatementsView) -> list[Assumptions]:
 
 def _net_debt(f: Mapping[str, Decimal | None]) -> tuple[Decimal | None, str]:
     debt, cash = debt_of(f), f.get("cash")
-    if debt is None or cash is None:
+    if cash is None:
         return None, "debt or cash not filed"
+    if debt is None:
+        # A filed balance sheet with no debt concept is a company without financial debt.
+        if f.get("total_assets") is None and f.get("equity") is None:
+            return None, "debt or cash not filed"
+        return cash * -1, "no debt filed; taken as zero, so net debt is minus cash; leases excluded"
     return debt - cash, "filed financial debt − cash; leases excluded"
 
 

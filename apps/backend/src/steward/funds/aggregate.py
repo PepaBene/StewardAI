@@ -23,6 +23,7 @@ inputs, optionally as of a past date (only records known by then, see lookthroug
 import datetime as dt
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Literal
@@ -93,6 +94,26 @@ class IssuerSecurity(BaseModel):
     ticker: str | None
     weight: float
     via: list[ChannelWeight]
+
+
+def channel_groups(channels: Iterable[ChannelWeight]) -> list[float]:
+    """Weights of the independent routes to an issuer: all directly held securities of it (two
+    share classes bought as stocks) are one route, each fund is its own. Overlap exists only
+    between routes."""
+    direct = 0.0
+    has_direct = False
+    out: list[float] = []
+    for c in channels:
+        if c.kind == "direct":
+            direct += c.weight
+            has_direct = True
+        else:
+            out.append(c.weight)
+    return [direct, *out] if has_direct else out
+
+
+def is_shared(channels: Iterable[ChannelWeight]) -> bool:
+    return len(channel_groups(channels)) > 1
 
 
 class IssuerExposure(BaseModel):
@@ -540,7 +561,8 @@ def aggregate_exposure(
     for acc in issuers.values():
         channels = channel_list(acc)
         weight = sum(c.weight for c in channels)
-        biggest = max((c.weight for c in channels), default=0.0)
+        channel_totals = channel_groups(channels)
+        biggest = max(channel_totals, default=0.0)
         label = acc.ref.label
         if len(acc.securities) > 1 or acc.ref.key.startswith(("isin:", "name:")):
             label = (
@@ -579,7 +601,7 @@ def aggregate_exposure(
                 value_base=weight * total,
                 direct_weight=sum(c.weight for c in channels if c.kind == "direct"),
                 fund_weight=sum(c.weight for c in channels if c.kind == "fund"),
-                overlap_weight=weight - biggest if len(channels) > 1 else 0.0,
+                overlap_weight=weight - biggest if len(channel_totals) > 1 else 0.0,
                 channels=channels,
                 sector=acc.sector,
                 country=acc.country,
@@ -589,7 +611,7 @@ def aggregate_exposure(
         )
     exposures_out.sort(key=lambda e: -e.weight)
     overlap = sorted(
-        (e for e in exposures_out if len(e.channels) > 1), key=lambda e: -e.overlap_weight
+        (e for e in exposures_out if is_shared(e.channels)), key=lambda e: -e.overlap_weight
     )
 
     # ---- dimensions ----

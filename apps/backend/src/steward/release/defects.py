@@ -52,6 +52,20 @@ class Defect(BaseModel):
     )
 
 
+def weight_for(ticker: str | None, weights: dict[str, float]) -> float | None:
+    """Portfolio weight of a typed ticker: the broker ticker itself (AAPL_US_EQ), or a bare
+    symbol (aapl, AAPL) folded to the held broker ticker whose symbol part matches, ignoring
+    case. Several listings of one symbol are added up; None when nothing held matches."""
+    if not ticker:
+        return None
+    key = ticker.strip().upper()
+    exact = {t: w for t, w in weights.items() if t.upper() == key}
+    if exact:
+        return sum(exact.values())
+    bare = [w for t, w in weights.items() if t.split("_")[0].upper() == key]
+    return sum(bare) if bare else None
+
+
 def current(rows: list[DefectRow], weights: dict[str, float]) -> list[Defect]:
     """One line per defect with its latest state, largest affected weight first, open before
     closed."""
@@ -67,7 +81,7 @@ def current(rows: list[DefectRow], weights: dict[str, float]) -> list[Defect]:
             id=root, title=roots[root].title, detail=row.detail or roots[root].detail,
             ticker=roots[root].ticker, feature=roots[root].feature, state=row.state,
             opened_at=roots[root].created_at,
-            weight=weights.get(roots[root].ticker or "") if roots[root].ticker else None,
+            weight=weight_for(roots[root].ticker, weights),
         )
         for root, row in latest.items()
         if root in roots

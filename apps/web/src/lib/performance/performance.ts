@@ -2,6 +2,7 @@ import type { components } from "@/lib/api/schema";
 
 type S = components["schemas"];
 export type PerformanceData = S["PerformanceResponse"];
+// `xirr_annualized` is not in the generated schema until it is regenerated.
 export type WindowData = S["WindowOut"];
 export type Figure = S["Figure"];
 export type LedgerHealth = S["LedgerHealth"];

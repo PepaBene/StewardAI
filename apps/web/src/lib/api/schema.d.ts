@@ -17004,6 +17004,11 @@ export interface components {
             needs_fx: number;
             /** Fees Not Captured */
             fees_not_captured: number;
+            /**
+             * Fees Excluded
+             * @description Fills whose fee lines in another currency than the fill were left out.
+             */
+            fees_excluded?: string[];
             /** Position Breaks */
             position_breaks: components["schemas"]["PositionBreakOut"][];
             /** Cash Breaks */
@@ -18523,7 +18528,7 @@ export interface components {
              * @default chosen
              * @enum {string}
              */
-            since_basis: "chosen" | "last_review" | "default_90_days";
+            since_basis: "chosen" | "last_review" | "last_journal_entry" | "default_90_days";
             /** Edges */
             edges: components["schemas"]["GraphEdge"][];
             /** Suggested Count */
@@ -19613,6 +19618,11 @@ export interface components {
             percentile: number | string | null;
             /** Withheld Reason */
             withheld_reason?: string | null;
+            /**
+             * Basis
+             * @description The period the company's figure is compared on.
+             */
+            basis?: string | null;
         };
         /** PeerStatusInput */
         PeerStatusInput: {
@@ -21510,7 +21520,7 @@ export interface components {
             trade_cost_bps: number;
             /**
              * Target Overrides
-             * @description Ticker -> target weight to use instead of the strategy's (what-if only).
+             * @description Ticker -> target weight (0 to 1) to use instead of the strategy's (what-if only).
              */
             target_overrides?: {
                 [key: string]: number;
@@ -23147,6 +23157,10 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Saved Result */
+            saved_result?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ScenarioMacroContext */
         ScenarioMacroContext: {
@@ -24050,7 +24064,7 @@ export interface components {
             cash_weight: number;
             /**
              * Reconciles
-             * @description after - before equals the sum of the P&L lines.
+             * @description The factor split and the position lines add to the P&L, and cash, shocked and unshocked weight add to the whole portfolio.
              */
             reconciles: boolean;
             /** Warnings */
@@ -25950,7 +25964,7 @@ export interface components {
             value_base: number;
             /**
              * Bear Case Price
-             * @description Buys only: the price you expect in the bear case, in the quote currency. A thesis stores no bear case, so the asymmetry gate needs it here.
+             * @description Buys only: the price you expect in the bear case, in the quote currency. Overrides the thesis's bear case for the asymmetry gate.
              */
             bear_case_price?: number | null;
         };
@@ -26807,6 +26821,12 @@ export interface components {
             /** Twr Annualized */
             twr_annualized: number | null;
             xirr: components["schemas"]["Figure"];
+            /**
+             * Xirr Annualized
+             * @description False when the window is under a year: `xirr` is then the money-weighted return over the window itself, not an annual rate.
+             * @default true
+             */
+            xirr_annualized: boolean;
             /** Reason */
             reason: string | null;
             benchmark: components["schemas"]["BenchmarkOut"] | null;

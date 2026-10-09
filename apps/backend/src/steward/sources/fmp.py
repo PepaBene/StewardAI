@@ -388,6 +388,14 @@ async def collect_fmp_company(
         select_estimates(parse_estimates(body, symbol), now.date()) if body is not None else []
     )
     source = f"{ESTIMATES_URL}?symbol={symbol}&period=annual"
+    # FMP states estimates in the reporting currency; only the filed statements tell it. Unknown
+    # stays null.
+    reporting_currency = await pool.fetchval(
+        """select coalesce(currency, unit) from public.financial_statement_fact
+           where ticker=$1 and coalesce(currency, unit) ~ '^[A-Z]{3}$'
+           order by period_end desc, known_at desc limit 1""",
+        ticker,
+    )
     for item in estimates:
         if item.analyst_count is None:
             counts["estimates_without_count"] += 1
@@ -402,6 +410,7 @@ async def collect_fmp_company(
                 basis="FMP annual analyst consensus (average)",
                 fiscal_period=f"FY{item.fiscal_year}",
                 period_end=item.period_end,
+                currency=reporting_currency,
                 value=item.value,
                 low=item.low,
                 high=item.high,

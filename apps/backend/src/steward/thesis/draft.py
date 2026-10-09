@@ -11,7 +11,9 @@ left to the owner, because no input here supports them.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
+import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.company.report import CompanyReport
@@ -197,3 +199,51 @@ async def draft_thesis(llm: LLM, model: str, report: CompanyReport) -> ThesisDra
     if not isinstance(done.parsed, ModelDraft):
         raise DraftUnavailable("The model returned no usable draft.")
     return resolve(done.parsed, facts, done.model, report.ticker)
+
+
+class DraftBudgetRefused(Exception):
+    """The Budget config's cap stopped the draft; the message says which cap."""
+
+
+async def draft_within_budget(
+    pool: asyncpg.Pool, llm: LLM, model: str, report: CompanyReport
+) -> ThesisDraft:
+    """`draft_thesis` run as a short `thesis_draft` job, so the Budget config's caps apply to
+    its model call (the client only guards requests made inside a job) and its cost is
+    recorded on a `job_step`, where every spend figure reads from. Raises `DraftBudgetRefused`
+    when a cap stops it and `DraftUnavailable` when no draft can be made or one is running."""
+    from steward.budget_guard import BudgetExceeded
+    from steward.jobs.runner import JobContext, run_job
+
+    box: dict[str, Any] = {}
+
+    async def handler(ctx: JobContext) -> None:
+        async with ctx.step("draft"):
+            try:
+                box["draft"] = await draft_thesis(llm, model, report)
+            except Exception as exc:  # kept for the caller; re-raised so the job shows failed
+                box["error"] = exc
+                raise
+
+    # One run per company at a time (the job lock): a second click does not spend twice.
+    outcome = await run_job(
+        pool,
+        "thesis_draft",
+        handler,
+        trigger="manual",
+        params={"ticker": report.ticker},
+        wait=False,
+    )
+    if outcome == "busy":
+        raise DraftUnavailable("A draft for this company is already being written.")
+    err: BaseException | None = box.get("error")
+    while err is not None:
+        if isinstance(err, BudgetExceeded):
+            raise DraftBudgetRefused(str(err)) from err
+        err = err.__cause__
+    if "error" in box:
+        raise box["error"]
+    if "draft" not in box:
+        raise DraftUnavailable("The draft could not be made; see the job log.")
+    draft: ThesisDraft = box["draft"]
+    return draft

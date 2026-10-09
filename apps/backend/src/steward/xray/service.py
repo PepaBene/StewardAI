@@ -425,7 +425,7 @@ async def load(
     )
 
 
-_cache: dict[str, tuple[float, Loaded]] = {}
+_cache: dict[tuple[str, dt.date | None], tuple[float, Loaded]] = {}
 
 
 def clear_cache() -> None:
@@ -433,19 +433,25 @@ def clear_cache() -> None:
 
 
 def drop_cache(owner_id: str) -> None:
-    """Forget one owner's loaded X-Ray, so an input they just changed shows at once."""
-    _cache.pop(owner_id, None)
+    """Forget one owner's loaded X-Ray (today's and any past date), so an input they just
+    changed shows at once."""
+    for key in [k for k in _cache if k[0] == owner_id]:
+        del _cache[key]
 
 
-async def load_cached(pool: asyncpg.Pool, owner_id: str) -> Loaded:
-    """`load`, reused for `CACHE_SECONDS` per owner: the six X-Ray tabs read the same data, so a
-    visit loads once, not once per tab. Holdings change at most daily; a minute is stale enough."""
+async def load_cached(pool: asyncpg.Pool, owner_id: str, as_of: dt.date | None = None) -> Loaded:
+    """`load`, reused for `CACHE_SECONDS` per (owner, as_of): the six X-Ray tabs read the same
+    data, so a visit loads once, not once per tab. Holdings change at most daily; a minute is
+    stale enough."""
     now = time.monotonic()
-    hit = _cache.get(owner_id)
+    key = (owner_id, as_of)
+    hit = _cache.get(key)
     if hit is not None and now - hit[0] < CACHE_SECONDS:
         return hit[1]
-    loaded = await load(pool, owner_id)
-    _cache[owner_id] = (now, loaded)
+    loaded = await load(pool, owner_id, as_of=as_of)
+    for stale in [k for k, (at, _) in _cache.items() if now - at >= CACHE_SECONDS]:
+        del _cache[stale]  # bounded: past dates would otherwise pile up
+    _cache[key] = (now, loaded)
     return loaded
 
 

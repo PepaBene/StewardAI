@@ -28,6 +28,9 @@ ONE = Decimal(1)
 Rebalance = Literal["none", "monthly", "quarterly", "annual"]
 Basis = Literal["total", "price", "unknown"]
 MAX_ENDPOINT_GAP_DAYS = 5
+# Shared by the settings validator and `blended_index`, so a blend the settings accept always
+# builds.
+WEIGHT_TOLERANCE = Decimal("1e-6")
 Series = Sequence[tuple[dt.date, Decimal]]
 
 
@@ -73,8 +76,10 @@ def blended_index(
     """
     if not series_by_symbol or set(series_by_symbol) != set(weights):
         raise ValueError("every benchmark component needs a weight and a series")
-    if any(w <= 0 for w in weights.values()) or abs(sum(weights.values()) - ONE) > Decimal("1e-9"):
+    total = sum(weights.values(), ZERO)
+    if any(w <= 0 for w in weights.values()) or abs(total - ONE) > WEIGHT_TOLERANCE:
         raise ValueError("benchmark weights must be positive and sum to 1")
+    weights = {s: w / total for s, w in weights.items()}
     maps = {s: dict(sorted(v)) for s, v in series_by_symbol.items()}
     start = max(min(m) for m in maps.values())
     days = sorted({d for m in maps.values() for d in m if d >= start})

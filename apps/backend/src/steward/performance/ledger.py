@@ -65,6 +65,8 @@ class RawTransaction:
     fees_captured: bool = True
     # Charges on a fill, as stored (always positive).
     fee_amounts: tuple[Decimal, ...] = ()
+    # Fee lines stored in another currency than the fill's: not in `fee_amounts`.
+    foreign_fee_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -121,6 +123,11 @@ def classify(raw: RawTransaction, account_currency: str | None = None) -> Ledger
             flags.append("fees not captured for this fill")
         if raw.fee_basis == "unknown":
             flags.append("unclear whether the fill's net value already includes its fees")
+        if raw.foreign_fee_count:
+            flags.append(
+                f"{raw.foreign_fee_count} fee line(s) in another currency than the fill "
+                f"({raw.currency}) are excluded from its cost"
+            )
         cash = _trade_cash(kind, gross, fees, raw.fee_basis)
     elif raw.type == "dividend":
         kind, cash = Kind.DIVIDEND, gross
@@ -376,6 +383,7 @@ class LedgerSummary:
     unsupported: list[str] = field(default_factory=list)
     needs_fx: int = 0
     fees_not_captured: int = 0
+    fees_excluded: list[str] = field(default_factory=list)  # "<fill id>: <reason>"
     first: dt.date | None = None
     last: dt.date | None = None
 
@@ -385,6 +393,9 @@ def summarize(entries: Sequence[LedgerEntry]) -> LedgerSummary:
     summary = LedgerSummary(entries=len(entries))
     for entry in entries:
         counts[entry.kind.value] += 1
+        summary.fees_excluded += [
+            f"{entry.id}: {f}" for f in entry.flags if "fee line(s) in another currency" in f
+        ]
         if entry.kind is Kind.UNSUPPORTED:
             summary.unsupported.append(entry.id)
         summary.needs_fx += entry.needs_fx

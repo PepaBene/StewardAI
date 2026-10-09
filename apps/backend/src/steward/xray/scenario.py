@@ -98,13 +98,16 @@ def apply_proposal(
         value = wanted[p.ticker] * total if p.ticker in wanted else p.value_base
         if value > 0:
             positions.append(_with_value(p, value))
+    added: dict[str, float] = {}
     for a in request.additions:
         if a.ticker in by_ticker:
             raise ProposalError(f"{a.ticker} is already held; edit its weight instead.")
         if a.ticker not in candidates:
             raise ProposalError(f"{a.ticker} is not in the investable universe.")
-        c = candidates[a.ticker]
-        if a.weight > 0:
+        added[a.ticker] = added.get(a.ticker, 0.0) + a.weight  # the same ticker twice adds up
+    for ticker, weight in added.items():
+        c = candidates[ticker]
+        if weight > 0:
             positions.append(
                 PositionIn(
                     ticker=c.ticker,
@@ -113,7 +116,7 @@ def apply_proposal(
                     security_type=c.asset_type,
                     home_country=c.country,
                     currency=c.currency,
-                    value_base=a.weight * total,
+                    value_base=weight * total,
                 )
             )
     invested = sum(p.value_base for p in positions)

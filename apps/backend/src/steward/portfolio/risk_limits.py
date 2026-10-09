@@ -386,10 +386,10 @@ async def _decision_inputs(
     if limits.max_stress_loss is not None and (owner := get_settings().owner_user_id):
         try:
             from steward.decision.service import run_shock
-            from steward.decision.shocks import Assumptions, ShockSet
+            from steward.decision.shocks import ShockAssumptions, ShockSet
 
             run = await run_shock(
-                pool, owner, ShockSet(equity_pct=-limits.stress_equity_fall), Assumptions()
+                pool, owner, ShockSet(equity_pct=-limits.stress_equity_fall), ShockAssumptions()
             )
             inputs.stress_loss = -run.result.pnl_pct
         except Exception as exc:
@@ -410,12 +410,22 @@ async def _decision_inputs(
             inputs.credit_spread_date = row["period"]
     if limits.max_valuation_terminal_growth is not None or limits.max_valuation_growth is not None:
         held = sorted({p.ticker for p in positions if p.quantity > 0})
-        rows = await pool.fetch(
-            "select distinct on (ticker, name) ticker, name, assumptions"
-            " from public.company_valuation_scenario where ticker = any($1::text[])"
-            " order by ticker, name, version desc",
-            held,
+        # Scenarios are the owner's own; with no owner configured there is no one to read for.
+        owner = get_settings().owner_user_id
+        rows = (
+            await pool.fetch(
+                "select distinct on (ticker, name) ticker, name, assumptions"
+                " from public.company_valuation_scenario"
+                " where ticker = any($1::text[]) and owner_id = $2::uuid"
+                " order by ticker, name, version desc",
+                held,
+                owner,
+            )
+            if owner
+            else []
         )
+        if not owner:
+            inputs.unavailable["valuation"] = "no owner configured (OWNER_USER_ID)"
         for r in rows:
             body = r["assumptions"]
             if isinstance(body, str):

@@ -71,6 +71,19 @@ const FULL: StrategyConfig = {
   },
   hard_limit_severity: "severity_2",
   band_breach_severity: "severity_2",
+  // Not editable in the form; a save must keep it as loaded, not reset it to the defaults.
+  pretrade: {
+    return_hurdle: 0.25,
+    asymmetry_gate: 3,
+    start_size_core: 0.06,
+    start_size_growth: 0.03,
+    start_size_speculative: 0.01,
+    switch_safety_margin: 0.04,
+    short_term_tax_rate: 0.15,
+    trade_cost_bps: 5,
+    fx_cost_bps: 15,
+    risk_contribution_cap: 0.2,
+  },
 };
 
 describe("percent conversion", () => {

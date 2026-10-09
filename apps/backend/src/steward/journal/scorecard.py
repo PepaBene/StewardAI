@@ -13,6 +13,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from steward.sources.market import quote_unit_of
+
 MIN_DECISIONS = 5
 BUYS = ("buy", "add")
 SALES = ("trim", "sell")
@@ -50,12 +52,11 @@ class DecisionOutcome(BaseModel):
         """Price change since the decision; None when a price is missing or currencies differ."""
         if not self.price_at_decision or self.price_now is None:
             return None
-        if (
-            self.currency_at_decision
-            and self.currency_now
-            and self.currency_at_decision != self.currency_now
+        if self.currency_at_decision and (
+            not self.currency_now
+            or quote_unit_of(self.currency_at_decision) != quote_unit_of(self.currency_now)
         ):
-            return None
+            return None  # currency of the stored series unknown or different: no change
         return self.price_now / self.price_at_decision - 1
 
 

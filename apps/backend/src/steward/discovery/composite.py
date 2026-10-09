@@ -216,9 +216,12 @@ def idea_pipeline(
             )
         elif cutoff is not None and s.score < cutoff:
             reasons.append(f"composite {s.score:.1f} is below the top-third cut {cutoff:.1f}")
-        for f in red_flags(r):
+        flags = red_flags(r)
+        for f in flags:
             if f.state == "flag" and f.id != "insider_cluster":
                 reasons.append(f"red flag: {f.label}")
+        if any(f.state == "unchecked" for f in flags):
+            reasons.append("red flags not checked")
         runway = _num(r, "cash_runway_years")
         speculative = runway is not None  # a runway exists only for a company burning cash
         if speculative:

@@ -14,11 +14,13 @@ from decimal import Decimal
 from typing import Any
 
 from steward.analytics import ratios
+from steward.analytics.ratio_set import nopat_roic
 from steward.analytics.returns import to_major_unit
+from steward.company.ratios import is_financial_issuer
 from steward.discovery.engine import Record
 from steward.discovery.metrics import STOCK_CATALOGUE, MetricValue
 from steward.discovery.universe import UniverseMember
-from steward.peer_metrics import latest_period
+from steward.peer_metrics import _is_annual, invested_capital, latest_period, prior_year
 from steward.reference.risk import volatility as _volatility
 
 ZERO = Decimal(0)
@@ -45,6 +47,11 @@ class StockInputs:
     first_trade: dt.date | None = None
     insider_buyers_90d: int | None = None
     forward_eps: Decimal | None = None
+    forward_currency: str | None = None  # currency of the consensus EPS
+    splits: list[tuple[dt.date, Decimal]] = field(default_factory=list)  # (ex_date, new per old)
+    # The same annual share series as the latest filings state it, ignoring the cutoff: filings
+    # restate earlier years for a split, so it shows a split no corporate action records.
+    restated_shares: list[tuple[dt.date, Decimal]] = field(default_factory=list)
     statement_currency: str | None = None
 
 
@@ -69,6 +76,42 @@ def _mv(
         basis=basis,
         source=source,
     )
+
+
+SPLIT_TOLERANCE = Decimal("0.02")
+
+
+def _split_like(ratio: Decimal) -> Decimal | None:
+    """The split ratio (new shares per old) a restated count implies, or None when the change is
+    not within 2% of a whole split such as 2:1, 10:1 or 1:4 (a correction, not a split)."""
+    for r, invert in ((ratio, False), (ONE / ratio, True)):
+        whole = r.to_integral_value()
+        if whole >= 2 and abs(r - whole) / whole <= SPLIT_TOLERANCE:
+            return ONE / whole if invert else whole
+    return None
+
+
+def split_factor(
+    filed: tuple[dt.date, Decimal],
+    splits: Sequence[tuple[dt.date, Decimal]],
+    restated: Sequence[tuple[dt.date, Decimal]],
+) -> tuple[Decimal, str | None]:
+    """What scales a filed share count onto the basis of today's split-adjusted closes, and how
+    it was found. Stored splits after the period end come first; without one, a later filing that
+    restates the same period by a whole split ratio stands in; else the count is used as filed."""
+    period_end, count = filed
+    stored = [r for ex, r in splits if ex > period_end and r > 0]
+    if stored:
+        factor = ONE
+        for r in stored:
+            factor *= r
+        return factor, None
+    later = dict(restated).get(period_end)
+    if later is not None and count > 0 and later > 0 and later != count:
+        implied = _split_like(later / count)
+        if implied is not None:
+            return implied, "split inferred from a later filing that restates the share count"
+    return ONE, None
 
 
 def _ratio_mv(r: ratios.RatioValue, **kw: Any) -> MetricValue:
@@ -102,6 +145,27 @@ def _price_major(member: UniverseMember, closes: Series) -> tuple[Decimal, str] 
     if not closes or not member.currency:
         return None
     return to_major_unit(closes[-1][1], member.currency)
+
+
+def _roic(
+    period: dict[str, Any], periods: list[dict[str, Any]], financial: bool
+) -> ratios.RatioValue:
+    """ROIC by the shared definition (`ratio_set.nopat_roic` over `peer_metrics.
+    invested_capital`, which counts non-controlling interest): average of invested capital now
+    and a year earlier, tax rate capped to 0-50%, not meaningful for banks and insurers."""
+    if financial:
+        return ratios.RatioValue(None, "ROIC is not meaningful for banks and insurers")
+    if not _is_annual(period["duration_days"]):
+        return ratios.RatioValue(None, "n/m: ROIC is computed for a full-year period only")
+    prior = prior_year(period, periods)
+    got = {k: v["value"] for k, v in period["inputs"].items()}
+    return nopat_roic(
+        got.get("operating_income"),
+        got.get("pretax"),
+        got.get("tax"),
+        invested_capital(period["inputs"]),
+        invested_capital(prior["inputs"]) if prior else None,
+    )
 
 
 def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> Record:
@@ -149,6 +213,10 @@ def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> R
                 source="filed_statements",
             )
         inputs = {k: v["value"] for k, v in period["inputs"].items()}
+        r = _roic(period, data.periods, is_financial_issuer(data.sector, data.industry))
+        values["roic"] = _ratio_mv(
+            r, period_end=period["period_end"], basis=period["basis"], source="filed_statements"
+        )
     pe, basis = (period["period_end"], period["basis"]) if period else (None, None)
     statement_ccy = data.statement_currency or (period.get("unit") if period else None)
     if isinstance(statement_ccy, str) and not re.fullmatch(r"[A-Z]{3}", statement_ccy):
@@ -159,19 +227,27 @@ def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> R
     shares = data.shares[-1] if data.shares else None
     market_cap: Decimal | None = None
     cap_reason: str | None = None
+    cap_source = "price_bar x filed shares"
     if price is None:
         cap_reason = "no stored close or trading currency"
     elif shares is None:
         cap_reason = "no stored share count"
-    elif statement_ccy and price[1] != statement_ccy:
+    elif not statement_ccy:
+        cap_reason = "statement currency unknown, so price and share count cannot be matched"
+    elif price[1] != statement_ccy:
         cap_reason = f"price currency {price[1]} differs from statement currency {statement_ccy}"
     else:
-        market_cap = price[0] * shares[1]
+        # Closes are split-adjusted to today's share basis; the filed share count is not, so it is
+        # scaled by every split after its period end (see `split_factor`).
+        factor, how = split_factor(shares, data.splits, data.restated_shares)
+        market_cap = price[0] * shares[1] * factor
+        if how:
+            cap_source += f" ({how})"
     values["market_cap"] = _mv(
         market_cap,
         reason=cap_reason,
         period_end=data.closes[-1][0] if data.closes else None,
-        source="price_bar x filed shares",
+        source=cap_source,
     )
 
     ey = (
@@ -197,7 +273,9 @@ def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> R
     debt, cash = inputs.get("debt"), inputs.get("cash")
     ev = ratios.enterprise_value(market_cap, debt, cash)
     values["ev_ebit"] = _ratio_mv(
-        ratios.ev_to_ebit(ev, inputs.get("operating_income")),
+        ratios.RatioValue(None, "enterprise value is not meaningful for banks and insurers")
+        if is_financial_issuer(data.sector, data.industry)
+        else ratios.ev_to_ebit(ev, inputs.get("operating_income")),
         period_end=pe,
         basis=basis,
         source="filed_statements",
@@ -267,24 +345,54 @@ def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> R
         period_end=s_now[0] if s_now else None,
         source="filed_statements (annualised)",
     )
+    # Runway needs a full year of burn: the latest period when it is a full year, else the latest
+    # annual one (stated in the basis); a quarter or year-to-date flow would overstate the runway.
+    run_p = period
+    if period is not None and not _is_annual(period["duration_days"]):
+        run_p = next(
+            (
+                p
+                for p in sorted(data.periods, key=lambda p: p["period_end"], reverse=True)
+                if _is_annual(p["duration_days"])
+                and p["inputs"].get("cfo")
+                and p["inputs"].get("cash")
+            ),
+            None,
+        )
+    if run_p is None:
+        runway = ratios.RatioValue(None, "no filed statements")
+    else:
+        got = {k: v["value"] for k, v in run_p["inputs"].items()}
+        runway = ratios.cash_runway_years(got.get("cash"), got.get("cfo"))
+    run_basis = basis
+    if run_p is not None and run_p is not period:
+        run_basis = f"{run_p['basis']}, latest annual operating cash flow (no TTM available)"
     values["cash_runway_years"] = _ratio_mv(
-        ratios.cash_runway_years(cash, cfo), period_end=pe, basis=basis, source="filed_statements"
+        runway,
+        period_end=run_p["period_end"] if run_p else pe,
+        basis=run_basis,
+        source="filed_statements",
     )
 
     # Prices.
     for mid, days in (("return_1y", 365), ("return_3y", 3 * 365), ("return_5y", 5 * 365)):
-        r, why = _return(data.closes, as_of, days)
+        ret, why = _return(data.closes, as_of, days)
         values[mid] = _mv(
-            r,
+            ret,
             reason=why,
             period_end=data.closes[-1][0] if data.closes else None,
             source="price_bar (adjusted)",
         )
     tail = [(d, float(c)) for d, c in data.closes[-253:]]
-    vol = _volatility(tail) if len(tail) >= 200 else None
+    stale = bool(data.closes) and (as_of - data.closes[-1][0]).days > 10
+    vol = _volatility(tail) if len(tail) >= 200 and not stale else None
     values["volatility_1y"] = _mv(
         Decimal(str(vol)) if vol is not None else None,
-        reason=None if vol is not None else "fewer than 200 sessions of stored closes",
+        reason=None
+        if vol is not None
+        else f"latest close is from {data.closes[-1][0]}, too old for the data date"
+        if stale
+        else "fewer than 200 sessions of stored closes",
         period_end=data.closes[-1][0] if data.closes else None,
         source="price_bar (adjusted)",
     )
@@ -331,6 +439,10 @@ def stock_record(member: UniverseMember, data: StockInputs, as_of: dt.date) -> R
     if data.forward_eps is not None:
         if price is None:
             fwd_reason = "no stored close"
+        elif data.forward_currency is not None and data.forward_currency != price[1]:
+            fwd_reason = (
+                f"consensus currency {data.forward_currency} differs from price currency {price[1]}"
+            )
         elif data.forward_eps <= 0:
             fwd_reason = "n/m: consensus EPS not positive"
         else:
@@ -446,7 +558,16 @@ def fund_record(data: FundInputs, as_of: dt.date) -> Record:
     if equity_rows:
         weights: dict[str, Decimal] = {}
         for h in equity_rows:
-            key = h.get("isin") or h.get("name") or h.get("ticker") or str(h.get("row_index"))
+            # One issuer may hold several lines (share classes, ISINs): key by issuer id, then a
+            # normalised name, before the security identifiers.
+            name = " ".join(re.sub(r"[^\w ]", " ", str(h.get("name") or "")).casefold().split())
+            key = (
+                (f"issuer:{h['issuer_id']}" if h.get("issuer_id") else None)
+                or (f"name:{name}" if name else None)
+                or h.get("isin")
+                or h.get("ticker")
+                or str(h.get("row_index"))
+            )
             weights[key] = weights.get(key, ZERO) + Decimal(h["weight"])
         total = sum(weights.values(), ZERO)
         shares = (

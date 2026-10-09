@@ -47,7 +47,7 @@ from steward.llm.types import Message, Request, provider_of
 from steward.ownership.read import holding_ownership
 from steward.performance.alerts import PerformanceBreach, alert_performance
 from steward.performance.review import performance_review
-from steward.performance.settings import load_latest_settings
+from steward.performance.settings import PerformanceSettings, load_latest_settings
 from steward.portfolio.breaches import _holds, evaluate
 from steward.portfolio.drift import DriftReport
 from steward.portfolio.read import portfolio_overview
@@ -812,8 +812,11 @@ async def run_review(ctx: JobContext, deps: ReviewDeps) -> int | None:
         jobs = await load_active(pool, "jobs", JobsConfig)
         strategy = await load_active(pool, "strategy", StrategyConfig)
         theses = await load_active(pool, "theses", ThesesConfig)
-        for v in (jobs, strategy, theses):
+        performance = await load_active(pool, "performance", PerformanceSettings)
+        for v in (jobs, strategy, theses, performance):
             await ctx.record_config_version(v.id if v else None)
+        # The sleeve gap, time test and alert severity come from these settings.
+        step.detail["performance_config_version"] = performance.id if performance else "defaults"
         settings = (jobs.body if jobs else JobsConfig()).review
         today = deps.now.date()
         if ctx.trigger == "schedule" and today != first_weekday(today):

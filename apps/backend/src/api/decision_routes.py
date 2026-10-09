@@ -40,6 +40,17 @@ def _no_strategy() -> HTTPException:
     return HTTPException(409, "No strategy is stored; save one under Config first.")
 
 
+async def _canonical_case(pool: Pool, case: whatif.WhatIfCase) -> whatif.WhatIfCase:
+    """The case with its tickers in the broker's spelling (see `svc.resolve_tickers`)."""
+    names = await svc.resolve_tickers(pool, [*([case.ticker] if case.ticker else []), *case.split])
+    return case.model_copy(
+        update={
+            "ticker": names.get(case.ticker.strip(), case.ticker) if case.ticker else None,
+            "split": {names.get(k.strip(), k): v for k, v in case.split.items()},
+        }
+    )
+
+
 # ------------------------------------------------------------------------------------- risk
 
 
@@ -83,8 +94,9 @@ async def post_shock(body: ShockRequest, pool: Pool, owner: Owner) -> svc.ShockR
     """Move every part of the portfolio by the sensitivities that apply to it and reconcile to a
     complete shocked portfolio. Measured betas where the history supports them, your values
     otherwise; a holding with no valid sensitivity stays put and is listed."""
+    assumptions = await svc.canonical_assumptions(pool, body.assumptions)
     try:
-        return await svc.run_shock(pool, owner.user_id, body.shocks, body.assumptions)
+        return await svc.run_shock(pool, owner.user_id, body.shocks, assumptions)
     except svc.NoHoldings as err:
         raise _no_holdings() from err
 
@@ -136,7 +148,7 @@ async def post_whatif(body: whatif.WhatIfCase, pool: Pool, owner: Owner) -> what
     """A named case on today's holdings: a new security, a contribution or withdrawal, dividend
     reinvestment, an FX move, a benchmark change or a thesis-triggered exit. Applied to a copy."""
     try:
-        return await whatif.run_case(pool, owner.user_id, body)
+        return await whatif.run_case(pool, owner.user_id, await _canonical_case(pool, body))
     except svc.NoHoldings as err:
         raise _no_holdings() from err
     except (whatif.CaseError, ProposalError) as err:
@@ -154,7 +166,9 @@ async def post_rebalance(
     assumed costs, tax-lot consequences of each sale and the drift and X-Ray after. Read-only:
     nothing is sent to Trading212."""
     try:
-        return await svc.run_rebalance(pool, owner.user_id, body)
+        return await svc.run_rebalance(
+            pool, owner.user_id, await svc.canonical_overrides(pool, body)
+        )
     except svc.NoHoldings as err:
         raise _no_holdings() from err
     except svc.NoStrategy as err:
@@ -168,7 +182,7 @@ async def post_pretrade(body: svc.PretradeRequest, pool: Pool, owner: Owner) -> 
     """A pass/flag list for a proposed buy, add, sale or switch, citing the strategy's principles
     8, 9 and 10 and your own caps. It never blocks and never places a trade."""
     try:
-        return await svc.run_pretrade(pool, owner.user_id, body)
+        return await svc.run_pretrade(pool, owner.user_id, await svc.canonical_trades(pool, body))
     except svc.NoHoldings as err:
         raise _no_holdings() from err
     except svc.NoStrategy as err:
@@ -224,13 +238,14 @@ async def _save(
 @router.post("/scenarios/shock/save", status_code=201)
 async def save_shock(body: SaveShock, pool: Pool, owner: Owner) -> saved.SavedAnalysisItem:
     """Keep a shock scenario: the server runs it now and stores the inputs with the result."""
+    assumptions = await svc.canonical_assumptions(pool, body.assumptions)
     try:
-        run = await svc.run_shock(pool, owner.user_id, body.shocks, body.assumptions)
+        run = await svc.run_shock(pool, owner.user_id, body.shocks, assumptions)
     except svc.NoHoldings as err:
         raise _no_holdings() from err
     return await _save(
         pool, owner, "shock_scenario", body,
-        ShockRequest(shocks=body.shocks, assumptions=body.assumptions), run,
+        ShockRequest(shocks=body.shocks, assumptions=assumptions), run,
         run.result.method_version,
     )  # fmt: skip
 
@@ -248,21 +263,21 @@ async def save_theme(body: SaveTheme, pool: Pool, owner: Owner) -> saved.SavedAn
 
 @router.post("/scenarios/whatif/save", status_code=201)
 async def save_whatif(body: SaveWhatIf, pool: Pool, owner: Owner) -> saved.SavedAnalysisItem:
+    case = await _canonical_case(pool, body.case)
     try:
-        result = await whatif.run_case(pool, owner.user_id, body.case)
+        result = await whatif.run_case(pool, owner.user_id, case)
     except svc.NoHoldings as err:
         raise _no_holdings() from err
     except (whatif.CaseError, ProposalError) as err:
         raise HTTPException(422, str(err)) from err
-    return await _save(
-        pool, owner, "whatif_case", body, body.case, result, version("scenario_shock")
-    )
+    return await _save(pool, owner, "whatif_case", body, case, result, version("whatif_case"))
 
 
 @router.post("/rebalance/save", status_code=201)
 async def save_rebalance(body: SaveRebalance, pool: Pool, owner: Owner) -> saved.SavedAnalysisItem:
+    request = await svc.canonical_overrides(pool, body.request)
     try:
-        result = await svc.run_rebalance(pool, owner.user_id, body.request)
+        result = await svc.run_rebalance(pool, owner.user_id, request)
     except svc.NoHoldings as err:
         raise _no_holdings() from err
     except svc.NoStrategy as err:
@@ -270,7 +285,7 @@ async def save_rebalance(body: SaveRebalance, pool: Pool, owner: Owner) -> saved
     except ValueError as err:
         raise HTTPException(422, str(err)) from err
     return await _save(
-        pool, owner, "rebalance_plan", body, body.request, result, version("rebalance"),
+        pool, owner, "rebalance_plan", body, request, result, version("rebalance"),
         as_of=dt.date.fromisoformat(result.as_of),
     )  # fmt: skip
 

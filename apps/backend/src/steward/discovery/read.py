@@ -292,6 +292,20 @@ async def load_stock_inputs(
     for t, series in _annual_series(facts, SHARE_CONCEPTS).items():
         if t in out:
             out[t].shares = series
+            out[t].restated_shares = series
+    if cutoff is not None:
+        # Filings after the cutoff restate earlier years for a split; only the share counts are
+        # read past it, and only to put the filed count on the basis of today's adjusted closes.
+        later = await pool.fetch(
+            """select ticker,concept,period_start,period_end,value,dimensions,known_at
+               from public.financial_statement_fact where ticker=any($1::text[]) and value is not null
+                 and lower(regexp_replace(concept, '^.*:', '')) = any($2::text[])""",
+            tickers,
+            list(SHARE_CONCEPTS),
+        )
+        for t, series in _annual_series([dict(r) for r in later], SHARE_CONCEPTS).items():
+            if t in out:
+                out[t].restated_shares = series
     for t, closes in (await _closes(pool, members, as_of)).items():
         out[t].closes = closes
 
@@ -317,6 +331,14 @@ async def load_stock_inputs(
         for t, ccys in seen.items():
             if len(ccys) > 1:
                 out[t].dividends_ttm, out[t].dividend_currency = None, None
+        # Splits scale the filed share counts onto the basis of the split-adjusted closes.
+        for r in await pool.fetch(
+            """select listing_id, ex_date, ratio from public.corporate_action
+               where listing_id=any($1::bigint[]) and action_type='split' and status='confirmed'
+                 and ratio is not null and ratio > 0 order by ex_date""",
+            list(by_listing),
+        ):
+            out[by_listing[r["listing_id"]]].splits.append((r["ex_date"], r["ratio"]))
     isins = sorted({m.isin for m in members if m.isin})
     if isins:
         rows = await pool.fetch(
@@ -370,9 +392,12 @@ async def load_stock_inputs(
         out[t].insider_buyers_90d = covered.get(t, 0)
     if access.get(("fmp", "analyst_estimates")) == "available":
         est = await pool.fetch(
-            """select distinct on (ticker) ticker, value from public.forward_observation
+            """select distinct on (ticker) ticker, value, currency from public.forward_observation
                where kind='published_analyst_consensus' and metric='earnings_per_share' and ticker=any($1::text[])
                  and value is not null and period_end > $2 and ($3::timestamptz is null or known_at<=$3)
+                 and provider is not null and provider<>'' and fiscal_period is not null and fiscal_period<>''
+                 and basis is not null and basis<>'' and currency is not null and currency<>''
+                 and analyst_count is not null
                order by ticker, period_end, known_at desc""",
             tickers,
             as_of,
@@ -380,6 +405,7 @@ async def load_stock_inputs(
         )
         for r in est:
             out[r["ticker"]].forward_eps = r["value"]
+            out[r["ticker"]].forward_currency = r["currency"]
     return out
 
 

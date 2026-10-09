@@ -258,16 +258,19 @@ def _npv(rate: Decimal, flows: Sequence[tuple[dt.date, Decimal]]) -> Decimal:
     )
 
 
-def xirr(flows: Sequence[tuple[dt.date, Decimal]]) -> AnalyticsResult:
+def xirr(
+    flows: Sequence[tuple[dt.date, Decimal]], *, upper: Decimal = XIRR_UPPER
+) -> AnalyticsResult:
     """The annual rate making dated owner flows plus the ending value sum to zero.
 
     Sign convention: money the owner pays in is negative, money received (withdrawals and the
-    ending value) positive. Actual/365 day count, solved by bisection on [-99.99 %, +10000 %];
-    a flow set with no sign change or no sign change of NPV across the bounds has no stable root
-    and returns `unavailable`, never an invented percentage.
+    ending value) positive. Actual/365 day count, solved by bisection on [-99.99 %, `upper`]
+    (+10000 % by default; a caller with a short window passes a wider bound, since a +50 % month
+    is a very large annual rate); a flow set with no sign change or no sign change of NPV across
+    the bounds has no stable root and returns `unavailable`, never an invented percentage.
     """
     method = version("xirr")
-    inputs = {"flows": list(flows), "bounds": (XIRR_LOWER, XIRR_UPPER), "day_count": "act/365"}
+    inputs = {"flows": list(flows), "bounds": (XIRR_LOWER, upper), "day_count": "act/365"}
     ordered = sorted(flows, key=lambda f: f[0])
     if len(ordered) < 2 or not any(a < 0 for _, a in ordered) or not any(a > 0 for _, a in ordered):
         return unavailable(
@@ -275,7 +278,7 @@ def xirr(flows: Sequence[tuple[dt.date, Decimal]]) -> AnalyticsResult:
         )
     if ordered[0][0] == ordered[-1][0]:
         return unavailable("fraction", method, "all flows on one date", inputs=inputs)
-    low, high = XIRR_LOWER, XIRR_UPPER
+    low, high = XIRR_LOWER, upper
     f_low, f_high = _npv(low, ordered), _npv(high, ordered)
     if f_low == 0:
         root = low
@@ -313,12 +316,15 @@ def attribution_bridge(
     components: dict[str, Decimal],
     *,
     unattributed_value: Decimal = ZERO,
+    unattributed_count: int = 0,
 ) -> Bridge:
     """Reconcile the value change to named effects with a disclosed residual.
 
     `gain = end - start - net external flows`; `residual = gain - sum(components)` is returned,
     never absorbed, so components + residual equal the gain. `unattributed_value` is the market
     value whose actions or FX were missing: it makes the bridge partial and sets the coverage.
+    `unattributed_count` marks it partial too when such a holding has no value to show (it was
+    sold before the end).
     """
     method = version("attribution")
     gain = end_value - start_value - net_flows
@@ -334,6 +340,11 @@ def attribution_bridge(
     warnings = []
     if unattributed_value:
         warnings.append(f"{unattributed_value / denominator:.2%} of value lacks actions or FX")
+    elif unattributed_count:
+        warnings.append(
+            f"{unattributed_count} holding(s) lacked actions or FX in some interval; their "
+            "effect sits in the residual"
+        )
     base = result(
         gain,
         "money",

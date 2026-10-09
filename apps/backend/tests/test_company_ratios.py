@@ -135,6 +135,43 @@ def test_stale_peers_are_excluded_with_the_reason() -> None:
     assert excluded and excluded[0].ticker == "P2" and "before the company's" in excluded[0].reason
 
 
+def test_a_ttm_company_point_is_ranked_against_peers_on_its_last_fiscal_year() -> None:
+    from steward.analytics.ratios import RatioValue
+
+    annual = build_view("AAA", rows(), units=1)
+    # Four quarters to June 2025: 1400 revenue and 190 net income, a 13.6% margin against
+    # 12.5% for FY2024.
+    quarters = (
+        (dt.date(2024, 7, 1), dt.date(2024, 9, 30), "300", "40"),
+        (dt.date(2024, 10, 1), dt.date(2024, 12, 31), "300", "50"),
+        (dt.date(2025, 1, 1), dt.date(2025, 3, 31), "400", "50"),
+        (dt.date(2025, 4, 1), dt.date(2025, 6, 30), "400", "50"),
+    )
+    quarterly = build_view(
+        "AAA",
+        [
+            f
+            for s, e, rev, ni in quarters
+            for f in (inc("revenue", e, rev, s), inc("net_income", e, ni, s))
+        ],
+        frequency="quarterly",
+        units=1,
+    )
+    peers = {
+        f"P{i}": {"net_margin": RatioValue(D(v))}
+        for i, v in enumerate(("0.10", "0.12", "0.126", "0.13", "0.14"))
+    }
+    v = build_ratios(
+        "AAA", annual, quarterly, Market(), sector="Industrials", peers=peers, peer_scope="sector"
+    )
+    margin = next(r for g in v.groups for r in g.ratios if r.id == "net_margin")
+    assert margin.latest and round(margin.latest.value or D(0), 4) == D("0.1357")  # TTM shown
+    assert margin.peer is not None
+    # Ranked on FY2024 (0.125): two of five peers at or below, not four as the TTM would give.
+    assert margin.peer.percentile == D("0.4")
+    assert "trailing twelve months" in (margin.peer.basis or "")
+
+
 def test_unknown_inputs_stay_unknown_when_balances_are_missing() -> None:
     annual = build_view(
         "AAA",

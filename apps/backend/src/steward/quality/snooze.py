@@ -67,7 +67,7 @@ def split_snoozed(
     issues: list[QualityIssue], rows: list[SnoozeRow], today: dt.date
 ) -> tuple[list[QualityIssue], list[SnoozedIssue]]:
     """Issues still active, and those set aside. The newest row for an issue decides, and a
-    snooze whose date has passed no longer hides it."""
+    snooze hides it only while today is before its date: the issue is back ON that date."""
     newest: dict[tuple[str, str], SnoozeRow] = {}
     for r in sorted(rows, key=lambda r: r.id):
         newest[(r.kind, r.subject)] = r
@@ -75,7 +75,7 @@ def split_snoozed(
     snoozed: list[SnoozedIssue] = []
     for issue in issues:
         row = newest.get((issue.kind, issue.subject))
-        if row and row.action == "snooze" and row.until and row.until >= today:
+        if row and row.action == "snooze" and row.until and row.until > today:
             snoozed.append(SnoozedIssue(issue=issue, until=row.until, note=row.note))
         else:
             active.append(issue)

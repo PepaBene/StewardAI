@@ -117,10 +117,18 @@ async def find_review_changes(pool: asyncpg.Pool, today: dt.date) -> list[Change
                     message=f"The thesis for {t.ticker} was due for review on {t.review_date}.",
                 )
             )
+    # Review entries (parent_id set) can carry a review date too. Each entry belongs to the chain
+    # of its root; only the newest entry of a chain alerts, so a review that has been followed
+    # by a later review of the same chain does not alert again.
     rows = await pool.fetch(
-        "select j.id, j.ticker, j.review_date from public.decision_journal j"
-        " where j.review_date between $1 and $2 and j.parent_id is null"
-        " and not exists (select 1 from public.decision_journal r where r.parent_id = j.id)",
+        "with recursive chain as ("
+        "  select id, id as root from public.decision_journal where parent_id is null"
+        "  union all"
+        "  select j.id, c.root from public.decision_journal j join chain c on j.parent_id = c.id)"
+        " select j.id, j.ticker, j.review_date from public.decision_journal j"
+        " join chain c on c.id = j.id"
+        " where j.review_date between $1 and $2"
+        " and not exists (select 1 from chain c2 where c2.root = c.root and c2.id > j.id)",
         since,
         today,
     )

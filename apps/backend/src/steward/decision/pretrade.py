@@ -9,7 +9,8 @@ Principles used (the owner's strategy notes):
 
 - 8a: a stock is bought or added to only with a thesis, an expected return of at least the hurdle
   (default 30 % to the thesis sell target) and a base-case upside of at least twice the bear-case
-  loss. The thesis stores no bear case yet, so the asymmetry gate is `unavailable`.
+  loss. The bear case is the thesis's `bear_case` price, or one typed on the buy (which wins);
+  with neither the asymmetry gate is `unavailable`.
 - 8b: a new stock starts at no more than 5 % (core), 3 % (growth) or 1.5 % (speculative).
 - 9f: a switch needs the expected-return gap to exceed the tax on the exact lots sold, plus costs,
   plus a safety margin of 5 points, and the replacement is sized to equal risk.
@@ -36,7 +37,7 @@ from steward.config.strategy import StrategyConfig
 from steward.decision import covariance
 from steward.decision.covariance import CovModel
 from steward.decision.lot_impact import SaleImpact
-from steward.portfolio.breaches import evaluate
+from steward.portfolio.breaches import Finding, evaluate
 from steward.portfolio.drift import DriftReport
 
 Status = Literal["pass", "flag", "unavailable", "info"]
@@ -82,7 +83,7 @@ class TradeLeg(BaseModel):
         default=None,
         gt=0,
         description="Buys only: the price you expect in the bear case, in the quote currency. "
-        "A thesis stores no bear case, so the asymmetry gate needs it here.",
+        "Overrides the thesis's bear case for the asymmetry gate.",
     )
 
 
@@ -182,8 +183,11 @@ def run(trades: list[TradeLeg], ctx: PretradeContext) -> PretradeResult:
     buys = [t for t in trades if t.side == "buy"]
     for t in buys:
         checks += _buy_checks(t, ctx)
+    # Sales in one request share the year's exemption: each is checked after the ones before it.
+    earlier = 0.0
     for t in sells:
-        checks += _sell_checks(t, ctx)
+        checks += _sell_checks(t, ctx, earlier)
+        earlier += ctx.sale_within_test_exemption_ccy.get(t.ticker) or 0.0
     is_switch = len(sells) == 1 and len(buys) == 1
     if is_switch:
         checks += _switch_checks(sells[0], buys[0], ctx)
@@ -424,7 +428,8 @@ def _risk_budget(t: TradeLeg, ctx: PretradeContext) -> PretradeCheck:
 # --------------------------------------------------------------------------------------- sells
 
 
-def _sell_checks(t: TradeLeg, ctx: PretradeContext) -> list[PretradeCheck]:
+def _sell_checks(t: TradeLeg, ctx: PretradeContext, earlier: float = 0.0) -> list[PretradeCheck]:
+    """`earlier`: proceeds inside the test from the sales before this one in the same request."""
     f = ctx.facts.get(t.ticker, TickerFacts(t.ticker))
     impact = ctx.sale_impacts.get(t.ticker)
     out: list[PretradeCheck] = []
@@ -543,7 +548,8 @@ def _sell_checks(t: TradeLeg, ctx: PretradeContext) -> list[PretradeCheck]:
             )
         )
     else:
-        headroom = ctx.exemption_limit - ctx.year_proceeds_so_far - within
+        headroom = ctx.exemption_limit - ctx.year_proceeds_so_far - earlier - within
+        alongside = f"; the other sales above add {earlier:,.0f}" if earlier > 0 else ""
         out.append(
             PretradeCheck(
                 id="sell.exemption",
@@ -553,9 +559,9 @@ def _sell_checks(t: TradeLeg, ctx: PretradeContext) -> list[PretradeCheck]:
                 title=f"Exemption headroom after the sale: {headroom:,.0f} "
                 f"{ctx.exemption_currency}",
                 detail=f"This year's gross proceeds from lots inside the test so far: "
-                f"{ctx.year_proceeds_so_far:,.0f}; this sale adds {within:,.0f}; the limit is "
-                f"{ctx.exemption_limit:,.0f} {ctx.exemption_currency}.",
-                values={"headroom": headroom, "this_sale": within},
+                f"{ctx.year_proceeds_so_far:,.0f}{alongside}; this sale adds {within:,.0f}; "
+                f"the limit is {ctx.exemption_limit:,.0f} {ctx.exemption_currency}.",
+                values={"headroom": headroom, "this_sale": within, "earlier_sales": earlier},
             )
         )
     return out
@@ -615,12 +621,19 @@ def _switch_checks(sell: TradeLeg, buy: TradeLeg, ctx: PretradeContext) -> list[
             if tax is None
             else f"estimated tax {tax:,.0f} {ctx.base_currency}"
         )
+        # Unknown tax is not zero tax: a gap that clears the hurdle only without it is unproven.
+        if gap <= hurdle:
+            gap_status: Status = "flag"
+        elif tax is None:
+            gap_status = "unavailable"
+        else:
+            gap_status = "pass"
         out.append(
             PretradeCheck(
                 id="switch.gap",
                 principle="9f",
                 ticker=None,
-                status="pass" if gap > hurdle else "flag",
+                status=gap_status,
                 title=f"Gap {_pct(gap)} against a switching hurdle of {_pct(hurdle)}",
                 detail=f"Expected return {_pct(er_b)} ({fb.name or fb.ticker}) minus {_pct(er_a)} "
                 f"({fa.name or fa.ticker}). Hurdle: {tax_note}, costs {costs:,.0f} "
@@ -785,17 +798,26 @@ def _portfolio_checks(ctx: PretradeContext) -> list[PretradeCheck]:
                 values={"observed": f.observed, "limit": f.limit},
             )
         )
+    worse = [f for f in still if _further_past(before[f.key], f)]
     for f in still:
+        deeper = f in worse
         out.append(
             PretradeCheck(
                 id=f"after.{f.key}",
                 principle="4",
                 ticker=f.ticker,
-                status="info",
-                title="Already breached before the trade, still breached",
+                # Adding to a position already over its cap is a flag, not background.
+                status="flag" if deeper else "info",
+                title=(
+                    "Already breached, and the trade takes it further past the limit"
+                    if deeper
+                    else "Already breached before the trade, still breached"
+                ),
                 detail=f.detail,
+                values={"observed_before": before[f.key].observed, "observed": f.observed,
+                        "limit": f.limit},
             )
-        )
+        )  # fmt: skip
     for f in cleared:
         out.append(
             PretradeCheck(
@@ -807,19 +829,28 @@ def _portfolio_checks(ctx: PretradeContext) -> list[PretradeCheck]:
                 detail=f.detail,
             )
         )
-    if not new:
+    if not new and not worse:
         out.append(
             PretradeCheck(
                 id="after.rules",
                 principle="4",
                 ticker=None,
                 status="pass",
-                title="No new rule, cap or band breach after the trade",
+                title="No new or deeper rule, cap or band breach after the trade",
                 detail=f"{len(ctx.strategy.enabled_rules)} rule(s) and the target bands were "
                 "evaluated on the post-trade weights.",
             )
         )
     return out
+
+
+def _further_past(before: Finding, after: Finding) -> bool:
+    """Whether a breach that existed before the trade is deeper after it (both sides breach the
+    same limit, so the distance from the limit says which way it moved)."""
+    if before.observed is None or after.observed is None or after.limit is None:
+        return False
+    limit = float(after.limit)
+    return bool(abs(float(after.observed) - limit) > abs(float(before.observed) - limit) + 1e-12)
 
 
 def decimal_or_none(x: float | None) -> Decimal | None:

@@ -50299,6 +50299,14 @@
             "type": "integer",
             "title": "Fees Not Captured"
           },
+          "fees_excluded": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fees Excluded",
+            "description": "Fills whose fee lines in another currency than the fill were left out."
+          },
           "position_breaks": {
             "items": {
               "$ref": "#/components/schemas/PositionBreakOut"
@@ -54598,6 +54606,7 @@
             "enum": [
               "chosen",
               "last_review",
+              "last_journal_entry",
               "default_90_days"
             ],
             "title": "Since Basis",
@@ -57643,6 +57652,18 @@
               }
             ],
             "title": "Withheld Reason"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis",
+            "description": "The period the company's figure is compared on."
           }
         },
         "type": "object",
@@ -63142,11 +63163,13 @@
           },
           "target_overrides": {
             "additionalProperties": {
-              "type": "number"
+              "type": "number",
+              "maximum": 1.0,
+              "minimum": 0.0
             },
             "type": "object",
             "title": "Target Overrides",
-            "description": "Ticker -> target weight to use instead of the strategy's (what-if only)."
+            "description": "Ticker -> target weight (0 to 1) to use instead of the strategy's (what-if only)."
           },
           "note": {
             "anyOf": [
@@ -67593,6 +67616,18 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "saved_result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved Result"
           }
         },
         "type": "object",
@@ -70040,7 +70075,7 @@
           "reconciles": {
             "type": "boolean",
             "title": "Reconciles",
-            "description": "after - before equals the sum of the P&L lines."
+            "description": "The factor split and the position lines add to the P&L, and cash, shocked and unshocked weight add to the whole portfolio."
           },
           "warnings": {
             "items": {
@@ -75253,7 +75288,7 @@
               }
             ],
             "title": "Bear Case Price",
-            "description": "Buys only: the price you expect in the bear case, in the quote currency. A thesis stores no bear case, so the asymmetry gate needs it here."
+            "description": "Buys only: the price you expect in the bear case, in the quote currency. Overrides the thesis's bear case for the asymmetry gate."
           }
         },
         "type": "object",
@@ -76034,7 +76069,7 @@
         "properties": {
           "path": {
             "type": "string",
-            "pattern": "^/[a-z0-9/_-]{0,120}$",
+            "pattern": "^/[A-Za-z0-9/_-]{0,120}$",
             "title": "Path"
           }
         },
@@ -77705,6 +77740,12 @@
           },
           "xirr": {
             "$ref": "#/components/schemas/Figure"
+          },
+          "xirr_annualized": {
+            "type": "boolean",
+            "title": "Xirr Annualized",
+            "description": "False when the window is under a year: `xirr` is then the money-weighted return over the window itself, not an annual rate.",
+            "default": true
           },
           "reason": {
             "anyOf": [

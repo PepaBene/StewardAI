@@ -102,9 +102,27 @@ describe("settings form", () => {
           "A core ticker is listed twice.",
           "Holding period must be a whole number from 1 to 10.",
           "The exemption currency must be a three-letter code such as CZK.",
-          "Benchmark weights must add up to 100.",
+          "Benchmark weights must add up to 100 (use more decimals, such as 33.333333, for thirds).",
         ]),
       );
     }
+  });
+
+  it("uses the backend tolerance for benchmark weights", () => {
+    const row = (weight: string) => ({ symbol: weight, weight, currency: "USD", basis: "total" as const });
+    const form = settingsToForm(base);
+    form.benchmark = [row("33.33"), row("33.33"), row("33.34") /* sums to 100.00 */];
+    form.benchmark[1].symbol = "B";
+    form.benchmark[2].symbol = "C";
+    expect(formToSettings(form).ok).toBe(true);
+    // 99.99 passed the old 0.01 tolerance but the backend answers 422 for it
+    form.benchmark = [row("33.33"), row("33.33"), row("33.33")];
+    form.benchmark[1].symbol = "B";
+    form.benchmark[2].symbol = "C";
+    expect(formToSettings(form).ok).toBe(false);
+    form.benchmark = [row("33.333333"), row("33.333333"), row("33.333334")];
+    form.benchmark[1].symbol = "B";
+    form.benchmark[2].symbol = "C";
+    expect(formToSettings(form).ok).toBe(true);
   });
 });

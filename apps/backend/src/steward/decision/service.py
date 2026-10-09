@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+from collections.abc import Iterable
 from decimal import Decimal
 
 import asyncpg
@@ -330,6 +331,83 @@ async def _latest_positions(pool: asyncpg.Pool) -> dict[str, asyncpg.Record]:
     return {r["ticker"]: r for r in rows}
 
 
+async def resolve_tickers(pool: asyncpg.Pool, typed: Iterable[str]) -> dict[str, str]:
+    """Typed ticker -> the broker's spelling. Trading212 tickers are case-sensitive (`CSPXl_EQ`),
+    so a ticker typed in another case is matched to a held one, else to the one instrument it can
+    only mean; an exact spelling always wins and a ticker matching nothing is kept as typed."""
+    wanted = sorted({t.strip() for t in typed if t and t.strip()})
+    if not wanted:
+        return {}
+    rows = await pool.fetch(
+        "select ticker, 0 as rank from public.position_snapshot"
+        " where snapshot_date = (select max(snapshot_date) from public.position_snapshot)"
+        " and upper(ticker) = any($1::text[])"
+        " union select t212_ticker, 1 from public.instrument"
+        " where upper(t212_ticker) = any($1::text[])",
+        [t.upper() for t in wanted],
+    )
+    return match_tickers(
+        wanted,
+        held=[r["ticker"] for r in rows if r["rank"] == 0],
+        instruments=[r["ticker"] for r in rows if r["rank"] == 1],
+    )
+
+
+def match_tickers(
+    wanted: Iterable[str], *, held: Iterable[str], instruments: Iterable[str]
+) -> dict[str, str]:
+    """The matching rule of `resolve_tickers`, without the database."""
+    held = list(held)
+    instruments = list(instruments)
+    exact = {*held, *instruments}
+    by_held: dict[str, str] = {}
+    for t in held:
+        by_held.setdefault(t.upper(), t)
+    others: dict[str, set[str]] = {}
+    for t in instruments:
+        others.setdefault(t.upper(), set()).add(t)
+    out: dict[str, str] = {}
+    for t in wanted:
+        if t in exact:
+            out[t] = t
+        elif t.upper() in by_held:
+            out[t] = by_held[t.upper()]
+        elif len(others.get(t.upper(), ())) == 1:
+            out[t] = next(iter(others[t.upper()]))
+        else:
+            out[t] = t
+    return out
+
+
+async def canonical_assumptions(pool: asyncpg.Pool, a: ShockAssumptions) -> ShockAssumptions:
+    names = await resolve_tickers(
+        pool, [*a.equity_beta, *a.duration_years, *a.spread_duration_years]
+    )
+    return a.model_copy(
+        update={
+            "equity_beta": {names.get(k.strip(), k): v for k, v in a.equity_beta.items()},
+            "duration_years": {names.get(k.strip(), k): v for k, v in a.duration_years.items()},
+            "spread_duration_years": {
+                names.get(k.strip(), k): v for k, v in a.spread_duration_years.items()
+            },
+        }
+    )
+
+
+async def canonical_trades(pool: asyncpg.Pool, req: PretradeRequest) -> PretradeRequest:
+    names = await resolve_tickers(pool, [t.ticker for t in req.trades])
+    trades = [
+        t.model_copy(update={"ticker": names.get(t.ticker.strip(), t.ticker)}) for t in req.trades
+    ]
+    return req.model_copy(update={"trades": trades})
+
+
+async def canonical_overrides(pool: asyncpg.Pool, req: rb.RebalanceRequest) -> rb.RebalanceRequest:
+    names = await resolve_tickers(pool, req.target_overrides)
+    overrides = {names.get(k.strip(), k): v for k, v in req.target_overrides.items()}
+    return req.model_copy(update={"target_overrides": overrides})
+
+
 async def _instruments(pool: asyncpg.Pool, tickers: list[str]) -> dict[str, asyncpg.Record]:
     if not tickers:
         return {}
@@ -559,9 +637,7 @@ async def build_pretrade_context(
             quote_currency=quote,
             sell_target=target.sell_target if target else None,
             bear_case=(
-                target.bear_case
-                if target and (not quote or target.currency == quote)
-                else None
+                target.bear_case if target and (not quote or target.currency == quote) else None
             ),
             target_currency=target.currency if target else None,
             has_thesis=thesis is not None,

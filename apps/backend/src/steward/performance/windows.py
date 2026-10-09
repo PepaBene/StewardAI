@@ -18,7 +18,7 @@ from decimal import Decimal
 from typing import Literal
 
 from steward.analytics.contract import AnalyticsResult, Status, result, unavailable
-from steward.analytics.returns import DayValue, twr, xirr
+from steward.analytics.returns import XIRR_UPPER, DayValue, twr, xirr
 from steward.analytics.versions import version
 
 ZERO = Decimal(0)
@@ -27,6 +27,7 @@ WindowLabel = Literal["1M", "YTD", "1Y", "3Y", "5Y", "inception"]
 WINDOW_LABELS: tuple[WindowLabel, ...] = ("1M", "YTD", "1Y", "3Y", "5Y", "inception")
 # An opening observation older than this before the window start is too stale to open it.
 MAX_OPENING_GAP_DAYS = 7
+CAP = Decimal("1e60")  # largest annual rate the short-window solver is asked to bracket
 
 
 def window_start(label: WindowLabel, end: dt.date) -> dt.date | None:
@@ -65,6 +66,7 @@ class WindowReturn:
     twr_annualized: Decimal | None
     xirr: AnalyticsResult
     reason: str | None
+    xirr_annualized: bool = True  # False: `xirr` is the period return of a window under a year
 
 
 def _unavailable(label: WindowLabel, reason: str, end: dt.date | None) -> WindowReturn:
@@ -116,7 +118,20 @@ def window_return(
     cash_flows = [(opening.date, -opening.value)]
     cash_flows += [(d.date, -d.flow) for d in series[1:] if d.flow != 0]
     cash_flows.append((series[-1].date, series[-1].value))
-    xirr_result = xirr(cash_flows)
+    annual_xirr = span >= 365
+    # The solver finds an annual rate; a short window can legitimately sit far above the default
+    # bound (+50 % in a month is about +13,000 % a year), so widen it to a +1000 % period return.
+    upper = XIRR_UPPER if annual_xirr else min(Decimal(11) ** (Decimal(365) / max(span, 1)), CAP)
+    xirr_result = xirr(cash_flows, upper=upper)
+    if not annual_xirr and xirr_result.value is not None:
+        # Below a year the annual rate is a projection, so report the money-weighted return over
+        # the window itself, and say so.
+        period = (ONE + xirr_result.value) ** (Decimal(span) / 365) - ONE
+        xirr_result = result(
+            period, "fraction", version("xirr"), as_of=end, status=Status.COMPLETE,
+            warnings=["period return over the window, not annualized (the window is under a year)"],
+            inputs={"annual_rate": xirr_result.value, "days": span},
+        )  # fmt: skip
     if missing_weight > max_missing_weight:
         xirr_result = result(
             None, "fraction", version("xirr"), as_of=end, status=Status.PARTIAL,
@@ -141,6 +156,7 @@ def window_return(
         annual,
         xirr_result,
         None,
+        annual_xirr,
     )
 
 

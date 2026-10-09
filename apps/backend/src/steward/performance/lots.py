@@ -111,10 +111,11 @@ def build_lots(
     entries: Iterable[LedgerEntry],
     method: CostMethod = "fifo",
     spin_offs: Sequence[SpinOff] = (),
+    time_test_years: int = 3,
 ) -> LotBook:
     """Replay fills in time order. `average` pools cost per ticker for the realized gain but
-    keeps the FIFO lots, because the time test is dated per purchase. A spin-off the owner
-    entered applies at the start of its day, before that day's fills."""
+    keeps the FIFO lots, because the time test is dated per purchase (`time_test_years` long).
+    A spin-off the owner entered applies at the start of its day, before that day's fills."""
     queues: dict[str, deque[Lot]] = defaultdict(deque)
     book = LotBook(method, [], [], [], ZERO, ZERO)
     pooled_cost: dict[str, Decimal] = defaultdict(Decimal)
@@ -138,7 +139,7 @@ def build_lots(
             book.fees += e.fees
         elif e.kind is Kind.SELL and e.ticker and e.quantity < 0:
             book.fees += e.fees
-            _sell(e, queues[e.ticker], pooled_cost, pooled_qty, book, method)
+            _sell(e, queues[e.ticker], pooled_cost, pooled_qty, book, method, time_test_years)
     for s in pending:
         _apply_spin_off(s, queues, pooled_cost, pooled_qty)
     book.lots = [lot for q in queues.values() for lot in q if lot.remaining_quantity > 0]
@@ -153,6 +154,7 @@ def _sell(
     pooled_qty: dict[str, Decimal],
     book: LotBook,
     method: CostMethod,
+    time_test_years: int = 3,
 ) -> None:
     ticker = e.ticker or ""
     wanted = -e.quantity
@@ -178,7 +180,7 @@ def _sell(
         take = min(lot.remaining_quantity, to_take)
         fifo_cost += take * lot.unit_cost
         holding_days_weighted += take * (e.day - lot.bought_on).days
-        if e.day < time_test_date(lot.bought_on):
+        if e.day < time_test_date(lot.bought_on, time_test_years):
             within_test += take
         lot.remaining_quantity -= take
         to_take -= take

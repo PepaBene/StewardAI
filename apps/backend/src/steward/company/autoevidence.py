@@ -9,6 +9,7 @@ an unknown input leaves the observation empty with its reason, never a zero.
 # ruff: noqa: E501
 from __future__ import annotations
 
+import datetime as dt
 from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
@@ -136,6 +137,17 @@ def _window(years: Sequence[AllocationYear]) -> list[AllocationYear]:
     return list(years)[-WINDOW:]
 
 
+def _years_between(first_column: str, last_column: str) -> float | None:
+    """Calendar years between two statement columns (`a:YYYY-MM-DD`); None when a date is missing."""
+    try:
+        first = dt.date.fromisoformat(first_column.split(":", 1)[1])
+        last = dt.date.fromisoformat(last_column.split(":", 1)[1])
+    except (IndexError, ValueError):
+        return None
+    years = (last - first).days / 365.25
+    return years if years > 0 else None
+
+
 def capital_observations(years: Sequence[AllocationYear]) -> list[Observed]:
     win = _window(years)
     span = f"{win[0].label} to {win[-1].label}" if win else None
@@ -218,9 +230,12 @@ def capital_observations(years: Sequence[AllocationYear]) -> list[Observed]:
     fps = [y for y in win if y.fcf_per_share is not None and y.fcf_per_share > 0]
     growth = None
     if len(fps) >= 2:
-        n = len(fps) - 1
-        ratio = float(fps[-1].fcf_per_share / fps[0].fcf_per_share)  # type: ignore[operator]
-        growth = rounded(Decimal(str(ratio ** (1 / n) - 1)), "fraction")
+        # Calendar years between the first and last point, not the count of positive points
+        # (a year without positive free cash flow in between still elapsed).
+        n = _years_between(fps[0].column, fps[-1].column)
+        if n:
+            ratio = float(fps[-1].fcf_per_share / fps[0].fcf_per_share)  # type: ignore[operator]
+            growth = rounded(Decimal(str(ratio ** (1 / n) - 1)), "fraction")
     out.append(
         Observed(
             kind="capital_allocation",

@@ -65,7 +65,9 @@ async def build_report(
 ) -> OwnerReport:
     rows = await entries.list_entries(pool, owner_id, limit=2000)
     card = await journal_service.scorecard(pool, owner_id, since)
-    cockpit = await build_cockpit(pool)
+    snoozes = await snooze.list_rows(pool, owner_id)
+    # The same snoozes as the cockpit page: set-aside issues are listed under "set aside".
+    cockpit = snooze.with_snoozes(await build_cockpit(pool), snoozes, dt.date.today())
     snapshot_day = await pool.fetchval("select max(snapshot_date) from public.position_snapshot")
     manifest = Manifest(
         generated_at=dt.datetime.now(dt.UTC),
@@ -94,7 +96,7 @@ async def build_report(
         journal=rows,
         scorecard=card,
         cockpit=cockpit,
-        snoozed=await snooze.list_rows(pool, owner_id),
+        snoozed=snoozes,
     )
 
 
@@ -260,4 +262,7 @@ def journal_csv(rows: list[JournalEntry]) -> str:
 
 def _cell(value: object) -> str:
     text = "" if value is None else str(value)
-    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+    # A spreadsheet ignores leading spaces before a formula, so test the first non-blank char.
+    if text[:1] in ("\t", "\r") or text.lstrip()[:1] in ("=", "+", "-", "@"):
+        return "'" + text
+    return text

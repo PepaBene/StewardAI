@@ -22,8 +22,11 @@ class PilotStart(BaseModel):
     length_days: int = Field(default=pilot.DEFAULT_DAYS, ge=7, le=120)
 
 
+USAGE_PATH = r"^/[A-Za-z0-9/_-]{0,120}$"  # mixed case: /companies/AAPL, /funds/IE00B5BMR087
+
+
 class UsageIn(BaseModel):
-    path: str = Field(pattern=r"^/[a-z0-9/_-]{0,120}$")
+    path: str = Field(pattern=USAGE_PATH)
 
 
 class PilotState(BaseModel):

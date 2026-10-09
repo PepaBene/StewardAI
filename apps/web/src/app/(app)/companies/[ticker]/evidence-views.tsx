@@ -168,7 +168,7 @@ export function NetworkView({ ticker }: { ticker: string }) {
             <>
               <Blueprint aria-labelledby="net-edges" className="space-y-3 px-[22px] py-5">
                 <PanelHeading
-                  kicker={`New since ${formatDate(d.since)}${d.since_basis === "last_review" ? ", your last review" : d.since_basis === "default_90_days" ? ", no review yet so 90 days back" : ""}`}
+                  kicker={`New since ${formatDate(d.since)}${d.since_basis === "last_review" ? ", the last monthly review" : d.since_basis === "last_journal_entry" ? ", your last journal entry" : d.since_basis === "default_90_days" ? ", no review yet so 90 days back" : ""}`}
                   title={<span id="net-edges">Confirmed relationships</span>}
                 />
                 {d.suggested_count > 0 ? <p className="text-sm text-text-muted">{d.suggested_count} more suggested relationships await review and are not shown here.</p> : null}

@@ -89,7 +89,9 @@ async def _raw_transactions(pool: asyncpg.Pool) -> list[RawTransaction]:
         " t.occurred_at, t.fee_basis, (t.fees_captured_at is not null or t.type <> 'order') as captured,"
         " coalesce((select array_agg(f.amount order by f.seq) from public.transaction_fee f"
         "   where f.transaction_id = t.id and (f.currency is null or f.currency = t.currency)),"
-        "   '{}'::numeric[]) as fees"
+        "   '{}'::numeric[]) as fees,"
+        " (select count(*) from public.transaction_fee f where f.transaction_id = t.id"
+        "   and f.currency is not null and f.currency <> t.currency) as foreign_fees"
         " from public.transaction t order by t.occurred_at, t.id"
     )
     return [
@@ -97,7 +99,7 @@ async def _raw_transactions(pool: asyncpg.Pool) -> list[RawTransaction]:
             id=x["id"], type=x["type"], subtype=x["subtype"], ticker=x["ticker"],
             quantity=x["quantity"], price=x["price"], amount=x["amount"], currency=x["currency"],
             occurred_at=x["occurred_at"], fee_basis=x["fee_basis"], fees_captured=x["captured"],
-            fee_amounts=tuple(x["fees"] or ()),
+            fee_amounts=tuple(x["fees"] or ()), foreign_fee_count=int(x["foreign_fees"] or 0),
         )
         for x in rows
     ]  # fmt: skip
@@ -263,7 +265,11 @@ async def _benchmark_series(
         return only.symbol, series[only.symbol], currency, basis, notes
     if currency is None:
         notes.append("blend mixes quote currencies: no like-for-like active return")
-    blend = blended_index(series, {c.symbol: c.weight for c in spec.components}, spec.rebalance)
+    try:
+        blend = blended_index(series, {c.symbol: c.weight for c in spec.components}, spec.rebalance)
+    except ValueError as exc:
+        notes.append(f"the benchmark blend cannot be built: {exc}")
+        return None, [], None, "unknown", notes
     label = " + ".join(f"{c.weight:.0%} {c.symbol}" for c in spec.components)
     return f"{label} ({spec.rebalance} rebalance)", blend, currency, basis, notes
 
@@ -328,7 +334,8 @@ PERFORMANCE_FORMULA = [
     "Time-weighted return: chain (value - flow) / previous value over each valuation day, minus 1. "
     "Deposits and withdrawals are the only flows; dividends, fees and trades are inside the return.",
     "Money-weighted return (XIRR): the annual rate that makes your dated deposits and withdrawals, "
-    "the opening value and the ending value sum to zero (actual/365).",
+    "the opening value and the ending value sum to zero (actual/365). Under a year it is shown "
+    "as the return over the window itself, not annualized.",
     "A window is annualized only when it spans a year or more. A window the stored history does "
     "not reach is unavailable, never shortened.",
     "A precise return is withheld when the ledger leaves part of the ending value's cash movement "
@@ -395,6 +402,7 @@ async def performance_report(
                 twr=r.figure(w.twr),
                 twr_annualized=r.num(w.twr_annualized),
                 xirr=r.figure(w.xirr),
+                xirr_annualized=w.xirr_annualized,
                 reason=w.reason,
                 benchmark=benchmark_out,
             )
@@ -430,6 +438,7 @@ async def performance_report(
         status="clean" if clean else "breaks", entries=summary.entries, first=summary.first,
         last=summary.last, by_kind=summary.by_kind, unsupported=summary.unsupported[:50],
         needs_fx=summary.needs_fx, fees_not_captured=summary.fees_not_captured,
+        fees_excluded=summary.fees_excluded[:50],
         position_breaks=[
             r.PositionBreakOut(ticker=b.ticker, ledger_quantity=float(b.ledger_quantity),
                                broker_quantity=float(b.broker_quantity),
@@ -491,7 +500,9 @@ async def lots_report(pool: asyncpg.Pool, settings: PerformanceSettings) -> r.Lo
             exemption=[], time_test_years=settings.time_test_years,
             warnings=["no transactions stored"], disclaimer=DISCLAIMER, explain=explain,
         )  # fmt: skip
-    book = build_lots(ledger, settings.cost_method, spin_offs_of(settings))
+    book = build_lots(
+        ledger, settings.cost_method, spin_offs_of(settings), settings.time_test_years
+    )
     as_of = snapshots[-1]["snapshot_date"] if snapshots else dt.date.today()
     prices: dict[str, Decimal] = {}
     names: dict[str, str | None] = {}

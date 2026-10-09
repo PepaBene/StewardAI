@@ -52,12 +52,13 @@ export function WhatIfView() {
       const w = parsePercent(weight);
       if (ticker.trim() === "") return "Enter the ticker of the security to add.";
       if (w === null || w === undefined || w <= 0) return "Enter the weight as a percentage, such as 5.";
-      return { ...c, ticker: ticker.trim().toUpperCase(), weight: w };
+      // Broker tickers are case-sensitive (CSPXl_EQ); the server matches the case to a held one.
+      return { ...c, ticker: ticker.trim(), weight: w };
     }
     if (kind === "contribution" || kind === "withdrawal" || kind === "reinvest_dividends") {
       const a = parseNumber(amount);
       if (a === null || a === undefined || a <= 0) return "Enter the amount in your base currency.";
-      const s = parseKeyed(split, { percent: true });
+      const s = parseKeyed(split, { percent: true, keepCase: true });
       if (s.problems.length > 0) return s.problems[0];
       return { ...c, amount: a, split: s.values };
     }
@@ -69,10 +70,11 @@ export function WhatIfView() {
     }
     if (kind === "benchmark_change") {
       if (benchmark.trim() === "") return "Enter the symbol of the benchmark to compare with.";
-      return { ...c, benchmark_symbol: benchmark.trim().toUpperCase() };
+      // Stored series keep their own case (issuer series are `ishares-bm-…`).
+      return { ...c, benchmark_symbol: benchmark.trim() };
     }
     if (ticker.trim() === "") return "Enter the ticker of the holding to exit.";
-    return { ...c, ticker: ticker.trim().toUpperCase() };
+    return { ...c, ticker: ticker.trim() };
   }
 
   async function run() {

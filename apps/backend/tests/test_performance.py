@@ -72,6 +72,21 @@ def fill(
 # ---------------------------------------------------------------------------
 
 
+def test_fee_lines_in_another_currency_are_listed_as_excluded_not_dropped_silently():
+    entries = build_ledger(
+        [
+            fill("b1", "BUY", "1", "10", "-10", at(2026, 1, 2), foreign_fee_count=1),
+            fill("b2", "BUY", "1", "10", "-10", at(2026, 1, 3)),
+        ]
+    )
+    summary = summarize(entries)
+    assert len(summary.fees_excluded) == 1
+    assert (
+        summary.fees_excluded[0].startswith("b1:")
+        and "another currency" in summary.fees_excluded[0]
+    )
+
+
 def test_ledger_separates_external_flow_from_income_and_fees():
     entries = build_ledger(
         [
@@ -188,9 +203,7 @@ def test_benchmark_relative_contribution_is_the_gain_less_the_benchmark_on_openi
     broken = HoldingContribution("CCC", attributed=False)
     rel = {
         x.ticker: x
-        for x in benchmark_relative(
-            [held, bought_later, broken], {"AAA": D("1000")}, D("0.10")
-        )
+        for x in benchmark_relative([held, bought_later, broken], {"AAA": D("1000")}, D("0.10"))
     }
     assert rel["AAA"].benchmark_equivalent == D("100.00") and rel["AAA"].active == D("24.00")
     assert rel["BBB"].active is None and rel["BBB"].reason == "not held at the start"
@@ -227,7 +240,14 @@ def test_a_merger_carries_earlier_fills_to_the_new_ticker_with_cost_and_date():
     entries = build_ledger(
         [
             fill("f1", "BUY", "10", "100", "-1000", at(2025, 1, 6)),
-            fill("f2", "BUY", "3", "50", "-150", at(2026, 6, 1), ),  # after the merger: untouched
+            fill(
+                "f2",
+                "BUY",
+                "3",
+                "50",
+                "-150",
+                at(2026, 6, 1),
+            ),  # after the merger: untouched
         ]
     )
     merged = apply_mergers(entries, [Merger("AAA", "BBB", day(2026, 3, 2), D("1.5"))])
@@ -325,6 +345,20 @@ def test_twr_is_not_distorted_by_a_deposit_but_xirr_reflects_timing():
     assert w.twr_annualized is None  # 58 days: not annualized
 
 
+def test_short_window_xirr_is_the_period_return_and_survives_a_big_month():
+    days = [DayValue(day(2026, 1, 1), D("100")), DayValue(day(2026, 1, 31), D("103"))]
+    w = window_return(days, "inception")
+    assert w.xirr_annualized is False
+    assert w.xirr.value == pytest.approx(D("0.03"), abs=D("1e-6"))  # not ~ +43 %
+    big = window_return([DayValue(day(2026, 1, 1), D("100")), DayValue(day(2026, 1, 31), D("150"))],
+                        "inception")  # fmt: skip
+    assert big.xirr.value == pytest.approx(D("0.5"), abs=D("1e-6"))
+    year = window_return([DayValue(day(2025, 1, 1), D("100")), DayValue(day(2026, 1, 1), D("110"))],
+                         "inception")  # fmt: skip
+    assert year.xirr_annualized is True
+    assert year.xirr.value == pytest.approx(D("0.1"), abs=D("1e-6"))
+
+
 def test_window_without_enough_history_is_unavailable_not_shortened():
     days = [DayValue(day(2026, 1, 1), D("100")), DayValue(day(2026, 6, 1), D("110"))]
     w = window_return(days, "1Y")
@@ -364,6 +398,23 @@ def test_blend_rejects_bad_weights():
     s = [(day(2026, 1, 1), D(1)), (day(2026, 1, 2), D(1))]
     with pytest.raises(ValueError):
         blended_index({"A": s}, {"A": D("0.9")})
+
+
+def test_settings_blend_that_validates_also_builds():
+    from steward.config.performance import BenchmarkSpec
+
+    spec = BenchmarkSpec.model_validate({
+        "components": [
+            {"symbol": s, "weight": "0.3333333", "currency": "USD", "basis": "total"}
+            for s in "ABC"
+        ],
+    })  # fmt: skip
+    assert sum(c.weight for c in spec.components) == pytest.approx(D(1), abs=D("1e-20"))
+    s = [(day(2026, 1, 1), D(1)), (day(2026, 1, 2), D(2))]
+    # The raw (un-normalised) weights are within the shared tolerance too.
+    raw = {x: D("0.3333333") for x in "ABC"}
+    out = blended_index({x: s for x in "ABC"}, raw)
+    assert out[-1][1] == pytest.approx(D(200), abs=D("1e-9"))
 
 
 def _twr_window(start: dt.date, end: dt.date, a: str, b: str):
@@ -500,6 +551,15 @@ def test_exemption_counts_only_the_part_sold_before_the_time_test():
     assert year.sales_without_rate == 1 and not year.exceeded
 
 
+def test_exemption_uses_the_owners_time_test_years():
+    # Lot 1 was bought 2023-06-01: inside a 5-year test on 2026-07-01, past a 3-year one.
+    late = build_ledger([fill("s2", "SELL", "10", "30", "300", at(2026, 7, 1))])
+    entries = sorted(_two_buys() + late, key=lambda e: e.occurred_at)
+    assert build_lots(entries).realized[0].gross_within_time_test == D("0")
+    five = build_lots(entries, time_test_years=5)
+    assert five.realized[0].gross_within_time_test == D("300")
+
+
 # ---------------------------------------------------------------------------
 # M4.6 attribution
 # ---------------------------------------------------------------------------
@@ -578,6 +638,23 @@ def test_a_position_bought_and_sold_between_two_snapshots_still_counts_its_gain(
     unpriced = attribute(days, [], trades, [], [])
     assert unpriced is not None and unpriced.unattributed_tickers == ["AAA"]
     assert unpriced.holdings[0].attributed is False
+    assert unpriced.bridge.status.value == "partial"  # nothing held at the end, still partial
+
+
+def test_ticker_unattributable_in_one_interval_but_sold_before_the_end_is_partial():
+    days = [
+        AccountDay(day(2026, 1, 1), D("100")),
+        AccountDay(day(2026, 1, 2), D("130")),
+        AccountDay(day(2026, 1, 3), D("130")),
+    ]
+    positions = [
+        PositionDay(day(2026, 1, 1), "AAA", D(10), D(10), D(1), D("100")),
+        PositionDay(day(2026, 1, 2), "AAA", D(20), D("6.5"), D(1), D("130")),  # unexplained
+    ]
+    report = attribute(days, positions, [Trade(day(2026, 1, 3), "AAA", D(-20), D("6.5"))], [], [])
+    assert report is not None
+    assert report.unattributed_tickers == ["AAA"]
+    assert report.bridge.status.value == "partial"
 
 
 def test_ticker_rate_lookup_takes_the_nearest_snapshot_day_and_prefers_the_earlier():
@@ -650,6 +727,15 @@ def test_sleeves_reconcile_to_the_invested_portfolio_and_flag_a_lagging_stock_sl
     assert cmp.review_item and "trail" in cmp.message
 
 
+def test_history_shorter_than_the_lookback_is_reported_and_raises_no_shift_item():
+    dates, positions = _daily_sleeve_inputs()  # 870 days of history
+    core = sleeve_days({"CORE"}, dates, positions, [], [], [], {})
+    stocks = sleeve_days({"STK"}, dates, positions, [], [], [], {})
+    cmp = compare_sleeves(core, stocks, lookback_years=3)
+    assert cmp.history_days == 870 and cmp.too_early and not cmp.review_item
+    assert "870 days" in cmp.message and "3 years" in cmp.message
+
+
 def test_sleeve_buys_are_flows_not_gains_and_short_history_is_too_early():
     dates = [dt.date(2026, 1, 1) + dt.timedelta(days=30 * i) for i in range(4)]
     positions = [
@@ -675,9 +761,7 @@ def test_sale_that_closes_a_position_still_counts_as_a_flow_out_of_the_sleeve():
     positions = [PositionDay(dates[0], "STK", D(10), D(10), D(1), D(100))]  # none on day 2
     trades = [Trade(dates[1], "STK", D(-10), D(12))]  # sold all 10 at 12
     # the closed position's own last rate stands in for the missing row of the sale day
-    stocks = sleeve_days(
-        {"STK"}, dates, positions, trades, [], [], {}, ticker_fx_lookup(positions)
-    )
+    stocks = sleeve_days({"STK"}, dates, positions, trades, [], [], {}, ticker_fx_lookup(positions))
     assert stocks[1].value == 0 and stocks[1].flow == D(-120)
     # (0 - (-120)) / 100 - 1: the sale proceeds are the sleeve's gain of 20%, not a total loss.
     assert (stocks[1].value - stocks[1].flow) / stocks[0].value - 1 == D("0.2")

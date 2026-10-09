@@ -78,6 +78,31 @@ def _need(value: object, what: str) -> None:
         raise CaseError(f"This case needs {what}.")
 
 
+def withdrawal_sales(
+    shortfall: float, values: dict[str, float], split: dict[str, float]
+) -> tuple[dict[str, float], float]:
+    """Sales (ticker -> base-currency value) that raise `shortfall`, and how much of it was sold
+    pro rata beyond the owner's split. The split is followed first; what it leaves uncovered (a
+    split under 100%, or a holding too small for its share) is sold pro rata from what remains."""
+    if shortfall <= 0:
+        return {}, 0.0
+    invested = sum(values.values())
+    if invested < shortfall - 1e-6:
+        raise CaseError("The withdrawal is larger than the portfolio.")
+    unheld = sorted(t for t in split if t not in values)
+    if unheld:
+        raise CaseError(f"Not held, so it cannot be sold: {', '.join(unheld)}.")
+    shares = dict(split) or {t: v / invested for t, v in values.items()}
+    sales = {t: min(shortfall * share, values[t]) for t, share in shares.items()}
+    rest = shortfall - sum(sales.values())
+    if rest > 1e-6:
+        left = {t: v - sales.get(t, 0.0) for t, v in values.items()}
+        remaining = sum(left.values())
+        for t, v in left.items():
+            sales[t] = sales.get(t, 0.0) + rest * v / remaining
+    return sales, max(0.0, rest)
+
+
 async def run_case(pool: asyncpg.Pool, owner_id: str, case: WhatIfCase) -> WhatIfResult:
     loaded = await xray_service.load_cached(pool, owner_id)
     portfolio = loaded.data.portfolio
@@ -190,18 +215,17 @@ async def run_case(pool: asyncpg.Pool, owner_id: str, case: WhatIfCase) -> WhatI
         assert case.amount is not None
         deposit = -case.amount
         shortfall = max(0.0, case.amount - portfolio.cash_base)
-        if shortfall > 0:
-            split = dict(case.split) or {t: v / sum(values.values()) for t, v in values.items()}
-            if sum(values.values()) < shortfall:
-                raise CaseError("The withdrawal is larger than the portfolio.")
-            for t, share in split.items():
-                sale = min(shortfall * share, values.get(t, 0.0))
-                if sale > 1e-6:
-                    after[t] = values[t] - sale
-                    legs.append(pt.TradeLeg(side="sell", ticker=t, value_base=sale))
+        sales, rest = withdrawal_sales(shortfall, values, case.split)
+        rest_note = (
+            f" ({rest:,.0f} of it pro rata, beyond the split you gave)" if rest > 1e-6 else ""
+        )
+        for t, sale in sales.items():
+            if sale > 1e-6:
+                after[t] = values[t] - sale
+                legs.append(pt.TradeLeg(side="sell", ticker=t, value_base=sale))
         summary.append(
             f"Withdraw {case.amount:,.0f} {base}: {min(case.amount, portfolio.cash_base):,.0f} "
-            f"from cash, {shortfall:,.0f} from sales."
+            f"from cash, {shortfall:,.0f} from sales{rest_note}."
         )
 
     elif case.kind == "thesis_exit":
