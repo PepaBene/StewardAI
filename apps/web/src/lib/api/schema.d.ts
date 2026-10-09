@@ -6900,7 +6900,7 @@ export interface paths {
         post?: never;
         /**
          * Retire Owner Weight
-         * @description Retire a weight. It stops applying from now; replays before now still see it.
+         * @description Retire a weight you assigned. It stops applying from now; replays before now still see it.
          */
         delete: operations["retire_owner_weight"];
         options?: never;
@@ -44532,6 +44532,8 @@ export interface operations {
                 start: number;
                 end: number;
                 context?: number;
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
             };
             header?: never;
             path: {

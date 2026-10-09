@@ -21869,7 +21869,7 @@
           "disclosures"
         ],
         "summary": "Retire Owner Weight",
-        "description": "Retire a weight. It stops applying from now; replays before now still see it.",
+        "description": "Retire a weight you assigned. It stops applying from now; replays before now still see it.",
         "operationId": "retire_owner_weight",
         "security": [
           {
@@ -22636,6 +22636,25 @@
               "default": 400,
               "title": "Context"
             }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
           }
         ],
         "responses": {

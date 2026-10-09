@@ -217,7 +217,8 @@ async def machine_value_for(pool: Pool, dataset: str, sample_key: str, item_ref:
         item_ref,
     )
     if stored is not None:
-        return stored["machine_value"]
+        machine: str | None = stored["machine_value"]
+        return machine
     kind, _, ident = item_ref.partition(":")
     if dataset == "relationship_claim":
         if kind == "planted" and ident.isdigit() and int(ident) < len(PLANTED_RELATIONSHIP_PHRASES):
@@ -246,7 +247,8 @@ async def machine_value_for(pool: Pool, dataset: str, sample_key: str, item_ref:
         )
         if found is None:
             raise ValueError(f"no such item {item_ref!r}")
-        return found["economic_class"]
+        economic: str | None = found["economic_class"]
+        return economic
     if dataset == "ownership_match":
         return "same_company"
     if dataset == "deal_state":
@@ -259,7 +261,7 @@ async def machine_value_for(pool: Pool, dataset: str, sample_key: str, item_ref:
         )
         if state is None:
             raise ValueError(f"no such item {item_ref!r}")
-        return state
+        return str(state)
     return None
 
 

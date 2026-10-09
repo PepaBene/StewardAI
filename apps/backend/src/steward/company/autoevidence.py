@@ -154,9 +154,7 @@ def capital_observations(years: Sequence[AllocationYear]) -> list[Observed]:
     out: list[Observed] = []
 
     full = [
-        y
-        for y in win
-        if y.fcf is not None and y.dividends is not None and y.buybacks is not None
+        y for y in win if y.fcf is not None and y.dividends is not None and y.buybacks is not None
     ]
     fcf_total = sum((y.fcf or ZERO for y in full), ZERO)
     returned = sum(((y.dividends or ZERO) + (y.buybacks or ZERO) for y in full), ZERO)

@@ -268,7 +268,6 @@ class TestExport:
         text = journal_csv([self.entry(hypothesis="=HYPERLINK(1)")])
         assert "'=HYPERLINK(1)" in text
 
-
     def _report(self):  # type: ignore[no-untyped-def]
         from steward.journal.export import Manifest, OwnerReport, figure_sources_for
         from steward.quality.cockpit import Check, Cockpit

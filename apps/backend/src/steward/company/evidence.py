@@ -172,9 +172,9 @@ def segment_lines(rows: list[dict[str, Any]]) -> list[SegmentLine]:
         return []
     period_end = max(end for _, _, _, end in latest)
     by_axis: dict[str, list[tuple[str, dict[str, Any]]]] = {}
-    for (axis, member, _start, end), r in latest.items():
+    for (axis_name, member, _start, end), r in latest.items():
         if end == period_end:
-            by_axis.setdefault(axis, []).append((member, r))
+            by_axis.setdefault(axis_name, []).append((member, r))
 
     def rank(axis: str) -> tuple[int, Decimal]:
         order = next(
@@ -602,7 +602,8 @@ async def forward_eps(
     )
     if r is None or not _complete(dict(r)) or not price_currency or r["currency"] != price_currency:
         return None
-    return r["value"]
+    value: Decimal | None = r["value"]
+    return value
 
 
 # ------------------------------------------------------------------------------ network

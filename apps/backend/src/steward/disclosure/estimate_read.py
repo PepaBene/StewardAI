@@ -148,7 +148,7 @@ def _dimension_key(raw: Any) -> str:
         try:
             raw = json.loads(raw)
         except ValueError:
-            return raw
+            return str(raw)
     if isinstance(raw, dict) and "members" in raw:
         raw = raw["members"]
     return json.dumps(raw, sort_keys=True) if raw else ""

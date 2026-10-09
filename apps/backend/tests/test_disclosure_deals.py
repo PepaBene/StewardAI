@@ -303,7 +303,9 @@ def test_unit_scale_and_currency_survive_into_the_impact():
         "in cash."
     )
     assert ex1.terms["cash_amount"].value == D("2500000000") and ex1.currency == "USD"
-    ex2 = ex.extract("The acquisition consideration is€2.0bn in cash and a term loan of £400 million.")
+    ex2 = ex.extract(
+        "The acquisition consideration is€2.0bn in cash and a term loan of £400 million."
+    )
     assert ex2.currency is None and ex2.currency_conflict
 
 
