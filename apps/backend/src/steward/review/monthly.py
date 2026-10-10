@@ -18,7 +18,7 @@ import datetime as dt
 import json
 import logging
 from dataclasses import asdict, dataclass
-from typing import Any, Literal, Protocol, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
 import anthropic
 import asyncpg
@@ -54,8 +54,15 @@ from steward.portfolio.read import portfolio_overview
 from steward.research.sources import CitedSentence, Registry, Source
 from steward.settings import get_settings
 
+if TYPE_CHECKING:
+    from steward.decision.ranking import RankingResponse
+    from steward.portfolio.exante import ExAnteRisk
+    from steward.portfolio.tail import TailReport
+    from steward.portfolio.validation import ModelValidation
+
 logger = logging.getLogger(__name__)
 
+MAX_PACKS = 5  # thesis risk lines in one review
 Status = Literal["pass", "breach", "unknown"]
 
 
@@ -121,6 +128,16 @@ class ReviewBody(BaseModel):
         description="How past journal decisions turned out (price change since the decision, "
         "each with its sample size; sections with too few decisions are not summarised).",
     )
+    risk_notes: list[str] = Field(
+        default_factory=list,
+        description="The forecast volatility from today's holdings, the factor tilts worth a "
+        "look and the hardest past episode, each as a plain sentence.",
+    )
+    bench_notes: list[str] = Field(
+        default_factory=list,
+        description="The bench (theses on stocks not held) against the 5 to 10 target, and the "
+        "best-ranked ideas by risk-adjusted expected return.",
+    )
     sources: list[Source]
     model: str | None = None
     notes: list[str] = Field(default_factory=list)
@@ -148,8 +165,9 @@ SYSTEM = """\
 You review a personal investment portfolio against its owner's written strategy. You get a \
 compliance table (every strategy rule with pass, breach or unknown), each holding's thesis \
 KPI statuses, theses due for review, and flags. Propose at most eight concrete actions. \
-Every action must cite the strategy rule ids or thesis KPIs (TICKER:kpi_id, exactly as \
-listed) it rests on; an action you cannot tie to one is not an action to propose. Do not \
+Every action must cite the strategy rule ids, open risk limits (risk:..., listed under \
+citable.risk_limits, put in rule_ids) or thesis KPIs (TICKER:kpi_id, exactly as listed) it \
+rests on; an action you cannot tie to one is not an action to propose. Do not \
 state figures that are not in the material. If nothing needs doing, return no actions.
 
 How to choose and write actions:
@@ -610,7 +628,9 @@ async def flags(pool: asyncpg.Pool, reg: Registry, settings: ReviewSettings) -> 
     return out
 
 
-def review_material(body: ReviewBody, strategy: StrategyConfig) -> str:
+def review_material(
+    body: ReviewBody, strategy: StrategyConfig, risk_limits: list[str] | None = None
+) -> str:
     return json.dumps(
         {
             "strategy": {
@@ -627,8 +647,10 @@ def review_material(body: ReviewBody, strategy: StrategyConfig) -> str:
             ],
             "theses_due_for_review": body.reviews_due,
             "flags": [f.text for f in body.flags],
+            "risk": body.risk_notes,
             "citable": {
                 "rule_ids": [r.id for r in strategy.enabled_rules],
+                "risk_limits": risk_limits or [],
                 "kpis": [k.ref for k in body.kpis],
             },
         },
@@ -692,6 +714,175 @@ async def decision_scorecard_lines(pool: asyncpg.Pool, notes: list[str]) -> list
     return lines
 
 
+def risk_section_lines(risk: "ExAnteRisk", validation: "ModelValidation | None") -> list[str]:
+    """The model-based part of the review's risk section (pure): forecast against realised
+    volatility, the largest risk contributors, risk by tier against its budgets and whether the
+    model passed its own back-test. The tail-loss lines come from `tail_lines`."""
+    lines: list[str] = []
+    if risk.volatility_forecast is not None:
+        limit = risk.limits.max_volatility
+        tail = "" if limit is None else f", against a limit of {limit:.0%}"
+        lines.append(
+            f"Forecast volatility from today's holdings: {risk.volatility_forecast:.1%}{tail}."
+        )
+        if risk.realized_volatility is not None:
+            lines.append(
+                f"Realised volatility over the last year was {risk.realized_volatility:.1%}, "
+                f"against the {risk.volatility_forecast:.1%} forecast."
+            )
+        top = [p for p in risk.positions if p.risk_share is not None][:3]
+        if top:
+            lines.append(
+                "Largest risk contributors: "
+                + "; ".join(
+                    f"{p.ticker} {p.risk_share:.0%} of risk ({p.weight:.0%} of value)" for p in top
+                )
+                + "."
+            )
+        budgets = risk.limits.tier_risk_budgets or {}
+        tiers = [
+            f"{g.label} {g.risk_share:.0%}"
+            + (f" (budget {budgets[g.label]:.0%})" if g.label in budgets else "")
+            for g in risk.by_tier
+            if g.label in budgets or g.risk_share >= 0.05
+        ]
+        if tiers:
+            lines.append("Share of risk by tier: " + ", ".join(tiers) + ".")
+        if risk.effective_bets is not None:
+            lines.append(f"About {risk.effective_bets:.1f} independent bets.")
+        lines += [w for w in risk.warnings if "understates" in w]
+    if validation is not None and validation.available:
+        lines.append(f"Model check: {validation.verdict}")
+    elif validation is not None:
+        lines.append(f"Model check not run: {validation.reason}.")
+    return lines
+
+
+BENCH_MIN, BENCH_MAX = 5, 10
+
+
+def bench_lines(ranking: "RankingResponse") -> list[str]:
+    """The bench count against the 5 to 10 target and the best-ranked ideas (pure). The bench is
+    every thesis on a stock that is not held; an idea without scenarios counts but cannot rank."""
+    ideas = [r for r in ranking.rows if not r.held]
+    count = len(ideas)
+    if count < BENCH_MIN:
+        verdict = f"below the target of {BENCH_MIN} to {BENCH_MAX}"
+    elif count > BENCH_MAX:
+        verdict = f"above the target of {BENCH_MIN} to {BENCH_MAX}"
+    else:
+        verdict = f"within the target of {BENCH_MIN} to {BENCH_MAX}"
+    lines = [f"Bench: {count} idea{'s' if count != 1 else ''} with a thesis, {verdict}."]
+    ranked = [r for r in ideas if r.score is not None and r.returns is not None]
+    unranked = count - len(ranked)
+    if unranked:
+        lines.append(
+            f"{unranked} bench idea{'s' if unranked != 1 else ''} cannot be ranked yet "
+            "(no scenarios, price or history)."
+        )
+    hurdle = ranking.return_hurdle
+    for r in ranked[:3]:
+        assert r.returns is not None and r.score is not None
+        flag = ""
+        if hurdle is not None:
+            flag = (
+                ", above the return hurdle" if r.returns.total >= hurdle else ", under the hurdle"
+            )
+        lines.append(
+            f"Best-ranked idea {r.ticker}: expected {r.returns.total:+.0%} over "
+            f"{r.returns.horizon_years:.1f} years, score {r.score:.2f}{flag}."
+        )
+    return lines
+
+
+async def bench_note_lines(pool: asyncpg.Pool, notes: list[str]) -> list[str]:
+    """The bench section of the review. A failure adds a note and never stops the review."""
+    from steward.decision.ranking_service import expected_returns
+
+    try:
+        return bench_lines(await expected_returns(pool))
+    except Exception:
+        logger.exception("bench notes failed")
+        notes.append("The bench and its ranking could not be computed.")
+        return []
+
+
+async def open_risk_limit_keys(pool: asyncpg.Pool) -> list[str]:
+    """Keys of the risk-limit findings open now; an action may cite them like a rule id."""
+    rows = await pool.fetch(
+        "select key from public.portfolio_breach where cleared_at is null and key like 'risk:%'"
+        " order by key"
+    )
+    return [r["key"] for r in rows]
+
+
+def tail_lines(report: "TailReport", max_drawdown: float | None) -> list[str]:
+    """The tail-loss lines of the risk section (pure): the bad-month loss and the chance of the
+    drawdown the strategy fears. A report that is not available says why, once."""
+    if not report.available:
+        return [f"No tail-loss figure this month: {report.reason or 'no estimate'}."]
+    lines: list[str] = []
+    if report.es_95_month is not None:
+        money = ""
+        month = next((x for x in report.lines if x.horizon_weeks == 4 and x.level == 0.95), None)
+        if month is not None and month.es_value is not None and report.es_95_month == month.es:
+            money = f" ({month.es_value:,.0f} {report.base_currency})"
+        lines.append(
+            f"In the worst one month in twenty the book has lost about {report.es_95_month:.1%} on "
+            f"average{money}, on weekly returns of today's holdings."
+        )
+    if report.drawdown:
+        longest = report.drawdown[-1]
+        limit = f" (the freeze is at {max_drawdown:.0%})" if max_drawdown is not None else ""
+        lines.append(
+            f"Simulated chance of a {longest.threshold:.0%} fall from a peak within "
+            f"{longest.years} years: {longest.probability:.0%}{limit}."
+        )
+    return lines
+
+
+async def risk_note_lines(
+    pool: asyncpg.Pool, notes: list[str], due: list[str] | None = None
+) -> list[str]:
+    """Forecast risk, flagged factor tilts, the hardest past episode and a risk line for each
+    thesis due for review. A part that cannot be computed is left out and noted; it never stops
+    the review."""
+    from steward.portfolio.exante import book_from_snapshot, ex_ante_risk
+    from steward.portfolio.factors import factor_exposures
+    from steward.portfolio.position_pack import position_risk_pack
+    from steward.portfolio.replay import stress_replay
+    from steward.portfolio.tail import tail_report
+    from steward.portfolio.validation import model_validation
+
+    lines: list[str] = []
+    try:
+        risk = await ex_ante_risk(pool)
+        lines += risk_section_lines(risk, await model_validation(pool))
+        book, strategy = await book_from_snapshot(pool)
+        if book is not None and strategy is not None:
+            lines += tail_lines(tail_report(book, strategy), strategy.risk.max_drawdown)
+        for ticker in (due or [])[:MAX_PACKS]:
+            pack = await position_risk_pack(pool, ticker)
+            if pack.available and pack.summary:
+                lines.append(f"Thesis review, {pack.summary}")
+        factors = await factor_exposures(pool)
+        lines += [t.note for t in factors.tilts if t.flagged and t.note]
+        replay = await stress_replay(pool)
+        worst = min(
+            (e for e in replay.episodes if e.loss is not None),
+            key=lambda e: e.loss or 0,
+            default=None,
+        )
+        if worst is not None and worst.loss is not None:
+            lines.append(
+                f"Hardest past episode on today's holdings: {worst.label}, {worst.loss:+.1%}."
+            )
+    except Exception:
+        logger.exception("risk notes failed")
+        notes.append("Forecast risk, factor tilts and past episodes could not be computed.")
+    return lines
+
+
 async def build_review(
     pool: asyncpg.Pool,
     now: dt.datetime,
@@ -742,18 +933,25 @@ async def build_review(
         actions=[],
         holding_periods=holding_periods,
         decision_scorecard=scorecard_lines,
+        risk_notes=await risk_note_lines(pool, notes, due),
+        bench_notes=await bench_note_lines(pool, notes),
         sources=[],
     )
     usage: Usage | None = None
     if writer is None:
         notes.append("Actions not proposed: ANTHROPIC_API_KEY is not set.")
     else:
-        draft, usage, note = await writer.propose(review_material(body, strategy), today)
+        limit_keys = await open_risk_limit_keys(pool)
+        draft, usage, note = await writer.propose(
+            review_material(body, strategy, limit_keys), today
+        )
         if draft is None:
             notes.append(f"Actions not proposed: {note}.")
         else:
             body.actions, body.dropped_actions = keep_cited(
-                draft, {r.id for r in strategy.enabled_rules}, {k.ref for k in kpis}
+                draft,
+                {r.id for r in strategy.enabled_rules} | set(limit_keys),
+                {k.ref for k in kpis},
             )
             body.model = usage.model
     breaches = sum(1 for r in rows if r.status == "breach")
@@ -785,6 +983,10 @@ def render_md(body: ReviewBody) -> str:
     if body.decision_scorecard:
         lines += ["", "## Decision scorecard", ""]
         lines += [f"- {line}" for line in body.decision_scorecard]
+    if body.risk_notes:
+        lines += ["", "## Risk", ""] + [f"- {n}" for n in body.risk_notes]
+    if body.bench_notes:
+        lines += ["", "## Bench", ""] + [f"- {n}" for n in body.bench_notes]
     lines += ["", "## Thesis KPIs", ""]
     lines += [f"- [{k.status}] {k.ref}: {k.description}" for k in body.kpis]
     if body.reviews_due:

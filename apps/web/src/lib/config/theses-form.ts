@@ -185,6 +185,17 @@ export type TargetForm = {
   currency: string;
   method: string;
   set_on: string; // yyyy-mm-dd or ""
+  /** Scenario values per share, in the target's currency (principle 5). */
+  bear: string;
+  base: string;
+  bull: string;
+  /** Probabilities in percent; blank keeps the defaults 25 / 50 / 25. */
+  p_bear: string;
+  p_base: string;
+  p_bull: string;
+  catalyst_date: string; // yyyy-mm-dd or ""
+  /** Expected annual volatility in percent. */
+  volatility_band: string;
 };
 
 export const EMPTY_TARGET: TargetForm = {
@@ -194,7 +205,26 @@ export const EMPTY_TARGET: TargetForm = {
   currency: "",
   method: "",
   set_on: "",
+  bear: "",
+  base: "",
+  bull: "",
+  p_bear: "",
+  p_base: "",
+  p_bull: "",
+  catalyst_date: "",
+  volatility_band: "",
 };
+
+/** A fraction as percent text for a form field: 0.25 -> "25". */
+function fractionText(value: number | null | undefined): string {
+  return value == null ? "" : String(Math.round(value * 1e6) / 1e4);
+}
+
+/** Percent text as a fraction, null when blank or not a number. */
+function percentFraction(text: string): number | null {
+  const value = parseThreshold(text);
+  return value == null ? null : value / 100;
+}
 
 let counter = 0;
 const nextKey = () => `k${++counter}`;
@@ -253,7 +283,30 @@ export function targetFromBody(
     currency: target.currency,
     method: target.method,
     set_on: target.set_on,
+    bear: target.scenarios ? String(target.scenarios.bear) : "",
+    base: target.scenarios ? String(target.scenarios.base) : "",
+    bull: target.scenarios ? String(target.scenarios.bull) : "",
+    p_bear: target.scenarios ? fractionText(target.scenarios.p_bear) : "",
+    p_base: target.scenarios ? fractionText(target.scenarios.p_base) : "",
+    p_bull: target.scenarios ? fractionText(target.scenarios.p_bull) : "",
+    catalyst_date: target.catalyst_date ?? "",
+    volatility_band: fractionText(target.volatility_band),
   };
+}
+
+/** Scenarios as typed; probabilities left blank are not sent, so the API's defaults apply. */
+function scenariosToBody(form: TargetForm): ThesisPriceTarget["scenarios"] {
+  const values = [form.bear, form.base, form.bull, form.p_bear, form.p_base, form.p_bull];
+  if (values.every((v) => !v.trim())) return null;
+  const body: Record<string, number | null> = {
+    bear: parseThreshold(form.bear),
+    base: parseThreshold(form.base),
+    bull: parseThreshold(form.bull),
+  };
+  for (const key of ["p_bear", "p_base", "p_bull"] as const) {
+    if (form[key].trim()) body[key] = percentFraction(form[key]);
+  }
+  return body as ThesisPriceTarget["scenarios"];
 }
 
 /** Null when every field is blank; otherwise sent as typed, so the API's 422 reports gaps. */
@@ -266,6 +319,9 @@ export function targetToBody(form: TargetForm): ThesisPriceTarget | null {
     currency: form.currency.trim().toUpperCase(),
     method: form.method.trim(),
     set_on: form.set_on,
+    scenarios: scenariosToBody(form),
+    catalyst_date: form.catalyst_date || null,
+    volatility_band: percentFraction(form.volatility_band),
   };
 }
 

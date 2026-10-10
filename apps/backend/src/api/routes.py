@@ -24,6 +24,8 @@ from steward.config import (
 )
 from steward.config.common import Ticker
 from steward.config.store import ConfigConflictError, StoredConfig, load_active, save_config
+from steward.decision.allocator import AllocationPlan, allocate_deposit
+from steward.decision.service import resolve_tickers
 from steward.earnings.check import local_today
 from steward.earnings.read import (
     FACT_CONFIDENCE,
@@ -44,6 +46,22 @@ from steward.earnings.review import review_fact as review_fact_in_db
 from steward.earnings.review_stats import ReviewStats, review_stats
 from steward.jobs import queue
 from steward.jobs.runner import create_job
+from steward.portfolio.concentration import ConcentrationReport, concentration_report
+from steward.portfolio.exante import ExAnteRisk, book_from_snapshot, ex_ante_risk
+from steward.portfolio.factor_shock import (
+    Scenario,
+    ScenarioIn,
+    ShockResult,
+    ShockSpec,
+    delete_scenario,
+    get_scenario,
+    list_scenarios,
+    run_shock,
+    save_scenario,
+)
+from steward.portfolio.factors import FactorExposures, factor_exposures
+from steward.portfolio.idea_fit import IdeaFitReport, idea_fit
+from steward.portfolio.position_pack import PositionRiskPack, position_risk_pack
 from steward.portfolio.read import (
     ContributionReport,
     HoldingsResponse,
@@ -56,7 +74,16 @@ from steward.portfolio.read import (
     portfolio_holdings,
     portfolio_overview,
 )
+from steward.portfolio.replay import StressReplay, stress_replay
 from steward.portfolio.risk import PortfolioRisk, portfolio_risk
+from steward.portfolio.risk_snapshots import (
+    SnapshotRow,
+    get_snapshot,
+    list_snapshots,
+    save_snapshot,
+)
+from steward.portfolio.sizing import StartSize, start_size
+from steward.portfolio.tail import TailReport, tail_report
 from steward.portfolio.transactions import (
     TransactionFilters,
     TransactionsPage,
@@ -64,6 +91,7 @@ from steward.portfolio.transactions import (
     decode_cursor,
     list_transactions,
 )
+from steward.portfolio.validation import ModelValidation, model_validation
 from steward.settings import get_settings
 from steward.storage import EvidenceStore, StorageError, SupabaseStorage
 
@@ -129,6 +157,207 @@ async def get_portfolio_risk(
     return, average risk-free rate, the window and the number of observations. `sharpe` is
     null with a `reason` under 60 observations or without a stored risk-free rate."""
     return await portfolio_risk(pool, days)
+
+
+@router.get("/portfolio/risk/ex-ante", tags=["portfolio"])
+async def get_portfolio_risk_ex_ante(pool: Pool, _owner: Owner) -> ExAnteRisk:
+    """Today's risk from the current weights: the forecast annualised volatility (the higher
+    of an EWMA and a Ledoit-Wolf covariance model on three years of weekly base-currency
+    returns, cash at zero volatility), each position's Euler share of it, the shares summed by
+    tier, sector, country and currency, the diversification ratio, the effective number of
+    independent bets, the tier-criterion volatility checks and the coverage: which weight rests
+    on a proxy-backfilled history and which is left out. `volatility_forecast` is null with a
+    `reason` when no position has enough history."""
+    return await ex_ante_risk(pool)
+
+
+@router.get("/portfolio/risk/tail", tags=["portfolio"])
+async def get_portfolio_risk_tail(pool: Pool, _owner: Owner) -> TailReport:
+    """The bad-month numbers for today's weights, on weekly returns: Value at Risk and Expected
+    Shortfall at 95 and 99 % over one week and one month (historical, filtered-historical and
+    Cornish-Fisher), each position's part of the Expected Shortfall, the simulated chance of the
+    `max_drawdown` fall within 1, 2 and 3 years with drawdown and terminal-value quantiles, and
+    the downside statistics of the weekly record. `available` is false, with a `reason`, when
+    there is no book or too little history."""
+    book, strategy = await book_from_snapshot(pool)
+    if book is None or strategy is None:
+        return TailReport(available=False, reason="no portfolio snapshot yet; run the sync")
+    report = tail_report(book, strategy)
+    if report.available:
+        await save_snapshot(pool, "tail", report, report.as_of, report.method_version)
+    return report
+
+
+@router.get("/portfolio/risk/snapshots", tags=["portfolio"])
+async def get_risk_snapshots(
+    pool: Pool,
+    _owner: Owner,
+    kind: Literal["ex_ante", "replay", "factors", "shock", "tail"] | None = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[SnapshotRow]:
+    """Saved copies of the risk reports with their method version, newest first. A report is
+    saved once per data date, method version and content, so a later change to a model does not
+    rewrite what was shown."""
+    return await list_snapshots(pool, kind, limit)
+
+
+@router.get("/portfolio/risk/snapshots/{snapshot_id}", tags=["portfolio"])
+async def get_risk_snapshot(pool: Pool, _owner: Owner, snapshot_id: IdPath) -> dict[str, Any]:
+    """One saved risk report exactly as it was shown."""
+    payload = await get_snapshot(pool, snapshot_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="no such saved report")
+    return payload
+
+
+@router.post("/portfolio/risk/factor-shock", tags=["portfolio"])
+async def post_factor_shock(
+    pool: Pool,
+    _owner: Owner,
+    spec: ShockSpec,
+    region: Literal["developed", "europe", "us"] = "developed",
+) -> ShockResult:
+    """What today's holdings would do if the stated factors moved: the equity market, the
+    size, value, profitability, investment and momentum styles, the US dollar and the euro
+    against the base currency, and the US 10-year yield. Each holding is moved by its measured
+    loadings; an owner beta replaces only the market loading. Holdings without loadings use the
+    owner's fallback beta, else stay flat and are listed. Nothing is saved."""
+    return await run_shock(pool, spec, region)
+
+
+@router.get("/portfolio/risk/scenarios", tags=["portfolio"])
+async def get_risk_scenarios(pool: Pool, _owner: Owner) -> list[Scenario]:
+    """The saved what-if scenarios, by name."""
+    return await list_scenarios(pool)
+
+
+@router.post("/portfolio/risk/scenarios", tags=["portfolio"], status_code=201)
+async def post_risk_scenario(pool: Pool, _owner: Owner, body: ScenarioIn) -> Scenario:
+    """Save a scenario under a name, replacing the one with that name."""
+    return await save_scenario(pool, body)
+
+
+@router.delete("/portfolio/risk/scenarios/{scenario_id}", tags=["portfolio"], status_code=204)
+async def delete_risk_scenario(pool: Pool, _owner: Owner, scenario_id: IdPath) -> None:
+    """Delete a saved scenario. Its saved runs are kept."""
+    if not await delete_scenario(pool, scenario_id):
+        raise HTTPException(status_code=404, detail="no such scenario")
+
+
+@router.post("/portfolio/risk/scenarios/{scenario_id}/run", tags=["portfolio"])
+async def run_risk_scenario(
+    pool: Pool,
+    _owner: Owner,
+    scenario_id: IdPath,
+    region: Literal["developed", "europe", "us"] = "developed",
+) -> ShockResult:
+    """Run a saved scenario on today's holdings; the run is saved with the loadings it used."""
+    scenario = await get_scenario(pool, scenario_id)
+    if scenario is None:
+        raise HTTPException(status_code=404, detail="no such scenario")
+    return await run_shock(pool, scenario.spec, region, scenario_id)
+
+
+@router.get("/portfolio/risk/validation", tags=["portfolio"])
+async def get_model_validation(pool: Pool, _owner: Owner) -> ModelValidation:
+    """Does the risk model's forecast match what happened? A weekly back-test on today's
+    holdings: Kupiec and Christoffersen tests of the 95 % and 99 % value-at-risk, and the ratio
+    of realised to forecast volatility. `confidence` is `reduced` and `review_item` is set when
+    a test fails; `untested` when too little history exists."""
+    return await model_validation(pool)
+
+
+@router.get("/portfolio/risk/factors", tags=["portfolio"])
+async def get_portfolio_factor_exposures(
+    pool: Pool, _owner: Owner, region: Literal["developed", "europe", "us"] = "developed"
+) -> FactorExposures:
+    """Factor exposures of the portfolio, the first benchmark and each holding, from two years
+    of weekly base-currency returns regressed on the Ken French factors of the chosen region
+    (market, size, value, profitability, investment, momentum) and the US dollar and euro
+    against the base currency. Each loading has a Newey-West t-statistic. `tilts` compare the
+    portfolio with the benchmark; a style tilt beyond 0.3 is `flagged` as a concentration note,
+    not a breach. `reason` is set when no factor data is stored yet."""
+    return await factor_exposures(pool, region)
+
+
+@router.get("/portfolio/risk/factors/ideas", tags=["portfolio"])
+async def get_idea_factor_fit(
+    pool: Pool,
+    _owner: Owner,
+    symbols: Annotated[str, Query(min_length=1, max_length=400)],
+    currency: Annotated[str, Query(min_length=3, max_length=3)] = "USD",
+    region: Literal["developed", "europe", "us"] = "developed",
+    weight: Annotated[float, Query(ge=0.005, le=0.2)] = 0.05,
+) -> IdeaFitReport:
+    """Rank candidate ideas (comma-separated price symbols with stored daily prices) by how much
+    each would reduce the portfolio's dominant style tilt if held at `weight`, paid for from
+    cash. A tie-breaker between comparable ideas (strategy principle 7c), not a recommendation;
+    an idea without stored prices is listed with the reason."""
+    return await idea_fit(
+        pool, [s for s in symbols.split(",") if s.strip()], currency.upper(), region, weight
+    )
+
+
+@router.get("/portfolio/risk/sizing", tags=["portfolio"])
+async def get_start_size(
+    pool: Pool,
+    _owner: Owner,
+    ticker: Annotated[str, Query(min_length=1, max_length=32)],
+    premium: Annotated[float | None, Query(ge=0, le=0.15)] = None,
+) -> StartSize:
+    """Risk-aware starting size for a stock: the smaller of the tier's starting cap (principle
+    8b) and the largest weight that raises no new ex-ante limit breach, with the quarter-Kelly
+    upper bound and its inputs where the stock has a thesis. A ceiling, never a target."""
+    name = (await resolve_tickers(pool, [ticker])).get(ticker.strip(), ticker.strip())
+    return await start_size(pool, name, premium)
+
+
+@router.get("/portfolio/risk/position", tags=["portfolio"])
+async def get_position_risk(
+    pool: Pool, _owner: Owner, ticker: Annotated[str, Query(min_length=1, max_length=32)]
+) -> PositionRiskPack:
+    """The risk page of a thesis review: the holding's share of the portfolio's risk against its
+    weight, the holdings it moves with (weekly correlation 0.6 or more) and its worst past
+    episodes. Expected Shortfall is not modelled yet and the response says so."""
+    name = (await resolve_tickers(pool, [ticker])).get(ticker.strip(), ticker.strip())
+    return await position_risk_pack(pool, name)
+
+
+@router.get("/portfolio/risk/deposit", tags=["portfolio"])
+async def get_deposit_plan(
+    pool: Pool,
+    _owner: Owner,
+    amount: Annotated[float, Query(gt=0, le=1e9)],
+) -> AllocationPlan:
+    """Where a deposit (base currency) should go under principle 8c, in whole shares, with every
+    rule, cap, band and ex-ante limit respected and the risk impact of each line. Read-only."""
+    try:
+        return await allocate_deposit(pool, amount)
+    except LookupError as err:
+        raise HTTPException(409, str(err)) from err
+
+
+@router.get("/portfolio/risk/over-cap", tags=["portfolio"])
+async def get_over_cap(
+    pool: Pool,
+    _owner: Owner,
+    monthly_deposit: Annotated[float | None, Query(ge=0, le=1e9)] = None,
+    cap: Annotated[float | None, Query(gt=0, le=1)] = None,
+) -> ConcentrationReport:
+    """Stocks above the single-position cap (principle 4f): how long deposits alone take to
+    dilute each under the cap, and the sale that trims it to 8 %."""
+    return await concentration_report(pool, monthly_deposit, cap)
+
+
+@router.get("/portfolio/risk/stress-replay", tags=["portfolio"])
+async def get_portfolio_stress_replay(pool: Pool, _owner: Owner) -> StressReplay:
+    """Named past episodes (2008, 2011, the end of the CZK floor, 2020, 2022) replayed on
+    today's weights in the base currency: the portfolio loss, the three worst contributors and
+    whether the drawdown limit would be reached. A position without prices in the episode is
+    moved by its beta on the best-fitting proxy and labelled `proxied`; one with neither stays
+    flat and is listed as `unavailable`. Episodes before the stored price history return
+    `no_data`."""
+    return await stress_replay(pool)
 
 
 @router.get("/portfolio/transactions", tags=["portfolio"])

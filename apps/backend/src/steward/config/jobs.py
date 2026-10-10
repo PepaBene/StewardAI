@@ -642,6 +642,65 @@ class MarketStripItem(ConfigModel):
         return self.yahoo_symbol or STOOQ_INDEX_YAHOO.get(self.symbol)
 
 
+class ProxySeries(ConfigModel):
+    """A sector or region ETF whose daily closes stand in for a holding with a short history
+    (quant plan Q0.3/Q0.4): a recent listing is regressed on it and the missing weeks are
+    backfilled from it."""
+
+    symbol: StooqSymbol = Field(examples=["xlk.us"])
+    label: str = Field(min_length=1, max_length=40, examples=["US technology"])
+    currency: Annotated[str, Field(pattern=r"^[A-Z]{3}$")] = Field(
+        default="USD", description="Quote currency of the ETF's closes."
+    )
+    kind: Literal["sector", "region", "market"] = "sector"
+    match: list[Annotated[str, Field(min_length=2, max_length=30)]] = Field(
+        default_factory=list,
+        max_length=20,
+        description="Lower-case words that, found in a holding's sector or country label, make "
+        "this ETF the preferred stand-in for it (when its fit is within 0.10 R-squared of the "
+        "best one).",
+    )
+
+    def yahoo(self) -> str | None:
+        ticker, _, suffix = self.symbol.rpartition(".")
+        return ticker.upper() if suffix == "us" and ticker else None
+
+
+def _default_proxy_series() -> list[ProxySeries]:
+    sectors = {
+        "xlk.us": ("US technology", ["tech", "software", "semiconductor", "it services"]),
+        "xlv.us": ("US health care", ["health", "pharma", "biotech", "medical"]),
+        "xlf.us": ("US financials", ["financ", "bank", "insurance", "asset manage"]),
+        "xle.us": ("US energy", ["energy", "oil", "gas"]),
+        "xly.us": ("US consumer discretionary", ["discretionary", "retail", "auto", "leisure"]),
+        "xlp.us": ("US consumer staples", ["staples", "food", "beverage", "household"]),
+        "xli.us": ("US industrials", ["industrial", "aerospace", "defen", "transport"]),
+        "xlb.us": ("US materials", ["material", "chemical", "mining", "metals"]),
+        "xlu.us": ("US utilities", ["utilit", "electric", "water"]),
+        "xlc.us": ("US communication services", ["communication", "media", "telecom"]),
+    }
+    out = [
+        ProxySeries(symbol=s, label=name, kind="sector", match=words)
+        for s, (name, words) in sectors.items()
+    ]
+    out += [
+        ProxySeries(
+            symbol="vgk.us",
+            label="Europe",
+            kind="region",
+            match=["europe", "germany", "france", "netherlands", "czech", "spain", "italy", "uk"],
+        ),
+        ProxySeries(
+            symbol="vwo.us",
+            label="Emerging markets",
+            kind="region",
+            match=["emerging", "china", "india", "brazil", "taiwan", "korea"],
+        ),
+        ProxySeries(symbol="vt.us", label="World equities", kind="market"),
+    ]
+    return out
+
+
 def _default_market_strip() -> list[MarketStripItem]:
     return [
         MarketStripItem(symbol="^spx", label="S&P 500", yahoo_symbol="^GSPC"),
@@ -662,7 +721,29 @@ class PriceSettings(ConfigModel):
         description="Stooq symbols of the benchmarks (^spx S&P 500, ^dax DAX, ^ukx FTSE 100). "
         "The first is used for beta and the holding charts.",
     )
-    history_years: int = Field(default=2, ge=1, le=10)
+    history_years: int = Field(
+        default=10,
+        ge=1,
+        le=10,
+        description="Years of daily closes fetched for holdings. The covariance model needs "
+        "three years of weekly returns. Benchmarks, proxy ETFs and FX use "
+        "`reference_history_years`.",
+    )
+    reference_history_years: int = Field(
+        default=20,
+        ge=1,
+        le=30,
+        description="Years of daily closes fetched for benchmarks, the market strip and proxy "
+        "ETFs, and of ECB FX rates. Longer than the holdings' history so that stress replays "
+        "can reach the 2008 and 2011 episodes through proxies.",
+    )
+    proxy_series: list[ProxySeries] = Field(
+        default_factory=_default_proxy_series,
+        max_length=40,
+        description="Sector and region ETFs collected as stand-ins for holdings with under "
+        "three years of history (the ex-ante risk model regresses a recent listing on the "
+        "best-fitting one).",
+    )
     plausibility_tolerance_pct: float = Field(
         default=1.0,
         gt=0,
@@ -708,6 +789,7 @@ class PriceSettings(ConfigModel):
     @model_validator(mode="after")
     def _unique_strip(self) -> Self:
         require_unique("market strip symbols", (i.symbol for i in self.market_strip))
+        require_unique("proxy series symbols", (p.symbol for p in self.proxy_series))
         return self
 
     def index_yahoo(self, symbol: str) -> str | None:
@@ -871,6 +953,11 @@ class MacroSettings(ConfigModel):
             ),
             FredSeries(
                 key="fed_funds", label="Fed funds effective rate", series_id="DFF", policy_rate=True
+            ),
+            FredSeries(
+                key="us_10y",
+                label="US 10-year Treasury yield (the rates factor of the risk model)",
+                series_id="DGS10",
             ),
             *(
                 FredSeries(key=key, label=label, series_id=series_id, unit=unit)
@@ -1912,6 +1999,13 @@ class JobsConfig(ConfigModel):
         "SEC XBRL filing (reported basis). Your own exposure entries are never changed. "
         "Default: Tuesdays 05:50.",
     )
+    factor_returns: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="30 5 * * 1"),
+        description="Downloads the Ken French Data Library daily factor returns (market, size, "
+        "value, profitability, investment, momentum) for the Developed, Europe and US markets, "
+        "which the factor exposures use. The library adds a month at a time. Default: Mondays "
+        "05:30.",
+    )
     disclosure_sources: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="0 6 * * *"),
         description="Re-test every disclosure source, store the result, switch a failing one off "
@@ -2018,6 +2112,7 @@ class JobsConfig(ConfigModel):
             "ir_discovery": self.ir_discovery,
             "gap_research": self.gap_research,
             "exposure_build": self.exposure_build,
+            "factor_returns": self.factor_returns,
             "disclosure_sources": self.disclosure_sources,
             "disclosure_ingest": self.disclosure_ingest,
             "disclosure_identifiers": self.disclosure_identifiers,

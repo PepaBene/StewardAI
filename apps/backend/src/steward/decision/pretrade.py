@@ -37,7 +37,7 @@ from steward.config.strategy import StrategyConfig
 from steward.decision import covariance
 from steward.decision.covariance import CovModel
 from steward.decision.lot_impact import SaleImpact
-from steward.fx.convert import normalise_currency
+from steward.fx.convert import normalise_currency, price_in_unit
 from steward.portfolio.breaches import Finding, evaluate
 from steward.portfolio.drift import DriftReport
 
@@ -67,6 +67,34 @@ class PretradeRules(BaseModel):
         description="Largest share of the portfolio's volatility one stock may account for. "
         "Unset: the share is shown but not judged, because the strategy states no number.",
     )
+    score_for_full_start: float | None = Field(
+        default=None,
+        gt=0,
+        le=10,
+        description="Risk-adjusted score that earns the full tier starting cap; a lower score "
+        "starts proportionally smaller. Unset: not applied.",
+    )
+    event_loss_budget: float | None = Field(
+        default=None,
+        gt=0,
+        le=1,
+        description="Most of the portfolio one results day may cost; the starting size is cut "
+        "to fit the stock's largest past move on a report date. Unset: not applied.",
+    )
+    equity_premium: float = Field(
+        default=0.05,
+        ge=0,
+        le=0.2,
+        description="Yearly return above cash that the market is assumed to pay; the anchor "
+        "the quarter-Kelly bound pulls a thesis return toward.",
+    )
+    confidence_low: float = Field(
+        default=0.2,
+        ge=0,
+        le=1,
+        description="Weight on the thesis return at conviction 1 (conviction 5 uses the high one).",
+    )
+    confidence_high: float = Field(default=0.8, ge=0, le=1)
 
     def start_cap(self, tier: str | None) -> float | None:
         return {
@@ -129,6 +157,10 @@ class TickerFacts:
     price: float | None = None  # in the quote currency
     quote_currency: str | None = None
     sell_target: float | None = None
+    # With thesis scenarios (Q8.1) the expected return is the probability-weighted value, and
+    # the asymmetry gate weighs the base case, not the expected value, against the bear case.
+    expected_value: float | None = None
+    base_value: float | None = None
     bear_case: float | None = None  # the thesis's bear-case price, in the quote currency
     target_currency: str | None = None
     has_thesis: bool = False
@@ -169,13 +201,22 @@ def expected_return(f: TickerFacts) -> tuple[float | None, str | None]:
     """(return to the sell target, reason it is unavailable)."""
     if not f.has_thesis:
         return None, "no thesis is stored for this ticker"
-    if f.sell_target is None:
-        return None, "the thesis has no sell target"
+    value = f.expected_value if f.expected_value is not None else f.sell_target
+    if value is None:
+        return None, "the thesis has no sell target or scenarios"
     if f.price is None or f.price <= 0:
         return None, "no current price"
+    price = f.price
     if f.target_currency and f.quote_currency and f.target_currency != f.quote_currency:
-        return None, f"the target is in {f.target_currency} but the price is in {f.quote_currency}"
-    return f.sell_target / f.price - 1, None
+        # GBX against GBP is one currency in two units; anything else cannot be compared.
+        scaled = price_in_unit(f.price, f.quote_currency, f.target_currency)
+        if scaled is None or scaled <= 0:
+            return (
+                None,
+                f"the target is in {f.target_currency} but the price is in {f.quote_currency}",
+            )
+        price = scaled
+    return value / price - 1, None
 
 
 def _pct(x: float) -> str:
@@ -290,10 +331,14 @@ def _buy_checks(t: TradeLeg, ctx: PretradeContext) -> list[PretradeCheck]:
                 status="pass" if ok else "flag",
                 title=f"Expected return {_pct(er)} against a {_pct(rules.return_hurdle)} hurdle",
                 detail=(
-                    f"Price {f.price:,.2f} to the thesis sell target {f.sell_target:,.2f} "
-                    f"{f.target_currency or f.quote_currency or ''} is {_pct(er)} "
-                    f"over the thesis horizon."
-                ),
+                    f"Price {f.price or 0:,.2f} to the thesis's probability-weighted value "
+                    f"{f.expected_value:,.2f} "
+                    if f.expected_value is not None
+                    else f"Price {f.price or 0:,.2f} to the thesis sell target "
+                    f"{f.sell_target or 0:,.2f} "
+                )
+                + f"{f.target_currency or f.quote_currency or ''} is {_pct(er)} "
+                "over the thesis horizon.",
                 values={"expected_return": er, "hurdle": rules.return_hurdle},
             )
         )
@@ -366,6 +411,8 @@ def _asymmetry(
             detail="The upside to the sell target is not available, so there is nothing to "
             "compare with the bear case.",
         )
+    if f.base_value is not None:
+        er = f.base_value / f.price - 1
     loss = 1 - bear / f.price
     if loss <= 0:
         return PretradeCheck(

@@ -46,7 +46,7 @@ from steward.fx.convert import FxRate, normalise_currency
 from steward.jobs.runner import JobContext
 from steward.news.escalation import queue_escalation
 from steward.portfolio.sync import store_rates
-from steward.reference.identity import holding_tickers
+from steward.reference.identity import bench_tickers, holding_tickers
 from steward.reference.intraday import PSE_SYMBOL, refresh_pse_px, store_payload
 from steward.reference.listings import derive_listings, resolve_series_listing
 from steward.reference.price_series import (
@@ -914,9 +914,11 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
         await ctx.record_config_version(profiles.id if profiles else None)
         settings = (jobs.body if jobs else JobsConfig()).prices
         tickers = await holding_tickers(pool)
+        bench = await bench_tickers(pool, tickers)
         holdings = await holding_symbols(
-            pool, tickers, profiles.body if profiles else HoldingProfilesConfig()
+            pool, [*tickers, *bench], profiles.body if profiles else HoldingProfilesConfig()
         )
+        step.detail["bench"] = bench
         step.detail.update(
             symbols={t: s.stooq for t, s in holdings.items()},
             yahoo_symbols={t: s.yahoo for t, s in holdings.items()},
@@ -958,12 +960,18 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
         wanted: list[tuple[str | None, str, PriceSymbols]] = [
             (t, t, s) for t, s in holdings.items()
         ] + [(None, b, index_symbols(settings, b)) for b in indices]
+        # Proxy ETFs for the ex-ante risk model's short-history backfill (quant plan Q0.3).
+        wanted += [
+            (None, p.symbol, PriceSymbols(stooq=p.symbol, yahoo=p.yahoo()))
+            for p in settings.proxy_series
+            if p.symbol not in indices
+        ]
         for ticker, key, symbols in wanted:
             used, gap = await collect_series(
                 pool,
                 deps,
                 symbols,
-                settings.history_years,
+                settings.history_years if ticker else settings.reference_history_years,
                 settings.yahoo_daily_fallback,
                 restated,
                 counts,
@@ -1082,7 +1090,7 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
             step.detail["split_skipped"] = splits
 
     async with ctx.step("fx_history") as step:
-        await fx_history(pool, deps, settings.history_years, step.detail)
+        await fx_history(pool, deps, settings.reference_history_years, step.detail)
 
 
 async def price_history_handler(ctx: JobContext) -> None:

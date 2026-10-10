@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from api.auth import Owner
 from api.db import Pool
 from steward import saved
-from steward.performance import exports, service
+from steward.performance import evaluation, exports, service
 from steward.performance.reports import (
     AttributionResponse,
     LotsResponse,
@@ -20,6 +20,7 @@ from steward.performance.reports import (
     SleevesResponse,
 )
 from steward.performance.settings import PerformanceSettings, load_settings, save_settings
+from steward.portfolio.factors import factor_exposures
 
 router = APIRouter()
 
@@ -139,6 +140,35 @@ async def open_saved_performance_report(
 async def archive_saved_performance_report(pool: Pool, owner: Owner, report_id: int) -> None:
     if not await saved.archive(pool, owner.user_id, "performance_report", report_id):
         raise HTTPException(404, "No such saved report.")
+
+
+@router.get("/portfolio/performance/evaluation", tags=["portfolio"])
+async def get_evaluation(
+    pool: Pool,
+    owner: Owner,
+    dimension: Annotated[
+        str, Query(max_length=40, description="A strategy classification, e.g. sector or risk.")
+    ] = "sector",
+) -> evaluation.Evaluation:
+    """Is the process adding value? Brinson-Fachler attribution by the chosen classification,
+    monthly and since inception, reconciled to the excess return over the benchmark; the
+    Probabilistic Sharpe Ratio against the benchmark (with the record length that would settle
+    it); and the factor-adjusted alpha with its t-statistic. Each part says when it cannot be
+    computed."""
+    settings, _ = await load_settings(pool, owner.user_id)
+    out = await evaluation.evaluation(pool, dimension, settings)
+    try:
+        exposures = await factor_exposures(pool)
+        if exposures.portfolio is not None:
+            fit = exposures.portfolio
+            out.factor_alpha = evaluation.factor_alpha(
+                fit.alpha_annual, fit.alpha_t, fit.observations
+            )
+        else:
+            out.notes.append(f"Factor alpha not computed: {exposures.reason or 'no factor fit'}.")
+    except Exception:
+        out.notes.append("Factor alpha could not be computed.")
+    return out
 
 
 @router.get("/portfolio/performance/settings", tags=["portfolio"])

@@ -43,8 +43,8 @@ const FULL: StrategyConfig = {
     { dimension: "geography", bucket: "US", target_weight: 0.4, band: 0.1 },
   ],
   rules: [
-    { id: "max-single-position", type: "position_weight", operator: "<=", value: 0.1, ticker: null, on_breach: "severity_2", description: "", enabled: true },
-    { id: "asml-cap", type: "position_weight", operator: "<", value: 0.2, ticker: "ASML_EQ", on_breach: "severity_3", description: "Hard cap", enabled: true },
+    { id: "max-single-position", type: "position_weight", operator: "<=", value: 0.1, ticker: null, exclude: ["VUAA_EQ", "CSPX_EQ"], on_breach: "severity_2", description: "", enabled: true },
+    { id: "asml-cap", type: "position_weight", operator: "<", value: 0.2, ticker: "ASML_EQ", exclude: [], on_breach: "severity_3", description: "Hard cap", enabled: true },
     { id: "max-sector", type: "category_weight", operator: "<=", value: 0.35, dimension: "sector", bucket: null, on_breach: "severity_1", description: "", enabled: true },
     { id: "europe-min", type: "category_weight", operator: ">=", value: 0.2, dimension: "geography", bucket: "Europe", on_breach: "severity_2", description: "At least a fifth in Europe", enabled: true },
     { id: "cash-floor", type: "cash_weight", operator: ">", value: 0.01, on_breach: "severity_2", description: "", enabled: true },
@@ -68,6 +68,15 @@ const FULL: StrategyConfig = {
     max_valuation_terminal_growth: null,
     max_valuation_growth: null,
     on_breach: "severity_2",
+    auto_tiers: false,
+    tier_speculative_market_cap: 2e9,
+    tier_core_min_market_cap: 1e10,
+    max_es_95_month: 0.12,
+    max_drawdown_probability: 0.15,
+    drawdown_probability_years: 2,
+    max_stock_risk_share: 0.05,
+    thesis_volatility_multiple: null,
+    drawdown_warnings: [0.1, 0.15],
   },
   hard_limit_severity: "severity_2",
   band_breach_severity: "severity_2",
@@ -83,6 +92,9 @@ const FULL: StrategyConfig = {
     trade_cost_bps: 5,
     fx_cost_bps: 15,
     risk_contribution_cap: 0.2,
+    equity_premium: 0.06,
+    confidence_low: 0.3,
+    confidence_high: 0.7,
   },
 };
 
@@ -124,6 +136,15 @@ describe("percent conversion", () => {
 describe("strategy form", () => {
   it("round-trips every field of a fully populated body", () => {
     expect(strategyToBody(strategyFromBody(FULL))).toEqual(FULL);
+  });
+
+  it("keeps a switched-off risk limit off and parses the drawdown rungs", () => {
+    const form = strategyFromBody({ ...FULL, risk: { ...FULL.risk!, max_stock_risk_share: null } });
+    expect(form.risk_max_stock_risk_share).toBe("");
+    expect(strategyToBody(form).risk?.max_stock_risk_share).toBeNull();
+    const edited = strategyToBody({ ...form, risk_drawdown_warnings: "8, 12.5" });
+    expect(edited.risk?.drawdown_warnings).toEqual([0.08, 0.125]);
+    expect(strategyToBody({ ...form, risk_drawdown_warnings: "" }).risk?.drawdown_warnings).toEqual([]);
   });
 
   it("starts from the backend defaults with a CZK base when nothing is saved", () => {

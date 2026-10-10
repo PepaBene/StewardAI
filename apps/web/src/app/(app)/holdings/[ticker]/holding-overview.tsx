@@ -576,12 +576,38 @@ function Stat({ label, value, sub }: { label: string; value: string; sub: ReactN
   );
 }
 
+const fetchExAnte = () => getBrowserApiClient().GET("/portfolio/risk/ex-ante");
+
+/** The holding's share of the portfolio's forecast risk, from the ex-ante model (not the
+ * stock's own volatility, which the tile beside it shows). */
+function RiskShareStat({ ticker }: { ticker: string }) {
+  const { state } = useApiResource(fetchExAnte);
+  const report = current(state);
+  const row = report?.positions.find((p) => p.ticker === ticker);
+  const share = row?.risk_share;
+  return (
+    <Stat
+      label="Share of portfolio risk"
+      value={typeof share === "number" ? formatPct(share, 1) : "—"}
+      sub={
+        state.kind === "loading"
+          ? "Loading…"
+          : row
+            ? `${formatPct(row.weight, 1)} of the portfolio${row.status === "proxied" ? ", partly estimated" : ""}`
+            : "not in today’s portfolio or left out"
+      }
+    />
+  );
+}
+
 export function DrawdownPanel({
   history,
   portfolioIndex,
+  ticker,
 }: {
   history: PriceHistory | null;
   portfolioIndex: { date: string; close: number }[] | null;
+  ticker?: string;
 }) {
   const bars = history?.bars ?? [];
   const year = barsInRange(bars, 365);
@@ -620,6 +646,7 @@ export function DrawdownPanel({
           sub={worst ? formatDate(worst.date) : "—"}
         />
         <Stat label="VaR 95%" value={varDay !== null ? formatPct(varDay, 1) : "—"} sub="1-day, historical" />
+        {ticker ? <RiskShareStat ticker={ticker} /> : null}
       </div>
       <p className="text-[11px] text-text-muted">
         Drawdown and max DD from the last year of daily closes. Volatility and beta are the backend&rsquo;s (252 days,

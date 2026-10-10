@@ -10,11 +10,17 @@ import datetime as dt
 import logging
 from dataclasses import dataclass, field
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import asyncpg
 
-from steward.config.strategy import RiskLimits, StrategyConfig
+from steward.config.store import load_active
+from steward.config.strategy import PositionWeightRule, RiskLimits, StrategyConfig
 from steward.portfolio.breaches import Finding
+
+if TYPE_CHECKING:
+    from steward.portfolio.exante import ExAnteRisk, LoadedBook
+    from steward.portfolio.tail import TailReport
 from steward.portfolio.snapshot import PositionRow
 from steward.settings import get_settings
 
@@ -22,6 +28,9 @@ log = logging.getLogger(__name__)
 
 # Window of the volatility and beta measurements, in days.
 RISK_WINDOW_DAYS = 365
+# Trading days in the realized-volatility window of a thesis's volatility band (three months).
+THESIS_VOLATILITY_DAYS = 63
+THESIS_VOLATILITY_SEVERITY = 2
 
 
 @dataclass(frozen=True)
@@ -61,16 +70,51 @@ class ValuationFlag:
     value: float
 
 
+@dataclass(frozen=True)
+class TierFlag:
+    ticker: str
+    tier: str
+    volatility: float
+    threshold: float
+    rule: str  # "speculative_above" or "core_above"
+
+
+@dataclass(frozen=True)
+class ThesisVolatilityFlag:
+    ticker: str
+    volatility: float  # three-month realized, annualised
+    band: float  # the thesis's expected volatility
+    multiple: float
+
+
+@dataclass(frozen=True)
+class StockRiskShare:
+    ticker: str
+    share: float  # of the portfolio's forecast variance
+
+
 @dataclass
 class RiskInputs:
     volatility: float | None = None
     beta: float | None = None
     drawdown: float | None = None
     var_95: float | None = None
+    es_95_month: float | None = None  # one-month 95 % Expected Shortfall, share of the book
+    drawdown_probability: float | None = None  # simulated chance of the max-drawdown fall
     tracking_error: float | None = None
     stress_loss: float | None = None  # positive loss, share of the portfolio
     credit_spread_bp: float | None = None
     credit_spread_date: dt.date | None = None
+    volatility_forecast: float | None = None  # ex-ante, the higher of EWMA and Ledoit-Wolf
+    forecast_model: str | None = None
+    tier_risk_shares: dict[str, float] = field(default_factory=dict)  # tier -> share of risk
+    effective_bets: float | None = None
+    model_check: str | None = None  # why the risk model's own back-test failed (Q6.1)
+    drawdown_drivers: list[tuple[str, float]] = field(default_factory=list)  # ticker, share lost
+    reviews_due: list[str] = field(default_factory=list)  # tickers whose thesis review is due
+    tier_flags: list[TierFlag] = field(default_factory=list)
+    thesis_volatility: list[ThesisVolatilityFlag] = field(default_factory=list)
+    stock_risk_shares: list[StockRiskShare] = field(default_factory=list)
     valuation_flags: list[ValuationFlag] = field(default_factory=list)
     correlations: list[PairCorrelation] = field(default_factory=list)
     positions: list[PositionLoss] = field(default_factory=list)
@@ -80,8 +124,55 @@ class RiskInputs:
     unavailable: dict[str, str] = field(default_factory=dict)
 
 
+# Which finding keys each unavailable measurement stands behind (a key matches a prefix when it
+# equals it or continues after a colon).
+_UNAVAILABLE_KEYS: dict[str, tuple[str, ...]] = {
+    "volatility": ("risk:volatility",),
+    "beta": ("risk:beta",),
+    "drawdown": ("risk:drawdown", "risk:drawdown_warning"),
+    "correlation": ("risk:correlation",),
+    "volatility_forecast": ("risk:volatility_forecast", "risk:stock_share", "risk:tier"),
+    "tier_risk": ("risk:tier_budget",),
+    "effective_bets": ("risk:effective_bets",),
+    "es": ("risk:es",),
+    "drawdown_probability": ("risk:drawdown_probability",),
+    "thesis_volatility": ("thesis:volatility",),
+    "var": ("risk:var",),
+    "tracking_error": ("risk:tracking_error",),
+    "stress": ("risk:stress",),
+    "credit_spread": ("risk:credit_spread",),
+    "valuation": ("risk:valuation",),
+    "xray": ("risk:sector", "risk:country", "risk:overlap"),
+    "overlap": ("risk:overlap",),
+}
+
+
+def unmeasured_keys(unavailable: dict[str, str]) -> frozenset[str]:
+    """Finding-key prefixes whose measurement failed this run: their open breaches are kept."""
+    return frozenset(k for name in unavailable for k in _UNAVAILABLE_KEYS.get(name, ()))
+
+
 def _pct(x: float) -> str:
     return f"{x * 100:.2f}%"
+
+
+def _model_name(model: str | None) -> str:
+    return {"ewma": "EWMA model", "ledoit_wolf": "Ledoit-Wolf model"}.get(model or "", "model")
+
+
+def drawdown_note(inputs: RiskInputs, rung: float, freeze: float) -> str:
+    """The text of a drawdown early warning: the drivers and the theses due for review."""
+    assert inputs.drawdown is not None
+    text = (
+        f"Early warning: the portfolio is {_pct(inputs.drawdown)} below its peak of the last "
+        f"year, past the {_pct(rung)} note; the freeze is at {_pct(freeze)}."
+    )
+    if inputs.drawdown_drivers:
+        drivers = ", ".join(f"{t} ({c:+.1%} of the portfolio)" for t, c in inputs.drawdown_drivers)
+        text += f" Biggest drivers since the peak, on today's weights: {drivers}."
+    if inputs.reviews_due:
+        text += f" Theses due for re-confirmation: {', '.join(inputs.reviews_due)}."
+    return text + " A fall in price alone is not a reason to sell."
 
 
 def evaluate_risk(inputs: RiskInputs, limits: RiskLimits) -> list[Finding]:
@@ -102,6 +193,121 @@ def evaluate_risk(inputs: RiskInputs, limits: RiskLimits) -> list[Finding]:
                 f"the limit is {_pct(limits.max_volatility)}",
                 inputs.volatility,
                 limits.max_volatility,
+            )
+        )
+    if (
+        limits.max_volatility is not None
+        and inputs.volatility_forecast is not None
+        and inputs.volatility_forecast > limits.max_volatility
+    ):
+        findings.append(
+            Finding(
+                "risk:volatility_forecast",
+                "rule",
+                None,
+                severity,
+                f"Risk limit: the forecast annualised volatility of today's portfolio is "
+                f"{_pct(inputs.volatility_forecast)} ({_model_name(inputs.forecast_model)}); "
+                f"the limit is {_pct(limits.max_volatility)}. A review prompt, not an "
+                "instruction to trade",
+                inputs.volatility_forecast,
+                limits.max_volatility,
+            )
+        )
+    for tier, budget in sorted((limits.tier_risk_budgets or {}).items()):
+        share = inputs.tier_risk_shares.get(tier)
+        if share is not None and share > budget:
+            findings.append(
+                Finding(
+                    f"risk:tier_budget:{tier}",
+                    "rule",
+                    None,
+                    severity,
+                    f"Risk limit: the {tier} tier accounts for {_pct(share)} of the portfolio's "
+                    f"forecast volatility; its risk budget is {_pct(budget)}",
+                    share,
+                    budget,
+                )
+            )
+    if (
+        limits.min_effective_bets is not None
+        and inputs.effective_bets is not None
+        and inputs.effective_bets < limits.min_effective_bets
+    ):
+        findings.append(
+            Finding(
+                "risk:effective_bets",
+                "rule",
+                None,
+                severity,
+                f"Risk limit: the portfolio holds about {inputs.effective_bets:.1f} independent "
+                f"bets; the floor is {limits.min_effective_bets:.1f}. Many names can still be "
+                "one bet: check what the largest risk contributors have in common",
+                inputs.effective_bets,
+                limits.min_effective_bets,
+            )
+        )
+    if inputs.model_check:
+        # A review item about the measuring tool, not about the portfolio: lowest severity that
+        # still reaches the review, whatever `on_breach` says.
+        findings.append(
+            Finding("risk:model_validation", "rule", None, 1, inputs.model_check, None, None)
+        )
+    # One finding per ticker, even when it breaches both tier rules (a core stock above 35 %).
+    by_ticker: dict[str, list[TierFlag]] = {}
+    for tf in inputs.tier_flags:
+        by_ticker.setdefault(tf.ticker, []).append(tf)
+    for ticker, flags in by_ticker.items():
+        first = min(flags, key=lambda f: f.threshold)
+        what = " and ".join(
+            f"is above {_pct(f.threshold)}, so it is not a {f.tier} stock by the tier criteria "
+            "(speculative above that volatility)"
+            if f.rule == "speculative_above"
+            else f"is above the core ceiling of {_pct(f.threshold)}"
+            for f in sorted(flags, key=lambda f: f.threshold)
+        )
+        findings.append(
+            Finding(
+                f"risk:tier:{ticker}",
+                "rule",
+                ticker,
+                severity,
+                f"Tier criterion: {ticker} ({first.tier}) has annualised volatility "
+                f"{_pct(first.volatility)} over the last year, which {what}. Re-check its tier "
+                "at the thesis review; reclassify by hand",
+                first.volatility,
+                max(f.threshold for f in flags),
+            )
+        )
+    cap = limits.max_stock_risk_share
+    for rs in inputs.stock_risk_shares:
+        if cap is not None and rs.share > cap:
+            findings.append(
+                Finding(
+                    f"risk:stock_share:{rs.ticker}",
+                    "rule",
+                    rs.ticker,
+                    severity,
+                    f"Risk limit: {rs.ticker} accounts for {_pct(rs.share)} of the portfolio's "
+                    f"forecast volatility; the ceiling per stock is {_pct(cap)}. A review "
+                    "prompt for its size, not an instruction to trade",
+                    rs.share,
+                    cap,
+                )
+            )
+    for tv in inputs.thesis_volatility:
+        findings.append(
+            Finding(
+                f"thesis:volatility:{tv.ticker}",
+                "rule",
+                tv.ticker,
+                THESIS_VOLATILITY_SEVERITY,
+                f"Thesis risk profile changed: {tv.ticker} has realized volatility of "
+                f"{_pct(tv.volatility)} over the last three months, above {tv.multiple:g} times "
+                f"the {_pct(tv.band)} its thesis expects. Re-check the thesis; a move in price "
+                "alone is not a reason to sell",
+                tv.volatility,
+                tv.band * tv.multiple,
             )
         )
     if limits.max_beta is not None and inputs.beta is not None and inputs.beta > limits.max_beta:
@@ -135,8 +341,38 @@ def evaluate_risk(inputs: RiskInputs, limits: RiskLimits) -> list[Finding]:
                 limits.max_drawdown,
             )
         )
+    if limits.max_drawdown is not None and inputs.drawdown is not None:
+        # Early-warning rungs below the freeze: one note per rung reached, so each alerts when
+        # it opens. The freeze above stays exactly as written.
+        for rung in sorted(limits.drawdown_warnings):
+            if rung >= limits.max_drawdown or inputs.drawdown < rung:
+                continue
+            findings.append(
+                Finding(
+                    f"risk:drawdown_warning:{round(rung * 100)}",
+                    "rule",
+                    None,
+                    1,
+                    drawdown_note(inputs, rung, limits.max_drawdown),
+                    inputs.drawdown,
+                    rung,
+                )
+            )
     for key, value, ceiling, what in (
         ("var", inputs.var_95, limits.max_var_95, "one-day historical 95% value at risk"),
+        (
+            "es",
+            inputs.es_95_month,
+            limits.max_es_95_month,
+            "one-month 95% Expected Shortfall (average loss in the worst 5% of months)",
+        ),
+        (
+            "drawdown_probability",
+            inputs.drawdown_probability,
+            limits.max_drawdown_probability,
+            f"simulated chance of a {_pct(limits.max_drawdown or 0)} fall from a peak within "
+            f"{limits.drawdown_probability_years} years",
+        ),
         (
             "tracking_error",
             inputs.tracking_error,
@@ -289,8 +525,43 @@ def position_losses(positions: list[PositionRow]) -> list[PositionLoss]:
     ]
 
 
+async def _drawdown_context(
+    pool: asyncpg.Pool,
+    strategy: StrategyConfig,
+    positions: list[PositionRow],
+    inputs: RiskInputs,
+    book: "LoadedBook | None",
+) -> None:
+    """The drivers and due reviews a drawdown note names; only when a rung is reached."""
+    limits = strategy.risk
+    if limits.max_drawdown is None or inputs.drawdown is None:
+        return
+    if not any(r < limits.max_drawdown and inputs.drawdown >= r for r in limits.drawdown_warnings):
+        return
+    try:
+        from steward.config.thesis import ThesesConfig
+        from steward.portfolio.drawdown_ladder import drivers
+        from steward.portfolio.exante import book_from_positions
+
+        loaded = book or await book_from_positions(pool, positions)
+        inputs.drawdown_drivers = drivers(loaded, strategy)
+        stored = await load_active(pool, "theses", ThesesConfig)
+        today = dt.date.today()
+        held = {p.ticker for p in positions}
+        inputs.reviews_due = sorted(
+            t.ticker
+            for t in (stored.body.theses if stored else [])
+            if t.review_date is not None and t.review_date <= today and t.ticker in held
+        )
+    except Exception as exc:
+        log.warning("drawdown context failed: %s", exc)
+
+
 async def gather_risk_inputs(
-    pool: asyncpg.Pool, strategy: StrategyConfig, positions: list[PositionRow]
+    pool: asyncpg.Pool,
+    strategy: StrategyConfig,
+    positions: list[PositionRow],
+    book: "LoadedBook | None" = None,
 ) -> RiskInputs:
     """Measure only what an enabled limit needs. A failed measurement is noted, never raised:
     a missing price history must not fail the sync."""
@@ -319,12 +590,80 @@ async def gather_risk_inputs(
             inputs.unavailable["volatility"] = inputs.unavailable["beta"] = str(exc)
             inputs.unavailable["drawdown"] = str(exc)
     await _decision_inputs(pool, strategy, positions, inputs)
-    if limits.max_pair_correlation is not None:
+    wants_book = (
+        limits.max_pair_correlation is not None
+        or limits.max_volatility is not None
+        or limits.tier_risk_budgets
+        or limits.min_effective_bets is not None
+        or limits.tier_speculative_volatility is not None
+        or limits.tier_core_max_volatility is not None
+        or limits.max_es_95_month is not None
+        or limits.max_stock_risk_share is not None
+        or limits.thesis_volatility_multiple is not None
+        or (limits.max_drawdown_probability is not None and limits.max_drawdown is not None)
+    )
+    if wants_book:
+        # One load of the weekly base-currency return matrix serves the correlation limit and
+        # the ex-ante model.
+        from steward.portfolio.risk_snapshots import save_snapshot
+
+        def unmeasured(names: tuple[str, ...], exc: Exception) -> None:
+            for name in names:
+                inputs.unavailable.setdefault(name, str(exc))
+
+        # Separate steps: one failing must not hide what the others measured, and each names
+        # what it could not measure so its open breaches stay open.
+        risk_report = None
         try:
-            inputs.correlations = await pair_correlations(pool, positions)
+            from steward.portfolio.exante import book_from_positions
+
+            book = book or await book_from_positions(pool, positions)
         except Exception as exc:
-            log.warning("correlation failed: %s", exc)
-            inputs.unavailable["correlation"] = str(exc)
+            log.warning("book load failed: %s", exc)
+            unmeasured(
+                (
+                    "correlation",
+                    "volatility_forecast",
+                    "tier_risk",
+                    "effective_bets",
+                    "es",
+                    "drawdown_probability",
+                    "thesis_volatility",
+                ),
+                exc,
+            )
+        if book is not None:
+            try:
+                risk_report = _book_inputs(book, strategy, inputs)
+            except Exception as exc:
+                log.warning("ex-ante measurement failed: %s", exc)
+                unmeasured(
+                    ("correlation", "volatility_forecast", "tier_risk", "effective_bets"), exc
+                )
+            try:
+                from steward.portfolio.validation import validate_book
+
+                inputs.model_check = validate_book(book, strategy).review_item
+            except Exception as exc:
+                log.warning("model validation failed: %s", exc)
+            try:
+                tail = _tail_inputs(book, strategy, inputs)
+            except Exception as exc:
+                log.warning("tail measurement failed: %s", exc)
+                unmeasured(("es", "drawdown_probability"), exc)
+                tail = None
+            try:
+                if tail is not None and tail.available:
+                    await save_snapshot(pool, "tail", tail, tail.as_of, tail.method_version)
+                if risk_report is not None and risk_report.volatility_forecast is not None:
+                    await save_snapshot(
+                        pool, "ex_ante", risk_report, risk_report.as_of, risk_report.method_version
+                    )
+            except Exception as exc:
+                log.warning("risk snapshot not saved: %s", exc)
+    await _drawdown_context(pool, strategy, positions, inputs, book)
+    if limits.thesis_volatility_multiple is not None and book is not None:
+        await _thesis_volatility(pool, limits.thesis_volatility_multiple, book, inputs)
     wants_xray = (
         limits.max_look_through_weight is not None
         or limits.max_sector_weight is not None
@@ -358,6 +697,28 @@ async def gather_risk_inputs(
             log.warning("look-through failed: %s", exc)
             inputs.unavailable["overlap"] = str(exc)
     return inputs
+
+
+async def _thesis_volatility(
+    pool: asyncpg.Pool, multiple: float, book: "LoadedBook", inputs: RiskInputs
+) -> None:
+    """Held stocks whose three-month realized volatility is above `multiple` times the band the
+    thesis expects (plan Q8.8). A thesis without a band, or a stock with too short a history,
+    is not judged."""
+    from steward.config.thesis import ThesesConfig
+    from steward.reference import risk as ref_risk
+
+    stored = await load_active(pool, "theses", ThesesConfig)
+    for thesis in stored.body.theses if stored else []:
+        band = thesis.price_target.volatility_band if thesis.price_target else None
+        closes = book.daily_closes.get(thesis.ticker)
+        if band is None or not closes:
+            continue
+        vol = ref_risk.volatility(closes, THESIS_VOLATILITY_DAYS)
+        if vol is not None and vol > band * multiple:
+            inputs.thesis_volatility.append(
+                ThesisVolatilityFlag(thesis.ticker, vol, band, multiple)
+            )
 
 
 async def _decision_inputs(
@@ -478,36 +839,73 @@ async def _xray_inputs(
         inputs.exposures += [Exposure("country", b.label, b.weight) for b in classified("country")]
 
 
-async def pair_correlations(
-    pool: asyncpg.Pool, positions: list[PositionRow]
-) -> list[PairCorrelation]:
-    """Correlation of daily returns (last year) for every pair of held positions that both have
-    a stored price series."""
-    # Imported here for the same cycle as in gather_risk_inputs.
-    from steward.config.holding_profiles import HoldingProfilesConfig
-    from steward.config.store import load_active
-    from steward.reference import risk as ref_risk
-    from steward.reference.price_series import choose_series, holding_symbols
-    from steward.reference.read import load_series
+def _tail_inputs(
+    book: "LoadedBook", strategy: StrategyConfig, inputs: RiskInputs, *, full: bool = True
+) -> "TailReport":
+    """The tail report of the loaded book, and the figures the limits need from it (Q2.4). A
+    limit that cannot be measured is noted as unavailable, never a breach. The caller saves the
+    report."""
+    from steward.portfolio.tail import tail_report
 
-    held = {p.ticker: float(p.value_base) for p in positions if p.value_base > 0}
-    total = sum(held.values())
-    if len(held) < 2 or total <= 0:
-        return []
-    profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
-    symbols = await holding_symbols(
-        pool, sorted(held), profiles.body if profiles else HoldingProfilesConfig()
-    )
-    chosen = await choose_series(pool, symbols)
-    series = {}
-    for ticker, ref in chosen.items():
-        if ref is not None:
-            series[ticker] = await load_series(pool, ref)
-    out: list[PairCorrelation] = []
-    tickers = sorted(series)
-    for i, a in enumerate(tickers):
-        for b in tickers[i + 1 :]:
-            corr = ref_risk.correlation(series[a], series[b])
-            if corr is not None:
-                out.append(PairCorrelation(a, b, corr, (held[a] + held[b]) / total))
-    return out
+    limits = strategy.risk
+    wants_dd = limits.max_drawdown_probability is not None and limits.max_drawdown is not None
+    report = tail_report(book, strategy, full=full)
+    if not report.available:
+        why = report.reason or "no estimate"
+        if limits.max_es_95_month is not None:
+            inputs.unavailable["es"] = why
+        if wants_dd:
+            inputs.unavailable["drawdown_probability"] = why
+        return report
+    inputs.es_95_month = report.es_95_month
+    if wants_dd:
+        horizon = next(
+            (d for d in report.drawdown if d.years == limits.drawdown_probability_years), None
+        )
+        if horizon is not None:
+            inputs.drawdown_probability = horizon.probability
+    return report
+
+
+def _book_inputs(book: "LoadedBook", strategy: StrategyConfig, inputs: RiskInputs) -> "ExAnteRisk":
+    """Fill the weekly-correlation and ex-ante inputs from a loaded book; returns the report
+    they came from."""
+    # Imported here: portfolio.exante imports portfolio.snapshot, as this module's callers do.
+    from steward.portfolio.exante import build_report, weekly_pair_correlations
+
+    limits = strategy.risk
+    invested = {p.ticker: p.value_base for p in book.positions}
+    total = sum(invested.values())
+    if limits.max_pair_correlation is not None and len(invested) >= 2 and total > 0:
+        inputs.correlations = [
+            PairCorrelation(a, b, corr, (invested[a] + invested[b]) / total)
+            for a, b, corr, _ in weekly_pair_correlations(book)
+        ]
+    report = build_report(book, strategy)
+    if report.volatility_forecast is None:
+        reason = report.reason or "no estimate"
+        for name in ("volatility_forecast", "tier_risk", "effective_bets"):
+            inputs.unavailable[name] = reason
+    else:
+        inputs.volatility_forecast = report.volatility_forecast
+        inputs.forecast_model = report.forecast_model
+        inputs.effective_bets = report.effective_bets
+        inputs.tier_risk_shares = {g.label: g.risk_share for g in report.by_tier}
+    if limits.max_stock_risk_share is not None:
+        exempt = {
+            t
+            for r in strategy.enabled_rules
+            if isinstance(r, PositionWeightRule) and r.ticker is None
+            for t in r.exclude
+        }
+        inputs.stock_risk_shares = [
+            StockRiskShare(p.ticker, p.risk_share)
+            for p in report.positions
+            if p.risk_share is not None and p.ticker not in exempt
+        ]
+    inputs.tier_flags = [
+        TierFlag(c.ticker, c.tier, c.volatility, c.threshold, c.rule)
+        for c in report.tier_checks
+        if c.breached
+    ]
+    return report

@@ -299,14 +299,17 @@ async def test_the_monthly_review_handler_sends_the_saved_override(
             created_by=None,
         )
     client: Any = _Client()
-    client.messages.batches = _Batches(_batch_success('{"actions": []}'), ["ended"])
     monkeypatch.setattr(monthly, "create_client", lambda _settings: client)
+    seen: dict[str, Any] = {}
+
+    async def run_review(ctx: Any, deps: Any) -> None:
+        # Claude models are never called now, so the Batch API path no longer runs from the
+        # handler; what matters here is the system prompt the handler gives the writer.
+        seen["system"] = deps.writer._system
+
+    monkeypatch.setattr(monthly, "run_review", run_review)
     status = await run_job(
         backend_pool, "monthly_review", monthly.monthly_review_handler, trigger="manual"
     )
     assert status == "succeeded"
-    assert client.messages.batches.created[0]["params"]["system"] == OVERRIDE
-    step = await backend_pool.fetchrow(
-        "select batch, input_tokens from job_step where name = 'review'"
-    )
-    assert step["batch"] is True and step["input_tokens"] == 100
+    assert seen["system"] == OVERRIDE

@@ -202,12 +202,28 @@ def parse_chart(
 
 
 async def yahoo_chart(
-    http: httpx.AsyncClient, symbol: str, *, range_: str, interval: str, retry: bool = True
+    http: httpx.AsyncClient,
+    symbol: str,
+    *,
+    range_: str,
+    interval: str,
+    retry: bool = True,
+    period: tuple[dt.date, dt.date] | None = None,
 ) -> YahooChart:
     """One chart request, retried after a 429 or a server error (unless `retry` is off, for
-    a page waiting on the answer)."""
+    a page waiting on the answer). `period` (first day, last day) replaces `range_`: Yahoo
+    answers `range=max` with monthly bars whatever `interval` says, but honours dated
+    `period1`/`period2` with daily ones."""
     url = CHART_URL.format(symbol=symbol)
-    params = {"range": range_, "interval": interval, "includePrePost": "false"}
+    params: dict[str, str | int] = {"interval": interval, "includePrePost": "false"}
+    if period is None:
+        params["range"] = range_
+    else:
+        zero = dt.time.min
+        params["period1"] = int(dt.datetime.combine(period[0], zero, dt.UTC).timestamp())
+        params["period2"] = int(
+            dt.datetime.combine(period[1] + dt.timedelta(days=1), zero, dt.UTC).timestamp()
+        )
     response: httpx.Response | None = None
     waits = RETRY_WAITS if retry else ()
     for attempt in range(len(waits) + 1):
@@ -291,5 +307,8 @@ async def yahoo_daily(
     """Daily bars from `start` (the smallest Yahoo range covering it) up to the last
     completed session."""
     days = (now.date() - start).days + 1
-    chart = await yahoo_chart(http, symbol, range_=daily_range(days), interval="1d")
+    name = daily_range(days)
+    # Beyond ten years the only named range is "max", which Yahoo serves as monthly bars.
+    period = (start, now.date()) if name == "max" else None
+    chart = await yahoo_chart(http, symbol, range_=name, interval="1d", period=period)
     return chart, [b for b in daily_bars(chart, now) if b.date >= start]

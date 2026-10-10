@@ -129,6 +129,197 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
+        "name": "risk_forecast",
+        "description": "The volatility forecast from today's holdings (not from past returns "
+        "of the old mix), the holdings that bring most of the risk, the diversification, and "
+        "the weight the model had to leave out. Use for 'how risky is my portfolio' or 'what "
+        "drives my risk'. Report the left-out weight and the warnings.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "past_episodes",
+        "description": "What today's holdings would have lost in past market episodes (2008, "
+        "2011, the end of the CZK floor, 2020, 2022 and any the owner added). Use for 'how "
+        "would I have done in 2008'. Quote the caution when a loss leans on a proxy estimate; "
+        "such a loss is probably understated.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "factor_tilts",
+        "description": "What the portfolio leans on beyond the market: size, value, "
+        "profitability, investment, momentum, currencies and the US 10-year yield, against a "
+        "world-equity benchmark. Use for 'am I really diversified' or 'what is my hidden bet'. "
+        "A loading counts as measured only when its t-statistic is at least 2.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"region": {"type": "string", "enum": ["developed", "europe", "us"]}},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "idea_factor_fit",
+        "description": "For candidate ideas with stored daily prices, how much each would "
+        "reduce the portfolio's largest style tilt (size, value, profitability, investment, "
+        "momentum or market) if held at a stated weight. A tie-breaker between comparable "
+        "ideas, not a reason to take a weaker one. An idea without stored prices comes back "
+        "with the reason; do not estimate it.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "symbols": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "maxItems": 10,
+                    "description": "Price symbols as stored, e.g. MSFT or msft.us.",
+                },
+                "currency": {"type": "string", "description": "Quote currency, default USD."},
+                "weight": {"type": "number", "description": "Portfolio share, 0.005 to 0.2."},
+            },
+            "required": ["symbols"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "model_check",
+        "description": "Whether the risk model's volatility and value-at-risk forecasts held up "
+        "against what happened (weekly back-test on today's holdings, Kupiec and Christoffersen "
+        "tests). Use before leaning on the model's figures, or when asked 'can I trust the risk "
+        "numbers'. Says so when too little history exists.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "position_risk",
+        "description": "One holding's risk for a thesis review: its share of the portfolio's "
+        "risk against its weight, the holdings it moves with, and its worst past episodes. "
+        "Expected Shortfall is not modelled yet and the answer says so.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"ticker": {"type": "string", "description": "A held ticker."}},
+            "required": ["ticker"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "risk_whatif",
+        "description": "What proposed buys or sells, or a deposit, do to the portfolio's "
+        "ex-ante risk: forecast volatility, effective bets, each position's share of risk, tier "
+        "risk budgets and every ex-ante limit, before and after. Use for 'what does buying X do "
+        "to my risk?'. Sizes are in the base currency. Expected Shortfall and drawdown "
+        "probability limits are tested (a new or deeper breach is listed) but their figures "
+        "are not shown here; say so.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "trades": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "side": {"type": "string", "enum": ["buy", "sell"]},
+                            "ticker": {"type": "string"},
+                            "value_base": {
+                                "type": "number",
+                                "exclusiveMinimum": 0,
+                                "maximum": 1e9,
+                                "description": "Size, base currency.",
+                            },
+                        },
+                        "required": ["side", "ticker", "value_base"],
+                    },
+                },
+                "deposit": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1e9,
+                    "description": "Cash added alongside, base currency.",
+                },
+            },
+            "required": ["trades"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "start_size",
+        "description": "The suggested starting weight for a stock: the smaller of the tier's "
+        "starting cap (principle 8b) and the largest weight that raises no new ex-ante limit "
+        "breach, with the quarter-Kelly upper bound and its inputs where a thesis exists.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"ticker": {"type": "string"}},
+            "required": ["ticker"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "deposit_allocation",
+        "description": "Where a deposit or sale proceeds should go under principle 8c: core "
+        "first while below target, then the most under-represented tier, sector or country, "
+        "then the best idea above the hurdle, else a core ETF. Whole shares, every rule, cap, "
+        "band and ex-ante limit respected, risk impact per line. Read-only. Use for 'where "
+        "should my next deposit go?'.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1e9,
+                    "description": "Base currency.",
+                }
+            },
+            "required": ["amount"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "rotation_candidates",
+        "description": "The theses ranked by risk-adjusted expected return (scenario-weighted "
+        "return annualised, less the cash rate, over volatility), held and bench ideas together, "
+        "and for each holding the best idea that beats it with the gap against the switching "
+        "hurdle (tax on the lots, costs, safety margin), the equal-risk size and whether every "
+        "limit holds after the switch. Flags only. Use for 'what should I rotate?'. A row "
+        "with a missing input says why; never invent a figure.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "switch_effect",
+        "description": "What selling one holding to buy another does: the expected-return gap "
+        "against the switching hurdle, the tax on the lots sold, the equal-risk size of the "
+        "purchase and the rule, cap and risk-limit effects on the book after the switch. Use for "
+        "'what does switching X for Y do to my risk?'.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "sell": {"type": "string", "description": "A held ticker."},
+                "buy": {"type": "string", "description": "The ticker to buy."},
+                "sell_value_base": {
+                    "type": "number",
+                    "description": "Amount sold, base currency; default the whole position.",
+                },
+            },
+            "required": ["sell", "buy"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "over_cap_positions",
+        "description": "Positions above the single-stock cap (principle 4f): months until "
+        "deposits alone dilute each below the cap, and the sale that trims it to 8 % (10 % above "
+        "the 15 % backstop). Whether the thesis still projects growth is the owner's call.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "monthly_deposit": {
+                    "type": "number",
+                    "description": "Expected deposit per month; default the last year's average.",
+                }
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "theme_exposure",
         "description": "How much of the portfolio is exposed to one sector, industry, country, "
         "currency, revenue country, commodity, trade product or issuer, directly and through "
@@ -254,6 +445,60 @@ class ChatTools:
         if owner is None:
             return {"error": "this conversation has no owner"}
         return await analytics_tools.stress_test(self.pool, self.registry, owner)
+
+    async def _tool_risk_forecast(self) -> dict[str, Any]:
+        return await analytics_tools.risk_forecast(self.pool, self.registry)
+
+    async def _tool_past_episodes(self) -> dict[str, Any]:
+        return await analytics_tools.past_episodes(self.pool, self.registry)
+
+    async def _tool_factor_tilts(self, region: str = "developed") -> dict[str, Any]:
+        return await analytics_tools.factor_tilts(self.pool, self.registry, region)
+
+    async def _tool_idea_factor_fit(
+        self, symbols: list[str], currency: str = "USD", weight: float = 0.05
+    ) -> dict[str, Any]:
+        return await analytics_tools.idea_factor_fit(
+            self.pool, self.registry, symbols, currency.upper(), weight
+        )
+
+    async def _tool_model_check(self) -> dict[str, Any]:
+        return await analytics_tools.model_check(self.pool, self.registry)
+
+    async def _tool_position_risk(self, ticker: str) -> dict[str, Any]:
+        return await analytics_tools.position_risk(self.pool, self.registry, ticker)
+
+    async def _tool_risk_whatif(
+        self, trades: list[dict[str, Any]], deposit: float = 0.0
+    ) -> dict[str, Any]:
+        return await analytics_tools.risk_whatif(self.pool, self.registry, trades, deposit)
+
+    async def _tool_start_size(self, ticker: str) -> dict[str, Any]:
+        return await analytics_tools.start_size_for(self.pool, self.registry, ticker)
+
+    async def _tool_deposit_allocation(self, amount: float) -> dict[str, Any]:
+        return await analytics_tools.deposit_allocation(self.pool, self.registry, amount)
+
+    async def _tool_rotation_candidates(self) -> dict[str, Any]:
+        owner = await self._owner()
+        if owner is None:
+            return {"error": "this conversation has no owner"}
+        return await analytics_tools.rotation_candidates(self.pool, self.registry, owner)
+
+    async def _tool_switch_effect(
+        self, sell: str, buy: str, sell_value_base: float | None = None
+    ) -> dict[str, Any]:
+        owner = await self._owner()
+        if owner is None:
+            return {"error": "this conversation has no owner"}
+        return await analytics_tools.switch_effect(
+            self.pool, self.registry, owner, sell, buy, sell_value_base
+        )
+
+    async def _tool_over_cap_positions(
+        self, monthly_deposit: float | None = None
+    ) -> dict[str, Any]:
+        return await analytics_tools.over_cap_positions(self.pool, self.registry, monthly_deposit)
 
     async def _tool_theme_exposure(self, kind: str, value: str) -> dict[str, Any]:
         owner = await self._owner()

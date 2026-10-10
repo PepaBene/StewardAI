@@ -236,6 +236,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "exchange_probes",
         "exposure_build",
         "fact_reconcile",
+        "factor_returns",
         "fmp_company",
         "free_source_alerts",
         "fund_characteristics_audit",

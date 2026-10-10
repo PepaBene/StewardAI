@@ -120,10 +120,14 @@ def test_drawdown_is_measured_from_the_window_peak() -> None:
 
 
 def test_drawdown_limit_breaches_past_the_ceiling_only() -> None:
-    limits = RiskLimits(max_drawdown=0.20)
+    limits = RiskLimits(max_drawdown=0.20, drawdown_warnings=[])
     assert evaluate_risk(RiskInputs(drawdown=0.20), limits) == []
     (f,) = evaluate_risk(RiskInputs(drawdown=0.25), limits)
     assert f.key == "risk:drawdown" and "not a reason to sell" in f.detail
+    # with the default early-warning rungs the freeze finding is the same, plus the notes
+    laddered = RiskLimits(max_drawdown=0.20)
+    keys = [f.key for f in evaluate_risk(RiskInputs(drawdown=0.20), laddered)]
+    assert keys == ["risk:drawdown_warning:10", "risk:drawdown_warning:15"]
 
 
 def test_correlation_needs_both_a_high_correlation_and_enough_weight() -> None:

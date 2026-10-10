@@ -12,6 +12,7 @@ dependencies = [
     "feedparser>=6.0.14",
     "fpdf2>=2.8.9",
     "httpx>=0.28.1",
+    "numpy>=2.3",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
     "pyjwt[crypto]>=2.15.0",

@@ -28,7 +28,7 @@ from steward.jobs.runner import JobContext, JobFailed
 from steward.portfolio.breaches import evaluate, record_breaches
 from steward.portfolio.drift import HoldingValue, compute_drift
 from steward.portfolio.fees import FeeBasis, FeeCharge, fee_basis, fee_charges
-from steward.portfolio.risk_limits import evaluate_risk, gather_risk_inputs
+from steward.portfolio.risk_limits import evaluate_risk, gather_risk_inputs, unmeasured_keys
 from steward.portfolio.snapshot import Snapshot, build_snapshot, snapshot_date_for
 from steward.portfolio.targets import evaluate_targets
 from steward.reference.calendar import fx_stale
@@ -138,6 +138,29 @@ async def portfolio_sync(ctx: JobContext, deps: SyncDeps) -> None:
     async with ctx.step("transactions") as step:
         step.detail.update(await sync_transactions(pool, deps.t212, ctx.job_id))
 
+    sync_book = None
+    if strategy.risk.auto_tiers:
+        async with ctx.step("risk_tiers") as step:
+            from steward.portfolio.exante import book_from_positions, with_book_tiers
+
+            try:
+                sync_book = await book_from_positions(pool, list(snapshot.positions))
+                tier_changes: list[str] = []
+                strategy = await with_book_tiers(pool, sync_book, strategy, tier_changes)
+                if tier_changes:
+                    # With derived tiers the tier criterion re-tiers a holding itself: the change
+                    # is what the owner should re-check (principle D6).
+                    step.detail["tier_changes"] = tier_changes
+                step.detail["tiers"] = len(
+                    [b for b in strategy.classifications.values() if "risk" in b]
+                )
+            except Exception as exc:  # a missing price history must not fail the sync
+                step.detail["unavailable"] = str(exc)
+                # The stored tiers keep the tier rules measuring against the last known tiers.
+                from steward.portfolio.risk_tier import with_saved_tiers
+
+                strategy = await with_saved_tiers(pool, strategy)
+
     async with ctx.step("drift") as step:
         report = compute_drift(
             [
@@ -155,7 +178,9 @@ async def portfolio_sync(ctx: JobContext, deps: SyncDeps) -> None:
         )
 
     async with ctx.step("breaches") as step:
-        risk_inputs = await gather_risk_inputs(pool, strategy, list(snapshot.positions))
+        risk_inputs = await gather_risk_inputs(
+            pool, strategy, list(snapshot.positions), book=sync_book
+        )
         if risk_inputs.unavailable:
             step.detail["risk_unavailable"] = risk_inputs.unavailable
         theses = await load_active(pool, "theses", ThesesConfig)
@@ -176,6 +201,7 @@ async def portfolio_sync(ctx: JobContext, deps: SyncDeps) -> None:
             config_version_id=stored.id if stored else None,
             now=deps.now(),
             app_url=get_settings().app_url,
+            unmeasured=unmeasured_keys(risk_inputs.unavailable),
         )
         step.detail.update(
             opened=breaches.opened,
