@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 import asyncpg
 
+from steward.config.store import load_active
 from steward.config.strategy import RiskLimits, StrategyConfig
 from steward.portfolio.breaches import Finding
 
@@ -88,6 +89,9 @@ class RiskInputs:
     forecast_model: str | None = None
     tier_risk_shares: dict[str, float] = field(default_factory=dict)  # tier -> share of risk
     effective_bets: float | None = None
+    model_check: str | None = None  # why the risk model's own back-test failed (Q6.1)
+    drawdown_drivers: list[tuple[str, float]] = field(default_factory=list)  # ticker, share lost
+    reviews_due: list[str] = field(default_factory=list)  # tickers whose thesis review is due
     tier_flags: list[TierFlag] = field(default_factory=list)
     valuation_flags: list[ValuationFlag] = field(default_factory=list)
     correlations: list[PairCorrelation] = field(default_factory=list)
@@ -104,6 +108,21 @@ def _pct(x: float) -> str:
 
 def _model_name(model: str | None) -> str:
     return {"ewma": "EWMA model", "ledoit_wolf": "Ledoit-Wolf model"}.get(model or "", "model")
+
+
+def drawdown_note(inputs: RiskInputs, rung: float, freeze: float) -> str:
+    """The text of a drawdown early warning: the drivers and the theses due for review."""
+    assert inputs.drawdown is not None
+    text = (
+        f"Early warning: the portfolio is {_pct(inputs.drawdown)} below its peak of the last "
+        f"year, past the {_pct(rung)} note; the freeze is at {_pct(freeze)}."
+    )
+    if inputs.drawdown_drivers:
+        drivers = ", ".join(f"{t} ({c:+.1%} of the portfolio)" for t, c in inputs.drawdown_drivers)
+        text += f" Biggest drivers since the peak, on today's weights: {drivers}."
+    if inputs.reviews_due:
+        text += f" Theses due for re-confirmation: {', '.join(inputs.reviews_due)}."
+    return text + " A fall in price alone is not a reason to sell."
 
 
 def evaluate_risk(inputs: RiskInputs, limits: RiskLimits) -> list[Finding]:
@@ -178,6 +197,12 @@ def evaluate_risk(inputs: RiskInputs, limits: RiskLimits) -> list[Finding]:
                 limits.min_effective_bets,
             )
         )
+    if inputs.model_check:
+        # A review item about the measuring tool, not about the portfolio: lowest severity that
+        # still reaches the review, whatever `on_breach` says.
+        findings.append(
+            Finding("risk:model_validation", "rule", None, 1, inputs.model_check, None, None)
+        )
     # One finding per ticker, even when it breaches both tier rules (a core stock above 35 %).
     by_ticker: dict[str, list[TierFlag]] = {}
     for tf in inputs.tier_flags:
@@ -235,6 +260,23 @@ def evaluate_risk(inputs: RiskInputs, limits: RiskLimits) -> list[Finding]:
                 limits.max_drawdown,
             )
         )
+    if limits.max_drawdown is not None and inputs.drawdown is not None:
+        # Early-warning rungs below the freeze: one note per rung reached, so each alerts when
+        # it opens. The freeze above stays exactly as written.
+        for rung in sorted(limits.drawdown_warnings):
+            if rung >= limits.max_drawdown or inputs.drawdown < rung:
+                continue
+            findings.append(
+                Finding(
+                    f"risk:drawdown_warning:{round(rung * 100)}",
+                    "rule",
+                    None,
+                    1,
+                    drawdown_note(inputs, rung, limits.max_drawdown),
+                    inputs.drawdown,
+                    rung,
+                )
+            )
     for key, value, ceiling, what in (
         ("var", inputs.var_95, limits.max_var_95, "one-day historical 95% value at risk"),
         (
@@ -389,6 +431,38 @@ def position_losses(positions: list[PositionRow]) -> list[PositionLoss]:
     ]
 
 
+async def _drawdown_context(
+    pool: asyncpg.Pool,
+    strategy: StrategyConfig,
+    positions: list[PositionRow],
+    inputs: RiskInputs,
+    book: "LoadedBook | None",
+) -> None:
+    """The drivers and due reviews a drawdown note names; only when a rung is reached."""
+    limits = strategy.risk
+    if limits.max_drawdown is None or inputs.drawdown is None:
+        return
+    if not any(r < limits.max_drawdown and inputs.drawdown >= r for r in limits.drawdown_warnings):
+        return
+    try:
+        from steward.config.thesis import ThesesConfig
+        from steward.portfolio.drawdown_ladder import drivers
+        from steward.portfolio.exante import book_from_positions
+
+        loaded = book or await book_from_positions(pool, positions)
+        inputs.drawdown_drivers = drivers(loaded, strategy)
+        stored = await load_active(pool, "theses", ThesesConfig)
+        today = dt.date.today()
+        held = {p.ticker for p in positions}
+        inputs.reviews_due = sorted(
+            t.ticker
+            for t in (stored.body.theses if stored else [])
+            if t.review_date is not None and t.review_date <= today and t.ticker in held
+        )
+    except Exception as exc:
+        log.warning("drawdown context failed: %s", exc)
+
+
 async def gather_risk_inputs(
     pool: asyncpg.Pool,
     strategy: StrategyConfig,
@@ -438,6 +512,9 @@ async def gather_risk_inputs(
 
             book = book or await book_from_positions(pool, positions)
             risk_report = _book_inputs(book, strategy, inputs)
+            from steward.portfolio.validation import validate_book
+
+            inputs.model_check = validate_book(book, strategy).review_item
             if risk_report.volatility_forecast is not None:
                 from steward.portfolio.risk_snapshots import save_snapshot
 
@@ -448,6 +525,7 @@ async def gather_risk_inputs(
             log.warning("ex-ante measurement failed: %s", exc)
             for name in ("correlation", "volatility_forecast", "tier_risk", "effective_bets"):
                 inputs.unavailable.setdefault(name, str(exc))
+    await _drawdown_context(pool, strategy, positions, inputs, book)
     wants_xray = (
         limits.max_look_through_weight is not None
         or limits.max_sector_weight is not None

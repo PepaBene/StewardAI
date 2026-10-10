@@ -2533,6 +2533,33 @@
         }
       }
     },
+    "/portfolio/risk/validation": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Model Validation",
+        "description": "Does the risk model's forecast match what happened? A weekly back-test on today's\nholdings: Kupiec and Christoffersen tests of the 95 % and 99 % value-at-risk, and the ratio\nof realised to forecast volatility. `confidence` is `reduced` and `review_item` is set when\na test fails; `untested` when too little history exists.",
+        "operationId": "get_model_validation",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelValidation"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/portfolio/risk/factors": {
       "get": {
         "tags": [
@@ -2721,6 +2748,56 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StartSize"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/risk/position": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Position Risk",
+        "description": "The risk page of a thesis review: the holding's share of the portfolio's risk against its\nweight, the holdings it moves with (weekly correlation 0.6 or more) and its worst past\nepisodes. Expected Shortfall is not modelled yet and the response says so.",
+        "operationId": "get_position_risk",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PositionRiskPack"
                 }
               }
             }
@@ -17037,6 +17114,58 @@
         }
       }
     },
+    "/portfolio/performance/evaluation": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Evaluation",
+        "description": "Is the process adding value? Brinson-Fachler attribution by the chosen classification,\nmonthly and since inception, reconciled to the excess return over the benchmark; the\nProbabilistic Sharpe Ratio against the benchmark (with the record length that would settle\nit); and the factor-adjusted alpha with its t-statistic. Each part says when it cannot be\ncomputed.",
+        "operationId": "get_evaluation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dimension",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "description": "A strategy classification, e.g. sector or risk.",
+              "default": "sector",
+              "title": "Dimension"
+            },
+            "description": "A strategy classification, e.g. sector or risk."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Evaluation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/performance/settings": {
       "get": {
         "tags": [
@@ -19302,6 +19431,33 @@
             }
           }
         }
+      }
+    },
+    "/journal/process": {
+      "get": {
+        "tags": [
+          "journal"
+        ],
+        "summary": "Get Process",
+        "description": "Closed theses (a buy or add followed by a sell): the price return over the holding\nperiod against the benchmark, the hit rate by tier (withheld below five theses) and how\nmany of the losing ones had a portfolio finding open on the ticker before the sale.",
+        "operationId": "get_process",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessReport"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/journal/export/report": {
@@ -30589,6 +30745,61 @@
         ],
         "title": "BacktestName"
       },
+      "BacktestOut": {
+        "properties": {
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "weeks": {
+            "type": "integer",
+            "title": "Weeks"
+          },
+          "hits": {
+            "type": "integer",
+            "title": "Hits"
+          },
+          "expected_hits": {
+            "type": "number",
+            "title": "Expected Hits"
+          },
+          "kupiec_p": {
+            "type": "number",
+            "title": "Kupiec P"
+          },
+          "independence_p": {
+            "type": "number",
+            "title": "Independence P"
+          },
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "confidence",
+          "weeks",
+          "hits",
+          "expected_hits",
+          "kupiec_p",
+          "independence_p",
+          "passed",
+          "reason"
+        ],
+        "title": "BacktestOut"
+      },
       "BacktestPeriod": {
         "properties": {
           "start": {
@@ -32810,6 +33021,86 @@
           "note"
         ],
         "title": "Calibration"
+      },
+      "CalibrationOut": {
+        "properties": {
+          "weeks": {
+            "type": "integer",
+            "title": "Weeks"
+          },
+          "realised_over_forecast": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realised Over Forecast"
+          },
+          "standard_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Error"
+          },
+          "biased": {
+            "type": "boolean",
+            "title": "Biased"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "forecast_volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Volatility",
+            "description": "Annualised, average over the weeks."
+          },
+          "realised_volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realised Volatility",
+            "description": "Annualised, the same weeks."
+          }
+        },
+        "type": "object",
+        "required": [
+          "weeks",
+          "realised_over_forecast",
+          "standard_error",
+          "biased",
+          "direction",
+          "forecast_volatility",
+          "realised_volatility"
+        ],
+        "title": "CalibrationOut"
       },
       "CapitalAllocation": {
         "properties": {
@@ -35096,6 +35387,115 @@
         "title": "ClaimVerifierSettings",
         "description": "The claim verifier (layer 4): every model-written sentence is checked against the\nsnippets it cites before a report is stored or sent."
       },
+      "ClosedThesis": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "tier": {
+            "type": "string",
+            "title": "Tier"
+          },
+          "opened_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Opened On"
+          },
+          "closed_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Closed On"
+          },
+          "holding_days": {
+            "type": "integer",
+            "title": "Holding Days"
+          },
+          "price_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Return"
+          },
+          "benchmark_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Return"
+          },
+          "excess_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excess Return"
+          },
+          "beat_benchmark": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beat Benchmark"
+          },
+          "trigger_before_close": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Before Close",
+            "description": "A finding opened on the ticker during the holding period; None when the thesis did not lose money."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why there is no return, when there is none."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "tier",
+          "opened_on",
+          "closed_on",
+          "holding_days",
+          "price_return",
+          "benchmark_return",
+          "excess_return",
+          "beat_benchmark",
+          "trigger_before_close",
+          "reason"
+        ],
+        "title": "ClosedThesis"
+      },
       "ClosureConfirmation": {
         "properties": {
           "closures": {
@@ -35149,6 +35549,29 @@
           "name"
         ],
         "title": "ClosureSuggestion"
+      },
+      "ClusterMember": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "correlation": {
+            "type": "number",
+            "title": "Correlation"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "correlation",
+          "weight"
+        ],
+        "title": "ClusterMember"
       },
       "CnbSeries": {
         "properties": {
@@ -45826,6 +46249,96 @@
         ],
         "title": "EvalCandidateOut"
       },
+      "Evaluation": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version",
+            "default": "evaluation-1"
+          },
+          "dimension": {
+            "type": "string",
+            "title": "Dimension"
+          },
+          "benchmark_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Label"
+          },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/PeriodOut"
+            },
+            "type": "array",
+            "title": "Periods"
+          },
+          "since_inception": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeriodOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "skill": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PsrOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "factor_alpha": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FactorAlpha"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "reason",
+          "dimension"
+        ],
+        "title": "Evaluation"
+      },
       "EventComparisonOut": {
         "properties": {
           "status": {
@@ -49040,6 +49553,41 @@
         ],
         "title": "FactReviewResult"
       },
+      "FactorAlpha": {
+        "properties": {
+          "alpha_annual": {
+            "type": "number",
+            "title": "Alpha Annual"
+          },
+          "t_stat": {
+            "type": "number",
+            "title": "T Stat"
+          },
+          "observations": {
+            "type": "integer",
+            "title": "Observations"
+          },
+          "significant": {
+            "type": "boolean",
+            "title": "Significant",
+            "description": "Absolute t-statistic of 2 or more."
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alpha_annual",
+          "t_stat",
+          "observations",
+          "significant",
+          "verdict"
+        ],
+        "title": "FactorAlpha",
+        "description": "What is left of the return once the factor exposures are paid for (quant plan Q6.3)."
+      },
       "FactorBeta": {
         "properties": {
           "factor": {
@@ -50817,6 +51365,12 @@
             "type": "number",
             "title": "Alpha Annual",
             "description": "Intercept, annualised (x52), log return."
+          },
+          "alpha_t": {
+            "type": "number",
+            "title": "Alpha T",
+            "description": "Newey-West t-statistic of the intercept.",
+            "default": 0.0
           },
           "betas": {
             "items": {
@@ -67333,6 +67887,108 @@
         ],
         "title": "ModelPrice"
       },
+      "ModelValidation": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "method_version": {
+            "type": "string",
+            "title": "Method Version",
+            "default": "validation-1"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": "At each past week the volatility of today's holdings is forecast from the weeks before it (zero-mean exponentially weighted, half-life 26 weeks). A week is a hit when the portfolio falls by more than the 95 % or 99 % value-at-risk of that forecast. Kupiec's test checks the number of hits, Christoffersen's whether they cluster; the standard deviation of the weekly return divided by its forecast should be 1."
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "reduced",
+              "untested"
+            ],
+            "title": "Confidence",
+            "default": "untested"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict",
+            "default": ""
+          },
+          "review_item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Item",
+            "description": "Set when a test failed: what to look at."
+          },
+          "backtests": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestOut"
+            },
+            "type": "array",
+            "title": "Backtests"
+          },
+          "calibration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "weeks_tested": {
+            "type": "integer",
+            "title": "Weeks Tested",
+            "default": 0
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "reason"
+        ],
+        "title": "ModelValidation"
+      },
       "MonitorSettings": {
         "properties": {
           "alert_failed_jobs": {
@@ -72894,6 +73550,81 @@
         ],
         "title": "PerformanceView"
       },
+      "PeriodOut": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "portfolio_return": {
+            "type": "number",
+            "title": "Portfolio Return"
+          },
+          "benchmark_return": {
+            "type": "number",
+            "title": "Benchmark Return"
+          },
+          "excess_return": {
+            "type": "number",
+            "title": "Excess Return"
+          },
+          "allocation": {
+            "type": "number",
+            "title": "Allocation"
+          },
+          "selection": {
+            "type": "number",
+            "title": "Selection"
+          },
+          "interaction": {
+            "type": "number",
+            "title": "Interaction"
+          },
+          "opened_in_period": {
+            "type": "number",
+            "title": "Opened In Period",
+            "description": "Gain on positions with no opening value."
+          },
+          "reconciliation_error_bp": {
+            "type": "number",
+            "title": "Reconciliation Error Bp",
+            "description": "Excess return minus the sum of the effects, in basis points."
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentOut"
+            },
+            "type": "array",
+            "title": "Segments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "start",
+          "end",
+          "portfolio_return",
+          "benchmark_return",
+          "excess_return",
+          "allocation",
+          "selection",
+          "interaction",
+          "opened_in_period",
+          "reconciliation_error_bp",
+          "segments"
+        ],
+        "title": "PeriodOut"
+      },
       "PeriodReturn": {
         "properties": {
           "label": {
@@ -74971,6 +75702,144 @@
         ],
         "title": "PositionFactors"
       },
+      "PositionRiskPack": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          },
+          "risk_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Share",
+            "description": "Share of the portfolio's forecast variance (Euler)."
+          },
+          "risk_to_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk To Weight",
+            "description": "Risk share divided by weight; above 1 it adds more than its size."
+          },
+          "standalone_volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standalone Volatility"
+          },
+          "marginal_risk": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginal Risk"
+          },
+          "cluster": {
+            "items": {
+              "$ref": "#/components/schemas/ClusterMember"
+            },
+            "type": "array",
+            "title": "Cluster",
+            "description": "Holdings that move with it (weekly correlation 0.6+)."
+          },
+          "cluster_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Weight",
+            "description": "The position plus its cluster, share of the portfolio."
+          },
+          "stress": {
+            "items": {
+              "$ref": "#/components/schemas/StressLine"
+            },
+            "type": "array",
+            "title": "Stress",
+            "description": "Worst past episodes."
+          },
+          "expected_shortfall_contribution": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Shortfall Contribution"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "available",
+          "reason"
+        ],
+        "title": "PositionRiskPack"
+      },
       "PositionTarget": {
         "properties": {
           "target_weight": {
@@ -76146,6 +77015,62 @@
         "title": "PriceSettings",
         "description": "Daily price history (Stooq, Yahoo as the fallback), intraday prices (Yahoo) and the\nrisk figures computed from the daily closes."
       },
+      "ProcessReport": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "theses": {
+            "items": {
+              "$ref": "#/components/schemas/ClosedThesis"
+            },
+            "type": "array",
+            "title": "Theses"
+          },
+          "by_tier": {
+            "items": {
+              "$ref": "#/components/schemas/TierHitRate"
+            },
+            "type": "array",
+            "title": "By Tier"
+          },
+          "triggers": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TriggerSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "reason"
+        ],
+        "title": "ProcessReport"
+      },
       "ProductLine": {
         "properties": {
           "ticker": {
@@ -77085,6 +78010,87 @@
         ],
         "title": "ProxySeries",
         "description": "A sector or region ETF whose daily closes stand in for a holding with a short history\n(quant plan Q0.3/Q0.4): a recent listing is regressed on it and the missing weeks are\nbackfilled from it."
+      },
+      "PsrOut": {
+        "properties": {
+          "weeks": {
+            "type": "integer",
+            "title": "Weeks"
+          },
+          "portfolio_sharpe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Sharpe",
+            "description": "Annualised."
+          },
+          "benchmark_sharpe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Sharpe",
+            "description": "Annualised."
+          },
+          "probability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probability",
+            "description": "Probability that the portfolio's true Sharpe ratio is above the benchmark's."
+          },
+          "min_track_record_weeks": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Track Record Weeks"
+          },
+          "distinguishable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distinguishable"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict"
+          }
+        },
+        "type": "object",
+        "required": [
+          "weeks",
+          "portfolio_sharpe",
+          "benchmark_sharpe",
+          "probability",
+          "min_track_record_weeks",
+          "distinguishable",
+          "verdict"
+        ],
+        "title": "PsrOut"
       },
       "PublicDataSettings": {
         "properties": {
@@ -82760,6 +83766,17 @@
             "title": "Max Drawdown",
             "description": "Ceiling on the portfolio's current drawdown: its fall from the highest level of the last year (0.20 = 20 % below the peak), on the deposit- and withdrawal-adjusted value."
           },
+          "drawdown_warnings": {
+            "items": {
+              "type": "number",
+              "maximum": 1.0,
+              "minimum": 0.0
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Drawdown Warnings",
+            "description": "Early-warning rungs below `max_drawdown` (0.10 = 10 % below the peak). Each raises a note naming the positions that drive the fall and the theses due for re-confirmation; the limit itself is unchanged. Only used when `max_drawdown` is set."
+          },
           "max_pair_correlation": {
             "anyOf": [
               {
@@ -85614,6 +86631,50 @@
           "lines"
         ],
         "title": "SegmentMix"
+      },
+      "SegmentOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "opening_weight": {
+            "type": "number",
+            "title": "Opening Weight"
+          },
+          "return": {
+            "type": "number",
+            "title": "Return"
+          },
+          "contribution": {
+            "type": "number",
+            "title": "Contribution",
+            "description": "Weight x (segment return - benchmark return)."
+          },
+          "allocation": {
+            "type": "number",
+            "title": "Allocation"
+          },
+          "selection": {
+            "type": "number",
+            "title": "Selection"
+          },
+          "interaction": {
+            "type": "number",
+            "title": "Interaction"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "opening_weight",
+          "return",
+          "contribution",
+          "allocation",
+          "selection",
+          "interaction"
+        ],
+        "title": "SegmentOut"
       },
       "SegmentPeriod": {
         "properties": {
@@ -91158,6 +92219,44 @@
         ],
         "title": "StressEpisodeConfig"
       },
+      "StressLine": {
+        "properties": {
+          "episode": {
+            "type": "string",
+            "title": "Episode"
+          },
+          "move": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Move",
+            "description": "The position's own move over the episode."
+          },
+          "pnl": {
+            "type": "number",
+            "title": "Pnl",
+            "description": "Gain or loss in the base currency."
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis",
+            "description": "real, proxied or unavailable."
+          }
+        },
+        "type": "object",
+        "required": [
+          "episode",
+          "move",
+          "pnl",
+          "basis"
+        ],
+        "title": "StressLine"
+      },
       "StressReplay": {
         "properties": {
           "as_of": {
@@ -93051,6 +94150,63 @@
         ],
         "title": "TierCheck"
       },
+      "TierHitRate": {
+        "properties": {
+          "tier": {
+            "type": "string",
+            "title": "Tier"
+          },
+          "closed": {
+            "type": "integer",
+            "title": "Closed"
+          },
+          "with_return": {
+            "type": "integer",
+            "title": "With Return"
+          },
+          "beat_benchmark": {
+            "type": "integer",
+            "title": "Beat Benchmark"
+          },
+          "hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hit Rate"
+          },
+          "enough": {
+            "type": "boolean",
+            "title": "Enough"
+          },
+          "median_excess": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Excess"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tier",
+          "closed",
+          "with_return",
+          "beat_benchmark",
+          "hit_rate",
+          "enough",
+          "median_excess"
+        ],
+        "title": "TierHitRate"
+      },
       "TierLine": {
         "properties": {
           "tier": {
@@ -94455,6 +95611,41 @@
           "cur"
         ],
         "title": "TrendOut"
+      },
+      "TriggerSummary": {
+        "properties": {
+          "losing_theses": {
+            "type": "integer",
+            "title": "Losing Theses"
+          },
+          "flagged_first": {
+            "type": "integer",
+            "title": "Flagged First"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share"
+          },
+          "enough": {
+            "type": "boolean",
+            "title": "Enough"
+          }
+        },
+        "type": "object",
+        "required": [
+          "losing_theses",
+          "flagged_first",
+          "share",
+          "enough"
+        ],
+        "title": "TriggerSummary"
       },
       "TrustSettings": {
         "properties": {

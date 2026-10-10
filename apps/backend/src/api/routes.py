@@ -61,6 +61,7 @@ from steward.portfolio.factor_shock import (
 )
 from steward.portfolio.factors import FactorExposures, factor_exposures
 from steward.portfolio.idea_fit import IdeaFitReport, idea_fit
+from steward.portfolio.position_pack import PositionRiskPack, position_risk_pack
 from steward.portfolio.read import (
     ContributionReport,
     HoldingsResponse,
@@ -84,6 +85,7 @@ from steward.portfolio.transactions import (
     decode_cursor,
     list_transactions,
 )
+from steward.portfolio.validation import ModelValidation, model_validation
 from steward.settings import get_settings
 from steward.storage import EvidenceStore, StorageError, SupabaseStorage
 
@@ -233,6 +235,15 @@ async def run_risk_scenario(
     return await run_shock(pool, scenario.spec, region, scenario_id)
 
 
+@router.get("/portfolio/risk/validation", tags=["portfolio"])
+async def get_model_validation(pool: Pool, _owner: Owner) -> ModelValidation:
+    """Does the risk model's forecast match what happened? A weekly back-test on today's
+    holdings: Kupiec and Christoffersen tests of the 95 % and 99 % value-at-risk, and the ratio
+    of realised to forecast volatility. `confidence` is `reduced` and `review_item` is set when
+    a test fails; `untested` when too little history exists."""
+    return await model_validation(pool)
+
+
 @router.get("/portfolio/risk/factors", tags=["portfolio"])
 async def get_portfolio_factor_exposures(
     pool: Pool, _owner: Owner, region: Literal["developed", "europe", "us"] = "developed"
@@ -276,6 +287,17 @@ async def get_start_size(
     upper bound and its inputs where the stock has a thesis. A ceiling, never a target."""
     name = (await resolve_tickers(pool, [ticker])).get(ticker.strip(), ticker.strip())
     return await start_size(pool, name, premium)
+
+
+@router.get("/portfolio/risk/position", tags=["portfolio"])
+async def get_position_risk(
+    pool: Pool, _owner: Owner, ticker: Annotated[str, Query(min_length=1, max_length=32)]
+) -> PositionRiskPack:
+    """The risk page of a thesis review: the holding's share of the portfolio's risk against its
+    weight, the holdings it moves with (weekly correlation 0.6 or more) and its worst past
+    episodes. Expected Shortfall is not modelled yet and the response says so."""
+    name = (await resolve_tickers(pool, [ticker])).get(ticker.strip(), ticker.strip())
+    return await position_risk_pack(pool, name)
 
 
 @router.get("/portfolio/risk/deposit", tags=["portfolio"])

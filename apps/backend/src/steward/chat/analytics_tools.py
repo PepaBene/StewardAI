@@ -189,6 +189,52 @@ async def factor_tilts(pool: asyncpg.Pool, registry: Registry, region: str) -> d
     }
 
 
+async def model_check(pool: asyncpg.Pool, registry: Registry) -> dict[str, Any]:
+    """Whether the risk model's forecasts held up against what happened."""
+    from steward.portfolio.validation import model_validation
+
+    report = await model_validation(pool)
+    if not report.available:
+        return {"unavailable": report.reason}
+    sid = registry.add(
+        "observation",
+        f"modelcheck:{report.as_of}",
+        f"Risk model back-test to {report.as_of}",
+        app_path="/risk/validation",
+        tier=1,
+        snippet=report.verdict[:500],
+        as_of=report.as_of,
+    )
+    return {
+        "source_id": sid,
+        "confidence": report.confidence,
+        "verdict": report.verdict,
+        "weeks_tested": report.weeks_tested,
+        "backtests": [b.model_dump() for b in report.backtests],
+        "calibration": report.calibration.model_dump() if report.calibration else None,
+        "warnings": report.warnings,
+        "method": report.method,
+    }
+
+
+async def position_risk(pool: asyncpg.Pool, registry: Registry, ticker: str) -> dict[str, Any]:
+    """One holding's risk contribution, cluster and stress losses."""
+    from steward.portfolio.position_pack import position_risk_pack
+
+    pack = await position_risk_pack(pool, ticker.strip())
+    if not pack.available:
+        return {"unavailable": pack.reason}
+    sid = registry.add(
+        "observation",
+        f"positionrisk:{pack.ticker}",
+        f"Risk of {pack.ticker} in the portfolio",
+        app_path="/risk/ex-ante",
+        tier=1,
+        snippet=pack.summary[:500],
+    )
+    return {"source_id": sid, **pack.model_dump()}
+
+
 async def idea_factor_fit(
     pool: asyncpg.Pool,
     registry: Registry,

@@ -219,6 +219,7 @@ const RISK_EXTRA_KEYS = [
   "tier_speculative_market_cap",
   "tier_core_min_market_cap",
   "stress_episodes",
+  "drawdown_warnings",
 ] as const;
 
 type RiskBody = NonNullable<StrategyConfig["risk"]>;

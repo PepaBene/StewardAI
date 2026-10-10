@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 
 from api.auth import Owner
 from api.db import Pool
-from steward.journal import entries
+from steward.journal import entries, process
 from steward.journal import export as owner_export
 from steward.journal import service as journal_service
 from steward.journal.entries import JournalEntry, JournalEntryIn
@@ -56,6 +56,14 @@ async def get_scorecard(
     says so instead of reporting a figure. `ticker` and `reason` limit it to one security or one
     main reason, which usually leaves too few decisions to summarise; the sections say so."""
     return await journal_service.scorecard(pool, owner.user_id, since, ticker, reason)
+
+
+@router.get("/journal/process")
+async def get_process(pool: Pool, owner: Owner) -> process.ProcessReport:
+    """Closed theses (a buy or add followed by a sell): the price return over the holding
+    period against the benchmark, the hit rate by tier (withheld below five theses) and how
+    many of the losing ones had a portfolio finding open on the ticker before the sale."""
+    return await process.process_report(pool, owner.user_id)
 
 
 @router.get("/journal/export/report")

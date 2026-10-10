@@ -298,20 +298,44 @@ Code: `quant/sizing.py` (equilibrium and shrunk returns, quarter-Kelly, bisectio
 
 **Outcome:** evidence on whether the risk model is right and whether the thesis process adds value.
 
-- [ ] `Q6.1` VaR backtest (Kupiec, Christoffersen) and volatility-forecast calibration on rolling history; results on the Activity page and in the monthly review. A failed test lowers the model's displayed confidence and opens a review item.
-- [ ] `Q6.2` Brinson-Fachler attribution by sector and tier vs the benchmark, monthly and since inception, reconciled to total excess return.
-- [ ] `Q6.3` Factor attribution: alpha net of the Q4 factors, with its t-statistic.
-- [ ] `Q6.4` Probabilistic Sharpe Ratio vs the benchmark's Sharpe and Minimum Track Record Length; shown as "not yet distinguishable from the benchmark" where applicable.
-- [ ] `Q6.5` Decision journal metrics (with `M7.1`): per closed thesis, return vs benchmark over the holding period, hit rate by tier, and whether risk-review triggers preceded losses.
+- [x] `Q6.1` VaR backtest (Kupiec, Christoffersen) and volatility-forecast calibration on rolling history; results on the Activity page and in the monthly review. A failed test lowers the model's displayed confidence and opens a review item. (`quant/validation.py`, `portfolio/validation.py`, `GET /portfolio/risk/validation`, page Risk → "Does it hold up", chat tool `model_check`; the review item is the finding `risk:model_validation`.)
+- [x] `Q6.2` Brinson-Fachler attribution by sector and tier vs the benchmark, monthly and since inception, reconciled to total excess return. (`quant/skill.py`, `performance/evaluation.py`, `GET /portfolio/performance/evaluation?dimension=`.)
+- [x] `Q6.3` Factor attribution: alpha net of the Q4 factors, with its t-statistic. (`FactorFit.alpha_t`, `FitOut.alpha_t`, `factor_alpha` in the evaluation response.)
+- [x] `Q6.4` Probabilistic Sharpe Ratio vs the benchmark's Sharpe and Minimum Track Record Length; shown as "not yet distinguishable from the benchmark" where applicable.
+- [x] `Q6.5` Decision journal metrics (with `M7.1`): per closed thesis, return vs benchmark over the holding period, hit rate by tier, and whether risk-review triggers preceded losses. (`journal/process.py`, `GET /journal/process`.)
 
-**Exit check:** Brinson effects sum to the measured excess return within 1 bp.
+**Exit check:** Brinson effects sum to the measured excess return within 1 bp. (Tested: the reconciliation error is below 1e-6 bp on the synthetic periods, including one with a position opened inside the period.)
 
 ## Phase Q7 — Integration into reviews and alerts
 
-- [ ] `Q7.1` Monthly review: a risk section with forecast vs realized volatility, top risk contributors, tier risk budgets, ES, drawdown probability, worst stress scenario, factor tilts and model-validation status; proposed actions must cite a rule, KPI or risk limit.
-- [ ] `Q7.2` Thesis review pack: the position's risk contribution, ES contribution, correlation cluster and stress losses.
-- [ ] `Q7.3` Drawdown early-warning ladder ahead of principle 4g: notes at 10 % and 15 % drawdown that list the positions driving it and the theses due for re-confirmation; the 20 % freeze stays as written.
-- [ ] `Q7.4` Glossary entries for every new measure, written in the owner's terms.
+- [x] `Q7.1` Monthly review: a risk section with forecast vs realized volatility, top risk contributors, tier risk budgets, ES, drawdown probability, worst stress scenario, factor tilts and model-validation status; proposed actions must cite a rule, KPI or risk limit. (Everything except ES and drawdown probability, which wait for Q2 and are stated as not modelled; an action may now cite an open `risk:` limit.)
+- [x] `Q7.2` Thesis review pack: the position's risk contribution, ES contribution, correlation cluster and stress losses. (`portfolio/position_pack.py`, `GET /portfolio/risk/position?ticker=`, chat tool `position_risk`, and one line per thesis due for review in the monthly review; ES contribution waits for Q2.)
+- [x] `Q7.3` Drawdown early-warning ladder ahead of principle 4g: notes at 10 % and 15 % drawdown that list the positions driving it and the theses due for re-confirmation; the 20 % freeze stays as written. (`risk.drawdown_warnings`, findings `risk:drawdown_warning:10` and `:15`, severity 1, `portfolio/drawdown_ladder.py`.)
+- [x] `Q7.4` Glossary entries for every new measure, written in the owner's terms. (Eleven entries; Expected Shortfall has none because it is not built.)
+
+### Status of Q6 and Q7 (implemented 9 October 2026) and the gaps that remain
+
+Verified: unit tests for the Kupiec and Christoffersen statistics (a golden Kupiec value, critical values of the chi-square), the back-test on a model that holds and on one that misses a volatility jump, the PSR closed form and Minimum Track Record, Brinson reconciliation (including a deposit and a position opened inside the period), the closed-thesis pairing, the drawdown rungs and drivers, the position pack and the review's risk lines; mypy and ruff clean on the touched modules; web vitest (1074 tests), eslint and tsc clean apart from the known route-type errors.
+
+Not verified:
+- G64. Nothing here has run on the live book. The routes, the chat handlers and the sync-time review item have no HTTP or database test, and the new page has not been looked at in a browser (G3, G50 still apply).
+- G65. The full backend suite was not run; only the touched modules and the related test files were.
+
+Method gaps:
+- G66. The back-test (Q6.1) holds today's weights constant over the past 156 weeks; the first 52 only seed the forecast, so at most 104 weeks are tested and the 99 % test has about one expected hit and can rarely fail. It tests the EWMA forecast, not whichever of EWMA and Ledoit-Wolf the report shows as larger. It tests the method, not the trades you made.
+- G67. The displayed confidence appears on the new page and in the monthly review only; the Today's risk page does not yet carry it, and no earlier results are stored, so there is no history of the model's confidence (the saved-report table has a fixed list of kinds and was not extended). The review item `risk:model_validation` exists only when a limit that needs the book is set, and it has severity 1 whatever `on_breach` says.
+- G68. The plan asked for the Activity page; the results are on Risk → "Does it hold up" instead.
+- G69. Brinson (Q6.2) has one benchmark index, so every segment gets the index's return and the benchmark weights equal the portfolio's own: allocation and interaction are zero by construction and the table is each segment's contribution to the gap. A benchmark with segment returns (a sector index set) is not stored. Segments come from the strategy's classification today (a core ETF with no sector is "Unclassified"), cash is excluded, and the periods are single-period each and not chain-linked, so monthly figures do not compound to the since-inception one.
+- G70. The PSR (Q6.4) uses weekly returns of the whole account with flows removed (cash included) against the benchmark's weekly price change; no risk-free rate is subtracted on either side, and the benchmark has no dividends, so its Sharpe ratio is understated. It needs at least 26 weeks. The benchmark and the portfolio are in different currencies when the benchmark is quoted abroad.
+- G71. The factor alpha (Q6.3) is the intercept of the existing two-year regression on today's weights, not on the realised record; its t-statistic is Newey-West with 4 lags.
+- G72. Closed theses (Q6.5) are a `sell` after a `buy` or `add` in the journal; partial trims are ignored, the first buy opens the thesis, prices are the ones written in the entries, returns exclude dividends, and the tier is today's classification. "A risk finding came first" counts findings stored in `portfolio_breach`, which only goes back to when storing began. Hit rate and the trigger share are withheld below five theses.
+- G73. The monthly review (Q7.1) has no Expected Shortfall or drawdown probability (Q2 not built) and its stress line is the historical replay only. It recomputes the model check on each run. The tier budget line appears only for tiers with a budget or at least 5 % of risk.
+- G74. The position pack (Q7.2) is not yet on the thesis page; it is a route, a chat tool and monthly-review lines. The cluster threshold (weekly correlation 0.6) is a constant, and the ES contribution is empty.
+- G75. The drawdown ladder (Q7.3): `risk.drawdown_warnings` (default 10 % and 15 %) has no field in the strategy editor; it is kept as loaded and changed through the import. The rungs apply only when `max_drawdown` is set. The drivers use today's weights from the weekly peak of the last 52 weeks, which approximates the real path and ignores trades since the peak. The note severity is fixed at 1.
+- G76. The glossary entries (Q7.4) were written, not reviewed with the owner (G27 stands).
+- G77. The existing drawdown test in `test_risk_limits.py` was changed: with the default rungs, a 20 % drawdown now also raises the 10 % and 15 % notes. Anyone reading the findings list for a book in drawdown will see three `risk:drawdown*` entries, and a strategy that sets `drawdown_warnings: []` gets the old behaviour.
+- G78. The generated web types mark fields with a `default_factory` as optional, so the Q5 trade-risk panels needed `?? []` guards. Other new list fields (Q6, Q7) rely on the same guards in the views; a new list field added without one will fail `tsc` or render blank on an old API response.
+- G79. Whether `price_history` holds the long histories the back-test and the 156-week window need is unchecked: earlier inspection found about nine rows per holding. A short history lowers the weeks tested and the confidence shown is "untested" rather than an error, so a data gap can look like a model verdict.
 
 ## Phase Q8 — The decision loop: expected return, risk-adjusted ranking and rotation
 

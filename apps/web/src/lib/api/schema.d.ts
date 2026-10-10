@@ -918,6 +918,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/risk/validation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Model Validation
+         * @description Does the risk model's forecast match what happened? A weekly back-test on today's
+         *     holdings: Kupiec and Christoffersen tests of the 95 % and 99 % value-at-risk, and the ratio
+         *     of realised to forecast volatility. `confidence` is `reduced` and `review_item` is set when
+         *     a test fails; `untested` when too little history exists.
+         */
+        get: operations["get_model_validation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/risk/factors": {
         parameters: {
             query?: never;
@@ -980,6 +1003,28 @@ export interface paths {
          *     upper bound and its inputs where the stock has a thesis. A ceiling, never a target.
          */
         get: operations["get_start_size"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/portfolio/risk/position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Position Risk
+         * @description The risk page of a thesis review: the holding's share of the portfolio's risk against its
+         *     weight, the holdings it moves with (weekly correlation 0.6 or more) and its worst past
+         *     episodes. Expected Shortfall is not modelled yet and the response says so.
+         */
+        get: operations["get_position_risk"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5316,6 +5361,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/performance/evaluation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Evaluation
+         * @description Is the process adding value? Brinson-Fachler attribution by the chosen classification,
+         *     monthly and since inception, reconciled to the excess return over the benchmark; the
+         *     Probabilistic Sharpe Ratio against the benchmark (with the record length that would settle
+         *     it); and the factor-adjusted alpha with its t-statistic. Each part says when it cannot be
+         *     computed.
+         */
+        get: operations["get_evaluation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/performance/settings": {
         parameters: {
             query?: never;
@@ -6141,6 +6210,28 @@ export interface paths {
          *     main reason, which usually leaves too few decisions to summarise; the sections say so.
          */
         get: operations["get_scorecard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journal/process": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Process
+         * @description Closed theses (a buy or add followed by a sell): the price return over the holding
+         *     period against the benchmark, the hit rate by tier (withheld below five theses) and how
+         *     many of the losing ones had a portfolio finding open on the ticker before the sale.
+         */
+        get: operations["get_process"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9733,6 +9824,25 @@ export interface components {
             /** Ended Early */
             ended_early: boolean;
         };
+        /** BacktestOut */
+        BacktestOut: {
+            /** Confidence */
+            confidence: number;
+            /** Weeks */
+            weeks: number;
+            /** Hits */
+            hits: number;
+            /** Expected Hits */
+            expected_hits: number;
+            /** Kupiec P */
+            kupiec_p: number;
+            /** Independence P */
+            independence_p: number;
+            /** Passed */
+            passed: boolean;
+            /** Reason */
+            reason: string | null;
+        };
         /** BacktestPeriod */
         BacktestPeriod: {
             /**
@@ -10463,6 +10573,29 @@ export interface components {
             status: "uncalibrated";
             /** Note */
             note: string;
+        };
+        /** CalibrationOut */
+        CalibrationOut: {
+            /** Weeks */
+            weeks: number;
+            /** Realised Over Forecast */
+            realised_over_forecast: number | null;
+            /** Standard Error */
+            standard_error: number | null;
+            /** Biased */
+            biased: boolean;
+            /** Direction */
+            direction: string | null;
+            /**
+             * Forecast Volatility
+             * @description Annualised, average over the weeks.
+             */
+            forecast_volatility: number | null;
+            /**
+             * Realised Volatility
+             * @description Annualised, the same weeks.
+             */
+            realised_volatility: number | null;
         };
         /** CapitalAllocation */
         CapitalAllocation: {
@@ -11330,6 +11463,43 @@ export interface components {
              */
             applies_to?: ("daily_digest" | "weekly_digest" | "escalation")[];
         };
+        /** ClosedThesis */
+        ClosedThesis: {
+            /** Ticker */
+            ticker: string;
+            /** Tier */
+            tier: string;
+            /**
+             * Opened On
+             * Format: date
+             */
+            opened_on: string;
+            /**
+             * Closed On
+             * Format: date
+             */
+            closed_on: string;
+            /** Holding Days */
+            holding_days: number;
+            /** Price Return */
+            price_return: number | null;
+            /** Benchmark Return */
+            benchmark_return: number | null;
+            /** Excess Return */
+            excess_return: number | null;
+            /** Beat Benchmark */
+            beat_benchmark: boolean | null;
+            /**
+             * Trigger Before Close
+             * @description A finding opened on the ticker during the holding period; None when the thesis did not lose money.
+             */
+            trigger_before_close: boolean | null;
+            /**
+             * Reason
+             * @description Why there is no return, when there is none.
+             */
+            reason: string | null;
+        };
         /** ClosureConfirmation */
         ClosureConfirmation: {
             /** Closures */
@@ -11351,6 +11521,15 @@ export interface components {
             date: string;
             /** Name */
             name: string;
+        };
+        /** ClusterMember */
+        ClusterMember: {
+            /** Ticker */
+            ticker: string;
+            /** Correlation */
+            correlation: number;
+            /** Weight */
+            weight: number;
         };
         /**
          * CnbSeries
@@ -14981,6 +15160,29 @@ export interface components {
             /** Exported To */
             exported_to: string | null;
         };
+        /** Evaluation */
+        Evaluation: {
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Method Version
+             * @default evaluation-1
+             */
+            method_version: string;
+            /** Dimension */
+            dimension: string;
+            /** Benchmark Label */
+            benchmark_label?: string | null;
+            /** Periods */
+            periods?: components["schemas"]["PeriodOut"][];
+            since_inception?: components["schemas"]["PeriodOut"] | null;
+            skill?: components["schemas"]["PsrOut"] | null;
+            factor_alpha?: components["schemas"]["FactorAlpha"] | null;
+            /** Notes */
+            notes?: string[];
+        };
         /** EventComparisonOut */
         EventComparisonOut: {
             /** Status */
@@ -16148,6 +16350,25 @@ export interface components {
             corrected_fact_id: number | null;
             verdict_job: components["schemas"]["JobSummary"];
         };
+        /**
+         * FactorAlpha
+         * @description What is left of the return once the factor exposures are paid for (quant plan Q6.3).
+         */
+        FactorAlpha: {
+            /** Alpha Annual */
+            alpha_annual: number;
+            /** T Stat */
+            t_stat: number;
+            /** Observations */
+            observations: number;
+            /**
+             * Significant
+             * @description Absolute t-statistic of 2 or more.
+             */
+            significant: boolean;
+            /** Verdict */
+            verdict: string;
+        };
         /** FactorBeta */
         FactorBeta: {
             /** Factor */
@@ -16737,6 +16958,12 @@ export interface components {
              * @description Intercept, annualised (x52), log return.
              */
             alpha_annual: number;
+            /**
+             * Alpha T
+             * @description Newey-West t-statistic of the intercept.
+             * @default 0
+             */
+            alpha_t: number;
             /** Betas */
             betas: components["schemas"]["FactorBeta"][];
         };
@@ -22400,6 +22627,51 @@ export interface components {
              */
             web_search_per_1000?: number | null;
         };
+        /** ModelValidation */
+        ModelValidation: {
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason: string | null;
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Method Version
+             * @default validation-1
+             */
+            method_version: string;
+            /**
+             * Method
+             * @default At each past week the volatility of today's holdings is forecast from the weeks before it (zero-mean exponentially weighted, half-life 26 weeks). A week is a hit when the portfolio falls by more than the 95 % or 99 % value-at-risk of that forecast. Kupiec's test checks the number of hits, Christoffersen's whether they cluster; the standard deviation of the weekly return divided by its forecast should be 1.
+             */
+            method: string;
+            /**
+             * Confidence
+             * @default untested
+             * @enum {string}
+             */
+            confidence: "ok" | "reduced" | "untested";
+            /**
+             * Verdict
+             * @default
+             */
+            verdict: string;
+            /**
+             * Review Item
+             * @description Set when a test failed: what to look at.
+             */
+            review_item?: string | null;
+            /** Backtests */
+            backtests?: components["schemas"]["BacktestOut"][];
+            calibration?: components["schemas"]["CalibrationOut"] | null;
+            /**
+             * Weeks Tested
+             * @default 0
+             */
+            weeks_tested: number;
+            /** Warnings */
+            warnings?: string[];
+        };
         /**
          * MonitorSettings
          * @description Monitoring: failed jobs, missed scheduled runs and per-holding coverage gaps alert.
@@ -24284,6 +24556,45 @@ export interface components {
             /** Method Version */
             method_version?: string;
         };
+        /** PeriodOut */
+        PeriodOut: {
+            /** Label */
+            label: string;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Portfolio Return */
+            portfolio_return: number;
+            /** Benchmark Return */
+            benchmark_return: number;
+            /** Excess Return */
+            excess_return: number;
+            /** Allocation */
+            allocation: number;
+            /** Selection */
+            selection: number;
+            /** Interaction */
+            interaction: number;
+            /**
+             * Opened In Period
+             * @description Gain on positions with no opening value.
+             */
+            opened_in_period: number;
+            /**
+             * Reconciliation Error Bp
+             * @description Excess return minus the sum of the effects, in basis points.
+             */
+            reconciliation_error_bp: number;
+            /** Segments */
+            segments: components["schemas"]["SegmentOut"][];
+        };
         /** PeriodReturn */
         PeriodReturn: {
             /** Label */
@@ -24969,6 +25280,55 @@ export interface components {
             /** Reason */
             reason: string | null;
         };
+        /** PositionRiskPack */
+        PositionRiskPack: {
+            /** Ticker */
+            ticker: string;
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Weight */
+            weight?: number | null;
+            /**
+             * Risk Share
+             * @description Share of the portfolio's forecast variance (Euler).
+             */
+            risk_share?: number | null;
+            /**
+             * Risk To Weight
+             * @description Risk share divided by weight; above 1 it adds more than its size.
+             */
+            risk_to_weight?: number | null;
+            /** Standalone Volatility */
+            standalone_volatility?: number | null;
+            /** Marginal Risk */
+            marginal_risk?: number | null;
+            /**
+             * Cluster
+             * @description Holdings that move with it (weekly correlation 0.6+).
+             */
+            cluster?: components["schemas"]["ClusterMember"][];
+            /**
+             * Cluster Weight
+             * @description The position plus its cluster, share of the portfolio.
+             */
+            cluster_weight?: number | null;
+            /**
+             * Stress
+             * @description Worst past episodes.
+             */
+            stress?: components["schemas"]["StressLine"][];
+            /** Expected Shortfall Contribution */
+            expected_shortfall_contribution?: number | null;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /** Notes */
+            notes?: string[];
+        };
         /** PositionTarget */
         PositionTarget: {
             /** Target Weight */
@@ -25473,6 +25833,20 @@ export interface components {
              */
             intraday_cache_seconds: number;
         };
+        /** ProcessReport */
+        ProcessReport: {
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Theses */
+            theses?: components["schemas"]["ClosedThesis"][];
+            /** By Tier */
+            by_tier?: components["schemas"]["TierHitRate"][];
+            triggers?: components["schemas"]["TriggerSummary"] | null;
+            /** Notes */
+            notes?: string[];
+        };
         /** ProductLine */
         ProductLine: {
             /** Ticker */
@@ -25814,6 +26188,32 @@ export interface components {
              * @description Lower-case words that, found in a holding's sector or country label, make this ETF the preferred stand-in for it (when its fit is within 0.10 R-squared of the best one).
              */
             match?: string[];
+        };
+        /** PsrOut */
+        PsrOut: {
+            /** Weeks */
+            weeks: number;
+            /**
+             * Portfolio Sharpe
+             * @description Annualised.
+             */
+            portfolio_sharpe: number | null;
+            /**
+             * Benchmark Sharpe
+             * @description Annualised.
+             */
+            benchmark_sharpe: number | null;
+            /**
+             * Probability
+             * @description Probability that the portfolio's true Sharpe ratio is above the benchmark's.
+             */
+            probability: number | null;
+            /** Min Track Record Weeks */
+            min_track_record_weeks: number | null;
+            /** Distinguishable */
+            distinguishable: boolean | null;
+            /** Verdict */
+            verdict: string;
         };
         /**
          * PublicDataSettings
@@ -27866,6 +28266,11 @@ export interface components {
              */
             max_drawdown?: number | null;
             /**
+             * Drawdown Warnings
+             * @description Early-warning rungs below `max_drawdown` (0.10 = 10 % below the peak). Each raises a note naming the positions that drive the fall and the theses due for re-confirmation; the limit itself is unchanged. Only used when `max_drawdown` is set.
+             */
+            drawdown_warnings?: number[];
+            /**
              * Max Pair Correlation
              * @description Ceiling on the correlation of two held positions' weekly base-currency returns over the last two years (0.85). Only pairs weighing at least `correlation_min_combined_weight` together are checked, so small positions do not raise noise.
              */
@@ -28842,6 +29247,26 @@ export interface components {
             ][];
             /** Note */
             note?: string | null;
+        };
+        /** SegmentOut */
+        SegmentOut: {
+            /** Name */
+            name: string;
+            /** Opening Weight */
+            opening_weight: number;
+            /** Return */
+            return: number;
+            /**
+             * Contribution
+             * @description Weight x (segment return - benchmark return).
+             */
+            contribution: number;
+            /** Allocation */
+            allocation: number;
+            /** Selection */
+            selection: number;
+            /** Interaction */
+            interaction: number;
         };
         /** SegmentPeriod */
         SegmentPeriod: {
@@ -30816,6 +31241,26 @@ export interface components {
              */
             note: string;
         };
+        /** StressLine */
+        StressLine: {
+            /** Episode */
+            episode: string;
+            /**
+             * Move
+             * @description The position's own move over the episode.
+             */
+            move: number | null;
+            /**
+             * Pnl
+             * @description Gain or loss in the base currency.
+             */
+            pnl: number;
+            /**
+             * Basis
+             * @description real, proxied or unavailable.
+             */
+            basis: string;
+        };
         /** StressReplay */
         StressReplay: {
             /** As Of */
@@ -31559,6 +32004,23 @@ export interface components {
             /** Breached */
             breached: boolean;
         };
+        /** TierHitRate */
+        TierHitRate: {
+            /** Tier */
+            tier: string;
+            /** Closed */
+            closed: number;
+            /** With Return */
+            with_return: number;
+            /** Beat Benchmark */
+            beat_benchmark: number;
+            /** Hit Rate */
+            hit_rate: number | null;
+            /** Enough */
+            enough: boolean;
+            /** Median Excess */
+            median_excess: number | null;
+        };
         /** TierLine */
         TierLine: {
             /** Tier */
@@ -32037,6 +32499,17 @@ export interface components {
             cur: {
                 [key: string]: string;
             };
+        };
+        /** TriggerSummary */
+        TriggerSummary: {
+            /** Losing Theses */
+            losing_theses: number;
+            /** Flagged First */
+            flagged_first: number;
+            /** Share */
+            share: number | null;
+            /** Enough */
+            enough: boolean;
         };
         /**
          * TrustSettings
@@ -35004,6 +35477,26 @@ export interface operations {
             };
         };
     };
+    get_model_validation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelValidation"];
+                };
+            };
+        };
+    };
     get_portfolio_factor_exposures: {
         parameters: {
             query?: {
@@ -35088,6 +35581,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StartSize"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_position_risk: {
+        parameters: {
+            query: {
+                ticker: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PositionRiskPack"];
                 };
             };
             /** @description Validation Error */
@@ -42912,6 +43436,38 @@ export interface operations {
             };
         };
     };
+    get_evaluation: {
+        parameters: {
+            query?: {
+                /** @description A strategy classification, e.g. sector or risk. */
+                dimension?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Evaluation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_performance_settings: {
         parameters: {
             query?: never;
@@ -44293,6 +44849,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_process: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessReport"];
                 };
             };
         };

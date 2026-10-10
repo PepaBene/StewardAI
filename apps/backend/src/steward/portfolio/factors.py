@@ -102,6 +102,7 @@ class FitOut(BaseModel):
     r_squared: float
     observations: int
     alpha_annual: float = Field(description="Intercept, annualised (x52), log return.")
+    alpha_t: float = Field(default=0.0, description="Newey-West t-statistic of the intercept.")
     betas: list[FactorBeta]
 
 
@@ -161,6 +162,7 @@ def _fit_out(fit: fc.FactorFit) -> FitOut:
         r_squared=fit.r_squared,
         observations=fit.observations,
         alpha_annual=fit.alpha * fc.WEEKS_PER_YEAR,
+        alpha_t=fit.alpha_t,
         betas=[
             FactorBeta(factor=k, label=_label(k), beta=b, t_stat=fit.t_stats[k])
             for k, b in fit.betas.items()

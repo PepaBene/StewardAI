@@ -178,6 +178,13 @@ class RiskLimits(ConfigModel):
         "level of the last year (0.20 = 20 % below the peak), on the deposit- and "
         "withdrawal-adjusted value.",
     )
+    drawdown_warnings: list[Weight] = Field(
+        default_factory=lambda: [0.10, 0.15],
+        max_length=5,
+        description="Early-warning rungs below `max_drawdown` (0.10 = 10 % below the peak). Each "
+        "raises a note naming the positions that drive the fall and the theses due for "
+        "re-confirmation; the limit itself is unchanged. Only used when `max_drawdown` is set.",
+    )
     max_pair_correlation: Weight | None = Field(
         default=None,
         description="Ceiling on the correlation of two held positions' weekly base-currency "

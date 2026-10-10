@@ -84,6 +84,7 @@ class FactorFit:
     t_stats: dict[str, float]
     r_squared: float
     observations: int
+    alpha_t: float = 0.0  # Newey-West t-statistic of the intercept
 
 
 def newey_west_covariance(
@@ -130,4 +131,5 @@ def regress(
         {k: float(t[i + 1]) for i, k in enumerate(names)},
         r2,
         n,
+        float(t[0]),
     )

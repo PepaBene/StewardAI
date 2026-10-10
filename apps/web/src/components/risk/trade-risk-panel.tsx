@@ -7,7 +7,8 @@ export function TradeRiskPanel({ risk }: { risk: TradeRisk }) {
   if (!risk.available) {
     return <p className="text-sm text-text-muted">The risk after the trade could not be forecast: {risk.reason ?? "no forecast"}.</p>;
   }
-  const worse = risk.limits.filter((l) => isWorse(l.change));
+  const limits = risk.limits ?? [];
+  const worse = limits.filter((l) => isWorse(l.change));
   return (
     <div className="space-y-4">
       <dl className="grid gap-x-8 gap-y-2 sm:grid-cols-3">
@@ -29,9 +30,9 @@ export function TradeRiskPanel({ risk }: { risk: TradeRisk }) {
           after={risk.diversification_after?.toFixed(2) ?? "—"}
         />
       </dl>
-      {risk.limits.length > 0 ? (
+      {limits.length > 0 ? (
         <ul className="space-y-1.5">
-          {risk.limits.map((l) => (
+          {limits.map((l) => (
             <li key={l.key} className={cn("border-l-2 py-0.5 pl-3 text-sm", isWorse(l.change) ? "border-warning-signal" : "border-border")}>
               <span className="font-semibold">{changeText(l.change)}.</span> <span className="text-text-muted">{l.detail}</span>
             </li>
@@ -40,7 +41,7 @@ export function TradeRiskPanel({ risk }: { risk: TradeRisk }) {
       ) : (
         <p className="text-sm text-text-muted">No ex-ante risk limit is breached before or after the trade.</p>
       )}
-      {worse.length === 0 && risk.limits.length > 0 ? <p className="text-sm text-text-muted">None of these gets worse with the trade.</p> : null}
+      {worse.length === 0 && limits.length > 0 ? <p className="text-sm text-text-muted">None of these gets worse with the trade.</p> : null}
       <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
@@ -53,7 +54,7 @@ export function TradeRiskPanel({ risk }: { risk: TradeRisk }) {
               </tr>
             </thead>
             <tbody>
-              {risk.lines.map((l) => (
+              {(risk.lines ?? []).map((l) => (
                 <tr key={l.ticker} className="border-b border-border-soft last:border-b-0">
                   <th scope="row" className="py-1.5 pr-3 text-left font-semibold">
                     {l.ticker}
@@ -81,7 +82,7 @@ export function TradeRiskPanel({ risk }: { risk: TradeRisk }) {
               </tr>
             </thead>
             <tbody>
-              {risk.tiers.map((t) => (
+              {(risk.tiers ?? []).map((t) => (
                 <tr key={t.tier} className="border-b border-border-soft last:border-b-0">
                   <th scope="row" className="py-1.5 pr-3 text-left font-semibold capitalize">{t.tier}</th>
                   <td className="num py-1.5 pr-3 text-right">
@@ -94,7 +95,7 @@ export function TradeRiskPanel({ risk }: { risk: TradeRisk }) {
           </table>
         </div>
       </div>
-      {[...risk.warnings, ...risk.not_modelled].map((w) => (
+      {[...(risk.warnings ?? []), ...(risk.not_modelled ?? [])].map((w) => (
         <p key={w} className="text-xs text-text-muted">
           {w}
         </p>

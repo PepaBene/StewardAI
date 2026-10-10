@@ -133,7 +133,7 @@ function PlanOutcome({ plan }: { plan: AllocationPlan }) {
           </table>
         </div>
       ) : null}
-      {plan.notes.map((n) => (
+      {(plan.notes ?? []).map((n) => (
         <p key={n} className="text-sm text-text-muted">
           {n}
         </p>
@@ -229,7 +229,7 @@ function SizeOutcome({ size }: { size: StartSize }) {
       </dl>
       <p className="text-sm text-text-muted">
         {size.binding === "risk_limits"
-          ? `The risk limits bind first${size.limits_reached.length > 0 ? ` (${size.limits_reached.join(", ")})` : ""}.`
+          ? `The risk limits bind first${(size.limits_reached ?? []).length > 0 ? ` (${(size.limits_reached ?? []).join(", ")})` : ""}.`
           : "Your tier cap binds first; the risk limits allow it."}
       </p>
       {k?.available ? (
@@ -241,7 +241,7 @@ function SizeOutcome({ size }: { size: StartSize }) {
       ) : (
         <p className="text-xs text-text-muted">No Kelly bound: {k?.reason ?? "no thesis"}.</p>
       )}
-      {size.warnings.map((w) => (
+      {(size.warnings ?? []).map((w) => (
         <p key={w} className="text-xs text-text-muted">
           {w}
         </p>
@@ -282,13 +282,13 @@ function OverCapList({ report }: { report: ConcentrationReport }) {
               <span className="num">{formatPercent(p.weight)}</span> <span className="text-text-muted">of the portfolio, {money(p.excess_value)} above the cap</span>
             </p>
             <p className="mt-0.5 max-w-prose text-sm text-text-muted">{p.advice}</p>
-            {p.thesis_gaps.length > 0 ? (
-              <p className="mt-0.5 text-xs text-text-muted">The thesis is missing: {p.thesis_gaps.join(", ")}.</p>
+            {(p.thesis_gaps ?? []).length > 0 ? (
+              <p className="mt-0.5 text-xs text-text-muted">The thesis is missing: {(p.thesis_gaps ?? []).join(", ")}.</p>
             ) : null}
           </li>
         ))}
       </ul>
-      {report.exempt.length > 0 ? <p className="text-xs text-text-muted">Funds above the cap are exempt: {report.exempt.join(", ")}.</p> : null}
+      {(report.exempt ?? []).length > 0 ? <p className="text-xs text-text-muted">Funds above the cap are exempt: {(report.exempt ?? []).join(", ")}.</p> : null}
     </div>
   );
 }

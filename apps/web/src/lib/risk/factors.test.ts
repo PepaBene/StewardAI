@@ -25,7 +25,7 @@ describe("factor helpers", () => {
   });
 
   it("finds a loading in a fit and recognises the currency factors", () => {
-    const fit = { r_squared: 0.9, observations: 100, alpha_annual: 0, betas: [{ factor: "HML", label: "Value", beta: 0.4, t_stat: 3 }] };
+    const fit = { r_squared: 0.9, observations: 100, alpha_annual: 0, alpha_t: 0, betas: [{ factor: "HML", label: "Value", beta: 0.4, t_stat: 3 }] };
     expect(betaOf(fit, "HML")?.beta).toBe(0.4);
     expect(betaOf(fit, "SMB")).toBeUndefined();
     expect(betaOf(null, "HML")).toBeUndefined();

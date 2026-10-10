@@ -180,6 +180,26 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "model_check",
+        "description": "Whether the risk model's volatility and value-at-risk forecasts held up "
+        "against what happened (weekly back-test on today's holdings, Kupiec and Christoffersen "
+        "tests). Use before leaning on the model's figures, or when asked 'can I trust the risk "
+        "numbers'. Says so when too little history exists.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "position_risk",
+        "description": "One holding's risk for a thesis review: its share of the portfolio's "
+        "risk against its weight, the holdings it moves with, and its worst past episodes. "
+        "Expected Shortfall is not modelled yet and the answer says so.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"ticker": {"type": "string", "description": "A held ticker."}},
+            "required": ["ticker"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "risk_whatif",
         "description": "What proposed buys or sells, or a deposit, do to the portfolio's "
         "ex-ante risk: forecast volatility, effective bets, each position's share of risk, tier "
@@ -395,6 +415,12 @@ class ChatTools:
         return await analytics_tools.idea_factor_fit(
             self.pool, self.registry, symbols, currency.upper(), weight
         )
+
+    async def _tool_model_check(self) -> dict[str, Any]:
+        return await analytics_tools.model_check(self.pool, self.registry)
+
+    async def _tool_position_risk(self, ticker: str) -> dict[str, Any]:
+        return await analytics_tools.position_risk(self.pool, self.registry, ticker)
 
     async def _tool_risk_whatif(
         self, trades: list[dict[str, Any]], deposit: float = 0.0

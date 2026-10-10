@@ -233,7 +233,7 @@ class TestChatTools:
             "stress_test", "theme_exposure", "decision_scorecard", "fund_overlap",
             "performance_explain", "event_paths", "risk_forecast", "past_episodes",
             "factor_tilts", "idea_factor_fit", "risk_whatif", "start_size", "deposit_allocation",
-            "over_cap_positions",
+            "over_cap_positions", "model_check", "position_risk",
         }  # fmt: skip
         assert wanted <= declared
         assert all(hasattr(ChatTools, f"_tool_{name}") for name in wanted)

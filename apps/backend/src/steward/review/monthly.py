@@ -18,7 +18,7 @@ import datetime as dt
 import json
 import logging
 from dataclasses import asdict, dataclass
-from typing import Any, Literal, Protocol, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
 import anthropic
 import asyncpg
@@ -54,8 +54,13 @@ from steward.portfolio.read import portfolio_overview
 from steward.research.sources import CitedSentence, Registry, Source
 from steward.settings import get_settings
 
+if TYPE_CHECKING:
+    from steward.portfolio.exante import ExAnteRisk
+    from steward.portfolio.validation import ModelValidation
+
 logger = logging.getLogger(__name__)
 
+MAX_PACKS = 5  # thesis risk lines in one review
 Status = Literal["pass", "breach", "unknown"]
 
 
@@ -153,8 +158,9 @@ SYSTEM = """\
 You review a personal investment portfolio against its owner's written strategy. You get a \
 compliance table (every strategy rule with pass, breach or unknown), each holding's thesis \
 KPI statuses, theses due for review, and flags. Propose at most eight concrete actions. \
-Every action must cite the strategy rule ids or thesis KPIs (TICKER:kpi_id, exactly as \
-listed) it rests on; an action you cannot tie to one is not an action to propose. Do not \
+Every action must cite the strategy rule ids, open risk limits (risk:..., listed under \
+citable.risk_limits, put in rule_ids) or thesis KPIs (TICKER:kpi_id, exactly as listed) it \
+rests on; an action you cannot tie to one is not an action to propose. Do not \
 state figures that are not in the material. If nothing needs doing, return no actions.
 
 How to choose and write actions:
@@ -615,7 +621,9 @@ async def flags(pool: asyncpg.Pool, reg: Registry, settings: ReviewSettings) -> 
     return out
 
 
-def review_material(body: ReviewBody, strategy: StrategyConfig) -> str:
+def review_material(
+    body: ReviewBody, strategy: StrategyConfig, risk_limits: list[str] | None = None
+) -> str:
     return json.dumps(
         {
             "strategy": {
@@ -635,6 +643,7 @@ def review_material(body: ReviewBody, strategy: StrategyConfig) -> str:
             "risk": body.risk_notes,
             "citable": {
                 "rule_ids": [r.id for r in strategy.enabled_rules],
+                "risk_limits": risk_limits or [],
                 "kpis": [k.ref for k in body.kpis],
             },
         },
@@ -698,25 +707,83 @@ async def decision_scorecard_lines(pool: asyncpg.Pool, notes: list[str]) -> list
     return lines
 
 
-async def risk_note_lines(pool: asyncpg.Pool, notes: list[str]) -> list[str]:
-    """Forecast risk, flagged factor tilts and the hardest past episode. A part that cannot be
-    computed is left out and noted; it never stops the review."""
+def risk_section_lines(risk: "ExAnteRisk", validation: "ModelValidation | None") -> list[str]:
+    """The model-based part of the review's risk section (pure): forecast against realised
+    volatility, the largest risk contributors, risk by tier against its budgets, the measures
+    that are not modelled yet and whether the model passed its own back-test."""
+    lines: list[str] = []
+    if risk.volatility_forecast is not None:
+        limit = risk.limits.max_volatility
+        tail = "" if limit is None else f", against a limit of {limit:.0%}"
+        lines.append(
+            f"Forecast volatility from today's holdings: {risk.volatility_forecast:.1%}{tail}."
+        )
+        if risk.realized_volatility is not None:
+            lines.append(
+                f"Realised volatility over the last year was {risk.realized_volatility:.1%}, "
+                f"against the {risk.volatility_forecast:.1%} forecast."
+            )
+        top = [p for p in risk.positions if p.risk_share is not None][:3]
+        if top:
+            lines.append(
+                "Largest risk contributors: "
+                + "; ".join(
+                    f"{p.ticker} {p.risk_share:.0%} of risk ({p.weight:.0%} of value)" for p in top
+                )
+                + "."
+            )
+        budgets = risk.limits.tier_risk_budgets or {}
+        tiers = [
+            f"{g.label} {g.risk_share:.0%}"
+            + (f" (budget {budgets[g.label]:.0%})" if g.label in budgets else "")
+            for g in risk.by_tier
+            if g.label in budgets or g.risk_share >= 0.05
+        ]
+        if tiers:
+            lines.append("Share of risk by tier: " + ", ".join(tiers) + ".")
+        if risk.effective_bets is not None:
+            lines.append(f"About {risk.effective_bets:.1f} independent bets.")
+        lines += [w for w in risk.warnings if "understates" in w]
+    lines.append(
+        "Expected Shortfall and the probability of a drawdown are not modelled yet, so this "
+        "section has no tail-loss figure."
+    )
+    if validation is not None and validation.available:
+        lines.append(f"Model check: {validation.verdict}")
+    elif validation is not None:
+        lines.append(f"Model check not run: {validation.reason}.")
+    return lines
+
+
+async def open_risk_limit_keys(pool: asyncpg.Pool) -> list[str]:
+    """Keys of the risk-limit findings open now; an action may cite them like a rule id."""
+    rows = await pool.fetch(
+        "select key from public.portfolio_breach where cleared_at is null and key like 'risk:%'"
+        " order by key"
+    )
+    return [r["key"] for r in rows]
+
+
+async def risk_note_lines(
+    pool: asyncpg.Pool, notes: list[str], due: list[str] | None = None
+) -> list[str]:
+    """Forecast risk, flagged factor tilts, the hardest past episode and a risk line for each
+    thesis due for review. A part that cannot be computed is left out and noted; it never stops
+    the review."""
     from steward.portfolio.exante import ex_ante_risk
     from steward.portfolio.factors import factor_exposures
+    from steward.portfolio.position_pack import position_risk_pack
     from steward.portfolio.replay import stress_replay
+    from steward.portfolio.validation import model_validation
 
     lines: list[str] = []
     try:
         risk = await ex_ante_risk(pool)
-        if risk.volatility_forecast is not None:
-            limit = risk.limits.max_volatility
-            tail = "" if limit is None else f", against a limit of {limit:.0%}"
-            lines.append(
-                f"Forecast volatility from today's holdings: {risk.volatility_forecast:.1%}{tail}."
-            )
-            if risk.effective_bets is not None:
-                lines.append(f"About {risk.effective_bets:.1f} independent bets.")
-            lines += [w for w in risk.warnings if "understates" in w]
+        lines += risk_section_lines(risk, await model_validation(pool))
+        for ticker in (due or [])[:MAX_PACKS]:
+            pack = await position_risk_pack(pool, ticker)
+            if pack.available and pack.summary:
+                lines.append(f"Thesis review, {pack.summary}")
         factors = await factor_exposures(pool)
         lines += [t.note for t in factors.tilts if t.flagged and t.note]
         replay = await stress_replay(pool)
@@ -785,19 +852,24 @@ async def build_review(
         actions=[],
         holding_periods=holding_periods,
         decision_scorecard=scorecard_lines,
-        risk_notes=await risk_note_lines(pool, notes),
+        risk_notes=await risk_note_lines(pool, notes, due),
         sources=[],
     )
     usage: Usage | None = None
     if writer is None:
         notes.append("Actions not proposed: ANTHROPIC_API_KEY is not set.")
     else:
-        draft, usage, note = await writer.propose(review_material(body, strategy), today)
+        limit_keys = await open_risk_limit_keys(pool)
+        draft, usage, note = await writer.propose(
+            review_material(body, strategy, limit_keys), today
+        )
         if draft is None:
             notes.append(f"Actions not proposed: {note}.")
         else:
             body.actions, body.dropped_actions = keep_cited(
-                draft, {r.id for r in strategy.enabled_rules}, {k.ref for k in kpis}
+                draft,
+                {r.id for r in strategy.enabled_rules} | set(limit_keys),
+                {k.ref for k in kpis},
             )
             body.model = usage.model
     breaches = sum(1 for r in rows if r.status == "breach")
