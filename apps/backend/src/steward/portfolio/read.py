@@ -363,7 +363,7 @@ _EXTERNAL_FLOW_SUBTYPES = ("DEPOSIT", "WITHDRAW", "TRANSFER")
 async def _snapshot_series(pool: asyncpg.Pool, since: dt.date) -> list[asyncpg.Record]:
     rows: list[asyncpg.Record] = await pool.fetch(
         "select snapshot_date, total_base, account_currency, fx_rate, base_currency,"
-        " invested_base, cash_base, unrealized_ppl from public.account_snapshot"
+        " invested_base, cash_base, unrealized_ppl from public.account_history"
         " where snapshot_date >= $1 order by snapshot_date",
         since,
     )
@@ -544,7 +544,7 @@ async def contribution_to_return(pool: asyncpg.Pool, days: int) -> ContributionR
     since = latest_date - dt.timedelta(days=days)
     rows = await pool.fetch(
         "select p.snapshot_date, p.ticker, i.name, p.quantity, p.avg_price, p.fx_rate,"
-        " p.value_base from public.position_snapshot p"
+        " p.value_base from public.position_history p"
         " left join public.instrument i on i.t212_ticker = p.ticker"
         " where p.snapshot_date >= $1 order by p.ticker, p.snapshot_date",
         since,
@@ -557,7 +557,7 @@ async def contribution_to_return(pool: asyncpg.Pool, days: int) -> ContributionR
 
     period_start = min(r["snapshot_date"] for r in rows)
     start_total = await pool.fetchval(
-        "select total_base from public.account_snapshot where snapshot_date = $1", period_start
+        "select total_base from public.account_history where snapshot_date = $1", period_start
     )
 
     by_ticker: dict[str, list[PositionDailyValue]] = {}
