@@ -1,11 +1,12 @@
 """Golden cases for the news techniques that run in code (span verification, thread claim diffs,
-novelty) and for what the code keeps of the model techniques' output (extraction, sentiment).
+novelty) and for what the code keeps of the model techniques' output (extraction, framing,
+claim checks, sentiment).
 
     uv run python -m steward.news.eval_analysis
 
 They need no model or database, so they run in CI and gate any change to those functions. The
 model cases fix a model's answer and check the verification around it, not the model itself;
-impact notes, framing, claim checks, thesis links and briefs have no golden set yet.
+impact notes, thesis links and briefs have no golden set yet.
 """
 
 import datetime as dt
@@ -15,7 +16,11 @@ from pathlib import Path
 from typing import Any
 
 from steward.news.analysis import ItemText, StoryMaterial, verify_span
+from steward.news.claims import ClaimVerdicts
+from steward.news.claims import checked as claims_checked
 from steward.news.extract import StoryExtraction, verified
+from steward.news.framing import FramingComparison
+from steward.news.framing import verified as framing_verified
 from steward.news.novelty import classify_novelty
 from steward.news.sentiment import RawSentiment, bounded
 from steward.news.threads import claim_diff
@@ -90,7 +95,7 @@ def _story(items: list[dict[str, Any]]) -> StoryMaterial:
                 tier=2,
                 region=None,
                 state_media=False,
-                evidence_kind=None,
+                evidence_kind=i.get("evidence_kind"),
                 independence_key=None,
                 is_correction=False,
                 published_at=NOW,
@@ -125,6 +130,38 @@ def run_extraction(cases: list[dict[str, Any]]) -> list[str]:
     return failures
 
 
+def run_framing(cases: list[dict[str, Any]]) -> list[str]:
+    failures = []
+    for c in cases:
+        out = framing_verified(_story(c["items"]), FramingComparison.model_validate(c["raw"]))
+        want = c["expect"]
+        if want.get("none"):
+            got: dict[str, Any] = {"none": out is None}
+        elif out is None:
+            got = {"none": True}
+        else:
+            got = {
+                "outlets": len(out.outlets),
+                "agreement": out.agreement,
+                "quotes": [len(o.quotes) for o in out.outlets],
+                "numbers": [len(o.numbers_cited) for o in out.outlets],
+            }
+        wrong = {k: (got.get(k), v) for k, v in want.items() if got.get(k) != v}
+        if wrong:
+            failures.append(f"framing {c['id']}: (got, expected) {wrong}")
+    return failures
+
+
+def run_claims(cases: list[dict[str, Any]]) -> list[str]:
+    failures = []
+    for c in cases:
+        raw = ClaimVerdicts.model_validate({"verdicts": c["raw"]})
+        got = [x.verdict for x in claims_checked(_story(c["items"]), c["claims"], raw)]
+        if got != c["expect"]:
+            failures.append(f"claims {c['id']}: {got}, expected {c['expect']}")
+    return failures
+
+
 def run_sentiment(cases: list[dict[str, Any]]) -> list[str]:
     failures = []
     for c in cases:
@@ -148,10 +185,12 @@ def run_all(
         + run_diffs(data["diffs"])
         + run_novelty(data["novelty"])
         + run_extraction(model["extraction"])
+        + run_framing(model["framing"])
+        + run_claims(model["claims"])
         + run_sentiment(model["sentiment"])
     )
     total = sum(len(data[k]) for k in ("spans", "diffs", "novelty")) + sum(
-        len(model[k]) for k in ("extraction", "sentiment")
+        len(model[k]) for k in ("extraction", "framing", "claims", "sentiment")
     )
     return total, failures
 

@@ -30,6 +30,7 @@ SourceType = Literal[
     "cninfo",
     "dart",
     "gazette",
+    "fca_nsm",
     "filings",
 ]
 Paywall = Literal["open", "metered", "hard"]
@@ -60,6 +61,7 @@ PER_HOLDING_TYPES: frozenset[str] = frozenset(
         "cninfo",
         "dart",
         "gazette",
+        "fca_nsm",
         "filings",
     }
 )
@@ -72,6 +74,7 @@ PRIMARY_COUNTRY: dict[str, str] = {
     "cninfo": "CN",
     "dart": "KR",
     "gazette": "GB",
+    "fca_nsm": "GB",
 }
 # Types that relay other outlets' items: an item's tier is its outlet's, not the source's.
 AGGREGATOR_TYPES: frozenset[str] = frozenset(
@@ -549,13 +552,14 @@ def _default_sources() -> list[NewsSource]:
         ),
         # Official disclosure sources by market. TDnet, HKEXnews and CNINFO need no key; DART
         # needs DART_API_KEY. `filings` reads the EDINET and Companies House filings the
-        # disclosure jobs already store. All are off until the owner enables them.
+        # disclosure jobs already store. All but DART are on by default (a saved config gets any
+        # that it lacks, see `with_default_sources`); DART stays off until a key is set.
         NewsSource(
             id="tdnet",
             name="TDnet (Tokyo)",
             tier=1,
             type="tdnet",
-            enabled=False,
+            enabled=True,
             region="JP",
             language="ja",
         ),
@@ -564,7 +568,7 @@ def _default_sources() -> list[NewsSource]:
             name="HKEXnews",
             tier=1,
             type="hkex",
-            enabled=False,
+            enabled=True,
             region="HK",
             language="en",
         ),
@@ -573,7 +577,7 @@ def _default_sources() -> list[NewsSource]:
             name="CNINFO (Shanghai, Shenzhen)",
             tier=1,
             type="cninfo",
-            enabled=False,
+            enabled=True,
             region="CN",
             language="zh",
         ),
@@ -591,7 +595,16 @@ def _default_sources() -> list[NewsSource]:
             name="The Gazette (UK)",
             tier=1,
             type="gazette",
-            enabled=False,
+            enabled=True,
+            region="GB",
+            language="en",
+        ),
+        NewsSource(
+            id="fca-nsm",
+            name="FCA National Storage Mechanism (UK)",
+            tier=1,
+            type="fca_nsm",
+            enabled=True,
             region="GB",
             language="en",
         ),
@@ -600,7 +613,7 @@ def _default_sources() -> list[NewsSource]:
             name="EDINET and Companies House filings",
             tier=1,
             type="filings",
-            enabled=False,
+            enabled=True,
         ),
     ]
 
@@ -612,6 +625,7 @@ def _default_domain_tiers() -> list[DomainTier]:
             "federalreserve.gov", "ecb.europa.eu", "cnb.cz", "boj.or.jp",
             "bankofengland.co.uk", "bankofcanada.ca", "bundesbank.de", "release.tdnet.info",
             "hkexnews.hk", "cninfo.com.cn", "dart.fss.or.kr", "thegazette.co.uk",
+            "data.fca.org.uk",
         ],
         2: [
             "reuters.com", "apnews.com", "cnbc.com", "marketwatch.com", "ft.com",
@@ -839,3 +853,20 @@ class NewsSourcesConfig(ConfigModel):
             return False
         host = host.lower().removeprefix("www.")
         return any(host == d or host.endswith(f".{d}") for d in self.blocked_domains)
+
+
+def with_default_sources(config: NewsSourcesConfig) -> NewsSourcesConfig:
+    """The config with the default official-disclosure source of any type the saved list has
+    none of. A config saved before a source type existed (TDnet, the FCA NSM...) would never
+    run it, and the owner would have to add it by hand; the stored version is not changed."""
+    have = {s.type for s in config.sources} | {s.id for s in config.sources}
+    missing = [
+        s
+        for s in _default_sources()
+        if (s.type in PRIMARY_COUNTRY or s.type == "filings")
+        and s.type not in have
+        and s.id not in have
+    ]
+    if not missing:
+        return config
+    return config.model_copy(update={"sources": [*config.sources, *missing]})

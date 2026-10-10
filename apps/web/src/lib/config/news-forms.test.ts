@@ -136,13 +136,13 @@ describe("news sources form", () => {
   });
 
   it("covers the official disclosure sources of each market, per holding with no URL", () => {
-    expect(PER_HOLDING).toEqual(expect.arrayContaining(["tdnet", "hkex", "cninfo", "dart", "gazette", "filings"]));
+    expect(PER_HOLDING).toEqual(expect.arrayContaining(["tdnet", "hkex", "cninfo", "dart", "gazette", "fca_nsm", "filings"]));
     const form = sourcesFromBody(null, DEFAULT_SOURCES);
     const tdnet = form.sources.find((s) => s.type === "tdnet")!;
     tdnet.url = "https://example.com";
     expect(sourcesToBody(form).sources!.find((s) => s.type === "tdnet")!.url).toBeNull();
     const services = DEFAULT_ANNOUNCEMENT_RULES.map((r) => r.service);
-    for (const s of ["tdnet", "hkex", "cninfo", "dart", "gazette", "filings"]) expect(services).toContain(s);
+    for (const s of ["tdnet", "hkex", "cninfo", "dart", "gazette", "fca_nsm", "filings"]) expect(services).toContain(s);
     expect(services.at(-1)).toBe("any");
   });
 

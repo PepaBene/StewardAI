@@ -6482,6 +6482,57 @@
         }
       }
     },
+    "/news/ops/incidents/{story_id}": {
+      "put": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Put Incident Status",
+        "description": "Acknowledge or resolve an incident from the ops report. A resolved incident leaves the\nreport; an acknowledged one stays, marked as seen.",
+        "operationId": "put_incident_status",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "story_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Story Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/news/marks/candidates": {
       "get": {
         "tags": [
@@ -27074,6 +27125,67 @@
         "title": "AiApprovalSettings",
         "description": "AI approval of suggested listings and peers. Nothing waits for a click; every decision\nis recorded with its reasons and the owner can overturn it (an owner decision is final)."
       },
+      "AiSearchCost": {
+        "properties": {
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "searches": {
+            "type": "integer",
+            "title": "Searches"
+          },
+          "cost_usd": {
+            "type": "number",
+            "title": "Cost Usd"
+          },
+          "leads": {
+            "type": "integer",
+            "title": "Leads",
+            "description": "Verified leads the model returned."
+          },
+          "new_items": {
+            "type": "integer",
+            "title": "New Items",
+            "description": "Leads stored as new wire items (the rest were known)."
+          },
+          "cost_per_search": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per Search"
+          },
+          "cost_per_new_item": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per New Item",
+            "description": "Null while the lane has stored no new item."
+          }
+        },
+        "type": "object",
+        "required": [
+          "runs",
+          "searches",
+          "cost_usd",
+          "leads",
+          "new_items",
+          "cost_per_search",
+          "cost_per_new_item"
+        ],
+        "title": "AiSearchCost",
+        "description": "What the AI search lane spent against what it brought in, from the job steps."
+      },
       "AlertDigestGroupOut": {
         "properties": {
           "ticker": {
@@ -29650,6 +29762,7 @@
               "cninfo",
               "dart",
               "gazette",
+              "fca_nsm",
               "filings",
               "any"
             ],
@@ -58412,6 +58525,27 @@
           "reason": {
             "type": "string",
             "title": "Reason"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "acknowledged",
+              "resolved"
+            ],
+            "title": "Status",
+            "default": "open"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
           }
         },
         "type": "object",
@@ -58426,6 +58560,45 @@
         ],
         "title": "Incident",
         "description": "A story the owner may need to look at: a severe one nobody was alerted to, or an alert\nthe owner marked as not useful."
+      },
+      "IncidentUpdate": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "unalerted_severe",
+              "alert_not_useful"
+            ],
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "acknowledged",
+              "resolved"
+            ],
+            "title": "Status"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "status"
+        ],
+        "title": "IncidentUpdate"
       },
       "IndexComparison": {
         "properties": {
@@ -69371,6 +69544,7 @@
               "cninfo",
               "dart",
               "gazette",
+              "fca_nsm",
               "filings"
             ],
             "title": "Type",
@@ -70565,6 +70739,9 @@
             },
             "type": "array",
             "title": "Incidents"
+          },
+          "ai_search": {
+            "$ref": "#/components/schemas/AiSearchCost"
           }
         },
         "type": "object",
@@ -70577,7 +70754,8 @@
           "useful_events",
           "cost_per_useful_event",
           "marks",
-          "incidents"
+          "incidents",
+          "ai_search"
         ],
         "title": "OpsReport"
       },
@@ -88401,6 +88579,7 @@
               "cninfo",
               "dart",
               "gazette",
+              "fca_nsm",
               "filings"
             ],
             "title": "Type"

@@ -49,7 +49,7 @@ PRIMARY_KINDS: frozenset[str] = frozenset(
 
 # Source types that read an exchange's or regulator's own filing list.
 _FILING_TYPES = frozenset(
-    {"edgar", "edgar_fts", "rns", "eqs", "tdnet", "hkex", "cninfo", "dart", "filings"}
+    {"edgar", "edgar_fts", "rns", "eqs", "tdnet", "hkex", "cninfo", "dart", "fca_nsm", "filings"}
 )
 
 
@@ -71,7 +71,7 @@ def evidence_kind(
     if source.type in _FILING_TYPES:
         return (
             "regulator"
-            if source.type in ("rns", "eqs", "dart", "tdnet", "hkex", "cninfo")
+            if source.type in ("rns", "eqs", "dart", "tdnet", "hkex", "cninfo", "fca_nsm")
             else ("primary_filing")
         )
     if source.macro and tier == 1:

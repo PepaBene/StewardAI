@@ -38,6 +38,7 @@ from steward.config.news_sources import (
     GoogleNewsLocale,
     NewsSource,
     NewsSourcesConfig,
+    with_default_sources,
 )
 from steward.config.notifications import NotificationsConfig
 from steward.config.prompts import load_prompts
@@ -112,6 +113,7 @@ from steward.news.normalize import canonical_url, host_of
 from steward.news.primary_sources import (
     collect_cninfo,
     collect_dart,
+    collect_fca_nsm,
     collect_gazette,
     collect_hkex,
     collect_stored_filings,
@@ -190,7 +192,7 @@ async def load_news_config(ctx: JobContext) -> NewsConfig:
         await ctx.record_config_version(s.id if s else None)
     verification_body = verification.body if verification else VerificationConfig()
     return NewsConfig(
-        sources=sources.body if sources else NewsSourcesConfig(),
+        sources=with_default_sources(sources.body if sources else NewsSourcesConfig()),
         event_rules=with_default_services(rules.body) if rules else EventRulesConfig(),
         notifications=notifications.body if notifications else NotificationsConfig(),
         notifications_version_id=notifications.id if notifications else None,
@@ -651,6 +653,8 @@ async def collect_source(
             primary = await collect_cninfo(deps.http, source.id, feeds, rules, today)
         elif source.type == "gazette":
             primary = await collect_gazette(deps.http, source.id, feeds, rules, today)
+        elif source.type == "fca_nsm":
+            primary = await collect_fca_nsm(deps.http, source.id, feeds, rules, deps.now())
         elif source.type == "dart":
             if not deps.dart_key:
                 return [], ["DART_API_KEY is not set"]

@@ -64,6 +64,87 @@
       "expect": {"claims": 1}
     }
   ],
+  "framing": [
+    {
+      "id": "fr-kept",
+      "items": [{"id": 1, "headline": "Omega recalls cars", "body": "Omega recalled 40,000 cars over a brake fault, the company said."},
+                {"id": 2, "headline": "Omega brake recall", "body": "Omega said it will recall 40,000 vehicles because of faulty brakes."}],
+      "raw": {"agreement": "agree", "outlets": [
+        {"item_id": 1, "headline_claim": "Omega recalls 40,000 cars", "numbers_cited": ["40,000"], "quotes": ["recalled 40,000 cars over a brake fault"]},
+        {"item_id": 2, "headline_claim": "Omega recalls 40,000 vehicles", "numbers_cited": ["40,000"], "quotes": ["will recall 40,000 vehicles"]}]},
+      "expect": {"outlets": 2, "agreement": "agree", "quotes": [1, 1]}
+    },
+    {
+      "id": "fr-invented-quote-and-number-dropped",
+      "items": [{"id": 1, "headline": "Pi cuts jobs", "body": "Pi will cut 300 jobs in Ohio."},
+                {"id": 2, "headline": "Pi layoffs", "body": "Pi confirmed layoffs at its Ohio plant."}],
+      "raw": {"agreement": "agree", "outlets": [
+        {"item_id": 1, "headline_claim": "Pi cuts 300 jobs", "numbers_cited": ["300", "5,000"], "quotes": ["Pi will cut 300 jobs", "the CEO called it painful"]},
+        {"item_id": 2, "headline_claim": "Pi confirms layoffs"}]},
+      "expect": {"outlets": 2, "quotes": [1, 0], "numbers": [1, 0]}
+    },
+    {
+      "id": "fr-one-outlet-is-not-a-comparison",
+      "items": [{"id": 1, "headline": "Rho sells unit", "body": "Rho agreed to sell its unit."},
+                {"id": 2, "headline": "Rho news", "body": "Rho agreed to sell."}],
+      "raw": {"agreement": "agree", "outlets": [
+        {"item_id": 1, "headline_claim": "Rho sells unit"},
+        {"item_id": 99, "headline_claim": "Rho sells unit again"}]},
+      "expect": {"none": true}
+    },
+    {
+      "id": "fr-conflict-without-a-named-conflict-becomes-agree",
+      "items": [{"id": 1, "headline": "Sigma profit", "body": "Sigma profit rose."},
+                {"id": 2, "headline": "Sigma earnings", "body": "Sigma earnings rose."}],
+      "raw": {"agreement": "conflict", "outlets": [
+        {"item_id": 1, "headline_claim": "Profit rose"}, {"item_id": 2, "headline_claim": "Earnings rose"}]},
+      "expect": {"outlets": 2, "agreement": "agree"}
+    }
+  ],
+  "claims": [
+    {
+      "id": "cl-supported-with-quote",
+      "items": [{"id": 1, "headline": "Tau annual report", "body": "Tau reported revenue of 8.1 billion euros for the year.", "evidence_kind": "primary_filing"}],
+      "claims": ["Tau revenue was 8.1 billion euros"],
+      "raw": [{"claim_index": 0, "verdict": "supported", "primary_item_id": 1, "quote": "Tau reported revenue of 8.1 billion euros for the year"}],
+      "expect": ["supported"]
+    },
+    {
+      "id": "cl-quote-not-in-document",
+      "items": [{"id": 1, "headline": "Tau annual report", "body": "Tau reported revenue of 8.1 billion euros for the year.", "evidence_kind": "primary_filing"}],
+      "claims": ["Tau revenue was 8.1 billion euros"],
+      "raw": [{"claim_index": 0, "verdict": "supported", "primary_item_id": 1, "quote": "Tau revenue was exactly 8.1 billion euros"}],
+      "expect": ["unverified"]
+    },
+    {
+      "id": "cl-claim-number-not-in-document",
+      "items": [{"id": 1, "headline": "Upsilon filing", "body": "Upsilon reported revenue of 4 billion dollars.", "evidence_kind": "regulator"}],
+      "claims": ["Upsilon revenue was 5 billion dollars"],
+      "raw": [{"claim_index": 0, "verdict": "supported", "primary_item_id": 1, "quote": "Upsilon reported revenue of 4 billion dollars"}],
+      "expect": ["unverified"]
+    },
+    {
+      "id": "cl-a-media-item-is-not-a-primary-document",
+      "items": [{"id": 1, "headline": "Phi blog", "body": "Phi reported profit of 2 billion dollars.", "evidence_kind": "media"}],
+      "claims": ["Phi profit was 2 billion dollars"],
+      "raw": [{"claim_index": 0, "verdict": "supported", "primary_item_id": 1, "quote": "Phi reported profit of 2 billion dollars"}],
+      "expect": ["unverified"]
+    },
+    {
+      "id": "cl-contradicted-keeps-quote",
+      "items": [{"id": 1, "headline": "Chi notice", "body": "Chi did not agree to any takeover offer, the notice states.", "evidence_kind": "company_release"}],
+      "claims": ["Chi accepted the takeover offer"],
+      "raw": [{"claim_index": 0, "verdict": "contradicted", "primary_item_id": 1, "quote": "Chi did not agree to any takeover offer"}],
+      "expect": ["contradicted"]
+    },
+    {
+      "id": "cl-missing-verdict-is-unverified",
+      "items": [{"id": 1, "headline": "Psi notice", "body": "Psi paid a dividend.", "evidence_kind": "company_release"}],
+      "claims": ["Psi paid a dividend", "Psi raised its dividend"],
+      "raw": [],
+      "expect": ["unverified", "unverified"]
+    }
+  ],
   "sentiment": [
     {
       "id": "se-kept",

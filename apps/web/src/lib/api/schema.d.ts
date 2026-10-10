@@ -2126,6 +2126,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/news/ops/incidents/{story_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Incident Status
+         * @description Acknowledge or resolve an incident from the ops report. A resolved incident leaves the
+         *     report; an acknowledged one stays, marked as seen.
+         */
+        put: operations["put_incident_status"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/news/marks/candidates": {
         parameters: {
             query?: never;
@@ -8549,6 +8570,35 @@ export interface components {
              */
             batch_wait_minutes: number;
         };
+        /**
+         * AiSearchCost
+         * @description What the AI search lane spent against what it brought in, from the job steps.
+         */
+        AiSearchCost: {
+            /** Runs */
+            runs: number;
+            /** Searches */
+            searches: number;
+            /** Cost Usd */
+            cost_usd: number;
+            /**
+             * Leads
+             * @description Verified leads the model returned.
+             */
+            leads: number;
+            /**
+             * New Items
+             * @description Leads stored as new wire items (the rest were known).
+             */
+            new_items: number;
+            /** Cost Per Search */
+            cost_per_search: number | null;
+            /**
+             * Cost Per New Item
+             * @description Null while the lane has stored no new item.
+             */
+            cost_per_new_item: number | null;
+        };
         /** AlertDigestGroupOut */
         AlertDigestGroupOut: {
             /** Ticker */
@@ -9376,7 +9426,7 @@ export interface components {
              * @default any
              * @enum {string}
              */
-            service: "rns" | "eqs" | "tdnet" | "hkex" | "cninfo" | "dart" | "gazette" | "filings" | "any";
+            service: "rns" | "eqs" | "tdnet" | "hkex" | "cninfo" | "dart" | "gazette" | "fca_nsm" | "filings" | "any";
             /**
              * Pattern
              * @description Case-insensitive regular expression matched against the announcement type (RNS: the headline, e.g. 'Final Results'; EQS: the category, e.g. 'Ad-hoc'; TDnet, CNINFO, DART and HKEX: the title in the filing's own language).
@@ -19332,6 +19382,29 @@ export interface components {
             first_seen: string;
             /** Reason */
             reason: string;
+            /**
+             * Status
+             * @default open
+             * @enum {string}
+             */
+            status: "open" | "acknowledged" | "resolved";
+            /** Note */
+            note?: string | null;
+        };
+        /** IncidentUpdate */
+        IncidentUpdate: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "unalerted_severe" | "alert_not_useful";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "acknowledged" | "resolved";
+            /** Note */
+            note?: string | null;
         };
         /** IndexComparison */
         IndexComparison: {
@@ -23258,7 +23331,7 @@ export interface components {
              * @description rss: an RSS or Atom feed. page: a news page read daily; new links on it become items. edgar: every holding's SEC filings. finnhub: US company news. google_news: a Google News query per holding (unofficial endpoint). rns: UK regulatory announcements per holding (Investegate company page). eqs: German regulatory announcements (EQS News company page from the holding profile's regulatory_news_urls). edgar_fts: SEC full-text search for each holding's watch topics and for other filers naming it.
              * @enum {string}
              */
-            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts" | "alpha_vantage" | "news_sitemap" | "gdelt" | "ai_search" | "tdnet" | "hkex" | "cninfo" | "dart" | "gazette" | "filings";
+            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts" | "alpha_vantage" | "news_sitemap" | "gdelt" | "ai_search" | "tdnet" | "hkex" | "cninfo" | "dart" | "gazette" | "fca_nsm" | "filings";
             /**
              * Url
              * @description Feed or page URL (rss, page).
@@ -23737,6 +23810,7 @@ export interface components {
             };
             /** Incidents */
             incidents: components["schemas"]["Incident"][];
+            ai_search: components["schemas"]["AiSearchCost"];
         };
         /** OutletFraming */
         OutletFraming: {
@@ -29950,7 +30024,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts" | "alpha_vantage" | "news_sitemap" | "gdelt" | "ai_search" | "tdnet" | "hkex" | "cninfo" | "dart" | "gazette" | "filings";
+            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts" | "alpha_vantage" | "news_sitemap" | "gdelt" | "ai_search" | "tdnet" | "hkex" | "cninfo" | "dart" | "gazette" | "fca_nsm" | "filings";
             /**
              * Host
              * @description The feed's host; null for per-holding sources (EDGAR, Finnhub, ...).
@@ -37222,6 +37296,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["OpsReport"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_incident_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                story_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncidentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

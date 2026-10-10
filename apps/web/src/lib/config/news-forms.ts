@@ -197,10 +197,11 @@ export const SOURCE_TYPES: readonly { value: SourceType; label: string }[] = [
   { value: "cninfo", label: "CNINFO, Shanghai and Shenzhen disclosures (per holding)" },
   { value: "dart", label: "DART, Korean disclosures (per holding, needs DART_API_KEY)" },
   { value: "gazette", label: "The Gazette, UK notices (per holding)" },
+  { value: "fca_nsm", label: "FCA National Storage Mechanism, UK announcements (per holding)" },
   { value: "filings", label: "EDINET and Companies House filings already stored (per holding)" },
 ];
 /** Types whose URL is built per holding (apps/backend/src/steward/config/news_sources.py). */
-export const PER_HOLDING: readonly SourceType[] = ["edgar", "finnhub", "google_news", "rns", "eqs", "edgar_fts", "alpha_vantage", "gdelt", "ai_search", "tdnet", "hkex", "cninfo", "dart", "gazette", "filings"];
+export const PER_HOLDING: readonly SourceType[] = ["edgar", "finnhub", "google_news", "rns", "eqs", "edgar_fts", "alpha_vantage", "gdelt", "ai_search", "tdnet", "hkex", "cninfo", "dart", "gazette", "fca_nsm", "filings"];
 
 /** Where a per-holding source finds each holding, shown instead of a URL field. */
 export const PER_HOLDING_NOTES: Partial<Record<SourceType, string>> = {
@@ -215,6 +216,7 @@ export const PER_HOLDING_NOTES: Partial<Record<SourceType, string>> = {
   cninfo: "Shanghai and Shenzhen announcements, matched to holdings listed in China by their six-digit code.",
   dart: "Korean company disclosures, matched to holdings listed in Korea by stock code. Needs DART_API_KEY.",
   gazette: "The Gazette's notices (insolvency, winding-up) naming a holding listed in the UK.",
+  fca_nsm: "The FCA National Storage Mechanism: regulated announcements of holdings listed in the UK, matched by company name.",
   filings: "EDINET and Companies House filings the disclosure jobs already stored for your holdings; no second fetch.",
 };
 
@@ -267,12 +269,13 @@ export const DEFAULT_SOURCES: NewsSourcesConfig = {
     { id: "boe-news", name: "Bank of England news", tier: 1, type: "rss", url: "https://www.bankofengland.co.uk/rss/news", enabled: true, tickers: [], macro: true },
     { id: "bundesbank-press", name: "Deutsche Bundesbank", tier: 1, type: "rss", url: "https://www.bundesbank.de/service/rss/en/633306/feed.rss", enabled: true, tickers: [], macro: true },
     { id: "boc-press", name: "Bank of Canada press releases", tier: 1, type: "rss", url: "https://www.bankofcanada.ca/content_type/press-releases/feed/", enabled: true, tickers: [], macro: true },
-    { id: "tdnet", name: "TDnet (Tokyo)", tier: 1, type: "tdnet", url: null, enabled: false, tickers: [], macro: false },
-    { id: "hkexnews", name: "HKEXnews", tier: 1, type: "hkex", url: null, enabled: false, tickers: [], macro: false },
-    { id: "cninfo", name: "CNINFO (Shanghai, Shenzhen)", tier: 1, type: "cninfo", url: null, enabled: false, tickers: [], macro: false },
+    { id: "tdnet", name: "TDnet (Tokyo)", tier: 1, type: "tdnet", url: null, enabled: true, tickers: [], macro: false },
+    { id: "hkexnews", name: "HKEXnews", tier: 1, type: "hkex", url: null, enabled: true, tickers: [], macro: false },
+    { id: "cninfo", name: "CNINFO (Shanghai, Shenzhen)", tier: 1, type: "cninfo", url: null, enabled: true, tickers: [], macro: false },
     { id: "dart", name: "DART (Korea)", tier: 1, type: "dart", url: null, enabled: false, tickers: [], macro: false },
-    { id: "gazette", name: "The Gazette (UK)", tier: 1, type: "gazette", url: null, enabled: false, tickers: [], macro: false },
-    { id: "filings-edinet-ch", name: "EDINET and Companies House filings", tier: 1, type: "filings", url: null, enabled: false, tickers: [], macro: false },
+    { id: "gazette", name: "The Gazette (UK)", tier: 1, type: "gazette", url: null, enabled: true, tickers: [], macro: false },
+    { id: "fca-nsm", name: "FCA National Storage Mechanism (UK)", tier: 1, type: "fca_nsm", url: null, enabled: true, tickers: [], macro: false },
+    { id: "filings-edinet-ch", name: "EDINET and Companies House filings", tier: 1, type: "filings", url: null, enabled: true, tickers: [], macro: false },
   ] as const).map((s) => ({ ...s, tickers: [], ...SOURCE_FLAGS })),
   portfolio_topics: [
     { id: "rates", label: "Interest rates", kind: "rates", keywords: ["interest rate", "rate cut", "rate hike", "central bank", "yield curve", "inflation"], enabled: true },
@@ -414,7 +417,7 @@ export const DEFAULT_SEVERITIES: Record<EventType, number> = {
 
 export type OverrideForm = { key: string; ticker: string; event_type: EventType; severity: number };
 
-export type AnnouncementService = "rns" | "eqs" | "tdnet" | "hkex" | "cninfo" | "dart" | "gazette" | "filings" | "any";
+export type AnnouncementService = "rns" | "eqs" | "tdnet" | "hkex" | "cninfo" | "dart" | "gazette" | "fca_nsm" | "filings" | "any";
 export type AnnouncementTarget = EventType | "classify";
 export const ANNOUNCEMENT_SERVICES: readonly { value: AnnouncementService; label: string }[] = [
   { value: "any", label: "Any service" },
@@ -425,6 +428,7 @@ export const ANNOUNCEMENT_SERVICES: readonly { value: AnnouncementService; label
   { value: "cninfo", label: "CNINFO (China)" },
   { value: "dart", label: "DART (Korea)" },
   { value: "gazette", label: "The Gazette (UK)" },
+  { value: "fca_nsm", label: "FCA NSM (UK)" },
   { value: "filings", label: "EDINET / Companies House filings" },
 ];
 export type AnnouncementRuleForm = {
@@ -500,6 +504,11 @@ export const DEFAULT_ANNOUNCEMENT_RULES: readonly Omit<AnnouncementRuleForm, "ke
   { service: "dart", pattern: String.raw`자기주식|배당|유상증자|무상증자|전환사채|신주인수권`, event_type: "capital_allocation" },
   { service: "dart", pattern: String.raw`대표이사|임원.{0,3}변경|최대주주변경`, event_type: "management_change" },
   { service: "gazette", pattern: String.raw`winding.?up|liquidat|administrat|receiver|insolven|strike.?off|dissol`, event_type: "entity_status" },
+  { service: "fca_nsm", pattern: String.raw`director/pdmr|pdmr shareholding|directors?.? dealings?|holding\(s\) in company|major shareholding`, event_type: "insider_transaction" },
+  { service: "fca_nsm", pattern: String.raw`results|financial report|trading (update|statement)|interim|annual report`, event_type: "earnings_release" },
+  { service: "fca_nsm", pattern: String.raw`acquisition|disposal|merger|takeover|offer for|rule 2\.7|scheme of arr`, event_type: "m_and_a" },
+  { service: "fca_nsm", pattern: String.raw`buy ?back|dividend|share repurchase|issue of (equity|shares)|total voting`, event_type: "capital_allocation" },
+  { service: "fca_nsm", pattern: String.raw`director.{0,20}(appointment|resignation|change)|board change|change of (chair|ceo|cfo)`, event_type: "management_change" },
   { service: "filings", pattern: String.raw`臨時報告書`, event_type: "classify" },
   { service: "filings", pattern: String.raw`有価証券報告書|四半期報告書|半期報告書|決算`, event_type: "earnings_release" },
   { service: "filings", pattern: String.raw`大量保有報告書|変更報告書`, event_type: "insider_transaction" },

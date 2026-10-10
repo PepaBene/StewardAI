@@ -13,6 +13,8 @@ list, read per holding by exchange stock code.
 - gazette (GB): The Gazette's Atom notice feed, one query per holding by company name, kept only
   when the notice text contains the whole normalised name. NOT checked live (the site was in
   scheduled maintenance when this was written); the Atom parsing is generic.
+- fca_nsm (GB): the FCA National Storage Mechanism's search API (no key, an Origin header),
+  the market-wide window filtered to the holdings' whole company names. Checked live 10 Oct 2026.
 - filings: the EDINET and Companies House filings the disclosure jobs already stored in
   `holding_filing_event`, turned into items (no second fetch, so their request budgets hold).
 
@@ -497,6 +499,110 @@ async def collect_gazette(
                     region="GB",
                 )
             )
+    return result
+
+
+# ---------------------------------------------------------------------------
+# FCA National Storage Mechanism (UK)
+# ---------------------------------------------------------------------------
+
+NSM_SEARCH = "https://api.data.fca.org.uk/search?index=nsm-search"
+NSM_FILES = "https://data.fca.org.uk/artefacts/"
+NSM_PAGE = 500
+NSM_MAX_PAGES = 12
+
+
+def parse_nsm(body: Any) -> tuple[list[Disclosure], int]:
+    """Disclosures and the total hit count. The NSM's search API is the one the NSM web page
+    calls; it has no key but wants an Origin header."""
+    hits = ((body or {}).get("hits") or {}) if isinstance(body, dict) else None
+    if hits is None:
+        raise ValueError("the NSM sent no JSON object")
+    out = []
+    for hit in hits.get("hits") or []:
+        row = hit.get("_source") or {}
+        link, headline = row.get("download_link"), row.get("headline")
+        company = str(row.get("company") or "").strip(" ;")
+        if not link or not headline or not company:
+            continue
+        try:
+            published: dt.datetime | None = dt.datetime.fromisoformat(
+                str(row.get("publication_date")).replace("Z", "+00:00")
+            ).astimezone(dt.UTC)
+        except ValueError:
+            published = None
+        out.append(
+            Disclosure(
+                url=NSM_FILES + str(link).lstrip("/"),
+                company=company,
+                title=_text(str(headline)),
+                kind=" / ".join(str(x) for x in (row.get("type"), row.get("category_group")) if x),
+                published_at=published,
+            )
+        )
+    total = (hits.get("total") or {}).get("value")
+    return out, int(total) if isinstance(total, int) else len(out)
+
+
+async def collect_fca_nsm(
+    http: httpx.AsyncClient,
+    source_id: str,
+    holdings: Sequence[HoldingFeedInfo],
+    rules: EventRulesConfig,
+    now: dt.datetime,
+    days: int = 2,
+) -> CollectResult:
+    """The NSM's disclosures of the last `days` days (about 1,100 a day), read newest first and
+    kept when the issuer's name is a UK holding's whole name. The API has no working company
+    filter (a LEI criterion is rejected), so the match is on the name."""
+    result = CollectResult()
+    wanted: dict[str, HoldingFeedInfo] = {}
+    for holding in holdings:
+        if holding.home_country == "GB":
+            for name in holding.names:
+                if len(name_key(name)) >= 4:
+                    wanted.setdefault(name_key(name), holding)
+    if not wanted:
+        return result
+    rows: list[Disclosure] = []
+    total, page = 0, 0
+    headers = {
+        **default_headers(), "Origin": "https://data.fca.org.uk",
+        "Content-Type": "application/json",
+    }  # fmt: skip
+    try:
+        while page < NSM_MAX_PAGES and (page == 0 or page * NSM_PAGE < total):
+            response = await http.post(
+                NSM_SEARCH,
+                headers=headers,
+                json={
+                    "from": page * NSM_PAGE, "size": NSM_PAGE, "sort": "publication_date",
+                    "sortorder": "desc",
+                    "criteriaObj": {
+                        "criteria": [],
+                        "dateCriteria": [{"name": "publication_date", "value": {
+                            "from": (now - dt.timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                            "to": (now + dt.timedelta(days=1)).strftime("%Y-%m-%dT00:00:00Z"),
+                        }}],
+                    },
+                },
+            )  # fmt: skip
+            response.raise_for_status()
+            batch, total = parse_nsm(response.json())
+            rows.extend(batch)
+            page += 1
+    except (httpx.HTTPError, ValueError) as exc:
+        result.errors.append(f"FCA NSM: {type(exc).__name__}")
+    if page >= NSM_MAX_PAGES and page * NSM_PAGE < total:
+        result.errors.append(f"FCA NSM: read {page * NSM_PAGE} of {total} disclosures")
+    for holding in {h.ticker: h for h in wanted.values()}.values():
+        mine = [d for d in rows if wanted.get(name_key(d.company)) is holding]
+        result.items.extend(
+            disclosure_items(
+                mine, holding, source_id, "fca_nsm", rules, "data.fca.org.uk",
+                "FCA National Storage Mechanism", "en", "GB",
+            )
+        )  # fmt: skip
     return result
 
 

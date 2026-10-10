@@ -111,7 +111,7 @@ class AnnouncementRule(ConfigModel):
     event type. First match wins; `classify` leaves the item to the classifier."""
 
     service: Literal[
-        "rns", "eqs", "tdnet", "hkex", "cninfo", "dart", "gazette", "filings", "any"
+        "rns", "eqs", "tdnet", "hkex", "cninfo", "dart", "gazette", "fca_nsm", "filings", "any"
     ] = "any"
     pattern: str = Field(
         min_length=1,
@@ -193,6 +193,17 @@ def _default_announcement_rules() -> list[AnnouncementRule]:
         # The Gazette (UK): insolvency and corporate-status notices.
         ("gazette", r"winding.?up|liquidat|administrat|receiver|insolven|strike.?off|"
          r"dissol", "entity_status"),
+        # FCA National Storage Mechanism (UK): the title plus the NSM's own type and category.
+        ("fca_nsm", r"director/pdmr|pdmr shareholding|directors?.? dealings?|"
+         r"holding\(s\) in company|major shareholding", "insider_transaction"),
+        ("fca_nsm", r"results|financial report|trading (update|statement)|interim|annual report",
+         "earnings_release"),
+        ("fca_nsm", r"acquisition|disposal|merger|takeover|offer for|rule 2\.7|scheme of arr",
+         "m_and_a"),
+        ("fca_nsm", r"buy ?back|dividend|share repurchase|issue of (equity|shares)|total voting",
+         "capital_allocation"),
+        ("fca_nsm", r"director.{0,20}(appointment|resignation|change)|board change|"
+         r"change of (chair|ceo|cfo)", "management_change"),
         # EDINET and Companies House filings stored by the disclosure jobs.
         ("filings", r"臨時報告書", "classify"),
         ("filings", r"有価証券報告書|四半期報告書|半期報告書|決算", "earnings_release"),

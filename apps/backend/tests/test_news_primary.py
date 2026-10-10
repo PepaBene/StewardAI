@@ -11,12 +11,13 @@ import httpx
 import pytest
 
 from steward.config.event_rules import EventRulesConfig
-from steward.config.news_sources import PRIMARY_COUNTRY, NewsSourcesConfig
+from steward.config.news_sources import PRIMARY_COUNTRY, NewsSourcesConfig, with_default_sources
 from steward.news.feeds import HoldingFeedInfo
 from steward.news.primary_sources import (
     code_key,
     collect_cninfo,
     collect_dart,
+    collect_fca_nsm,
     collect_gazette,
     collect_hkex,
     collect_tdnet,
@@ -183,10 +184,11 @@ def test_default_rules_map_each_market_in_its_own_language() -> None:
     assert event("tdnet", "お知らせ") is None
 
 
-def test_every_primary_source_type_has_a_seeded_off_by_default_source() -> None:
+def test_every_primary_source_type_has_a_seeded_source_and_only_the_keyed_one_is_off() -> None:
     seeded = {s.type: s for s in NewsSourcesConfig().sources}
     for kind in (*PRIMARY_COUNTRY, "filings"):
-        assert kind in seeded and seeded[kind].enabled is False and seeded[kind].tier == 1
+        assert kind in seeded and seeded[kind].tier == 1
+        assert seeded[kind].enabled is (kind != "dart")  # DART needs DART_API_KEY
     macro = {s.id for s in NewsSourcesConfig().sources if s.macro}
     assert {"boj-whatsnew", "boe-news", "bundesbank-press", "boc-press"} <= macro
 
@@ -283,6 +285,74 @@ async def test_dart_filters_to_held_stock_codes() -> None:
             http, "k", "dart", [holding("005930_KR_EQ", "KR", "005930")], RULES, TODAY
         )
     assert [i.event_type for i in result.items] == ["earnings_release"]
+
+
+def _nsm_hit(company: str, headline: str, kind: str = "Results") -> dict[str, object]:
+    return {
+        "_source": {
+            "company": company, "headline": headline, "type": kind,
+            "category_group": "Financial reporting", "publication_date": "2026-10-09T07:00:00Z",
+            "download_link": "NSM/RNS/abc.html",
+        }
+    }  # fmt: skip
+
+
+NSM_BODY = {
+    "hits": {
+        "total": {"value": 3},
+        "hits": [
+            _nsm_hit("ASTRAZENECA PLC;", "Half year results"),
+            _nsm_hit("ASTRAZENECA FINANCE LTD", "Final terms", "Final Terms"),
+            _nsm_hit("OTHER CO", "Results"),
+        ],
+    }
+}
+
+
+@pytest.mark.asyncio
+async def test_nsm_keeps_the_holdings_own_disclosures_and_sends_origin() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json=NSM_BODY)
+
+    async with client(handler) as http:
+        result = await collect_fca_nsm(
+            http, "fca-nsm", [holding("AZN_GB_EQ", "GB", name="AstraZeneca PLC")], RULES,
+            dt.datetime(2026, 10, 10, 8, tzinfo=dt.UTC),
+        )  # fmt: skip
+    assert len(seen) == 1 and seen[0].headers["origin"] == "https://data.fca.org.uk"
+    assert [i.url for i in result.items] == ["https://data.fca.org.uk/artefacts/NSM/RNS/abc.html"]
+    assert result.items[0].event_type == "earnings_release"
+    assert result.items[0].tickers == ("AZN_GB_EQ",) and result.errors == []
+
+
+def test_a_config_saved_before_a_source_type_existed_still_runs_it() -> None:
+    old = NewsSourcesConfig(sources=[s for s in NewsSourcesConfig().sources if s.type == "rss"])
+    merged = with_default_sources(old)
+    types = {s.type for s in merged.sources}
+    assert {"tdnet", "hkex", "cninfo", "fca_nsm", "gazette", "filings"} <= types
+    assert with_default_sources(merged) == merged  # idempotent
+    # a source the owner switched off is kept as saved, not re-added enabled
+    off = NewsSourcesConfig()
+    off.sources = [
+        s.model_copy(update={"enabled": False}) if s.type == "fca_nsm" else s for s in off.sources
+    ]
+    assert [s.enabled for s in with_default_sources(off).sources if s.type == "fca_nsm"] == [False]
+
+
+@pytest.mark.asyncio
+async def test_nsm_failure_is_reported_not_raised() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, text="no")
+
+    async with client(handler) as http:
+        result = await collect_fca_nsm(
+            http, "fca-nsm", [holding("AZN_GB_EQ", "GB", name="AstraZeneca PLC")], RULES,
+            dt.datetime(2026, 10, 10, 8, tzinfo=dt.UTC),
+        )  # fmt: skip
+    assert result.items == [] and result.errors == ["FCA NSM: HTTPStatusError"]
 
 
 def test_gazette_name_match_needs_the_whole_company_name() -> None:

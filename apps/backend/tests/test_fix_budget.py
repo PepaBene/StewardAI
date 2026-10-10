@@ -9,7 +9,6 @@ from typing import Any, get_args
 
 import asyncpg
 import httpx
-import httpx2
 import pytest
 from fastapi import FastAPI
 from pydantic import ValidationError
@@ -222,14 +221,12 @@ async def test_the_client_applies_the_guard_inside_a_job(backend_pool: asyncpg.P
     sent; a downgraded request is sent to the cheaper model."""
     sent: list[dict[str, Any]] = []
 
-    def handler(request: httpx2.Request) -> httpx2.Response:
+    def handler(request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)
         sent.append(body)
-        return httpx2.Response(200, json=_openai_answer(10, 5))
+        return httpx.Response(200, json=_openai_answer(10, 5))
 
-    client = LLM(
-        openai_key="test", http=httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
-    )
+    client = LLM(openai_key="test", http=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
     req = Request(
         model="gpt-6.1-sol",
         system="s",
@@ -273,12 +270,10 @@ async def test_a_failed_step_still_records_what_its_requests_cost(
     """The API bills a response whether or not the call site gets to count it: a step that
     raises after a response, and one whose call site counts less than came back, keep it."""
 
-    def handler(request: httpx2.Request) -> httpx2.Response:
-        return httpx2.Response(200, json=_openai_answer(1_000_000, 100_000))
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_openai_answer(1_000_000, 100_000))
 
-    client = LLM(
-        openai_key="test", http=httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
-    )
+    client = LLM(openai_key="test", http=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
     req = Request(
         model="gpt-6.1-sol", system="s", messages=(Message(role="user", text="hi"),), max_tokens=16
     )
