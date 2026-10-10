@@ -1716,6 +1716,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stories/{story_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Story Evidence
+         * @description Why a story is linked, confirmed, disputed or corrected: its items with their
+         *     provenance kind, independence group and link reasons, and every lifecycle change with the
+         *     evidence behind it.
+         */
+        get: operations["get_story_evidence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stories/{story_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Story
+         * @description Close a story (lifecycle `resolved`) or reopen it.
+         */
+        post: operations["close_story"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/news/event-types": {
         parameters: {
             query?: never;
@@ -9034,10 +9076,10 @@ export interface components {
              * @default any
              * @enum {string}
              */
-            service: "rns" | "eqs" | "any";
+            service: "rns" | "eqs" | "tdnet" | "hkex" | "cninfo" | "dart" | "gazette" | "filings" | "any";
             /**
              * Pattern
-             * @description Case-insensitive regular expression matched against the announcement type (RNS: the headline, e.g. 'Final Results'; EQS: the category, e.g. 'Ad-hoc').
+             * @description Case-insensitive regular expression matched against the announcement type (RNS: the headline, e.g. 'Final Results'; EQS: the category, e.g. 'Ad-hoc'; TDnet, CNINFO, DART and HKEX: the title in the filing's own language).
              */
             pattern: string;
             /** Event Type */
@@ -14878,6 +14920,41 @@ export interface components {
             /** Description */
             description: string;
         };
+        /** EvidenceItem */
+        EvidenceItem: {
+            /** Id */
+            id: number;
+            /** Url */
+            url: string;
+            /** Headline */
+            headline: string;
+            /** Outlet */
+            outlet: string | null;
+            /** Tier */
+            tier: number;
+            /**
+             * Kind
+             * @description Provenance kind; null on items stored before N5.
+             */
+            kind: string | null;
+            /**
+             * Independence Key
+             * @description Items sharing a key are one source (a wire and its republishers).
+             */
+            independence_key: string | null;
+            /** Is Correction */
+            is_correction: boolean;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /**
+             * Links
+             * @description Why the item is tied to each holding.
+             */
+            links: components["schemas"]["ItemLink"][];
+        };
         /** EvidenceLink */
         EvidenceLink: {
             /** Fact Id */
@@ -19717,6 +19794,11 @@ export interface components {
             via: string;
             /** Term */
             term: string;
+            /**
+             * Confidence
+             * @description How sure the link is: 1 for the source or an identifier, lower for a name, lowest for a competitor, supplier, customer or topic. Null before N5.
+             */
+            confidence?: number | null;
         };
         /** JobDetail */
         JobDetail: {
@@ -20528,6 +20610,30 @@ export interface components {
             source: string;
             /** As Of */
             as_of: string | null;
+        };
+        /** LifecycleStep */
+        LifecycleStep: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** From State */
+            from_state: string | null;
+            /**
+             * To State
+             * @enum {string}
+             */
+            to_state: "reported" | "corroborated" | "primary_confirmed" | "disputed" | "corrected" | "resolved";
+            /** Reason */
+            reason: string;
+            /**
+             * Evidence
+             * @description The items and results behind it.
+             */
+            evidence: {
+                [key: string]: unknown;
+            }[];
         };
         /** Line */
         Line: {
@@ -22194,6 +22300,12 @@ export interface components {
              */
             ai_search_days: number;
             /**
+             * Indirect Alert Min Severity
+             * @description A story that reaches its holding only through a competitor, supplier, customer or watch topic alerts only from this severity up (direct links alert from 1).
+             * @default 2
+             */
+            indirect_alert_min_severity: number;
+            /**
              * Embedding Model
              * @description Multilingual embedding of each wire item, used to group the same event reported in different languages. Needs GOOGLE_API_KEY.
              * @default gemini-embedding-2
@@ -22257,7 +22369,7 @@ export interface components {
              * @description rss: an RSS or Atom feed. page: a news page read daily; new links on it become items. edgar: every holding's SEC filings. finnhub: US company news. google_news: a Google News query per holding (unofficial endpoint). rns: UK regulatory announcements per holding (Investegate company page). eqs: German regulatory announcements (EQS News company page from the holding profile's regulatory_news_urls). edgar_fts: SEC full-text search for each holding's watch topics and for other filers naming it.
              * @enum {string}
              */
-            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts" | "alpha_vantage" | "news_sitemap" | "gdelt" | "ai_search";
+            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts" | "alpha_vantage" | "news_sitemap" | "gdelt" | "ai_search" | "tdnet" | "hkex" | "cninfo" | "dart" | "gazette" | "filings";
             /**
              * Url
              * @description Feed or page URL (rss, page).
@@ -22326,6 +22438,11 @@ export interface components {
              * @constant
              */
             schema_version: 1;
+            /**
+             * Portfolio Topics
+             * @description Watch topics for the whole portfolio (macro, regulation, rates, currencies, sectors, supply chain). Matching wire items are tagged with the topic id.
+             */
+            portfolio_topics?: components["schemas"]["PortfolioTopic"][];
             /**
              * Syndication Groups
              * @description Outlets that republish one wire's copy. A story carried by several of them counts as one independent source, not several.
@@ -24261,6 +24378,34 @@ export interface components {
              * @description Portfolio beta against the benchmark (covariance of daily returns over the benchmark's variance); null without a benchmark or enough shared days.
              */
             beta?: number | null;
+        };
+        /**
+         * PortfolioTopic
+         * @description A portfolio-level watch topic: wire items that mention one of its keywords are tagged
+         *     with it, so a relevant story that names no holding is still found by topic. A tag never
+         *     links an item to a holding and never alerts.
+         */
+        PortfolioTopic: {
+            /**
+             * Id
+             * @example max-single-position
+             */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Kind
+             * @default other
+             * @enum {string}
+             */
+            kind: "macro" | "regulation" | "rates" | "currency" | "sector" | "supply_chain" | "other";
+            /** Keywords */
+            keywords: string[];
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
         };
         /** PortfolioValuation */
         PortfolioValuation: {
@@ -28846,7 +28991,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts" | "alpha_vantage" | "news_sitemap" | "gdelt" | "ai_search";
+            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts" | "alpha_vantage" | "news_sitemap" | "gdelt" | "ai_search" | "tdnet" | "hkex" | "cninfo" | "dart" | "gazette" | "filings";
             /**
              * Host
              * @description The feed's host; null for per-holding sources (EDGAR, Finnhub, ...).
@@ -29599,6 +29744,59 @@ export interface components {
             /** Cluster Id */
             cluster_id?: string | null;
         };
+        /** StoryClosing */
+        StoryClosing: {
+            /** Closed */
+            closed: boolean;
+        };
+        /** StoryEvidence */
+        StoryEvidence: {
+            /** Id */
+            id: number;
+            /** Headline */
+            headline: string;
+            /**
+             * Lifecycle
+             * @enum {string}
+             */
+            lifecycle: "reported" | "corroborated" | "primary_confirmed" | "disputed" | "corrected" | "resolved";
+            /** Lifecycle Reason */
+            lifecycle_reason: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "confirmed" | "unconfirmed" | "disputed" | "sentiment";
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "verified" | "corroborated" | "unconfirmed" | "disputed";
+            /** Status Reason */
+            status_reason: string | null;
+            /**
+             * Closed At
+             * @description When the owner closed (resolved) it.
+             */
+            closed_at: string | null;
+            /**
+             * Independent Sources
+             * @description Independence groups among the items.
+             */
+            independent_sources: number;
+            /**
+             * Primary Evidence
+             * @description Items that are primary evidence.
+             */
+            primary_evidence: number;
+            /** Items */
+            items: components["schemas"]["EvidenceItem"][];
+            /**
+             * History
+             * @description Every lifecycle change, oldest first.
+             */
+            history: components["schemas"]["LifecycleStep"][];
+        };
         /** StoryOut */
         StoryOut: {
             /** Id */
@@ -29619,6 +29817,13 @@ export interface components {
              * @enum {string}
              */
             confidence: "verified" | "corroborated" | "unconfirmed" | "disputed";
+            /**
+             * Lifecycle
+             * @description Where the story is: reported to resolved.
+             * @default reported
+             * @enum {string}
+             */
+            lifecycle: "reported" | "corroborated" | "primary_confirmed" | "disputed" | "corrected" | "resolved";
             /** Status Reason */
             status_reason: string | null;
             /** Rumour */
@@ -35200,6 +35405,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DisputedStory"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_story_evidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                story_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoryEvidence"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_story: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                story_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoryClosing"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoryEvidence"];
                 };
             };
             /** @description Validation Error */

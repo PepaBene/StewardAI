@@ -32,14 +32,40 @@ def short_name(name: str) -> str:
     return re.sub(r"^the\s+", "", text, flags=re.IGNORECASE)
 
 
+# How sure a link of each kind is, and which kinds reach the holding only indirectly.
+LINK_CONFIDENCE: dict[str, float] = {
+    "source": 1.0,
+    "isin": 1.0,
+    "ticker": 0.95,
+    "name": 0.85,
+    "alias": 0.75,
+    "supplier": 0.6,
+    "customer": 0.6,
+    "competitor": 0.5,
+    "topic": 0.4,
+}
+INDIRECT_VIA: frozenset[str] = frozenset({"competitor", "supplier", "customer", "topic"})
+
+
 @dataclass(frozen=True)
 class Link:
     ticker: str
     via: str  # name, alias, ticker, isin, source, competitor, supplier, customer, topic
     term: str
 
-    def as_json(self) -> dict[str, str]:
-        return {"ticker": self.ticker, "via": self.via, "term": self.term}
+    @property
+    def confidence(self) -> float:
+        """How sure the link is: by identifier or the source itself, by name, or only through
+        a competitor, supplier, customer or topic."""
+        return LINK_CONFIDENCE.get(self.via, 0.5)
+
+    def as_json(self) -> dict[str, str | float]:
+        return {
+            "ticker": self.ticker,
+            "via": self.via,
+            "term": self.term,
+            "confidence": self.confidence,
+        }
 
 
 @dataclass
@@ -100,7 +126,7 @@ def _name_pattern(term: str) -> re.Pattern[str]:
     return re.compile(rf"(?<![\w&]){escaped}(?![\w&])", re.IGNORECASE)
 
 
-def _topic_pattern(topic: str) -> re.Pattern[str]:
+def topic_pattern(topic: str) -> re.Pattern[str]:
     """Whole-word match for a watch topic: "AI" must not match "said". A short all-caps topic
     (AI, EV) matches its case exactly; any other topic matches case-insensitively."""
     escaped = re.escape(topic).replace(r"\ ", r"\s+")
@@ -131,7 +157,7 @@ class Linker:
             for via, term in h.relations:
                 self._patterns.append((h.ticker, via, term, _name_pattern(term)))
             for topic in h.topics:
-                self._patterns.append((h.ticker, "topic", topic, _topic_pattern(topic)))
+                self._patterns.append((h.ticker, "topic", topic, topic_pattern(topic)))
 
     @property
     def tickers(self) -> list[str]:

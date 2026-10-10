@@ -510,6 +510,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     ai_search_max_holdings: 10,
     ai_search_thin_below: 3,
     ai_search_days: 3,
+    indirect_alert_min_severity: 2,
     embedding_model: "gemini-embedding-2",
     embedding_dimensions: 768,
     embedding_per_run: 600,
@@ -818,6 +819,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "ai_search_max_holdings", label: "Holdings searched per run", kind: "int", min: 0, max: 100 },
       { key: "ai_search_thin_below", label: "Search holdings with fewer items than", kind: "int", min: 1, max: 100 },
       { key: "ai_search_days", label: "AI search window (days)", kind: "int", min: 1, max: 14 },
+      { key: "indirect_alert_min_severity", label: "Lowest severity that alerts for an indirect link", kind: "int", min: 0, max: 3 },
     ],
   },
   digest: {

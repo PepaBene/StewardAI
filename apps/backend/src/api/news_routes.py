@@ -24,6 +24,7 @@ from steward.news.read import (
     NewsFeed,
     ReportOut,
     ReportSummary,
+    StoryEvidence,
     disputed_stories,
     get_report,
     list_escalations,
@@ -31,6 +32,8 @@ from steward.news.read import (
     news_feed,
     recent_alerts,
     resolve_story,
+    set_story_closed,
+    story_evidence,
 )
 from steward.news.stats import NewsStats, SourcesHealth, news_stats, sources_health
 from steward.notify.alerts import create_alerts
@@ -122,6 +125,33 @@ async def resolve_disputed_story(
     if not await resolve_story(pool, story_id, body.resolution, body.note):
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"No disputed story {story_id}")
     return [s for s in await disputed_stories(pool, True) if s.id == story_id]
+
+
+@router.get("/stories/{story_id}/evidence", tags=["news"])
+async def get_story_evidence(story_id: IdPath, pool: Pool, _owner: Owner) -> StoryEvidence:
+    """Why a story is linked, confirmed, disputed or corrected: its items with their
+    provenance kind, independence group and link reasons, and every lifecycle change with the
+    evidence behind it."""
+    evidence = await story_evidence(pool, story_id)
+    if evidence is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No story {story_id}")
+    return evidence
+
+
+class StoryClosing(BaseModel):
+    closed: bool
+
+
+@router.post("/stories/{story_id}/close", tags=["news"])
+async def close_story(
+    story_id: IdPath, body: StoryClosing, pool: Pool, _owner: Owner
+) -> StoryEvidence:
+    """Close a story (lifecycle `resolved`) or reopen it."""
+    if not await set_story_closed(pool, story_id, body.closed):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No story {story_id}")
+    evidence = await story_evidence(pool, story_id)
+    assert evidence is not None
+    return evidence
 
 
 class EventTypeInfo(BaseModel):

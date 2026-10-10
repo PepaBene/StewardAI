@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     # EDINET (Japan FSA filings) and Companies House (UK statutory filings): free API keys.
     edinet_api_key: SecretStr | None = None
     companies_house_api_key: SecretStr | None = None
+    # OpenDART (Korean disclosure system): free key, used by the news `dart` source.
+    dart_api_key: SecretStr | None = None
     # FRED (St. Louis Fed) macro series need a free API key.
     fred_api_key: SecretStr | None = None
     # OpenFIGI works without a key; a key raises its rate limit.
@@ -153,6 +155,7 @@ class Settings(BaseSettings):
             self.epo_ops_client_secret,
             self.edinet_api_key,
             self.companies_house_api_key,
+            self.dart_api_key,
             self.openfigi_api_key,
             self.fred_api_key,
             self.stooq_api_key,

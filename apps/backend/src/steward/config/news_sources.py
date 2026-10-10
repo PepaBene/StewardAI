@@ -25,6 +25,12 @@ SourceType = Literal[
     "news_sitemap",
     "gdelt",
     "ai_search",
+    "tdnet",
+    "hkex",
+    "cninfo",
+    "dart",
+    "gazette",
+    "filings",
 ]
 Paywall = Literal["open", "metered", "hard"]
 Domain = Annotated[
@@ -49,10 +55,24 @@ PER_HOLDING_TYPES: frozenset[str] = frozenset(
         "alpha_vantage",
         "gdelt",
         "ai_search",
+        "tdnet",
+        "hkex",
+        "cninfo",
+        "dart",
+        "gazette",
+        "filings",
     }
 )
 # Regulatory news services and the home-market country they cover (from FIRDS/FITRS).
 REGULATORY_COUNTRY: dict[str, str] = {"rns": "GB", "eqs": "DE"}
+# Official disclosure sources (news/primary_sources.py), keyed to the holding's home country.
+PRIMARY_COUNTRY: dict[str, str] = {
+    "tdnet": "JP",
+    "hkex": "HK",
+    "cninfo": "CN",
+    "dart": "KR",
+    "gazette": "GB",
+}
 # Types that relay other outlets' items: an item's tier is its outlet's, not the source's.
 AGGREGATOR_TYPES: frozenset[str] = frozenset(
     {"finnhub", "google_news", "alpha_vantage", "gdelt", "ai_search"}
@@ -192,9 +212,17 @@ class GoogleNewsLocale(ConfigModel):
 
 
 def _default_sources() -> list[NewsSource]:
-    def central_bank(source_id: str, name: str, url: str) -> NewsSource:
+    def central_bank(source_id: str, name: str, url: str, region: str | None = None) -> NewsSource:
         return NewsSource.model_validate(
-            {"id": source_id, "name": name, "tier": 1, "type": "rss", "url": url, "macro": True}
+            {
+                "id": source_id,
+                "name": name,
+                "tier": 1,
+                "type": "rss",
+                "url": url,
+                "macro": True,
+                "region": region,
+            }
         )
 
     def outlet(
@@ -497,6 +525,83 @@ def _default_sources() -> list[NewsSource]:
             "ČNB press releases",
             "https://www.cnb.cz/en/.content/rss-feed/rss-feed_tz.xml",
         ),
+        # Feeds probed 2026-10-10 (HTTP 200, RSS/Atom) from this machine.
+        central_bank(
+            "boj-whatsnew",
+            "Bank of Japan what's new",
+            "https://www.boj.or.jp/en/rss/whatsnew.xml",
+            "JP",
+        ),
+        central_bank(
+            "boe-news", "Bank of England news", "https://www.bankofengland.co.uk/rss/news", "GB"
+        ),
+        central_bank(
+            "bundesbank-press",
+            "Deutsche Bundesbank",
+            "https://www.bundesbank.de/service/rss/en/633306/feed.rss",
+            "DE",
+        ),
+        central_bank(
+            "boc-press",
+            "Bank of Canada press releases",
+            "https://www.bankofcanada.ca/content_type/press-releases/feed/",
+            "CA",
+        ),
+        # Official disclosure sources by market. TDnet, HKEXnews and CNINFO need no key; DART
+        # needs DART_API_KEY. `filings` reads the EDINET and Companies House filings the
+        # disclosure jobs already store. All are off until the owner enables them.
+        NewsSource(
+            id="tdnet",
+            name="TDnet (Tokyo)",
+            tier=1,
+            type="tdnet",
+            enabled=False,
+            region="JP",
+            language="ja",
+        ),
+        NewsSource(
+            id="hkexnews",
+            name="HKEXnews",
+            tier=1,
+            type="hkex",
+            enabled=False,
+            region="HK",
+            language="en",
+        ),
+        NewsSource(
+            id="cninfo",
+            name="CNINFO (Shanghai, Shenzhen)",
+            tier=1,
+            type="cninfo",
+            enabled=False,
+            region="CN",
+            language="zh",
+        ),
+        NewsSource(
+            id="dart",
+            name="DART (Korea)",
+            tier=1,
+            type="dart",
+            enabled=False,
+            region="KR",
+            language="ko",
+        ),
+        NewsSource(
+            id="gazette",
+            name="The Gazette (UK)",
+            tier=1,
+            type="gazette",
+            enabled=False,
+            region="GB",
+            language="en",
+        ),
+        NewsSource(
+            id="filings-edinet-ch",
+            name="EDINET and Companies House filings",
+            tier=1,
+            type="filings",
+            enabled=False,
+        ),
     ]
 
 
@@ -505,7 +610,8 @@ def _default_domain_tiers() -> list[DomainTier]:
         1: [
             "sec.gov", "globenewswire.com", "prnewswire.com", "businesswire.com",
             "federalreserve.gov", "ecb.europa.eu", "cnb.cz", "boj.or.jp",
-            "bankofengland.co.uk", "bankofcanada.ca",
+            "bankofengland.co.uk", "bankofcanada.ca", "bundesbank.de", "release.tdnet.info",
+            "hkexnews.hk", "cninfo.com.cn", "dart.fss.or.kr", "thegazette.co.uk",
         ],
         2: [
             "reuters.com", "apnews.com", "cnbc.com", "marketwatch.com", "ft.com",
@@ -549,10 +655,50 @@ def _default_syndication_groups() -> list[SyndicationGroup]:
     ]
 
 
+TopicKind = Literal["macro", "regulation", "rates", "currency", "sector", "supply_chain", "other"]
+
+
+class PortfolioTopic(ConfigModel):
+    """A portfolio-level watch topic: wire items that mention one of its keywords are tagged
+    with it, so a relevant story that names no holding is still found by topic. A tag never
+    links an item to a holding and never alerts."""
+
+    id: Slug
+    label: str = Field(min_length=1, max_length=80)
+    kind: TopicKind = "other"
+    keywords: list[Annotated[str, Field(min_length=2, max_length=80)]] = Field(
+        min_length=1, max_length=40
+    )
+    enabled: bool = True
+
+
+def _default_portfolio_topics() -> list[PortfolioTopic]:
+    def topic(id_: str, label: str, kind: TopicKind, *keywords: str) -> PortfolioTopic:
+        return PortfolioTopic(id=id_, label=label, kind=kind, keywords=list(keywords))
+
+    return [
+        topic("rates", "Interest rates", "rates", "interest rate", "rate cut", "rate hike",
+              "central bank", "yield curve", "inflation"),
+        topic("trade-policy", "Tariffs and trade policy", "regulation", "tariff", "tariffs",
+              "export controls", "sanctions", "trade war"),
+        topic("antitrust", "Antitrust and regulation", "regulation", "antitrust",
+              "competition authority", "SEC investigation", "fined"),
+        topic("fx", "Currencies", "currency", "dollar", "euro", "yen", "yuan", "sterling",
+              "currency"),
+        topic("semiconductors", "Semiconductor supply", "supply_chain", "semiconductor",
+              "chip shortage", "foundry", "TSMC"),
+    ]  # fmt: skip
+
+
 class NewsSourcesConfig(ConfigModel):
     """Stored as `config_version` rows, domain `news_sources`."""
 
     schema_version: Literal[1] = 1
+    portfolio_topics: list[PortfolioTopic] = Field(
+        default_factory=_default_portfolio_topics,
+        description="Watch topics for the whole portfolio (macro, regulation, rates, currencies, "
+        "sectors, supply chain). Matching wire items are tagged with the topic id.",
+    )
     syndication_groups: list[SyndicationGroup] = Field(
         default_factory=_default_syndication_groups,
         description="Outlets that republish one wire's copy. A story carried by several of "
@@ -592,6 +738,7 @@ class NewsSourcesConfig(ConfigModel):
     def _unique(self) -> Self:
         require_unique("source id", [s.id for s in self.sources])
         require_unique("domain", [d.domain for d in self.domain_tiers])
+        require_unique("portfolio topic id", [t.id for t in self.portfolio_topics])
         return self
 
     def domain_tier(self, host: str | None) -> int | None:

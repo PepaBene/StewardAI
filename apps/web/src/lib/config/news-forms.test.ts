@@ -11,9 +11,11 @@ import {
   eventRulesFromBody,
   eventRulesToBody,
   newRule,
+  formatPortfolioTopics,
   notificationsFromBody,
   notificationsToBody,
   parseDomainTiers,
+  parsePortfolioTopics,
   parseSurpriseBands,
   PER_HOLDING,
   sourcesFromBody,
@@ -68,6 +70,7 @@ describe("news sources form", () => {
     domain_tiers: [{ domain: "reuters.com", tier: 2 as const }],
     blocked_domains: [],
     allowed_domains: ["reuters.com"],
+    portfolio_topics: [],
     unknown_outlet_tier: 3 as const,
     freshness_hours: 72,
     include_tier3: false,
@@ -110,7 +113,37 @@ describe("news sources form", () => {
     rns.url = "https://www.investegate.co.uk";
     expect(sourcesToBody(form).sources!.find((s) => s.type === "rns")!.url).toBeNull();
     expect(sourcesToBody(sourcesFromBody(null, DEFAULT_SOURCES))).toEqual(DEFAULT_SOURCES);
-    expect(DEFAULT_SOURCES.sources!.filter((s) => s.macro).map((s) => s.id)).toEqual(["fed-press", "ecb-press", "cnb-press"]);
+    expect(DEFAULT_SOURCES.sources!.filter((s) => s.macro).map((s) => s.id)).toEqual([
+      "fed-press",
+      "ecb-press",
+      "cnb-press",
+      "boj-whatsnew",
+      "boe-news",
+      "bundesbank-press",
+      "boc-press",
+    ]);
+  });
+
+  it("edits portfolio watch topics one per line and keeps a disabled topic disabled", () => {
+    const form = sourcesFromBody(null, DEFAULT_SOURCES);
+    expect(form.portfolio_topics.split("\n")[0]).toBe("rates | Interest rates | rates | interest rate, rate cut, rate hike, central bank, yield curve, inflation");
+    form.portfolio_topics = "off Rates | Rates | rates | interest rate, cut\nfx | FX | currency |  yen ,euro ";
+    expect(sourcesToBody(form).portfolio_topics).toEqual([
+      { id: "rates", label: "Rates", kind: "rates", keywords: ["interest rate", "cut"], enabled: false },
+      { id: "fx", label: "FX", kind: "currency", keywords: ["yen", "euro"], enabled: true },
+    ]);
+    expect(parsePortfolioTopics(formatPortfolioTopics(DEFAULT_SOURCES.portfolio_topics!))).toEqual(DEFAULT_SOURCES.portfolio_topics);
+  });
+
+  it("covers the official disclosure sources of each market, per holding with no URL", () => {
+    expect(PER_HOLDING).toEqual(expect.arrayContaining(["tdnet", "hkex", "cninfo", "dart", "gazette", "filings"]));
+    const form = sourcesFromBody(null, DEFAULT_SOURCES);
+    const tdnet = form.sources.find((s) => s.type === "tdnet")!;
+    tdnet.url = "https://example.com";
+    expect(sourcesToBody(form).sources!.find((s) => s.type === "tdnet")!.url).toBeNull();
+    const services = DEFAULT_ANNOUNCEMENT_RULES.map((r) => r.service);
+    for (const s of ["tdnet", "hkex", "cninfo", "dart", "gazette", "filings"]) expect(services).toContain(s);
+    expect(services.at(-1)).toBe("any");
   });
 
   it("drops the URL of per-holding sources and parses domain tiers", () => {

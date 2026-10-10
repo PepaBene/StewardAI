@@ -5230,6 +5230,116 @@
         }
       }
     },
+    "/stories/{story_id}/evidence": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Story Evidence",
+        "description": "Why a story is linked, confirmed, disputed or corrected: its items with their\nprovenance kind, independence group and link reasons, and every lifecycle change with the\nevidence behind it.",
+        "operationId": "get_story_evidence",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "story_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Story Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryEvidence"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stories/{story_id}/close": {
+      "post": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Close Story",
+        "description": "Close a story (lifecycle `resolved`) or reopen it.",
+        "operationId": "close_story",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "story_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Story Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoryClosing"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryEvidence"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/news/event-types": {
       "get": {
         "tags": [
@@ -28528,6 +28638,12 @@
             "enum": [
               "rns",
               "eqs",
+              "tdnet",
+              "hkex",
+              "cninfo",
+              "dart",
+              "gazette",
+              "filings",
               "any"
             ],
             "title": "Service",
@@ -28538,7 +28654,7 @@
             "maxLength": 200,
             "minLength": 1,
             "title": "Pattern",
-            "description": "Case-insensitive regular expression matched against the announcement type (RNS: the headline, e.g. 'Final Results'; EQS: the category, e.g. 'Ad-hoc')."
+            "description": "Case-insensitive regular expression matched against the announcement type (RNS: the headline, e.g. 'Final Results'; EQS: the category, e.g. 'Ad-hoc'; TDnet, CNINFO, DART and HKEX: the title in the filing's own language)."
           },
           "event_type": {
             "anyOf": [
@@ -45698,6 +45814,92 @@
         ],
         "title": "EventTypeInfo"
       },
+      "EvidenceItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "outlet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlet"
+          },
+          "tier": {
+            "type": "integer",
+            "title": "Tier"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "description": "Provenance kind; null on items stored before N5."
+          },
+          "independence_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Independence Key",
+            "description": "Items sharing a key are one source (a wire and its republishers)."
+          },
+          "is_correction": {
+            "type": "boolean",
+            "title": "Is Correction"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/ItemLink"
+            },
+            "type": "array",
+            "title": "Links",
+            "description": "Why the item is tied to each holding."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "headline",
+          "outlet",
+          "tier",
+          "kind",
+          "independence_key",
+          "is_correction",
+          "published_at",
+          "links"
+        ],
+        "title": "EvidenceItem"
+      },
       "EvidenceLink": {
         "properties": {
           "fact_id": {
@@ -59679,6 +59881,18 @@
           "term": {
             "type": "string",
             "title": "Term"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence",
+            "description": "How sure the link is: 1 for the source or an identifier, lower for a name, lowest for a competitor, supplier, customer or topic. Null before N5."
           }
         },
         "type": "object",
@@ -62050,6 +62264,60 @@
           "as_of"
         ],
         "title": "LegalLink"
+      },
+      "LifecycleStep": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "from_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From State"
+          },
+          "to_state": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "corroborated",
+              "primary_confirmed",
+              "disputed",
+              "corrected",
+              "resolved"
+            ],
+            "title": "To State"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Evidence",
+            "description": "The items and results behind it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "from_state",
+          "to_state",
+          "reason",
+          "evidence"
+        ],
+        "title": "LifecycleStep"
       },
       "Line": {
         "properties": {
@@ -66619,6 +66887,14 @@
             "description": "How far back leads are asked for, and the window.",
             "default": 3
           },
+          "indirect_alert_min_severity": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Indirect Alert Min Severity",
+            "description": "A story that reaches its holding only through a competitor, supplier, customer or watch topic alerts only from this severity up (direct links alert from 1).",
+            "default": 2
+          },
           "embedding_model": {
             "type": "string",
             "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
@@ -66722,7 +66998,13 @@
               "alpha_vantage",
               "news_sitemap",
               "gdelt",
-              "ai_search"
+              "ai_search",
+              "tdnet",
+              "hkex",
+              "cninfo",
+              "dart",
+              "gazette",
+              "filings"
             ],
             "title": "Type",
             "description": "rss: an RSS or Atom feed. page: a news page read daily; new links on it become items. edgar: every holding's SEC filings. finnhub: US company news. google_news: a Google News query per holding (unofficial endpoint). rns: UK regulatory announcements per holding (Investegate company page). eqs: German regulatory announcements (EQS News company page from the holding profile's regulatory_news_urls). edgar_fts: SEC full-text search for each holding's watch topics and for other filers naming it."
@@ -66847,6 +67129,14 @@
             "const": 1,
             "title": "Schema Version",
             "default": 1
+          },
+          "portfolio_topics": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioTopic"
+            },
+            "type": "array",
+            "title": "Portfolio Topics",
+            "description": "Watch topics for the whole portfolio (macro, regulation, rates, currencies, sectors, supply chain). Matching wire items are tagged with the topic id."
           },
           "syndication_groups": {
             "items": {
@@ -72714,6 +73004,64 @@
           "benchmark"
         ],
         "title": "PortfolioRisk"
+      },
+      "PortfolioTopic": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Id",
+            "examples": [
+              "max-single-position"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "macro",
+              "regulation",
+              "rates",
+              "currency",
+              "sector",
+              "supply_chain",
+              "other"
+            ],
+            "title": "Kind",
+            "default": "other"
+          },
+          "keywords": {
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 2
+            },
+            "type": "array",
+            "maxItems": 40,
+            "minItems": 1,
+            "title": "Keywords"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "keywords"
+        ],
+        "title": "PortfolioTopic",
+        "description": "A portfolio-level watch topic: wire items that mention one of its keywords are tagged\nwith it, so a relevant story that names no holding is still found by topic. A tag never\nlinks an item to a holding and never alerts."
       },
       "PortfolioValuation": {
         "properties": {
@@ -85458,7 +85806,13 @@
               "alpha_vantage",
               "news_sitemap",
               "gdelt",
-              "ai_search"
+              "ai_search",
+              "tdnet",
+              "hkex",
+              "cninfo",
+              "dart",
+              "gazette",
+              "filings"
             ],
             "title": "Type"
           },
@@ -87567,6 +87921,140 @@
         ],
         "title": "Story"
       },
+      "StoryClosing": {
+        "properties": {
+          "closed": {
+            "type": "boolean",
+            "title": "Closed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "closed"
+        ],
+        "title": "StoryClosing"
+      },
+      "StoryEvidence": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "lifecycle": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "corroborated",
+              "primary_confirmed",
+              "disputed",
+              "corrected",
+              "resolved"
+            ],
+            "title": "Lifecycle"
+          },
+          "lifecycle_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifecycle Reason"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "confirmed",
+              "unconfirmed",
+              "disputed",
+              "sentiment"
+            ],
+            "title": "Status"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "corroborated",
+              "unconfirmed",
+              "disputed"
+            ],
+            "title": "Confidence"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At",
+            "description": "When the owner closed (resolved) it."
+          },
+          "independent_sources": {
+            "type": "integer",
+            "title": "Independent Sources",
+            "description": "Independence groups among the items."
+          },
+          "primary_evidence": {
+            "type": "integer",
+            "title": "Primary Evidence",
+            "description": "Items that are primary evidence."
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/LifecycleStep"
+            },
+            "type": "array",
+            "title": "History",
+            "description": "Every lifecycle change, oldest first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "headline",
+          "lifecycle",
+          "lifecycle_reason",
+          "status",
+          "confidence",
+          "status_reason",
+          "closed_at",
+          "independent_sources",
+          "primary_evidence",
+          "items",
+          "history"
+        ],
+        "title": "StoryEvidence"
+      },
       "StoryOut": {
         "properties": {
           "id": {
@@ -87626,6 +88114,20 @@
               "disputed"
             ],
             "title": "Confidence"
+          },
+          "lifecycle": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "corroborated",
+              "primary_confirmed",
+              "disputed",
+              "corrected",
+              "resolved"
+            ],
+            "title": "Lifecycle",
+            "description": "Where the story is: reported to resolved.",
+            "default": "reported"
           },
           "status_reason": {
             "anyOf": [

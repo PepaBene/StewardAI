@@ -565,6 +565,13 @@ class NewsSettings(ConfigModel):
     ai_search_days: int = Field(
         default=3, ge=1, le=14, description="How far back leads are asked for, and the window."
     )
+    indirect_alert_min_severity: int = Field(
+        default=2,
+        ge=0,
+        le=3,
+        description="A story that reaches its holding only through a competitor, supplier, "
+        "customer or watch topic alerts only from this severity up (direct links alert from 1).",
+    )
     embedding_model: ModelId = Field(
         default="gemini-embedding-2",
         description="Multilingual embedding of each wire item, used to group the same event "

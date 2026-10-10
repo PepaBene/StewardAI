@@ -116,6 +116,7 @@ const FULL: JobsConfig = {
     ai_search_max_holdings: 10,
     ai_search_thin_below: 3,
     ai_search_days: 3,
+    indirect_alert_min_severity: 2,
     embedding_model: "gemini-embedding-2",
     embedding_dimensions: 768,
     embedding_per_run: 600,

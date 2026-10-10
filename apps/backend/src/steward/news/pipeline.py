@@ -33,6 +33,7 @@ from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import EscalationSettings, JobsConfig, NewsSettings
 from steward.config.news_sources import (
     AGGREGATOR_TYPES,
+    PRIMARY_COUNTRY,
     REGULATORY_COUNTRY,
     GoogleNewsLocale,
     NewsSource,
@@ -86,6 +87,14 @@ from steward.news.embeddings import (
     estimate_tokens,
 )
 from steward.news.escalation import escalation_due, queue_escalation
+from steward.news.evidence import (
+    Basis,
+    evidence_kind,
+    indirect_only,
+    is_correction,
+    lifecycle_for,
+    matching_topics,
+)
 from steward.news.feeds import (
     HoldingFeedInfo,
     RawItem,
@@ -100,6 +109,14 @@ from steward.news.fulltext import purge_expired, run_fulltext
 from steward.news.language import resolve_language
 from steward.news.link import HoldingTerms, Linker, holding_terms
 from steward.news.normalize import canonical_url, host_of
+from steward.news.primary_sources import (
+    collect_cninfo,
+    collect_dart,
+    collect_gazette,
+    collect_hkex,
+    collect_stored_filings,
+    collect_tdnet,
+)
 from steward.news.regulatory import MAX_HITS as FTS_MAX_HITS
 from steward.news.regulatory import FtsResult, collect_edgar_fts, collect_regulatory
 from steward.news.simhash import item_hash, to_signed, to_unsigned
@@ -130,6 +147,7 @@ class NewsDeps:
     edgar: EdgarClient | None = None
     finnhub_key: str | None = None
     alpha_vantage_key: str | None = None
+    dart_key: str | None = None
     classifier: Classifier | None = None
     corroborator: Corroborator | None = None
     channels: dict[str, Channel] = field(default_factory=dict)
@@ -264,6 +282,7 @@ async def load_holdings(pool: asyncpg.Pool, config: NewsConfig) -> Holdings:
                 else (),
                 topics=tuple(profile.watch_topics) if profile else (),
                 alpha_symbol=profile.alpha_vantage_symbol if profile else None,
+                listing_codes=tuple(dict.fromkeys([ticker.split("_")[0], *t.symbols])),
             )
         )
         thesis = next((th for th in config.theses.theses if th.ticker == ticker), None)
@@ -592,6 +611,23 @@ async def collect_source(
         return await collect_alpha_vantage_news(
             deps.http, deps.alpha_vantage_key, source.id, feeds, pool
         )
+    if source.type in PRIMARY_COUNTRY or source.type == "filings":
+        today = deps.now().date()
+        if source.type == "tdnet":
+            primary = await collect_tdnet(deps.http, source.id, feeds, rules, today)
+        elif source.type == "hkex":
+            primary = await collect_hkex(deps.http, source.id, feeds, rules, today)
+        elif source.type == "cninfo":
+            primary = await collect_cninfo(deps.http, source.id, feeds, rules, today)
+        elif source.type == "gazette":
+            primary = await collect_gazette(deps.http, source.id, feeds, rules, today)
+        elif source.type == "dart":
+            if not deps.dart_key:
+                return [], ["DART_API_KEY is not set"]
+            primary = await collect_dart(deps.http, deps.dart_key, source.id, feeds, rules, today)
+        else:
+            primary = await collect_stored_filings(pool, source.id, feeds, rules, since)
+        return primary.items, primary.errors
     if source.type in REGULATORY_COUNTRY:
         result = await collect_regulatory(
             deps.http,
@@ -720,10 +756,11 @@ class IngestStats:
 WIRE_UPSERT = (
     "insert into public.news_article (url, source_id, outlet, outlet_name, region, tier,"
     " published_at, first_seen_at, headline, summary, language, linked, news_item_id, job_id,"
-    " fetch_state, simhash, translation_state) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,"
-    " $11, $12, $13, $14, $15, $16, $17)"
+    " fetch_state, simhash, translation_state, topics) values ($1, $2, $3, $4, $5, $6, $7, $8,"
+    " $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)"
     " on conflict (url) do update set linked = news_article.linked or excluded.linked,"
-    " news_item_id = coalesce(news_article.news_item_id, excluded.news_item_id)"
+    " news_item_id = coalesce(news_article.news_item_id, excluded.news_item_id),"
+    " topics = array(select distinct t from unnest(news_article.topics || excluded.topics) t)"
 )
 
 
@@ -737,6 +774,7 @@ def wire_args(
     job_id: int,
     *,
     news_item_id: int | None = None,
+    topics: Sequence[str] = (),
 ) -> tuple[Any, ...]:
     """The `WIRE_UPSERT` arguments of one kept item."""
     language = item_language(item, source)
@@ -759,6 +797,7 @@ def wire_args(
         "summary" if item.summary else "headline",
         to_signed(digest) if digest is not None else None,
         "not_needed" if language in (None, "en") else None,
+        list(topics),
     )
 
 
@@ -843,6 +882,8 @@ async def store_items(
             tally.drops["aggregator_not_allowed"] += 1
             continue
         tier = item_tier(item, source, config.sources, holdings.ir_domains)
+        text = f"{item.headline}\n{item.summary or ''}"
+        topics = matching_topics(text, config.sources.portfolio_topics)
         # Everything not dropped above stays on the wire; only linked items of a tier that may
         # raise stories go on to clustering, classification and alerts.
         if tier == 3 and not config.sources.include_tier3:
@@ -850,18 +891,24 @@ async def store_items(
             stats.wire_only += 1
             tally.drops["tier3_wire_only"] += 1
             if url not in on_wire:
-                wire_rows.append(wire_args(url, item, source, tier, published, now, job_id))
+                wire_rows.append(
+                    wire_args(url, item, source, tier, published, now, job_id, topics=topics)
+                )
                 tally.stored_wire += 1
             continue
-        links = linker.link(f"{item.headline}\n{item.summary or ''}", item.tickers)
+        links = linker.link(text, item.tickers)
         if not links and not source.macro:
             stats.unlinked += 1
             stats.wire_only += 1
             tally.drops["unmatched_wire_only"] += 1
             if url not in on_wire:
-                wire_rows.append(wire_args(url, item, source, tier, published, now, job_id))
+                wire_rows.append(
+                    wire_args(url, item, source, tier, published, now, job_id, topics=topics)
+                )
                 tally.stored_wire += 1
             continue
+        outlet_host = item.outlet_host or host_of(url)
+        kind = evidence_kind(source, tier, outlet_host, holdings.ir_domains, config.sources)
         fingerprint = Fingerprint.of(item.headline, item.summary, (item.outlet_name or "",))
         async with pool.acquire() as conn, conn.transaction():
             digest = item_hash(item.headline, item.summary)
@@ -882,9 +929,10 @@ async def store_items(
                 "insert into public.news_item (url, source_id, outlet, outlet_name, tier,"
                 " published_at, first_seen_at, headline, summary, language, cluster_id,"
                 " tickers, links, event_type, affected_ticker, rumour, relevant,"
-                " classified_at, classified_by, job_id, sentiment_score, sentiment_relevance)"
+                " classified_at, classified_by, job_id, sentiment_score, sentiment_relevance,"
+                " evidence_kind, independence_key, is_correction)"
                 " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14,"
-                " $15, $16, $17, $18, $19, $20, $21, $22)"
+                " $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)"
                 " on conflict (url) do nothing returning id",
                 url,
                 source.id,
@@ -908,6 +956,9 @@ async def store_items(
                 job_id,
                 item.sentiment_score,
                 item.sentiment_relevance,
+                kind,
+                config.sources.independence_key(outlet_host) or None,
+                is_correction(item.headline),
             )
             if item_id is None:
                 stats.duplicate += 1
@@ -915,7 +966,17 @@ async def store_items(
                 continue
             await conn.execute(
                 WIRE_UPSERT,
-                *wire_args(url, item, source, tier, published, now, job_id, news_item_id=item_id),
+                *wire_args(
+                    url,
+                    item,
+                    source,
+                    tier,
+                    published,
+                    now,
+                    job_id,
+                    news_item_id=item_id,
+                    topics=topics,
+                ),
             )
             evidence_text = json.dumps(
                 {"headline": item.headline, "summary": item.summary},
@@ -1102,6 +1163,15 @@ class StoryState:
     classified: bool
     resolution: str | None = None
     duplicate_of: int | None = None
+    # Evidence model (N5): kinds of the story's items, whether one is a correction notice,
+    # whether the owner closed the story, whether every link to the holding is indirect, the
+    # stored lifecycle, and the items behind it (for the lifecycle event).
+    kinds: frozenset[str] = frozenset()
+    corrected: bool = False
+    closed: bool = False
+    indirect_only: bool = False
+    lifecycle: str = "reported"
+    evidence: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _finding_from_json(data: Any) -> SearchFinding | None:
@@ -1124,12 +1194,14 @@ async def load_story(
 ) -> StoryState | None:
     cluster = await pool.fetchrow(
         "select id, status, search_rounds, last_searched_at, corroboration, first_seen,"
-        " resolution, duplicate_of from public.story_cluster where id = $1",
+        " resolution, duplicate_of, lifecycle, lifecycle_closed_at"
+        " from public.story_cluster where id = $1",
         cluster_id,
     )
     items = await pool.fetch(
         "select url, headline, summary, outlet, tier, published_at, event_type,"
-        " affected_ticker, relevant, thesis_link, rumour, event_date, classified_at, tickers"
+        " affected_ticker, relevant, thesis_link, rumour, event_date, classified_at, tickers,"
+        " evidence_kind, is_correction, links"
         " from public.news_item where cluster_id = $1 order by tier, published_at, id",
         cluster_id,
     )
@@ -1170,6 +1242,26 @@ async def load_story(
         classified=bool(labelled),
         resolution=cluster["resolution"],
         duplicate_of=cluster["duplicate_of"],
+        kinds=frozenset(i["evidence_kind"] for i in items if i["evidence_kind"]),
+        corrected=any(i["is_correction"] for i in items),
+        closed=cluster["lifecycle_closed_at"] is not None,
+        indirect_only=ticker is not None
+        and indirect_only(
+            link["via"]
+            for i in items
+            for link in json.loads(i["links"])
+            if link["ticker"] == ticker
+        ),
+        lifecycle=cluster["lifecycle"],
+        evidence=[
+            {
+                "url": i["url"],
+                "kind": i["evidence_kind"],
+                "tier": i["tier"],
+                "outlet": i["outlet"],
+            }
+            for i in items[:20]
+        ],
     )
 
 
@@ -1266,11 +1358,41 @@ async def assess(
         status, confidence, reason = "disputed", "disputed", "marked false by the owner"
     story.status = status
     recheck = story.first_seen + window if status in ("unconfirmed", "sentiment") else None
+    lifecycle, lifecycle_reason = lifecycle_for(
+        Basis(
+            status=status,
+            confidence=confidence,
+            kinds=story.kinds,
+            tier1_support=any(
+                t == 1 for _, t in (story.finding.supporting if story.finding else ())
+            ),
+            corrected=story.corrected,
+            closed=story.closed,
+        )
+    )
+    if lifecycle != story.lifecycle:
+        support = [
+            {"url": u, "kind": "search", "tier": t, "outlet": host_of(u)}
+            for u, t in (story.finding.supporting if story.finding else ())
+        ]
+        await pool.execute(
+            "insert into public.story_lifecycle_event (cluster_id, at, from_state, to_state,"
+            " reason, evidence) values ($1, $2, $3, $4, $5, $6::jsonb)",
+            story.id,
+            now,
+            story.lifecycle,
+            lifecycle,
+            lifecycle_reason,
+            json.dumps([*story.evidence, *support]),
+        )
+        story.lifecycle = lifecycle
     await pool.execute(
         "update public.story_cluster set ticker = $2, event_type = $3, severity = $4,"
         " status = $5, confidence = $6, status_reason = $7, rumour = $8, recycled = $9,"
         " event_date = $10, kpi_id = $11, headline = $12, best_tier = $13,"
-        " recheck_until = $14 where id = $1",
+        " recheck_until = $14, lifecycle = $15,"
+        " lifecycle_reason = $16, lifecycle_at = case when lifecycle is distinct from $15"
+        " then $17 else lifecycle_at end where id = $1",
         story.id,
         story.ticker,
         story.event_type,
@@ -1285,6 +1407,9 @@ async def assess(
         story.headline,
         story.best_tier,
         recheck,
+        lifecycle,
+        lifecycle_reason,
+        now,
     )
     return story
 
@@ -1408,6 +1533,12 @@ async def route_story(
         return None
     if story.duplicate_of is not None:
         return None
+    if story.indirect_only and story.severity < config.news.indirect_alert_min_severity:
+        # Reached the holding only through a competitor, supplier, customer or topic.
+        return (
+            f"story {story.id}: indirect link only, severity {story.severity} is below "
+            f"{config.news.indirect_alert_min_severity}"
+        )
     known = await known_event(ctx.pool, story)
     if known is not None:
         await ctx.pool.execute(
@@ -1781,6 +1912,7 @@ async def news_ingest_handler(ctx: JobContext) -> None:
                 if settings.alpha_vantage_api_key
                 else None
             ),
+            dart_key=settings.dart_api_key.get_secret_value() if settings.dart_api_key else None,
             classifier=classifier,
             corroborator=corroborator,
             channels=channels_from_settings(http, settings),

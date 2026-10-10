@@ -72,6 +72,9 @@ class HoldingFeedInfo:
     regulatory_urls: tuple[str, ...] = ()
     topics: tuple[str, ...] = ()
     alpha_symbol: str | None = None
+    # Exchange stock codes (Tokyo 7203, Hong Kong 0700, Shenzhen 002475, Seoul 005930): the
+    # key the exchange disclosure sources match on.
+    listing_codes: tuple[str, ...] = ()
 
 
 async def collect_alpha_vantage_news(

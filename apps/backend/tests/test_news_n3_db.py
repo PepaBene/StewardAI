@@ -15,7 +15,7 @@ from steward.llm.types import Citation
 from steward.news import ai_search
 from steward.news.ai_search import Lead, SearchLeads, news_ai_search_handler
 from steward.news.embeddings import normalise
-from steward.news.translate import LlmTranslator, TranslatedItem, TranslationOutput
+from steward.news.translate import LlmTranslator, TranslatedItem
 from tests.test_news_pipeline import (
     NOON,
     Clock,

@@ -269,10 +269,10 @@ How the plan stays inside it:
 - [x] (Implemented and tested with fake embedder/LLM. The JP/ZH/DE pair set exists (`tests/news/crosslang_pairs.json`, synthetic); `python -m steward.news.eval_cluster --live` must be run with a Google key to set `embedding_duplicate_threshold` (default 0.90 is untuned) and prove the "clusters correctly" criterion. The embedding price is provisional.) Language detect, headline translation, multilingual embedding clustering, SimHash stage, syndication independence groups. → verify: JP/ZH/DE benchmark pairs cluster correctly; duplicate burden target met.
 
 ### N4 Official multi-country primary sources (2–4 weeks, parallel)
-- [ ] EDINET, DART, Companies House, HKEXnews, CNINFO, TDnet (page or paid), Bundesbank/BoJ/BoE/BoC macro; SEDAR+ and Bundesanzeiger only through a reviewed governed fetch (old Phase 4 rules apply: robots, rate limit, kill switch). Ship each as its own source type with an event mapping. → verify: per-country filings of a held issuer appear within an agreed latency vs the official site.
+- [x] (Implemented in `news/primary_sources.py`, with the source types `tdnet`, `hkex`, `cninfo`, `dart`, `gazette`, `filings`, each seeded off, matched to holdings by home country and exchange stock code, with per-language event mapping in the announcement rules. EDINET and Companies House were already built as disclosure jobs (`sources/edinet.py`, `sources/companies_house.py`); the `filings` source turns the rows they stored into items, so there is no second fetch and their request budgets hold. Japan therefore has TDnet (free, no key) beside EDINET, England has the Gazette beside RNS and Companies House. Bank of Japan, Bank of England, Bundesbank and Bank of Canada ship as seeded macro RSS sources (feeds probed 200 on 2026-10-10). **Verified live 2026-10-10:** TDnet list pages, HKEXnews title search, CNINFO query and lookup, the four central-bank feeds; the TDnet, HKEX and CNINFO test fixtures are trimmed live responses. **Not verified:** DART (needs `DART_API_KEY`; response shape follows the OpenDART docs), The Gazette (site was in scheduled maintenance; parsing is generic Atom with a whole-name match), EDINET and Companies House (no keys; the earlier modules say the same), FCA National Storage Mechanism (the documented index name was refused, so it is not shipped). **Not done:** SEDAR+ and Bundesanzeiger (the reviewed governed-fetch path); the latency check against the official sites, which needs the sources enabled for a few days; stock-code matching assumes the listing code appears in the holding's listing tickers, which is unproven for Asian listings until a real holding is enabled. Existing saved `event_rules` configs keep their old rule list: the new per-market rules apply to new configs, or after the owner adds them in the Event rules form.) Ship each as its own source type with an event mapping. → verify: per-country filings of a held issuer appear within an agreed latency vs the official site.
 
 ### N5 Evidence model and event lifecycle (rev 1 Phase 1, 2–3 weeks)
-- [ ] Typed provenance, independence groups, lifecycle states (reported, corroborated, primary-confirmed, disputed, corrected, resolved), identifier-backed entity linking, watch topics. → verify: rev 1 exit criteria.
+- [x] (Implemented in `news/evidence.py` and migration `20261029110000`: each stored item carries `evidence_kind` (primary_filing, regulator, company_release, central_bank, wire, outlet, aggregator, lead), `independence_key` and `is_correction`; each story has a `lifecycle` derived in `assess` from the corroboration status plus the evidence, and every change is appended to `story_lifecycle_event` with its reason and the items behind it. Disputed comes from the existing corroboration rules or the owner's "false"; corrected from a correction notice in the story (English, German, French, Japanese, Chinese, Korean markers; a Japanese forecast revision is not one); resolved is the owner closing the story (`POST /stories/{id}/close`); `GET /stories/{id}/evidence` shows why a story is linked, confirmed, disputed or corrected. Links carry a confidence by how they were found, and a story whose links to its holding are all indirect (competitor, supplier, customer, topic) alerts only from `indirect_alert_min_severity` (default 2, a behaviour change from 1). Portfolio watch topics (`portfolio_topics` in the news sources config; rates, tariffs, antitrust, currencies and semiconductors seeded) tag wire items in `news_article.topics`; a tag never links a holding or alerts. **Not done:** entity linking by executives, brands and fund look-through (identifier-backed aliases already come from GLEIF, Wikidata and listing tickers in `entity_alias`); a UI for the evidence view (API only); backfilling provenance on items stored before this migration (their kind is null and they count as no primary evidence); a measured recall/precision change, which needs the live benchmark run.) Typed provenance, independence groups, lifecycle states (reported, corroborated, primary-confirmed, disputed, corrected, resolved), identifier-backed entity linking, watch topics. → verify: rev 1 exit criteria.
 
 ### N6 Analysis engine (4–6 weeks, ordered)
 - [ ] 6.1 extraction schema + span verification → 6.2 novelty → 6.3 impact chains (needs exposure graph) → 6.4 threads and diffs → 6.5 framing comparison → 6.6 claim check → 6.7 market context → 6.8 themes → 6.9 thesis linkage. Each ships behind its own flag, as a `LLM.complete` call site with a registered prompt, pydantic schema, job type, `ResultCache` key and golden-set eval (section 6.13), starting on luna and moving to flash only where the eval requires it; 6.3 calls the existing `event_reach` exposure path instead of new graph code. → verify: per-technique eval set (see section 11 metrics) run with `news/eval.py --live --model <id>` per provider, human-adjudicated sample of 100 outputs, zero uncited claims in saved output.
@@ -282,6 +282,48 @@ How the plan stays inside it:
 
 ### N8 Evaluation and operations (ongoing)
 - [ ] Benchmark on every change to sources, prompts, models, clustering, severity; segment release gates (language, region, event type); incident review for missed high-severity events; monthly cost per useful event. 
+
+### Implementation gaps in N0–N5 (recorded 2026-10-10)
+
+What is built is code with tests against fakes and recorded fixtures. The items below are what the checkboxes above do not cover. Nothing here was verified against a live model or, unless stated, a live source.
+
+**Verification never run**
+- The full backend regression has not completed once (a run was killed for memory; another stopped on a Windows temp-dir permission error). Only the news, wire, N3, N4, N5 and jobs test files were run together.
+- `tests/test_news_n3_db.py` had no confirmed clean run in its final state before commit 82f4fa5.
+- Live runs needing keys or network: the classifier benchmark against a real model (`news/eval.py --set benchmark --live`); embedding-threshold tuning (`python -m steward.news.eval_cluster --live`, Google key); AI-search cost per call, URL validity and false-lead rate; trafilatura accuracy on 30 real articles per outlet; per-country filing latency against the official sites.
+- Web: type-check and vitest for the N4/N5 form changes were started after the code was written; the evidence endpoints have no UI, so no Playwright check exists.
+
+**Data that is synthetic or provisional**
+- The 150-event benchmark (`tests/news/news_benchmark.json`) and the JP/ZH/DE pair set (`crosslang_pairs.json`) were written by us, not labelled from real history. The "+20 points recall" target in section 11 cannot be judged until a real labelled set exists.
+- `embedding_duplicate_threshold` 0.90 is untuned; the embedding price ($0.15/Mtok) and token counts are estimates, so the cost table in section 8 is still unmeasured.
+- The source catalog (`news_source_catalog.md`) comes from desk research, not live probes, except the feeds probed on 2026-10-10.
+
+**N0–N3 not done**
+- Job types `news_triage`, `news_analysis`, `news_brief` are not registered (no call sites until N6). There is no `switch_models.py` in this repo, so the plan's "add to switch_models.py" step did not apply.
+- Rung-1 feed text is parsed but not persisted to the full-text store; rung 3 (browser render) works only through the render hook.
+- The cost dashboard for tokens and dollars per stage per day exists as SQL view data only; `GET /costs/summary` per-stage spend was not checked.
+- Cluster merge is deliberately conservative (single-item new cluster, no alert, shared ticker); merged-away duplicates across languages that fail those conditions stay separate.
+
+**N4 not done or unverified**
+- SEDAR+ and Bundesanzeiger (the reviewed governed-fetch path) are not built. The FCA National Storage Mechanism is not built (its documented index name was refused).
+- DART (no key), The Gazette (site in maintenance), EDINET and Companies House (no keys) were not exercised live; DART and Gazette parsers follow documentation and generic Atom.
+- Holdings are matched to exchange filings by stock code taken from listing tickers; that this works for real Japanese, Hong Kong, Chinese and Korean holdings is unproven. The Gazette matches by whole normalised company name only.
+- Existing saved `event_rules` configs keep their old rule list, so the per-market rules apply only to new configs or after the owner adds them.
+- The EDINET document link stored by the disclosure job is an API URL that needs a key, so an EDINET item's link is not clickable for reading.
+- All six new sources ship disabled; the "within an agreed latency" criterion was never defined or measured. TDnet reads up to 20 pages for each of two days per run; the polling load has not been reviewed.
+
+**N5 not done**
+- Entity linking by executives, brands and fund look-through; counterparties beyond the existing competitor, supplier, customer fields.
+- No UI for the evidence view or the close/reopen action (API only).
+- Items stored before migration `20261029110000` have null provenance and count as no primary evidence; no backfill.
+- "Resolved" is set only by the owner; there is no automatic resolution.
+- `indirect_alert_min_severity` defaults to 2, a behaviour change for stories reached only through competitor, supplier, customer or topic links; its effect on alert volume was not measured.
+- Portfolio watch topics tag wire items only; they do not feed stories, ranking or briefs yet (N6/N7).
+- The exit criterion "improved benchmark recall without material loss of alert precision" was not measured.
+
+**Housekeeping**
+- No rollback (`.down.sql`) files exist for migrations `20261028100000`, `20261028110000`, `20261029100000`, `20261029110000`, unlike earlier migrations.
+- The repository moved to `https://github.com/PepaBene/StewardAI.git`; `origin` still points at the old URL.
 
 Suggested order if time is short: N0 → N1 → N3 → N2 (rungs 1–4) → N6.1–6.4 → N7 Wire/Brief → rest.
 
