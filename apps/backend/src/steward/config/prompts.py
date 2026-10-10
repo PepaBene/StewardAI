@@ -27,6 +27,8 @@ PromptKey = Literal[
     "news_corroboration",
     "news_escalation",
     "news_digest",
+    "news_translation",
+    "news_search_leads",
     "research_writer",
     "monthly_review",
     "chat_assistant",
@@ -91,6 +93,18 @@ PROMPTS: dict[PromptKey, PromptInfo] = {
         "Daily and weekly digest",
         "Writes the digest from the period's stories, facts and macro figures.",
         "steward.news.digest:SYSTEM_PROMPT",
+    ),
+    "news_translation": PromptInfo(
+        "News translation",
+        "Translates non-English news headlines and summaries to English, keeping numbers and "
+        "names exact.",
+        "steward.news.translate:SYSTEM_PROMPT",
+    ),
+    "news_search_leads": PromptInfo(
+        "News search leads",
+        "Searches the web for recent news on a thinly covered holding and lists article links "
+        "as leads (never as facts).",
+        "steward.news.ai_search:SYSTEM_PROMPT",
     ),
     "research_writer": PromptInfo(
         "Deep research writer",

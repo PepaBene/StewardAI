@@ -88,6 +88,19 @@ describe("trustBars", () => {
 describe("healthSummary", () => {
   it("counts healthy feeds among the enabled ones", () => {
     const src = (id: string, enabled: boolean, healthy: boolean): SourceHealth => ({
+      state: healthy ? "ok" : "down",
+      region: null,
+      language: null,
+      paywall: "open",
+      state_media: false,
+      needs_alt: false,
+      runs_7d: 0,
+      fetched_7d: 0,
+      stored_linked_7d: 0,
+      stored_wire_7d: 0,
+      consecutive_failures: 0,
+      backoff_until: null,
+      last_success_at: null,
       id,
       name: id,
       type: "rss",

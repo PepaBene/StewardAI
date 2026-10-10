@@ -188,9 +188,13 @@ export const SOURCE_TYPES: readonly { value: SourceType; label: string }[] = [
   { value: "rns", label: "RNS, UK regulatory news (per holding)" },
   { value: "eqs", label: "EQS News, German regulatory news (per holding)" },
   { value: "edgar_fts", label: "SEC EDGAR full-text search (per holding)" },
+  { value: "alpha_vantage", label: "Alpha Vantage news (per holding)" },
+  { value: "news_sitemap", label: "News sitemap (Google News sitemap)" },
+  { value: "gdelt", label: "GDELT DOC search (per holding)" },
+  { value: "ai_search", label: "AI web search leads (per holding, own job)" },
 ];
 /** Types whose URL is built per holding (apps/backend/src/steward/config/news_sources.py). */
-export const PER_HOLDING: readonly SourceType[] = ["edgar", "finnhub", "google_news", "rns", "eqs", "edgar_fts"];
+export const PER_HOLDING: readonly SourceType[] = ["edgar", "finnhub", "google_news", "rns", "eqs", "edgar_fts", "alpha_vantage", "gdelt", "ai_search"];
 
 /** Where a per-holding source finds each holding, shown instead of a URL field. */
 export const PER_HOLDING_NOTES: Partial<Record<SourceType, string>> = {
@@ -213,6 +217,8 @@ export type SourceForm = {
   tickers: string;
   /** A macro or central-bank source: kept without matching a holding, shown under Markets and macro. */
   macro: boolean;
+  /** The saved source as it came, so fields the form has no input for (region, language, paywall, fetch policy) survive a save. */
+  base: Partial<NewsSource>;
 };
 
 export type SourcesForm = {
@@ -228,10 +234,12 @@ export type SourcesForm = {
   google_news_country: string;
 };
 
+const SOURCE_FLAGS = { paywall: "open", state_media: false, needs_alt: false } as const;
+
 /** The backend's defaults (news_sources.py), shown when nothing is saved yet (it fills in the same values). */
 export const DEFAULT_SOURCES: NewsSourcesConfig = {
   schema_version: 1,
-  sources: [
+  sources: ([
     { id: "edgar-filings", name: "SEC EDGAR filings", tier: 1, type: "edgar", url: null, enabled: true, tickers: [], macro: false },
     { id: "edgar-full-text", name: "SEC EDGAR full-text search", tier: 1, type: "edgar_fts", url: null, enabled: true, tickers: [], macro: false },
     { id: "finnhub-company-news", name: "Finnhub company news", tier: 2, type: "finnhub", url: null, enabled: true, tickers: [], macro: false },
@@ -241,7 +249,7 @@ export const DEFAULT_SOURCES: NewsSourcesConfig = {
     { id: "fed-press", name: "Federal Reserve press releases", tier: 1, type: "rss", url: "https://www.federalreserve.gov/feeds/press_monetary.xml", enabled: true, tickers: [], macro: true },
     { id: "ecb-press", name: "ECB press releases", tier: 1, type: "rss", url: "https://www.ecb.europa.eu/rss/press.html", enabled: true, tickers: [], macro: true },
     { id: "cnb-press", name: "ČNB press releases", tier: 1, type: "rss", url: "https://www.cnb.cz/en/.content/rss-feed/rss-feed_tz.xml", enabled: true, tickers: [], macro: true },
-  ],
+  ] as const).map((s) => ({ ...s, tickers: [], ...SOURCE_FLAGS })),
   domain_tiers: [
     ...["sec.gov", "globenewswire.com", "prnewswire.com", "businesswire.com", "federalreserve.gov", "ecb.europa.eu", "cnb.cz"].map((domain) => ({ domain, tier: 1 as const })),
     ...["reuters.com", "apnews.com", "cnbc.com", "marketwatch.com", "ft.com", "bloomberg.com", "wsj.com", "hn.cz", "e15.cz", "seznamzpravy.cz"].map((domain) => ({ domain, tier: 2 as const })),
@@ -256,7 +264,7 @@ export const DEFAULT_SOURCES: NewsSourcesConfig = {
 };
 
 export function newSource(): SourceForm {
-  return { key: nextKey(), id: "", name: "", tier: 2, type: "rss", url: "", enabled: true, tickers: "", macro: false };
+  return { key: nextKey(), id: "", name: "", tier: 2, type: "rss", url: "", enabled: true, tickers: "", macro: false, base: { ...SOURCE_FLAGS } };
 }
 
 /** "reuters.com 2" per line <-> [{domain, tier}]. */
@@ -280,6 +288,7 @@ export function sourcesFromBody(body: NewsSourcesConfig | null, defaults: NewsSo
       enabled: s.enabled ?? true,
       tickers: (s.tickers ?? []).join("\n"),
       macro: s.macro ?? false,
+      base: s,
     })),
     domain_tiers: (b.domain_tiers ?? []).map((d) => `${d.domain} ${d.tier}`).join("\n"),
     blocked_domains: (b.blocked_domains ?? []).join("\n"),
@@ -296,6 +305,8 @@ export function sourcesToBody(form: SourcesForm): NewsSourcesConfig {
   return {
     schema_version: 1,
     sources: form.sources.map((s) => ({
+      ...SOURCE_FLAGS,
+      ...s.base,
       id: s.id.trim(),
       name: s.name.trim(),
       tier: s.tier,

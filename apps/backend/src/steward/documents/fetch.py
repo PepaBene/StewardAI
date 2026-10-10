@@ -30,11 +30,19 @@ class FetchError(Exception):
     pass
 
 
+class NotModified(FetchError):
+    """The server answered HTTP 304 to a conditional request (If-None-Match or
+    If-Modified-Since): nothing changed since the caller's last read."""
+
+
 @dataclass(frozen=True)
 class Document:
     url: str
     content_type: str  # PDF, HTML or TEXT
     data: bytes
+    # Validators for the next conditional request, when the server sent them.
+    etag: str | None = None
+    last_modified: str | None = None
 
     @property
     def sha256(self) -> str:
@@ -178,6 +186,8 @@ async def fetch_document(
                 if response.status_code in _REDIRECTS and response.headers.get("location"):
                     current = urljoin(current, response.headers["location"])
                     continue
+                if response.status_code == 304:
+                    raise NotModified(f"{url} not modified")
                 if response.status_code != 200:
                     raise FetchError(f"{url} returned HTTP {response.status_code}")
                 chunks: list[bytes] = []
@@ -189,6 +199,8 @@ async def fetch_document(
                     chunks.append(chunk)
                 data = b"".join(chunks)
                 content_type = sniff_type(data, response.headers.get("content-type"), current)
+                etag = response.headers.get("etag")
+                last_modified = response.headers.get("last-modified")
                 break
         else:
             raise FetchError(f"{url} redirects more than {MAX_REDIRECTS} times")
@@ -196,4 +208,6 @@ async def fetch_document(
         raise FetchError(f"fetching {url} failed: {exc}") from exc
     if not data:
         raise FetchError(f"{url} returned an empty body")
-    return Document(url=str(url), content_type=content_type, data=data)
+    return Document(
+        url=str(url), content_type=content_type, data=data, etag=etag, last_modified=last_modified
+    )

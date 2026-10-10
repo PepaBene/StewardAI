@@ -62,8 +62,8 @@ describe("news sources form", () => {
   const defaults = {
     schema_version: 1 as const,
     sources: [
-      { id: "edgar-filings", name: "EDGAR", tier: 1 as const, type: "edgar" as const, url: null, enabled: true, tickers: [], macro: false },
-      { id: "ecb-press", name: "ECB", tier: 1 as const, type: "rss" as const, url: "https://www.ecb.europa.eu/rss/press.html", enabled: true, tickers: [], macro: true },
+      { id: "edgar-filings", name: "EDGAR", tier: 1 as const, type: "edgar" as const, url: null, enabled: true, tickers: [], macro: false, paywall: "open" as const, state_media: false, needs_alt: false },
+      { id: "ecb-press", name: "ECB", tier: 1 as const, type: "rss" as const, url: "https://www.ecb.europa.eu/rss/press.html", enabled: true, tickers: [], macro: true, paywall: "open" as const, state_media: false, needs_alt: false },
     ],
     domain_tiers: [{ domain: "reuters.com", tier: 2 as const }],
     blocked_domains: [],
@@ -76,6 +76,20 @@ describe("news sources form", () => {
 
   it("round-trips", () => {
     expect(sourcesToBody(sourcesFromBody(null, defaults))).toEqual(defaults);
+  });
+
+  it("keeps the fields the form has no input for (region, language, paywall, fetch policy)", () => {
+    const seeded = {
+      ...defaults,
+      sources: [
+        { ...defaults.sources[1], region: "DE", language: "de", paywall: "hard" as const, state_media: true, fetch: { rungs: [], display: "link_only" as const } },
+      ],
+    };
+    const form = sourcesFromBody(seeded as never, defaults);
+    form.sources[0].name = "Renamed";
+    const out = sourcesToBody(form).sources![0];
+    expect(out).toMatchObject({ name: "Renamed", region: "DE", language: "de", paywall: "hard", state_media: true });
+    expect(out.fetch).toEqual({ rungs: [], display: "link_only" });
   });
 
   it("keeps the macro flag and the aggregator allow list", () => {

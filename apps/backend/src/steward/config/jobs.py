@@ -532,11 +532,79 @@ class NewsSettings(ConfigModel):
         description="Most EDGAR full-text search hits read per query (100 per request; EDGAR "
         "serves at most 10,000). A query with more is noted in the collect step.",
     )
+    translation_model: ModelId = Field(
+        default="gpt-6-luna",
+        description="Translates the headline and summary of non-English wire items to English "
+        "(the original is kept). A cheap model: the work is volume, not judgement.",
+    )
+    translation_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    translation_per_run: int = Field(
+        default=300,
+        ge=0,
+        le=5000,
+        description="Items translated per run (0: no translation); linked items first.",
+    )
+    search_lead_model: ModelId = Field(
+        default="gpt-6-luna",
+        description="The model that web-searches for recent news on thinly covered holdings.",
+    )
+    search_lead_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    ai_search_max_searches: int = Field(
+        default=3, ge=1, le=20, description="Web searches per holding per run."
+    )
+    ai_search_max_holdings: int = Field(
+        default=10, ge=0, le=100, description="Holdings searched per run (0: none)."
+    )
+    ai_search_thin_below: int = Field(
+        default=3,
+        ge=1,
+        le=100,
+        description="A holding is searched when the wire has fewer than this many items for "
+        "it in the window.",
+    )
+    ai_search_days: int = Field(
+        default=3, ge=1, le=14, description="How far back leads are asked for, and the window."
+    )
+    embedding_model: ModelId = Field(
+        default="gemini-embedding-2",
+        description="Multilingual embedding of each wire item, used to group the same event "
+        "reported in different languages. Needs GOOGLE_API_KEY.",
+    )
+    embedding_dimensions: int = Field(default=768, ge=128, le=3072)
+    embedding_per_run: int = Field(
+        default=600, ge=0, le=5000, description="Items embedded per run (0: none)."
+    )
+    embedding_duplicate_threshold: float = Field(
+        default=0.90,
+        ge=0.5,
+        le=1.0,
+        description="Cosine similarity at or above which two wire items within the window are "
+        "the same event. High on purpose: a missed duplicate costs a repeat in the wire, a "
+        "wrong one hides a story. Tune with `python -m steward.news.eval_cluster --live`.",
+    )
+    duplicate_window_hours: int = Field(
+        default=36, ge=1, le=168, description="Items further apart than this are not grouped."
+    )
+    fulltext_per_run: int = Field(
+        default=40,
+        ge=0,
+        le=500,
+        description="Article pages fetched per run for holding-linked wire items (0: none). "
+        "Each source's own hourly allowance (`fetch.max_requests_per_hour`) also applies.",
+    )
+    fulltext_browser_fallback: bool = Field(
+        default=False,
+        description="Read an article page in a headless browser when a plain request is refused "
+        "(HTTP 403/429) or the page is an empty JavaScript shell. Never logs in or bypasses a "
+        "paywall. Needs Playwright (the `browser` extra).",
+    )
 
     @model_validator(mode="after")
     def _effort_supported(self) -> Self:
         check_effort(self.classification_model, self.classification_effort, "classification_effort")
         check_effort(self.corroboration_model, self.corroboration_effort, "corroboration_effort")
+        check_effort(self.translation_model, self.translation_effort, "translation_effort")
+        check_effort(self.search_lead_model, self.search_lead_effort, "search_lead_effort")
         return self
 
 
@@ -1900,6 +1968,12 @@ class JobsConfig(ConfigModel):
         description="Finds investor-relations pages for holdings that have none (web search, "
         "checked and approved by AI). Default: Mondays 07:30.",
     )
+    news_ai_search: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(enabled=False, cron="20 6 * * *"),
+        description="Asks a search-capable model for recent news on holdings the wire covers "
+        "thinly. Results are leads at the lowest tier: they never alert on their own. Off by "
+        "default (it spends on web searches). Default: daily 06:20.",
+    )
     gap_research: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="0 8 * * 3"),
         description="Searches reliable web pages for facts the structured sources left empty "
@@ -2016,6 +2090,7 @@ class JobsConfig(ConfigModel):
             "edinet_filings": self.edinet_filings,
             "ai_approvals": self.ai_approvals,
             "ir_discovery": self.ir_discovery,
+            "news_ai_search": self.news_ai_search,
             "gap_research": self.gap_research,
             "exposure_build": self.exposure_build,
             "disclosure_sources": self.disclosure_sources,

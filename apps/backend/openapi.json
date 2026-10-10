@@ -31722,6 +31722,7 @@
                 "twelve_data_corporate_actions",
                 "ai_approvals",
                 "ir_discovery",
+                "news_ai_search",
                 "gap_research",
                 "exposure_build",
                 "disclosure_sources",
@@ -31795,6 +31796,7 @@
                 "twelve_data_corporate_actions",
                 "ai_approvals",
                 "ir_discovery",
+                "news_ai_search",
                 "gap_research",
                 "exposure_build",
                 "disclosure_sources",
@@ -31822,6 +31824,80 @@
             ],
             "title": "Default Job Cap Usd",
             "description": "Most AI spend of one run of a job type not in `per_job_cap_usd`. Null: no cap."
+          },
+          "per_job_monthly_cap_usd": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "propertyNames": {
+              "enum": [
+                "portfolio_sync",
+                "earnings_check",
+                "thesis_verdicts",
+                "earnings_calendar",
+                "earnings_calendar_full",
+                "earnings_due",
+                "fact_reconcile",
+                "reference_data",
+                "price_history",
+                "intraday_prices",
+                "holiday_refresh",
+                "macro_collect",
+                "public_data_collect",
+                "source_audit",
+                "event_escalation",
+                "monitor",
+                "news_ingest",
+                "daily_digest",
+                "weekly_digest",
+                "research",
+                "ownership_13f",
+                "insider_trades",
+                "etf_look_through",
+                "monthly_review",
+                "chat",
+                "sec_xbrl",
+                "valuation_refresh",
+                "control_stakes",
+                "nport_holdings",
+                "fund_probes",
+                "fund_characteristics_audit",
+                "fund_issuer_facts",
+                "free_source_alerts",
+                "change_alerts",
+                "shadow_snapshot",
+                "shadow_report",
+                "raw_retention",
+                "zero_cost_gate",
+                "returns_refresh",
+                "exchange_probes",
+                "ir_releases",
+                "sec_fsds_backfill",
+                "pdmr_uk",
+                "graph_review",
+                "fmp_company",
+                "alpha_vantage_statements",
+                "epo_patents",
+                "companies_house_filings",
+                "edinet_filings",
+                "twelve_data_corporate_actions",
+                "ai_approvals",
+                "ir_discovery",
+                "news_ai_search",
+                "gap_research",
+                "exposure_build",
+                "disclosure_sources",
+                "disclosure_ingest",
+                "disclosure_identifiers",
+                "disclosure_deals",
+                "disclosure_esef",
+                "disclosure_estimates",
+                "disclosure_alerts"
+              ]
+            },
+            "type": "object",
+            "title": "Per Job Monthly Cap Usd",
+            "description": "Most AI spend of one job type per calendar month (Europe/Prague), in USD, so one stage cannot use the whole monthly budget. A run over it fails before its next request, whatever its criticality."
           }
         },
         "additionalProperties": false,
@@ -48642,6 +48718,55 @@
         ],
         "title": "FeedbackOut"
       },
+      "FetchPolicy": {
+        "properties": {
+          "rungs": {
+            "items": {
+              "type": "integer",
+              "enum": [
+                1,
+                2,
+                3,
+                4
+              ]
+            },
+            "type": "array",
+            "title": "Rungs",
+            "description": "Ladder rungs allowed, tried in order: 1 feed text, 2 polite fetch + extractor, 3 browser render, 4 official API. Empty: headline and summary only."
+          },
+          "max_requests_per_hour": {
+            "type": "integer",
+            "maximum": 3600.0,
+            "minimum": 0.0,
+            "title": "Max Requests Per Hour",
+            "description": "Article page fetches per hour for this source.",
+            "default": 30
+          },
+          "retention_days": {
+            "type": "integer",
+            "maximum": 3650.0,
+            "minimum": 1.0,
+            "title": "Retention Days",
+            "description": "Days the extracted text is kept.",
+            "default": 90
+          },
+          "display": {
+            "type": "string",
+            "enum": [
+              "full",
+              "excerpt",
+              "link_only"
+            ],
+            "title": "Display",
+            "description": "What the app shows of the text: full, a short excerpt, or only a link. Analysis may use more than is displayed.",
+            "default": "excerpt"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FetchPolicy",
+        "description": "How far the article-text ladder (news/fulltext.py) may go for a source's items."
+      },
       "Figure": {
         "properties": {
           "value": {
@@ -60297,6 +60422,10 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Finds investor-relations pages for holdings that have none (web search, checked and approved by AI). Default: Mondays 07:30."
           },
+          "news_ai_search": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Asks a search-capable model for recent news on holdings the wire covers thinly. Results are leads at the lowest tier: they never alert on their own. Off by default (it spends on web searches). Default: daily 06:20."
+          },
           "gap_research": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Searches reliable web pages for facts the structured sources left empty (next report date, shares outstanding, description); AI approves them. Default: Wednesdays 08:00."
@@ -66389,6 +66518,162 @@
             "title": "Edgar Fts Max Hits",
             "description": "Most EDGAR full-text search hits read per query (100 per request; EDGAR serves at most 10,000). A query with more is noted in the collect step.",
             "default": 100
+          },
+          "translation_model": {
+            "type": "string",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Translation Model",
+            "description": "Translates the headline and summary of non-English wire items to English (the original is kept). A cheap model: the work is volume, not judgement.",
+            "default": "gpt-6-luna",
+            "examples": [
+              "claude-sonnet-5",
+              "gpt-6-luna"
+            ]
+          },
+          "translation_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Effort",
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+          },
+          "translation_per_run": {
+            "type": "integer",
+            "maximum": 5000.0,
+            "minimum": 0.0,
+            "title": "Translation Per Run",
+            "description": "Items translated per run (0: no translation); linked items first.",
+            "default": 300
+          },
+          "search_lead_model": {
+            "type": "string",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Search Lead Model",
+            "description": "The model that web-searches for recent news on thinly covered holdings.",
+            "default": "gpt-6-luna",
+            "examples": [
+              "claude-sonnet-5",
+              "gpt-6-luna"
+            ]
+          },
+          "search_lead_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Lead Effort",
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+          },
+          "ai_search_max_searches": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Ai Search Max Searches",
+            "description": "Web searches per holding per run.",
+            "default": 3
+          },
+          "ai_search_max_holdings": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Ai Search Max Holdings",
+            "description": "Holdings searched per run (0: none).",
+            "default": 10
+          },
+          "ai_search_thin_below": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Ai Search Thin Below",
+            "description": "A holding is searched when the wire has fewer than this many items for it in the window.",
+            "default": 3
+          },
+          "ai_search_days": {
+            "type": "integer",
+            "maximum": 14.0,
+            "minimum": 1.0,
+            "title": "Ai Search Days",
+            "description": "How far back leads are asked for, and the window.",
+            "default": 3
+          },
+          "embedding_model": {
+            "type": "string",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Embedding Model",
+            "description": "Multilingual embedding of each wire item, used to group the same event reported in different languages. Needs GOOGLE_API_KEY.",
+            "default": "gemini-embedding-2",
+            "examples": [
+              "claude-sonnet-5",
+              "gpt-6-luna"
+            ]
+          },
+          "embedding_dimensions": {
+            "type": "integer",
+            "maximum": 3072.0,
+            "minimum": 128.0,
+            "title": "Embedding Dimensions",
+            "default": 768
+          },
+          "embedding_per_run": {
+            "type": "integer",
+            "maximum": 5000.0,
+            "minimum": 0.0,
+            "title": "Embedding Per Run",
+            "description": "Items embedded per run (0: none).",
+            "default": 600
+          },
+          "embedding_duplicate_threshold": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.5,
+            "title": "Embedding Duplicate Threshold",
+            "description": "Cosine similarity at or above which two wire items within the window are the same event. High on purpose: a missed duplicate costs a repeat in the wire, a wrong one hides a story. Tune with `python -m steward.news.eval_cluster --live`.",
+            "default": 0.9
+          },
+          "duplicate_window_hours": {
+            "type": "integer",
+            "maximum": 168.0,
+            "minimum": 1.0,
+            "title": "Duplicate Window Hours",
+            "description": "Items further apart than this are not grouped.",
+            "default": 36
+          },
+          "fulltext_per_run": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Fulltext Per Run",
+            "description": "Article pages fetched per run for holding-linked wire items (0: none). Each source's own hourly allowance (`fetch.max_requests_per_hour`) also applies.",
+            "default": 40
+          },
+          "fulltext_browser_fallback": {
+            "type": "boolean",
+            "title": "Fulltext Browser Fallback",
+            "description": "Read an article page in a headless browser when a plain request is refused (HTTP 403/429) or the page is an empty JavaScript shell. Never logs in or bypasses a paywall. Needs Playwright (the `browser` extra).",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -66434,7 +66719,10 @@
               "rns",
               "eqs",
               "edgar_fts",
-              "alpha_vantage"
+              "alpha_vantage",
+              "news_sitemap",
+              "gdelt",
+              "ai_search"
             ],
             "title": "Type",
             "description": "rss: an RSS or Atom feed. page: a news page read daily; new links on it become items. edgar: every holding's SEC filings. finnhub: US company news. google_news: a Google News query per holding (unofficial endpoint). rns: UK regulatory announcements per holding (Investegate company page). eqs: German regulatory announcements (EQS News company page from the holding profile's regulatory_news_urls). edgar_fts: SEC full-text search for each holding's watch topics and for other filers naming it."
@@ -66475,6 +66763,71 @@
             "title": "Macro",
             "description": "A macro or central-bank source: its items are kept without matching a holding and appear under Markets and macro.",
             "default": false
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region",
+            "description": "ISO country of the outlet or authority (US, GB, JP, ...). Null: global."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z]{2,3}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language",
+            "description": "Language of the source's items when the feed does not say (ISO 639)."
+          },
+          "paywall": {
+            "type": "string",
+            "enum": [
+              "open",
+              "metered",
+              "hard"
+            ],
+            "title": "Paywall",
+            "description": "open: the article page is readable. metered: some free reads. hard: only headline and summary are public. Never bypassed.",
+            "default": "open"
+          },
+          "state_media": {
+            "type": "boolean",
+            "title": "State Media",
+            "description": "State-run media: labelled, and never the only corroboration of a political story.",
+            "default": false
+          },
+          "bias_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bias Note",
+            "description": "Short label shown with the outlet (tabloid, trade press, state media)."
+          },
+          "needs_alt": {
+            "type": "boolean",
+            "title": "Needs Alt",
+            "description": "The feed is blocked or gone (HTTP 402/403/404); kept off until another route (Google News query, browser rung) is configured.",
+            "default": false
+          },
+          "fetch": {
+            "$ref": "#/components/schemas/FetchPolicy"
           }
         },
         "additionalProperties": false,
@@ -66494,6 +66847,14 @@
             "const": 1,
             "title": "Schema Version",
             "default": 1
+          },
+          "syndication_groups": {
+            "items": {
+              "$ref": "#/components/schemas/SyndicationGroup"
+            },
+            "type": "array",
+            "title": "Syndication Groups",
+            "description": "Outlets that republish one wire's copy. A story carried by several of them counts as one independent source, not several."
           },
           "sources": {
             "items": {
@@ -73889,6 +74250,8 @@
               "news_corroboration",
               "news_escalation",
               "news_digest",
+              "news_translation",
+              "news_search_leads",
               "research_writer",
               "monthly_review",
               "chat_assistant",
@@ -73953,6 +74316,8 @@
                 "news_corroboration",
                 "news_escalation",
                 "news_digest",
+                "news_translation",
+                "news_search_leads",
                 "research_writer",
                 "monthly_review",
                 "chat_assistant",
@@ -73995,6 +74360,8 @@
                 "news_corroboration",
                 "news_escalation",
                 "news_digest",
+                "news_translation",
+                "news_search_leads",
                 "research_writer",
                 "monthly_review",
                 "chat_assistant",
@@ -85088,7 +85455,10 @@
               "rns",
               "eqs",
               "edgar_fts",
-              "alpha_vantage"
+              "alpha_vantage",
+              "news_sitemap",
+              "gdelt",
+              "ai_search"
             ],
             "title": "Type"
           },
@@ -85158,6 +85528,126 @@
             "type": "boolean",
             "title": "Healthy",
             "description": "healthy = enabled, last fetched within the Jobs config's monitoring.news_coverage_hours, and that fetch recorded no error or note"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded",
+              "down",
+              "unknown",
+              "disabled"
+            ],
+            "title": "State",
+            "description": "down: the circuit breaker is open after repeated failures (the outlet is unreachable, which is not the same as no news); degraded: the last read failed; unknown: never read successfully.",
+            "default": "unknown"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region",
+            "description": "ISO country of the outlet."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "paywall": {
+            "type": "string",
+            "enum": [
+              "open",
+              "metered",
+              "hard"
+            ],
+            "title": "Paywall",
+            "default": "open"
+          },
+          "state_media": {
+            "type": "boolean",
+            "title": "State Media",
+            "default": false
+          },
+          "needs_alt": {
+            "type": "boolean",
+            "title": "Needs Alt",
+            "description": "Feed blocked or gone; kept off.",
+            "default": false
+          },
+          "consecutive_failures": {
+            "type": "integer",
+            "title": "Consecutive Failures",
+            "default": 0
+          },
+          "backoff_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backoff Until",
+            "description": "Breaker reopens then."
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "runs_7d": {
+            "type": "integer",
+            "title": "Runs 7D",
+            "default": 0
+          },
+          "fetched_7d": {
+            "type": "integer",
+            "title": "Fetched 7D",
+            "default": 0
+          },
+          "stored_linked_7d": {
+            "type": "integer",
+            "title": "Stored Linked 7D",
+            "description": "Items that became story items.",
+            "default": 0
+          },
+          "stored_wire_7d": {
+            "type": "integer",
+            "title": "Stored Wire 7D",
+            "description": "Items kept on the wire only.",
+            "default": 0
+          },
+          "avg_latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Latency Ms"
           }
         },
         "type": "object",
@@ -87954,6 +88444,40 @@
           "version"
         ],
         "title": "SurpriseFormulaOut"
+      },
+      "SyndicationGroup": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Name",
+            "examples": [
+              "max-single-position"
+            ]
+          },
+          "domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+              "examples": [
+                "reuters.com"
+              ]
+            },
+            "type": "array",
+            "minItems": 2,
+            "title": "Domains"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "domains"
+        ],
+        "title": "SyndicationGroup",
+        "description": "Outlets that republish one wire's copy: one independence group, counted once as a\nsource however many of them carry a story. The first domain is the group's key."
       },
       "TargetBand": {
         "properties": {

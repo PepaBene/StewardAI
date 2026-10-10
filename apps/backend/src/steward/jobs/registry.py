@@ -39,6 +39,7 @@ from steward.lookthrough.collect import etf_look_through_handler
 from steward.macro.collect import macro_collect_handler
 from steward.macro.public_collect import public_data_collect_handler
 from steward.monitor import monitor_handler
+from steward.news.ai_search import news_ai_search_handler
 from steward.news.digest import daily_digest_handler, weekly_digest_handler
 from steward.news.escalation import event_escalation_handler
 from steward.news.pipeline import news_ingest_handler
@@ -127,6 +128,7 @@ JobType = Literal[
     "twelve_data_corporate_actions",
     "ai_approvals",
     "ir_discovery",
+    "news_ai_search",
     "gap_research",
     "exposure_build",
     "disclosure_sources",
@@ -191,6 +193,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "twelve_data_corporate_actions": twelve_data_corporate_actions_handler,
     "ai_approvals": ai_approvals_handler,
     "ir_discovery": ir_discovery_handler,
+    "news_ai_search": news_ai_search_handler,
     "gap_research": gap_research_handler,
     "exposure_build": exposure_build_handler,
     "disclosure_sources": disclosure_sources_handler,

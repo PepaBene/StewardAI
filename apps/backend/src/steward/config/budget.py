@@ -71,6 +71,7 @@ BudgetJobType = Literal[
     "twelve_data_corporate_actions",
     "ai_approvals",
     "ir_discovery",
+    "news_ai_search",
     "gap_research",
     "exposure_build",
     "disclosure_sources",
@@ -120,6 +121,10 @@ def _default_prices() -> list[ModelPrice]:
     prices = [
         ModelPrice(model=m, input_per_mtok=i, output_per_mtok=o) for m, (i, o) in table.items()
     ]
+    # Embedding model: input only. PROVISIONAL list price (the plan flags it unverified; the
+    # embedding API reports no usage, so tokens are estimated). Check against the provider's
+    # price page and correct here; the news embedding cost is ~$1/month at this rate.
+    prices.append(ModelPrice(model="gemini-embedding-2", input_per_mtok=0.15, output_per_mtok=0))
     # OpenAI and Google list prices of 2026-10-06 (docs/plans/multi_provider_model_routing_plan.md).
     # Cached input is read at 5 % (sol) or 10 % (luna, flash) of input with no write premium.
     # Gemini 3.x prices double on 2027-01-01: re-price flash then.
@@ -205,6 +210,12 @@ class BudgetConfig(ConfigModel):
         description="Most AI spend of one run of a job type not in `per_job_cap_usd`."
         " Null: no cap.",
     )
+    per_job_monthly_cap_usd: dict[BudgetJobType, float] = Field(
+        default_factory=dict,
+        description="Most AI spend of one job type per calendar month (Europe/Prague), in USD,"
+        " so one stage cannot use the whole monthly budget. A run over it fails before its next"
+        " request, whatever its criticality.",
+    )
 
     @model_validator(mode="after")
     def _one_price_per_model(self) -> Self:
@@ -213,6 +224,9 @@ class BudgetConfig(ConfigModel):
         for job_type, cap in self.per_job_cap_usd.items():
             if cap <= 0:
                 raise ValueError(f"per_job_cap_usd[{job_type}] must be greater than 0")
+        for job_type, cap in self.per_job_monthly_cap_usd.items():
+            if cap <= 0:
+                raise ValueError(f"per_job_monthly_cap_usd[{job_type}] must be greater than 0")
         if self.at_cap == "downgrade_noncritical" and not any(
             p.model == self.downgrade_model for p in self.prices
         ):
@@ -225,3 +239,7 @@ class BudgetConfig(ConfigModel):
         """The spend cap of one run of `job_type` (None: none)."""
         caps = {str(k): v for k, v in self.per_job_cap_usd.items()}
         return caps.get(job_type, self.default_job_cap_usd)
+
+    def job_monthly_cap(self, job_type: str) -> float | None:
+        """The spend cap of one job type per month (None: none)."""
+        return {str(k): v for k, v in self.per_job_monthly_cap_usd.items()}.get(job_type)

@@ -10058,7 +10058,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "gap_research" | "exposure_build" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "news_ai_search" | "gap_research" | "exposure_build" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -10071,6 +10071,13 @@ export interface components {
              * @description Most AI spend of one run of a job type not in `per_job_cap_usd`. Null: no cap.
              */
             default_job_cap_usd?: number | null;
+            /**
+             * Per Job Monthly Cap Usd
+             * @description Most AI spend of one job type per calendar month (Europe/Prague), in USD, so one stage cannot use the whole monthly budget. A run over it fails before its next request, whatever its criticality.
+             */
+            per_job_monthly_cap_usd?: {
+                [key: string]: number;
+            };
         };
         /** BudgetConfigVersion */
         BudgetConfigVersion: {
@@ -16026,6 +16033,36 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * FetchPolicy
+         * @description How far the article-text ladder (news/fulltext.py) may go for a source's items.
+         */
+        FetchPolicy: {
+            /**
+             * Rungs
+             * @description Ladder rungs allowed, tried in order: 1 feed text, 2 polite fetch + extractor, 3 browser render, 4 official API. Empty: headline and summary only.
+             */
+            rungs?: (1 | 2 | 3 | 4)[];
+            /**
+             * Max Requests Per Hour
+             * @description Article page fetches per hour for this source.
+             * @default 30
+             */
+            max_requests_per_hour: number;
+            /**
+             * Retention Days
+             * @description Days the extracted text is kept.
+             * @default 90
+             */
+            retention_days: number;
+            /**
+             * Display
+             * @description What the app shows of the text: full, a short excerpt, or only a link. Analysis may use more than is displayed.
+             * @default excerpt
+             * @enum {string}
+             */
+            display: "full" | "excerpt" | "link_only";
+        };
         /** Figure */
         Figure: {
             /**
@@ -19998,6 +20035,8 @@ export interface components {
             ai_approvals?: components["schemas"]["JobSchedule"];
             /** @description Finds investor-relations pages for holdings that have none (web search, checked and approved by AI). Default: Mondays 07:30. */
             ir_discovery?: components["schemas"]["JobSchedule"];
+            /** @description Asks a search-capable model for recent news on holdings the wire covers thinly. Results are leads at the lowest tier: they never alert on their own. Off by default (it spends on web searches). Default: daily 06:20. */
+            news_ai_search?: components["schemas"]["JobSchedule"];
             /** @description Searches reliable web pages for facts the structured sources left empty (next report date, shares outstanding, description); AI approves them. Default: Wednesdays 08:00. */
             gap_research?: components["schemas"]["JobSchedule"];
             /** @description Builds each holding's revenue-by-country exposure from its latest annual SEC XBRL filing (reported basis). Your own exposure entries are never changed. Default: Tuesdays 05:50. */
@@ -22098,6 +22137,105 @@ export interface components {
              * @default 100
              */
             edgar_fts_max_hits: number;
+            /**
+             * Translation Model
+             * @description Translates the headline and summary of non-English wire items to English (the original is kept). A cheap model: the work is volume, not judgement.
+             * @default gpt-6-luna
+             * @example claude-sonnet-5
+             * @example gpt-6-luna
+             */
+            translation_model: string;
+            /**
+             * Translation Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            translation_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Translation Per Run
+             * @description Items translated per run (0: no translation); linked items first.
+             * @default 300
+             */
+            translation_per_run: number;
+            /**
+             * Search Lead Model
+             * @description The model that web-searches for recent news on thinly covered holdings.
+             * @default gpt-6-luna
+             * @example claude-sonnet-5
+             * @example gpt-6-luna
+             */
+            search_lead_model: string;
+            /**
+             * Search Lead Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            search_lead_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Ai Search Max Searches
+             * @description Web searches per holding per run.
+             * @default 3
+             */
+            ai_search_max_searches: number;
+            /**
+             * Ai Search Max Holdings
+             * @description Holdings searched per run (0: none).
+             * @default 10
+             */
+            ai_search_max_holdings: number;
+            /**
+             * Ai Search Thin Below
+             * @description A holding is searched when the wire has fewer than this many items for it in the window.
+             * @default 3
+             */
+            ai_search_thin_below: number;
+            /**
+             * Ai Search Days
+             * @description How far back leads are asked for, and the window.
+             * @default 3
+             */
+            ai_search_days: number;
+            /**
+             * Embedding Model
+             * @description Multilingual embedding of each wire item, used to group the same event reported in different languages. Needs GOOGLE_API_KEY.
+             * @default gemini-embedding-2
+             * @example claude-sonnet-5
+             * @example gpt-6-luna
+             */
+            embedding_model: string;
+            /**
+             * Embedding Dimensions
+             * @default 768
+             */
+            embedding_dimensions: number;
+            /**
+             * Embedding Per Run
+             * @description Items embedded per run (0: none).
+             * @default 600
+             */
+            embedding_per_run: number;
+            /**
+             * Embedding Duplicate Threshold
+             * @description Cosine similarity at or above which two wire items within the window are the same event. High on purpose: a missed duplicate costs a repeat in the wire, a wrong one hides a story. Tune with `python -m steward.news.eval_cluster --live`.
+             * @default 0.9
+             */
+            embedding_duplicate_threshold: number;
+            /**
+             * Duplicate Window Hours
+             * @description Items further apart than this are not grouped.
+             * @default 36
+             */
+            duplicate_window_hours: number;
+            /**
+             * Fulltext Per Run
+             * @description Article pages fetched per run for holding-linked wire items (0: none). Each source's own hourly allowance (`fetch.max_requests_per_hour`) also applies.
+             * @default 40
+             */
+            fulltext_per_run: number;
+            /**
+             * Fulltext Browser Fallback
+             * @description Read an article page in a headless browser when a plain request is refused (HTTP 403/429) or the page is an empty JavaScript shell. Never logs in or bypasses a paywall. Needs Playwright (the `browser` extra).
+             * @default false
+             */
+            fulltext_browser_fallback: boolean;
         };
         /** NewsSource */
         NewsSource: {
@@ -22119,7 +22257,7 @@ export interface components {
              * @description rss: an RSS or Atom feed. page: a news page read daily; new links on it become items. edgar: every holding's SEC filings. finnhub: US company news. google_news: a Google News query per holding (unofficial endpoint). rns: UK regulatory announcements per holding (Investegate company page). eqs: German regulatory announcements (EQS News company page from the holding profile's regulatory_news_urls). edgar_fts: SEC full-text search for each holding's watch topics and for other filers naming it.
              * @enum {string}
              */
-            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts" | "alpha_vantage";
+            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts" | "alpha_vantage" | "news_sitemap" | "gdelt" | "ai_search";
             /**
              * Url
              * @description Feed or page URL (rss, page).
@@ -22141,6 +22279,41 @@ export interface components {
              * @default false
              */
             macro: boolean;
+            /**
+             * Region
+             * @description ISO country of the outlet or authority (US, GB, JP, ...). Null: global.
+             */
+            region?: string | null;
+            /**
+             * Language
+             * @description Language of the source's items when the feed does not say (ISO 639).
+             */
+            language?: string | null;
+            /**
+             * Paywall
+             * @description open: the article page is readable. metered: some free reads. hard: only headline and summary are public. Never bypassed.
+             * @default open
+             * @enum {string}
+             */
+            paywall: "open" | "metered" | "hard";
+            /**
+             * State Media
+             * @description State-run media: labelled, and never the only corroboration of a political story.
+             * @default false
+             */
+            state_media: boolean;
+            /**
+             * Bias Note
+             * @description Short label shown with the outlet (tabloid, trade press, state media).
+             */
+            bias_note?: string | null;
+            /**
+             * Needs Alt
+             * @description The feed is blocked or gone (HTTP 402/403/404); kept off until another route (Google News query, browser rung) is configured.
+             * @default false
+             */
+            needs_alt: boolean;
+            fetch?: components["schemas"]["FetchPolicy"];
         };
         /**
          * NewsSourcesConfig
@@ -22153,6 +22326,11 @@ export interface components {
              * @constant
              */
             schema_version: 1;
+            /**
+             * Syndication Groups
+             * @description Outlets that republish one wire's copy. A story carried by several of them counts as one independent source, not several.
+             */
+            syndication_groups?: components["schemas"]["SyndicationGroup"][];
             /** Sources */
             sources?: components["schemas"]["NewsSource"][];
             /**
@@ -24713,7 +24891,7 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier" | "ir_discovery_search" | "ir_discovery_approve" | "web_gap_search" | "web_fact_approve" | "web_domain_tier" | "exposure_inputs" | "exposure_hs_mapping" | "dependency_extract" | "dependency_approve" | "listing_approval" | "peer_approval";
+            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "news_translation" | "news_search_leads" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier" | "ir_discovery_search" | "ir_discovery_approve" | "web_gap_search" | "web_fact_approve" | "web_domain_tier" | "exposure_inputs" | "exposure_hs_mapping" | "dependency_extract" | "dependency_approve" | "listing_approval" | "peer_approval";
             /** Title */
             title: string;
             /** Description */
@@ -28668,7 +28846,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts" | "alpha_vantage";
+            type: "rss" | "page" | "edgar" | "finnhub" | "google_news" | "rns" | "eqs" | "edgar_fts" | "alpha_vantage" | "news_sitemap" | "gdelt" | "ai_search";
             /**
              * Host
              * @description The feed's host; null for per-holding sources (EDGAR, Finnhub, ...).
@@ -28701,6 +28879,73 @@ export interface components {
              * @description healthy = enabled, last fetched within the Jobs config's monitoring.news_coverage_hours, and that fetch recorded no error or note
              */
             healthy: boolean;
+            /**
+             * State
+             * @description down: the circuit breaker is open after repeated failures (the outlet is unreachable, which is not the same as no news); degraded: the last read failed; unknown: never read successfully.
+             * @default unknown
+             * @enum {string}
+             */
+            state: "ok" | "degraded" | "down" | "unknown" | "disabled";
+            /**
+             * Region
+             * @description ISO country of the outlet.
+             */
+            region?: string | null;
+            /** Language */
+            language?: string | null;
+            /**
+             * Paywall
+             * @default open
+             * @enum {string}
+             */
+            paywall: "open" | "metered" | "hard";
+            /**
+             * State Media
+             * @default false
+             */
+            state_media: boolean;
+            /**
+             * Needs Alt
+             * @description Feed blocked or gone; kept off.
+             * @default false
+             */
+            needs_alt: boolean;
+            /**
+             * Consecutive Failures
+             * @default 0
+             */
+            consecutive_failures: number;
+            /**
+             * Backoff Until
+             * @description Breaker reopens then.
+             */
+            backoff_until?: string | null;
+            /** Last Success At */
+            last_success_at?: string | null;
+            /**
+             * Runs 7D
+             * @default 0
+             */
+            runs_7d: number;
+            /**
+             * Fetched 7D
+             * @default 0
+             */
+            fetched_7d: number;
+            /**
+             * Stored Linked 7D
+             * @description Items that became story items.
+             * @default 0
+             */
+            stored_linked_7d: number;
+            /**
+             * Stored Wire 7D
+             * @description Items kept on the wire only.
+             * @default 0
+             */
+            stored_wire_7d: number;
+            /** Avg Latency Ms */
+            avg_latency_ms?: number | null;
         };
         /** SourceRef */
         SourceRef: {
@@ -29681,6 +29926,20 @@ export interface components {
             surprise: string;
             /** Version */
             version: string;
+        };
+        /**
+         * SyndicationGroup
+         * @description Outlets that republish one wire's copy: one independence group, counted once as a
+         *     source however many of them carry a story. The first domain is the group's key.
+         */
+        SyndicationGroup: {
+            /**
+             * Name
+             * @example max-single-position
+             */
+            name: string;
+            /** Domains */
+            domains: string[];
         };
         /** TargetBand */
         TargetBand: {

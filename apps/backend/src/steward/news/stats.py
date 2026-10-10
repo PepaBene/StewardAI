@@ -112,6 +112,25 @@ class SourceHealth(BaseModel):
     last_item_count: int | None = Field(description="Items the last fetch returned.")
     last_error: str | None = Field(description="The last fetch's error, or its note when empty.")
     healthy: bool = Field(description=HEALTH_RULE)
+    state: Literal["ok", "degraded", "down", "unknown", "disabled"] = Field(
+        default="unknown",
+        description="down: the circuit breaker is open after repeated failures (the outlet "
+        "is unreachable, which is not the same as no news); degraded: the last read failed; "
+        "unknown: never read successfully.",
+    )
+    region: str | None = Field(default=None, description="ISO country of the outlet.")
+    language: str | None = None
+    paywall: Literal["open", "metered", "hard"] = "open"
+    state_media: bool = False
+    needs_alt: bool = Field(default=False, description="Feed blocked or gone; kept off.")
+    consecutive_failures: int = 0
+    backoff_until: dt.datetime | None = Field(default=None, description="Breaker reopens then.")
+    last_success_at: dt.datetime | None = None
+    runs_7d: int = 0
+    fetched_7d: int = 0
+    stored_linked_7d: int = Field(default=0, description="Items that became story items.")
+    stored_wire_7d: int = Field(default=0, description="Items kept on the wire only.")
+    avg_latency_ms: int | None = None
 
 
 class SourcesHealth(BaseModel):
@@ -128,7 +147,10 @@ async def sources_health(pool: asyncpg.Pool, now: dt.datetime) -> SourcesHealth:
     fetched = {
         r["id"]: r
         for r in await pool.fetch(
-            "select id, last_fetched_at, last_item_count, last_error from public.source"
+            "select s.id, s.last_fetched_at, s.last_item_count, s.last_error,"
+            " h.health, h.consecutive_failures, h.backoff_until, h.last_success_at, h.runs_7d,"
+            " h.fetched_7d, h.stored_linked_7d, h.stored_wire_7d, h.avg_latency_ms"
+            " from public.source s join public.news_source_health h on h.source_id = s.id"
         )
     }
     out = []
@@ -151,6 +173,22 @@ async def sources_health(pool: asyncpg.Pool, now: dt.datetime) -> SourcesHealth:
                 and last is not None
                 and last >= now - dt.timedelta(hours=hours)
                 and error is None,
+                state=row["health"] if row else ("unknown" if source.enabled else "disabled"),
+                region=source.region,
+                language=source.language,
+                paywall=source.paywall,
+                state_media=source.state_media,
+                needs_alt=source.needs_alt,
+                consecutive_failures=row["consecutive_failures"] if row else 0,
+                backoff_until=row["backoff_until"] if row else None,
+                last_success_at=row["last_success_at"] if row else None,
+                runs_7d=row["runs_7d"] if row else 0,
+                fetched_7d=row["fetched_7d"] if row else 0,
+                stored_linked_7d=row["stored_linked_7d"] if row else 0,
+                stored_wire_7d=row["stored_wire_7d"] if row else 0,
+                avg_latency_ms=int(row["avg_latency_ms"])
+                if row and row["avg_latency_ms"] is not None
+                else None,
             )
         )
     return SourcesHealth(window_hours=hours, sources=out)

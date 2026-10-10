@@ -11,6 +11,9 @@ limited). The check is one small query per request:
   response's usage, as the step will be).
 - A run whose own spend has reached its cap (`per_job_cap_usd`, else `default_job_cap_usd`)
   fails before its next request.
+- A job type's own monthly cap (`per_job_monthly_cap_usd`) stops its runs before their next
+  request once the month's spend of that job type reaches it, so one stage cannot use up the
+  whole monthly budget.
 - At the monthly cap, a job type not in `critical_job_types` fails before its next request
   (`pause_noncritical`) or has the request sent to `downgrade_model`
   (`downgrade_noncritical`); `alert_only` only alerts.
@@ -144,6 +147,23 @@ async def before_request(
             f"AI budget of one {ctx.job_type} run reached ({_usd(spent)} of {_usd(job_cap)});"
             " the run is stopped"
         )
+    type_cap = cfg.job_monthly_cap(ctx.job_type)
+    if type_cap is not None:
+        earlier: Decimal = await ctx.pool.fetchval(
+            "select coalesce(sum(s.cost_usd), 0) from public.job_step s"
+            " join public.job j on j.id = s.job_id"
+            " where s.cost_usd is not null and j.job_type = $1 and s.job_id <> $2"
+            " and s.started_at >= $3 and s.started_at < $4",
+            ctx.job_type,
+            ctx.job_id,
+            start,
+            end,
+        )
+        if earlier + spent >= Decimal(str(type_cap)):
+            raise BudgetExceeded(
+                f"monthly AI budget of {ctx.job_type} jobs reached"
+                f" ({_usd(earlier + spent)} of {_usd(type_cap)}); the run is stopped"
+            )
     cap = cfg.monthly_cap_usd
     if cap is None:
         return model

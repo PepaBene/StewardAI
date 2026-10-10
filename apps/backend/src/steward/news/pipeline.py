@@ -17,7 +17,8 @@ classify -> corroborate -> route.
 import datetime as dt
 import json
 import logging
-from collections import defaultdict
+import time
+from collections import Counter, defaultdict
 from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -25,8 +26,8 @@ from typing import Any
 import asyncpg
 import httpx
 
-from steward import __version__
-from steward.ai import AINotConfigured, create_client
+from steward import __version__, budget_guard
+from steward.ai import AINotConfigured, Usage, create_client
 from steward.config.event_rules import EVENT_DESCRIPTIONS, EventRulesConfig
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import EscalationSettings, JobsConfig, NewsSettings
@@ -42,7 +43,7 @@ from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import TrustSettings, VerificationConfig
-from steward.documents.fetch import FetchError
+from steward.documents.fetch import FetchError, NotModified
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
 from steward.llm.cache import ResultCache
@@ -58,7 +59,7 @@ from steward.news.classify import (
     HoldingContext,
     Label,
 )
-from steward.news.cluster import ClusterMember, Fingerprint, best_cluster
+from steward.news.cluster import ClusterMember, Fingerprint, best_cluster, simhash_cluster
 from steward.news.corroborate import (
     SEARCH_SYSTEM,
     ClaudeCorroborator,
@@ -67,6 +68,22 @@ from steward.news.corroborate import (
     SearchFinding,
     SearchRequest,
     decide,
+)
+from steward.news.dedupe import (
+    DedupeResult,
+    group_by_embedding,
+    group_by_simhash,
+    merge_story_clusters,
+    pending_embedding,
+    recent_vectors,
+    store_embeddings,
+)
+from steward.news.embeddings import (
+    Embedder,
+    EmbeddingError,
+    GeminiEmbedder,
+    embed_text,
+    estimate_tokens,
 )
 from steward.news.escalation import escalation_due, queue_escalation
 from steward.news.feeds import (
@@ -77,15 +94,28 @@ from steward.news.feeds import (
     collect_finnhub,
     collect_google_news,
     collect_page,
-    collect_rss,
+    collect_rss_conditional,
 )
+from steward.news.fulltext import purge_expired, run_fulltext
+from steward.news.language import resolve_language
 from steward.news.link import HoldingTerms, Linker, holding_terms
 from steward.news.normalize import canonical_url, host_of
 from steward.news.regulatory import MAX_HITS as FTS_MAX_HITS
 from steward.news.regulatory import FtsResult, collect_edgar_fts, collect_regulatory
+from steward.news.simhash import item_hash, to_signed, to_unsigned
+from steward.news.translate import (
+    BATCH_SIZE,
+    LlmTranslator,
+    TranslateItem,
+    TranslationError,
+    usable_model,
+)
+from steward.news.translate import SYSTEM_PROMPT as TRANSLATION_PROMPT
+from steward.news.wire_sources import collect_gdelt, collect_news_sitemap
 from steward.notify.alerts import create_alerts, dispatch_due
 from steward.notify.channels import Channel, channels_from_settings
 from steward.notify.route import AlertRequest
+from steward.research.polite import PoliteFetcher, build_fetcher
 from steward.settings import get_settings
 from steward.sources.documents import link_public_document
 from steward.sources.edgar import EdgarClient
@@ -105,6 +135,11 @@ class NewsDeps:
     channels: dict[str, Channel] = field(default_factory=dict)
     now: Callable[[], dt.datetime] = lambda: dt.datetime.now(dt.UTC)
     app_url: str | None = None
+    # Fetches article pages for the full-text step; None skips the step.
+    fetcher: PoliteFetcher | None = None
+    # Translation of non-English wire items and their embeddings; None skips the step.
+    translator: LlmTranslator | None = None
+    embedder: Embedder | None = None
 
 
 @dataclass(frozen=True)
@@ -258,11 +293,18 @@ async def load_holdings(pool: asyncpg.Pool, config: NewsConfig) -> Holdings:
 async def sync_sources(pool: asyncpg.Pool, sources: Sequence[NewsSource]) -> None:
     for s in sources:
         await pool.execute(
-            "insert into public.source (id, name, tier, type, url, enabled, tickers)"
-            " values ($1, $2, $3, $4, $5, $6, $7)"
-            " on conflict (id) do update set name = excluded.name, tier = excluded.tier,"
+            "insert into public.source (id, name, tier, type, url, enabled, tickers, region,"
+            " language, paywall, state_media) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,"
+            " $11) on conflict (id) do update set name = excluded.name, tier = excluded.tier,"
             " type = excluded.type, url = excluded.url, enabled = excluded.enabled,"
-            " tickers = excluded.tickers",
+            " tickers = excluded.tickers, region = excluded.region,"
+            " language = excluded.language, paywall = excluded.paywall,"
+            " state_media = excluded.state_media,"
+            # A source the owner switches back on starts with a clean breaker.
+            " consecutive_failures = case when excluded.enabled and not source.enabled"
+            " then 0 else source.consecutive_failures end,"
+            " backoff_until = case when excluded.enabled and not source.enabled"
+            " then null else source.backoff_until end",
             s.id,
             s.name,
             s.tier,
@@ -270,11 +312,173 @@ async def sync_sources(pool: asyncpg.Pool, sources: Sequence[NewsSource]) -> Non
             str(s.url) if s.url else None,
             s.enabled,
             list(s.tickers),
+            s.region,
+            s.language,
+            s.paywall,
+            s.state_media,
         )
     await pool.execute(
         "update public.source set enabled = false where not (id = any($1::text[]))",
         [s.id for s in sources],
     )
+
+
+async def run_dedupe(
+    ctx: JobContext,
+    embedder: Embedder | None,
+    settings: NewsSettings,
+    now: dt.datetime,
+) -> tuple[DedupeResult, set[int]]:
+    """SimHash groups, then (with an embedder) embedding groups and safe cluster merges.
+    Returns the result and the cluster ids that gained an item."""
+    pool = ctx.pool
+    since = now - dt.timedelta(hours=72)
+    result = DedupeResult()
+    result.simhash_groups = await group_by_simhash(pool, ctx.job_id, since)
+    kept: set[int] = set()
+    if embedder is None or settings.embedding_per_run == 0:
+        result.skipped = "no embedder" if embedder is None else "embedding_per_run is 0"
+        return result, kept
+    rows = await pending_embedding(pool, settings.embedding_per_run, since)
+    if not rows:
+        return result, kept
+    texts = [embed_text(r["headline"], r["summary"], r["language"]) for r in rows]
+    try:
+        await budget_guard.before_request(ctx, embedder.model, can_switch_provider=True)
+        vectors = await embedder.embed(texts)
+    except (EmbeddingError, budget_guard.BudgetExceeded) as exc:
+        # Degrade: the wire is still stored, grouped by SimHash and searchable.
+        result.skipped = f"{type(exc).__name__}: {exc}"[:300]
+        return result, kept
+    ids = [r["id"] for r in rows]
+    await store_embeddings(pool, embedder.model, ids, vectors)
+    result.embedded = len(ids)
+    result.embedding_tokens = estimate_tokens(texts)
+    window = settings.duplicate_window_hours
+    all_vectors = await recent_vectors(pool, embedder.model, now - dt.timedelta(hours=window * 2))
+    groups = await group_by_embedding(
+        pool, set(ids), all_vectors, settings.embedding_duplicate_threshold, window
+    )
+    result.embedding_groups = len(groups)
+    result.merged_clusters = await merge_story_clusters(pool, groups, set(ids))
+    kept = {keep for _, keep in result.merged_clusters}
+    return result, kept
+
+
+async def translate_pending(
+    ctx: JobContext, translator: LlmTranslator, settings: NewsSettings
+) -> tuple[dict[str, Any], Usage]:
+    """Translate the newest non-English wire items (linked first) that have no translation."""
+    rows = await ctx.pool.fetch(
+        "select id, headline, summary, language from public.news_article"
+        " where translation_state is null order by linked desc, published_at desc limit $1",
+        settings.translation_per_run,
+    )
+    detail: dict[str, Any] = {"pending": len(rows), "done": 0, "failed": 0}
+    usage = Usage(model=translator.model)
+    for start in range(0, len(rows), BATCH_SIZE):
+        chunk = rows[start : start + BATCH_SIZE]
+        items = [
+            TranslateItem(i, r["headline"], r["summary"], r["language"])
+            for i, r in enumerate(chunk)
+        ]
+        try:
+            done, used = await translator.translate(items)
+        except (TranslationError, budget_guard.BudgetExceeded) as exc:
+            # Degrade: the originals stay searchable and the rest wait for the next run.
+            detail["error"] = str(exc)[:300]
+            failed_usage = getattr(exc, "usage", None)
+            if failed_usage is not None:
+                usage.input_tokens += failed_usage.input_tokens
+                usage.output_tokens += failed_usage.output_tokens
+            break
+        usage.input_tokens += used.input_tokens
+        usage.output_tokens += used.output_tokens
+        for i, r in enumerate(chunk):
+            got = done.get(i)
+            if got is None:
+                await ctx.pool.execute(
+                    "update public.news_article set translation_state = 'failed' where id = $1",
+                    r["id"],
+                )
+                detail["failed"] += 1
+                continue
+            await ctx.pool.execute(
+                "update public.news_article set title_en = $2, summary_en = $3,"
+                " translation_state = 'done' where id = $1",
+                r["id"],
+                got.headline_en,
+                got.summary_en,
+            )
+            detail["done"] += 1
+    return detail, usage
+
+
+BREAKER_AFTER = 3
+BACKOFF_BASE = dt.timedelta(minutes=10)
+BACKOFF_MAX = dt.timedelta(hours=6)
+
+
+def next_backoff(failures: int, now: dt.datetime) -> dt.datetime | None:
+    """When a source with `failures` consecutive failures is read again: not at all delayed for
+    the first two, then 10 minutes doubling per further failure up to 6 hours."""
+    if failures < BREAKER_AFTER:
+        return None
+    doublings = min(failures - BREAKER_AFTER, 10)
+    return now + min(BACKOFF_BASE * (1 << doublings), BACKOFF_MAX)
+
+
+def breaker_open(backoff_until: dt.datetime | None, now: dt.datetime) -> bool:
+    return backoff_until is not None and backoff_until > now
+
+
+@dataclass
+class SourceRun:
+    """What one source's read did in this run (the non-item half of a `news_source_run` row)."""
+
+    latency_ms: int | None = None
+    error: str | None = None
+    not_modified: bool = False
+    skipped: bool = False
+
+
+async def record_source_runs(
+    pool: asyncpg.Pool,
+    job_id: int,
+    now: dt.datetime,
+    runs: dict[str, SourceRun],
+    stats: "IngestStats",
+) -> None:
+    """One `news_source_run` row per source read (or skipped by its breaker) in this run."""
+    rows = []
+    for source_id, run in runs.items():
+        tally = stats.per_source.get(source_id) or SourceTally()
+        drops = dict(tally.drops)
+        if run.not_modified:
+            drops["not_modified"] = 1
+        if run.skipped:
+            drops["skipped_backoff"] = 1
+        rows.append(
+            (
+                job_id,
+                source_id,
+                now,
+                run.latency_ms,
+                tally.fetched,
+                tally.stored_linked,
+                tally.stored_wire,
+                json.dumps(drops),
+                run.error,
+            )
+        )
+    if rows:
+        await pool.executemany(
+            "insert into public.news_source_run (job_id, source_id, started_at, latency_ms,"
+            " fetched, stored_linked, stored_wire, drops, error)"
+            " values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)"
+            " on conflict (job_id, source_id) do nothing",
+            rows,
+        )
 
 
 async def undated_baseline(
@@ -324,8 +528,38 @@ async def collect_source(
     scoped = tuple(source.tickers)
     feeds = [h for h in holdings.feed_info if not scoped or h.ticker in scoped]
     if source.type == "rss":
-        rss_items = await collect_rss(deps.http, source.id, str(source.url), scoped)
+        validators = await pool.fetchrow(
+            "select etag, http_last_modified from public.source where id = $1", source.id
+        )
+        rss_items, etag, modified = await collect_rss_conditional(
+            deps.http,
+            source.id,
+            str(source.url),
+            scoped,
+            validators["etag"] if validators else None,
+            validators["http_last_modified"] if validators else None,
+        )
+        await pool.execute(
+            "update public.source set etag = $2, http_last_modified = $3 where id = $1",
+            source.id,
+            etag,
+            modified,
+        )
         return await undated_baseline(pool, source.id, rss_items)
+    if source.type == "news_sitemap":
+        return (
+            await collect_news_sitemap(
+                deps.http,
+                source.id,
+                str(source.url),
+                region=source.region,
+                default_language=source.language,
+            ),
+            [],
+        )
+    if source.type == "gdelt":
+        gdelt = await collect_gdelt(deps.http, source.id, feeds, freshness_days)
+        return gdelt.items, gdelt.errors
     if source.type == "page":
         key = f"news_page:{source.id}"
         stored = await pool.fetchval("select value from public.sync_state where key = $1", key)
@@ -438,9 +672,21 @@ def item_tier(
     configured = config.domain_tier(host)
     if configured is not None:
         return configured
+    if source.type == "ai_search":
+        return 3
     if source.type in AGGREGATOR_TYPES:
         return config.unknown_outlet_tier
     return source.tier
+
+
+@dataclass
+class SourceTally:
+    """One source's items in one run, by outcome (the `news_source_run` row)."""
+
+    fetched: int = 0
+    stored_linked: int = 0
+    stored_wire: int = 0
+    drops: Counter[str] = field(default_factory=Counter)
 
 
 @dataclass
@@ -453,7 +699,9 @@ class IngestStats:
     tier3_dropped: int = 0
     unlinked: int = 0
     new_clusters: int = 0
+    wire_only: int = 0
     touched_clusters: set[int] = field(default_factory=set)
+    per_source: dict[str, SourceTally] = field(default_factory=lambda: defaultdict(SourceTally))
 
     def detail(self) -> dict[str, int]:
         return {
@@ -465,19 +713,73 @@ class IngestStats:
             "tier3_dropped": self.tier3_dropped,
             "unlinked": self.unlinked,
             "new_clusters": self.new_clusters,
+            "wire_only": self.wire_only,
         }
+
+
+WIRE_UPSERT = (
+    "insert into public.news_article (url, source_id, outlet, outlet_name, region, tier,"
+    " published_at, first_seen_at, headline, summary, language, linked, news_item_id, job_id,"
+    " fetch_state, simhash, translation_state) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,"
+    " $11, $12, $13, $14, $15, $16, $17)"
+    " on conflict (url) do update set linked = news_article.linked or excluded.linked,"
+    " news_item_id = coalesce(news_article.news_item_id, excluded.news_item_id)"
+)
+
+
+def wire_args(
+    url: str,
+    item: RawItem,
+    source: NewsSource,
+    tier: int,
+    published: dt.datetime,
+    now: dt.datetime,
+    job_id: int,
+    *,
+    news_item_id: int | None = None,
+) -> tuple[Any, ...]:
+    """The `WIRE_UPSERT` arguments of one kept item."""
+    language = item_language(item, source)
+    digest = item_hash(item.headline, item.summary)
+    return (
+        url,
+        source.id,
+        item.outlet_host,
+        item.outlet_name,
+        item.region or source.region,
+        tier,
+        published,
+        now,
+        item.headline,
+        item.summary,
+        language,
+        news_item_id is not None,
+        news_item_id,
+        job_id,
+        "summary" if item.summary else "headline",
+        to_signed(digest) if digest is not None else None,
+        "not_needed" if language in (None, "en") else None,
+    )
+
+
+def item_language(item: RawItem, source: NewsSource) -> str | None:
+    """The language stored for an item: detected from its text when the detector is confident
+    (a feed's tag is often only its site's default), else the feed's or the source's."""
+    return resolve_language(item.language or source.language, item.headline, item.summary)
 
 
 async def recent_members(pool: asyncpg.Pool, since: dt.datetime) -> list[ClusterMember]:
     rows = await pool.fetch(
-        "select cluster_id, headline, summary, outlet_name from public.news_item"
-        " where cluster_id is not null and first_seen_at >= $1",
+        "select i.cluster_id, i.headline, i.summary, i.outlet_name, a.simhash"
+        " from public.news_item i left join public.news_article a on a.news_item_id = i.id"
+        " where i.cluster_id is not null and i.first_seen_at >= $1",
         since,
     )
     return [
         ClusterMember(
             r["cluster_id"],
             Fingerprint.of(r["headline"], r["summary"], (r["outlet_name"] or "",)),
+            to_unsigned(r["simhash"]) if r["simhash"] is not None else None,
         )
         for r in rows
     ]
@@ -496,7 +798,12 @@ async def store_items(
     linker = Linker(holdings.terms)
     by_url: dict[str, tuple[RawItem, NewsSource]] = {}
     for item, source in items:
-        by_url.setdefault(canonical_url(item.url), (item, source))
+        stats.per_source[source.id].fetched += 1
+        canonical = canonical_url(item.url)
+        if canonical in by_url:
+            stats.per_source[source.id].drops["duplicate_url"] += 1
+        else:
+            by_url[canonical] = (item, source)
     stats.duplicate += len(items) - len(by_url)
     existing = {
         r["url"]
@@ -504,36 +811,61 @@ async def store_items(
             "select url from public.news_item where url = any($1::text[])", list(by_url)
         )
     }
+    on_wire = {
+        r["url"]
+        for r in await pool.fetch(
+            "select url from public.news_article where url = any($1::text[])", list(by_url)
+        )
+    }
     members = await recent_members(pool, since)
+    wire_rows: list[tuple[Any, ...]] = []
     # Oldest first, so the original of a syndicated story starts the cluster.
     ordered = sorted(by_url.items(), key=lambda kv: kv[1][0].published_at or now)
     for url, (item, source) in ordered:
+        tally = stats.per_source[source.id]
         if url in existing:
             stats.duplicate += 1
+            tally.drops["duplicate_url"] += 1
             continue
         published = item.published_at or now
         if published < since or published > now + dt.timedelta(hours=6):
             stats.stale += 1
+            tally.drops["stale"] += 1
             continue
         if config.sources.blocked(item.outlet_host) or config.sources.blocked(host_of(url)):
             stats.blocked += 1
+            tally.drops["blocked"] += 1
             continue
         if source.type in AGGREGATOR_TYPES and not config.sources.allowed_aggregated(
             item.outlet_host
         ):
             stats.blocked += 1
+            tally.drops["aggregator_not_allowed"] += 1
             continue
         tier = item_tier(item, source, config.sources, holdings.ir_domains)
+        # Everything not dropped above stays on the wire; only linked items of a tier that may
+        # raise stories go on to clustering, classification and alerts.
         if tier == 3 and not config.sources.include_tier3:
             stats.tier3_dropped += 1
+            stats.wire_only += 1
+            tally.drops["tier3_wire_only"] += 1
+            if url not in on_wire:
+                wire_rows.append(wire_args(url, item, source, tier, published, now, job_id))
+                tally.stored_wire += 1
             continue
         links = linker.link(f"{item.headline}\n{item.summary or ''}", item.tickers)
         if not links and not source.macro:
             stats.unlinked += 1
+            stats.wire_only += 1
+            tally.drops["unmatched_wire_only"] += 1
+            if url not in on_wire:
+                wire_rows.append(wire_args(url, item, source, tier, published, now, job_id))
+                tally.stored_wire += 1
             continue
         fingerprint = Fingerprint.of(item.headline, item.summary, (item.outlet_name or "",))
         async with pool.acquire() as conn, conn.transaction():
-            cluster_id = best_cluster(fingerprint, members)
+            digest = item_hash(item.headline, item.summary)
+            cluster_id = best_cluster(fingerprint, members) or simhash_cluster(digest, members)
             if cluster_id is None:
                 cluster_id = await conn.fetchval(
                     "insert into public.story_cluster (headline, headline_key, best_tier,"
@@ -563,7 +895,7 @@ async def store_items(
                 now,
                 item.headline,
                 item.summary,
-                item.language,
+                item_language(item, source),
                 cluster_id,
                 [link.ticker for link in links],
                 json.dumps([link.as_json() for link in links]),
@@ -579,7 +911,12 @@ async def store_items(
             )
             if item_id is None:
                 stats.duplicate += 1
+                tally.drops["duplicate_url"] += 1
                 continue
+            await conn.execute(
+                WIRE_UPSERT,
+                *wire_args(url, item, source, tier, published, now, job_id, news_item_id=item_id),
+            )
             evidence_text = json.dumps(
                 {"headline": item.headline, "summary": item.summary},
                 ensure_ascii=False,
@@ -598,25 +935,38 @@ async def store_items(
                 record_key=item_id,
                 quote=item.headline,
             )
-            await refresh_cluster_sources(conn, cluster_id, now)
-        members.append(ClusterMember(cluster_id, fingerprint))
+            await refresh_cluster_sources(conn, cluster_id, now, config.sources.independence_key)
+        members.append(ClusterMember(cluster_id, fingerprint, digest))
         stats.stored += 1
+        tally.stored_linked += 1
         stats.touched_clusters.add(cluster_id)
+    if wire_rows:
+        await pool.executemany(WIRE_UPSERT, wire_rows)
     return stats
 
 
 async def refresh_cluster_sources(
-    conn: asyncpg.Connection, cluster_id: int, now: dt.datetime
+    conn: asyncpg.Connection,
+    cluster_id: int,
+    now: dt.datetime,
+    key_of: Callable[[str | None], str] | None = None,
 ) -> None:
+    """Recompute a story's last-seen time, best tier and number of independent sources.
+    `key_of` maps an outlet to its independence group (outlets that republish one wire count
+    once); without it every outlet counts."""
+    rows = await conn.fetch(
+        "select outlet, url, tier from public.news_item where cluster_id = $1", cluster_id
+    )
+    sources = {
+        (key_of(r["outlet"]) if key_of else r["outlet"]) if r["outlet"] else r["url"] for r in rows
+    }
     await conn.execute(
-        "update public.story_cluster c set last_seen = greatest(c.last_seen, $2),"
-        " best_tier = s.best_tier, source_count = s.outlets"
-        " from (select min(tier) as best_tier,"
-        "   count(distinct coalesce(outlet, url)) as outlets"
-        "   from public.news_item where cluster_id = $1) s"
-        " where c.id = $1",
+        "update public.story_cluster set last_seen = greatest(last_seen, $2),"
+        " best_tier = $3, source_count = $4 where id = $1",
         cluster_id,
         now,
+        min((r["tier"] for r in rows), default=3),
+        len(sources),
     )
 
 
@@ -770,6 +1120,7 @@ async def load_story(
     cluster_id: int,
     rules: EventRulesConfig,
     trust: TrustTable | None = None,
+    key_of: Callable[[str | None], str] | None = None,
 ) -> StoryState | None:
     cluster = await pool.fetchrow(
         "select id, status, search_rounds, last_searched_at, corroboration, first_seen,"
@@ -806,7 +1157,9 @@ async def load_story(
         best_tier=min(
             trust.effective_tier(i["tier"], i["outlet"]) if trust else i["tier"] for i in items
         ),
-        outlets=frozenset(i["outlet"] for i in items if i["outlet"]),
+        outlets=frozenset(
+            (key_of(i["outlet"]) if key_of else i["outlet"]) for i in items if i["outlet"]
+        ),
         published_at=min(i["published_at"] for i in items),
         first_seen=cluster["first_seen"],
         status=cluster["status"],
@@ -834,7 +1187,11 @@ async def insider_cluster(
 
 
 async def other_stories(
-    pool: asyncpg.Pool, story: StoryState, window: dt.timedelta, trust: TrustTable | None = None
+    pool: asyncpg.Pool,
+    story: StoryState,
+    window: dt.timedelta,
+    trust: TrustTable | None = None,
+    key_of: Callable[[str | None], str] | None = None,
 ) -> list[OtherStory]:
     if story.ticker is None or story.event_type is None:
         return []
@@ -861,7 +1218,7 @@ async def other_stories(
                 trust.effective_tier(t, o) if trust else t
                 for t, o in zip(r["tiers"], r["outlets"], strict=True)
             ),
-            frozenset(o for o in r["outlets"] if o),
+            frozenset((key_of(o) if key_of else o) for o in r["outlets"] if o),
         )
         for r in rows
     ]
@@ -888,7 +1245,9 @@ async def assess(
         if story.best_tier == 1:
             confidence = "verified"
     else:
-        others = await other_stories(pool, story, window, config.trust)
+        others = await other_stories(
+            pool, story, window, config.trust, config.sources.independence_key
+        )
         rules_v = config.verification.corroboration
         decision = decide(
             best_tier=story.best_tier,
@@ -976,7 +1335,7 @@ async def corroborate_story(
             summary=story.summary,
             company=holdings.name(story.ticker),
             published_at=story.published_at,
-            own_outlets=story.outlets,
+            own_outlets=config.sources.group_members(story.outlets),
             domains=search_domains(config, holdings),
         )
 
@@ -1153,7 +1512,7 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
         config = await load_news_config(ctx)
         holdings = await load_holdings(pool, config)
         await sync_sources(pool, config.sources.sources)
-        enabled = [s for s in config.sources.sources if s.enabled]
+        enabled = [s for s in config.sources.sources if s.enabled and s.type != "ai_search"]
         step.detail.update(
             holdings=[t.ticker for t in holdings.terms], sources=[s.id for s in enabled]
         )
@@ -1161,9 +1520,22 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
     since = now - dt.timedelta(hours=config.sources.freshness_hours)
     freshness_days = max(1, config.sources.freshness_hours // 24)
     collected: list[tuple[RawItem, NewsSource]] = []
+    runs: dict[str, SourceRun] = {}
     for source in enabled:
         async with ctx.step(f"collect:{source.id}") as step:
+            health = await pool.fetchrow(
+                "select consecutive_failures, backoff_until, last_item_count"
+                " from public.source where id = $1",
+                source.id,
+            )
+            failures = health["consecutive_failures"] if health else 0
+            if health and breaker_open(health["backoff_until"], now):
+                runs[source.id] = SourceRun(skipped=True)
+                step.detail["skipped"] = f"circuit breaker open until {health['backoff_until']}"
+                continue
             error: str | None = None
+            not_modified = False
+            started = time.monotonic()
             try:
                 items, notes = await collect_source(
                     source,
@@ -1176,31 +1548,74 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
                     config.sources.google_news_locale,
                     config.news.edgar_fts_max_hits,
                 )
+            except NotModified:
+                items, notes, not_modified = [], [], True
             except (FetchError, httpx.HTTPError, ValueError) as exc:
                 items, notes, error = [], [], str(exc)[:500]
+            latency_ms = round((time.monotonic() - started) * 1000)
+            previous_count = health["last_item_count"] if health else None
+            if not error and not not_modified and not items and previous_count:
+                # A feed that answers but yields nothing after yielding items: the layout or
+                # the URL may have changed. Reported, and counted against the breaker.
+                notes = [*notes, f"parser drift: 0 items (previous run {previous_count})"]
+            drift = bool(notes) and notes[-1].startswith("parser drift")
+            failed = error is not None or drift
             collected.extend((item, source) for item in items)
-            step.detail.update(items=len(items))
+            runs[source.id] = SourceRun(
+                latency_ms=latency_ms,
+                error=error or (notes[-1] if drift else None),
+                not_modified=not_modified,
+            )
+            step.detail.update(items=len(items), latency_ms=latency_ms)
+            if not_modified:
+                step.detail["not_modified"] = True
             if notes:
                 step.detail["notes"] = notes[:20]
             if error:
                 step.detail["error"] = error
             await pool.execute(
-                "update public.source set last_fetched_at = $2, last_item_count = $3,"
-                " last_error = $4 where id = $1",
+                "update public.source set last_fetched_at = $2,"
+                " last_item_count = case when $8::boolean then last_item_count else $3 end,"
+                " last_error = $4, consecutive_failures = $5, backoff_until = $6,"
+                " last_success_at = case when $7::boolean then last_success_at else $2 end,"
+                " last_item_at = case when $3::integer > 0 then $2 else last_item_at end"
+                " where id = $1",
                 source.id,
                 now,
                 len(items),
                 error or ("; ".join(notes)[:500] if notes and not items else None),
+                0 if not failed else failures + 1,
+                None if not failed else next_backoff(failures + 1, now),
+                failed,
+                not_modified,
             )
 
     async with ctx.step("normalise_dedupe_link") as step:
         stats = await store_items(pool, collected, config, holdings, now, ctx.job_id)
         step.detail.update(stats.detail())
+        await record_source_runs(pool, ctx.job_id, now, runs, stats)
         await pool.execute(
             "update public.filing_hit h set news_item_id = n.id from public.news_item n"
             " where h.news_item_id is null and h.kind = 'topic' and n.url = h.url"
         )
     touched = set(stats.touched_clusters)
+
+    async with ctx.step("dedupe") as step:
+        deduped, kept = await run_dedupe(ctx, deps.embedder, config.news, now)
+        if deps.embedder is not None and deduped.embedding_tokens:
+            step.usage = Usage(
+                model=deps.embedder.model, input_tokens=deduped.embedding_tokens
+            ).step_usage()
+            step.detail["embedding_tokens_estimated"] = deduped.embedding_tokens
+        touched = (touched - {gone for gone, _ in deduped.merged_clusters}) | kept
+        step.detail.update(
+            simhash_grouped=deduped.simhash_groups,
+            embedded=deduped.embedded,
+            embedding_grouped=deduped.embedding_groups,
+            clusters_merged=[list(m) for m in deduped.merged_clusters],
+        )
+        if deduped.skipped:
+            step.detail["skipped"] = deduped.skipped
 
     if deps.classifier is not None:
         classified, _ = await classify_pending(ctx, deps.classifier, holdings, config.news, now)
@@ -1226,7 +1641,13 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
         for _ in range(2):
             stories = []
             for cluster_id in ids:
-                story = await load_story(pool, cluster_id, config.event_rules, config.trust)
+                story = await load_story(
+                    pool,
+                    cluster_id,
+                    config.event_rules,
+                    config.trust,
+                    config.sources.independence_key,
+                )
                 if story is not None:
                     stories.append(await assess(pool, story, config, now))
         counts: dict[str, int] = defaultdict(int)
@@ -1279,6 +1700,22 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
         result = await dispatch_due(pool, deps.channels, now=now)
         step.detail.update(sent=result.sent, failed=result.failed, retrying=result.retrying)
 
+    if deps.translator is not None and config.news.translation_per_run > 0:
+        async with ctx.step("translate") as step:
+            detail, used = await translate_pending(ctx, deps.translator, config.news)
+            step.detail.update(detail)
+            step.usage = used.step_usage()
+
+    # Last, so page fetches never delay an alert.
+    if deps.fetcher is not None and config.news.fulltext_per_run > 0:
+        async with ctx.step("fulltext") as step:
+            step.detail.update(
+                await run_fulltext(
+                    pool, config.sources, deps.fetcher, now, limit=config.news.fulltext_per_run
+                )
+            )
+            step.detail["expired_bodies_cleared"] = await purge_expired(pool, now)
+
 
 async def news_ingest_handler(ctx: JobContext) -> None:
     settings = get_settings()
@@ -1309,10 +1746,31 @@ async def news_ingest_handler(ctx: JobContext) -> None:
             prompts.text("news_corroboration", SEARCH_SYSTEM, news.corroboration_model),
             effort=news.corroboration_effort,
         )
+    translator: LlmTranslator | None = None
+    if usable_model(llm, news.translation_model):
+        translator = LlmTranslator(
+            llm,
+            news.translation_model,
+            prompts.text("news_translation", TRANSLATION_PROMPT, news.translation_model),
+            effort=news.translation_effort,
+            cache=ResultCache(ctx.pool, "news_translation"),
+        )
     async with httpx.AsyncClient(
         timeout=30.0, headers={"User-Agent": f"StewardAI/{__version__}"}
     ) as http:
+        embedder: Embedder | None = (
+            GeminiEmbedder(
+                http,
+                settings.google_api_key.get_secret_value(),
+                news.embedding_model,
+                news.embedding_dimensions,
+            )
+            if settings.google_api_key
+            else None
+        )
         deps = NewsDeps(
+            translator=translator,
+            embedder=embedder,
             http=http,
             edgar=EdgarClient(http, settings.sec_user_agent) if settings.sec_user_agent else None,
             finnhub_key=(
@@ -1327,5 +1785,14 @@ async def news_ingest_handler(ctx: JobContext) -> None:
             corroborator=corroborator,
             channels=channels_from_settings(http, settings),
             app_url=settings.app_url,
+            fetcher=build_fetcher(
+                http,
+                news.fulltext_browser_fallback,
+                f"{settings.sec_user_agent or 'StewardAI'} StewardAI/{__version__}",
+            ),
         )
-        await run_news_pipeline(ctx, deps)
+        try:
+            await run_news_pipeline(ctx, deps)
+        finally:
+            if deps.fetcher is not None:
+                await deps.fetcher.aclose()
