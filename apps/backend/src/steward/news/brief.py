@@ -26,6 +26,7 @@ from steward.ai import Usage
 from steward.llm.cache import ResultCache
 from steward.llm.client import LLM
 from steward.news.analysis import StoryMaterial, latest_analysis, load_story, structured
+from steward.news.impact import ATTRIBUTE_RANK_FACTOR
 from steward.news.market import region_of
 from steward.news.translate import numbers_in
 
@@ -65,13 +66,32 @@ def market_region(ticker: str | None) -> str:
     return "Other"
 
 
-def rank_score(severity: int, exposure: float, novelty: str | None) -> float:
-    """exposure x materiality x novelty; zero for a repeat or recycled story."""
-    return (
+TOPIC_BOOST = 0.05
+TOPIC_BOOST_MAX = 0.15
+
+
+def rank_score(
+    severity: int,
+    exposure: float,
+    novelty: str | None,
+    sentiment: float = 0.0,
+    sentiment_weight: float = 0.0,
+    topics: int = 0,
+) -> float:
+    """exposure x materiality x novelty; zero for a repeat or recycled story.
+
+    Two bounded nudges reorder close stories and nothing more: a strong verified sentiment
+    raises the score by at most `sentiment_weight`, and each portfolio watch topic the story's
+    wire items carry raises it by 5 % (at most 15 %). Both multiply the base, so a zero stays
+    zero."""
+    base = (
         max(exposure, EXPOSURE_FLOOR)
         * ((severity + 1) / 4)
         * NOVELTY_FACTOR.get(novelty or "new", 1.0)
     )
+    nudge = 1.0 + sentiment_weight * max(0.0, min(1.0, sentiment))
+    nudge += min(TOPIC_BOOST_MAX, TOPIC_BOOST * max(0, topics))
+    return base * nudge
 
 
 class WrittenLine(BaseModel):
@@ -126,6 +146,7 @@ async def candidates(
     end: dt.datetime,
     min_severity: int,
     ticker: str | None = None,
+    sentiment_weight: float = 0.0,
 ) -> tuple[list[Candidate], int]:
     """Ranked candidate stories for the period and the number suppressed as repeats."""
     rows = await pool.fetch(
@@ -146,13 +167,28 @@ async def candidates(
         novelty = novelty_doc["novelty"] if novelty_doc else None
         impact = await latest_analysis(pool, story.cluster_id, "impact")
         exposure = (
-            float(impact.get("direct_weight", 0)) + 0.5 * float(impact.get("reached_weight", 0))
+            float(impact.get("direct_weight", 0))
+            + 0.5 * float(impact.get("reached_weight", 0))
+            + ATTRIBUTE_RANK_FACTOR * float(impact.get("attribute_weight", 0))
             if impact
             else 0.0
         )
         extraction = await latest_analysis(pool, story.cluster_id, "extraction")
         claims = tuple(c["text"] for c in (extraction or {}).get("key_claims", []))
-        score = rank_score(story.severity, exposure, novelty)
+        sentiment = await latest_analysis(pool, story.cluster_id, "sentiment")
+        topics = await pool.fetchval(
+            "select count(distinct t) from public.news_article a join public.news_item i"
+            " on i.id = a.news_item_id, unnest(a.topics) t where i.cluster_id = $1",
+            story.cluster_id,
+        )
+        score = rank_score(
+            story.severity,
+            exposure,
+            novelty,
+            float((sentiment or {}).get("intensity", 0.0)),
+            sentiment_weight,
+            int(topics or 0),
+        )
         if score <= 0:
             suppressed += 1
             continue
@@ -287,11 +323,24 @@ async def build_brief(
     max_lines: int,
     ticker: str | None = None,
     writer: Any = None,
+    sentiment_weight: float = 0.0,
 ) -> tuple[BriefBody, bool]:
     """The brief body and whether a model wrote any line. `writer` is an async callable taking
-    the chosen candidates and returning `{story_id: WrittenLine}`, or None for no model."""
-    ranked, suppressed = await candidates(pool, start, end, min_severity, ticker)
-    chosen = ranked[:max_lines]
+    the chosen candidates and returning `{story_id: WrittenLine}`, or None for no model.
+
+    A `region` digest keeps the top `max_lines` of each market region instead of the top
+    `max_lines` overall, so a quiet region is not crowded out by a busy one."""
+    ranked, suppressed = await candidates(pool, start, end, min_severity, ticker, sentiment_weight)
+    if kind == "region":
+        per_region: dict[str, int] = {}
+        chosen = []
+        for c in ranked:
+            region = market_region(c.story.ticker)
+            if per_region.get(region, 0) < max_lines:
+                per_region[region] = per_region.get(region, 0) + 1
+                chosen.append(c)
+    else:
+        chosen = ranked[:max_lines]
     written: dict[int, WrittenLine] = {}
     if writer is not None and chosen:
         written = await writer(chosen)

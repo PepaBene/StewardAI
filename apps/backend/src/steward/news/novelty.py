@@ -109,17 +109,27 @@ async def story_vectors(pool: asyncpg.Pool, cluster_ids: Sequence[int]) -> dict[
 
 
 async def earlier_stories(
-    pool: asyncpg.Pool, cluster_id: int, ticker: str | None, first_seen: dt.datetime, days: int
+    pool: asyncpg.Pool,
+    cluster_id: int,
+    ticker: str | None,
+    first_seen: dt.datetime,
+    days: int,
+    event_type: str | None = None,
 ) -> dict[int, list[float]]:
-    """Centroids of the other stories on the holding in the `days` before this one."""
-    if ticker is None:
+    """Centroids of the other stories in the `days` before this one: those on the same holding,
+    plus, when the story has an event type, those of the same type on any holding. A theme that
+    reaches the owner through two holdings (an export rule, a rate decision) is then one
+    development, not two new ones."""
+    if ticker is None and event_type is None:
         return {}
     rows = await pool.fetch(
-        "select id from public.story_cluster where ticker = $1 and id <> $2"
-        " and first_seen < $3 and first_seen >= $4 and duplicate_of is null",
-        ticker,
+        "select id from public.story_cluster where id <> $1"
+        " and first_seen < $2 and first_seen >= $3 and duplicate_of is null"
+        " and (ticker = $4 or (event_type = $5 and $5 is not null))",
         cluster_id,
         first_seen,
         first_seen - dt.timedelta(days=days),
+        ticker,
+        event_type,
     )
     return await story_vectors(pool, [r["id"] for r in rows])

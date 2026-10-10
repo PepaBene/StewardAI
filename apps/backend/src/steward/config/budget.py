@@ -72,6 +72,7 @@ BudgetJobType = Literal[
     "ai_approvals",
     "ir_discovery",
     "news_ai_search",
+    "news_triage",
     "news_analysis",
     "news_brief",
     "gap_research",
@@ -91,6 +92,11 @@ AtCap = Literal["alert_only", "pause_noncritical", "downgrade_noncritical"]
 # theses, judging a severe news event, and answering the owner's own chat questions are
 # what the app is for and are time-critical; digests, research and reviews can wait.
 DEFAULT_CRITICAL_JOB_TYPES: list[BudgetJobType] = ["earnings_check", "event_escalation", "chat"]
+DEFAULT_MONTHLY_CAPS_USD: dict[BudgetJobType, float] = {
+    "news_analysis": 4.0,
+    "news_brief": 1.5,
+    "news_ai_search": 2.5,
+}
 
 
 class ModelPrice(ConfigModel):
@@ -213,7 +219,9 @@ class BudgetConfig(ConfigModel):
         " Null: no cap.",
     )
     per_job_monthly_cap_usd: dict[BudgetJobType, float] = Field(
-        default_factory=dict,
+        # The $10 news envelope (news plan section 8a): the new news stages degrade at their own
+        # ceiling and never stop ingestion. Ingestion itself has no monthly cap here.
+        default_factory=lambda: dict(DEFAULT_MONTHLY_CAPS_USD),
         description="Most AI spend of one job type per calendar month (Europe/Prague), in USD,"
         " so one stage cannot use the whole monthly budget. A run over it fails before its next"
         " request, whatever its criticality.",

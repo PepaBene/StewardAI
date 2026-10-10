@@ -1,10 +1,10 @@
 """Linking items to holdings through each holding's news profile.
 
 A holding is matched by its company name and aliases, its ticker written as a ticker
-("$AAPL", "(NASDAQ: AAPL)"), or its ISIN. Named competitors, suppliers and customers and the
-watch topics link an item to the holding too, with the relation recorded, so news about a key
-supplier reaches the owner even when the holding is not mentioned. Items that match nothing
-are dropped.
+("$AAPL", "(NASDAQ: AAPL)"), or its ISIN. Named executives and brands link too. Named
+competitors, suppliers and customers, the top constituents of a held fund, and the watch topics
+link an item to the holding with the relation recorded, so news about a key supplier reaches
+the owner even when the holding is not mentioned. Items that match nothing are dropped.
 """
 
 import re
@@ -39,12 +39,20 @@ LINK_CONFIDENCE: dict[str, float] = {
     "ticker": 0.95,
     "name": 0.85,
     "alias": 0.75,
+    # A named executive or a product brand is about the company itself, but a name alone
+    # is weaker evidence than the company's own.
+    "executive": 0.7,
+    "brand": 0.7,
     "supplier": 0.6,
     "customer": 0.6,
+    # A top constituent of a held fund: the fund is reached through it, not named.
+    "constituent": 0.5,
     "competitor": 0.5,
     "topic": 0.4,
 }
-INDIRECT_VIA: frozenset[str] = frozenset({"competitor", "supplier", "customer", "topic"})
+INDIRECT_VIA: frozenset[str] = frozenset(
+    {"competitor", "supplier", "customer", "constituent", "topic"}
+)
 
 
 @dataclass(frozen=True)
@@ -104,6 +112,8 @@ def holding_terms(
     if profile:
         terms.aliases = list(profile.aliases)
         terms.relations = [
+            *(("executive", e) for e in profile.executives),
+            *(("brand", b) for b in profile.brands),
             *(("competitor", c) for c in profile.competitors),
             *(("supplier", s) for s in profile.suppliers),
             *(("customer", c) for c in profile.customers),
@@ -177,9 +187,12 @@ class Linker:
             "alias",
             "ticker",
             "isin",
+            "executive",
+            "brand",
             "competitor",
             "supplier",
             "customer",
+            "constituent",
             "topic",
         ]
         for ticker, via, term, pattern in self._patterns:

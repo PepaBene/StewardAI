@@ -73,7 +73,10 @@ def checked(
     extraction: StoryExtraction,
     thesis: ThesisConfig,
     raw: ThesisLinks,
+    owner_confirmed: bool = False,
 ) -> list[LinkedAssumption]:
+    """`owner_confirmed`: the owner marked the story confirmed, which counts as a primary
+    source for a breach (a model reading never breaches an assumption on its own)."""
     refs = valid_refs(thesis)
     out: list[LinkedAssumption] = []
     for link in raw.links:
@@ -83,7 +86,9 @@ def checked(
             continue
         if link.effect == "strengthens":
             status: Literal["supports", "review", "breach"] = "supports"
-        elif link.kind != "why_owned" and story.lifecycle == "primary_confirmed":
+        elif link.kind != "why_owned" and (
+            story.lifecycle == "primary_confirmed" or owner_confirmed
+        ):
             status = "breach"
         else:
             status = "review"
@@ -122,6 +127,7 @@ async def link_thesis(
     system: str = SYSTEM_PROMPT,
     effort: str | None = None,
     cache: ResultCache | None = None,
+    owner_confirmed: bool = False,
 ) -> list[LinkedAssumption]:
     claims = "\n".join(f"{i}: {c.text}" for i, c in enumerate(extraction.key_claims))
     raw = await structured(
@@ -137,4 +143,4 @@ async def link_thesis(
         cache_key="news_thesis",
         max_tokens=2000,
     )
-    return checked(story, extraction, thesis, raw)
+    return checked(story, extraction, thesis, raw, owner_confirmed)

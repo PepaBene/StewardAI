@@ -16,8 +16,10 @@ forecast of return.
 """
 
 import datetime as dt
+from collections.abc import Collection, Mapping
 from typing import Literal
 
+import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
@@ -41,7 +43,19 @@ hold, with the entities between and the relation. Say it as a possibility. Never
 - Never state a price move or a return.
 """
 
-Relation = Literal["direct", "second_order", "hypothesis"]
+Relation = Literal["direct", "second_order", "attribute", "hypothesis"]
+
+# Which of the owner's classification dimensions an extracted entity kind is matched against.
+ATTRIBUTE_DIMENSIONS: dict[str, tuple[str, ...]] = {
+    "sector": ("sector",),
+    "country": ("geography", "country", "home_country"),
+    "currency": ("currency",),
+    "commodity": ("commodity",),
+    "rate": ("rate",),
+}
+# An attribute match is a broad class of holdings, so it counts for less than a named company
+# or a supply-chain path when ranking.
+ATTRIBUTE_RANK_FACTOR = 0.25
 Confidence = Literal["high", "medium", "low"]
 
 
@@ -82,6 +96,11 @@ class ImpactResult(BaseModel):
     chains: list[ImpactChain]
     direct_weight: float
     reached_weight: float
+    attribute_weight: float = Field(
+        default=0.0,
+        description="Portfolio share in holdings the story reaches only through a shared "
+        "sector, country, currency, commodity or rate classification (no supply-chain link).",
+    )
     notes: list[str] = Field(default_factory=list)
 
 
@@ -110,12 +129,78 @@ def _chain(path: EventPath) -> ImpactChain:
     )
 
 
+async def holding_attributes(
+    pool: asyncpg.Pool, classifications: Mapping[str, Mapping[str, str]]
+) -> dict[str, dict[str, str]]:
+    """What each held company is, by symbol: the owner's own classification of it (sector,
+    geography, currency and any other dimension of the strategy config), plus the country and
+    currency of the instrument itself where the owner gave none."""
+    out: dict[str, dict[str, str]] = {}
+    for r in await pool.fetch("select t212_ticker, home_country, currency from public.instrument"):
+        attrs = {}
+        if r["home_country"]:
+            attrs["home_country"] = r["home_country"]
+        if r["currency"]:
+            attrs["currency"] = r["currency"]
+        out[symbol_of(r["t212_ticker"])] = attrs
+    for ticker, dims in classifications.items():
+        out.setdefault(symbol_of(ticker), {}).update(dims)
+    return out
+
+
+def attribute_chains(
+    graph: SupplyChain,
+    extraction: StoryExtraction | None,
+    attributes: Mapping[str, Mapping[str, str]],
+    exclude: Collection[str] = (),
+) -> list[ImpactChain]:
+    """Holdings that share a sector, country, currency, commodity or rate with an entity the
+    story is about, by the owner's own classification. Matching is by equal name (case and
+    spacing aside), never by guess; a holding already reached another way is left out."""
+    if extraction is None:
+        return []
+    held = {n.symbol: n for n in graph.nodes if n.weight > 0}
+    chains: list[ImpactChain] = []
+    for entity in extraction.affected_entities:
+        dims = ATTRIBUTE_DIMENSIONS.get(entity.kind)
+        if dims is None:
+            continue
+        wanted = " ".join(entity.name.casefold().split())
+        for symbol, node in sorted(held.items()):
+            if symbol in exclude:
+                continue
+            attrs = attributes.get(symbol, {})
+            hit = next(
+                (
+                    (dim, attrs[dim])
+                    for dim in dims
+                    if dim in attrs and " ".join(attrs[dim].casefold().split()) == wanted
+                ),
+                None,
+            )
+            if hit is None:
+                continue
+            chains.append(
+                ImpactChain(
+                    relation="attribute",
+                    holding=symbol,
+                    chain=[f"{entity.kind}: {entity.name}", symbol],
+                    links=[f"{symbol} is classified {hit[0]} = {hit[1]} in your strategy"],
+                    confidence="low" if entity.confidence == "low" else "medium",
+                    weight=node.weight,
+                    note=f"The story has {entity.name} going {entity.direction}.",
+                )
+            )
+    return chains
+
+
 def graph_chains(
     graph: SupplyChain,
     story: StoryMaterial,
     extraction: StoryExtraction | None,
     indicators: dict[str, list[str]] | None = None,
     today: dt.date | None = None,
+    attributes: Mapping[str, Mapping[str, str]] | None = None,
 ) -> tuple[ImpactResult, list[EventPath]]:
     """The verified chains of a story from the graph, and the raw paths they were built from."""
     symbol = symbol_of(story.ticker) if story.ticker else None
@@ -148,12 +233,17 @@ def graph_chains(
             notes.extend(impact.notes)
     else:
         notes.append("The story is not tied to one company, so no graph path starts from it.")
+    by_attribute = attribute_chains(
+        graph, extraction, attributes or {}, exclude={c.holding for c in chains}
+    )
+    chains.extend(by_attribute)
     return (
         ImpactResult(
             symbol=symbol,
             chains=chains,
             direct_weight=direct,
             reached_weight=reached,
+            attribute_weight=sum(c.weight or 0.0 for c in by_attribute),
             notes=list(dict.fromkeys(notes)),
         ),
         paths,

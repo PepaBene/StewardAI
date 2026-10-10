@@ -4,12 +4,16 @@ For high-severity stories only. The claims come from the verified extraction (6.
 documents are the story's own items of a primary kind (filing, regulator, company release,
 central bank). Each claim is marked `supported`, `contradicted` or `unverified`.
 
+Other primary documents about the same holding, stored in neighbouring stories (the company's
+filing of the same week, a regulator notice), are checked too.
+
 The model judges; code keeps it honest. A `supported` or `contradicted` verdict stands only when
 it names one of the story's primary items and quotes a span of that item's text that is really
 there; a `supported` claim's numbers must all occur in that item. Anything else is `unverified`.
 With no primary document stored, every claim is `unverified` and no model is called.
 """
 
+from collections.abc import Sequence
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -60,8 +64,13 @@ def primaries(story: StoryMaterial) -> list[ItemText]:
     return [i for i in story.items if i.evidence_kind in PRIMARY_KINDS]
 
 
-def checked(story: StoryMaterial, claims: list[str], raw: ClaimVerdicts) -> list[CheckedClaim]:
-    docs = {i.id: i for i in primaries(story)}
+def checked(
+    story: StoryMaterial,
+    claims: list[str],
+    raw: ClaimVerdicts,
+    extra: Sequence[ItemText] = (),
+) -> list[CheckedClaim]:
+    docs = {i.id: i for i in [*primaries(story), *extra]}
     by_claim = {v.claim_index: v for v in raw.verdicts}
     out: list[CheckedClaim] = []
     for idx, text in enumerate(claims):
@@ -102,9 +111,11 @@ async def check_claims(
     system: str = SYSTEM_PROMPT,
     effort: str | None = None,
     cache: ResultCache | None = None,
+    extra: Sequence[ItemText] = (),
 ) -> list[CheckedClaim]:
+    """`extra` are primary documents stored in other stories about the same holding."""
     claims = [c.text for c in extraction.key_claims]
-    docs = primaries(story)
+    docs = [*primaries(story), *extra]
     if not claims:
         return []
     if not docs:
@@ -123,4 +134,4 @@ async def check_claims(
         cache_key="news_claims",
         max_tokens=2500,
     )
-    return checked(story, claims, raw)
+    return checked(story, claims, raw, extra)

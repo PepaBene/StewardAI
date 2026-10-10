@@ -29,6 +29,9 @@ PromptKey = Literal[
     "news_digest",
     "news_translation",
     "news_search_leads",
+    "news_triage",
+    "news_sentiment",
+    "news_theme",
     "news_extract",
     "news_impact",
     "news_framing",
@@ -111,6 +114,22 @@ PROMPTS: dict[PromptKey, PromptInfo] = {
         "Searches the web for recent news on a thinly covered holding and lists article links "
         "as leads (never as facts).",
         "steward.news.ai_search:SYSTEM_PROMPT",
+    ),
+    "news_triage": PromptInfo(
+        "News triage",
+        "Rates each wire item's relevance to a global equity portfolio and writes a one-line "
+        "gloss, a topic and the named entities.",
+        "steward.news.triage:SYSTEM_PROMPT",
+    ),
+    "news_theme": PromptInfo(
+        "News theme narrative",
+        "Writes a short cited paragraph on what a week of coverage of a watch theme reports.",
+        "steward.news.theme_narrative:SYSTEM_PROMPT",
+    ),
+    "news_sentiment": PromptInfo(
+        "News sentiment",
+        "Reads the direction of a story toward each named entity, quoting the text it rests on.",
+        "steward.news.sentiment:SYSTEM_PROMPT",
     ),
     "news_extract": PromptInfo(
         "News event extraction",

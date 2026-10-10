@@ -6271,7 +6271,9 @@
                   "enum": [
                     "morning",
                     "weekly",
-                    "holding"
+                    "holding",
+                    "region",
+                    "theme"
                   ],
                   "type": "string"
                 },
@@ -6498,7 +6500,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/steward__news__read_analysis__FeedbackIn"
+                "$ref": "#/components/schemas/NewsFeedbackIn"
               }
             }
           }
@@ -6509,7 +6511,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/steward__news__read_analysis__FeedbackOut"
+                  "$ref": "#/components/schemas/NewsFeedbackOut"
                 }
               }
             }
@@ -6598,7 +6600,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/steward__news__read_analysis__FeedbackOut"
+                    "$ref": "#/components/schemas/NewsFeedbackOut"
                   },
                   "title": "Response Get News Feedback"
                 }
@@ -8334,7 +8336,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/steward__verify__feedback__FeedbackIn"
+                "$ref": "#/components/schemas/FeedbackIn"
               }
             }
           }
@@ -8345,7 +8347,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/steward__verify__feedback__FeedbackOut"
+                  "$ref": "#/components/schemas/FeedbackOut"
                 }
               }
             }
@@ -8460,7 +8462,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/steward__verify__feedback__FeedbackOut"
+                    "$ref": "#/components/schemas/FeedbackOut"
                   },
                   "title": "Response Get Feedback"
                 }
@@ -29850,6 +29852,46 @@
         ],
         "title": "AreaCount"
       },
+      "Aspect": {
+        "properties": {
+          "entity": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Entity"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "positive",
+              "negative",
+              "mixed",
+              "neutral"
+            ],
+            "title": "Direction"
+          },
+          "strength": {
+            "type": "number",
+            "title": "Strength"
+          },
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "span": {
+            "type": "string",
+            "title": "Span"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity",
+          "direction",
+          "strength",
+          "item_id",
+          "span"
+        ],
+        "title": "Aspect"
+      },
       "Assumptions": {
         "properties": {
           "name": {
@@ -32554,7 +32596,9 @@
             "enum": [
               "morning",
               "weekly",
-              "holding"
+              "holding",
+              "region",
+              "theme"
             ],
             "title": "Kind"
           },
@@ -32916,6 +32960,7 @@
                 "ai_approvals",
                 "ir_discovery",
                 "news_ai_search",
+                "news_triage",
                 "news_analysis",
                 "news_brief",
                 "gap_research",
@@ -32992,6 +33037,7 @@
                 "ai_approvals",
                 "ir_discovery",
                 "news_ai_search",
+                "news_triage",
                 "news_analysis",
                 "news_brief",
                 "gap_research",
@@ -33081,6 +33127,7 @@
                 "ai_approvals",
                 "ir_discovery",
                 "news_ai_search",
+                "news_triage",
                 "news_analysis",
                 "news_brief",
                 "gap_research",
@@ -49888,6 +49935,214 @@
         ],
         "title": "FeedItem"
       },
+      "FeedbackIn": {
+        "properties": {
+          "target_kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "verdict",
+              "alert",
+              "news_item",
+              "story",
+              "report_sentence"
+            ],
+            "title": "Target Kind"
+          },
+          "target_id": {
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
+            "title": "Target Id",
+            "description": "The fact, verdict, alert, news item, story or report id."
+          },
+          "sentence_path": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z_]+(/[0-9a-z_]+)*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentence Path",
+            "description": "Report sentences only: where it sits in the report body, e.g. 'overview/0', 'sections/2/summary/1' (digest) or 'sentences/3' (impact note)."
+          },
+          "rating": {
+            "type": "string",
+            "enum": [
+              "wrong",
+              "irrelevant",
+              "useful"
+            ],
+            "title": "Rating"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "add_to_eval": {
+            "type": "boolean",
+            "title": "Add To Eval",
+            "description": "With rating 'wrong' on a fact or news item: add it to the golden or labelled evaluation set with the corrected value or label.",
+            "default": false
+          },
+          "corrected_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Value",
+            "description": "Facts: the right value, in the fact's printed scale."
+          },
+          "corrected_value_as_written": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Value As Written",
+            "description": "Facts added to the golden set: the right number exactly as printed, when it differs from the stored one (e.g. '94,036')."
+          },
+          "corrected_snippet": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Snippet",
+            "description": "Facts added to the golden set: the document passage that states the right number, when the stored snippet does not contain it."
+          },
+          "corrected_label": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NewsLabel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_kind",
+          "target_id",
+          "rating"
+        ],
+        "title": "FeedbackIn"
+      },
+      "FeedbackOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "target_kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "verdict",
+              "alert",
+              "news_item",
+              "story",
+              "report_sentence"
+            ],
+            "title": "Target Kind"
+          },
+          "target_id": {
+            "type": "integer",
+            "title": "Target Id"
+          },
+          "sentence_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentence Path"
+          },
+          "rating": {
+            "type": "string",
+            "enum": [
+              "wrong",
+              "irrelevant",
+              "useful"
+            ],
+            "title": "Rating"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "source_hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Hosts"
+          },
+          "effects": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Effects",
+            "description": "What the feedback did: quarantined fact, verdict job, trust scores, eval candidate."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "target_kind",
+          "target_id",
+          "sentence_path",
+          "rating",
+          "note",
+          "source_hosts",
+          "effects",
+          "created_at"
+        ],
+        "title": "FeedbackOut"
+      },
       "FetchPolicy": {
         "properties": {
           "rungs": {
@@ -56392,6 +56647,26 @@
             ],
             "description": "Hand-entered per-share figures for holdings without an automatic source."
           },
+          "executives": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Executives",
+            "description": "Named executives (CEO, CFO, chair). News naming one links to the holding."
+          },
+          "brands": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Brands",
+            "description": "Product and brand names that are not part of the company name."
+          },
           "competitors": {
             "items": {
               "type": "string",
@@ -57686,6 +57961,7 @@
             "enum": [
               "direct",
               "second_order",
+              "attribute",
               "hypothesis"
             ],
             "title": "Relation"
@@ -57790,6 +58066,12 @@
           "reached_weight": {
             "type": "number",
             "title": "Reached Weight"
+          },
+          "attribute_weight": {
+            "type": "number",
+            "title": "Attribute Weight",
+            "description": "Portfolio share in holdings the story reaches only through a shared sector, country, currency, commodity or rate classification (no supply-chain link).",
+            "default": 0.0
           },
           "notes": {
             "items": {
@@ -61859,6 +62141,10 @@
           "news_ai_search": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Asks a search-capable model for recent news on holdings the wire covers thinly. Results are leads at the lowest tier: they never alert on their own. Off by default (it spends on web searches). Default: daily 06:20."
+          },
+          "news_triage": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Triages new wire items on a cheap model: relevance, topic, entities and a one-line gloss. Off by default (it spends on a model). Default: hourly at :10."
           },
           "news_analysis": {
             "$ref": "#/components/schemas/JobSchedule",
@@ -67867,6 +68153,121 @@
         ],
         "title": "NewsFeed"
       },
+      "NewsFeedbackIn": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "enum": [
+              "item",
+              "story",
+              "claim",
+              "brief_line"
+            ],
+            "title": "Target"
+          },
+          "target_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Target Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "wrong_entity",
+              "duplicate",
+              "misread",
+              "missing_source",
+              "useful",
+              "not_useful",
+              "confirmed"
+            ],
+            "title": "Kind"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "target_id",
+          "kind"
+        ],
+        "title": "NewsFeedbackIn"
+      },
+      "NewsFeedbackOut": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "enum": [
+              "item",
+              "story",
+              "claim",
+              "brief_line"
+            ],
+            "title": "Target"
+          },
+          "target_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Target Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "wrong_entity",
+              "duplicate",
+              "misread",
+              "missing_source",
+              "useful",
+              "not_useful",
+              "confirmed"
+            ],
+            "title": "Kind"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "target_id",
+          "kind",
+          "id",
+          "created_at"
+        ],
+        "title": "NewsFeedbackOut"
+      },
       "NewsItemOut": {
         "properties": {
           "id": {
@@ -68327,7 +68728,8 @@
                 "claims",
                 "market",
                 "themes",
-                "thesis"
+                "thesis",
+                "sentiment"
               ]
             },
             "type": "array",
@@ -68487,6 +68889,108 @@
             "title": "Brief Max Lines",
             "description": "Most lines in one brief (the highest ranked).",
             "default": 12
+          },
+          "brief_alert": {
+            "type": "boolean",
+            "title": "Brief Alert",
+            "description": "Send the morning brief's top lines through the alert routing (Telegram or email, by your alert rules) when it is written.",
+            "default": false
+          },
+          "gdelt_themes": {
+            "type": "boolean",
+            "title": "Gdelt Themes",
+            "description": "Fetch GDELT's average tone and share of coverage for each watch theme once a day (free, no key, one request per five seconds). Shown next to the theme counts; never used for ranking or alerts.",
+            "default": false
+          },
+          "gdelt_max_themes": {
+            "type": "integer",
+            "maximum": 40.0,
+            "minimum": 1.0,
+            "title": "Gdelt Max Themes",
+            "description": "Most themes fetched from GDELT per run.",
+            "default": 6
+          },
+          "theme_narratives": {
+            "type": "boolean",
+            "title": "Theme Narratives",
+            "description": "On Mondays the brief job writes a short cited narrative for each watch theme with enough items in the week (needs the brief model's key).",
+            "default": true
+          },
+          "triage_model": {
+            "type": "string",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Triage Model",
+            "description": "Triages each wire item: relevance to a global equity portfolio, topic, named entities and a one-line gloss. Decides what gets full text and analysis.",
+            "default": "gpt-6-luna",
+            "examples": [
+              "claude-sonnet-5",
+              "gpt-6-luna"
+            ]
+          },
+          "triage_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Effort",
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+          },
+          "triage_per_run": {
+            "type": "integer",
+            "maximum": 2000.0,
+            "minimum": 0.0,
+            "title": "Triage Per Run",
+            "description": "Wire items triaged per run (0: none).",
+            "default": 200
+          },
+          "triage_fulltext_relevance": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Triage Fulltext Relevance",
+            "description": "An unlinked wire item triaged at this relevance or above is also fetched for full text (linked items always are).",
+            "default": 2
+          },
+          "batch_extraction": {
+            "type": "boolean",
+            "title": "Batch Extraction",
+            "description": "Send extraction through the provider's batch endpoint (half price, but a run waits up to an hour for the results).",
+            "default": false
+          },
+          "sector_benchmarks": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Sector Benchmarks",
+            "description": "Price symbol of the sector index to measure a holding against, by the holding's sector (for example {'Technology': 'xlk.us'}). Without an entry the country's market index is used."
+          },
+          "auto_resolve_days": {
+            "type": "integer",
+            "maximum": 180.0,
+            "minimum": 0.0,
+            "title": "Auto Resolve Days",
+            "description": "A story that is confirmed or corroborated and has had no new item for this many days is marked resolved (0: only you resolve stories).",
+            "default": 14
+          },
+          "sentiment_weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Sentiment Weight",
+            "description": "How much a strong verified sentiment can raise a story's rank in the briefs (0: sentiment is not used for ranking).",
+            "default": 0.25
           },
           "indirect_alert_min_severity": {
             "type": "integer",
@@ -76369,6 +76873,9 @@
               "news_digest",
               "news_translation",
               "news_search_leads",
+              "news_triage",
+              "news_sentiment",
+              "news_theme",
               "news_extract",
               "news_impact",
               "news_framing",
@@ -76441,6 +76948,9 @@
                 "news_digest",
                 "news_translation",
                 "news_search_leads",
+                "news_triage",
+                "news_sentiment",
+                "news_theme",
                 "news_extract",
                 "news_impact",
                 "news_framing",
@@ -76491,6 +77001,9 @@
                 "news_digest",
                 "news_translation",
                 "news_search_leads",
+                "news_triage",
+                "news_sentiment",
+                "news_theme",
                 "news_extract",
                 "news_impact",
                 "news_framing",
@@ -85435,6 +85948,24 @@
         ],
         "title": "Sentence"
       },
+      "SentimentResult": {
+        "properties": {
+          "aspects": {
+            "items": {
+              "$ref": "#/components/schemas/Aspect"
+            },
+            "type": "array",
+            "title": "Aspects"
+          },
+          "intensity": {
+            "type": "number",
+            "title": "Intensity",
+            "default": 0.0
+          }
+        },
+        "type": "object",
+        "title": "SentimentResult"
+      },
       "SeriesEffect": {
         "properties": {
           "series_id": {
@@ -89794,6 +90325,16 @@
               }
             ]
           },
+          "sentiment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SentimentResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "models": {
             "additionalProperties": {
               "type": "string"
@@ -91246,6 +91787,30 @@
               }
             ],
             "title": "Flag"
+          },
+          "tone": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone",
+            "description": "GDELT's average tone of worldwide coverage of the theme that day (negative below zero); null when GDELT is off or has no data."
+          },
+          "attention": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attention",
+            "description": "GDELT's share of monitored coverage the theme took that day."
           }
         },
         "type": "object",
@@ -98516,119 +99081,6 @@
         ],
         "title": "Check"
       },
-      "steward__news__read_analysis__FeedbackIn": {
-        "properties": {
-          "target": {
-            "type": "string",
-            "enum": [
-              "item",
-              "story",
-              "claim",
-              "brief_line"
-            ],
-            "title": "Target"
-          },
-          "target_id": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Target Id"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "wrong_entity",
-              "duplicate",
-              "misread",
-              "missing_source",
-              "useful",
-              "not_useful"
-            ],
-            "title": "Kind"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          }
-        },
-        "type": "object",
-        "required": [
-          "target",
-          "target_id",
-          "kind"
-        ],
-        "title": "FeedbackIn"
-      },
-      "steward__news__read_analysis__FeedbackOut": {
-        "properties": {
-          "target": {
-            "type": "string",
-            "enum": [
-              "item",
-              "story",
-              "claim",
-              "brief_line"
-            ],
-            "title": "Target"
-          },
-          "target_id": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Target Id"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "wrong_entity",
-              "duplicate",
-              "misread",
-              "missing_source",
-              "useful",
-              "not_useful"
-            ],
-            "title": "Kind"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "target",
-          "target_id",
-          "kind",
-          "id",
-          "created_at"
-        ],
-        "title": "FeedbackOut"
-      },
       "steward__ownership__control_stakes_read__StakeChangeOut": {
         "properties": {
           "change_type": {
@@ -98743,214 +99195,6 @@
           "denominator"
         ],
         "title": "Check"
-      },
-      "steward__verify__feedback__FeedbackIn": {
-        "properties": {
-          "target_kind": {
-            "type": "string",
-            "enum": [
-              "fact",
-              "verdict",
-              "alert",
-              "news_item",
-              "story",
-              "report_sentence"
-            ],
-            "title": "Target Kind"
-          },
-          "target_id": {
-            "type": "integer",
-            "maximum": 9.223372036854776e+18,
-            "minimum": 1.0,
-            "title": "Target Id",
-            "description": "The fact, verdict, alert, news item, story or report id."
-          },
-          "sentence_path": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^[a-z_]+(/[0-9a-z_]+)*$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sentence Path",
-            "description": "Report sentences only: where it sits in the report body, e.g. 'overview/0', 'sections/2/summary/1' (digest) or 'sentences/3' (impact note)."
-          },
-          "rating": {
-            "type": "string",
-            "enum": [
-              "wrong",
-              "irrelevant",
-              "useful"
-            ],
-            "title": "Rating"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          },
-          "add_to_eval": {
-            "type": "boolean",
-            "title": "Add To Eval",
-            "description": "With rating 'wrong' on a fact or news item: add it to the golden or labelled evaluation set with the corrected value or label.",
-            "default": false
-          },
-          "corrected_value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Corrected Value",
-            "description": "Facts: the right value, in the fact's printed scale."
-          },
-          "corrected_value_as_written": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 40
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Corrected Value As Written",
-            "description": "Facts added to the golden set: the right number exactly as printed, when it differs from the stored one (e.g. '94,036')."
-          },
-          "corrected_snippet": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Corrected Snippet",
-            "description": "Facts added to the golden set: the document passage that states the right number, when the stored snippet does not contain it."
-          },
-          "corrected_label": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/NewsLabel"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "target_kind",
-          "target_id",
-          "rating"
-        ],
-        "title": "FeedbackIn"
-      },
-      "steward__verify__feedback__FeedbackOut": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "target_kind": {
-            "type": "string",
-            "enum": [
-              "fact",
-              "verdict",
-              "alert",
-              "news_item",
-              "story",
-              "report_sentence"
-            ],
-            "title": "Target Kind"
-          },
-          "target_id": {
-            "type": "integer",
-            "title": "Target Id"
-          },
-          "sentence_path": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sentence Path"
-          },
-          "rating": {
-            "type": "string",
-            "enum": [
-              "wrong",
-              "irrelevant",
-              "useful"
-            ],
-            "title": "Rating"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          },
-          "source_hosts": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Source Hosts"
-          },
-          "effects": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Effects",
-            "description": "What the feedback did: quarantined fact, verdict job, trust scores, eval candidate."
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "target_kind",
-          "target_id",
-          "sentence_path",
-          "rating",
-          "note",
-          "source_hosts",
-          "effects",
-          "created_at"
-        ],
-        "title": "FeedbackOut"
       }
     },
     "securitySchemes": {

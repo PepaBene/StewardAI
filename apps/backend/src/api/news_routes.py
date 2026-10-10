@@ -39,9 +39,9 @@ from steward.news.read import (
 )
 from steward.news.read_analysis import (
     BriefOut,
-    FeedbackIn,
-    FeedbackOut,
     FeedbackTarget,
+    NewsFeedbackIn,
+    NewsFeedbackOut,
     StoryAnalysis,
     ThemeDay,
     ThreadDetail,
@@ -405,7 +405,9 @@ async def get_wire(
 async def get_briefs(
     pool: Pool,
     _owner: Owner,
-    kind: Annotated[Literal["morning", "weekly", "holding"] | None, Query()] = None,
+    kind: Annotated[
+        Literal["morning", "weekly", "holding", "region", "theme"] | None, Query()
+    ] = None,
     ticker: Annotated[Ticker | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=50)] = 10,
 ) -> list[BriefOut]:
@@ -440,7 +442,7 @@ async def get_news_ops(
 
 
 @router.post("/news/feedback", tags=["news"], status_code=status.HTTP_201_CREATED)
-async def post_news_feedback(body: FeedbackIn, pool: Pool, _owner: Owner) -> FeedbackOut:
+async def post_news_feedback(body: NewsFeedbackIn, pool: Pool, _owner: Owner) -> NewsFeedbackOut:
     """Mark an item, story, claim or brief line (wrong entity, duplicate, misread, missing
     source, useful, not useful). Feedback feeds the benchmark, never model training."""
     return await add_feedback(pool, body)
@@ -453,7 +455,7 @@ async def get_news_feedback(
     target: Annotated[FeedbackTarget | None, Query()] = None,
     target_id: Annotated[str | None, Query(max_length=200)] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
-) -> list[FeedbackOut]:
+) -> list[NewsFeedbackOut]:
     return await list_feedback(pool, target, target_id, limit)
 
 

@@ -302,6 +302,41 @@ async def store_result(
     )
 
 
+async def store_feed_text(
+    db: asyncpg.Pool | asyncpg.Connection,
+    url: str,
+    text: str,
+    summary: str | None,
+    policy: FetchPolicy,
+    now: dt.datetime,
+    *,
+    keep: bool,
+) -> bool:
+    """Rung 1: persist the article text the feed itself carried (`content:encoded`), so the
+    ladder never fetches a page the feed already delivered. False when the text looks cut off
+    (it is then left to the later rungs) or the wire row does not exist."""
+    if detect_truncation(text, None, summary) is not None:
+        return False
+    stored = await db.fetchval(
+        "with ins as (insert into public.news_fulltext (url, article_id, news_item_id, rung,"
+        " extractor, body, content_hash, truncated, char_count, fetched_at, expires_at)"
+        " select $1, a.id, a.news_item_id, 1, 'feed', $2, $3, false, $4, $5, $6"
+        " from public.news_article a where a.url = $1"
+        " on conflict (url) do nothing returning article_id),"
+        " upd as (update public.news_article set fetch_state = 'full'"
+        "  where id in (select article_id from ins) and fetch_state in ('headline', 'summary')"
+        "  returning 1)"
+        " select count(*) from ins",
+        url,
+        text,
+        content_hash(text),
+        len(text),
+        now,
+        expiry(now, policy, keep=keep),
+    )
+    return bool(stored)
+
+
 async def purge_expired(pool: asyncpg.Pool, now: dt.datetime) -> int:
     """Clear the bodies past their expiry. The row, hash and provenance stay."""
     status: str = await pool.execute(
@@ -313,17 +348,20 @@ async def purge_expired(pool: asyncpg.Pool, now: dt.datetime) -> int:
 
 
 async def fulltext_candidates(
-    pool: asyncpg.Pool, limit: int, since: dt.datetime
+    pool: asyncpg.Pool, limit: int, since: dt.datetime, unlinked_relevance: int | None = None
 ) -> list[asyncpg.Record]:
-    """Wire items worth article text, newest first: linked to a holding, not yet fetched.
-    (The whole wire is never fetched: the funnel in section 8 of the plan.)"""
+    """Wire items worth article text, newest first: linked to a holding, or triaged at
+    `unlinked_relevance` or above, and not yet fetched. (The whole wire is never fetched: the
+    funnel in section 8 of the plan.)"""
     rows: list[asyncpg.Record] = await pool.fetch(
         "select a.id, a.url, a.source_id, a.summary, a.news_item_id"
         " from public.news_article a"
-        " where a.linked and a.fetch_state in ('headline', 'summary') and a.first_seen_at >= $2"
+        " where (a.linked or ($3::int is not null and (a.triage->>'relevance')::int >= $3))"
+        " and a.fetch_state in ('headline', 'summary') and a.first_seen_at >= $2"
         " order by a.published_at desc limit $1",
         limit,
         since,
+        unlinked_relevance,
     )
     return rows
 
@@ -350,15 +388,17 @@ async def run_fulltext(
     limit: int = 40,
     render: Render | None = None,
     api: ApiFetch | None = None,
+    unlinked_relevance: int | None = None,
 ) -> dict[str, Any]:
-    """Acquire article text for the newest linked wire items that have none yet, within each
-    source's hourly fetch allowance. Returns counts by outcome for the job step."""
+    """Acquire article text for the newest linked (or highly triaged) wire items that have none
+    yet, within each source's hourly fetch allowance. Returns counts by outcome for the job
+    step."""
     policies = {s.id: s.fetch for s in sources.sources}
     counts: dict[str, int] = {"candidates": 0, "full": 0, "stub": 0, "failed": 0, "skipped": 0}
     errors: list[str] = []
     allowance: dict[str, int] = {}
     since = now - dt.timedelta(hours=sources.freshness_hours)
-    rows = await fulltext_candidates(pool, limit, since)
+    rows = await fulltext_candidates(pool, limit, since, unlinked_relevance)
     counts["candidates"] = len(rows)
     for row in rows:
         policy = policies.get(row["source_id"])

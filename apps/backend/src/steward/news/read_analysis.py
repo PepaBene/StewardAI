@@ -14,6 +14,7 @@ from steward.news.extract import StoryExtraction
 from steward.news.framing import FramingComparison
 from steward.news.impact import ImpactResult
 from steward.news.market import MarketContext, StudyRow, event_study
+from steward.news.sentiment import SentimentResult
 from steward.news.thesis_link import LinkedAssumption
 
 
@@ -60,6 +61,7 @@ class StoryAnalysis(BaseModel):
     claims: ClaimsOut | None = None
     market: MarketContext | None = None
     thesis: ThesisOut | None = None
+    sentiment: SentimentResult | None = None
     models: dict[str, str] = Field(
         default_factory=dict, description="The model behind each technique that used one."
     )
@@ -74,6 +76,7 @@ _KINDS: dict[str, type[BaseModel]] = {
     "claims": ClaimsOut,
     "market": MarketContext,
     "thesis": ThesisOut,
+    "sentiment": SentimentResult,
 }
 
 
@@ -267,7 +270,7 @@ async def wire(pool: asyncpg.Pool, f: WireFilters) -> WirePage:
 
 class BriefOut(BaseModel):
     id: int
-    kind: Literal["morning", "weekly", "holding"]
+    kind: Literal["morning", "weekly", "holding", "region", "theme"]
     ticker: str
     period_start: dt.datetime
     period_end: dt.datetime
@@ -299,13 +302,22 @@ class ThemeDay(BaseModel):
     stories: int
     regions: list[str]
     flag: Literal["spike", "spread"] | None
+    tone: float | None = Field(
+        default=None,
+        description="GDELT's average tone of worldwide coverage of the theme that day "
+        "(negative below zero); null when GDELT is off or has no data.",
+    )
+    attention: float | None = Field(
+        default=None, description="GDELT's share of monitored coverage the theme took that day."
+    )
 
 
 async def theme_days(pool: asyncpg.Pool, days: int) -> list[ThemeDay]:
     rows = await pool.fetch(
         "select theme, day, sum(wire_items)::int as wire_items, sum(stories)::int as stories,"
         " array_agg(region order by region) filter (where region <> '' and wire_items > 0)"
-        " as regions, max(flag) as flag from public.news_theme_day"
+        " as regions, max(flag) as flag, max(tone) as tone, max(attention) as attention"
+        " from public.news_theme_day"
         " where day >= current_date - $1::int group by theme, day order by day desc, theme",
         days,
     )
@@ -314,23 +326,23 @@ async def theme_days(pool: asyncpg.Pool, days: int) -> list[ThemeDay]:
 
 FeedbackTarget = Literal["item", "story", "claim", "brief_line"]
 FeedbackKind = Literal[
-    "wrong_entity", "duplicate", "misread", "missing_source", "useful", "not_useful"
+    "wrong_entity", "duplicate", "misread", "missing_source", "useful", "not_useful", "confirmed"
 ]
 
 
-class FeedbackIn(BaseModel):
+class NewsFeedbackIn(BaseModel):
     target: FeedbackTarget
     target_id: str = Field(min_length=1, max_length=200)
     kind: FeedbackKind
     note: str | None = Field(default=None, max_length=1000)
 
 
-class FeedbackOut(FeedbackIn):
+class NewsFeedbackOut(NewsFeedbackIn):
     id: int
     created_at: dt.datetime
 
 
-async def add_feedback(pool: asyncpg.Pool, body: FeedbackIn) -> FeedbackOut:
+async def add_feedback(pool: asyncpg.Pool, body: NewsFeedbackIn) -> NewsFeedbackOut:
     row = await pool.fetchrow(
         "insert into public.news_feedback (target, target_id, kind, note)"
         " values ($1, $2, $3, $4) returning id, target, target_id, kind, note, created_at",
@@ -340,12 +352,12 @@ async def add_feedback(pool: asyncpg.Pool, body: FeedbackIn) -> FeedbackOut:
         body.note,
     )
     assert row is not None
-    return FeedbackOut(**dict(row))
+    return NewsFeedbackOut(**dict(row))
 
 
 async def list_feedback(
     pool: asyncpg.Pool, target: str | None, target_id: str | None, limit: int
-) -> list[FeedbackOut]:
+) -> list[NewsFeedbackOut]:
     rows = await pool.fetch(
         "select id, target, target_id, kind, note, created_at from public.news_feedback"
         " where ($1::text is null or target = $1) and ($2::text is null or target_id = $2)"
@@ -354,7 +366,7 @@ async def list_feedback(
         target_id,
         limit,
     )
-    return [FeedbackOut(**dict(r)) for r in rows]
+    return [NewsFeedbackOut(**dict(r)) for r in rows]
 
 
 async def study(pool: asyncpg.Pool) -> list[StudyRow]:

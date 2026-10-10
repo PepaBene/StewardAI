@@ -105,9 +105,9 @@ from steward.news.feeds import (
     collect_page,
     collect_rss_conditional,
 )
-from steward.news.fulltext import purge_expired, run_fulltext
+from steward.news.fulltext import purge_expired, run_fulltext, store_feed_text
 from steward.news.language import resolve_language
-from steward.news.link import HoldingTerms, Linker, holding_terms
+from steward.news.link import HoldingTerms, Linker, holding_terms, short_name
 from steward.news.normalize import canonical_url, host_of
 from steward.news.primary_sources import (
     collect_cninfo,
@@ -219,6 +219,30 @@ class Holdings:
         return next((t.display_name() for t in self.terms if t.ticker == ticker), ticker or "")
 
 
+FUND_CONSTITUENTS = 10
+
+
+async def fund_constituents(pool: asyncpg.Pool, isins: Sequence[str]) -> dict[str, list[str]]:
+    """The names of the largest equity constituents of each held fund, from its newest holdings
+    snapshot, so news about a top constituent reaches the fund indirectly."""
+    rows = await pool.fetch(
+        "select s.fund_isin, h.name from public.etf_snapshot s"
+        " join lateral (select name from public.etf_holding"
+        "   where snapshot_id = s.id and asset_class = 'equity' and name is not null"
+        "   order by weight desc limit $2) h on true"
+        " where s.fund_isin = any($1::text[]) and s.as_of = (select max(as_of)"
+        "   from public.etf_snapshot where fund_isin = s.fund_isin)",
+        list(isins),
+        FUND_CONSTITUENTS,
+    )
+    found: dict[str, list[str]] = defaultdict(list)
+    for r in rows:
+        name = short_name(r["name"])
+        if len(name) >= 3 and name not in found[r["fund_isin"]]:
+            found[r["fund_isin"]].append(name)
+    return found
+
+
 async def load_holdings(pool: asyncpg.Pool, config: NewsConfig) -> Holdings:
     rows = await pool.fetch(
         "select ticker from public.position_snapshot where snapshot_date = coalesce("
@@ -250,6 +274,9 @@ async def load_holdings(pool: asyncpg.Pool, config: NewsConfig) -> Holdings:
         tickers,
     ):
         known_aliases[row["ticker"]].append((row["alias"], row["kind"]))
+    constituents = await fund_constituents(
+        pool, [r["isin"] for r in instruments.values() if r["isin"]]
+    )
     terms, feed_info, context = [], [], []
     ir_domains: set[str] = set()
     for ticker in tickers:
@@ -265,6 +292,8 @@ async def load_holdings(pool: asyncpg.Pool, config: NewsConfig) -> Holdings:
             target = t.symbols if kind == "listing_ticker" else t.aliases
             if alias not in target and alias not in t.names:
                 target.append(alias)
+        if instrument and instrument["isin"]:
+            t.relations.extend(("constituent", n) for n in constituents.get(instrument["isin"], []))
         terms.append(t)
         cik = (profile.sec_cik if profile else None) or (instrument["cik"] if instrument else None)
         names = tuple(dict.fromkeys([*t.names[1:2], *t.names[:1], *t.aliases]))
@@ -858,6 +887,8 @@ async def store_items(
     }
     members = await recent_members(pool, since)
     wire_rows: list[tuple[Any, ...]] = []
+    # (url, item, source, keep) of kept items whose feed carried the article text (rung 1).
+    feed_texts: list[tuple[str, RawItem, NewsSource, bool]] = []
     # Oldest first, so the original of a syndicated story starts the cluster.
     ordered = sorted(by_url.items(), key=lambda kv: kv[1][0].published_at or now)
     for url, (item, source) in ordered:
@@ -895,6 +926,7 @@ async def store_items(
                     wire_args(url, item, source, tier, published, now, job_id, topics=topics)
                 )
                 tally.stored_wire += 1
+                feed_texts.append((url, item, source, False))
             continue
         links = linker.link(text, item.tickers)
         if not links and not source.macro:
@@ -906,6 +938,7 @@ async def store_items(
                     wire_args(url, item, source, tier, published, now, job_id, topics=topics)
                 )
                 tally.stored_wire += 1
+                feed_texts.append((url, item, source, False))
             continue
         outlet_host = item.outlet_host or host_of(url)
         kind = evidence_kind(source, tier, outlet_host, holdings.ir_domains, config.sources)
@@ -1001,8 +1034,14 @@ async def store_items(
         stats.stored += 1
         tally.stored_linked += 1
         stats.touched_clusters.add(cluster_id)
+        feed_texts.append((url, item, source, True))
     if wire_rows:
         await pool.executemany(WIRE_UPSERT, wire_rows)
+    for url, item, source, keep in feed_texts:
+        if item.content:
+            await store_feed_text(
+                pool, url, item.content, item.summary, source.fetch, now, keep=keep
+            )
     return stats
 
 
@@ -1842,7 +1881,12 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
         async with ctx.step("fulltext") as step:
             step.detail.update(
                 await run_fulltext(
-                    pool, config.sources, deps.fetcher, now, limit=config.news.fulltext_per_run
+                    pool,
+                    config.sources,
+                    deps.fetcher,
+                    now,
+                    limit=config.news.fulltext_per_run,
+                    unlinked_relevance=config.news.triage_fulltext_relevance,
                 )
             )
             step.detail["expired_bodies_cleared"] = await purge_expired(pool, now)

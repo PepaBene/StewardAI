@@ -93,7 +93,16 @@ ModelId = Annotated[
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 
 AnalysisTechnique = Literal[
-    "extraction", "novelty", "impact", "thread", "framing", "claims", "market", "themes", "thesis"
+    "extraction",
+    "novelty",
+    "impact",
+    "thread",
+    "framing",
+    "claims",
+    "market",
+    "themes",
+    "thesis",
+    "sentiment",
 ]
 # The techniques computed in code, which cost nothing and so run by default.
 CODE_TECHNIQUES: tuple[AnalysisTechnique, ...] = ("novelty", "thread", "market", "themes")
@@ -636,6 +645,66 @@ class NewsSettings(ConfigModel):
     brief_max_lines: int = Field(
         default=12, ge=3, le=40, description="Most lines in one brief (the highest ranked)."
     )
+    brief_alert: bool = Field(
+        default=False,
+        description="Send the morning brief's top lines through the alert routing (Telegram or "
+        "email, by your alert rules) when it is written.",
+    )
+    gdelt_themes: bool = Field(
+        default=False,
+        description="Fetch GDELT's average tone and share of coverage for each watch theme once "
+        "a day (free, no key, one request per five seconds). Shown next to the theme counts; "
+        "never used for ranking or alerts.",
+    )
+    gdelt_max_themes: int = Field(
+        default=6, ge=1, le=40, description="Most themes fetched from GDELT per run."
+    )
+    theme_narratives: bool = Field(
+        default=True,
+        description="On Mondays the brief job writes a short cited narrative for each watch "
+        "theme with enough items in the week (needs the brief model's key).",
+    )
+    triage_model: ModelId = Field(
+        default="gpt-6-luna",
+        description="Triages each wire item: relevance to a global equity portfolio, topic, "
+        "named entities and a one-line gloss. Decides what gets full text and analysis.",
+    )
+    triage_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    triage_per_run: int = Field(
+        default=200, ge=0, le=2000, description="Wire items triaged per run (0: none)."
+    )
+    triage_fulltext_relevance: int = Field(
+        default=2,
+        ge=1,
+        le=3,
+        description="An unlinked wire item triaged at this relevance or above is also fetched "
+        "for full text (linked items always are).",
+    )
+    batch_extraction: bool = Field(
+        default=False,
+        description="Send extraction through the provider's batch endpoint (half price, but a "
+        "run waits up to an hour for the results).",
+    )
+    sector_benchmarks: dict[str, str] = Field(
+        default_factory=lambda: {},
+        description="Price symbol of the sector index to measure a holding against, by the "
+        "holding's sector (for example {'Technology': 'xlk.us'}). Without an entry the "
+        "country's market index is used.",
+    )
+    auto_resolve_days: int = Field(
+        default=14,
+        ge=0,
+        le=180,
+        description="A story that is confirmed or corroborated and has had no new item for this "
+        "many days is marked resolved (0: only you resolve stories).",
+    )
+    sentiment_weight: float = Field(
+        default=0.25,
+        ge=0.0,
+        le=1.0,
+        description="How much a strong verified sentiment can raise a story's rank in the "
+        "briefs (0: sentiment is not used for ranking).",
+    )
     indirect_alert_min_severity: int = Field(
         default=2,
         ge=0,
@@ -686,6 +755,7 @@ class NewsSettings(ConfigModel):
         check_effort(self.extraction_model, self.extraction_effort, "extraction_effort")
         check_effort(self.analysis_model, self.analysis_effort, "analysis_effort")
         check_effort(self.brief_model, self.brief_effort, "brief_effort")
+        check_effort(self.triage_model, self.triage_effort, "triage_effort")
         if self.novelty_update_similarity >= self.novelty_repeat_similarity:
             raise ValueError("novelty_update_similarity must be below novelty_repeat_similarity")
         if len(set(self.analysis_techniques)) != len(self.analysis_techniques):
@@ -2059,6 +2129,11 @@ class JobsConfig(ConfigModel):
         "thinly. Results are leads at the lowest tier: they never alert on their own. Off by "
         "default (it spends on web searches). Default: daily 06:20.",
     )
+    news_triage: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(enabled=False, cron="10 * * * *"),
+        description="Triages new wire items on a cheap model: relevance, topic, entities and a "
+        "one-line gloss. Off by default (it spends on a model). Default: hourly at :10.",
+    )
     news_analysis: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="25 */3 * * *"),
         description="Analyses new stories: novelty, threads, market context and themes in code, "
@@ -2187,6 +2262,7 @@ class JobsConfig(ConfigModel):
             "ai_approvals": self.ai_approvals,
             "ir_discovery": self.ir_discovery,
             "news_ai_search": self.news_ai_search,
+            "news_triage": self.news_triage,
             "news_analysis": self.news_analysis,
             "news_brief": self.news_brief,
             "gap_research": self.gap_research,

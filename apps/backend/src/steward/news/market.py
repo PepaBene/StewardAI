@@ -14,7 +14,7 @@ Retrospective labelling only, computed in code from stored prices:
 import datetime as dt
 import json
 import statistics
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -88,8 +88,16 @@ def _round(x: float | None) -> float | None:
     return None if x is None else round(x, 2)
 
 
-def pick_benchmark(country: str | None, configured: Sequence[str]) -> str | None:
-    """The benchmark of the holding's country when configured, else the first configured one."""
+def pick_benchmark(
+    country: str | None,
+    configured: Sequence[str],
+    sector: str | None = None,
+    sector_benchmarks: Mapping[str, str] | None = None,
+) -> str | None:
+    """The holding's sector index when the owner configured one for its sector, else the
+    benchmark of its country when configured, else the first configured one."""
+    if sector and sector_benchmarks and sector in sector_benchmarks:
+        return sector_benchmarks[sector]
     wanted = COUNTRY_BENCHMARK.get(country or "")
     if wanted and wanted in configured:
         return wanted
@@ -105,9 +113,14 @@ async def load_closes(
 
 
 async def market_context(
-    pool: asyncpg.Pool, story: StoryMaterial, configured_benchmarks: Sequence[str]
+    pool: asyncpg.Pool,
+    story: StoryMaterial,
+    configured_benchmarks: Sequence[str],
+    sector: str | None = None,
+    sector_benchmarks: Mapping[str, str] | None = None,
 ) -> MarketContext | None:
-    """The story's market context, or None for a story with no holding or no price symbol."""
+    """The story's market context, or None for a story with no holding or no price symbol.
+    `sector` is the owner's own classification of the holding (the strategy config)."""
     if story.ticker is None:
         return None
     row = await pool.fetchrow(
@@ -125,7 +138,9 @@ async def market_context(
     since = event_day - dt.timedelta(days=LOOKBACK_DAYS)
     until = event_day + dt.timedelta(days=LOOKAHEAD_DAYS)
     stock = await load_closes(pool, row["price_symbol"], since, until)
-    benchmark = pick_benchmark(row["home_country"], configured_benchmarks)
+    benchmark = pick_benchmark(
+        row["home_country"], configured_benchmarks, sector, sector_benchmarks
+    )
     bench = await load_closes(pool, benchmark, since, until) if benchmark else []
     base_date, moves = window_moves(stock, bench, event_day)
     notes: list[str] = []

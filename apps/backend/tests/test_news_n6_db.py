@@ -23,7 +23,7 @@ from steward.news.extract import StoryExtraction
 from steward.news.framing import FramingComparison
 from steward.news.impact import ImpactNotes
 from steward.news.read_analysis import (
-    FeedbackIn,
+    NewsFeedbackIn,
     WireFilters,
     add_feedback,
     list_briefs,
@@ -327,7 +327,8 @@ async def test_the_wire_feedback_and_themes_read_side(
     assert (await wire(backend_pool, WireFilters(tier=1))).items
 
     mark = await add_feedback(
-        backend_pool, FeedbackIn(target="story", target_id="1", kind="duplicate", note="same as 2")
+        backend_pool,
+        NewsFeedbackIn(target="story", target_id="1", kind="duplicate", note="same as 2"),
     )
     assert mark.id and (await list_feedback(backend_pool, "story", "1", 10))[0].kind == "duplicate"
     assert await list_feedback(backend_pool, "item", None, 10) == []

@@ -44,6 +44,7 @@ from steward.news.analysis_job import news_analysis_handler, news_brief_handler
 from steward.news.digest import daily_digest_handler, weekly_digest_handler
 from steward.news.escalation import event_escalation_handler
 from steward.news.pipeline import news_ingest_handler
+from steward.news.triage import news_triage_handler
 from steward.ownership.collect import ownership_13f_handler
 from steward.ownership.control_stakes import control_stakes_handler
 from steward.ownership.insider_collect import insider_trades_handler
@@ -130,6 +131,7 @@ JobType = Literal[
     "ai_approvals",
     "ir_discovery",
     "news_ai_search",
+    "news_triage",
     "news_analysis",
     "news_brief",
     "gap_research",
@@ -197,6 +199,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "ai_approvals": ai_approvals_handler,
     "ir_discovery": ir_discovery_handler,
     "news_ai_search": news_ai_search_handler,
+    "news_triage": news_triage_handler,
     "news_analysis": news_analysis_handler,
     "news_brief": news_brief_handler,
     "gap_research": gap_research_handler,

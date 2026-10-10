@@ -14,26 +14,35 @@ alerts.
 import datetime as dt
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import asyncpg
+import httpx
 
 from steward.ai import AINotConfigured, Usage, create_client
 from steward.budget_guard import BudgetExceeded
 from steward.config.jobs import JobsConfig, NewsSettings
+from steward.config.news_sources import NewsSourcesConfig
+from steward.config.notifications import NotificationsConfig
 from steward.config.prompts import PromptsConfig, load_prompts
 from steward.config.store import load_active
+from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig, ThesisConfig
 from steward.jobs.runner import JobContext
+from steward.llm.batching import BatchCollector
 from steward.llm.cache import ResultCache
 from steward.llm.client import LLM, create_llm
+from steward.llm.types import Completion, Request
 from steward.news import brief as briefs
 from steward.news import claims as claim_checks
 from steward.news import extract as extraction
 from steward.news import framing as framings
+from steward.news import gdelt_theme
 from steward.news import impact as impacts
 from steward.news import market as markets
 from steward.news import novelty as novelties
+from steward.news import sentiment as sentiments
+from steward.news import theme_narrative as theme_narratives
 from steward.news import themes as theme_logic
 from steward.news import thesis_link as thesis_links
 from steward.news import threads as thread_logic
@@ -43,14 +52,35 @@ from steward.news.analysis import (
     input_hash,
     latest_analysis,
     load_story,
+    related_primaries,
     save_analysis,
 )
+from steward.notify.alerts import create_alerts
+from steward.notify.route import AlertRequest
 from steward.settings import get_settings
 from steward.xray.supply_chain import SupplyChain
 
 logger = logging.getLogger(__name__)
 
 SELECT_DAYS = 3
+BATCH_WAIT_MINUTES = 60.0
+
+
+class BatchedLLM:
+    """The part of `LLM` that `structured` uses, sending each completion through a batch
+    collector so many extractions share one batch request."""
+
+    def __init__(self, llm: LLM, collector: BatchCollector) -> None:
+        self._llm = llm
+        self._collector = collector
+
+    def configured(self, model: str) -> bool:
+        return self._llm.configured(model)
+
+    async def complete(self, request: Request) -> Completion:
+        return await self._collector.submit(request)
+
+
 MAX_STORIES = 500
 
 
@@ -91,6 +121,67 @@ async def pick_stories(pool: asyncpg.Pool, now: dt.datetime) -> list[tuple[int, 
         MAX_STORIES,
     )
     return [(r["id"], r["severity"]) for r in rows]
+
+
+async def fetch_gdelt(pool: asyncpg.Pool, limit: int, now: dt.datetime) -> dict[str, Any]:
+    """GDELT tone and attention for the themes whose data is more than a day old."""
+    stored = await load_active(pool, "news_sources", NewsSourcesConfig)
+    topics = {
+        t.id: t.keywords
+        for t in (stored.body if stored else NewsSourcesConfig()).portfolio_topics
+        if t.enabled
+    }
+    due = (await gdelt_theme.stale_themes(pool, sorted(topics), now.date()))[:limit]
+    done: list[str] = []
+    errors: list[str] = []
+    async with httpx.AsyncClient(timeout=30.0, headers={"User-Agent": "stewardai/1.0"}) as client:
+
+        async def get(url: str) -> dict[str, Any] | None:
+            response = await client.get(url)
+            if response.status_code != 200 or not response.text.lstrip().startswith("{"):
+                raise httpx.HTTPError(f"GDELT answered {response.status_code}")
+            body: dict[str, Any] = response.json()
+            return body
+
+        for theme in due:
+            try:
+                tone, attention = await gdelt_theme.theme_series(get, topics[theme])
+            except (httpx.HTTPError, ValueError) as exc:
+                errors.append(f"{theme}: {str(exc)[:80]}")
+                break
+            await gdelt_theme.store_series(pool, theme, tone, attention)
+            done.append(theme)
+    return {"themes": done, "errors": errors}
+
+
+async def resolve_quiet_stories(pool: asyncpg.Pool, now: dt.datetime, days: int) -> int:
+    """Mark confirmed or corroborated stories with no new item for `days` days as resolved.
+
+    This is not the owner closing a story: `lifecycle_closed_at` stays empty, so a new item
+    reaching the story makes its next assessment recompute the state from the evidence and
+    the story reopens by itself. Disputed and corrected stories stay as they are."""
+    if days <= 0:
+        return 0
+    async with pool.acquire() as conn, conn.transaction():
+        rows = await conn.fetch(
+            "update public.story_cluster c set lifecycle = 'resolved', lifecycle_at = $1,"
+            " lifecycle_reason = $3 from (select id, lifecycle from public.story_cluster"
+            "  where lifecycle in ('corroborated', 'primary_confirmed') and last_seen < $2"
+            "  and lifecycle_closed_at is null and duplicate_of is null for update) old"
+            " where c.id = old.id returning c.id, old.lifecycle as before",
+            now,
+            now - dt.timedelta(days=days),
+            f"no new item for {days} days",
+        )
+        for r in rows:
+            await conn.execute(
+                "insert into public.story_lifecycle_event (cluster_id, from_state, to_state,"
+                " reason) values ($1, $2, 'resolved', $3)",
+                r["id"],
+                r["before"],
+                f"no new item for {days} days",
+            )
+    return len(rows)
 
 
 def make_llm() -> LLM:
@@ -162,7 +253,15 @@ class AnalysisRun:
         self.extractions[story.cluster_id] = parsed
         return parsed
 
-    async def extract(self, story: StoryMaterial, usage: Usage) -> None:
+    async def extract_batched(self, stories: list[StoryMaterial], usage: Usage) -> None:
+        """Extract many stories through the provider's batch endpoint (half price): every
+        story's request goes into one batch and the run waits for the answers. A request the
+        batch does not answer is asked directly, as `BatchCollector` does."""
+        collector = BatchCollector(self.llm, wait_minutes=BATCH_WAIT_MINUTES)
+        adapter = cast(LLM, BatchedLLM(self.llm, collector))
+        await collector.run([self.extract(s, usage, adapter) for s in stories])
+
+    async def extract(self, story: StoryMaterial, usage: Usage, llm: LLM | None = None) -> None:
         model = self.news.extraction_model
         system = self.prompts.text("news_extract", extraction.SYSTEM_PROMPT, model)
         hash_ = extraction.extraction_hash(story, model, system)
@@ -170,7 +269,7 @@ class AnalysisRun:
             return
         try:
             result = await extraction.extract_story(
-                self.llm,
+                llm or self.llm,
                 model,
                 story,
                 usage,
@@ -201,6 +300,7 @@ class AnalysisRun:
             story.ticker,
             story.first_seen,
             self.news.novelty_window_days,
+            story.event_type,
         )
         result = novelties.classify_novelty(
             own,
@@ -246,8 +346,16 @@ class AnalysisRun:
             payload,
         )
 
-    async def market(self, story: StoryMaterial, benchmarks: list[str]) -> None:
-        ctx = await markets.market_context(self.pool, story, benchmarks)
+    async def market(
+        self, story: StoryMaterial, benchmarks: list[str], sectors: dict[str, str]
+    ) -> None:
+        ctx = await markets.market_context(
+            self.pool,
+            story,
+            benchmarks,
+            sectors.get(story.ticker or ""),
+            self.news.sector_benchmarks,
+        )
         if ctx is None:
             return
         payload = ctx.model_dump(mode="json")
@@ -260,9 +368,10 @@ class AnalysisRun:
         graph: SupplyChain,
         indicators: dict[str, list[str]],
         usage: Usage,
+        attributes: dict[str, dict[str, str]],
     ) -> None:
         ex = await self.extraction_of(story)
-        result, paths = impacts.graph_chains(graph, story, ex, indicators)
+        result, paths = impacts.graph_chains(graph, story, ex, indicators, attributes=attributes)
         model = self.news.analysis_model
         explain = bool(paths) and self.llm_ready(model)
         system = self.prompts.text("news_impact", impacts.SYSTEM_PROMPT, model)
@@ -332,12 +441,13 @@ class AnalysisRun:
         if story.severity < 3 or ex is None or not self.llm_ready(model):
             return
         system = self.prompts.text("news_claims", claim_checks.SYSTEM_PROMPT, model)
+        extra = await related_primaries(self.pool, story)
         hash_ = input_hash(
             "claims",
             model,
             system,
             [c.text for c in ex.key_claims],
-            [(i.id, i.text) for i in claim_checks.primaries(story)],
+            [(i.id, i.text) for i in [*claim_checks.primaries(story), *extra]],
         )
         if await analysis_exists(self.pool, story.cluster_id, "claims", hash_):
             return
@@ -351,6 +461,7 @@ class AnalysisRun:
                 system=system,
                 effort=self.news.analysis_effort,
                 cache=self.cache("news_claims"),
+                extra=extra,
             )
         except BudgetExceeded as exc:
             self.stopped = True
@@ -363,6 +474,34 @@ class AnalysisRun:
             story, "claims", hash_, model, {"claims": [c.model_dump(mode="json") for c in result]}
         )
 
+    async def sentiment(self, story: StoryMaterial, usage: Usage) -> None:
+        model = self.news.analysis_model
+        if not self.llm_ready(model):
+            return
+        system = self.prompts.text("news_sentiment", sentiments.SYSTEM_PROMPT, model)
+        hash_ = input_hash("sentiment", model, system, [(i.id, i.text) for i in story.items])
+        if await analysis_exists(self.pool, story.cluster_id, "sentiment", hash_):
+            return
+        try:
+            result = await sentiments.read_sentiment(
+                self.llm,
+                model,
+                story,
+                usage,
+                system=system,
+                effort=self.news.analysis_effort,
+                cache=self.cache("news_sentiment"),
+            )
+        except BudgetExceeded as exc:
+            self.stopped = True
+            self.counts.failed("budget", exc)
+            return
+        except AnalysisError as exc:
+            self.counts.failed(f"sentiment:{story.cluster_id}", exc)
+            return
+        if result is not None:
+            await self.save(story, "sentiment", hash_, model, result.model_dump(mode="json"))
+
     async def thesis(self, story: StoryMaterial, theses: ThesesConfig | None, usage: Usage) -> None:
         model = self.news.analysis_model
         ex = await self.extraction_of(story)
@@ -370,11 +509,19 @@ class AnalysisRun:
         if thesis is None or ex is None or not self.llm_ready(model):
             return
         system = self.prompts.text("news_thesis", thesis_links.SYSTEM_PROMPT, model)
+        confirmed = bool(
+            await self.pool.fetchval(
+                "select exists (select 1 from public.news_feedback where target = 'story'"
+                " and target_id = $1 and kind = 'confirmed')",
+                str(story.cluster_id),
+            )
+        )
         hash_ = input_hash(
             "thesis",
             model,
             system,
             story.lifecycle,
+            confirmed,
             [c.text for c in ex.key_claims],
             thesis.model_dump(mode="json"),
         )
@@ -391,6 +538,7 @@ class AnalysisRun:
                 system=system,
                 effort=self.news.analysis_effort,
                 cache=self.cache("news_thesis"),
+                owner_confirmed=confirmed,
             )
         except BudgetExceeded as exc:
             self.stopped = True
@@ -421,13 +569,22 @@ async def news_analysis_handler(ctx: JobContext) -> None:
         if story is not None and story.items:
             stories[sid] = story
 
+    strategy = await load_active(ctx.pool, "strategy", StrategyConfig)
+    classifications: dict[str, dict[str, str]] = (
+        {t: dict(d) for t, d in strategy.body.classifications.items()} if strategy else {}
+    )
+
     if "extraction" in run.techniques and news.analysis_per_run:
         usage = Usage(model=news.extraction_model)
         async with ctx.step("extract") as step:
             if run.llm_ready(news.extraction_model):
-                for sid in model_ids:
-                    if sid in stories and not run.stopped:
-                        await run.extract(stories[sid], usage)
+                chosen = [stories[sid] for sid in model_ids if sid in stories]
+                if news.batch_extraction and len(chosen) > 1:
+                    await run.extract_batched(chosen, usage)
+                else:
+                    for story in chosen:
+                        if not run.stopped:
+                            await run.extract(story, usage)
             else:
                 step.detail.update(skipped=f"no API key for {news.extraction_model}")
             step.detail.update(run.counts.detail())
@@ -435,6 +592,7 @@ async def news_analysis_handler(ctx: JobContext) -> None:
 
     async with ctx.step("code") as step:
         benchmarks = [str(s) for s in config.prices.benchmark_symbols]
+        sectors = {t: dims["sector"] for t, dims in classifications.items() if "sector" in dims}
         for story in stories.values():
             for technique in ("novelty", "thread", "market"):
                 if technique not in run.techniques:
@@ -445,16 +603,21 @@ async def news_analysis_handler(ctx: JobContext) -> None:
                     elif technique == "thread":
                         await run.thread(story)
                     else:
-                        await run.market(story, benchmarks)
+                        await run.market(story, benchmarks, sectors)
                 except (asyncpg.PostgresError, ValueError) as exc:
                     run.counts.failed(f"{technique}:{story.cluster_id}", exc)
         if "thread" in run.techniques:
             await thread_logic.quiet_old_threads(ctx.pool, now, news.thread_window_days)
         if "themes" in run.techniques:
             step.detail.update(theme_rows=await theme_logic.update_themes(ctx.pool, now.date()))
+            if news.gdelt_themes:
+                step.detail.update(gdelt=await fetch_gdelt(ctx.pool, news.gdelt_max_themes, now))
+        step.detail.update(
+            auto_resolved=await resolve_quiet_stories(ctx.pool, now, news.auto_resolve_days)
+        )
         step.detail.update(run.counts.detail())
 
-    wants_model = run.techniques & {"impact", "framing", "claims", "thesis"}
+    wants_model = run.techniques & {"impact", "framing", "claims", "thesis", "sentiment"}
     if wants_model and news.analysis_per_run:
         usage = Usage(model=news.analysis_model)
         async with ctx.step("analyse") as step:
@@ -463,6 +626,11 @@ async def news_analysis_handler(ctx: JobContext) -> None:
             )
             if graph_note:
                 step.detail.update(graph=graph_note)
+            attributes = (
+                await impacts.holding_attributes(ctx.pool, classifications)
+                if graph is not None
+                else {}
+            )
             theses_stored = await load_active(ctx.pool, "theses", ThesesConfig)
             theses = theses_stored.body if theses_stored else None
             for sid in model_ids:
@@ -470,15 +638,109 @@ async def news_analysis_handler(ctx: JobContext) -> None:
                 if story is None:
                     continue
                 if "impact" in run.techniques and graph is not None:
-                    await run.impact(story, graph, indicators, usage)
+                    await run.impact(story, graph, indicators, usage, attributes)
                 if "framing" in run.techniques:
                     await run.framing(story, usage)
                 if "claims" in run.techniques:
                     await run.claims(story, usage)
+                if "sentiment" in run.techniques:
+                    await run.sentiment(story, usage)
                 if "thesis" in run.techniques:
                     await run.thesis(story, theses, usage)
             step.detail.update(run.counts.detail())
             step.usage = usage.step_usage()
+
+
+async def write_theme_briefs(
+    ctx: JobContext,
+    news: NewsSettings,
+    llm: LLM,
+    prompts: PromptsConfig,
+    usage: Usage,
+    start: dt.datetime,
+    end: dt.datetime,
+) -> dict[str, Any]:
+    """One cited paragraph per watch theme with enough items in the week."""
+    model = news.brief_model
+    stored = await load_active(ctx.pool, "news_sources", NewsSourcesConfig)
+    topics = [
+        t for t in (stored.body if stored else NewsSourcesConfig()).portfolio_topics if t.enabled
+    ]
+    system = prompts.text("news_theme", theme_narratives.SYSTEM_PROMPT, model)
+    written: list[str] = []
+    rejected: list[str] = []
+    errors: list[str] = []
+    for topic in topics:
+        items = await theme_narratives.theme_items(ctx.pool, topic.id, start, end)
+        if len(items) < theme_narratives.MIN_ITEMS:
+            continue
+        try:
+            narrative = await theme_narratives.write_narrative(
+                llm,
+                model,
+                topic.label,
+                items,
+                usage,
+                system=system,
+                effort=news.brief_effort,
+                cache=ResultCache(ctx.pool, "news_theme"),
+            )
+        except BudgetExceeded as exc:
+            errors.append(f"budget: {str(exc)[:100]}")
+            break
+        except AnalysisError as exc:
+            errors.append(f"{topic.id}: {str(exc)[:100]}")
+            continue
+        if narrative is None:
+            rejected.append(topic.id)
+            continue
+        await ctx.pool.execute(
+            "insert into public.news_brief (kind, ticker, period_start, period_end, body, model,"
+            " job_id) values ('theme', $1, $2, $3, $4::jsonb, $5, $6)"
+            " on conflict (kind, ticker, period_start) do update set"
+            " period_end = excluded.period_end, body = excluded.body, model = excluded.model,"
+            " job_id = excluded.job_id, created_at = now()",
+            topic.id,
+            start,
+            end,
+            theme_narratives.as_body(topic.label, narrative).model_dump_json(),
+            model,
+            ctx.job_id,
+        )
+        written.append(topic.id)
+    return {"written": written, "rejected": rejected, "errors": errors}
+
+
+BRIEF_ALERT_LINES = 3
+
+
+async def alert_brief(ctx: JobContext, body: briefs.BriefBody, now: dt.datetime) -> str:
+    """Send the morning brief's top lines through the alert routing, once a day. What the
+    notification rules decide (channel, quiet hours, daily cap) applies as for any alert."""
+    lines = sorted((ln for s in body.sections for ln in s.lines), key=lambda ln: -ln.score)
+    top = lines[:BRIEF_ALERT_LINES]
+    if not top:
+        return "no lines"
+    key = f"morning-brief:{now.date().isoformat()}"
+    if await ctx.pool.fetchval(
+        "select exists (select 1 from public.alert where dedupe_key = $1)", key
+    ):
+        return "already sent today"
+    stored = await load_active(ctx.pool, "notifications", NotificationsConfig)
+    config = stored.body if stored else NotificationsConfig()
+    message = "Morning brief:\n" + "\n".join(
+        f"- {ln.ticker + ': ' if ln.ticker else ''}{ln.text}" for ln in top
+    )
+    created = await create_alerts(
+        ctx.pool,
+        AlertRequest("news", max(ln.severity for ln in top), None, "brief"),
+        message,
+        config,
+        now=now,
+        job_id=ctx.job_id,
+        dedupe_key=key,
+    )
+    return created.explanation
 
 
 async def news_brief_handler(ctx: JobContext) -> None:
@@ -514,6 +776,8 @@ async def news_brief_handler(ctx: JobContext) -> None:
         except AnalysisError:
             return {}
 
+    last_body: list[briefs.BriefBody] = []
+
     async def store(kind: str, ticker: str, start: dt.datetime, end: dt.datetime) -> int:
         body, by_model = await briefs.build_brief(
             ctx.pool,
@@ -524,10 +788,12 @@ async def news_brief_handler(ctx: JobContext) -> None:
             max_lines=news.brief_max_lines,
             ticker=ticker or None,
             writer=writer,
+            sentiment_weight=news.sentiment_weight,
         )
         lines = sum(len(s.lines) for s in body.sections)
         if lines == 0:
             return 0
+        last_body[:] = [body]
         await ctx.pool.execute(
             "insert into public.news_brief (kind, ticker, period_start, period_end, body, model,"
             " job_id) values ($1, $2, $3, $4, $5::jsonb, $6, $7)"
@@ -550,12 +816,15 @@ async def news_brief_handler(ctx: JobContext) -> None:
     async with ctx.step("morning") as step:
         written["morning"] = await store("morning", "", day - dt.timedelta(days=1), now)
         step.detail.update(lines=written["morning"])
+        if news.brief_alert and written["morning"] and last_body:
+            step.detail.update(alert=await alert_brief(ctx, last_body[0], now))
         step.usage = usage[0].step_usage()
     if now.weekday() == 0:
         week = day - dt.timedelta(days=7)
         usage[0] = Usage(model=model)
         async with ctx.step("weekly") as step:
             written["weekly"] = await store("weekly", "", week, now)
+            written["region"] = await store("region", "", week, now)
             rows = await ctx.pool.fetch(
                 "select distinct ticker from public.story_cluster where last_seen >= $1"
                 " and ticker is not null and severity >= $2 and duplicate_of is null",
@@ -566,5 +835,14 @@ async def news_brief_handler(ctx: JobContext) -> None:
             for r in rows:
                 if await store("holding", r["ticker"], week, now):
                     holdings += 1
-            step.detail.update(lines=written["weekly"], holdings=holdings)
+            step.detail.update(
+                lines=written["weekly"], region_lines=written["region"], holdings=holdings
+            )
             step.usage = usage[0].step_usage()
+        if news.theme_narratives and llm.configured(model) and not state["stopped"]:
+            usage[0] = Usage(model=model)
+            async with ctx.step("themes") as step:
+                step.detail.update(
+                    await write_theme_briefs(ctx, news, llm, prompts, usage[0], week, now)
+                )
+                step.usage = usage[0].step_usage()

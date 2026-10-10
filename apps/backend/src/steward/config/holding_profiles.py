@@ -244,6 +244,14 @@ class HoldingProfile(ConfigModel):
     )
 
     # News relevance (used from Phase 3).
+    executives: list[ShortText] = Field(
+        default_factory=list,
+        description="Named executives (CEO, CFO, chair). News naming one links to the holding.",
+    )
+    brands: list[ShortText] = Field(
+        default_factory=list,
+        description="Product and brand names that are not part of the company name.",
+    )
     competitors: list[ShortText] = Field(default_factory=list)
     suppliers: list[ShortText] = Field(default_factory=list)
     customers: list[ShortText] = Field(default_factory=list)

@@ -117,6 +117,60 @@ def input_hash(*parts: object) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
 
+ITEM_SELECT = (
+    "select i.id, i.url, i.outlet, i.outlet_name, i.tier, i.evidence_kind, i.independence_key,"
+    " i.is_correction, i.published_at, i.language, i.headline, i.summary,"
+    " a.region, coalesce(s.state_media, false) as state_media,"
+    " (select f.body from public.news_fulltext f where f.news_item_id = i.id"
+    "  and f.body is not null and not f.truncated order by f.fetched_at desc limit 1) as body"
+    " from public.news_item i left join public.news_article a on a.news_item_id = i.id"
+    " left join public.source s on s.id = i.source_id"
+)
+
+
+def item_from_row(r: asyncpg.Record) -> ItemText:
+    return ItemText(
+        id=r["id"],
+        url=r["url"],
+        outlet=r["outlet"],
+        outlet_name=r["outlet_name"],
+        tier=r["tier"],
+        region=r["region"],
+        state_media=r["state_media"],
+        evidence_kind=r["evidence_kind"],
+        independence_key=r["independence_key"],
+        is_correction=r["is_correction"],
+        published_at=r["published_at"],
+        language=r["language"],
+        headline=r["headline"],
+        summary=r["summary"],
+        body=(r["body"] or "")[:MAX_BODY_CHARS] or None,
+    )
+
+
+async def related_primaries(
+    pool: asyncpg.Pool, story: StoryMaterial, days: int = 3, limit: int = 4
+) -> list[ItemText]:
+    """Primary documents about the story's holding that are stored in other stories: filings,
+    regulator notices, company releases and central-bank items from a few days around it. A
+    claim can be checked against them even when none of the story's own items is primary."""
+    if story.ticker is None:
+        return []
+    window = dt.timedelta(days=days)
+    rows = await pool.fetch(
+        ITEM_SELECT + " join public.story_cluster c on c.id = i.cluster_id"
+        " where i.cluster_id <> $1 and c.ticker = $2 and i.evidence_kind = any($3::text[])"
+        " and i.published_at between $4 and $5 order by i.published_at desc limit $6",
+        story.cluster_id,
+        story.ticker,
+        list(PRIMARY_KINDS),
+        story.first_seen - window,
+        story.last_seen + window,
+        limit,
+    )
+    return [item_from_row(r) for r in rows]
+
+
 async def load_story(pool: asyncpg.Pool, cluster_id: int) -> StoryMaterial | None:
     c = await pool.fetchrow(
         "select id, ticker, headline, event_type, severity, lifecycle, recycled, event_date,"
@@ -126,36 +180,9 @@ async def load_story(pool: asyncpg.Pool, cluster_id: int) -> StoryMaterial | Non
     if c is None:
         return None
     rows = await pool.fetch(
-        "select i.id, i.url, i.outlet, i.outlet_name, i.tier, i.evidence_kind, i.independence_key,"
-        " i.is_correction, i.published_at, i.language, i.headline, i.summary,"
-        " a.region, coalesce(s.state_media, false) as state_media,"
-        " (select f.body from public.news_fulltext f where f.news_item_id = i.id"
-        "  and f.body is not null and not f.truncated order by f.fetched_at desc limit 1) as body"
-        " from public.news_item i left join public.news_article a on a.news_item_id = i.id"
-        " left join public.source s on s.id = i.source_id"
-        " where i.cluster_id = $1 order by i.tier, i.published_at",
-        cluster_id,
+        ITEM_SELECT + " where i.cluster_id = $1 order by i.tier, i.published_at", cluster_id
     )
-    items = tuple(
-        ItemText(
-            id=r["id"],
-            url=r["url"],
-            outlet=r["outlet"],
-            outlet_name=r["outlet_name"],
-            tier=r["tier"],
-            region=r["region"],
-            state_media=r["state_media"],
-            evidence_kind=r["evidence_kind"],
-            independence_key=r["independence_key"],
-            is_correction=r["is_correction"],
-            published_at=r["published_at"],
-            language=r["language"],
-            headline=r["headline"],
-            summary=r["summary"],
-            body=(r["body"] or "")[:MAX_BODY_CHARS] or None,
-        )
-        for r in rows
-    )
+    items = tuple(item_from_row(r) for r in rows)
     return StoryMaterial(
         cluster_id=c["id"],
         ticker=c["ticker"],
