@@ -401,7 +401,8 @@ A second pass closed the gaps that need only code, tests against fakes and a loc
 - Provenance backfill: each news run classifies up to 500 stored items that have no evidence kind, with the same rules as new items. An item whose source is gone is classified only if it is tier 2; tier 1 and 3 are left unclassified rather than guessed.
 - Ops report: alert latency (median and 95th percentile, minutes from first article to alert) and alert volume split into direct and indirect reach; a Review page under News shows them with cost and incidents.
 - Marks as benchmark cases: `GET /news/marks/candidates` lists items and stories marked wrong, in the benchmark's shape with `expected` empty for the owner to fill. Nothing feeds a score or model automatically.
-- Framing `conflict` still does not change corroboration status (a decision, not a gap).
+- Framing `conflict` does not change corroboration status. **Decided (delegated by the owner, 2026-10-10):** a framing conflict is one model's reading of how outlets word a story, and only its quotes and numbers are checked against the text, so it must not flip an evidence state that drives alerts. The evidence-backed path already exists: a claim check or web corroboration that finds a contradiction with a qualifying source sets `disputed` (`corroborate.py`). Revisit only if the framing benchmark shows conflicts that match real disputes.
+- The model jobs `news_triage`, `news_brief` and `news_ai_search` are now on by default (the owner's choice, 2026-10-10); they run inside the budget guard. A deployment whose stored `jobs` config has no entry for them picks the new defaults up on deploy; one that saved them as off must switch them on.
 - The full backend regression was not completed.
 
 ### Live checks run 2026-10-10

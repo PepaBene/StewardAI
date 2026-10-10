@@ -2082,15 +2082,16 @@ class JobsConfig(ConfigModel):
         "checked and approved by AI). Default: Mondays 07:30.",
     )
     news_ai_search: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(enabled=False, cron="20 6 * * *"),
+        default_factory=lambda: JobSchedule(cron="20 6 * * *"),
         description="Asks a search-capable model for recent news on holdings the wire covers "
-        "thinly. Results are leads at the lowest tier: they never alert on their own. Off by "
-        "default (it spends on web searches). Default: daily 06:20.",
+        "thinly. Results are leads at the lowest tier: they never alert on their own. On by "
+        "default (it spends on web searches, within the budget). Default: daily 06:20.",
     )
     news_triage: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(enabled=False, cron="10 * * * *"),
+        default_factory=lambda: JobSchedule(cron="10 * * * *"),
         description="Triages new wire items on a cheap model: relevance, topic, entities and a "
-        "one-line gloss. Off by default (it spends on a model). Default: hourly at :10.",
+        "one-line gloss. On by default (it spends on a model, within the budget). Default: hourly "
+        "at :10.",
     )
     news_analysis: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="25 */3 * * *"),
@@ -2098,9 +2099,9 @@ class JobsConfig(ConfigModel):
         "plus the model techniques selected in the news settings. Default: every 3 hours.",
     )
     news_brief: JobSchedule = Field(
-        default_factory=lambda: JobSchedule(enabled=False, cron="30 6 * * *"),
+        default_factory=lambda: JobSchedule(cron="30 6 * * *"),
         description="Writes the morning brief (and on Mondays the weekly brief and the "
-        "per-holding briefs) from stored stories, each line citing its items. Off by default "
+        "per-holding briefs) from stored stories, each line citing its items. On by default "
         "(it spends on a model). Default: daily 06:30.",
     )
     gap_research: JobSchedule = Field(
