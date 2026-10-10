@@ -28,7 +28,7 @@ import httpx
 
 from steward import __version__, budget_guard
 from steward.ai import AINotConfigured, Usage, create_client
-from steward.config.event_rules import EVENT_DESCRIPTIONS, EventRulesConfig
+from steward.config.event_rules import EVENT_DESCRIPTIONS, EventRulesConfig, with_default_services
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import EscalationSettings, JobsConfig, NewsSettings
 from steward.config.news_sources import (
@@ -117,6 +117,7 @@ from steward.news.primary_sources import (
     collect_stored_filings,
     collect_tdnet,
 )
+from steward.news.provenance import backfill_provenance
 from steward.news.regulatory import MAX_HITS as FTS_MAX_HITS
 from steward.news.regulatory import FtsResult, collect_edgar_fts, collect_regulatory
 from steward.news.simhash import item_hash, to_signed, to_unsigned
@@ -190,7 +191,7 @@ async def load_news_config(ctx: JobContext) -> NewsConfig:
     verification_body = verification.body if verification else VerificationConfig()
     return NewsConfig(
         sources=sources.body if sources else NewsSourcesConfig(),
-        event_rules=rules.body if rules else EventRulesConfig(),
+        event_rules=with_default_services(rules.body) if rules else EventRulesConfig(),
         notifications=notifications.body if notifications else NotificationsConfig(),
         notifications_version_id=notifications.id if notifications else None,
         profiles=profiles.body if profiles else HoldingProfilesConfig(),
@@ -1683,8 +1684,16 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
         holdings = await load_holdings(pool, config)
         await sync_sources(pool, config.sources.sources)
         enabled = [s for s in config.sources.sources if s.enabled and s.type != "ai_search"]
+        backfilled = await backfill_provenance(
+            pool,
+            {s.id: s for s in config.sources.sources},
+            config.sources,
+            holdings.ir_domains,
+        )
         step.detail.update(
-            holdings=[t.ticker for t in holdings.terms], sources=[s.id for s in enabled]
+            holdings=[t.ticker for t in holdings.terms],
+            sources=[s.id for s in enabled],
+            provenance_backfilled=backfilled,
         )
 
     since = now - dt.timedelta(hours=config.sources.freshness_hours)

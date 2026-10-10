@@ -6,9 +6,13 @@ the report needs no model and costs nothing to run.
 """
 
 import datetime as dt
+import json
+import math
 
 import asyncpg
 from pydantic import BaseModel, Field
+
+from steward.news.evidence import indirect_only
 
 
 class JobCost(BaseModel):
@@ -30,8 +34,28 @@ class Incident(BaseModel):
     reason: str
 
 
+class AlertLatency(BaseModel):
+    alerts: int
+    p50_minutes: float | None = Field(
+        description="Median minutes from the first item's publication to the alert being sent."
+    )
+    p95_minutes: float | None
+
+
+class AlertVolume(BaseModel):
+    total: int
+    direct: int
+    indirect: int = Field(
+        description="Alerts for stories that reached the holding only through an indirect link."
+    )
+    per_day: float
+    indirect_per_day: float
+
+
 class OpsReport(BaseModel):
     days: int
+    latency: AlertLatency
+    volume: AlertVolume
     cost_usd: float
     by_job: list[JobCost]
     useful_events: int
@@ -113,6 +137,60 @@ async def incidents(pool: asyncpg.Pool, since: dt.datetime, limit: int = 50) -> 
     ]
 
 
+def percentile(values: list[float], p: float) -> float | None:
+    """Nearest-rank percentile (`p` in 0..100); None for an empty list."""
+    if not values:
+        return None
+    ordered = sorted(values)
+    rank = max(1, math.ceil(p / 100 * len(ordered)))
+    return ordered[rank - 1]
+
+
+async def alert_latency(pool: asyncpg.Pool, since: dt.datetime) -> AlertLatency:
+    """Minutes from the earliest item's publication to the news alert being sent."""
+    rows = await pool.fetch(
+        "select extract(epoch from (a.sent_at - min(i.published_at))) / 60 as minutes"
+        " from public.alert a join public.news_item i on i.cluster_id = a.cluster_id"
+        " where a.kind = 'news' and a.status = 'sent' and a.sent_at >= $1"
+        " group by a.id, a.sent_at",
+        since,
+    )
+    minutes = [max(0.0, float(r["minutes"])) for r in rows if r["minutes"] is not None]
+    p50, p95 = percentile(minutes, 50), percentile(minutes, 95)
+    return AlertLatency(
+        alerts=len(minutes),
+        p50_minutes=round(p50, 1) if p50 is not None else None,
+        p95_minutes=round(p95, 1) if p95 is not None else None,
+    )
+
+
+async def alert_volume(pool: asyncpg.Pool, since: dt.datetime, days: int) -> AlertVolume:
+    """Sent news alerts per day, split by whether the story reached its holding only through
+    an indirect link (competitor, supplier, customer, watch topic) or directly. This is the
+    number to read when judging `indirect_alert_min_severity`."""
+    rows = await pool.fetch(
+        "select a.id, a.ticker, i.links from public.alert a"
+        " join public.news_item i on i.cluster_id = a.cluster_id"
+        " where a.kind = 'news' and a.status = 'sent' and a.sent_at >= $1",
+        since,
+    )
+    vias: dict[int, list[str]] = {}
+    for r in rows:
+        links = json.loads(r["links"]) if isinstance(r["links"], str) else (r["links"] or [])
+        vias.setdefault(r["id"], []).extend(
+            link["via"] for link in links if link.get("ticker") == r["ticker"]
+        )
+    indirect = sum(1 for v in vias.values() if indirect_only(v))
+    total = len(vias)
+    return AlertVolume(
+        total=total,
+        indirect=indirect,
+        direct=total - indirect,
+        per_day=round(total / max(days, 1), 2),
+        indirect_per_day=round(indirect / max(days, 1), 2),
+    )
+
+
 async def mark_counts(pool: asyncpg.Pool, since: dt.datetime) -> dict[str, int]:
     rows = await pool.fetch(
         "select kind, count(*) as n from public.news_feedback where created_at >= $1"
@@ -131,6 +209,8 @@ async def ops_report(
     useful = await useful_event_count(pool, since)
     return OpsReport(
         days=days,
+        latency=await alert_latency(pool, since),
+        volume=await alert_volume(pool, since, days),
         cost_usd=total,
         by_job=by_job,
         useful_events=useful,

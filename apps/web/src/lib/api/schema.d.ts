@@ -2126,6 +2126,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/news/marks/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Mark Candidates
+         * @description Items and stories the owner marked as wrong, as benchmark cases with `expected` left
+         *     empty. The owner labels them and adds them to the benchmark file; nothing here changes
+         *     the benchmark or any model.
+         */
+        get: operations["get_mark_candidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/news/feedback": {
         parameters: {
             query?: never;
@@ -8542,6 +8564,18 @@ export interface components {
              */
             latest_known_at: string;
         };
+        /** AlertLatency */
+        AlertLatency: {
+            /** Alerts */
+            alerts: number;
+            /**
+             * P50 Minutes
+             * @description Median minutes from the first item's publication to the alert being sent.
+             */
+            p50_minutes: number | null;
+            /** P95 Minutes */
+            p95_minutes: number | null;
+        };
         /** AlertOut */
         AlertOut: {
             /** Id */
@@ -8629,6 +8663,22 @@ export interface components {
             review_tasks: number;
             /** Failed */
             failed: number;
+        };
+        /** AlertVolume */
+        AlertVolume: {
+            /** Total */
+            total: number;
+            /** Direct */
+            direct: number;
+            /**
+             * Indirect
+             * @description Alerts for stories that reached the holding only through an indirect link.
+             */
+            indirect: number;
+            /** Per Day */
+            per_day: number;
+            /** Indirect Per Day */
+            indirect_per_day: number;
         };
         /**
          * AlertWhyOut
@@ -10505,6 +10555,44 @@ export interface components {
             status: "uncalibrated";
             /** Note */
             note: string;
+        };
+        /** CandidateCase */
+        CandidateCase: {
+            /** Id */
+            id: string;
+            /** Mark */
+            mark: string;
+            /** Note */
+            note: string | null;
+            /**
+             * Marked At
+             * Format: date-time
+             */
+            marked_at: string;
+            /** Headline */
+            headline: string;
+            /** Summary */
+            summary: string | null;
+            /** Outlet */
+            outlet: string | null;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /** Candidates */
+            candidates?: string[];
+            /** Region */
+            region?: string | null;
+            /** Language */
+            language?: string | null;
+            /**
+             * Expected
+             * @description Left empty on purpose: the owner supplies the right answer.
+             */
+            expected?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** CapitalAllocation */
         CapitalAllocation: {
@@ -23608,6 +23696,8 @@ export interface components {
         OpsReport: {
             /** Days */
             days: number;
+            latency: components["schemas"]["AlertLatency"];
+            volume: components["schemas"]["AlertVolume"];
             /** Cost Usd */
             cost_usd: number;
             /** By Job */
@@ -37065,6 +37155,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OpsReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_mark_candidates: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateCase"][];
                 };
             };
             /** @description Validation Error */

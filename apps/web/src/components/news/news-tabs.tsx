@@ -9,6 +9,7 @@ const TABS = [
   { id: "brief", label: "Brief", title: "Morning and weekly briefs", href: "/news/brief" },
   { id: "ask", label: "Ask", title: "Ask a question over the news", href: "/news/ask" },
   { id: "sources", label: "Sources", title: "Health of every feed", href: "/news/sources" },
+  { id: "ops", label: "Review", title: "Cost, alert speed and stories to review", href: "/news/ops" },
 ] as const;
 
 export type NewsTab = (typeof TABS)[number]["id"];

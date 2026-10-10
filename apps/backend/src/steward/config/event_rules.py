@@ -314,6 +314,22 @@ class FreeSourceAlertsConfig(ConfigModel):
     )
 
 
+def with_default_services(rules: "EventRulesConfig") -> "EventRulesConfig":
+    """The rules with the default announcement rules of any service the saved list has none
+    for, placed before the catch-all. A config saved before a service existed (TDnet, HKEX,
+    DART, the Gazette...) would otherwise send all its filings to the classifier. Services the
+    owner already has rules for are left exactly as saved; the stored version is not changed."""
+    have = {r.service for r in rules.announcement_types}
+    missing = [
+        r for r in _default_announcement_rules() if r.service not in have and r.service != "any"
+    ]
+    if not missing:
+        return rules
+    kept = list(rules.announcement_types)
+    at = next((i for i, r in enumerate(kept) if r.service == "any"), len(kept))
+    return rules.model_copy(update={"announcement_types": [*kept[:at], *missing, *kept[at:]]})
+
+
 class EventRulesConfig(ConfigModel):
     """Stored as `config_version` rows, domain `event_rules`."""
 

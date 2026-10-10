@@ -15,6 +15,7 @@ from steward.config.common import Ticker
 from steward.config.event_rules import EVENT_DESCRIPTIONS, EVENT_TYPES, EventType
 from steward.config.store import load_active
 from steward.news.market import StudyRow
+from steward.news.marks_export import CandidateCase, marks_candidates
 from steward.news.ops import OpsReport, ops_report
 from steward.news.read import (
     AlertOut,
@@ -439,6 +440,16 @@ async def get_news_ops(
     and the incidents to review: severe stories nobody was alerted to, and alerts marked not
     useful."""
     return await ops_report(pool, days)
+
+
+@router.get("/news/marks/candidates", tags=["news"])
+async def get_mark_candidates(
+    pool: Pool, _owner: Owner, limit: Annotated[int, Query(ge=1, le=500)] = 200
+) -> list[CandidateCase]:
+    """Items and stories the owner marked as wrong, as benchmark cases with `expected` left
+    empty. The owner labels them and adds them to the benchmark file; nothing here changes
+    the benchmark or any model."""
+    return await marks_candidates(pool, limit)
 
 
 @router.post("/news/feedback", tags=["news"], status_code=status.HTTP_201_CREATED)

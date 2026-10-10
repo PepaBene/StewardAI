@@ -391,11 +391,16 @@ A second pass closed the gaps that need only code, tests against fakes and a loc
 - Everything that needs a live model, key or network: the benchmark baseline and gate threshold, embedding tuning, AI-search cost, trafilatura accuracy, per-country filing latency and the live checks of DART, The Gazette, EDINET and Companies House; the 100-output human adjudication; a real labelled benchmark.
 - SEDAR+, Bundesanzeiger and FCA NSM; matching holdings to exchange filings by stock code is unproven.
 - Chat: embedding retrieval for `search_wire` and a live `web_news_search` tool. The system prompt was not changed; the tools are described in their own schemas, as `search_news` is.
-- Ops: latency p50 and p95, the effect of `indirect_alert_min_severity` on alert volume, a web page for `/news/ops`, an incident workflow, a scheduled report, CI wiring of the gate, golden sets for the model techniques.
-- N4: existing saved `event_rules` configs are not merged with the per-market rules; the EDINET document link still needs a key.
-- N5: no provenance backfill for items stored before `20261029110000`; no UI for the evidence view or close/reopen.
-- Marks do not yet feed the benchmark.
+- Ops: an incident workflow, a scheduled report, CI wiring of the gate, golden sets for the model techniques. The alert volume figure is now reported, but whether `indirect_alert_min_severity` 2 is the right value needs weeks of real alerts.
+- N4: the EDINET document link still needs a key (no keyless public URL was verified).
+- N5: no UI for the evidence view or close/reopen.
 - Web: no per-item translation toggle, no wire gloss, no Sources-page fetch-rung or latency columns, effects not moved into a data hook, no browser check of any page.
+
+**Closed in the third pass (2026-10-10):**
+- Saved `event_rules` configs: `with_default_services` adds the default announcement rules of any service the saved list has none for (before the catch-all) when the news config loads. Rules the owner already has are untouched and the stored version is not rewritten.
+- Provenance backfill: each news run classifies up to 500 stored items that have no evidence kind, with the same rules as new items. An item whose source is gone is classified only if it is tier 2; tier 1 and 3 are left unclassified rather than guessed.
+- Ops report: alert latency (median and 95th percentile, minutes from first article to alert) and alert volume split into direct and indirect reach; a Review page under News shows them with cost and incidents.
+- Marks as benchmark cases: `GET /news/marks/candidates` lists items and stories marked wrong, in the benchmark's shape with `expected` empty for the owner to fill. Nothing feeds a score or model automatically.
 - Framing `conflict` still does not change corroboration status (a decision, not a gap).
 - The full backend regression was not completed.
 

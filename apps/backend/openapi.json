@@ -6482,6 +6482,61 @@
         }
       }
     },
+    "/news/marks/candidates": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Mark Candidates",
+        "description": "Items and stories the owner marked as wrong, as benchmark cases with `expected` left\nempty. The owner labels them and adds them to the benchmark file; nothing here changes\nthe benchmark or any model.",
+        "operationId": "get_mark_candidates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CandidateCase"
+                  },
+                  "title": "Response Get Mark Candidates"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/news/feedback": {
       "post": {
         "tags": [
@@ -27058,6 +27113,44 @@
         ],
         "title": "AlertDigestGroupOut"
       },
+      "AlertLatency": {
+        "properties": {
+          "alerts": {
+            "type": "integer",
+            "title": "Alerts"
+          },
+          "p50_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Minutes",
+            "description": "Median minutes from the first item's publication to the alert being sent."
+          },
+          "p95_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alerts",
+          "p50_minutes",
+          "p95_minutes"
+        ],
+        "title": "AlertLatency"
+      },
       "AlertOut": {
         "properties": {
           "id": {
@@ -27304,6 +27397,40 @@
           "failed"
         ],
         "title": "AlertScanOut"
+      },
+      "AlertVolume": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "direct": {
+            "type": "integer",
+            "title": "Direct"
+          },
+          "indirect": {
+            "type": "integer",
+            "title": "Indirect",
+            "description": "Alerts for stories that reached the holding only through an indirect link."
+          },
+          "per_day": {
+            "type": "number",
+            "title": "Per Day"
+          },
+          "indirect_per_day": {
+            "type": "number",
+            "title": "Indirect Per Day"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "direct",
+          "indirect",
+          "per_day",
+          "indirect_per_day"
+        ],
+        "title": "AlertVolume"
       },
       "AlertWhyOut": {
         "properties": {
@@ -33232,6 +33359,119 @@
           "note"
         ],
         "title": "Calibration"
+      },
+      "CandidateCase": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "mark": {
+            "type": "string",
+            "title": "Mark"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "marked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Marked At"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "outlet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlet"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          },
+          "candidates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "expected": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected",
+            "description": "Left empty on purpose: the owner supplies the right answer."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "mark",
+          "note",
+          "marked_at",
+          "headline",
+          "summary",
+          "outlet",
+          "published_at"
+        ],
+        "title": "CandidateCase"
       },
       "CapitalAllocation": {
         "properties": {
@@ -70257,6 +70497,12 @@
             "type": "integer",
             "title": "Days"
           },
+          "latency": {
+            "$ref": "#/components/schemas/AlertLatency"
+          },
+          "volume": {
+            "$ref": "#/components/schemas/AlertVolume"
+          },
           "cost_usd": {
             "type": "number",
             "title": "Cost Usd"
@@ -70302,6 +70548,8 @@
         "type": "object",
         "required": [
           "days",
+          "latency",
+          "volume",
           "cost_usd",
           "by_job",
           "useful_events",
