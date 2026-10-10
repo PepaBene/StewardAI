@@ -26,7 +26,7 @@ from steward.free_sources import (
     compute_returns,
 )
 from steward.jobs.runner import JobContext
-from steward.portfolio.history import rebuild_portfolio_history
+from steward.portfolio.reconstruct import rebuild_portfolio_history
 from steward.reference.identity import holding_tickers
 from steward.reference.listings import resolve_series_listing
 from steward.reference.price_series import (
