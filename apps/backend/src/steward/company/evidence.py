@@ -24,6 +24,9 @@ from steward.analytics.contract import SourceRef, rounded
 from steward.analytics.versions import version
 from steward.company.ratios import figures_by_column
 from steward.company.statements import StatementsView
+from steward.config.holding_profiles import HoldingProfilesConfig
+from steward.config.store import load_active
+from steward.reference.price_series import choose_series, holding_symbols
 
 PROFILE_METRICS = ("sector", "industry", "description", "employees", "ceo", "website", "ipo_date")
 
@@ -284,12 +287,21 @@ async def overview(pool: asyncpg.Pool, ticker: str) -> Overview | None:
                 source=a["source_url"],
             )
         )
+    # The instrument's symbol is Stooq style; the stored bars may be Yahoo style, so the series
+    # is chosen the way every other reader does (newest stored bar, Stooq on a tie).
     bar = None
-    if u["price_symbol"]:
+    profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
+    symbols = await holding_symbols(
+        pool, [ticker], profiles.body if profiles else HoldingProfilesConfig()
+    )
+    ref = (await choose_series(pool, symbols))[ticker]
+    if ref is not None:
         bar = await pool.fetchrow(
-            """select date, close from public.price_bar where symbol=$1 and bar_type='adjusted' and access_state='available'
+            """select date, close from public.price_bar where symbol=$1 and source=$2
+               and bar_type='adjusted' and access_state='available'
                order by date desc limit 1""",
-            u["price_symbol"],
+            ref.symbol,
+            ref.source,
         )
     years = await pool.fetchval(
         "select count(distinct period_end) from public.financial_statement_fact where ticker=$1 and statement='income' and period_start is not null and period_end-period_start between 330 and 380",

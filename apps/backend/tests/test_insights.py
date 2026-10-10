@@ -5,6 +5,7 @@ import datetime as dt
 from steward.changes.feed import (
     Record,
     Ref,
+    _latest_as_of,
     compare,
     holding_changes,
     price_moves,
@@ -14,6 +15,20 @@ from steward.changes.feed import (
 from steward.sectors.map import MIN_SAMPLE, Profile, build_map, spread
 
 NOW = dt.datetime(2026, 10, 7, tzinfo=dt.UTC)
+
+
+def test_latest_as_of_picks_each_cutoffs_newest_known_row_from_one_read() -> None:
+    day = dt.timedelta(days=1)
+    # Ordered as the query orders them: identity, then known_at descending.
+    rows = [
+        {"k": "a", "known_at": NOW, "id": 3},
+        {"k": "a", "known_at": NOW - 2 * day, "id": 2},
+        {"k": "a", "known_at": NOW - 5 * day, "id": 1},
+        {"k": "b", "known_at": NOW - day, "id": 4},
+    ]
+    old, new = _latest_as_of(rows, (NOW - 3 * day, NOW), ("k",))  # type: ignore[arg-type]
+    assert [r["id"] for r in old] == [1]  # b was first known after the earlier cut-off
+    assert [r["id"] for r in new] == [3, 4]
 
 
 def rec(value: float, i: str = "1") -> Record:
