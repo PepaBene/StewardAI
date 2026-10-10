@@ -442,7 +442,7 @@ async def test_stooq_refusal_falls_back_to_yahoo_daily_and_px_to_the_pse_page(
         " and symbol = 'CEZ.PR' and kind = 'chart_1d'"
     )
     assert payload["http_status"] == 200 and payload["body"] == fixture("yahoo_cez_pr_1d.json")
-    assert "range=2y" in payload["url"] and "interval=1d" in payload["url"]
+    assert "range=10y" in payload["url"] and "interval=1d" in payload["url"]
 
     sources = json.loads(
         await backend_pool.fetchval("select value from sync_state where key = $1", SOURCES_KEY)

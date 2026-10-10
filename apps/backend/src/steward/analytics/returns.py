@@ -246,6 +246,7 @@ def twr(
 
 XIRR_LOWER = Decimal("-0.9999")
 XIRR_UPPER = Decimal(100)
+MAX_PUBLISHED_RATE = Decimal(10) ** 12  # beyond this the rate cannot be rounded to 4 places
 XIRR_TOLERANCE = Decimal("1e-12")
 
 
@@ -299,6 +300,11 @@ def xirr(
             else:
                 high = mid
         root = (low + high) / 2
+    if abs(root) > MAX_PUBLISHED_RATE:
+        # A short window can put the root at an annual rate too large to round or to mean much.
+        return unavailable(
+            "fraction", method, "the annual rate is too large to publish", inputs=inputs
+        )
     return result(root, "fraction", method, as_of=ordered[-1][0], inputs=inputs)
 
 

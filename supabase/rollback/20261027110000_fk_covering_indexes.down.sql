@@ -1,0 +1,12 @@
+drop index if exists public.deal_document_document_version_id_idx;
+drop index if exists public.deal_event_issuer_id_idx;
+drop index if exists public.deal_participant_issuer_id_idx;
+drop index if exists public.deal_state_transition_document_version_id_idx;
+drop index if exists public.deal_state_transition_evidence_id_idx;
+drop index if exists public.deal_structure_link_evidence_id_idx;
+drop index if exists public.deal_structure_link_successor_issuer_id_idx;
+drop index if exists public.deal_term_version_document_version_id_idx;
+drop index if exists public.deal_term_version_evidence_id_idx;
+drop index if exists public.deal_term_version_supersedes_id_idx;
+drop index if exists public.pilot_defect_parent_id_idx;
+drop index if exists public.public_estimate_snapshot_corrected_by_id_idx;

@@ -168,8 +168,10 @@ async def test_the_volatility_limit_opens_a_forecast_finding_and_clears_when_it_
     loose = StrategyConfig(base_currency="CZK", risk=RiskLimits(max_volatility=1.0))
     cleared = await gather_risk_inputs(backend_pool, loose, positions)
     assert "risk:volatility_forecast" not in {f.key for f in evaluate_risk(cleared, loose.risk)}
-    # the sync path saved the report it measured
-    assert [s.kind for s in await list_snapshots(backend_pool)] == ["ex_ante"]
+    # the sync path saved the reports it measured: the tail one beside the ex-ante ones, and one
+    # ex-ante report per different report (the two strategies carry different limits)
+    kinds = [s.kind for s in await list_snapshots(backend_pool)]
+    assert set(kinds) == {"ex_ante", "tail"} and kinds.count("tail") == 1
 
 
 @pytest.mark.db

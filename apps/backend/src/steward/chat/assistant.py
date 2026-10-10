@@ -511,6 +511,11 @@ async def chat_handler(ctx: JobContext) -> None:
     sources = await load_active(ctx.pool, "news_sources", NewsSourcesConfig)
     chat_settings = (jobs.body if jobs else JobsConfig()).chat
     if provider_of(chat_settings.model) == "anthropic":
+        # No answer will be written: the question must not stay pending.
+        await ctx.pool.execute(
+            "update public.chat_message set status = 'failed' where id = $1 and status = 'pending'",
+            int(ctx.params.get("message_id", 0)),
+        )
         raise JobFailed(
             f"{chat_settings.model} is a Claude model and Claude is not used; "
             "set a gpt-* or gemini-* chat model in the jobs config"
