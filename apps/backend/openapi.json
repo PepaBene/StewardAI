@@ -96824,6 +96824,30 @@
               }
             ],
             "title": "Story Lifecycle"
+          },
+          "gloss": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gloss",
+            "description": "One plain sentence from triage, when triage has read the item."
+          },
+          "relevance": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relevance",
+            "description": "Triage relevance: 0 noise, 1 background, 2 may matter, 3 material."
           }
         },
         "type": "object",

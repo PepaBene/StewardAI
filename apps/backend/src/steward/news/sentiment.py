@@ -65,7 +65,17 @@ def bounded(story: StoryMaterial, raw: RawSentiment) -> SentimentResult:
             continue
         strength = 0.0 if a.direction == "neutral" else max(0.0, min(1.0, a.strength))
         kept.append(a.model_copy(update={"strength": round(strength, 3)}))
-    return SentimentResult(aspects=kept, intensity=max((a.strength for a in kept), default=0.0))
+    # One reading per entity: a live run gave four rows for one company, all from the same
+    # story. The strongest stays, so a repeated reading cannot add weight.
+    strongest: dict[str, Aspect] = {}
+    for a in kept:
+        key = a.entity.casefold().strip()
+        if key not in strongest or a.strength > strongest[key].strength:
+            strongest[key] = a
+    deduped = [a for a in kept if strongest[a.entity.casefold().strip()] is a]
+    return SentimentResult(
+        aspects=deduped, intensity=max((a.strength for a in deduped), default=0.0)
+    )
 
 
 async def read_sentiment(

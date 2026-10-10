@@ -314,7 +314,7 @@ What is built is code with tests against fakes and recorded fixtures. The items 
 
 **N5 not done**
 - Entity linking by executives, brands and fund look-through; counterparties beyond the existing competitor, supplier, customer fields.
-- No UI for the evidence view or the close/reopen action (API only).
+- ~~No UI for the evidence view or the close/reopen action~~ The Story page (N7) shows the evidence and has Close and Reopen; this line was stale.
 - Items stored before migration `20261029110000` have null provenance and count as no primary evidence; no backfill.
 - "Resolved" is set only by the owner; there is no automatic resolution.
 - `indirect_alert_min_severity` defaults to 2, a behaviour change for stories reached only through competitor, supplier, customer or topic links; its effect on alert volume was not measured.
@@ -403,6 +403,21 @@ A second pass closed the gaps that need only code, tests against fakes and a loc
 - Marks as benchmark cases: `GET /news/marks/candidates` lists items and stories marked wrong, in the benchmark's shape with `expected` empty for the owner to fill. Nothing feeds a score or model automatically.
 - Framing `conflict` still does not change corroboration status (a decision, not a gap).
 - The full backend regression was not completed.
+
+### Live checks run 2026-10-10
+
+| Check | Result |
+|---|---|
+| Companies House | Works; transport and parsing confirmed. |
+| The Gazette | Transport and parsing work, but matches are generic supplement pages with no event type. Low value; keep it off the alert path. |
+| DART, EDINET | **Not run**: `DART_API_KEY` and `EDINET_API_KEY` are not in `.env`. |
+| Classifier benchmark | Live run on `gpt-6-luna`: 99.3 % event-type accuracy. The set is synthetic, so this is a regression baseline (`tests/news/baseline_benchmark.json`), not evidence of real-world accuracy. Anthropic credit is exhausted, so no Claude run. |
+| Embedding threshold | No clean separating cosine: at 0.90 recall was 50 % with 18.5 % false merges on hard distractors. Merge threshold stays conservative. |
+| Extraction and sentiment, 2 stories | Spans verified. One `status: official` on a media-only story is questionable. Sentiment returned several rows for one entity; fixed by keeping the strongest per entity. |
+| Full-text extraction, 14 RSS sources | BBC, Guardian, Nikkei, SCMP extract well (350–6200 chars, bylines). FT and Bloomberg return only a ~400–800 char teaser (paywall) and add little over the feed summary. Sky News and Japan Times return HTTP 403 to the fetcher. |
+| Semantic wire search (chat) | Falls back to embeddings when full-text finds fewer than 8; 2 DB tests pass. |
+
+Needs from the owner: `DART_API_KEY`, `EDINET_API_KEY`; Anthropic credit; the repo secret `OPENAI_API_KEY` and variable `NEWS_EVAL_ENABLED=true` for `.github/workflows/news-eval.yml`. Independent labelling and adjudication of a real-history benchmark, and browser verification, need a person.
 
 Suggested order if time is short: N0 → N1 → N3 → N2 (rungs 1–4) → N6.1–6.4 → N7 Wire/Brief → rest.
 

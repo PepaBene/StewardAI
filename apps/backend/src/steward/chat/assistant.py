@@ -21,7 +21,7 @@ from anthropic.types import MessageParam, ToolUseBlock
 from pydantic import BaseModel, Field
 
 from steward.ai import AINotConfigured, Usage, create_client
-from steward.chat.tools import TOOL_DEFINITIONS, ChatTools
+from steward.chat.tools import TOOL_DEFINITIONS, ChatTools, QueryEmbedder
 from steward.config.jobs import ChatSettings, JobsConfig, effort_kwargs
 from steward.config.news_sources import NewsSourcesConfig
 from steward.config.prompts import load_prompts
@@ -439,7 +439,16 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
         step.detail.update(history=len(history))
 
     registry = Registry()
-    tools = ChatTools(pool, registry, conversation_id, message_id)
+    news = (jobs.body if jobs else JobsConfig()).news
+    google_key = get_settings().google_api_key
+    embedder = (
+        QueryEmbedder(
+            google_key.get_secret_value(), news.embedding_model, news.embedding_dimensions
+        )
+        if google_key
+        else None
+    )
+    tools = ChatTools(pool, registry, conversation_id, message_id, embedder)
     async with ctx.step("answer") as step:
         if deps.assistant is None:
             result = AssistantResult(None, Usage(model="none"), {}, "ANTHROPIC_API_KEY is not set")

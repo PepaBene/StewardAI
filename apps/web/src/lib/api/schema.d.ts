@@ -32970,6 +32970,16 @@ export interface components {
             story_severity: number | null;
             /** Story Lifecycle */
             story_lifecycle: string | null;
+            /**
+             * Gloss
+             * @description One plain sentence from triage, when triage has read the item.
+             */
+            gloss?: string | null;
+            /**
+             * Relevance
+             * @description Triage relevance: 0 noise, 1 background, 2 may matter, 3 material.
+             */
+            relevance?: number | null;
         };
         /** WirePage */
         WirePage: {

@@ -182,9 +182,13 @@ export function wireQuery(filters: WireFilters, beforeId: number | null, limit: 
   };
 }
 
-/** The headline to show: the English translation when there is one, else the original. */
-export function wireHeadline(item: Pick<WireItem, "headline" | "title_en">): { text: string; translated: boolean } {
-  return item.title_en && item.title_en !== item.headline
+/** The headline to show: the English translation when there is one, else the original.
+ * `original` shows the original even when a translation exists (`translated` is then false). */
+export function wireHeadline(
+  item: Pick<WireItem, "headline" | "title_en">,
+  original = false,
+): { text: string; translated: boolean } {
+  return !original && item.title_en && item.title_en !== item.headline
     ? { text: item.title_en, translated: true }
     : { text: item.headline, translated: false };
 }

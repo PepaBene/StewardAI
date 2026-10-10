@@ -234,6 +234,8 @@ def main() -> None:
     parser.add_argument("--gate", type=Path, help="fail if a segment is worse than this baseline")
     parser.add_argument("--save-baseline", type=Path, help="write this run as the baseline")
     args = parser.parse_args()
+    # The report names Japanese and Chinese items; a Windows console code page cannot print them.
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     path = SETS[args.set]
     labelled = load_set(path)
     holdings = load_holdings(path)

@@ -48,6 +48,7 @@ describe("wire filters", () => {
     expect(wireHeadline({ headline: "円安が進む", title_en: "Yen weakens" })).toEqual({ text: "Yen weakens", translated: true });
     expect(wireHeadline({ headline: "Yen weakens", title_en: "Yen weakens" }).translated).toBe(false);
     expect(wireHeadline({ headline: "Yen weakens", title_en: null }).translated).toBe(false);
+    expect(wireHeadline({ headline: "円安が進む", title_en: "Yen weakens" }, true)).toEqual({ text: "円安が進む", translated: false });
   });
 });
 

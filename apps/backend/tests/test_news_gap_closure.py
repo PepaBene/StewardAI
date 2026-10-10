@@ -52,8 +52,21 @@ def test_sentiment_keeps_only_verified_spans_and_clamps_strength() -> None:
         ]
     )
     out = sentiment.bounded(s, raw)
-    assert [(a.direction, a.strength) for a in out.aspects] == [("positive", 1.0), ("neutral", 0.0)]
+    # The unverifiable span is dropped, the strength clamped, and the neutral repeat for the
+    # same entity folded into the stronger reading.
+    assert [(a.direction, a.strength) for a in out.aspects] == [("positive", 1.0)]
     assert out.intensity == 1.0
+
+
+def test_sentiment_keeps_one_reading_per_entity() -> None:
+    s = story(GUIDANCE)
+    span = "TSMC raises 2026 revenue guidance to 30%"
+    raw = sentiment.RawSentiment(
+        aspects=[aspect(span, 0.4), aspect(span, 0.9, "negative"), aspect(span, 0.7)]
+    )
+    out = sentiment.bounded(s, raw)
+    assert [(a.direction, a.strength) for a in out.aspects] == [("negative", 0.9)]
+    assert out.intensity == 0.9
 
 
 # --- GDELT -------------------------------------------------------------------------------

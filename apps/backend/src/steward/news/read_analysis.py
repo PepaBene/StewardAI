@@ -200,6 +200,13 @@ class WireItem(BaseModel):
     story_id: int | None
     story_severity: int | None
     story_lifecycle: str | None
+    gloss: str | None = Field(
+        default=None, description="One plain sentence from triage, when triage has read the item."
+    )
+    relevance: int | None = Field(
+        default=None,
+        description="Triage relevance: 0 noise, 1 background, 2 may matter, 3 material.",
+    )
 
 
 class WireFilters(BaseModel):
@@ -256,7 +263,8 @@ async def wire(pool: asyncpg.Pool, f: WireFilters) -> WirePage:
         "select a.id, a.url, a.headline, a.title_en, a.summary, a.language, a.region, a.outlet,"  # noqa: S608
         " a.outlet_name, a.tier, a.published_at, a.linked, a.topics, a.fetch_state,"
         " s.paywall, s.state_media, a.group_id, c.id as story_id, c.severity as story_severity,"
-        " c.lifecycle as story_lifecycle"
+        " c.lifecycle as story_lifecycle, a.triage ->> 'gloss' as gloss,"
+        " (a.triage ->> 'relevance')::int as relevance"
         " from public.news_article a join public.source s on s.id = a.source_id"
         " left join public.news_item i on i.id = a.news_item_id"
         " left join public.story_cluster c on c.id = i.cluster_id"

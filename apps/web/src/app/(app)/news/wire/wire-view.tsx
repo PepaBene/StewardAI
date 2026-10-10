@@ -45,6 +45,26 @@ export function WireView() {
   const [draftQ, setDraftQ] = useState(filters.q);
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [reloadKey, setReloadKey] = useState(0);
+  const [showOriginal, setShowOriginal] = useState(false);
+
+  useEffect(() => {
+    // The choice is a per-viewer convenience: a blocked or empty store just means the default.
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (window.localStorage.getItem("news.wire.original") === "1") setShowOriginal(true);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+
+  function chooseOriginal(value: boolean) {
+    setShowOriginal(value);
+    try {
+      window.localStorage.setItem("news.wire.original", value ? "1" : "0");
+    } catch {
+      /* storage unavailable */
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -54,7 +74,7 @@ export function WireView() {
       .GET("/wire", { params: { query: wireQuery(filters, null, PAGE) } })
       .then(({ data, response }) => {
         if (cancelled) return;
-        if (data) setLoad({ kind: "ok", items: data.items, next: data.next_before_id ?? null, loadingMore: false });
+        if (data) setLoad({ kind: "ok", items: data.items as WireItem[], next: data.next_before_id ?? null, loadingMore: false });
         else setLoad({ kind: "error", message: `The API answered HTTP ${response.status}.` });
       })
       .catch((err: unknown) => {
@@ -75,7 +95,7 @@ export function WireView() {
     setLoad((l) =>
       l.kind === "ok"
         ? data
-          ? { kind: "ok", items: [...l.items, ...data.items], next: data.next_before_id ?? null, loadingMore: false }
+          ? { kind: "ok", items: [...l.items, ...(data.items as WireItem[])], next: data.next_before_id ?? null, loadingMore: false }
           : { ...l, loadingMore: false }
         : l,
     );
@@ -184,9 +204,13 @@ export function WireView() {
       ) : null}
       {load.kind === "ok" && load.items.length > 0 ? (
         <>
+          <label className="flex items-center gap-2 text-sm text-text-muted">
+            <input type="checkbox" checked={showOriginal} onChange={(e) => chooseOriginal(e.target.checked)} />
+            Show headlines in their original language
+          </label>
           <ul className="m-0 flex list-none flex-col divide-y divide-border border-y border-border p-0" aria-label="Wire items">
             {load.items.map((item) => (
-              <WireRow key={item.id} item={item} />
+              <WireRow key={item.id} item={item} showOriginal={showOriginal} />
             ))}
           </ul>
           {load.next !== null ? (
@@ -212,8 +236,11 @@ function Field({ label, children, className }: { label: string; children: React.
   );
 }
 
-function WireRow({ item }: { item: WireItem }) {
-  const { text, translated } = wireHeadline(item);
+function WireRow({ item, showOriginal }: { item: WireItem; showOriginal: boolean }) {
+  // Per-item flip on top of the page-wide choice.
+  const [flipped, setFlipped] = useState(false);
+  const hasTranslation = Boolean(item.title_en && item.title_en !== item.headline);
+  const { text, translated } = wireHeadline(item, showOriginal !== flipped);
   return (
     <li className="space-y-1 py-3">
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
@@ -241,7 +268,13 @@ function WireRow({ item }: { item: WireItem }) {
           Original: {item.headline}
         </p>
       ) : null}
+      {item.gloss ? <p className="text-sm text-text-muted">{item.gloss}</p> : null}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+        {hasTranslation ? (
+          <button type="button" onClick={() => setFlipped((f) => !f)} className="text-accent-ink hover:underline">
+            {showOriginal !== flipped ? "Show English" : "Show original"}
+          </button>
+        ) : null}
         {item.story_id ? (
           <Link href={`/news/stories/${item.story_id}`} className="text-accent-ink hover:underline">
             Story about a holding

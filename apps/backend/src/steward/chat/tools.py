@@ -10,9 +10,11 @@ or cancels in the chat panel. Only a confirmed action creates a job (trigger `ch
 
 import datetime as dt
 import json
+from collections.abc import Sequence
 from typing import Any
 
 import asyncpg
+import httpx
 
 from steward.chat import analytics_tools
 from steward.chat.analytics_tools import SELECTOR_KINDS
@@ -27,6 +29,7 @@ from steward.data_context.research import (
     country_context,
 )
 from steward.earnings.read import holding_detail
+from steward.news.embeddings import Embedder, EmbeddingError, GeminiEmbedder, cosine
 from steward.portfolio.read import portfolio_overview
 from steward.research.sources import Registry
 
@@ -254,6 +257,25 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
 ]
 
 
+SEMANTIC_MIN_COSINE = 0.6
+SEMANTIC_CANDIDATES = 4000
+SEMANTIC_ENOUGH = 8
+
+
+class QueryEmbedder:
+    """Embeds one search query, opening its own HTTP client for the call (a chat question
+    embeds at most a few queries, so a shared client is not worth the lifetime handling)."""
+
+    def __init__(self, api_key: str, model: str, dimensions: int) -> None:
+        self._key = api_key
+        self.model = model
+        self.dimensions = dimensions
+
+    async def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        async with httpx.AsyncClient(timeout=30.0) as http:
+            return await GeminiEmbedder(http, self._key, self.model, self.dimensions).embed(texts)
+
+
 class ChatTools:
     def __init__(
         self,
@@ -261,11 +283,13 @@ class ChatTools:
         registry: Registry,
         conversation_id: int,
         message_id: int | None,
+        embedder: Embedder | None = None,
     ) -> None:
         self.pool = pool
         self.registry = registry
         self.conversation_id = conversation_id
         self.message_id = message_id
+        self.embedder = embedder
         self.used: list[str] = []
         self.actions: list[int] = []
 
@@ -507,7 +531,85 @@ class ChatTools:
                     "story_id": r["story_id"],
                 }
             )
+        if len(items) < SEMANTIC_ENOUGH and self.embedder is not None:
+            items.extend(
+                await self._semantic_wire(
+                    query, region, language, days, {r["id"] for r in rows}, SEMANTIC_ENOUGH
+                )
+            )
         return {"items": items, "note": "Wire items are headlines; they do not alert."}
+
+    async def _semantic_wire(
+        self,
+        query: str,
+        region: str | None,
+        language: str | None,
+        days: int,
+        have: set[int],
+        want: int,
+    ) -> list[dict[str, Any]]:
+        """Wire items close in meaning to the query, in any language, when the words matched
+        too few. Only items embedded by the same model are compared."""
+        assert self.embedder is not None
+        try:
+            (vector,) = await self.embedder.embed([query])
+        except EmbeddingError:
+            return []
+        rows = await self.pool.fetch(
+            "select a.id, a.url, a.headline, a.title_en, a.summary, a.outlet, a.outlet_name,"
+            " a.region, a.language, a.tier, a.published_at, a.linked, e.vector,"
+            " i.cluster_id as story_id from public.news_article a"
+            " join public.news_embedding e on e.article_id = a.id"
+            " left join public.news_item i on i.id = a.news_item_id"
+            " where a.published_at >= $1 and e.model = $2 and e.dim = $3"
+            " and ($4::text is null or a.region = upper($4))"
+            " and ($5::text is null or a.language = lower($5))"
+            " order by a.published_at desc limit $6",
+            dt.datetime.now(dt.UTC) - dt.timedelta(days=max(1, min(90, days))),
+            self.embedder.model,
+            self.embedder.dimensions,
+            region,
+            language,
+            SEMANTIC_CANDIDATES,
+        )
+        scored = sorted(
+            (
+                (cosine(vector, r["vector"]), r)
+                for r in rows
+                if r["id"] not in have and len(r["vector"]) == len(vector)
+            ),
+            key=lambda pair: pair[0],
+            reverse=True,
+        )
+        out: list[dict[str, Any]] = []
+        for score, r in scored[:want]:
+            if score < SEMANTIC_MIN_COSINE:
+                break
+            sid = self.registry.add(
+                "news_item",
+                f"wire:{r['id']}",
+                r["title_en"] or r["headline"],
+                url=r["url"],
+                tier=r["tier"],
+                snippet=(r["summary"] or "")[:600] or None,
+                as_of=str(r["published_at"].date()),
+            )
+            out.append(
+                {
+                    "source_id": sid,
+                    "headline": r["headline"],
+                    "headline_en": r["title_en"],
+                    "outlet": r["outlet_name"] or r["outlet"],
+                    "region": r["region"],
+                    "language": r["language"],
+                    "tier": r["tier"],
+                    "published": r["published_at"].isoformat(timespec="minutes"),
+                    "linked_to_holding": r["linked"],
+                    "story_id": r["story_id"],
+                    "match": f"similar in meaning ({score:.2f}), not the same words",
+                }
+            )
+        return out
 
     async def _tool_get_story_thread(self, story_id: int) -> dict[str, Any]:
         from steward.news.read_analysis import thread_detail
