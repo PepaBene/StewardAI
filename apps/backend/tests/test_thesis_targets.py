@@ -47,7 +47,7 @@ def _theses(*pairs: tuple[str, ThesisPriceTarget | None]) -> ThesesConfig:
 
 
 def test_target_needs_a_level_and_buy_below_sell() -> None:
-    with pytest.raises(ValidationError, match="sell target, a buy target or both"):
+    with pytest.raises(ValidationError, match="sell target, a buy target, scenarios"):
         _target()
     with pytest.raises(ValidationError, match="below the sell target"):
         _target(sell_target=100, buy_target=100)

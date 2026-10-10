@@ -4705,6 +4705,136 @@
         ]
       }
     },
+    "/theses/expected-returns": {
+      "get": {
+        "tags": [
+          "theses"
+        ],
+        "summary": "Get Expected Returns",
+        "description": "Every thesis, held or on the bench, ranked by its risk-adjusted expected return: the\nprobability-weighted scenario value over the price, annualised, less the cash rate, over\nthe stock's volatility. A row with a missing input says why instead of showing a number.",
+        "operationId": "get_expected_returns",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RankingResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/theses/switches": {
+      "get": {
+        "tags": [
+          "theses"
+        ],
+        "summary": "Get Switches",
+        "description": "For each holding, the best-ranked idea that beats it, the expected-return gap against\nthe switching hurdle (tax on the lots sold, costs, safety margin) and the suggested size at\nequal risk, evaluated on the post-trade book. Flags only: nothing is traded.",
+        "operationId": "get_switches",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwitchResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/theses/switches/log": {
+      "get": {
+        "tags": [
+          "theses"
+        ],
+        "summary": "List Switch Log",
+        "description": "The switches you confirmed, newest first, with the figures behind each.",
+        "operationId": "list_switch_log",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SwitchEntry"
+                  },
+                  "type": "array",
+                  "title": "Response List Switch Log"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "theses"
+        ],
+        "summary": "Add Switch Log",
+        "description": "Record a switch you made in Trading212 (stock sold, stock bought), with the prices of the\nday and the suggestion it followed. The log is append-only. The yearly scorecard follows the\ntwo stocks from the switch date and says whether the safety margin should be raised.",
+        "operationId": "add_switch_log",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwitchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwitchEntry"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/config/prompts": {
       "get": {
         "tags": [
@@ -44564,6 +44694,36 @@
         "title": "EarningsCheckSettings",
         "description": "The earnings thesis check: find the release, extract figures, validate, judge KPIs."
       },
+      "EarningsMoves": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "median_abs": {
+            "type": "number",
+            "title": "Median Abs"
+          },
+          "largest_abs": {
+            "type": "number",
+            "title": "Largest Abs"
+          },
+          "largest_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Largest Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "median_abs",
+          "largest_abs",
+          "largest_date"
+        ],
+        "title": "EarningsMoves",
+        "description": "How the price moved around past results, so a position ahead of a binary event can be\nsized down (principle 4e). Each move runs from the close before the report date to the first\nclose after it, which covers results released before or after the market."
+      },
       "EcbSeries": {
         "properties": {
           "key": {
@@ -75955,6 +76115,18 @@
               }
             ],
             "title": "Ticker"
+          },
+          "exclude": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "examples": [
+                "AAPL_US_EQ"
+              ]
+            },
+            "type": "array",
+            "title": "Exclude",
+            "description": "Holdings the rule skips (the core ETFs); they still count toward the look-through limit. Only for a rule that applies to every position."
           }
         },
         "additionalProperties": false,
@@ -78762,6 +78934,321 @@
         "additionalProperties": false,
         "type": "object",
         "title": "QuietHours"
+      },
+      "RankingResponse": {
+        "properties": {
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "cash_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Rate"
+          },
+          "cash_rate_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Rate Label"
+          },
+          "portfolio_sharpe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Sharpe"
+          },
+          "return_hurdle": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Hurdle"
+          },
+          "asymmetry_gate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asymmetry Gate"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RankingRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "bench_count": {
+            "type": "integer",
+            "title": "Bench Count"
+          },
+          "bench_target": {
+            "type": "string",
+            "title": "Bench Target",
+            "default": "5 to 10"
+          },
+          "formula": {
+            "type": "string",
+            "title": "Formula",
+            "default": "score = (annualised expected return - cash rate) / one-year volatility; the expected return is the probability-weighted value over the price, annualised to the catalyst date (two years when none)."
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method_version",
+          "as_of",
+          "base_currency",
+          "cash_rate",
+          "cash_rate_label",
+          "portfolio_sharpe",
+          "return_hurdle",
+          "asymmetry_gate",
+          "rows",
+          "bench_count"
+        ],
+        "title": "RankingResponse"
+      },
+      "RankingRow": {
+        "properties": {
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "held": {
+            "type": "boolean",
+            "title": "Held"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight",
+            "description": "Share of the invested value."
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "price_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Date"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "scenarios": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarios"
+          },
+          "returns": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReturnFigures"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score",
+            "description": "(annualised expected return - cash rate) / volatility."
+          },
+          "score_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Basis"
+          },
+          "improves_portfolio": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Improves Portfolio"
+          },
+          "bear_loss_vs_history": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bear Loss Vs History"
+          },
+          "earnings_moves": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EarningsMoves"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "volatility_band": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility Band"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons",
+            "description": "Why a figure is missing, in plain words."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "held"
+        ],
+        "title": "RankingRow"
       },
       "RateBucket": {
         "properties": {
@@ -82720,6 +83207,89 @@
         ],
         "title": "ReturnCell"
       },
+      "ReturnFigures": {
+        "properties": {
+          "expected_value": {
+            "type": "number",
+            "title": "Expected Value"
+          },
+          "total": {
+            "type": "number",
+            "title": "Total",
+            "description": "Expected return over the horizon."
+          },
+          "annualized": {
+            "type": "number",
+            "title": "Annualized"
+          },
+          "horizon_years": {
+            "type": "number",
+            "title": "Horizon Years"
+          },
+          "horizon_source": {
+            "type": "string",
+            "title": "Horizon Source"
+          },
+          "upside": {
+            "type": "number",
+            "title": "Upside",
+            "description": "Base case over the price."
+          },
+          "loss": {
+            "type": "number",
+            "title": "Loss",
+            "description": "Bear case under the price, zero when the bear is above."
+          },
+          "asymmetry": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asymmetry",
+            "description": "Base-case upside / bear-case loss."
+          },
+          "meets_hurdle": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meets Hurdle"
+          },
+          "meets_asymmetry": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meets Asymmetry"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_value",
+          "total",
+          "annualized",
+          "horizon_years",
+          "horizon_source",
+          "upside",
+          "loss",
+          "asymmetry",
+          "meets_hurdle",
+          "meets_asymmetry"
+        ],
+        "title": "ReturnFigures"
+      },
       "ReviewBody": {
         "properties": {
           "month": {
@@ -82829,6 +83399,14 @@
             "type": "array",
             "title": "Risk Notes",
             "description": "The forecast volatility from today's holdings, the factor tilts worth a look and the hardest past episode, each as a plain sentence."
+          },
+          "bench_notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Bench Notes",
+            "description": "The bench (theses on stocks not held) against the 5 to 10 target, and the best-ranked ideas by risk-adjusted expected return."
           },
           "sources": {
             "items": {
@@ -83977,6 +84555,36 @@
             "description": "Market cap in USD a core stock must exceed.",
             "default": 10000000000.0
           },
+          "max_stock_risk_share": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Stock Risk Share",
+            "description": "Ceiling on one stock's share of the portfolio's forecast volatility (0.08 = 8 %), from the ex-ante model. Funds the single-position rule exempts are not judged. A review prompt, not an instruction to trade (null: off).",
+            "default": 0.08
+          },
+          "thesis_volatility_multiple": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "exclusiveMinimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thesis Volatility Multiple",
+            "description": "A held stock whose three-month realized volatility is above this multiple of the volatility band in its thesis opens a 'thesis risk profile changed' finding (null: off). It asks for a review; it never means 'sell'.",
+            "default": 1.5
+          },
           "on_breach": {
             "type": "string",
             "enum": [
@@ -84092,6 +84700,127 @@
           "status_after"
         ],
         "title": "RiskLine"
+      },
+      "RiskProfile": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B"
+            ],
+            "title": "Stage",
+            "description": "A: daily closes in the stock's own currency."
+          },
+          "observations": {
+            "type": "integer",
+            "title": "Observations",
+            "description": "Closes behind the figures."
+          },
+          "window_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Start"
+          },
+          "window_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window End"
+          },
+          "volatility_1y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility 1Y"
+          },
+          "volatility_3m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility 3M"
+          },
+          "max_drawdown": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown",
+            "description": "Worst fall from a peak over the stored history (negative)."
+          },
+          "correlation": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation",
+            "description": "With the portfolio's daily returns over the last year."
+          },
+          "marginal_risk": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginal Risk",
+            "description": "Stage A: correlation x volatility. Stage B: change in the portfolio's volatility per unit of weight, from the covariance model."
+          },
+          "marginal_stage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "A",
+                  "B"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginal Stage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "observations"
+        ],
+        "title": "RiskProfile"
       },
       "RiskReport": {
         "properties": {
@@ -92844,6 +93573,532 @@
         ],
         "title": "SurpriseFormulaOut"
       },
+      "SwitchEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "switched_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Switched On"
+          },
+          "sold_ticker": {
+            "type": "string",
+            "title": "Sold Ticker"
+          },
+          "bought_ticker": {
+            "type": "string",
+            "title": "Bought Ticker"
+          },
+          "sold_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold Price"
+          },
+          "sold_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold Currency"
+          },
+          "bought_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bought Price"
+          },
+          "bought_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bought Currency"
+          },
+          "sold_value_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold Value Base"
+          },
+          "bought_value_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bought Value Base"
+          },
+          "snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Snapshot"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "switched_on",
+          "sold_ticker",
+          "bought_ticker",
+          "sold_price",
+          "sold_currency",
+          "bought_price",
+          "bought_currency",
+          "sold_value_base",
+          "bought_value_base",
+          "snapshot",
+          "note",
+          "created_at"
+        ],
+        "title": "SwitchEntry"
+      },
+      "SwitchIn": {
+        "properties": {
+          "sold_ticker": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Sold Ticker"
+          },
+          "bought_ticker": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Bought Ticker"
+          },
+          "switched_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Switched On",
+            "description": "Defaults to today."
+          },
+          "sold_price": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold Price",
+            "description": "Defaults to the stored close on that day."
+          },
+          "bought_price": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bought Price",
+            "description": "Defaults to the stored close on that day."
+          },
+          "sold_value_base": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold Value Base"
+          },
+          "bought_value_base": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bought Value Base"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line",
+            "description": "The suggestion the switch followed, as the switches list returned it: both expected returns and risk profiles, the hurdle, the lots and the tax."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sold_ticker",
+          "bought_ticker"
+        ],
+        "title": "SwitchIn"
+      },
+      "SwitchLine": {
+        "properties": {
+          "sell": {
+            "type": "string",
+            "title": "Sell"
+          },
+          "buy": {
+            "type": "string",
+            "title": "Buy"
+          },
+          "sell_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sell Name"
+          },
+          "buy_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Name"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "hold",
+              "partial",
+              "full"
+            ],
+            "title": "Action"
+          },
+          "share": {
+            "type": "number",
+            "title": "Share",
+            "description": "Share of the holding to switch."
+          },
+          "sell_value": {
+            "type": "number",
+            "title": "Sell Value"
+          },
+          "buy_value": {
+            "type": "number",
+            "title": "Buy Value",
+            "description": "Replacement at equal risk, base currency."
+          },
+          "remainder": {
+            "type": "number",
+            "title": "Remainder",
+            "description": "Proceeds not used by the equal-risk purchase."
+          },
+          "return_gap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Gap"
+          },
+          "hurdle": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hurdle"
+          },
+          "tax": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax"
+          },
+          "costs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costs"
+          },
+          "safety_margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safety Margin"
+          },
+          "holding_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holding Return"
+          },
+          "idea_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idea Return"
+          },
+          "holding_volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holding Volatility"
+          },
+          "idea_volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idea Volatility"
+          },
+          "portfolio_improves": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Improves",
+            "description": "Risk-adjusted expected return of the book improves with the switch."
+          },
+          "limits_held": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limits Held",
+            "description": "No rule, cap or risk limit breaks or deepens."
+          },
+          "flagged": {
+            "type": "boolean",
+            "title": "Flagged",
+            "description": "Suggested: the gap clears the hurdle with every limit held."
+          },
+          "wait_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wait Note",
+            "description": "Switch now or after the time test."
+          },
+          "checks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Checks",
+            "description": "Pre-trade lines behind it."
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sell",
+          "buy",
+          "action",
+          "share",
+          "sell_value",
+          "buy_value",
+          "remainder",
+          "return_gap",
+          "hurdle",
+          "tax",
+          "costs",
+          "safety_margin",
+          "holding_return",
+          "idea_return",
+          "holding_volatility",
+          "idea_volatility",
+          "portfolio_improves",
+          "limits_held",
+          "flagged"
+        ],
+        "title": "SwitchLine"
+      },
+      "SwitchResponse": {
+        "properties": {
+          "method_version": {
+            "type": "string",
+            "title": "Method Version"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/SwitchLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer",
+            "default": "Flags only. Nothing is traded: the owner decides in Trading212. A tax figure is the rule of thumb applied to the stored lots, not a tax computation."
+          }
+        },
+        "type": "object",
+        "required": [
+          "method_version",
+          "as_of",
+          "base_currency",
+          "lines"
+        ],
+        "title": "SwitchResponse"
+      },
       "TargetBand": {
         "properties": {
           "target_weight": {
@@ -93975,6 +95230,43 @@
       },
       "ThesisPriceTarget": {
         "properties": {
+          "scenarios": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisScenarios"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "catalyst_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalyst Date",
+            "description": "When the thesis should have played out; the expected return is annualised to it (two years when unset, at least three months)."
+          },
+          "volatility_band": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 5.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility Band",
+            "description": "Annual volatility the thesis expects (0.30 = 30 %). A held stock whose three-month volatility runs well above it needs a review."
+          },
           "sell_target": {
             "anyOf": [
               {
@@ -94049,7 +95341,59 @@
           "set_on"
         ],
         "title": "ThesisPriceTarget",
-        "description": "The price levels the thesis's valuation sets, checked after each sync against the\nTrading212 price. Reaching the sell target asks for the research to be re-run: sell\nunless the new thesis raises the target. At or below the buy target the holding is a\ncandidate to add to."
+        "description": "The price levels the thesis's valuation sets, checked after each sync against the\nTrading212 price. Reaching the sell target asks for the research to be re-run: sell\nunless the new thesis raises the target. At or below the buy target the holding is a\ncandidate to add to. Scenarios alone are enough: they feed the expected return."
+      },
+      "ThesisScenarios": {
+        "properties": {
+          "bear": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Bear",
+            "description": "Value per share if the thesis fails."
+          },
+          "base": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Base",
+            "description": "Value per share if the thesis plays out."
+          },
+          "bull": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Bull",
+            "description": "Value per share if it plays out better."
+          },
+          "p_bear": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P Bear",
+            "default": 0.25
+          },
+          "p_base": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P Base",
+            "default": 0.5
+          },
+          "p_bull": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P Bull",
+            "default": 0.25
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "bear",
+          "base",
+          "bull"
+        ],
+        "title": "ThesisScenarios",
+        "description": "Bear, base and bull value per share with the owner's probabilities (principle 5).\nThe expected return, the upside against the loss and the risk-adjusted ranking read them."
       },
       "ThesisVariantPerception": {
         "properties": {

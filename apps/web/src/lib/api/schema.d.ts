@@ -1623,6 +1623,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/theses/expected-returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Expected Returns
+         * @description Every thesis, held or on the bench, ranked by its risk-adjusted expected return: the
+         *     probability-weighted scenario value over the price, annualised, less the cash rate, over
+         *     the stock's volatility. A row with a missing input says why instead of showing a number.
+         */
+        get: operations["get_expected_returns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/theses/switches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Switches
+         * @description For each holding, the best-ranked idea that beats it, the expected-return gap against
+         *     the switching hurdle (tax on the lots sold, costs, safety margin) and the suggested size at
+         *     equal risk, evaluated on the post-trade book. Flags only: nothing is traded.
+         */
+        get: operations["get_switches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/theses/switches/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Switch Log
+         * @description The switches you confirmed, newest first, with the figures behind each.
+         */
+        get: operations["list_switch_log"];
+        put?: never;
+        /**
+         * Add Switch Log
+         * @description Record a switch you made in Trading212 (stock sold, stock bought), with the prices of the
+         *     day and the suggestion it followed. The log is append-only. The yearly scorecard follows the
+         *     two stocks from the switch date and says whether the safety margin should be raised.
+         */
+        post: operations["add_switch_log"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/config/prompts": {
         parameters: {
             query?: never;
@@ -14591,6 +14661,25 @@ export interface components {
              */
             kpi_history_periods: number;
         };
+        /**
+         * EarningsMoves
+         * @description How the price moved around past results, so a position ahead of a binary event can be
+         *     sized down (principle 4e). Each move runs from the close before the report date to the first
+         *     close after it, which covers results released before or after the market.
+         */
+        EarningsMoves: {
+            /** Count */
+            count: number;
+            /** Median Abs */
+            median_abs: number;
+            /** Largest Abs */
+            largest_abs: number;
+            /**
+             * Largest Date
+             * Format: date
+             */
+            largest_date: string;
+        };
         /** EcbSeries */
         EcbSeries: {
             /** Key */
@@ -25391,6 +25480,11 @@ export interface components {
             value: number;
             /** Ticker */
             ticker?: string | null;
+            /**
+             * Exclude
+             * @description Holdings the rule skips (the core ETFs); they still count toward the look-through limit. Only for a rule that applies to every position.
+             */
+            exclude?: string[];
         };
         /** Positions */
         Positions: {
@@ -26445,6 +26539,91 @@ export interface components {
              * @example Europe/Prague
              */
             timezone: string;
+        };
+        /** RankingResponse */
+        RankingResponse: {
+            /** Method Version */
+            method_version: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Cash Rate */
+            cash_rate: number | null;
+            /** Cash Rate Label */
+            cash_rate_label: string | null;
+            /** Portfolio Sharpe */
+            portfolio_sharpe: number | null;
+            /** Return Hurdle */
+            return_hurdle: number | null;
+            /** Asymmetry Gate */
+            asymmetry_gate: number | null;
+            /** Rows */
+            rows: components["schemas"]["RankingRow"][];
+            /** Bench Count */
+            bench_count: number;
+            /**
+             * Bench Target
+             * @default 5 to 10
+             */
+            bench_target: string;
+            /**
+             * Formula
+             * @default score = (annualised expected return - cash rate) / one-year volatility; the expected return is the probability-weighted value over the price, annualised to the catalyst date (two years when none).
+             */
+            formula: string;
+            /** Notes */
+            notes?: string[];
+        };
+        /** RankingRow */
+        RankingRow: {
+            /** Rank */
+            rank?: number | null;
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name?: string | null;
+            /** Held */
+            held: boolean;
+            /**
+             * Weight
+             * @description Share of the invested value.
+             */
+            weight?: number | null;
+            /** Price */
+            price?: number | null;
+            /** Price Date */
+            price_date?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Scenarios */
+            scenarios?: {
+                [key: string]: number;
+            } | null;
+            returns?: components["schemas"]["ReturnFigures"] | null;
+            risk?: components["schemas"]["RiskProfile"] | null;
+            /**
+             * Score
+             * @description (annualised expected return - cash rate) / volatility.
+             */
+            score?: number | null;
+            /** Score Basis */
+            score_basis?: string | null;
+            /** Improves Portfolio */
+            improves_portfolio?: boolean | null;
+            /** Bear Loss Vs History */
+            bear_loss_vs_history?: string | null;
+            earnings_moves?: components["schemas"]["EarningsMoves"] | null;
+            /** Volatility Band */
+            volatility_band?: number | null;
+            /**
+             * Reasons
+             * @description Why a figure is missing, in plain words.
+             */
+            reasons?: string[];
         };
         /**
          * RateBucket
@@ -27861,6 +28040,41 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** ReturnFigures */
+        ReturnFigures: {
+            /** Expected Value */
+            expected_value: number;
+            /**
+             * Total
+             * @description Expected return over the horizon.
+             */
+            total: number;
+            /** Annualized */
+            annualized: number;
+            /** Horizon Years */
+            horizon_years: number;
+            /** Horizon Source */
+            horizon_source: string;
+            /**
+             * Upside
+             * @description Base case over the price.
+             */
+            upside: number;
+            /**
+             * Loss
+             * @description Bear case under the price, zero when the bear is above.
+             */
+            loss: number;
+            /**
+             * Asymmetry
+             * @description Base-case upside / bear-case loss.
+             */
+            asymmetry: number | null;
+            /** Meets Hurdle */
+            meets_hurdle: boolean | null;
+            /** Meets Asymmetry */
+            meets_asymmetry: boolean | null;
+        };
         /** ReviewBody */
         ReviewBody: {
             /** Month */
@@ -27907,6 +28121,11 @@ export interface components {
              * @description The forecast volatility from today's holdings, the factor tilts worth a look and the hardest past episode, each as a plain sentence.
              */
             risk_notes?: string[];
+            /**
+             * Bench Notes
+             * @description The bench (theses on stocks not held) against the 5 to 10 target, and the best-ranked ideas by risk-adjusted expected return.
+             */
+            bench_notes?: string[];
             /** Sources */
             sources: components["schemas"]["Source"][];
             /** Model */
@@ -28358,6 +28577,18 @@ export interface components {
              */
             tier_core_min_market_cap: number;
             /**
+             * Max Stock Risk Share
+             * @description Ceiling on one stock's share of the portfolio's forecast volatility (0.08 = 8 %), from the ex-ante model. Funds the single-position rule exempts are not judged. A review prompt, not an instruction to trade (null: off).
+             * @default 0.08
+             */
+            max_stock_risk_share: number | null;
+            /**
+             * Thesis Volatility Multiple
+             * @description A held stock whose three-month realized volatility is above this multiple of the volatility band in its thesis opens a 'thesis risk profile changed' finding (null: off). It asks for a review; it never means 'sell'.
+             * @default 1.5
+             */
+            thesis_volatility_multiple: number | null;
+            /**
              * On Breach
              * @description Severity of a risk-limit breach (alerted when it opens).
              * @default severity_2
@@ -28396,6 +28627,45 @@ export interface components {
              * @description real, proxied or excluded after the trade.
              */
             status_after: string | null;
+        };
+        /** RiskProfile */
+        RiskProfile: {
+            /**
+             * Stage
+             * @description A: daily closes in the stock's own currency.
+             * @enum {string}
+             */
+            stage: "A" | "B";
+            /**
+             * Observations
+             * @description Closes behind the figures.
+             */
+            observations: number;
+            /** Window Start */
+            window_start?: string | null;
+            /** Window End */
+            window_end?: string | null;
+            /** Volatility 1Y */
+            volatility_1y?: number | null;
+            /** Volatility 3M */
+            volatility_3m?: number | null;
+            /**
+             * Max Drawdown
+             * @description Worst fall from a peak over the stored history (negative).
+             */
+            max_drawdown?: number | null;
+            /**
+             * Correlation
+             * @description With the portfolio's daily returns over the last year.
+             */
+            correlation?: number | null;
+            /**
+             * Marginal Risk
+             * @description Stage A: correlation x volatility. Stage B: change in the portfolio's volatility per unit of weight, from the covariance model.
+             */
+            marginal_risk?: number | null;
+            /** Marginal Stage */
+            marginal_stage?: ("A" | "B") | null;
         };
         /** RiskReport */
         RiskReport: {
@@ -31465,6 +31735,177 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** SwitchEntry */
+        SwitchEntry: {
+            /** Id */
+            id: number;
+            /**
+             * Switched On
+             * Format: date
+             */
+            switched_on: string;
+            /** Sold Ticker */
+            sold_ticker: string;
+            /** Bought Ticker */
+            bought_ticker: string;
+            /** Sold Price */
+            sold_price: number | null;
+            /** Sold Currency */
+            sold_currency: string | null;
+            /** Bought Price */
+            bought_price: number | null;
+            /** Bought Currency */
+            bought_currency: string | null;
+            /** Sold Value Base */
+            sold_value_base: number | null;
+            /** Bought Value Base */
+            bought_value_base: number | null;
+            /** Snapshot */
+            snapshot: {
+                [key: string]: unknown;
+            };
+            /** Note */
+            note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** SwitchIn */
+        SwitchIn: {
+            /** Sold Ticker */
+            sold_ticker: string;
+            /** Bought Ticker */
+            bought_ticker: string;
+            /**
+             * Switched On
+             * @description Defaults to today.
+             */
+            switched_on?: string | null;
+            /**
+             * Sold Price
+             * @description Defaults to the stored close on that day.
+             */
+            sold_price?: number | null;
+            /**
+             * Bought Price
+             * @description Defaults to the stored close on that day.
+             */
+            bought_price?: number | null;
+            /** Sold Value Base */
+            sold_value_base?: number | null;
+            /** Bought Value Base */
+            bought_value_base?: number | null;
+            /**
+             * Line
+             * @description The suggestion the switch followed, as the switches list returned it: both expected returns and risk profiles, the hurdle, the lots and the tax.
+             */
+            line?: {
+                [key: string]: unknown;
+            } | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** SwitchLine */
+        SwitchLine: {
+            /** Sell */
+            sell: string;
+            /** Buy */
+            buy: string;
+            /** Sell Name */
+            sell_name?: string | null;
+            /** Buy Name */
+            buy_name?: string | null;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "hold" | "partial" | "full";
+            /**
+             * Share
+             * @description Share of the holding to switch.
+             */
+            share: number;
+            /** Sell Value */
+            sell_value: number;
+            /**
+             * Buy Value
+             * @description Replacement at equal risk, base currency.
+             */
+            buy_value: number;
+            /**
+             * Remainder
+             * @description Proceeds not used by the equal-risk purchase.
+             */
+            remainder: number;
+            /** Return Gap */
+            return_gap: number | null;
+            /** Hurdle */
+            hurdle: number | null;
+            /** Tax */
+            tax: number | null;
+            /** Costs */
+            costs: number | null;
+            /** Safety Margin */
+            safety_margin: number | null;
+            /** Holding Return */
+            holding_return: number | null;
+            /** Idea Return */
+            idea_return: number | null;
+            /** Holding Volatility */
+            holding_volatility: number | null;
+            /** Idea Volatility */
+            idea_volatility: number | null;
+            /**
+             * Portfolio Improves
+             * @description Risk-adjusted expected return of the book improves with the switch.
+             */
+            portfolio_improves: boolean | null;
+            /**
+             * Limits Held
+             * @description No rule, cap or risk limit breaks or deepens.
+             */
+            limits_held: boolean | null;
+            /**
+             * Flagged
+             * @description Suggested: the gap clears the hurdle with every limit held.
+             */
+            flagged: boolean;
+            /**
+             * Wait Note
+             * @description Switch now or after the time test.
+             */
+            wait_note?: string | null;
+            /**
+             * Checks
+             * @description Pre-trade lines behind it.
+             */
+            checks?: string[];
+            /** Reasons */
+            reasons?: string[];
+        };
+        /** SwitchResponse */
+        SwitchResponse: {
+            /** Method Version */
+            method_version: string;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Lines */
+            lines: components["schemas"]["SwitchLine"][];
+            /** Notes */
+            notes?: string[];
+            /**
+             * Disclaimer
+             * @default Flags only. Nothing is traded: the owner decides in Trading212. A tax figure is the rule of thumb applied to the stored lots, not a tax computation.
+             */
+            disclaimer: string;
+        };
         /** TargetBand */
         TargetBand: {
             /** Target Weight */
@@ -31923,9 +32364,20 @@ export interface components {
          * @description The price levels the thesis's valuation sets, checked after each sync against the
          *     Trading212 price. Reaching the sell target asks for the research to be re-run: sell
          *     unless the new thesis raises the target. At or below the buy target the holding is a
-         *     candidate to add to.
+         *     candidate to add to. Scenarios alone are enough: they feed the expected return.
          */
         ThesisPriceTarget: {
+            scenarios?: components["schemas"]["ThesisScenarios"] | null;
+            /**
+             * Catalyst Date
+             * @description When the thesis should have played out; the expected return is annualised to it (two years when unset, at least three months).
+             */
+            catalyst_date?: string | null;
+            /**
+             * Volatility Band
+             * @description Annual volatility the thesis expects (0.30 = 30 %). A held stock whose three-month volatility runs well above it needs a review.
+             */
+            volatility_band?: number | null;
             /**
              * Sell Target
              * @description Price at which the thesis has played out.
@@ -31960,6 +32412,43 @@ export interface components {
              * @description Date of the valuation the targets come from.
              */
             set_on: string;
+        };
+        /**
+         * ThesisScenarios
+         * @description Bear, base and bull value per share with the owner's probabilities (principle 5).
+         *     The expected return, the upside against the loss and the risk-adjusted ranking read them.
+         */
+        ThesisScenarios: {
+            /**
+             * Bear
+             * @description Value per share if the thesis fails.
+             */
+            bear: number;
+            /**
+             * Base
+             * @description Value per share if the thesis plays out.
+             */
+            base: number;
+            /**
+             * Bull
+             * @description Value per share if it plays out better.
+             */
+            bull: number;
+            /**
+             * P Bear
+             * @default 0.25
+             */
+            p_bear: number;
+            /**
+             * P Base
+             * @default 0.5
+             */
+            p_base: number;
+            /**
+             * P Bull
+             * @default 0.25
+             */
+            p_bull: number;
         };
         /**
          * ThesisVariantPerception
@@ -36622,6 +37111,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BudgetConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_expected_returns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RankingResponse"];
+                };
+            };
+        };
+    };
+    get_switches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SwitchResponse"];
+                };
+            };
+        };
+    };
+    list_switch_log: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SwitchEntry"][];
+                };
+            };
+        };
+    };
+    add_switch_log: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SwitchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SwitchEntry"];
                 };
             };
             /** @description Validation Error */

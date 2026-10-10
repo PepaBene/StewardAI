@@ -195,6 +195,12 @@ async def concentration_report(
     gaps = {t.ticker: t.missing_requirements() for t in (theses.body.theses if theses else [])}
     out: list[OverCap] = []
     exempt: list[str] = []
+    listed = {
+        t
+        for r in strategy.enabled_rules
+        if isinstance(r, PositionWeightRule) and r.ticker is None
+        for t in r.exclude
+    }
     for p in sorted(book.positions, key=lambda x: -x.value_base):
         r = info.get(p.ticker)
         qty = float(r["quantity"] or 0) if r else 0.0
@@ -212,7 +218,7 @@ async def concentration_report(
         )
         if found is None:
             continue
-        if r is not None and (r["instrument_type"] or "").upper() == "ETF":
+        if p.ticker in listed or (r is not None and (r["instrument_type"] or "").upper() == "ETF"):
             exempt.append(p.ticker)
             continue
         out.append(found)

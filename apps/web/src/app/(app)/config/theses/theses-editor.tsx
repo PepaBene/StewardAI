@@ -401,7 +401,7 @@ function ThesisCard({
         <p className="text-sm text-text-muted">
           Checked after each sync. At the sell target, re-run the research: sell
           unless the new thesis raises the target. At or below the buy target,
-          the holding is a candidate to add to. Leave all blank for none.
+          the holding is a candidate to add to. Scenarios alone are enough. Leave all blank for none.
         </p>
         <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-3 lg:grid-cols-[0.8fr_0.8fr_0.8fr_0.6fr_1.6fr_0.9fr]">
           <TextField
@@ -457,6 +457,26 @@ function ThesisCard({
             value={form.target.set_on}
             onChange={(v) => setTarget({ set_on: v })}
           />
+        </div>
+        <div className="space-y-2 border-t border-border-soft pt-3">
+          <p className="text-sm font-medium">Scenarios</p>
+          <p className="text-sm text-text-muted">
+            What one share is worth if the thesis fails, plays out, or plays out better, in the
+            currency above, with how likely you think each is. They give the expected return and
+            rank this stock against the others. Leave the probabilities blank for 25 / 50 / 25.
+          </p>
+          <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <TextField label="Bear value" path={`${path}.price_target.scenarios.bear`} errors={errors} value={form.target.bear} inputMode="decimal" className="num" onChange={(v) => setTarget({ bear: v })} />
+            <TextField label="Base value" path={`${path}.price_target.scenarios.base`} errors={errors} value={form.target.base} inputMode="decimal" className="num" onChange={(v) => setTarget({ base: v })} />
+            <TextField label="Bull value" path={`${path}.price_target.scenarios.bull`} errors={errors} value={form.target.bull} inputMode="decimal" className="num" onChange={(v) => setTarget({ bull: v })} />
+            <TextField label="Bear chance (%)" path={`${path}.price_target.scenarios.p_bear`} errors={errors} value={form.target.p_bear} inputMode="decimal" className="num" placeholder="25" onChange={(v) => setTarget({ p_bear: v })} />
+            <TextField label="Base chance (%)" path={`${path}.price_target.scenarios.p_base`} errors={errors} value={form.target.p_base} inputMode="decimal" className="num" placeholder="50" onChange={(v) => setTarget({ p_base: v })} />
+            <TextField label="Bull chance (%)" path={`${path}.price_target.scenarios.p_bull`} errors={errors} value={form.target.p_bull} inputMode="decimal" className="num" placeholder="25" onChange={(v) => setTarget({ p_bull: v })} />
+          </div>
+          <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <TextField label="Catalyst date" type="date" path={`${path}.price_target.catalyst_date`} errors={errors} value={form.target.catalyst_date} hint="Blank: two years" onChange={(v) => setTarget({ catalyst_date: v })} />
+            <TextField label="Expected volatility (%)" path={`${path}.price_target.volatility_band`} errors={errors} value={form.target.volatility_band} inputMode="decimal" className="num" hint="A year, e.g. 30" onChange={(v) => setTarget({ volatility_band: v })} />
+          </div>
         </div>
         {errorsAt(errors, `${path}.price_target`).map((m) => (
           <p key={m} className="text-xs text-text">

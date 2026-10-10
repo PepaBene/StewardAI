@@ -258,6 +258,36 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "rotation_candidates",
+        "description": "The theses ranked by risk-adjusted expected return (scenario-weighted "
+        "return annualised, less the cash rate, over volatility), held and bench ideas together, "
+        "and for each holding the best idea that beats it with the gap against the switching "
+        "hurdle (tax on the lots, costs, safety margin), the equal-risk size and whether every "
+        "limit holds after the switch. Flags only. Use for 'what should I rotate?'. A row "
+        "with a missing input says why; never invent a figure.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "switch_effect",
+        "description": "What selling one holding to buy another does: the expected-return gap "
+        "against the switching hurdle, the tax on the lots sold, the equal-risk size of the "
+        "purchase and the rule, cap and risk-limit effects on the book after the switch. Use for "
+        "'what does switching X for Y do to my risk?'.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "sell": {"type": "string", "description": "A held ticker."},
+                "buy": {"type": "string", "description": "The ticker to buy."},
+                "sell_value_base": {
+                    "type": "number",
+                    "description": "Amount sold, base currency; default the whole position.",
+                },
+            },
+            "required": ["sell", "buy"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "over_cap_positions",
         "description": "Positions above the single-stock cap (principle 4f): months until "
         "deposits alone dilute each below the cap, and the sale that trims it to 8 % (10 % above "
@@ -432,6 +462,22 @@ class ChatTools:
 
     async def _tool_deposit_allocation(self, amount: float) -> dict[str, Any]:
         return await analytics_tools.deposit_allocation(self.pool, self.registry, amount)
+
+    async def _tool_rotation_candidates(self) -> dict[str, Any]:
+        owner = await self._owner()
+        if owner is None:
+            return {"error": "this conversation has no owner"}
+        return await analytics_tools.rotation_candidates(self.pool, self.registry, owner)
+
+    async def _tool_switch_effect(
+        self, sell: str, buy: str, sell_value_base: float | None = None
+    ) -> dict[str, Any]:
+        owner = await self._owner()
+        if owner is None:
+            return {"error": "this conversation has no owner"}
+        return await analytics_tools.switch_effect(
+            self.pool, self.registry, owner, sell, buy, sell_value_base
+        )
 
     async def _tool_over_cap_positions(
         self, monthly_deposit: float | None = None

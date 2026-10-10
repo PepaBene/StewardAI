@@ -680,7 +680,12 @@ function RulesPanel({ form, errors, set }: SectionProps) {
                     <TextField className="w-44" label="Rule id" path={`rules.${i}.id`} errors={errors} value={r.id} onChange={(v) => setRule(r.key, { id: v })} hint="Lowercase words joined by hyphens." />
                     <SelectField className="w-44" label="Checks" path={`rules.${i}.type`} errors={errors} value={r.type} options={RULE_TYPES} onChange={(v) => setRule(r.key, { type: v })} />
                     {r.type === "position_weight" ? (
-                      <TextField className="w-40" label="Ticker (optional)" path={`rules.${i}.ticker`} errors={errors} value={r.ticker} onChange={(v) => setRule(r.key, { ticker: v.trim() })} />
+                      <>
+                        <TextField className="w-40" label="Ticker (optional)" path={`rules.${i}.ticker`} errors={errors} value={r.ticker} onChange={(v) => setRule(r.key, { ticker: v.trim() })} />
+                        {!r.ticker.trim() ? (
+                          <TextField className="w-56" label="Except (optional)" path={`rules.${i}.exclude`} errors={errors} value={r.exclude} onChange={(v) => setRule(r.key, { exclude: v })} hint="Tickers the rule skips, separated by commas." />
+                        ) : null}
+                      </>
                     ) : null}
                     {r.type === "category_weight" ? (
                       <>

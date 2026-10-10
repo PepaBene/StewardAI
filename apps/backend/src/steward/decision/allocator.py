@@ -500,14 +500,20 @@ def _candidate(
     held_name = next((p.name for p in book.positions if p.ticker == ticker), name)
     target = thesis.price_target if thesis else None
     ret: float | None = None
-    if target is not None and target.sell_target is not None:
+    # Scenarios (Q8.1) give the probability-weighted value; without them the sell target does.
+    value = (
+        target.scenarios.expected_value
+        if target is not None and target.scenarios is not None
+        else (target.sell_target if target is not None else None)
+    )
+    if target is not None and value is not None:
         price = price_local if price_local is not None else _local_price(book, ticker)
         if (
             price
             and price > 0
             and normalise_currency(target.currency)[0] == normalise_currency(currency)[0]
         ):
-            ret = target.sell_target / price - 1.0
+            ret = value / price - 1.0
     return Candidate(ticker, held_name, currency, price_base, etf, held_value, ret)
 
 

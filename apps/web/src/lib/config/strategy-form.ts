@@ -161,6 +161,8 @@ export type RuleForm = {
   /** A percentage for weight rules, a whole number for position_count. */
   value: string;
   ticker: string;
+  /** Tickers a position_weight rule skips, comma separated. Only for a rule with no ticker. */
+  exclude: string;
   dimension: string;
   bucket: string;
 };
@@ -258,6 +260,7 @@ export function newRule(type: RuleType = "position_weight"): RuleForm {
     enabled: true,
     value: "",
     ticker: "",
+    exclude: "",
     dimension: "",
     bucket: "",
   };
@@ -339,10 +342,18 @@ export function strategyFromBody(body: StrategyConfig | null): StrategyForm {
       enabled: r.enabled ?? true,
       value: r.type === "position_count" ? String(r.value) : fractionToPercent(r.value),
       ticker: r.type === "position_weight" ? (r.ticker ?? "") : "",
+      exclude: r.type === "position_weight" ? (r.exclude ?? []).join(", ") : "",
       dimension: r.type === "category_weight" ? r.dimension : "",
       bucket: r.type === "category_weight" ? (r.bucket ?? "") : "",
     })),
   };
+}
+
+function splitTickers(text: string): string[] {
+  return text
+    .split(/[\s,;]+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
 }
 
 function ruleToBody(r: RuleForm): StrategyRule {
@@ -355,7 +366,13 @@ function ruleToBody(r: RuleForm): StrategyRule {
   };
   switch (r.type) {
     case "position_weight":
-      return { ...common, type: r.type, value: percentToFraction(r.value) as number, ticker: r.ticker.trim() || null };
+      return {
+        ...common,
+        type: r.type,
+        value: percentToFraction(r.value) as number,
+        ticker: r.ticker.trim() || null,
+        exclude: r.ticker.trim() ? [] : splitTickers(r.exclude),
+      };
     case "category_weight":
       return {
         ...common,

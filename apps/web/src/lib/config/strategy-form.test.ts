@@ -43,8 +43,8 @@ const FULL: StrategyConfig = {
     { dimension: "geography", bucket: "US", target_weight: 0.4, band: 0.1 },
   ],
   rules: [
-    { id: "max-single-position", type: "position_weight", operator: "<=", value: 0.1, ticker: null, on_breach: "severity_2", description: "", enabled: true },
-    { id: "asml-cap", type: "position_weight", operator: "<", value: 0.2, ticker: "ASML_EQ", on_breach: "severity_3", description: "Hard cap", enabled: true },
+    { id: "max-single-position", type: "position_weight", operator: "<=", value: 0.1, ticker: null, exclude: ["VUAA_EQ", "CSPX_EQ"], on_breach: "severity_2", description: "", enabled: true },
+    { id: "asml-cap", type: "position_weight", operator: "<", value: 0.2, ticker: "ASML_EQ", exclude: [], on_breach: "severity_3", description: "Hard cap", enabled: true },
     { id: "max-sector", type: "category_weight", operator: "<=", value: 0.35, dimension: "sector", bucket: null, on_breach: "severity_1", description: "", enabled: true },
     { id: "europe-min", type: "category_weight", operator: ">=", value: 0.2, dimension: "geography", bucket: "Europe", on_breach: "severity_2", description: "At least a fifth in Europe", enabled: true },
     { id: "cash-floor", type: "cash_weight", operator: ">", value: 0.01, on_breach: "severity_2", description: "", enabled: true },

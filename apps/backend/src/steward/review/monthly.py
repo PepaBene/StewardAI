@@ -55,6 +55,7 @@ from steward.research.sources import CitedSentence, Registry, Source
 from steward.settings import get_settings
 
 if TYPE_CHECKING:
+    from steward.decision.ranking import RankingResponse
     from steward.portfolio.exante import ExAnteRisk
     from steward.portfolio.validation import ModelValidation
 
@@ -130,6 +131,11 @@ class ReviewBody(BaseModel):
         default_factory=list,
         description="The forecast volatility from today's holdings, the factor tilts worth a "
         "look and the hardest past episode, each as a plain sentence.",
+    )
+    bench_notes: list[str] = Field(
+        default_factory=list,
+        description="The bench (theses on stocks not held) against the 5 to 10 target, and the "
+        "best-ranked ideas by risk-adjusted expected return.",
     )
     sources: list[Source]
     model: str | None = None
@@ -755,6 +761,55 @@ def risk_section_lines(risk: "ExAnteRisk", validation: "ModelValidation | None")
     return lines
 
 
+BENCH_MIN, BENCH_MAX = 5, 10
+
+
+def bench_lines(ranking: "RankingResponse") -> list[str]:
+    """The bench count against the 5 to 10 target and the best-ranked ideas (pure). The bench is
+    every thesis on a stock that is not held; an idea without scenarios counts but cannot rank."""
+    ideas = [r for r in ranking.rows if not r.held]
+    count = len(ideas)
+    if count < BENCH_MIN:
+        verdict = f"below the target of {BENCH_MIN} to {BENCH_MAX}"
+    elif count > BENCH_MAX:
+        verdict = f"above the target of {BENCH_MIN} to {BENCH_MAX}"
+    else:
+        verdict = f"within the target of {BENCH_MIN} to {BENCH_MAX}"
+    lines = [f"Bench: {count} idea{'s' if count != 1 else ''} with a thesis, {verdict}."]
+    ranked = [r for r in ideas if r.score is not None and r.returns is not None]
+    unranked = count - len(ranked)
+    if unranked:
+        lines.append(
+            f"{unranked} bench idea{'s' if unranked != 1 else ''} cannot be ranked yet "
+            "(no scenarios, price or history)."
+        )
+    hurdle = ranking.return_hurdle
+    for r in ranked[:3]:
+        assert r.returns is not None and r.score is not None
+        flag = ""
+        if hurdle is not None:
+            flag = (
+                ", above the return hurdle" if r.returns.total >= hurdle else ", under the hurdle"
+            )
+        lines.append(
+            f"Best-ranked idea {r.ticker}: expected {r.returns.total:+.0%} over "
+            f"{r.returns.horizon_years:.1f} years, score {r.score:.2f}{flag}."
+        )
+    return lines
+
+
+async def bench_note_lines(pool: asyncpg.Pool, notes: list[str]) -> list[str]:
+    """The bench section of the review. A failure adds a note and never stops the review."""
+    from steward.decision.ranking_service import expected_returns
+
+    try:
+        return bench_lines(await expected_returns(pool))
+    except Exception:
+        logger.exception("bench notes failed")
+        notes.append("The bench and its ranking could not be computed.")
+        return []
+
+
 async def open_risk_limit_keys(pool: asyncpg.Pool) -> list[str]:
     """Keys of the risk-limit findings open now; an action may cite them like a rule id."""
     rows = await pool.fetch(
@@ -853,6 +908,7 @@ async def build_review(
         holding_periods=holding_periods,
         decision_scorecard=scorecard_lines,
         risk_notes=await risk_note_lines(pool, notes, due),
+        bench_notes=await bench_note_lines(pool, notes),
         sources=[],
     )
     usage: Usage | None = None
@@ -903,6 +959,8 @@ def render_md(body: ReviewBody) -> str:
         lines += [f"- {line}" for line in body.decision_scorecard]
     if body.risk_notes:
         lines += ["", "## Risk", ""] + [f"- {n}" for n in body.risk_notes]
+    if body.bench_notes:
+        lines += ["", "## Bench", ""] + [f"- {n}" for n in body.bench_notes]
     lines += ["", "## Thesis KPIs", ""]
     lines += [f"- [{k.status}] {k.ref}: {k.description}" for k in body.kpis]
     if body.reviews_due:

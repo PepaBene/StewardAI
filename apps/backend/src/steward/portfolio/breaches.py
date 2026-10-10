@@ -130,6 +130,8 @@ def evaluate(report: DriftReport, strategy: StrategyConfig) -> list[Finding]:
         checks: list[tuple[str, str | None, float, str]] = []  # (key suffix, ticker, value, what)
         if isinstance(rule, PositionWeightRule):
             for p in held:
+                if p.ticker in rule.exclude:
+                    continue
                 if rule.ticker is None or p.ticker == rule.ticker:
                     checks.append((p.ticker, p.ticker, p.weight, f"{p.ticker} weight"))
         elif isinstance(rule, CategoryWeightRule):
@@ -235,6 +237,8 @@ async def record_breaches(
         headline = f"{what} breached"
         if f.key.startswith("target:"):
             headline = "thesis price target reached"
+        if f.key.startswith("thesis:volatility:"):
+            headline = "thesis risk profile changed"
         lines = [f"[Severity {f.severity}] Portfolio: {headline}", f.detail]
         if app_url:
             lines.append(f"{app_url.rstrip('/')}/")

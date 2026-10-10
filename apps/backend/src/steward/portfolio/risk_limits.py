@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import asyncpg
 
 from steward.config.store import load_active
-from steward.config.strategy import RiskLimits, StrategyConfig
+from steward.config.strategy import PositionWeightRule, RiskLimits, StrategyConfig
 from steward.portfolio.breaches import Finding
 
 if TYPE_CHECKING:
@@ -27,6 +27,9 @@ log = logging.getLogger(__name__)
 
 # Window of the volatility and beta measurements, in days.
 RISK_WINDOW_DAYS = 365
+# Trading days in the realized-volatility window of a thesis's volatility band (three months).
+THESIS_VOLATILITY_DAYS = 63
+THESIS_VOLATILITY_SEVERITY = 2
 
 
 @dataclass(frozen=True)
@@ -75,6 +78,20 @@ class TierFlag:
     rule: str  # "speculative_above" or "core_above"
 
 
+@dataclass(frozen=True)
+class ThesisVolatilityFlag:
+    ticker: str
+    volatility: float  # three-month realized, annualised
+    band: float  # the thesis's expected volatility
+    multiple: float
+
+
+@dataclass(frozen=True)
+class StockRiskShare:
+    ticker: str
+    share: float  # of the portfolio's forecast variance
+
+
 @dataclass
 class RiskInputs:
     volatility: float | None = None
@@ -93,6 +110,8 @@ class RiskInputs:
     drawdown_drivers: list[tuple[str, float]] = field(default_factory=list)  # ticker, share lost
     reviews_due: list[str] = field(default_factory=list)  # tickers whose thesis review is due
     tier_flags: list[TierFlag] = field(default_factory=list)
+    thesis_volatility: list[ThesisVolatilityFlag] = field(default_factory=list)
+    stock_risk_shares: list[StockRiskShare] = field(default_factory=list)
     valuation_flags: list[ValuationFlag] = field(default_factory=list)
     correlations: list[PairCorrelation] = field(default_factory=list)
     positions: list[PositionLoss] = field(default_factory=list)
@@ -227,6 +246,37 @@ def evaluate_risk(inputs: RiskInputs, limits: RiskLimits) -> list[Finding]:
                 "at the thesis review; reclassify by hand",
                 first.volatility,
                 max(f.threshold for f in flags),
+            )
+        )
+    cap = limits.max_stock_risk_share
+    for rs in inputs.stock_risk_shares:
+        if cap is not None and rs.share > cap:
+            findings.append(
+                Finding(
+                    f"risk:stock_share:{rs.ticker}",
+                    "rule",
+                    rs.ticker,
+                    severity,
+                    f"Risk limit: {rs.ticker} accounts for {_pct(rs.share)} of the portfolio's "
+                    f"forecast volatility; the ceiling per stock is {_pct(cap)}. A review "
+                    "prompt for its size, not an instruction to trade",
+                    rs.share,
+                    cap,
+                )
+            )
+    for tv in inputs.thesis_volatility:
+        findings.append(
+            Finding(
+                f"thesis:volatility:{tv.ticker}",
+                "rule",
+                tv.ticker,
+                THESIS_VOLATILITY_SEVERITY,
+                f"Thesis risk profile changed: {tv.ticker} has realized volatility of "
+                f"{_pct(tv.volatility)} over the last three months, above {tv.multiple:g} times "
+                f"the {_pct(tv.band)} its thesis expects. Re-check the thesis; a move in price "
+                "alone is not a reason to sell",
+                tv.volatility,
+                tv.band * tv.multiple,
             )
         )
     if limits.max_beta is not None and inputs.beta is not None and inputs.beta > limits.max_beta:
@@ -526,6 +576,8 @@ async def gather_risk_inputs(
             for name in ("correlation", "volatility_forecast", "tier_risk", "effective_bets"):
                 inputs.unavailable.setdefault(name, str(exc))
     await _drawdown_context(pool, strategy, positions, inputs, book)
+    if limits.thesis_volatility_multiple is not None and book is not None:
+        await _thesis_volatility(pool, limits.thesis_volatility_multiple, book, inputs)
     wants_xray = (
         limits.max_look_through_weight is not None
         or limits.max_sector_weight is not None
@@ -551,6 +603,28 @@ async def gather_risk_inputs(
             log.warning("look-through failed: %s", exc)
             inputs.unavailable["overlap"] = str(exc)
     return inputs
+
+
+async def _thesis_volatility(
+    pool: asyncpg.Pool, multiple: float, book: "LoadedBook", inputs: RiskInputs
+) -> None:
+    """Held stocks whose three-month realized volatility is above `multiple` times the band the
+    thesis expects (plan Q8.8). A thesis without a band, or a stock with too short a history,
+    is not judged."""
+    from steward.config.thesis import ThesesConfig
+    from steward.reference import risk as ref_risk
+
+    stored = await load_active(pool, "theses", ThesesConfig)
+    for thesis in stored.body.theses if stored else []:
+        band = thesis.price_target.volatility_band if thesis.price_target else None
+        closes = book.daily_closes.get(thesis.ticker)
+        if band is None or not closes:
+            continue
+        vol = ref_risk.volatility(closes, THESIS_VOLATILITY_DAYS)
+        if vol is not None and vol > band * multiple:
+            inputs.thesis_volatility.append(
+                ThesisVolatilityFlag(thesis.ticker, vol, band, multiple)
+            )
 
 
 async def _decision_inputs(
@@ -695,6 +769,18 @@ def _book_inputs(book: "LoadedBook", strategy: StrategyConfig, inputs: RiskInput
         inputs.forecast_model = report.forecast_model
         inputs.effective_bets = report.effective_bets
         inputs.tier_risk_shares = {g.label: g.risk_share for g in report.by_tier}
+    if limits.max_stock_risk_share is not None:
+        exempt = {
+            t
+            for r in strategy.enabled_rules
+            if isinstance(r, PositionWeightRule) and r.ticker is None
+            for t in r.exclude
+        }
+        inputs.stock_risk_shares = [
+            StockRiskShare(p.ticker, p.risk_share)
+            for p in report.positions
+            if p.risk_share is not None and p.ticker not in exempt
+        ]
     inputs.tier_flags = [
         TierFlag(c.ticker, c.tier, c.volatility, c.threshold, c.rule)
         for c in report.tier_checks

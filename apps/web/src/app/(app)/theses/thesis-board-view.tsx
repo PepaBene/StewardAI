@@ -37,6 +37,7 @@ import { useNow } from "@/lib/hooks/use-now";
 import { jobHref } from "@/lib/jobs/job-detail";
 import { cn } from "@/lib/utils";
 
+import { RankingSection } from "./ranking-section";
 import { ThesisCard } from "./thesis-card";
 
 const fetchBoard = () => getBrowserApiClient().GET("/theses/board");
@@ -237,6 +238,8 @@ function Board({ board }: { board: ThesisBoard }) {
           <span className="font-medium text-text">How scores work.</span> {board.score_method}
         </span>
       </p>
+
+      <RankingSection />
     </>
   );
 }

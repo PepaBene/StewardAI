@@ -68,6 +68,18 @@ class PositionWeightRule(_RuleBase):
     type: Literal["position_weight"]
     value: Weight
     ticker: Ticker | None = None
+    exclude: list[Ticker] = Field(
+        default_factory=list,
+        description="Holdings the rule skips (the core ETFs); they still count toward the "
+        "look-through limit. Only for a rule that applies to every position.",
+    )
+
+    @model_validator(mode="after")
+    def _exclude_needs_general_rule(self) -> Self:
+        if self.exclude and self.ticker is not None:
+            raise ValueError("`exclude` only applies to a rule that names no single ticker")
+        require_unique(f"exclude in rule {self.id}", self.exclude)
+        return self
 
 
 class CategoryWeightRule(_RuleBase):
@@ -274,6 +286,20 @@ class RiskLimits(ConfigModel):
     )
     tier_core_min_market_cap: float = Field(
         default=1e10, gt=0, description="Market cap in USD a core stock must exceed."
+    )
+    max_stock_risk_share: Weight | None = Field(
+        default=0.08,
+        description="Ceiling on one stock's share of the portfolio's forecast volatility (0.08 "
+        "= 8 %), from the ex-ante model. Funds the single-position rule exempts are not "
+        "judged. A review prompt, not an instruction to trade (null: off).",
+    )
+    thesis_volatility_multiple: float | None = Field(
+        default=1.5,
+        gt=1,
+        le=10,
+        description="A held stock whose three-month realized volatility is above this multiple "
+        "of the volatility band in its thesis opens a 'thesis risk profile changed' finding "
+        "(null: off). It asks for a review; it never means 'sell'.",
     )
     on_breach: Severity = Field(
         default="severity_2",

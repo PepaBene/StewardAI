@@ -638,8 +638,14 @@ async def build_pretrade_context(
             price=price,
             quote_currency=quote,
             sell_target=target.sell_target if target else None,
+            expected_value=(
+                target.scenarios.expected_value if target and target.scenarios else None
+            ),
+            base_value=target.scenarios.base if target and target.scenarios else None,
             bear_case=(
-                target.bear_case if target and (not quote or target.currency == quote) else None
+                (target.scenarios.bear if target.scenarios else target.bear_case)
+                if target and (not quote or target.currency == quote)
+                else None
             ),
             target_currency=target.currency if target else None,
             has_thesis=thesis is not None,
@@ -711,6 +717,8 @@ async def run_pretrade(
     if rules is None:
         strategy = await load_strategy(pool)
         rules = pt.PretradeRules(**strategy.pretrade.model_dump())
+        if rules.risk_contribution_cap is None:
+            rules.risk_contribution_cap = strategy.risk.max_stock_risk_share
     ctx, portfolio, positions = await build_pretrade_context(
         pool, owner_id, request.trades, rules, deposit=request.deposit, loaded=loaded
     )

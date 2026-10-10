@@ -358,6 +358,81 @@ async def deposit_allocation(
     return {"source_id": sid, **plan.model_dump()}
 
 
+async def rotation_candidates(
+    pool: asyncpg.Pool, registry: Registry, owner_id: str
+) -> dict[str, Any]:
+    """The thesis ranking and the switches it suggests (plan Q8.4, Q8.5, Q8.10)."""
+    from steward.decision.ranking_service import switch_suggestions
+    from steward.decision.service import NoHoldings, NoStrategy
+
+    try:
+        switches = await switch_suggestions(pool, owner_id)
+    except (NoHoldings, NoStrategy) as err:
+        return {"unavailable": str(err) or type(err).__name__}
+    from steward.decision.ranking_service import expected_returns
+
+    ranking = await expected_returns(pool)
+    sid = registry.add(
+        "observation",
+        f"rotation:{ranking.as_of}",
+        "Thesis ranking and suggested switches",
+        app_path="/theses",
+        tier=1,
+        snippet="; ".join(
+            f"{r.ticker} score {r.score:.2f}" for r in ranking.rows if r.score is not None
+        )[:300],
+        as_of=ranking.as_of,
+    )
+    return {
+        "source_id": sid,
+        "ranking": [r.model_dump(mode="json") for r in ranking.rows[:12]],
+        "switches": [line.model_dump(mode="json") for line in switches.lines],
+        "notes": [*ranking.notes, *switches.notes],
+        "formula": ranking.formula,
+        "disclaimer": switches.disclaimer,
+    }
+
+
+async def switch_effect(
+    pool: asyncpg.Pool,
+    registry: Registry,
+    owner_id: str,
+    sell: str,
+    buy: str,
+    sell_value_base: float | None,
+) -> dict[str, Any]:
+    """What selling one holding to buy another does: gap against the hurdle, tax, equal-risk size
+    and the effect on the book's limits (plan Q8.10)."""
+    from steward.decision.ranking_service import switch_pair
+    from steward.decision.service import NoHoldings, NoStrategy
+
+    try:
+        line, plain, reason = await switch_pair(
+            pool, owner_id, sell.strip(), buy.strip(), sell_value_base
+        )
+    except (NoHoldings, NoStrategy) as err:
+        return {"unavailable": str(err) or type(err).__name__}
+    if reason:
+        return {"unavailable": reason}
+    sid = registry.add(
+        "observation",
+        f"switch:{sell}:{buy}",
+        f"Switching {sell} for {buy}",
+        app_path="/risk/pretrade",
+        tier=1,
+        snippet=(line.checks[0] if line and line.checks else "pre-trade check")[:300],
+    )
+    if line is not None:
+        return {"source_id": sid, "switch": line.model_dump(mode="json")}
+    assert plain is not None
+    return {
+        "source_id": sid,
+        "note": "One of the two stocks has no scenarios or no price history, so only the "
+        "pre-trade checks ran at the same value on both sides.",
+        "checks": [c.model_dump(mode="json") for c in plain.checks],
+    }
+
+
 async def over_cap_positions(
     pool: asyncpg.Pool, registry: Registry, monthly_deposit: float | None
 ) -> dict[str, Any]:

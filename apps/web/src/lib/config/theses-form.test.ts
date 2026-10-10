@@ -43,6 +43,9 @@ const BODY: ThesesConfig = {
         currency: "USD",
         method: "DCF",
         set_on: "2026-10-01",
+        scenarios: { bear: 120, base: 230, bull: 290, p_bear: 0.25, p_base: 0.5, p_bull: 0.25 },
+        catalyst_date: "2028-01-31",
+        volatility_band: 0.3,
       },
       implied_growth: 0.085,
       base_rate: { share_achieved: 0.2, comparison: "US large caps, 10-year", source: "own screen" },
@@ -121,7 +124,27 @@ describe("theses form", () => {
       currency: "USD",
       method: "",
       set_on: "",
+      scenarios: null,
+      catalyst_date: null,
+      volatility_band: null,
     });
+  });
+
+  it("sends scenarios alone, leaving blank probabilities to the API's 25 / 50 / 25", () => {
+    const forms = thesesFromBody(BODY);
+    forms[0].target = { ...EMPTY_TARGET, currency: "usd", method: "m", set_on: "2026-10-01", bear: "40", base: "70", bull: "90", volatility_band: "30" };
+    const target = thesesToBody(forms).theses![0].price_target!;
+    expect(target.scenarios).toEqual({ bear: 40, base: 70, bull: 90 });
+    expect(target.sell_target).toBeNull();
+    expect(target.volatility_band).toBeCloseTo(0.3);
+  });
+
+  it("reads scenario probabilities as percent and sends fractions", () => {
+    const forms = thesesFromBody(BODY);
+    expect(forms[0].target.p_bear).toBe("25");
+    forms[0].target = { ...forms[0].target, p_bear: "20", p_base: "50", p_bull: "30" };
+    const sc = thesesToBody(forms).theses![0].price_target!.scenarios!;
+    expect([sc.p_bear, sc.p_base, sc.p_bull]).toEqual([0.2, 0.5, 0.3]);
   });
 
   it("splits lists and builds ids", () => {

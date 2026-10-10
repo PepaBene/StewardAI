@@ -46,7 +46,7 @@ from steward.fx.convert import FxRate, normalise_currency
 from steward.jobs.runner import JobContext
 from steward.news.escalation import queue_escalation
 from steward.portfolio.sync import store_rates
-from steward.reference.identity import holding_tickers
+from steward.reference.identity import bench_tickers, holding_tickers
 from steward.reference.intraday import PSE_SYMBOL, refresh_pse_px, store_payload
 from steward.reference.listings import derive_listings, resolve_series_listing
 from steward.reference.price_series import (
@@ -914,9 +914,11 @@ async def run_price_history(ctx: JobContext, deps: PriceDeps) -> None:
         await ctx.record_config_version(profiles.id if profiles else None)
         settings = (jobs.body if jobs else JobsConfig()).prices
         tickers = await holding_tickers(pool)
+        bench = await bench_tickers(pool, tickers)
         holdings = await holding_symbols(
-            pool, tickers, profiles.body if profiles else HoldingProfilesConfig()
+            pool, [*tickers, *bench], profiles.body if profiles else HoldingProfilesConfig()
         )
+        step.detail["bench"] = bench
         step.detail.update(
             symbols={t: s.stooq for t, s in holdings.items()},
             yahoo_symbols={t: s.yahoo for t, s in holdings.items()},

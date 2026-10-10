@@ -34,6 +34,8 @@ def _book() -> ex.LoadedBook:
 
 def _strategy(**risk: float) -> StrategyConfig:
     s = StrategyConfig(base_currency="CZK", categories=["risk"])
+    # These tests isolate the volatility limit; the per-stock risk-share ceiling would add lines.
+    s.risk.max_stock_risk_share = None
     for k, v in risk.items():
         setattr(s.risk, k, v)
     return s

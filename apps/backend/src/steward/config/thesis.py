@@ -45,12 +45,49 @@ class ThesisKPI(ConfigModel):
         return value
 
 
+class ThesisScenarios(ConfigModel):
+    """Bear, base and bull value per share with the owner's probabilities (principle 5).
+    The expected return, the upside against the loss and the risk-adjusted ranking read them."""
+
+    bear: float = Field(gt=0, description="Value per share if the thesis fails.")
+    base: float = Field(gt=0, description="Value per share if the thesis plays out.")
+    bull: float = Field(gt=0, description="Value per share if it plays out better.")
+    p_bear: float = Field(default=0.25, ge=0, le=1)
+    p_base: float = Field(default=0.50, ge=0, le=1)
+    p_bull: float = Field(default=0.25, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> Self:
+        if not self.bear < self.base < self.bull:
+            raise ValueError("scenario values must rise from bear to base to bull")
+        if abs(self.p_bear + self.p_base + self.p_bull - 1) > 1e-6:
+            raise ValueError("scenario probabilities must add up to 100 %")
+        return self
+
+    @property
+    def expected_value(self) -> float:
+        return self.p_bear * self.bear + self.p_base * self.base + self.p_bull * self.bull
+
+
 class ThesisPriceTarget(ConfigModel):
     """The price levels the thesis's valuation sets, checked after each sync against the
     Trading212 price. Reaching the sell target asks for the research to be re-run: sell
     unless the new thesis raises the target. At or below the buy target the holding is a
-    candidate to add to."""
+    candidate to add to. Scenarios alone are enough: they feed the expected return."""
 
+    scenarios: ThesisScenarios | None = None
+    catalyst_date: dt.date | None = Field(
+        default=None,
+        description="When the thesis should have played out; the expected return is annualised "
+        "to it (two years when unset, at least three months).",
+    )
+    volatility_band: float | None = Field(
+        default=None,
+        gt=0,
+        le=5,
+        description="Annual volatility the thesis expects (0.30 = 30 %). A held stock whose "
+        "three-month volatility runs well above it needs a review.",
+    )
     sell_target: float | None = Field(
         default=None, gt=0, description="Price at which the thesis has played out."
     )
@@ -81,12 +118,20 @@ class ThesisPriceTarget(ConfigModel):
             for side, value in (("sell", self.sell_target), ("buy", self.buy_target))
             if value is not None
         ]
+        s = self.scenarios
+        if s is not None:
+            levels.append(
+                f"scenarios bear {s.bear:g} / base {s.base:g} / bull {s.bull:g} {self.currency} "
+                f"at {s.p_bear:.0%} / {s.p_base:.0%} / {s.p_bull:.0%}"
+            )
+        if self.catalyst_date is not None:
+            levels.append(f"catalyst {self.catalyst_date.isoformat()}")
         return f"{', '.join(levels)} ({self.method}, set {self.set_on.isoformat()})"
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
-        if self.sell_target is None and self.buy_target is None:
-            raise ValueError("set a sell target, a buy target or both")
+        if self.sell_target is None and self.buy_target is None and self.scenarios is None:
+            raise ValueError("set a sell target, a buy target, scenarios or a combination")
         if (
             self.sell_target is not None
             and self.buy_target is not None
