@@ -15,10 +15,23 @@ import { Blueprint } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDateTime } from "@/lib/format";
-import { BRIEF_KIND_LABELS, FLAG_LABELS, LIFECYCLE_LABELS, NOVELTY_LABELS, type BriefOut, type ThemeDay } from "@/lib/news/analysis";
+import {
+  BRIEF_KIND_LABELS,
+  FLAG_LABELS,
+  LIFECYCLE_LABELS,
+  NOVELTY_LABELS,
+  toneLabel,
+  type BriefOut,
+  type ThemeDay,
+} from "@/lib/news/analysis";
+
+function latestPerTicker(briefs: BriefOut[]): BriefOut[] {
+  const seen = new Set<string>();
+  return briefs.filter((b) => (seen.has(b.ticker) ? false : (seen.add(b.ticker), true)));
+}
 import { cn } from "@/lib/utils";
 
-const KINDS = ["morning", "weekly", "holding"] as const;
+const KINDS = ["morning", "region", "weekly", "holding", "theme"] as const;
 type Kind = (typeof KINDS)[number];
 
 type Load = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; briefs: BriefOut[]; themes: ThemeDay[] };
@@ -40,7 +53,8 @@ export function BriefView() {
       api.GET("/news/themes", { params: { query: { days: 7 } } }),
     ])
       .then(([briefs, themes]) => {
-        if (briefs.data) setLoad({ kind: "ok", briefs: briefs.data, themes: themes.data ?? [] });
+        // Defaulted response fields are always sent (see `Sent` in lib/news/analysis.ts).
+        if (briefs.data) setLoad({ kind: "ok", briefs: briefs.data, themes: (themes.data ?? []) as ThemeDay[] });
         else setLoad({ kind: "error", message: `The API answered HTTP ${briefs.response.status}.` });
       })
       .catch((err: unknown) => setLoad({ kind: "error", message: err instanceof Error ? err.message : String(err) }));
@@ -57,8 +71,11 @@ export function BriefView() {
     setRunning(response.ok ? "queued" : "error");
   }
 
-  const latest = load.kind === "ok" ? load.briefs[0] : undefined;
-  const flagged = load.kind === "ok" ? load.themes.filter((t) => t.flag) : [];
+  const all = load.kind === "ok" ? load.briefs : [];
+  // A theme digest is one brief per theme; every other kind shows its newest brief only.
+  const shown = kind === "theme" ? latestPerTicker(all) : all.slice(0, 1);
+  const latest = shown[0];
+  const flagged = load.kind === "ok" ? load.themes.filter((t) => t.flag || (t.tone !== null && t.tone !== undefined)) : [];
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
@@ -109,11 +126,13 @@ export function BriefView() {
           on under Config, Jobs, or press Write now.
         </EmptyState>
       ) : null}
-      {latest ? <Brief brief={latest} /> : null}
+      {shown.map((b) => (
+        <Brief key={b.id} brief={b} />
+      ))}
       {flagged.length > 0 ? (
         <section aria-labelledby="themes-heading" className="space-y-2">
           <h2 id="themes-heading" className="text-[22px] leading-tight font-semibold">
-            Themes changing this week
+            Themes this week
           </h2>
           <ul className="m-0 list-none space-y-1 p-0 text-sm">
             {flagged.map((t) => (
@@ -121,7 +140,9 @@ export function BriefView() {
                 <Link href={`/news/wire?topic=${encodeURIComponent(t.theme)}`} className="font-medium text-accent-ink hover:underline">
                   {t.theme}
                 </Link>{" "}
-                {t.flag ? FLAG_LABELS[t.flag] : ""} on {t.day}: {t.wire_items} items{t.regions.length ? ` in ${t.regions.join(", ")}` : ""}.
+                {t.flag ? `${FLAG_LABELS[t.flag]} on ${t.day}: ` : `${t.day}: `}
+                {t.wire_items} items{t.regions.length ? ` in ${t.regions.join(", ")}` : ""}. Worldwide coverage: {toneLabel(t.tone)}
+                {t.attention !== null && t.attention !== undefined ? `, ${t.attention.toFixed(3)}% of monitored coverage` : ""}.
               </li>
             ))}
           </ul>

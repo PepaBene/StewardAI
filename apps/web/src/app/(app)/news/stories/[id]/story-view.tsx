@@ -21,6 +21,7 @@ import {
   LIFECYCLE_LABELS,
   NOVELTY_LABELS,
   RELATION_LABELS,
+  SENTIMENT_LABELS,
   signedPct,
   SURPRISE_LABELS,
   THESIS_STATUS_LABELS,
@@ -177,7 +178,7 @@ export function StoryView({ id }: { id: number }) {
 }
 
 function AnalysisPanels({ analysis }: { analysis: StoryAnalysis }) {
-  const { extraction, novelty, impact, thread, framing, claims, market, thesis } = analysis;
+  const { extraction, novelty, impact, thread, framing, claims, market, thesis, sentiment } = analysis;
   return (
     <>
       {extraction ? (
@@ -259,8 +260,28 @@ function AnalysisPanels({ analysis }: { analysis: StoryAnalysis }) {
             ))}
           </ul>
           <p className="num text-xs text-text-muted">
-            Held directly {exposurePct(impact.direct_weight)}, reached through links {exposurePct(impact.reached_weight)}.
+            Held directly {exposurePct(impact.direct_weight)}, reached through links {exposurePct(impact.reached_weight)}, shared
+            sector, country or currency {exposurePct(impact.attribute_weight)}.
           </p>
+        </Panel>
+      ) : null}
+
+      {sentiment && sentiment.aspects.length > 0 ? (
+        <Panel title="Direction of the text" note="Read from the article text, not a forecast of the price. Each reading quotes its sentence.">
+          <ul className="m-0 list-none space-y-2 p-0">
+            {sentiment.aspects.map((a, i) => (
+              <li key={i} className="space-y-0.5 text-sm">
+                <p className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-medium">{a.entity}</span>
+                  <span>{SENTIMENT_LABELS[a.direction]}</span>
+                  <span className="num text-xs text-text-muted">strength {a.strength.toFixed(2)}</span>
+                </p>
+                <blockquote className="border-l-2 border-border pl-3 text-xs text-text-muted [overflow-wrap:anywhere]">
+                  &ldquo;{a.span}&rdquo; (item {a.item_id})
+                </blockquote>
+              </li>
+            ))}
+          </ul>
         </Panel>
       ) : null}
 

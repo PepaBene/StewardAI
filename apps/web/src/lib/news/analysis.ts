@@ -19,8 +19,8 @@ export type ThreadDetail = Sent<Schemas["ThreadDetail"]>;
 export type BriefOut = Sent<Schemas["BriefOut"]>;
 export type ThemeDay = Sent<Schemas["ThemeDay"]>;
 export type StudyRow = Sent<Schemas["StudyRow"]>;
-export type NewsFeedbackKind = Schemas["steward__news__read_analysis__FeedbackIn"]["kind"];
-export type NewsFeedbackTarget = Schemas["steward__news__read_analysis__FeedbackIn"]["target"];
+export type NewsFeedbackKind = Schemas["NewsFeedbackIn"]["kind"];
+export type NewsFeedbackTarget = Schemas["NewsFeedbackIn"]["target"];
 
 export const NOVELTY_LABELS: Record<NonNullable<StoryAnalysis["novelty"]>["novelty"], string> = {
   new: "New",
@@ -49,6 +49,7 @@ export const LIFECYCLE_LABELS: Record<string, string> = {
 export const RELATION_LABELS = {
   direct: "Held directly",
   second_order: "Through a supply-chain link",
+  attribute: "Shares a sector, country or currency",
   hypothesis: "Possible, not in the graph",
 } as const;
 
@@ -71,13 +72,28 @@ export const EVENT_STATUS_LABELS = {
   official: "Official",
 } as const;
 
-export const BRIEF_KIND_LABELS = { morning: "Morning brief", weekly: "Weekly brief", holding: "Holding brief" } as const;
+export const BRIEF_KIND_LABELS = {
+  morning: "Morning brief",
+  weekly: "Weekly brief",
+  holding: "Holding brief",
+  region: "By region",
+  theme: "Theme digests",
+} as const;
+
+export const SENTIMENT_LABELS = { positive: "Positive", negative: "Negative", mixed: "Mixed", neutral: "Neutral" } as const;
+
+/** GDELT's average tone for a theme: "-2.1" reads as coverage leaning negative. */
+export function toneLabel(tone: number | null | undefined): string {
+  if (tone === null || tone === undefined) return "no tone data";
+  return `${tone > 0 ? "+" : ""}${tone.toFixed(1)} tone`;
+}
 
 export const FEEDBACK_KINDS: { id: NewsFeedbackKind; label: string }[] = [
   { id: "wrong_entity", label: "Wrong company" },
   { id: "duplicate", label: "Duplicate" },
   { id: "misread", label: "Misread" },
   { id: "missing_source", label: "A source is missing" },
+  { id: "confirmed", label: "I confirmed this myself" },
   { id: "useful", label: "Useful" },
   { id: "not_useful", label: "Not useful" },
 ];

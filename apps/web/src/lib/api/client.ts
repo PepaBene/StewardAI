@@ -131,8 +131,8 @@ export type MacroFigure = Schemas["MacroFigure"];
 export type MarketHoliday = Schemas["MarketHoliday"];
 export type AnnouncementRule = Schemas["AnnouncementRule"];
 // Phase 4: verification hardening.
-export type FeedbackIn = Schemas["steward__verify__feedback__FeedbackIn"];
-export type FeedbackOut = Schemas["steward__verify__feedback__FeedbackOut"];
+export type FeedbackIn = Schemas["FeedbackIn"];
+export type FeedbackOut = Schemas["FeedbackOut"];
 export type FeedbackTargetKind = FeedbackIn["target_kind"];
 export type FeedbackRating = FeedbackIn["rating"];
 export type NewsLabel = Schemas["NewsLabel"];

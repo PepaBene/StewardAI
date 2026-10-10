@@ -9420,6 +9420,22 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** Aspect */
+        Aspect: {
+            /** Entity */
+            entity: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "positive" | "negative" | "mixed" | "neutral";
+            /** Strength */
+            strength: number;
+            /** Item Id */
+            item_id: number;
+            /** Span */
+            span: string;
+        };
         /**
          * Assumptions
          * @description One scenario's explicit inputs. Everything here is the owner's assumption, not a fact.
@@ -10289,7 +10305,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "morning" | "weekly" | "holding";
+            kind: "morning" | "weekly" | "holding" | "region" | "theme";
             /** Ticker */
             ticker: string;
             /**
@@ -10429,7 +10445,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "news_ai_search" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -16385,6 +16401,88 @@ export interface components {
             /** Would Alert */
             would_alert: boolean;
         };
+        /** FeedbackIn */
+        FeedbackIn: {
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "fact" | "verdict" | "alert" | "news_item" | "story" | "report_sentence";
+            /**
+             * Target Id
+             * @description The fact, verdict, alert, news item, story or report id.
+             */
+            target_id: number;
+            /**
+             * Sentence Path
+             * @description Report sentences only: where it sits in the report body, e.g. 'overview/0', 'sections/2/summary/1' (digest) or 'sentences/3' (impact note).
+             */
+            sentence_path?: string | null;
+            /**
+             * Rating
+             * @enum {string}
+             */
+            rating: "wrong" | "irrelevant" | "useful";
+            /** Note */
+            note?: string | null;
+            /**
+             * Add To Eval
+             * @description With rating 'wrong' on a fact or news item: add it to the golden or labelled evaluation set with the corrected value or label.
+             * @default false
+             */
+            add_to_eval: boolean;
+            /**
+             * Corrected Value
+             * @description Facts: the right value, in the fact's printed scale.
+             */
+            corrected_value?: number | string | null;
+            /**
+             * Corrected Value As Written
+             * @description Facts added to the golden set: the right number exactly as printed, when it differs from the stored one (e.g. '94,036').
+             */
+            corrected_value_as_written?: string | null;
+            /**
+             * Corrected Snippet
+             * @description Facts added to the golden set: the document passage that states the right number, when the stored snippet does not contain it.
+             */
+            corrected_snippet?: string | null;
+            corrected_label?: components["schemas"]["NewsLabel"] | null;
+        };
+        /** FeedbackOut */
+        FeedbackOut: {
+            /** Id */
+            id: number;
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "fact" | "verdict" | "alert" | "news_item" | "story" | "report_sentence";
+            /** Target Id */
+            target_id: number;
+            /** Sentence Path */
+            sentence_path: string | null;
+            /**
+             * Rating
+             * @enum {string}
+             */
+            rating: "wrong" | "irrelevant" | "useful";
+            /** Note */
+            note: string | null;
+            /** Source Hosts */
+            source_hosts: string[];
+            /**
+             * Effects
+             * @description What the feedback did: quarantined fact, verdict job, trust scores, eval candidate.
+             */
+            effects: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /**
          * FetchPolicy
          * @description How far the article-text ladder (news/fulltext.py) may go for a source's items.
@@ -18643,6 +18741,16 @@ export interface components {
             valuation_source: "auto" | "sec" | "esef" | "manual";
             /** @description Hand-entered per-share figures for holdings without an automatic source. */
             manual_fundamentals?: components["schemas"]["ManualFundamentals"] | null;
+            /**
+             * Executives
+             * @description Named executives (CEO, CFO, chair). News naming one links to the holding.
+             */
+            executives?: string[];
+            /**
+             * Brands
+             * @description Product and brand names that are not part of the company name.
+             */
+            brands?: string[];
             /** Competitors */
             competitors?: string[];
             /** Suppliers */
@@ -19040,7 +19148,7 @@ export interface components {
              * Relation
              * @enum {string}
              */
-            relation: "direct" | "second_order" | "hypothesis";
+            relation: "direct" | "second_order" | "attribute" | "hypothesis";
             /** Holding */
             holding: string;
             /**
@@ -19075,6 +19183,12 @@ export interface components {
             direct_weight: number;
             /** Reached Weight */
             reached_weight: number;
+            /**
+             * Attribute Weight
+             * @description Portfolio share in holdings the story reaches only through a shared sector, country, currency, commodity or rate classification (no supply-chain link).
+             * @default 0
+             */
+            attribute_weight: number;
             /** Notes */
             notes?: string[];
         };
@@ -20488,6 +20602,8 @@ export interface components {
             ir_discovery?: components["schemas"]["JobSchedule"];
             /** @description Asks a search-capable model for recent news on holdings the wire covers thinly. Results are leads at the lowest tier: they never alert on their own. Off by default (it spends on web searches). Default: daily 06:20. */
             news_ai_search?: components["schemas"]["JobSchedule"];
+            /** @description Triages new wire items on a cheap model: relevance, topic, entities and a one-line gloss. Off by default (it spends on a model). Default: hourly at :10. */
+            news_triage?: components["schemas"]["JobSchedule"];
             /** @description Analyses new stories: novelty, threads, market context and themes in code, plus the model techniques selected in the news settings. Default: every 3 hours. */
             news_analysis?: components["schemas"]["JobSchedule"];
             /** @description Writes the morning brief (and on Mondays the weekly brief and the per-holding briefs) from stored stories, each line citing its items. Off by default (it spends on a model). Default: daily 06:30. */
@@ -22558,6 +22674,47 @@ export interface components {
              */
             next_ingest_due_at?: string | null;
         };
+        /** NewsFeedbackIn */
+        NewsFeedbackIn: {
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "item" | "story" | "claim" | "brief_line";
+            /** Target Id */
+            target_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "wrong_entity" | "duplicate" | "misread" | "missing_source" | "useful" | "not_useful" | "confirmed";
+            /** Note */
+            note?: string | null;
+        };
+        /** NewsFeedbackOut */
+        NewsFeedbackOut: {
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "item" | "story" | "claim" | "brief_line";
+            /** Target Id */
+            target_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "wrong_entity" | "duplicate" | "misread" | "missing_source" | "useful" | "not_useful" | "confirmed";
+            /** Note */
+            note?: string | null;
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** NewsItemOut */
         NewsItemOut: {
             /** Id */
@@ -22759,7 +22916,7 @@ export interface components {
              * Analysis Techniques
              * @description The analysis techniques that run. The default four are computed in code and cost nothing; the others call a model (extraction first: impact chains, framing, claim checks and thesis links read its output).
              */
-            analysis_techniques?: ("extraction" | "novelty" | "impact" | "thread" | "framing" | "claims" | "market" | "themes" | "thesis")[];
+            analysis_techniques?: ("extraction" | "novelty" | "impact" | "thread" | "framing" | "claims" | "market" | "themes" | "thesis" | "sentiment")[];
             /**
              * Extraction Model
              * @description Extracts the typed event (actors, magnitude, claims with cited spans) from a story's stored text.
@@ -22847,6 +23004,80 @@ export interface components {
              * @default 12
              */
             brief_max_lines: number;
+            /**
+             * Brief Alert
+             * @description Send the morning brief's top lines through the alert routing (Telegram or email, by your alert rules) when it is written.
+             * @default false
+             */
+            brief_alert: boolean;
+            /**
+             * Gdelt Themes
+             * @description Fetch GDELT's average tone and share of coverage for each watch theme once a day (free, no key, one request per five seconds). Shown next to the theme counts; never used for ranking or alerts.
+             * @default false
+             */
+            gdelt_themes: boolean;
+            /**
+             * Gdelt Max Themes
+             * @description Most themes fetched from GDELT per run.
+             * @default 6
+             */
+            gdelt_max_themes: number;
+            /**
+             * Theme Narratives
+             * @description On Mondays the brief job writes a short cited narrative for each watch theme with enough items in the week (needs the brief model's key).
+             * @default true
+             */
+            theme_narratives: boolean;
+            /**
+             * Triage Model
+             * @description Triages each wire item: relevance to a global equity portfolio, topic, named entities and a one-line gloss. Decides what gets full text and analysis.
+             * @default gpt-6-luna
+             * @example claude-sonnet-5
+             * @example gpt-6-luna
+             */
+            triage_model: string;
+            /**
+             * Triage Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            triage_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Triage Per Run
+             * @description Wire items triaged per run (0: none).
+             * @default 200
+             */
+            triage_per_run: number;
+            /**
+             * Triage Fulltext Relevance
+             * @description An unlinked wire item triaged at this relevance or above is also fetched for full text (linked items always are).
+             * @default 2
+             */
+            triage_fulltext_relevance: number;
+            /**
+             * Batch Extraction
+             * @description Send extraction through the provider's batch endpoint (half price, but a run waits up to an hour for the results).
+             * @default false
+             */
+            batch_extraction: boolean;
+            /**
+             * Sector Benchmarks
+             * @description Price symbol of the sector index to measure a holding against, by the holding's sector (for example {'Technology': 'xlk.us'}). Without an entry the country's market index is used.
+             */
+            sector_benchmarks?: {
+                [key: string]: string;
+            };
+            /**
+             * Auto Resolve Days
+             * @description A story that is confirmed or corroborated and has had no new item for this many days is marked resolved (0: only you resolve stories).
+             * @default 14
+             */
+            auto_resolve_days: number;
+            /**
+             * Sentiment Weight
+             * @description How much a strong verified sentiment can raise a story's rank in the briefs (0: sentiment is not used for ranking).
+             * @default 0.25
+             */
+            sentiment_weight: number;
             /**
              * Indirect Alert Min Severity
              * @description A story that reaches its holding only through a competitor, supplier, customer or watch topic alerts only from this severity up (direct links alert from 1).
@@ -25640,7 +25871,7 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "news_translation" | "news_search_leads" | "news_extract" | "news_impact" | "news_framing" | "news_claims" | "news_thesis" | "news_brief" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier" | "ir_discovery_search" | "ir_discovery_approve" | "web_gap_search" | "web_fact_approve" | "web_domain_tier" | "exposure_inputs" | "exposure_hs_mapping" | "dependency_extract" | "dependency_approve" | "listing_approval" | "peer_approval";
+            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "news_translation" | "news_search_leads" | "news_triage" | "news_sentiment" | "news_theme" | "news_extract" | "news_impact" | "news_framing" | "news_claims" | "news_thesis" | "news_brief" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier" | "ir_discovery_search" | "ir_discovery_approve" | "web_gap_search" | "web_fact_approve" | "web_domain_tier" | "exposure_inputs" | "exposure_hs_mapping" | "dependency_extract" | "dependency_approve" | "listing_approval" | "peer_approval";
             /** Title */
             title: string;
             /** Description */
@@ -28812,6 +29043,16 @@ export interface components {
             /** Check Reason */
             check_reason?: string | null;
         };
+        /** SentimentResult */
+        SentimentResult: {
+            /** Aspects */
+            aspects?: components["schemas"]["Aspect"][];
+            /**
+             * Intensity
+             * @default 0
+             */
+            intensity: number;
+        };
         /**
          * SeriesEffect
          * @description Exposure-weighted latest change of one country series: sum of weight x (latest minus
@@ -30360,6 +30601,7 @@ export interface components {
             claims?: components["schemas"]["ClaimsOut"] | null;
             market?: components["schemas"]["MarketContext"] | null;
             thesis?: components["schemas"]["ThesisOut"] | null;
+            sentiment?: components["schemas"]["SentimentResult"] | null;
             /**
              * Models
              * @description The model behind each technique that used one.
@@ -30904,6 +31146,16 @@ export interface components {
             regions: string[];
             /** Flag */
             flag: ("spike" | "spread") | null;
+            /**
+             * Tone
+             * @description GDELT's average tone of worldwide coverage of the theme that day (negative below zero); null when GDELT is off or has no data.
+             */
+            tone?: number | null;
+            /**
+             * Attention
+             * @description GDELT's share of monitored coverage the theme took that day.
+             */
+            attention?: number | null;
         };
         /** ThemeDefinition */
         ThemeDefinition: {
@@ -33458,47 +33710,6 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
-        /** FeedbackIn */
-        steward__news__read_analysis__FeedbackIn: {
-            /**
-             * Target
-             * @enum {string}
-             */
-            target: "item" | "story" | "claim" | "brief_line";
-            /** Target Id */
-            target_id: string;
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "wrong_entity" | "duplicate" | "misread" | "missing_source" | "useful" | "not_useful";
-            /** Note */
-            note?: string | null;
-        };
-        /** FeedbackOut */
-        steward__news__read_analysis__FeedbackOut: {
-            /**
-             * Target
-             * @enum {string}
-             */
-            target: "item" | "story" | "claim" | "brief_line";
-            /** Target Id */
-            target_id: string;
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "wrong_entity" | "duplicate" | "misread" | "missing_source" | "useful" | "not_useful";
-            /** Note */
-            note?: string | null;
-            /** Id */
-            id: number;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-        };
         /** StakeChangeOut */
         steward__ownership__control_stakes_read__StakeChangeOut: {
             /** Change Type */
@@ -33532,88 +33743,6 @@ export interface components {
             issues: number;
             /** Note */
             note?: string | null;
-        };
-        /** FeedbackIn */
-        steward__verify__feedback__FeedbackIn: {
-            /**
-             * Target Kind
-             * @enum {string}
-             */
-            target_kind: "fact" | "verdict" | "alert" | "news_item" | "story" | "report_sentence";
-            /**
-             * Target Id
-             * @description The fact, verdict, alert, news item, story or report id.
-             */
-            target_id: number;
-            /**
-             * Sentence Path
-             * @description Report sentences only: where it sits in the report body, e.g. 'overview/0', 'sections/2/summary/1' (digest) or 'sentences/3' (impact note).
-             */
-            sentence_path?: string | null;
-            /**
-             * Rating
-             * @enum {string}
-             */
-            rating: "wrong" | "irrelevant" | "useful";
-            /** Note */
-            note?: string | null;
-            /**
-             * Add To Eval
-             * @description With rating 'wrong' on a fact or news item: add it to the golden or labelled evaluation set with the corrected value or label.
-             * @default false
-             */
-            add_to_eval: boolean;
-            /**
-             * Corrected Value
-             * @description Facts: the right value, in the fact's printed scale.
-             */
-            corrected_value?: number | string | null;
-            /**
-             * Corrected Value As Written
-             * @description Facts added to the golden set: the right number exactly as printed, when it differs from the stored one (e.g. '94,036').
-             */
-            corrected_value_as_written?: string | null;
-            /**
-             * Corrected Snippet
-             * @description Facts added to the golden set: the document passage that states the right number, when the stored snippet does not contain it.
-             */
-            corrected_snippet?: string | null;
-            corrected_label?: components["schemas"]["NewsLabel"] | null;
-        };
-        /** FeedbackOut */
-        steward__verify__feedback__FeedbackOut: {
-            /** Id */
-            id: number;
-            /**
-             * Target Kind
-             * @enum {string}
-             */
-            target_kind: "fact" | "verdict" | "alert" | "news_item" | "story" | "report_sentence";
-            /** Target Id */
-            target_id: number;
-            /** Sentence Path */
-            sentence_path: string | null;
-            /**
-             * Rating
-             * @enum {string}
-             */
-            rating: "wrong" | "irrelevant" | "useful";
-            /** Note */
-            note: string | null;
-            /** Source Hosts */
-            source_hosts: string[];
-            /**
-             * Effects
-             * @description What the feedback did: quarantined fact, verdict job, trust scores, eval candidate.
-             */
-            effects: {
-                [key: string]: unknown;
-            };
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
         };
     };
     responses: never;
@@ -36837,7 +36966,7 @@ export interface operations {
     get_briefs: {
         parameters: {
             query?: {
-                kind?: ("morning" | "weekly" | "holding") | null;
+                kind?: ("morning" | "weekly" | "holding" | "region" | "theme") | null;
                 ticker?: string | null;
                 limit?: number;
             };
@@ -36968,7 +37097,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["steward__news__read_analysis__FeedbackOut"][];
+                    "application/json": components["schemas"]["NewsFeedbackOut"][];
                 };
             };
             /** @description Validation Error */
@@ -36991,7 +37120,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["steward__news__read_analysis__FeedbackIn"];
+                "application/json": components["schemas"]["NewsFeedbackIn"];
             };
         };
         responses: {
@@ -37001,7 +37130,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["steward__news__read_analysis__FeedbackOut"];
+                    "application/json": components["schemas"]["NewsFeedbackOut"];
                 };
             };
             /** @description Validation Error */
@@ -38027,7 +38156,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["steward__verify__feedback__FeedbackOut"][];
+                    "application/json": components["schemas"]["FeedbackOut"][];
                 };
             };
             /** @description Validation Error */
@@ -38050,7 +38179,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["steward__verify__feedback__FeedbackIn"];
+                "application/json": components["schemas"]["FeedbackIn"];
             };
         };
         responses: {
@@ -38060,7 +38189,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["steward__verify__feedback__FeedbackOut"];
+                    "application/json": components["schemas"]["FeedbackOut"];
                 };
             };
             /** @description Validation Error */

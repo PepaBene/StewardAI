@@ -369,6 +369,36 @@ What is built is tested against hand-written fake model answers and a real Postg
 - The full backend regression (only the news tests ran).
 - Nothing was exercised against a live model, a live database with real stories, or a browser.
 
+### Gap closure pass (2026-10-10)
+
+A second pass closed the gaps that need only code, tests against fakes and a local Postgres. Nothing in it ran against a live model or live source.
+
+**Closed (code, tests, rollback proven):**
+- Rollback files for the five earlier news migrations and for `20261031100000_news_gap_closure`; `test_lifecycle_phase8` applies and rolls back each.
+- Monthly caps for `news_analysis` (4 USD), `news_brief` (1.5) and `news_ai_search` (2.5) by default; `news_triage` is a budget job type.
+- `news_triage` job (off by default): relevance, topic, entities and a checked one-line gloss per wire item; relevance decides full text for unlinked items. The gloss is stored in `news_article.triage` but no page shows it yet.
+- 6.11 bounded sentiment: span-verified aspects, a bounded nudge on brief rank (`sentiment_weight`), and a panel on the Story page.
+- 6.1 extraction can go through `BatchCollector` (`batch_extraction`, off by default).
+- 6.3 attribute chains (shared sector, country, currency from the owner's classifications); fund constituents link stories to held funds.
+- 6.2 novelty scoped by event type as well as holding. 6.7 sector benchmark from `sector_benchmarks`.
+- 6.8 about 30 watch topics; GDELT daily tone and attention (`gdelt_themes`, off by default); weekly cited narrative per theme (`theme_narratives`); topic count nudges brief rank.
+- 6.9 an owner "confirmed" mark counts as a primary source for a thesis breach. 6.10 regional digest (`region` brief) and theme briefs; morning brief lines can alert (`brief_alert`, off).
+- N5 executives, brands and fund constituents as link kinds; rung-1 feed text is stored; stories confirmed or corroborated and quiet for `auto_resolve_days` are resolved.
+- Feedback schemas renamed `NewsFeedbackIn`/`NewsFeedbackOut`, removing the long generated names.
+- Web: Brief page has region and theme digests and theme tone; Story page shows attribute reach and sentiment; a "confirmed" mark; job form fields for the new settings.
+
+**Still open:**
+- Everything that needs a live model, key or network: the benchmark baseline and gate threshold, embedding tuning, AI-search cost, trafilatura accuracy, per-country filing latency and the live checks of DART, The Gazette, EDINET and Companies House; the 100-output human adjudication; a real labelled benchmark.
+- SEDAR+, Bundesanzeiger and FCA NSM; matching holdings to exchange filings by stock code is unproven.
+- Chat: embedding retrieval for `search_wire` and a live `web_news_search` tool. The system prompt was not changed; the tools are described in their own schemas, as `search_news` is.
+- Ops: latency p50 and p95, the effect of `indirect_alert_min_severity` on alert volume, a web page for `/news/ops`, an incident workflow, a scheduled report, CI wiring of the gate, golden sets for the model techniques.
+- N4: existing saved `event_rules` configs are not merged with the per-market rules; the EDINET document link still needs a key.
+- N5: no provenance backfill for items stored before `20261029110000`; no UI for the evidence view or close/reopen.
+- Marks do not yet feed the benchmark.
+- Web: no per-item translation toggle, no wire gloss, no Sources-page fetch-rung or latency columns, effects not moved into a data hook, no browser check of any page.
+- Framing `conflict` still does not change corroboration status (a decision, not a gap).
+- The full backend regression was not completed.
+
 Suggested order if time is short: N0 → N1 → N3 → N2 (rungs 1–4) → N6.1–6.4 → N7 Wire/Brief → rest.
 
 ## 11. Success measures and owner decisions
