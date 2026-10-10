@@ -73,10 +73,11 @@ def _d(value: float | Decimal | None) -> Decimal | None:
 
 
 async def _snapshots(pool: asyncpg.Pool) -> list[asyncpg.Record]:
-    """Daily account snapshots in the latest snapshot's base currency, oldest first."""
+    """Daily account snapshots in the latest snapshot's base currency, oldest first. The days
+    before the first Trading212 snapshot are the ones rebuilt from the ledger."""
     rows: list[asyncpg.Record] = await pool.fetch(
         "select snapshot_date, captured_at, total_base, cash_base, invested_base, account_currency,"
-        " base_currency, fx_rate, total_value, invested_value from public.account_snapshot"
+        " base_currency, fx_rate, total_value, invested_value from public.account_history"
         " order by snapshot_date"
     )
     if not rows:
@@ -847,7 +848,7 @@ async def sleeves_report(
     ledger = await _ledger(pool, account_currency, settings)
     rows = await pool.fetch(
         "select snapshot_date, ticker, quantity, current_price, fx_rate, value_base"
-        " from public.position_snapshot where base_currency = $1 order by snapshot_date",
+        " from public.position_history where base_currency = $1 order by snapshot_date",
         snapshots[-1]["base_currency"],
     )
     positions = [PositionDay(x["snapshot_date"], x["ticker"], x["quantity"], x["current_price"],

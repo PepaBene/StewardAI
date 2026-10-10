@@ -1,6 +1,7 @@
 -- Rollback for supabase/migrations/20261028100000_universe_prices_by_listing.sql.
 -- Run it in a transaction, newest migration first. The migration file itself is never edited.
 -- No data is touched: the view returns to matching bars by price_symbol only.
+-- Proven by apps/backend/tests/test_lifecycle_phase8.py (needs STEWARD_TEST_DATABASE_URL).
 create or replace view public.investment_universe with (security_invoker = true) as
 select
   i.t212_ticker                              as ticker,
