@@ -31,7 +31,7 @@ from pydantic import BaseModel, Field
 from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig, ThesisConfig
-from steward.fx.convert import normalise_currency
+from steward.fx.convert import normalise_currency, price_in_unit
 from steward.portfolio import exante as ea
 from steward.portfolio import trade_risk as tr
 from steward.portfolio.breaches import Finding, evaluate
@@ -41,7 +41,7 @@ from steward.portfolio.drift import (
     bucket_for,
     compute_drift,
 )
-from steward.portfolio.risk_tier import apply_tiers
+from steward.portfolio.risk_tier import apply_tiers, instrument_is_fund
 
 METHOD_VERSION = "allocator-1"
 MAX_STEPS = 60
@@ -414,11 +414,14 @@ async def allocate_deposit(pool: asyncpg.Pool, amount: float) -> AllocationPlan:
     bench = sorted(t for t in thesis_by if t not in held_values)
     new = await tr.load_new_series(pool, bench)
     names = await pool.fetch(
-        "select t212_ticker, instrument_type from public.instrument"
+        "select t212_ticker, instrument_type, security_type from public.instrument"
         " where t212_ticker = any($1::text[])",
         sorted(set(held_values) | set(new)),
     )
-    is_etf = {r["t212_ticker"]: (r["instrument_type"] or "").upper() == "ETF" for r in names}
+    is_etf = {
+        r["t212_ticker"]: instrument_is_fund(r["instrument_type"], r["security_type"])
+        for r in names
+    }
     probe = tr.book_after(book, {}, 0.0, new) if new else book
     strategy2 = await tr.candidate_tiers(pool, probe, strategy, sorted(new))
     tier_of = {t: b["risk"] for t, b in strategy2.classifications.items() if b.get("risk")}
@@ -528,12 +531,10 @@ def _candidate(
     )
     if target is not None and value is not None:
         price = price_local if price_local is not None else _local_price(book, ticker)
-        if (
-            price
-            and price > 0
-            and normalise_currency(target.currency)[0] == normalise_currency(currency)[0]
-        ):
-            ret = value / price - 1.0
+        # The price in the target's unit: a GBX quote against a GBP target is scaled by 100.
+        scaled = price_in_unit(price, currency, target.currency) if price and price > 0 else None
+        if scaled is not None and scaled > 0:
+            ret = value / scaled - 1.0
     return Candidate(ticker, held_name, currency, price_base, etf, held_value, ret)
 
 

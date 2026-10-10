@@ -22,8 +22,11 @@ from statistics import NormalDist
 import numpy as np
 import numpy.typing as npt
 
-METHOD_VERSION = "tail-1"
-EWMA_LAMBDA = 0.94
+METHOD_VERSION = "tail-2"
+# The same 26-week half-life as the covariance model, so the filtered estimates and the back-test
+# of the risk model test one volatility model (0.94 is RiskMetrics' decay for daily data).
+EWMA_HALF_LIFE_WEEKS = 26
+EWMA_LAMBDA = float(0.5 ** (1.0 / EWMA_HALF_LIFE_WEEKS))
 MIN_OBSERVATIONS = 52
 TAIL_GRID = 400  # points averaged over the tail for the Cornish-Fisher Expected Shortfall
 
@@ -118,6 +121,11 @@ def cornish_fisher(returns: Array, level: float) -> TailRisk | None:
     var = -(mean + sd * _cornish_fisher_quantile(alpha, skew, kurt))
     grid = (np.arange(TAIL_GRID) + 0.5) / TAIL_GRID * alpha
     quantiles = np.array([_cornish_fisher_quantile(float(u), skew, kurt) for u in grid])
+    # The expansion is valid only for moderate skew and kurtosis; outside that domain the
+    # quantile function folds over. A quantile that falls as the probability rises is no
+    # quantile, so there is no estimate rather than a plausible-looking wrong one.
+    if np.any(np.diff(quantiles) < -1e-12):
+        return None
     es = -(mean + sd * float(quantiles.mean()))
     return TailRisk(level, len(r), max(var, 0.0), max(es, var, 0.0))
 

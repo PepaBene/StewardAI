@@ -2191,7 +2191,7 @@
           "portfolio"
         ],
         "summary": "Get Risk Snapshots",
-        "description": "Saved copies of the risk reports with their method version, newest first. A report is\nsaved once per data date and method version, so a later change to a model does not rewrite\nwhat was shown.",
+        "description": "Saved copies of the risk reports with their method version, newest first. A report is\nsaved once per data date, method version and content, so a later change to a model does not\nrewrite what was shown.",
         "operationId": "get_risk_snapshots",
         "security": [
           {
@@ -2283,6 +2283,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Snapshot Id"
             }
           }
@@ -44601,6 +44603,12 @@
           "years": {
             "type": "integer",
             "title": "Years"
+          },
+          "start_drawdown": {
+            "type": "number",
+            "title": "Start Drawdown",
+            "description": "How far below its one-year peak today's book is; the paths start there.",
+            "default": 0.0
           },
           "probability": {
             "type": "number",
@@ -94653,6 +94661,12 @@
             "type": "string",
             "title": "Method"
           },
+          "independent_tail": {
+            "type": "number",
+            "title": "Independent Tail",
+            "description": "Expected number of non-overlapping periods in the tail (about n / horizon x (1 - level)); overlapping windows are not independent samples.",
+            "default": 0.0
+          },
           "var": {
             "type": "number",
             "title": "Var",
@@ -94701,7 +94715,7 @@
           "method_version": {
             "type": "string",
             "title": "Method Version",
-            "default": "tail-report-1"
+            "default": "tail-report-2"
           },
           "available": {
             "type": "boolean",
@@ -94814,7 +94828,7 @@
           "block_weeks": {
             "type": "number",
             "title": "Block Weeks",
-            "default": 8.0
+            "default": 4.0
           },
           "seed": {
             "type": "integer",

@@ -196,13 +196,13 @@ async def get_risk_snapshots(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> list[SnapshotRow]:
     """Saved copies of the risk reports with their method version, newest first. A report is
-    saved once per data date and method version, so a later change to a model does not rewrite
-    what was shown."""
+    saved once per data date, method version and content, so a later change to a model does not
+    rewrite what was shown."""
     return await list_snapshots(pool, kind, limit)
 
 
 @router.get("/portfolio/risk/snapshots/{snapshot_id}", tags=["portfolio"])
-async def get_risk_snapshot(pool: Pool, _owner: Owner, snapshot_id: int) -> dict[str, Any]:
+async def get_risk_snapshot(pool: Pool, _owner: Owner, snapshot_id: IdPath) -> dict[str, Any]:
     """One saved risk report exactly as it was shown."""
     payload = await get_snapshot(pool, snapshot_id)
     if payload is None:

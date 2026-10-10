@@ -94,7 +94,8 @@ def validate_book(book: ea.LoadedBook, strategy: StrategyConfig) -> ModelValidat
         return _unavailable("no position has enough history for the model")
     weights = np.array([p.value_base for p in usable])
     weights = weights / weights.sum()
-    series = np.column_stack([filled.column(p.ticker) for p in usable]) @ weights
+    # Simple returns, as the tail report uses: the weights apply to value, not to log growth.
+    series = np.expm1(np.column_stack([filled.column(p.ticker) for p in usable])) @ weights
     returns = [float(x) for x in series]
     sigmas = qv.rolling_ewma_sigma(returns, 26.0)
     tested = sum(s is not None for s in sigmas)

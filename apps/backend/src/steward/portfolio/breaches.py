@@ -188,7 +188,11 @@ async def record_breaches(
     config_version_id: int | None,
     now: dt.datetime,
     app_url: str | None = None,
+    unmeasured: frozenset[str] = frozenset(),
 ) -> BreachSummary:
+    """Open, refresh and clear breaches. An open breach whose key is (or starts with, before a
+    colon) one of `unmeasured` stays open: a measurement that failed this run says nothing about
+    whether the limit is still breached, and clearing it would re-alert on the next good run."""
     notify_stored = await load_active(pool, "notifications", NotificationsConfig)
     notify = notify_stored.body if notify_stored else NotificationsConfig()
     summary = BreachSummary([], [], [], [])
@@ -257,6 +261,9 @@ async def record_breaches(
             summary.alerts.append(f"{f.key}: {created.explanation}")
     for key, row_id in open_rows.items():
         if key not in current:
+            if any(key == p or key.startswith(p + ":") for p in unmeasured):
+                summary.still_open.append(key)
+                continue
             await pool.execute(
                 "update public.portfolio_breach set cleared_at = $2 where id = $1", row_id, now
             )

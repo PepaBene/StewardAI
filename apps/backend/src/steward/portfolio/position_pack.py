@@ -163,7 +163,7 @@ async def position_risk_pack(pool: asyncpg.Pool, ticker: str) -> PositionRiskPac
         log.exception("replay for the position pack failed")
     es_part: float | None = None
     try:
-        tail = tail_report(book, strategy)
+        tail = tail_report(book, strategy, contributions_only=True)
         es_part = next((c.part_of_es for c in tail.contributions if c.ticker == ticker), None)
     except Exception:
         log.exception("tail report for the position pack failed")

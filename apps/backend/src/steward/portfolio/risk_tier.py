@@ -40,6 +40,23 @@ class Fundamentals:
 
 MIN_PROFIT_YEARS = 3
 
+# `instrument.instrument_type` is empty for the broker's instruments; `security_type` (from the
+# identity lookup) is what is stored. Either one can say what an instrument is.
+_STOCK_SECURITY_TYPES = ("common stock", "depositary receipt")
+_FUND_SECURITY_TYPES = ("mutual fund", "etf", "etp", "etc")
+
+
+def instrument_is_stock(instrument_type: str | None, security_type: str | None) -> bool:
+    return (instrument_type or "").upper() == "STOCK" or (
+        (security_type or "").lower() in _STOCK_SECURITY_TYPES
+    )
+
+
+def instrument_is_fund(instrument_type: str | None, security_type: str | None) -> bool:
+    return (instrument_type or "").upper() == "ETF" or (
+        (security_type or "").lower() in _FUND_SECURITY_TYPES
+    )
+
 
 @dataclass(frozen=True)
 class DerivedTier:
@@ -87,6 +104,8 @@ def derive_tier(
             and profitable is True
         ):
             return make("core", "large, profitable and calm")
+        if cap is None and profitable is None:
+            return make("growth", "no fundamentals are stored, so it cannot qualify as core")
         return make("growth", "meets neither the speculative nor the core criteria")
     if volatility is None:
         return None
@@ -141,7 +160,8 @@ def _number(value: Any) -> float | None:
 
 async def load_fundamentals(pool: asyncpg.Pool, tickers: Sequence[str]) -> dict[str, Fundamentals]:
     """Market cap and profitability per ticker from the stored fundamentals (Alpha Vantage,
-    in USD, then SEC net income). A ticker with no row is treated as a fund."""
+    in USD, then SEC net income). A ticker with no row is a fund unless the broker lists it as
+    a stock."""
     rows = await pool.fetch(
         "select ticker, source, figures from public.fundamentals"
         " where ticker = any($1::text[]) and source in ('alphavantage', 'sec')",
@@ -171,7 +191,47 @@ async def load_fundamentals(pool: asyncpg.Pool, tickers: Sequence[str]) -> dict[
             else (net_income > 0 if net_income is not None else None)
         )
         out[ticker] = Fundamentals(is_stock, cap, profitable, losses.get(ticker))
+    # A stock with no fundamentals row is still a stock: judged as a fund it could be called
+    # "core" on volatility alone. The broker's instrument type decides.
+    bare = [t for t in tickers if t not in out]
+    if bare:
+        try:
+            kinds = await pool.fetch(
+                "select t212_ticker, instrument_type, security_type from public.instrument"
+                " where t212_ticker = any($1::text[])",
+                bare,
+            )
+            for r in kinds:
+                if instrument_is_stock(r["instrument_type"], r["security_type"]):
+                    out[r["t212_ticker"]] = Fundamentals(
+                        True, None, None, losses.get(r["t212_ticker"])
+                    )
+        except Exception as exc:  # the tier must not depend on this
+            log.warning("could not read instrument types for the tiers: %s", exc)
     return out
+
+
+# Annual (about one year, fiscal-year) net results of the 10-K and 20-F filings inside the SEC
+# companyfacts payload, one value per year-end (the latest filed).
+_COMPANYFACTS_NET_INCOME = """
+select distinct on (ticker, period_end) ticker, period_end, value from (
+  select f.ticker, (e->>'end')::date as period_end, (e->>'val')::float8 as value,
+         e->>'filed' as filed
+  from public.fundamentals f
+  cross join lateral (
+    select jsonb_path_query(f.raw::jsonb, p::jsonpath) as e
+    from unnest(array[
+      '$.companyfacts.facts."us-gaap".NetIncomeLoss.units.*[*]',
+      '$.companyfacts.facts."us-gaap".ProfitLoss.units.*[*]',
+      '$.companyfacts.facts."ifrs-full".ProfitLoss.units.*[*]'
+    ]) as p
+  ) x
+  where f.source = 'sec' and f.ticker = any($1::text[])
+    and e->>'fp' = 'FY' and e->>'form' in ('10-K', '20-F', '10-K/A', '20-F/A') and e ? 'start'
+    and (e->>'end')::date - (e->>'start')::date between 350 and 380
+) t
+order by ticker, period_end, filed desc
+"""
 
 
 async def _loss_years(pool: asyncpg.Pool, tickers: Sequence[str]) -> dict[str, int]:
@@ -192,9 +252,19 @@ async def _loss_years(pool: asyncpg.Pool, tickers: Sequence[str]) -> dict[str, i
     except Exception as exc:  # the tier must not depend on this
         log.warning("could not read annual results for the tiers: %s", exc)
         return {}
-    per: dict[str, list[tuple[Any, float]]] = {}
+    # The filed facts hold only the latest annual report (three years of results). The SEC
+    # companyfacts payload kept with the fundamentals goes back much further, so it fills the
+    # earlier years; where both give a year, the filed fact wins.
+    by_year: dict[str, dict[Any, float]] = {}
     for r in rows:
-        per.setdefault(r["ticker"], []).append((r["period_end"], float(r["value"])))
+        by_year.setdefault(r["ticker"], {})[r["period_end"]] = float(r["value"])
+    try:
+        history = await pool.fetch(_COMPANYFACTS_NET_INCOME, list(tickers))
+        for r in history:
+            by_year.setdefault(r["ticker"], {}).setdefault(r["period_end"], float(r["value"]))
+    except Exception as exc:  # the filed facts alone still answer
+        log.warning("could not read the stored companyfacts for the tiers: %s", exc)
+    per = {t: list(years.items()) for t, years in by_year.items()}
     return {
         t: sum(1 for _, v in sorted(vals)[-5:] if v < 0)
         for t, vals in per.items()
@@ -245,13 +315,28 @@ async def derive_for_book(
     daily_closes: Mapping[str, Sequence[tuple[Any, float]]],
     tickers: Sequence[str],
     strategy: StrategyConfig,
+    changes: list[str] | None = None,
 ) -> dict[str, DerivedTier]:
     """Work out, store and return the tiers of the book's holdings (nothing when the strategy
-    does not ask for them)."""
+    does not ask for them). A holding whose tier differs from the stored one is described in
+    `changes`: with derived tiers the volatility criterion re-tiers it silently, so the change
+    itself is what the owner is told to look at (principle D6)."""
     if not strategy.risk.auto_tiers:
         return {}
     facts = await load_fundamentals(pool, tickers)
     vols = volatilities_of(daily_closes)
     tiers = derive_tiers({t: vols.get(t) for t in tickers}, facts, strategy.risk)
+    if changes is not None:
+        try:
+            before = {
+                r["ticker"]: r["tier"]
+                for r in await pool.fetch("select ticker, tier from public.holding_risk_tier")
+            }
+        except Exception as exc:
+            log.warning("could not read the stored risk tiers: %s", exc)
+            before = {}
+        for t, d in sorted(tiers.items()):
+            if t in before and before[t] != d.tier:
+                changes.append(f"{t}: {before[t]} to {d.tier} ({d.reason})")
     await save_tiers(pool, tiers)
     return tiers

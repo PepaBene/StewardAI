@@ -16,10 +16,10 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
-METHOD_VERSION = "bootstrap-1"
+METHOD_VERSION = "bootstrap-2"
 DEFAULT_PATHS = 10_000
 DEFAULT_SEED = 20261010
-DEFAULT_BLOCK = 8.0  # weeks, the mean block length
+DEFAULT_BLOCK = 4.0  # weeks, the mean block length (the plan's 20 trading days)
 TAIL = 0.05  # the share of worst paths averaged for Conditional Drawdown at Risk
 MIN_WEEKS = 52
 
@@ -62,21 +62,28 @@ def stationary_indices(
     return idx
 
 
-def max_drawdowns(growth: Array) -> Array:
+def peak_start(start_drawdown: float) -> float:
+    """The running peak on day 0 for a book that is `start_drawdown` below its peak today
+    (value 1 today, so the peak was 1 / (1 - start_drawdown))."""
+    return 1.0 / (1.0 - min(max(start_drawdown, 0.0), 0.99))
+
+
+def max_drawdowns(growth: Array, start_drawdown: float = 0.0) -> Array:
     """Largest peak-to-trough fall of each path (positive fraction); `growth` is the path of
-    values starting from 1, one row per path."""
-    peaks = np.maximum.accumulate(
-        np.concatenate([np.ones((len(growth), 1)), growth], axis=1), axis=1
-    )
+    values starting from 1, one row per path. A positive `start_drawdown` puts the peak above
+    the starting value, so the book that is already down needs a smaller further fall."""
     path = np.concatenate([np.ones((len(growth), 1)), growth], axis=1)
+    peaks = np.maximum(np.maximum.accumulate(path, axis=1), peak_start(start_drawdown))
     return (1.0 - path / peaks).max(axis=1)
 
 
-def _recovery_weeks(growth: Array, threshold: float) -> tuple[float | None, float | None]:
+def _recovery_weeks(
+    growth: Array, threshold: float, start_drawdown: float = 0.0
+) -> tuple[float | None, float | None]:
     """Among paths that fell `threshold` below a peak: the median weeks from the deepest point of
     that fall back to the peak, and the share of such paths that recovered before the end."""
     path = np.concatenate([np.ones((len(growth), 1)), growth], axis=1)
-    peaks = np.maximum.accumulate(path, axis=1)
+    peaks = np.maximum(np.maximum.accumulate(path, axis=1), peak_start(start_drawdown))
     fall = 1.0 - path / peaks
     waits: list[int] = []
     hit = 0
@@ -101,8 +108,10 @@ def simulate(
     paths: int = DEFAULT_PATHS,
     seed: int = DEFAULT_SEED,
     block: float = DEFAULT_BLOCK,
+    start_drawdown: float = 0.0,
 ) -> BootstrapResult | None:
-    """Simulate `paths` futures of `weeks` weeks from simple weekly returns of the portfolio."""
+    """Simulate `paths` futures of `weeks` weeks from simple weekly returns of the portfolio.
+    `start_drawdown` is how far below its peak the book is today (the peak counts from there)."""
     r = np.asarray(weekly_returns, dtype=float)
     r = r[~np.isnan(r)]
     if len(r) < MIN_WEEKS or weeks < 1:
@@ -110,10 +119,10 @@ def simulate(
     rng = np.random.default_rng(seed)
     idx = stationary_indices(len(r), weeks, paths, block, rng)
     growth = np.cumprod(1.0 + r[idx], axis=1)
-    drawdown = max_drawdowns(growth)
+    drawdown = max_drawdowns(growth, start_drawdown)
     worst = np.sort(drawdown)[::-1]
     count = max(1, round(TAIL * paths))
-    wait, share = _recovery_weeks(growth, threshold)
+    wait, share = _recovery_weeks(growth, threshold, start_drawdown)
     levels = {"p50": 0.50, "p90": 0.90, "p95": 0.95, "p99": 0.99}
     terminal = growth[:, -1]
     return BootstrapResult(

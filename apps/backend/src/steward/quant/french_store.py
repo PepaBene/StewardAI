@@ -8,6 +8,7 @@ coverage (first date, last date, days per region and factor) always says what is
 
 import datetime as dt
 import logging
+import zipfile
 
 import asyncpg
 import httpx
@@ -78,12 +79,19 @@ async def refresh_factors(ctx: JobContext, http: httpx.AsyncClient) -> None:
                 response = await http.get(file.url)
                 response.raise_for_status()
                 factors = french.parse_zip(response.content)
-            except (httpx.HTTPError, french.FrenchFormatError, OSError) as exc:
+            except (
+                httpx.HTTPError,
+                french.FrenchFormatError,
+                zipfile.BadZipFile,  # a 200 with an HTML maintenance page instead of the zip
+                ValueError,  # includes undecodable text
+                OSError,
+            ) as exc:
                 step.detail["error"] = str(exc)[:300]
                 log.warning("factor file %s failed: %s", file.name, exc)
                 continue
             step.detail["rows"] = await store_factors(ctx.pool, file.region, factors)
-            step.detail["last_date"] = str(max(s[-1][0] for s in factors.values()))
+            if any(factors.values()):
+                step.detail["last_date"] = str(max(s[-1][0] for s in factors.values() if s))
 
 
 async def factor_returns_handler(ctx: JobContext) -> None:

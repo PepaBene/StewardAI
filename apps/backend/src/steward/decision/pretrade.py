@@ -37,6 +37,7 @@ from steward.config.strategy import StrategyConfig
 from steward.decision import covariance
 from steward.decision.covariance import CovModel
 from steward.decision.lot_impact import SaleImpact
+from steward.fx.convert import price_in_unit
 from steward.portfolio.breaches import Finding, evaluate
 from steward.portfolio.drift import DriftReport
 
@@ -201,9 +202,17 @@ def expected_return(f: TickerFacts) -> tuple[float | None, str | None]:
         return None, "the thesis has no sell target or scenarios"
     if f.price is None or f.price <= 0:
         return None, "no current price"
+    price = f.price
     if f.target_currency and f.quote_currency and f.target_currency != f.quote_currency:
-        return None, f"the target is in {f.target_currency} but the price is in {f.quote_currency}"
-    return value / f.price - 1, None
+        # GBX against GBP is one currency in two units; anything else cannot be compared.
+        scaled = price_in_unit(f.price, f.quote_currency, f.target_currency)
+        if scaled is None or scaled <= 0:
+            return (
+                None,
+                f"the target is in {f.target_currency} but the price is in {f.quote_currency}",
+            )
+        price = scaled
+    return value / price - 1, None
 
 
 def _pct(x: float) -> str:

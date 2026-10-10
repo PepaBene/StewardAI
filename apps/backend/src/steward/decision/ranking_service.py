@@ -166,6 +166,8 @@ def _row(
         vol = row.risk.volatility_1y
         if cash_rate is None:
             row.reasons.append("no cash rate is stored for the base currency")
+        elif vol is not None and vol == 0:  # a missing volatility already has its reason above
+            row.reasons.append("the one-year volatility is zero (a flat price series): no score")
         elif vol:
             row.score = rk.risk_adjusted_score(row.returns.annualized, cash_rate, vol)
             row.score_basis = "(annualised expected return - cash rate) / one-year volatility"
@@ -440,9 +442,31 @@ async def _switch_line(
         share = asked if action != "hold" else 0.0
     elif action == "partial":
         sell, buy = sizes(share)
-        result = await _run(pool, owner_id, held.ticker, idea.ticker, sell, buy)
-        gap_check = _check(result, "switch.gap")
-        values = gap_check.values if gap_check else values
+        try:
+            partial = await _run(pool, owner_id, held.ticker, idea.ticker, sell, buy)
+        except Exception as exc:  # one failing pair must not fail the whole scan
+            log.warning("switch %s -> %s (partial) failed: %s", held.ticker, idea.ticker, exc)
+            return rk.SwitchLine(
+                **base, **empty, action="hold", share=0.0, sell_value=value, buy_value=0.0,
+                remainder=value, flagged=False,
+                reasons=[f"the pre-trade evaluation at the partial size failed: {exc}"],
+            )  # fmt: skip
+        partial_check = _check(partial, "switch.gap")
+        pv = partial_check.values if partial_check else {}
+        new_gap, new_hurdle = pv.get("gap"), pv.get("hurdle")
+        if isinstance(new_gap, float) and isinstance(new_hurdle, float):
+            # The tax and costs of the smaller sale change the hurdle (it may fall under the
+            # annual exemption): judge the action on the partial run's own figures.
+            result, gap_check, values = partial, partial_check, pv
+            gap, hurdle = new_gap, new_hurdle
+            action, _ = rk.switch_action(gap, hurdle)
+            if action == "hold":
+                share = 0.0
+                reasons.append("at the partial size the gap no longer clears the hurdle")
+            else:
+                action = "partial"
+        else:
+            result, gap_check, values = partial, partial_check, pv or values
     tax = values.get("tax") if isinstance(values.get("tax"), float) else None
     costs = values.get("costs") if isinstance(values.get("costs"), float) else None
     portfolio = _check(result, "switch.portfolio")

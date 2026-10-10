@@ -10,6 +10,7 @@ much to sell to reach the trim weight, in money and whole shares.
 
 from __future__ import annotations
 
+import datetime as dt
 import math
 from typing import Literal
 
@@ -20,6 +21,7 @@ from steward.config.store import load_active
 from steward.config.strategy import PositionWeightRule, StrategyConfig
 from steward.config.thesis import ThesesConfig
 from steward.portfolio import exante as ea
+from steward.portfolio.risk_tier import instrument_is_fund
 from steward.quant import sizing as sz
 
 METHOD_VERSION = "concentration-1"
@@ -145,18 +147,29 @@ def assess(
     )
 
 
-async def average_monthly_deposit(pool: asyncpg.Pool) -> float | None:
-    """Deposits over the last twelve months divided by twelve, from the stored cash movements
-    (account currency, which is the base currency for this owner); None without any."""
+async def average_monthly_deposit(
+    pool: asyncpg.Pool, base_currency: str | None = None
+) -> float | None:
+    """Deposits over the last twelve months divided by the months the account has existed (at
+    most twelve, at least one), from the stored cash movements; None without any. Only deposits
+    in the base currency count when it is given: an amount in another currency is not converted."""
     row = await pool.fetchrow(
-        "select coalesce(sum(amount), 0) as total, count(*) as n from public.transaction"
+        "select coalesce(sum(amount), 0) as total, count(*) as n,"
+        " (select min(occurred_at) from public.transaction) as first_seen"
+        " from public.transaction"
         " where type = 'cash' and upper(subtype) = 'DEPOSIT'"
+        " and ($2::text is null or currency is null or upper(currency) = upper($2))"
         " and occurred_at >= now() - make_interval(days => $1)",
         DEPOSIT_LOOKBACK_DAYS,
+        base_currency,
     )
     if row is None or not row["n"]:
         return None
-    return float(row["total"]) / 12.0
+    months = 12.0
+    if row["first_seen"] is not None:
+        age_days = (dt.datetime.now(dt.UTC) - row["first_seen"]).days
+        months = min(12.0, max(1.0, age_days / 30.44))
+    return float(row["total"]) / months
 
 
 async def concentration_report(
@@ -182,11 +195,11 @@ async def concentration_report(
     source = "request"
     deposit = monthly_deposit
     if deposit is None:
-        deposit = await average_monthly_deposit(pool)
+        deposit = await average_monthly_deposit(pool, book.base_currency)
         source = "average of the last 12 months of deposits" if deposit is not None else "none"
         deposit = deposit or 0.0
     rows = await pool.fetch(
-        "select p.ticker, p.quantity, p.value_base, i.instrument_type"
+        "select p.ticker, p.quantity, p.value_base, i.instrument_type, i.security_type"
         " from public.position_snapshot p left join public.instrument i on i.t212_ticker = p.ticker"
         " where p.snapshot_date = (select max(snapshot_date) from public.position_snapshot)"
     )
@@ -201,6 +214,13 @@ async def concentration_report(
         if isinstance(r, PositionWeightRule) and r.ticker is None
         for t in r.exclude
     }
+    # Weights on the strategy's basis, as the drift rules judge them: of the invested value when
+    # `weight_basis` is "invested", else of the whole portfolio.
+    denominator = (
+        sum(p.value_base for p in book.positions)
+        if strategy.weight_basis == "invested"
+        else book.total_value
+    )
     for p in sorted(book.positions, key=lambda x: -x.value_base):
         r = info.get(p.ticker)
         qty = float(r["quantity"] or 0) if r else 0.0
@@ -208,7 +228,7 @@ async def concentration_report(
             p.ticker,
             p.name,
             p.value_base,
-            book.total_value,
+            denominator,
             used_cap,
             deposit,
             trim_to,
@@ -218,7 +238,9 @@ async def concentration_report(
         )
         if found is None:
             continue
-        if p.ticker in listed or (r is not None and (r["instrument_type"] or "").upper() == "ETF"):
+        if p.ticker in listed or (
+            r is not None and instrument_is_fund(r["instrument_type"], r["security_type"])
+        ):
             exempt.append(p.ticker)
             continue
         out.append(found)

@@ -127,6 +127,25 @@ def test_a_riskier_book_has_a_higher_drawdown_probability() -> None:
     assert wild.probability_of_drawdown > calm.probability_of_drawdown + 0.3
 
 
+def test_a_book_already_below_its_peak_has_a_higher_drawdown_probability() -> None:
+    r = _normal(900, seed=7)
+    fresh = bs.simulate(r, 104, threshold=0.20, paths=3000, seed=3)
+    down = bs.simulate(r, 104, threshold=0.20, paths=3000, seed=3, start_drawdown=0.12)
+    assert fresh is not None and down is not None
+    assert down.probability_of_drawdown > fresh.probability_of_drawdown
+    # Already past the threshold: every path counts.
+    gone = bs.simulate(r, 52, threshold=0.20, paths=500, seed=3, start_drawdown=0.25)
+    assert gone is not None and gone.probability_of_drawdown == 1.0
+
+
+def test_current_drawdown_is_measured_from_the_highest_of_the_last_year() -> None:
+    from steward.portfolio.tail import current_drawdown
+
+    assert current_drawdown(np.array([0.10, 0.10, -0.20, -0.05])) == pytest.approx(1 - 0.8 * 0.95)
+    assert current_drawdown(np.array([0.01, 0.02])) == 0.0
+    assert current_drawdown(np.array([])) == 0.0
+
+
 def test_downside_statistics_by_hand() -> None:
     r = np.array([0.02, -0.01, 0.03, -0.02, 0.01] * 6)  # 30 periods
     out = dn.downside_stats(r, periods_per_year=52)

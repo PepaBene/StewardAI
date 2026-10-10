@@ -124,6 +124,34 @@ class RiskInputs:
     unavailable: dict[str, str] = field(default_factory=dict)
 
 
+# Which finding keys each unavailable measurement stands behind (a key matches a prefix when it
+# equals it or continues after a colon).
+_UNAVAILABLE_KEYS: dict[str, tuple[str, ...]] = {
+    "volatility": ("risk:volatility",),
+    "beta": ("risk:beta",),
+    "drawdown": ("risk:drawdown", "risk:drawdown_warning"),
+    "correlation": ("risk:correlation",),
+    "volatility_forecast": ("risk:volatility_forecast", "risk:stock_share", "risk:tier"),
+    "tier_risk": ("risk:tier_budget",),
+    "effective_bets": ("risk:effective_bets",),
+    "es": ("risk:es",),
+    "drawdown_probability": ("risk:drawdown_probability",),
+    "thesis_volatility": ("thesis:volatility",),
+    "var": ("risk:var",),
+    "tracking_error": ("risk:tracking_error",),
+    "stress": ("risk:stress",),
+    "credit_spread": ("risk:credit_spread",),
+    "valuation": ("risk:valuation",),
+    "xray": ("risk:sector", "risk:country", "risk:overlap"),
+    "overlap": ("risk:overlap",),
+}
+
+
+def unmeasured_keys(unavailable: dict[str, str]) -> frozenset[str]:
+    """Finding-key prefixes whose measurement failed this run: their open breaches are kept."""
+    return frozenset(k for name in unavailable for k in _UNAVAILABLE_KEYS.get(name, ()))
+
+
 def _pct(x: float) -> str:
     return f"{x * 100:.2f}%"
 
@@ -570,34 +598,69 @@ async def gather_risk_inputs(
         or limits.tier_speculative_volatility is not None
         or limits.tier_core_max_volatility is not None
         or limits.max_es_95_month is not None
+        or limits.max_stock_risk_share is not None
+        or limits.thesis_volatility_multiple is not None
         or (limits.max_drawdown_probability is not None and limits.max_drawdown is not None)
     )
     if wants_book:
         # One load of the weekly base-currency return matrix serves the correlation limit and
         # the ex-ante model.
+        from steward.portfolio.risk_snapshots import save_snapshot
+
+        def unmeasured(names: tuple[str, ...], exc: Exception) -> None:
+            for name in names:
+                inputs.unavailable.setdefault(name, str(exc))
+
+        # Separate steps: one failing must not hide what the others measured, and each names
+        # what it could not measure so its open breaches stay open.
+        risk_report = None
         try:
             from steward.portfolio.exante import book_from_positions
 
             book = book or await book_from_positions(pool, positions)
-            risk_report = _book_inputs(book, strategy, inputs)
-            from steward.portfolio.validation import validate_book
-
-            inputs.model_check = validate_book(book, strategy).review_item
-            tail = _tail_inputs(book, strategy, inputs)
-            if tail.available:
-                from steward.portfolio.risk_snapshots import save_snapshot as save_tail
-
-                await save_tail(pool, "tail", tail, tail.as_of, tail.method_version)
-            if risk_report.volatility_forecast is not None:
-                from steward.portfolio.risk_snapshots import save_snapshot
-
-                await save_snapshot(
-                    pool, "ex_ante", risk_report, risk_report.as_of, risk_report.method_version
-                )
         except Exception as exc:
-            log.warning("ex-ante measurement failed: %s", exc)
-            for name in ("correlation", "volatility_forecast", "tier_risk", "effective_bets"):
-                inputs.unavailable.setdefault(name, str(exc))
+            log.warning("book load failed: %s", exc)
+            unmeasured(
+                (
+                    "correlation",
+                    "volatility_forecast",
+                    "tier_risk",
+                    "effective_bets",
+                    "es",
+                    "drawdown_probability",
+                    "thesis_volatility",
+                ),
+                exc,
+            )
+        if book is not None:
+            try:
+                risk_report = _book_inputs(book, strategy, inputs)
+            except Exception as exc:
+                log.warning("ex-ante measurement failed: %s", exc)
+                unmeasured(
+                    ("correlation", "volatility_forecast", "tier_risk", "effective_bets"), exc
+                )
+            try:
+                from steward.portfolio.validation import validate_book
+
+                inputs.model_check = validate_book(book, strategy).review_item
+            except Exception as exc:
+                log.warning("model validation failed: %s", exc)
+            try:
+                tail = _tail_inputs(book, strategy, inputs)
+            except Exception as exc:
+                log.warning("tail measurement failed: %s", exc)
+                unmeasured(("es", "drawdown_probability"), exc)
+                tail = None
+            try:
+                if tail is not None and tail.available:
+                    await save_snapshot(pool, "tail", tail, tail.as_of, tail.method_version)
+                if risk_report is not None and risk_report.volatility_forecast is not None:
+                    await save_snapshot(
+                        pool, "ex_ante", risk_report, risk_report.as_of, risk_report.method_version
+                    )
+            except Exception as exc:
+                log.warning("risk snapshot not saved: %s", exc)
     await _drawdown_context(pool, strategy, positions, inputs, book)
     if limits.thesis_volatility_multiple is not None and book is not None:
         await _thesis_volatility(pool, limits.thesis_volatility_multiple, book, inputs)
@@ -769,7 +832,7 @@ async def _xray_inputs(
 
 
 def _tail_inputs(
-    book: "LoadedBook", strategy: StrategyConfig, inputs: RiskInputs
+    book: "LoadedBook", strategy: StrategyConfig, inputs: RiskInputs, *, full: bool = True
 ) -> "TailReport":
     """The tail report of the loaded book, and the figures the limits need from it (Q2.4). A
     limit that cannot be measured is noted as unavailable, never a breach. The caller saves the
@@ -778,7 +841,7 @@ def _tail_inputs(
 
     limits = strategy.risk
     wants_dd = limits.max_drawdown_probability is not None and limits.max_drawdown is not None
-    report = tail_report(book, strategy)
+    report = tail_report(book, strategy, full=full)
     if not report.available:
         why = report.reason or "no estimate"
         if limits.max_es_95_month is not None:

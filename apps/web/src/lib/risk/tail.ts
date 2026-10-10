@@ -22,7 +22,12 @@ export function worstLine(lines: readonly TailLine[], weeks: number, level: numb
 
 /** One sentence for the bad month: what the average loss in the worst one month in twenty is. */
 export function badMonthSentence(lines: readonly TailLine[], currency: string | null | undefined): string | null {
-  const line = worstLine(lines, 4, 0.95);
+  // The same two empirical methods as the backend's limit figure (Cornish-Fisher is shown apart).
+  const line = worstLine(
+    lines.filter((l) => l.method !== "Cornish-Fisher"),
+    4,
+    0.95,
+  );
   if (!line) return null;
   const money = line.es_value != null ? `${Math.round(line.es_value).toLocaleString("en")} ${currency ?? ""}`.trim() : null;
   const pct = `${(line.es * 100).toFixed(1)} %`;

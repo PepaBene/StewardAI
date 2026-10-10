@@ -27,6 +27,7 @@ SELECTOR_KINDS = [
     "commodity", "trade_product", "issuer",
 ]  # fmt: skip
 
+MAX_AMOUNT = 1e9  # the same ceiling as the REST routes for a deposit or a trade size
 UNAVAILABLE = {"unavailable": "There is no portfolio snapshot yet, so nothing can be computed."}
 
 
@@ -221,7 +222,8 @@ async def position_risk(pool: asyncpg.Pool, registry: Registry, ticker: str) -> 
     """One holding's risk contribution, cluster and stress losses."""
     from steward.portfolio.position_pack import position_risk_pack
 
-    pack = await position_risk_pack(pool, ticker.strip())
+    name = (await decision_service.resolve_tickers(pool, [ticker])).get(ticker.strip(), ticker)
+    pack = await position_risk_pack(pool, name.strip())
     if not pack.available:
         return {"unavailable": pack.reason}
     sid = registry.add(
@@ -276,8 +278,14 @@ async def risk_whatif(
     from steward.decision.pretrade import TradeLeg
     from steward.portfolio.trade_risk import trade_risk
 
-    names = await decision_service.resolve_tickers(pool, [str(t.get("ticker", "")) for t in trades])
+    if not trades and not deposit:
+        return {"error": "give at least one trade or a deposit"}
+    if not isinstance(deposit, int | float) or not 0 <= deposit <= MAX_AMOUNT:
+        return {"error": f"the deposit must be between 0 and {MAX_AMOUNT:,.0f}"}
     try:
+        names = await decision_service.resolve_tickers(
+            pool, [str(t.get("ticker", "")) for t in trades]
+        )
         legs = [
             TradeLeg(
                 side=t["side"],
@@ -286,7 +294,9 @@ async def risk_whatif(
             )
             for t in trades
         ]
-    except (KeyError, ValueError) as err:
+        if any(not 0 < leg.value_base <= MAX_AMOUNT for leg in legs):
+            raise ValueError(f"value_base must be above 0 and at most {MAX_AMOUNT:,.0f}")
+    except (KeyError, ValueError, TypeError, AttributeError) as err:
         return {"error": f"each trade needs side (buy or sell), ticker and value_base: {err}"}
     report = await trade_risk(pool, legs, deposit)
     if not report.available:
@@ -306,8 +316,9 @@ async def risk_whatif(
         "deposit": deposit,
         **report.model_dump(exclude={"lines"}),
         "largest_lines": [x.model_dump() for x in report.lines[:8]],
-        "use": "Quote the before and after figures and any limit marked new or deeper. Say "
-        "that Expected Shortfall and the drawdown probability are not modelled yet.",
+        "use": "Quote the before and after figures and any limit marked new or deeper. The "
+        "Expected Shortfall and drawdown-probability limits are tested but their figures are not "
+        "shown here.",
     }
 
 
@@ -343,6 +354,8 @@ async def deposit_allocation(
     """Where a deposit should go under principle 8c (plan Q5.4)."""
     from steward.decision.allocator import allocate_deposit
 
+    if not isinstance(amount, int | float) or not 0 < amount <= MAX_AMOUNT:
+        return {"error": f"the amount must be above 0 and at most {MAX_AMOUNT:,.0f}"}
     try:
         plan = await allocate_deposit(pool, amount)
     except LookupError as err:
@@ -406,10 +419,11 @@ async def switch_effect(
     from steward.decision.ranking_service import switch_pair
     from steward.decision.service import NoHoldings, NoStrategy
 
+    resolved = await decision_service.resolve_tickers(pool, [sell, buy])
+    sell = resolved.get(sell.strip(), sell.strip())
+    buy = resolved.get(buy.strip(), buy.strip())
     try:
-        line, plain, reason = await switch_pair(
-            pool, owner_id, sell.strip(), buy.strip(), sell_value_base
-        )
+        line, plain, reason = await switch_pair(pool, owner_id, sell, buy, sell_value_base)
     except (NoHoldings, NoStrategy) as err:
         return {"unavailable": str(err) or type(err).__name__}
     if reason:

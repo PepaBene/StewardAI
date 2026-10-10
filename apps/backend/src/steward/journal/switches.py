@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.store import load_active
+from steward.earnings.check import local_today
 from steward.journal.entries import JournalError, price_on_or_before
 from steward.journal.scorecard import SwitchOutcome
 from steward.reference.price_series import choose_series, holding_symbols
@@ -85,16 +86,16 @@ def _entry(row: asyncpg.Record) -> SwitchEntry:
 async def record(pool: asyncpg.Pool, owner_id: str, body: SwitchIn) -> SwitchEntry:
     if body.sold_ticker == body.bought_ticker:
         raise JournalError("A switch needs two different stocks.")
-    today = dt.date.today()
+    today = local_today()
     day = body.switched_on or today
     if day > today:
         raise JournalError("The switch date cannot be in the future.")
-    sold_price, sold_ccy = body.sold_price, None
-    bought_price, bought_ccy = body.bought_price, None
-    if sold_price is None:
-        sold_price, sold_ccy = await price_on_or_before(pool, body.sold_ticker, day)
-    if bought_price is None:
-        bought_price, bought_ccy = await price_on_or_before(pool, body.bought_ticker, day)
+    # The stored close fixes the currency even when the owner gives the price, so the scorecard
+    # can still check that the price it compares with is in the same currency.
+    sold_found, sold_ccy = await price_on_or_before(pool, body.sold_ticker, day)
+    bought_found, bought_ccy = await price_on_or_before(pool, body.bought_ticker, day)
+    sold_price = body.sold_price if body.sold_price is not None else sold_found
+    bought_price = body.bought_price if body.bought_price is not None else bought_found
     snapshot: dict[str, Any] = {"line": body.line} if body.line else {}
     try:
         from steward.decision import ranking_service
@@ -165,8 +166,14 @@ def pair_switches(fills: list[Fill], logged: set[tuple[str, str, dt.date]]) -> l
     """Pair each sale with the nearest later-or-same-day buy of a different stock that fits it
     (within the window, and between MIN_SHARE and MAX_SHARE of the proceeds). Each buy is used
     once, and a pair already in the switch log is left out."""
-    sells = sorted((f for f in fills if f.side == "SELL" and f.amount > 0), key=lambda f: f.on)
-    buys = [f for f in fills if f.side == "BUY" and f.amount > 0]
+    # An order filled in several rows is one trade: add up the rows of a ticker and side per day.
+    merged: dict[tuple[str, str, dt.date], float] = {}
+    for f in fills:
+        if f.amount > 0:
+            merged[(f.ticker, f.side, f.on)] = merged.get((f.ticker, f.side, f.on), 0.0) + f.amount
+    whole = [Fill(ticker=t, side=s, on=d, amount=a) for (t, s, d), a in merged.items()]
+    sells = sorted((f for f in whole if f.side == "SELL"), key=lambda f: f.on)
+    buys = [f for f in whole if f.side == "BUY"]
     used: set[int] = set()
     out: list[DetectedSwitch] = []
     for sell in sells:

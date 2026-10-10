@@ -36,5 +36,9 @@ describe("tail helpers", () => {
       "In the worst one month in twenty, the book has lost about 7.0 % on average.",
     );
     expect(badMonthSentence([], "CZK")).toBeNull();
+    // Cornish-Fisher never sets the headline figure.
+    expect(
+      badMonthSentence([line({ es: 0.07 }), line({ method: "Cornish-Fisher", es: 0.2 })], null),
+    ).toBe("In the worst one month in twenty, the book has lost about 7.0 % on average: 70,000 at today's value.");
   });
 });

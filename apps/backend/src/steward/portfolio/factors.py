@@ -250,7 +250,10 @@ def build_exposures(
             regressors[RATES_FACTOR] = changes
 
     candidates = [k for k in weekly.keys if k == ea.BENCHMARK_KEY or k.startswith(ea.PROXY_PREFIX)]
-    filled, status = px.backfill(weekly, candidates, preferred=preferences)
+    # Backfill over the same window as the ex-ante model so a holding is "real" or "proxied" on
+    # both pages alike; the regression still uses only the last FACTOR_WEEKS of it.
+    filled_all, status = px.backfill(book.weekly, candidates, preferred=preferences)
+    filled = filled_all.last(FACTOR_WEEKS)
     total = book.total_value
 
     positions: list[PositionFactors] = []

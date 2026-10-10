@@ -186,7 +186,11 @@ async def start_size(pool: asyncpg.Pool, ticker: str, premium: float | None = No
 
     def model(w: float) -> tuple[ea.ExAnteRisk, list[Finding]]:
         target = w * total
-        after_book = tr.book_after(book, {ticker: target - current}, 0.0, new)
+        # The probe already carries the new stock's series, so only the weights change here: the
+        # return matrix (a rate lookup per day and series) is built once, not at every step.
+        after_book = tr.book_after(
+            probe, {ticker: target - current}, 0.0, known={t: n[0] for t, n in new.items()}
+        )
         return tr.findings_for(after_book, strategy)
 
     def ok(w: float) -> bool:
@@ -295,10 +299,12 @@ async def _kelly(
             asymmetry_gate=None,
         ).annualized
     else:
-        years = float(strategy.horizon_years or 3)
+        # The same horizon as the ranking (catalyst date, else two years), so a thesis has one
+        # annualised return on every page.
+        years, _ = er.horizon_years(target.catalyst_date, dt.date.today())
         sell = target.sell_target
         assert sell is not None
-        thesis_return = (sell / price) ** (1.0 / years) - 1.0
+        thesis_return = er.annualize(sell / price - 1.0, years)
     found = await _risk_free(pool, book.base_currency, dt.date.today() - dt.timedelta(days=30))
     rf = found[0].latest_rate if found is not None and found[0].latest_rate is not None else None
     if rf is None:

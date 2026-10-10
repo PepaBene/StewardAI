@@ -25,7 +25,7 @@ from steward.config.strategy import StrategyConfig
 from steward.decision.pretrade import PretradeCheck, TradeLeg
 from steward.portfolio import exante as ea
 from steward.portfolio.breaches import Finding
-from steward.portfolio.risk_limits import RiskInputs, _book_inputs, evaluate_risk
+from steward.portfolio.risk_limits import RiskInputs, _book_inputs, _tail_inputs, evaluate_risk
 from steward.portfolio.risk_tier import (
     apply_tiers,
     derive_tiers,
@@ -38,8 +38,8 @@ from steward.reference.read import load_series
 
 METHOD_VERSION = "trade-risk-1"
 NOT_MODELLED = [
-    "Expected Shortfall and the probability of a 20 % drawdown are not in the risk model yet "
-    "(plan phase Q2), so the before and after cannot show them."
+    "Expected Shortfall and the drawdown probability are tested against their limits, but only "
+    "as a pass or a breach: the before and after do not show the figures themselves."
 ]
 TOP_LINES = 12
 
@@ -136,13 +136,44 @@ def book_after(
     return out
 
 
+def impossible_trades(book: ea.LoadedBook, deltas: dict[str, float], deposit: float) -> list[str]:
+    """Notes for trades the book cannot make: a sale above the holding is modelled as selling it
+    all, and buys above the cash plus deposit and the sale proceeds leave negative cash (pure)."""
+    held = {p.ticker: p.value_base for p in book.positions}
+    notes: list[str] = []
+    cash = book.total_value - sum(held.values()) + deposit
+    for ticker, delta in sorted(deltas.items()):
+        have = held.get(ticker, 0.0)
+        if delta < 0 and -delta > have + 1e-6:
+            notes.append(
+                f"{ticker}: the sale of {-delta:,.0f} is more than the {have:,.0f} held, so it is "
+                "modelled as selling the whole position"
+            )
+        cash -= max(delta, -have)
+    if cash < -1e-6:
+        notes.append(
+            f"the buys are {-cash:,.0f} more than the cash, the deposit and the sale proceeds; "
+            "the after figures leave the shortfall as negative cash"
+        )
+    return notes
+
+
 def findings_for(
     book: ea.LoadedBook, strategy: StrategyConfig
 ) -> tuple[ea.ExAnteRisk, list[Finding]]:
     """The ex-ante report of a book and the risk-limit findings it raises."""
     inputs = RiskInputs()
     report = _book_inputs(book, strategy, inputs)
-    return report, evaluate_risk(inputs, strategy.risk)
+    limits = strategy.risk
+    if limits.max_es_95_month is not None or (
+        limits.max_drawdown_probability is not None and limits.max_drawdown is not None
+    ):
+        # The same figures the sync raises `risk:es` and `risk:drawdown_probability` from.
+        try:
+            _tail_inputs(book, strategy, inputs, full=False)
+        except Exception as exc:  # a tail failure leaves these two out, never the rest
+            inputs.unavailable["es"] = inputs.unavailable["drawdown_probability"] = str(exc)
+    return report, evaluate_risk(inputs, limits)
 
 
 def change_of(before: Finding | None, after: Finding | None) -> str:
@@ -396,6 +427,7 @@ async def trade_risk(pool: asyncpg.Pool, trades: list[TradeLeg], deposit: float 
     before, found_before = findings_for(book, strategy)
     after, found_after = findings_for(after_book, strategy_after)
     result = compare(before, after, found_before, found_after)
+    result.warnings.extend(impossible_trades(book, deltas, deposit))
     for name in missing:
         result.warnings.append(
             f"{name}: no stored price series or instrument record, so it is left out of the "

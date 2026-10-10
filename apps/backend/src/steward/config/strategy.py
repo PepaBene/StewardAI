@@ -363,6 +363,15 @@ class RiskLimits(ConfigModel):
         "trough dates. An entry with the key of a built-in one replaces it.",
     )
 
+    @model_validator(mode="after")
+    def _drawdown_rungs_distinct(self) -> Self:
+        # Each rung's finding key is its whole-percent value; two rungs in one percent would
+        # hide each other.
+        keys = [round(r * 100) for r in self.drawdown_warnings]
+        if len(set(keys)) != len(keys):
+            raise ValueError("drawdown_warnings must differ by at least one percentage point")
+        return self
+
 
 class StrategyConfig(ConfigModel):
     """The owner's investment strategy.

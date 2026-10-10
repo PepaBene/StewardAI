@@ -710,12 +710,15 @@ async def book_from_snapshot(
 
 
 async def with_book_tiers(
-    pool: asyncpg.Pool, book: LoadedBook, strategy: StrategyConfig
+    pool: asyncpg.Pool,
+    book: LoadedBook,
+    strategy: StrategyConfig,
+    changes: list[str] | None = None,
 ) -> StrategyConfig:
     """The strategy with each holding's derived risk tier filled in (and stored), when the
-    strategy asks for derived tiers."""
+    strategy asks for derived tiers. Tier changes since the stored tiers go into `changes`."""
     tiers = await derive_for_book(
-        pool, book.daily_closes, [p.ticker for p in book.positions], strategy
+        pool, book.daily_closes, [p.ticker for p in book.positions], strategy, changes
     )
     return apply_tiers(strategy, {t: d.tier for t, d in tiers.items()})
 

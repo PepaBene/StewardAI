@@ -205,25 +205,34 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "ex-ante risk: forecast volatility, effective bets, each position's share of risk, tier "
         "risk budgets and every ex-ante limit, before and after. Use for 'what does buying X do "
         "to my risk?'. Sizes are in the base currency. Expected Shortfall and drawdown "
-        "probability are not modelled yet; say so.",
+        "probability limits are tested (a new or deeper breach is listed) but their figures "
+        "are not shown here; say so.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "trades": {
                     "type": "array",
+                    "minItems": 1,
                     "maxItems": 10,
                     "items": {
                         "type": "object",
                         "properties": {
                             "side": {"type": "string", "enum": ["buy", "sell"]},
                             "ticker": {"type": "string"},
-                            "value_base": {"type": "number", "description": "Size, base currency."},
+                            "value_base": {
+                                "type": "number",
+                                "exclusiveMinimum": 0,
+                                "maximum": 1e9,
+                                "description": "Size, base currency.",
+                            },
                         },
                         "required": ["side", "ticker", "value_base"],
                     },
                 },
                 "deposit": {
                     "type": "number",
+                    "minimum": 0,
+                    "maximum": 1e9,
                     "description": "Cash added alongside, base currency.",
                 },
             },
@@ -252,7 +261,14 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "should my next deposit go?'.",
         "input_schema": {
             "type": "object",
-            "properties": {"amount": {"type": "number", "description": "Base currency."}},
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1e9,
+                    "description": "Base currency.",
+                }
+            },
             "required": ["amount"],
             "additionalProperties": False,
         },

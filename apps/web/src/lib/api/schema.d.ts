@@ -823,8 +823,8 @@ export interface paths {
         /**
          * Get Risk Snapshots
          * @description Saved copies of the risk reports with their method version, newest first. A report is
-         *     saved once per data date and method version, so a later change to a model does not rewrite
-         *     what was shown.
+         *     saved once per data date, method version and content, so a later change to a model does not
+         *     rewrite what was shown.
          */
         get: operations["get_risk_snapshots"];
         put?: never;
@@ -14606,6 +14606,12 @@ export interface components {
         DrawdownOdds: {
             /** Years */
             years: number;
+            /**
+             * Start Drawdown
+             * @description How far below its one-year peak today's book is; the paths start there.
+             * @default 0
+             */
+            start_drawdown: number;
             /** Probability */
             probability: number;
             /** Threshold */
@@ -32164,6 +32170,12 @@ export interface components {
             /** Method */
             method: string;
             /**
+             * Independent Tail
+             * @description Expected number of non-overlapping periods in the tail (about n / horizon x (1 - level)); overlapping windows are not independent samples.
+             * @default 0
+             */
+            independent_tail: number;
+            /**
              * Var
              * @description Loss exceeded on (1 - level) of periods, share of the book.
              */
@@ -32182,7 +32194,7 @@ export interface components {
         TailReport: {
             /**
              * Method Version
-             * @default tail-report-1
+             * @default tail-report-2
              */
             method_version: string;
             /** Available */
@@ -32216,7 +32228,7 @@ export interface components {
             es_95_month?: number | null;
             /**
              * Block Weeks
-             * @default 8
+             * @default 4
              */
             block_weeks: number;
             /**

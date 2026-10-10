@@ -22,10 +22,12 @@ from steward.quant import downside as dn
 from steward.quant import proxy as px
 from steward.quant import tail as tl
 
-METHOD_VERSION = "tail-report-1"
+METHOD_VERSION = "tail-report-2"
+MIN_TAIL_PERIODS = 5  # independent periods in the tail below which a figure is called rough
 LEVELS = (0.95, 0.99)
 HORIZONS = (1, 4)  # weeks: one week and one month
 YEARS = (1, 2, 3)
+LIMIT_METHODS = ("historical", "filtered historical")  # the methods behind `es_95_month`
 CONTRIBUTION_ROWS = 50  # the page shows the top few; the thesis pack looks one up
 
 
@@ -33,6 +35,11 @@ class TailLine(BaseModel):
     horizon_weeks: int
     level: float
     method: str
+    independent_tail: float = Field(
+        default=0.0,
+        description="Expected number of non-overlapping periods in the tail (about n / horizon "
+        "x (1 - level)); overlapping windows are not independent samples.",
+    )
     var: float = Field(description="Loss exceeded on (1 - level) of periods, share of the book.")
     es: float = Field(description="Average loss on those periods.")
     var_value: float | None = None
@@ -49,6 +56,10 @@ class EsContribution(BaseModel):
 
 class DrawdownOdds(BaseModel):
     years: int
+    start_drawdown: float = Field(
+        default=0.0,
+        description="How far below its one-year peak today's book is; the paths start there.",
+    )
     probability: float
     threshold: float
     drawdown_p50: float
@@ -140,9 +151,17 @@ def portfolio_series(
     return assets @ weights, tickers, weights, assets, covered, warnings
 
 
-def tail_report(book: ea.LoadedBook, strategy: StrategyConfig, *, full: bool = True) -> TailReport:
+def tail_report(
+    book: ea.LoadedBook,
+    strategy: StrategyConfig,
+    *,
+    full: bool = True,
+    contributions_only: bool = False,
+) -> TailReport:
     """The report. `full=False` skips the downside statistics and the longer horizons (the
-    sync-time check only needs the one-month Expected Shortfall and the limit's horizon)."""
+    sync-time check only needs the one-month Expected Shortfall and the limit's horizon).
+    `contributions_only` computes just each position's part of the Expected Shortfall, with
+    no tail lines and no simulation."""
     built = portfolio_series(book, strategy)
     if built is None:
         return TailReport(available=False, reason="no position has a weekly return series")
@@ -157,6 +176,7 @@ def tail_report(book: ea.LoadedBook, strategy: StrategyConfig, *, full: bool = T
         warnings=warnings,
         not_modelled=[
             "a one-day horizon (weekly returns only)",
+            "one month is four weekly returns, not 4.33; the √t scaling of that gap is about 4 %",
             "events the history does not contain; the simulation resamples what happened",
         ],
     )
@@ -164,9 +184,16 @@ def tail_report(book: ea.LoadedBook, strategy: StrategyConfig, *, full: bool = T
         out.available = False
         out.reason = f"only {len(series)} weeks of history; at least {tl.MIN_OBSERVATIONS} needed"
         return out
-    for periods in HORIZONS if full else (4,):
+    for periods in () if contributions_only else HORIZONS if full else (4,):
         window = tl.horizon_returns(series, periods)
         for level in LEVELS if full else (0.95,):
+            independent = len(window) / periods * (1.0 - level)
+            if independent < MIN_TAIL_PERIODS:
+                out.warnings.append(
+                    f"the {periods}-week {level:.0%} figures rest on about {independent:.1f} "
+                    "independent periods in the tail (overlapping windows repeat the same "
+                    "episodes): read them as rough"
+                )
             for name, got in (
                 ("historical", tl.historical(window, level)),
                 ("filtered historical", _filtered(series, periods, level)),
@@ -179,16 +206,23 @@ def tail_report(book: ea.LoadedBook, strategy: StrategyConfig, *, full: bool = T
                         horizon_weeks=periods,
                         level=level,
                         method=name,
+                        independent_tail=independent,
                         var=got.var,
                         es=got.es,
                         var_value=got.var * book.total_value,
                         es_value=got.es * book.total_value,
                     )
                 )
-    month = [x.es for x in out.lines if x.horizon_weeks == 4 and x.level == 0.95]
+    # The limit's figure is the larger of the two empirical estimates; Cornish-Fisher is shown
+    # on the page but a noisy moment estimate must not raise a limit finding on its own.
+    month = [
+        x.es
+        for x in out.lines
+        if x.horizon_weeks == 4 and x.level == 0.95 and x.method in LIMIT_METHODS
+    ]
     out.es_95_month = max(month) if month else None
     shares = tl.es_contributions(weights, assets, 0.95)
-    if shares is not None and full:
+    if shares is not None and (full or contributions_only):
         by_ticker = {p.ticker: p for p in book.positions}
         values, _ = shares
         total = float(values.sum()) or 1.0
@@ -206,14 +240,18 @@ def tail_report(book: ea.LoadedBook, strategy: StrategyConfig, *, full: bool = T
         out.not_modelled.append(
             "contributions are one-week (the worst 5 % of weeks), not one-month"
         )
+    if contributions_only:
+        return out
     threshold = strategy.risk.max_drawdown or 0.20
+    start = current_drawdown(series)
     for years in YEARS if full else (strategy.risk.drawdown_probability_years,):
-        sim = bs.simulate(series, 52 * years, threshold=threshold)
+        sim = bs.simulate(series, 52 * years, threshold=threshold, start_drawdown=start)
         if sim is None:
             continue
         out.drawdown.append(
             DrawdownOdds(
                 years=years,
+                start_drawdown=start,
                 probability=sim.probability_of_drawdown,
                 threshold=threshold,
                 drawdown_p50=sim.drawdown_quantiles["p50"],
@@ -232,6 +270,15 @@ def tail_report(book: ea.LoadedBook, strategy: StrategyConfig, *, full: bool = T
         if stats is not None:
             out.downside = DownsideOut(**stats.__dict__)
     return out
+
+
+def current_drawdown(series: np.ndarray) -> float:
+    """How far today's value is below the highest of the last year (52 weeks) of the series."""
+    recent = series[-52:]
+    if not len(recent):
+        return 0.0
+    path = np.concatenate([[1.0], np.cumprod(1.0 + recent)])
+    return float(max(0.0, 1.0 - path[-1] / path.max()))
 
 
 def _filtered(series: np.ndarray, periods: int, level: float) -> tl.TailRisk | None:
