@@ -358,6 +358,17 @@ What is built is tested against hand-written fake model answers and a real Postg
 - The Sources page shows what `GET /news/sources/health` returns; per-outlet fetch rung, latency and parser drift are not shown.
 - No UI for the theme counts beyond the flagged themes listed on the Brief page.
 
+**Shortcuts taken in the web code (found in the typecheck and lint pass)**
+- The API schema marks every response field that has a default as optional. `lib/news/analysis.ts` strips that with a `Sent<T>` type, and two call sites cast API data to it (`story-view.tsx` for the analysis, `stories-view.tsx` for a thread). The cast is true only while the backend keeps sending defaulted fields. The better fix is to emit separate input and output schemas, or required response fields, in `export_openapi`; that was not done.
+- The two news feedback schemas and the verify-feedback ones share the name `FeedbackIn`/`FeedbackOut`, so the generated types carry the module prefix (`steward__news__read_analysis__FeedbackIn`). A rename on the news side would remove the long names.
+- Three effects (Wire, Story, Brief) set "loading" inside an effect and carry an `eslint-disable react-hooks/set-state-in-effect` comment, as other views in the repo do. They were not moved to a data hook.
+- Route types for `/news/stories/[id]` only exist after `next typegen`; `npm run typecheck` does this, a bare `tsc --noEmit` does not.
+- Web checks run: `tsc`, eslint on the news folders, and vitest on `src/lib/news` and `src/lib/config`. The full web suite and `npm run lint:colors` were not run.
+
+**Not run at all**
+- The full backend regression (only the news tests ran).
+- Nothing was exercised against a live model, a live database with real stories, or a browser.
+
 Suggested order if time is short: N0 → N1 → N3 → N2 (rungs 1–4) → N6.1–6.4 → N7 Wire/Brief → rest.
 
 ## 11. Success measures and owner decisions
