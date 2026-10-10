@@ -282,9 +282,8 @@ async def rebuild_portfolio_history(ctx: JobContext) -> None:
         }
         check_row = next((a for a in built.accounts if a.day == first_day), None)
         if check_row is None:
-            raise JobFailed(
-                f"the first real day {first_day} could not be rebuilt: {built.skipped.get(first_day)}"
-            )
+            why = built.skipped.get(first_day)
+            raise JobFailed(f"the first real day {first_day} could not be rebuilt: {why}")
         mine = {p.ticker: p.quantity for p in built.positions if p.day == first_day}
         quantity_gap = max(
             (
