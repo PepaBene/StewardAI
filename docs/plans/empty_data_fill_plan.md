@@ -32,6 +32,35 @@ Queue in this order, with the worker, as `manual` jobs: `disclosure_sources`, th
 fix), then `disclosure_ingest`, `disclosure_esef`, `disclosure_deals`, and last
 `disclosure_alerts` (it e-mails; the 10-07 run mailed 100 alerts).
 
+## Done on 2026-10-10 (after the first version of this plan)
+
+- Fix 1: migration `20261028100000_universe_prices_by_listing` applied; Discover now counts 23
+  instruments with price history (was 0). Company overview and fund research use the shared
+  resolver (PR 24).
+- Fix 2: the change feed reads each table once and runs its areas together (PR 24).
+- Fix 3: TTM falls back to FY + YTD - prior YTD (PR 24); NVIDIA's TTM revenue is 302,970 m.
+- Jobs run: the seven `disclosure_*` jobs, `change_alerts`, `fund_issuer_facts`, `graph_review`
+  (its failure is fixed), `ownership_13f`, `control_stakes`.
+- Owner config: nine 13F managers tracked (Jobs config v63: Berkshire, Vanguard, State Street,
+  FMR, Renaissance, Tiger Global, Bridgewater, Citadel, Pershing Square; CIKs checked against
+  the loaded 13F filings); core ETF set to `SXRVd_EQ` in Performance settings.
+- Deals (5): sampled the Quantinuum 8-K (a CHIPS Act grant plus shares issued to the Commerce
+  Department) and the Broadcom S-4 (a registered exchange of existing notes). Neither is an
+  acquisition, so the extractor is right to skip them; the party rule stays as it is.
+
+Not done, on purpose:
+
+- Theses, strategy targets and the case for each holding are the owner's investment views;
+  inventing price targets or KPI thresholds would put invented opinions in the app.
+- Consensus sources (6): needs pages the owner trusts; FMP estimates already fill the company
+  Estimates tab.
+- Fund factsheet charges and total assets: the sources found disagree (0.30% against 0.33% for
+  the Nasdaq-100 fund) or are missing, so nothing is entered until it is read from the KID.
+- Portfolio history (4): a reconstruction from transactions would be written beside, not into,
+  `position_snapshot` (which holds what Trading212 reported on each day). That needs its own
+  table, the split and merger settings applied, and a "reconstructed" label; it is a feature,
+  not a data fix.
+
 ## Order of work
 
 1. Fix 1 (small, shows prices on three pages) and add a test that `has_prices` is true for a
