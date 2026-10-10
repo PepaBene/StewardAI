@@ -2104,6 +2104,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/news/ops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get News Ops
+         * @description What the news jobs cost over the window, the cost per useful event, the owner's marks,
+         *     and the incidents to review: severe stories nobody was alerted to, and alerts marked not
+         *     useful.
+         */
+        get: operations["get_news_ops"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/news/feedback": {
         parameters: {
             query?: never;
@@ -19071,6 +19093,33 @@ export interface components {
              */
             unchanged: string[];
         };
+        /**
+         * Incident
+         * @description A story the owner may need to look at: a severe one nobody was alerted to, or an alert
+         *     the owner marked as not useful.
+         */
+        Incident: {
+            /**
+             * Kind
+             * @description `unalerted_severe` or `alert_not_useful`
+             */
+            kind: string;
+            /** Story Id */
+            story_id: number;
+            /** Headline */
+            headline: string;
+            /** Ticker */
+            ticker: string | null;
+            /** Severity */
+            severity: number | null;
+            /**
+             * First Seen
+             * Format: date-time
+             */
+            first_seen: string;
+            /** Reason */
+            reason: string;
+        };
         /** IndexComparison */
         IndexComparison: {
             /** Label */
@@ -20110,6 +20159,15 @@ export interface components {
              * @description How sure the link is: 1 for the source or an identifier, lower for a name, lowest for a competitor, supplier, customer or topic. Null before N5.
              */
             confidence?: number | null;
+        };
+        /** JobCost */
+        JobCost: {
+            /** Job Type */
+            job_type: string;
+            /** Runs */
+            runs: number;
+            /** Cost Usd */
+            cost_usd: number;
         };
         /** JobDetail */
         JobDetail: {
@@ -23314,6 +23372,28 @@ export interface components {
             revenue: number | string | null;
             /** Share */
             share: number | string | null;
+        };
+        /** OpsReport */
+        OpsReport: {
+            /** Days */
+            days: number;
+            /** Cost Usd */
+            cost_usd: number;
+            /** By Job */
+            by_job: components["schemas"]["JobCost"][];
+            /** Useful Events */
+            useful_events: number;
+            /**
+             * Cost Per Useful Event
+             * @description Null while no story has been marked useful or alerted and left unmarked.
+             */
+            cost_per_useful_event: number | null;
+            /** Marks */
+            marks: {
+                [key: string]: number;
+            };
+            /** Incidents */
+            incidents: components["schemas"]["Incident"][];
         };
         /** OutletFraming */
         OutletFraming: {
@@ -36834,6 +36914,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudyRow"][];
+                };
+            };
+        };
+    };
+    get_news_ops: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpsReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

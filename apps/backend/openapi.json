@@ -6429,6 +6429,57 @@
         ]
       }
     },
+    "/news/ops": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get News Ops",
+        "description": "What the news jobs cost over the window, the cost per useful event, the owner's marks,\nand the incidents to review: severe stories nobody was alerted to, and alerts marked not\nuseful.",
+        "operationId": "get_news_ops",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 30,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpsReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/news/feedback": {
       "post": {
         "tags": [
@@ -57783,6 +57834,66 @@
         ],
         "title": "ImportResult"
       },
+      "Incident": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "`unalerted_severe` or `alert_not_useful`"
+          },
+          "story_id": {
+            "type": "integer",
+            "title": "Story Id"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "first_seen": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Seen"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "story_id",
+          "headline",
+          "ticker",
+          "severity",
+          "first_seen",
+          "reason"
+        ],
+        "title": "Incident",
+        "description": "A story the owner may need to look at: a severe one nobody was alerted to, or an alert\nthe owner marked as not useful."
+      },
       "IndexComparison": {
         "properties": {
           "label": {
@@ -60988,6 +61099,29 @@
           "term"
         ],
         "title": "ItemLink"
+      },
+      "JobCost": {
+        "properties": {
+          "job_type": {
+            "type": "string",
+            "title": "Job Type"
+          },
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "cost_usd": {
+            "type": "number",
+            "title": "Cost Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_type",
+          "runs",
+          "cost_usd"
+        ],
+        "title": "JobCost"
       },
       "JobDetail": {
         "properties": {
@@ -69612,6 +69746,66 @@
           "share"
         ],
         "title": "OperationLine"
+      },
+      "OpsReport": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "cost_usd": {
+            "type": "number",
+            "title": "Cost Usd"
+          },
+          "by_job": {
+            "items": {
+              "$ref": "#/components/schemas/JobCost"
+            },
+            "type": "array",
+            "title": "By Job"
+          },
+          "useful_events": {
+            "type": "integer",
+            "title": "Useful Events"
+          },
+          "cost_per_useful_event": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per Useful Event",
+            "description": "Null while no story has been marked useful or alerted and left unmarked."
+          },
+          "marks": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Marks"
+          },
+          "incidents": {
+            "items": {
+              "$ref": "#/components/schemas/Incident"
+            },
+            "type": "array",
+            "title": "Incidents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "cost_usd",
+          "by_job",
+          "useful_events",
+          "cost_per_useful_event",
+          "marks",
+          "incidents"
+        ],
+        "title": "OpsReport"
       },
       "OutletFraming": {
         "properties": {

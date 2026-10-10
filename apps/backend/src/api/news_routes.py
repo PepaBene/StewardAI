@@ -15,6 +15,7 @@ from steward.config.common import Ticker
 from steward.config.event_rules import EVENT_DESCRIPTIONS, EVENT_TYPES, EventType
 from steward.config.store import load_active
 from steward.news.market import StudyRow
+from steward.news.ops import OpsReport, ops_report
 from steward.news.read import (
     AlertOut,
     Confidence,
@@ -426,6 +427,16 @@ async def get_event_study(pool: Pool, _owner: Owner) -> list[StudyRow]:
     history: the median abnormal 3-day move with quartiles and the number of stories. A
     description of the past, not a forecast."""
     return await study(pool)
+
+
+@router.get("/news/ops", tags=["news"])
+async def get_news_ops(
+    pool: Pool, _owner: Owner, days: Annotated[int, Query(ge=1, le=365)] = 30
+) -> OpsReport:
+    """What the news jobs cost over the window, the cost per useful event, the owner's marks,
+    and the incidents to review: severe stories nobody was alerted to, and alerts marked not
+    useful."""
+    return await ops_report(pool, days)
 
 
 @router.post("/news/feedback", tags=["news"], status_code=status.HTTP_201_CREATED)

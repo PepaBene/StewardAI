@@ -12,7 +12,6 @@ import argparse
 import asyncio
 import datetime as dt
 import json
-import math
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -29,6 +28,7 @@ from steward.news.classify import (
     HoldingContext,
     Label,
 )
+from steward.news.gate import check, load_baseline, make_baseline, save_baseline, wilson_interval
 from steward.settings import get_settings
 
 SET_PATH = Path(__file__).resolve().parents[3] / "tests" / "news" / "news_classification.json"
@@ -70,17 +70,6 @@ def infer_region(outlet: str | None) -> str | None:
     if not outlet:
         return None
     return _TLD_REGIONS.get(outlet.lower().rstrip(".").rsplit(".", 1)[-1])
-
-
-def wilson_interval(successes: int, total: int, z: float = 1.96) -> tuple[float, float]:
-    """The 95 % Wilson score interval of a proportion (well behaved for small segments)."""
-    if total == 0:
-        return (0.0, 1.0)
-    p = successes / total
-    denom = 1 + z * z / total
-    centre = (p + z * z / (2 * total)) / denom
-    margin = z * math.sqrt(p * (1 - p) / total + z * z / (4 * total * total)) / denom
-    return (max(0.0, centre - margin), min(1.0, centre + margin))
 
 
 def load_holdings(path: Path = SET_PATH) -> list[HoldingContext]:
@@ -242,6 +231,8 @@ def main() -> None:
         default="classification",
         help="classification: the 100-item set; benchmark: the 150-item multi-region set",
     )
+    parser.add_argument("--gate", type=Path, help="fail if a segment is worse than this baseline")
+    parser.add_argument("--save-baseline", type=Path, help="write this run as the baseline")
     args = parser.parse_args()
     path = SETS[args.set]
     labelled = load_set(path)
@@ -254,7 +245,22 @@ def main() -> None:
         classifier = OracleClassifier(labelled)
     score = asyncio.run(evaluate(classifier, labelled, holdings=holdings))
     print(score.report())
-    sys.exit(0 if score.accuracy >= TARGET else 1)
+    pooled = (score.event_type, score.total)
+    if args.save_baseline:
+        if not args.live:
+            sys.exit("A baseline from the oracle run would record the labels, not a model.")
+        save_baseline(
+            args.save_baseline,
+            make_baseline(args.model, pooled, score.segments, dt.datetime.now(dt.UTC).date()),
+        )
+        print(f"\nbaseline written to {args.save_baseline}")
+    baseline = load_baseline(args.gate) if args.gate else None
+    failures = check(pooled, score.segments, baseline)
+    if args.gate is None:
+        print("\nno baseline given: only the pooled target was checked")
+    for failure in failures:
+        print(f"GATE FAIL: {failure}")
+    sys.exit(1 if failures else 0)
 
 
 if __name__ == "__main__":
