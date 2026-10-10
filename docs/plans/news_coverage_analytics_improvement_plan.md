@@ -330,7 +330,7 @@ What is built is code with tests against fakes and recorded fixtures. The items 
 What is built is tested against hand-written fake model answers and a real Postgres. No technique has run against a live model, and no page has been opened in a browser.
 
 **Verification never run**
-- No golden-set eval exists for extraction, impact notes, framing, claim checks, thesis links or briefs, and `news/eval.py --live --model` was not extended; the 100-output human adjudication is not done. The prompts are first drafts.
+- Golden sets now exist for extraction, framing, claim checks, sentiment, impact chains and notes (14 cases: path confidence, upstream and downstream reach, attribute chains, hypotheses), thesis links (7: supports, review, breach, owner confirmation, dropped refs) and briefs (7: ranking and its bounded nudges, the checks on a written line, headline fallback, regional order); `python -m steward.news.eval_analysis` runs all 73 with no key. They fix a model's answer and test the code that verifies it, not the model's quality, and were written by the coding assistant, not a person. `news/eval.py --live --model` was not extended; the 100-output human adjudication is not done. The prompts are first drafts.
 - No Playwright run or screenshot of the Wire, Stories, Story, Brief, Ask or Sources pages. The pages compile and their helpers are unit-tested, nothing more.
 - The migration `20261030100000` has no `.down.sql`.
 - Per-stage spend of `news_analysis` and `news_brief` is recorded per job step, but the `GET /costs/summary` view was not checked, and no `per_job_monthly_cap_usd` is set for the two new job types (the default config has none).
