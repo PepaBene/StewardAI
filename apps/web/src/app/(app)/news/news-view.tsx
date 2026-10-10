@@ -12,6 +12,7 @@ import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { FreshnessText } from "@/components/freshness/as-of-label";
 import { NewsSummary, type Loaded } from "@/components/news/news-summary";
+import { NewsTabs } from "@/components/news/news-tabs";
 import { TierBadge } from "@/components/news/severity-badge";
 import { SeverityBlocks } from "@/components/news/severity-timeline";
 import { PageHeader } from "@/components/page-header";
@@ -245,6 +246,7 @@ export function NewsView() {
           </nav>
         }
       />
+      <NewsTabs active="feed" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         {load.kind === "ok" ? <IngestFreshness job={load.lastIngest} nextDueAt={load.nextIngestDueAt} /> : <span />}

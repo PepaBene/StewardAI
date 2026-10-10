@@ -275,10 +275,10 @@ How the plan stays inside it:
 - [x] (Implemented in `news/evidence.py` and migration `20261029110000`: each stored item carries `evidence_kind` (primary_filing, regulator, company_release, central_bank, wire, outlet, aggregator, lead), `independence_key` and `is_correction`; each story has a `lifecycle` derived in `assess` from the corroboration status plus the evidence, and every change is appended to `story_lifecycle_event` with its reason and the items behind it. Disputed comes from the existing corroboration rules or the owner's "false"; corrected from a correction notice in the story (English, German, French, Japanese, Chinese, Korean markers; a Japanese forecast revision is not one); resolved is the owner closing the story (`POST /stories/{id}/close`); `GET /stories/{id}/evidence` shows why a story is linked, confirmed, disputed or corrected. Links carry a confidence by how they were found, and a story whose links to its holding are all indirect (competitor, supplier, customer, topic) alerts only from `indirect_alert_min_severity` (default 2, a behaviour change from 1). Portfolio watch topics (`portfolio_topics` in the news sources config; rates, tariffs, antitrust, currencies and semiconductors seeded) tag wire items in `news_article.topics`; a tag never links a holding or alerts. **Not done:** entity linking by executives, brands and fund look-through (identifier-backed aliases already come from GLEIF, Wikidata and listing tickers in `entity_alias`); a UI for the evidence view (API only); backfilling provenance on items stored before this migration (their kind is null and they count as no primary evidence); a measured recall/precision change, which needs the live benchmark run.) Typed provenance, independence groups, lifecycle states (reported, corroborated, primary-confirmed, disputed, corrected, resolved), identifier-backed entity linking, watch topics. → verify: rev 1 exit criteria.
 
 ### N6 Analysis engine (4–6 weeks, ordered)
-- [ ] 6.1 extraction schema + span verification → 6.2 novelty → 6.3 impact chains (needs exposure graph) → 6.4 threads and diffs → 6.5 framing comparison → 6.6 claim check → 6.7 market context → 6.8 themes → 6.9 thesis linkage. Each ships behind its own flag, as a `LLM.complete` call site with a registered prompt, pydantic schema, job type, `ResultCache` key and golden-set eval (section 6.13), starting on luna and moving to flash only where the eval requires it; 6.3 calls the existing `event_reach` exposure path instead of new graph code. → verify: per-technique eval set (see section 11 metrics) run with `news/eval.py --live --model <id>` per provider, human-adjudicated sample of 100 outputs, zero uncited claims in saved output.
+- [x] (6.1–6.10 built as `news/extract.py`, `novelty.py`, `impact.py`, `threads.py`, `framing.py`, `claims.py`, `market.py`, `themes.py`, `thesis_link.py`, `brief.py`, run by the jobs `news_analysis` and `news_brief` (`analysis_job.py`), results appended to `story_analysis`; see "Implementation gaps in N6 and N7" for everything that is not done or not measured. **Not done: 6.11 bounded sentiment, the `news_triage` stage, every golden-set eval and the 100-output human adjudication this phase's verify step asks for. No technique has run against a live model.** The four code-only techniques (novelty, thread, market, themes) are on by default; the model techniques are off until listed in `analysis_techniques`.) 6.1 extraction schema + span verification → 6.2 novelty → 6.3 impact chains (needs exposure graph) → 6.4 threads and diffs → 6.5 framing comparison → 6.6 claim check → 6.7 market context → 6.8 themes → 6.9 thesis linkage. Each ships behind its own flag, as a `LLM.complete` call site with a registered prompt, pydantic schema, job type, `ResultCache` key and golden-set eval (section 6.13), starting on luna and moving to flash only where the eval requires it; 6.3 calls the existing `event_reach` exposure path instead of new graph code. → verify: per-technique eval set (see section 11 metrics) run with `news/eval.py --live --model <id>` per provider, human-adjudicated sample of 100 outputs, zero uncited claims in saved output.
 
 ### N7 Surface (3–4 weeks, parallel with N6 once 6.1 exists)
-- [ ] Wire, Stories, Brief, Ask, Sources pages, feedback controls, inbox alerts through the existing alert routing. → verify: Playwright run of each page once, one screenshot per page per the repo guardrails.
+- [x] (Pages `/news/wire`, `/news/stories` and `/news/stories/[id]`, `/news/brief`, `/news/ask`, `/news/sources` under one tab row, with mark controls writing to `news_feedback`. **Not done: the Playwright run and screenshot per page this phase's verify step asks for (the pages are type-checked and their helpers unit-tested, but never rendered in a browser); inbox alerts from briefs.**) Wire, Stories, Brief, Ask, Sources pages, feedback controls, inbox alerts through the existing alert routing. → verify: Playwright run of each page once, one screenshot per page per the repo guardrails.
 
 ### N8 Evaluation and operations (ongoing)
 - [ ] Benchmark on every change to sources, prompts, models, clustering, severity; segment release gates (language, region, event type); incident review for missed high-severity events; monthly cost per useful event. 
@@ -324,6 +324,39 @@ What is built is code with tests against fakes and recorded fixtures. The items 
 **Housekeeping**
 - No rollback (`.down.sql`) files exist for migrations `20261028100000`, `20261028110000`, `20261029100000`, `20261029110000`, unlike earlier migrations.
 - The repository moved to `https://github.com/PepaBene/StewardAI.git`; `origin` still points at the old URL.
+
+### Implementation gaps in N6 and N7 (recorded 2026-10-10)
+
+What is built is tested against hand-written fake model answers and a real Postgres. No technique has run against a live model, and no page has been opened in a browser.
+
+**Verification never run**
+- No golden-set eval exists for extraction, impact notes, framing, claim checks, thesis links or briefs, and `news/eval.py --live --model` was not extended; the 100-output human adjudication is not done. The prompts are first drafts.
+- No Playwright run or screenshot of the Wire, Stories, Story, Brief, Ask or Sources pages. The pages compile and their helpers are unit-tested, nothing more.
+- The migration `20261030100000` has no `.down.sql`.
+- Per-stage spend of `news_analysis` and `news_brief` is recorded per job step, but the `GET /costs/summary` view was not checked, and no `per_job_monthly_cap_usd` is set for the two new job types (the default config has none).
+
+**N6 not done**
+- 6.11 bounded sentiment (aspect-level direction as a ranking input) and the `news_triage` stage are not built.
+- 6.1 extraction runs per story, not per batch: no `BatchCollector`, so no batch pricing.
+- 6.2 novelty compares embeddings of stories on the same holding only (not by topic); with no embedding the answer is `new` with the basis `no_embedding`. Surprise is read from the expectation stated in the text; the company-guidance data is not consulted.
+- 6.3 chains come from the supply-chain graph (`events/paths.py`, the code behind `event_reach`), so they cover supplier and customer links with the weakest-link confidence. Sectors, countries of revenue, currencies, commodities and rates are not graph edges here; ETF look-through counts only through the node weights. The model writes the sentences and hypotheses only. It needs `OWNER_USER_ID` to build the graph.
+- 6.4 the thread diff is code (token overlap and number changes between extracted claims), not a model call, so no `news_thread` prompt exists; "changed" is a heuristic. Thread membership by embedding uses the update-similarity setting, and by headline overlap when there is no embedding.
+- 6.5 a framing `conflict` is shown with the story but does not change its corroboration status.
+- 6.6 checks only severity-3 stories against primary items already in the story, not against stored filings, IR documents, central-bank data or prices; `contradicted` rests on the model's quote.
+- 6.7 the benchmark is the configured index of the holding's country (^spx, ^dax, ^ukx) or the first configured one, not a sector index. Earnings proximity uses `instrument.next_report_date` only. The event study uses the 3-day abnormal move, needs price bars for the holding, and shows groups only from five stories.
+- 6.8 themes are the five seeded watch topics, not 20 to 40; no GDELT tone or attention; no weekly narrative summary per theme; the only regime flags are spike and spread.
+- 6.9 thesis links read the thesis config (KPIs, exit conditions, why owned) only. Nothing marks a breach from an owner-confirmed story; `breach` needs a primary-confirmed one.
+- 6.10 the per-holding brief is written on Mondays for holdings with stories in the week; there is no separate weekly regional digest. Ask uses the new chat tools `search_wire` and `get_story_thread` over full-text search; there is no embedding retrieval and no live `web_news_search` tool, and the chat system prompt was not changed to mention them.
+- `analysis_techniques` is a list in the Jobs config; the web form edits it as comma-separated words.
+- The job `news_analysis` is on by default (its default techniques cost nothing); `news_brief` is off.
+
+**N7 not done**
+- The one-line AI gloss on materiality per wire item is not built; a wire row shows the lifecycle of the story it belongs to, if any.
+- Translation shows the English headline with the original beneath it; there is no per-item or global toggle.
+- Marks (`news_feedback`) are stored and listed through the API but nothing feeds them into the benchmark yet.
+- Brief lines do not raise inbox alerts through the alert routing.
+- The Sources page shows what `GET /news/sources/health` returns; per-outlet fetch rung, latency and parser drift are not shown.
+- No UI for the theme counts beyond the flagged themes listed on the Brief page.
 
 Suggested order if time is short: N0 → N1 → N3 → N2 (rungs 1–4) → N6.1–6.4 → N7 Wire/Brief → rest.
 
