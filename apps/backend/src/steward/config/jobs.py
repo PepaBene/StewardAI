@@ -91,6 +91,12 @@ ModelId = Annotated[
 ]
 
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
+
+AnalysisTechnique = Literal[
+    "extraction", "novelty", "impact", "thread", "framing", "claims", "market", "themes", "thesis"
+]
+# The techniques computed in code, which cost nothing and so run by default.
+CODE_TECHNIQUES: tuple[AnalysisTechnique, ...] = ("novelty", "thread", "market", "themes")
 EFFORT_HELP = (
     "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level "
     "sets an extended-thinking budget instead (low 2k to max 32k tokens)."
@@ -565,6 +571,71 @@ class NewsSettings(ConfigModel):
     ai_search_days: int = Field(
         default=3, ge=1, le=14, description="How far back leads are asked for, and the window."
     )
+    analysis_techniques: list[AnalysisTechnique] = Field(
+        default_factory=lambda: list(CODE_TECHNIQUES),
+        description="The analysis techniques that run. The default four are computed in code and "
+        "cost nothing; the others call a model (extraction first: impact chains, framing, claim "
+        "checks and thesis links read its output).",
+    )
+    extraction_model: ModelId = Field(
+        default="gpt-6-luna",
+        description="Extracts the typed event (actors, magnitude, claims with cited spans) from "
+        "a story's stored text.",
+    )
+    extraction_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    analysis_model: ModelId = Field(
+        default="gemini-3.8-flash",
+        description="Writes impact chains, framing comparisons, claim checks and thesis links.",
+    )
+    analysis_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    brief_model: ModelId = Field(
+        default="gemini-3.8-flash", description="Writes the morning and weekly briefs."
+    )
+    brief_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    analysis_per_run: int = Field(
+        default=25,
+        ge=0,
+        le=500,
+        description="Stories analysed by the model techniques per run (0: none); the most severe "
+        "and newest first.",
+    )
+    analysis_min_severity: int = Field(
+        default=1,
+        ge=0,
+        le=3,
+        description="Stories below this severity are not sent to a model for analysis.",
+    )
+    framing_min_outlets: int = Field(
+        default=3,
+        ge=2,
+        le=20,
+        description="A framing comparison needs this many independent outlets on the story.",
+    )
+    novelty_window_days: int = Field(
+        default=30, ge=1, le=120, description="How far back a story is compared for novelty."
+    )
+    novelty_repeat_similarity: float = Field(
+        default=0.88,
+        ge=0.5,
+        le=1.0,
+        description="Cosine similarity at or above which a story repeats an earlier one.",
+    )
+    novelty_update_similarity: float = Field(
+        default=0.72,
+        ge=0.3,
+        le=1.0,
+        description="Cosine similarity at or above which a story updates an earlier one "
+        "(below the repeat level).",
+    )
+    thread_window_days: int = Field(
+        default=21,
+        ge=1,
+        le=120,
+        description="A story joins a thread whose last update is within this many days.",
+    )
+    brief_max_lines: int = Field(
+        default=12, ge=3, le=40, description="Most lines in one brief (the highest ranked)."
+    )
     indirect_alert_min_severity: int = Field(
         default=2,
         ge=0,
@@ -612,6 +683,13 @@ class NewsSettings(ConfigModel):
         check_effort(self.corroboration_model, self.corroboration_effort, "corroboration_effort")
         check_effort(self.translation_model, self.translation_effort, "translation_effort")
         check_effort(self.search_lead_model, self.search_lead_effort, "search_lead_effort")
+        check_effort(self.extraction_model, self.extraction_effort, "extraction_effort")
+        check_effort(self.analysis_model, self.analysis_effort, "analysis_effort")
+        check_effort(self.brief_model, self.brief_effort, "brief_effort")
+        if self.novelty_update_similarity >= self.novelty_repeat_similarity:
+            raise ValueError("novelty_update_similarity must be below novelty_repeat_similarity")
+        if len(set(self.analysis_techniques)) != len(self.analysis_techniques):
+            raise ValueError("analysis_techniques lists a technique twice")
         return self
 
 
@@ -1981,6 +2059,17 @@ class JobsConfig(ConfigModel):
         "thinly. Results are leads at the lowest tier: they never alert on their own. Off by "
         "default (it spends on web searches). Default: daily 06:20.",
     )
+    news_analysis: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="25 */3 * * *"),
+        description="Analyses new stories: novelty, threads, market context and themes in code, "
+        "plus the model techniques selected in the news settings. Default: every 3 hours.",
+    )
+    news_brief: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(enabled=False, cron="30 6 * * *"),
+        description="Writes the morning brief (and on Mondays the weekly brief and the "
+        "per-holding briefs) from stored stories, each line citing its items. Off by default "
+        "(it spends on a model). Default: daily 06:30.",
+    )
     gap_research: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="0 8 * * 3"),
         description="Searches reliable web pages for facts the structured sources left empty "
@@ -2098,6 +2187,8 @@ class JobsConfig(ConfigModel):
             "ai_approvals": self.ai_approvals,
             "ir_discovery": self.ir_discovery,
             "news_ai_search": self.news_ai_search,
+            "news_analysis": self.news_analysis,
+            "news_brief": self.news_brief,
             "gap_research": self.gap_research,
             "exposure_build": self.exposure_build,
             "disclosure_sources": self.disclosure_sources,

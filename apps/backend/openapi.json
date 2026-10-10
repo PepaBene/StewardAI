@@ -5788,6 +5788,785 @@
         ]
       }
     },
+    "/jobs/news-analysis": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run News Analysis",
+        "description": "Analyse recent stories now: novelty, threads, market context, themes and the model\ntechniques selected in the news settings.",
+        "operationId": "run_news_analysis",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/news-brief": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run News Brief",
+        "description": "Write the morning brief now (on a Monday also the weekly and per-holding briefs).",
+        "operationId": "run_news_brief",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/stories/{story_id}/analysis": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Story Analysis",
+        "description": "What the analysis engine found for a story: the extracted event with its cited claims,\nnovelty, impact chains onto the portfolio, thread step, framing comparison, claim check,\nmarket context and thesis links. A technique that has not run (or is off) is null.",
+        "operationId": "get_story_analysis",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "story_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Story Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryAnalysis"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/threads": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Threads",
+        "description": "Developing situations with their story counts, newest update first.",
+        "operationId": "get_threads",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                  "examples": [
+                    "AAPL_US_EQ"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "quiet",
+                    "closed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ThreadOut"
+                  },
+                  "title": "Response Get Threads"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/threads/{thread_id}": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Thread",
+        "description": "A thread's timeline: each story with what it added to the thread.",
+        "operationId": "get_thread",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wire": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Wire",
+        "description": "Every fresh item from every enabled source, linked to a holding or not, newest first.",
+        "operationId": "get_wire",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "region",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Region"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 8
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language"
+            }
+          },
+          {
+            "name": "outlet",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outlet"
+            }
+          },
+          {
+            "name": "tier",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 3,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tier"
+            }
+          },
+          {
+            "name": "topic",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Topic"
+            }
+          },
+          {
+            "name": "linked",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Linked"
+            }
+          },
+          {
+            "name": "paywall",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "metered",
+                    "hard"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Paywall"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "before_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WirePage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/news/briefs": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Briefs",
+        "description": "Written briefs, newest first. Every line cites stored news items.",
+        "operationId": "get_briefs",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "morning",
+                    "weekly",
+                    "holding"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                  "examples": [
+                    "AAPL_US_EQ"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BriefOut"
+                  },
+                  "title": "Response Get Briefs"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/news/themes": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Themes",
+        "description": "Daily wire and story counts per portfolio watch theme, with regime flags.",
+        "operationId": "get_themes",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "default": 14,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ThemeDay"
+                  },
+                  "title": "Response Get Themes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/news/event-study": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Event Study",
+        "description": "What stories of each type, region and outlet tier were followed by, from the owner's own\nhistory: the median abnormal 3-day move with quartiles and the number of stories. A\ndescription of the past, not a forecast.",
+        "operationId": "get_event_study",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StudyRow"
+                  },
+                  "type": "array",
+                  "title": "Response Get Event Study"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/news/feedback": {
+      "post": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Post News Feedback",
+        "description": "Mark an item, story, claim or brief line (wrong entity, duplicate, misread, missing\nsource, useful, not useful). Feedback feeds the benchmark, never model training.",
+        "operationId": "post_news_feedback",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/steward__news__read_analysis__FeedbackIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/steward__news__read_analysis__FeedbackOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get News Feedback",
+        "operationId": "get_news_feedback",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "item",
+                    "story",
+                    "claim",
+                    "brief_line"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Target"
+            }
+          },
+          {
+            "name": "target_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Target Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/steward__news__read_analysis__FeedbackOut"
+                  },
+                  "title": "Response Get News Feedback"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/jobs/digest": {
       "post": {
         "tags": [
@@ -7504,7 +8283,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/FeedbackIn"
+                "$ref": "#/components/schemas/steward__verify__feedback__FeedbackIn"
               }
             }
           }
@@ -7515,7 +8294,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FeedbackOut"
+                  "$ref": "#/components/schemas/steward__verify__feedback__FeedbackOut"
                 }
               }
             }
@@ -7630,7 +8409,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/FeedbackOut"
+                    "$ref": "#/components/schemas/steward__verify__feedback__FeedbackOut"
                   },
                   "title": "Response Get Feedback"
                 }
@@ -25896,6 +26675,53 @@
         ],
         "title": "AdjustedReturnCoverage"
       },
+      "AffectedEntity": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "company",
+              "sector",
+              "country",
+              "commodity",
+              "currency",
+              "rate"
+            ],
+            "title": "Kind"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "mixed",
+              "unclear"
+            ],
+            "title": "Direction"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Confidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "direction",
+          "confidence"
+        ],
+        "title": "AffectedEntity"
+      },
       "AggregateReport": {
         "properties": {
           "as_of": {
@@ -31549,6 +32375,206 @@
         ],
         "title": "BridgeOut"
       },
+      "BriefBody": {
+        "properties": {
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/BriefSection"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "suppressed": {
+            "type": "integer",
+            "title": "Suppressed",
+            "default": 0
+          },
+          "generated_without_model": {
+            "type": "boolean",
+            "title": "Generated Without Model",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "sections"
+        ],
+        "title": "BriefBody"
+      },
+      "BriefLine": {
+        "properties": {
+          "story_id": {
+            "type": "integer",
+            "title": "Story Id"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "why": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why"
+          },
+          "watch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Watch"
+          },
+          "item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Item Ids"
+          },
+          "severity": {
+            "type": "integer",
+            "title": "Severity"
+          },
+          "lifecycle": {
+            "type": "string",
+            "title": "Lifecycle"
+          },
+          "novelty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Novelty"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "written_by_model": {
+            "type": "boolean",
+            "title": "Written By Model",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "story_id",
+          "ticker",
+          "text",
+          "item_ids",
+          "severity",
+          "lifecycle",
+          "score"
+        ],
+        "title": "BriefLine"
+      },
+      "BriefOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "morning",
+              "weekly",
+              "holding"
+            ],
+            "title": "Kind"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "period_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Period End"
+          },
+          "body": {
+            "$ref": "#/components/schemas/BriefBody"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "ticker",
+          "period_start",
+          "period_end",
+          "body",
+          "model",
+          "created_at"
+        ],
+        "title": "BriefOut"
+      },
+      "BriefSection": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/BriefLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "lines"
+        ],
+        "title": "BriefSection"
+      },
       "Bucket": {
         "properties": {
           "key": {
@@ -31839,6 +32865,8 @@
                 "ai_approvals",
                 "ir_discovery",
                 "news_ai_search",
+                "news_analysis",
+                "news_brief",
                 "gap_research",
                 "exposure_build",
                 "disclosure_sources",
@@ -31913,6 +32941,8 @@
                 "ai_approvals",
                 "ir_discovery",
                 "news_ai_search",
+                "news_analysis",
+                "news_brief",
                 "gap_research",
                 "exposure_build",
                 "disclosure_sources",
@@ -32000,6 +33030,8 @@
                 "ai_approvals",
                 "ir_discovery",
                 "news_ai_search",
+                "news_analysis",
+                "news_brief",
                 "gap_research",
                 "exposure_build",
                 "disclosure_sources",
@@ -33708,6 +34740,62 @@
         ],
         "title": "CheckOut"
       },
+      "CheckedClaim": {
+        "properties": {
+          "claim": {
+            "type": "string",
+            "title": "Claim"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "supported",
+              "contradicted",
+              "unverified"
+            ],
+            "title": "Verdict"
+          },
+          "primary_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Url"
+          },
+          "primary_outlet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Outlet"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim",
+          "verdict"
+        ],
+        "title": "CheckedClaim"
+      },
       "Checklist": {
         "properties": {
           "isin": {
@@ -34387,6 +35475,22 @@
         "type": "object",
         "title": "ClaimVerifierSettings",
         "description": "The claim verifier (layer 4): every model-written sentence is checked against the\nsnippets it cites before a report is stored or sent."
+      },
+      "ClaimsOut": {
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/CheckedClaim"
+            },
+            "type": "array",
+            "title": "Claims"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claims"
+        ],
+        "title": "ClaimsOut"
       },
       "ClosureConfirmation": {
         "properties": {
@@ -42743,6 +43847,27 @@
         ],
         "title": "DisputedStory"
       },
+      "Divergence": {
+        "properties": {
+          "regions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Regions"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "regions",
+          "summary"
+        ],
+        "title": "Divergence"
+      },
       "DocumentVersionOut": {
         "properties": {
           "id": {
@@ -48712,214 +49837,6 @@
         ],
         "title": "FeedItem"
       },
-      "FeedbackIn": {
-        "properties": {
-          "target_kind": {
-            "type": "string",
-            "enum": [
-              "fact",
-              "verdict",
-              "alert",
-              "news_item",
-              "story",
-              "report_sentence"
-            ],
-            "title": "Target Kind"
-          },
-          "target_id": {
-            "type": "integer",
-            "maximum": 9.223372036854776e+18,
-            "minimum": 1.0,
-            "title": "Target Id",
-            "description": "The fact, verdict, alert, news item, story or report id."
-          },
-          "sentence_path": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^[a-z_]+(/[0-9a-z_]+)*$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sentence Path",
-            "description": "Report sentences only: where it sits in the report body, e.g. 'overview/0', 'sections/2/summary/1' (digest) or 'sentences/3' (impact note)."
-          },
-          "rating": {
-            "type": "string",
-            "enum": [
-              "wrong",
-              "irrelevant",
-              "useful"
-            ],
-            "title": "Rating"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          },
-          "add_to_eval": {
-            "type": "boolean",
-            "title": "Add To Eval",
-            "description": "With rating 'wrong' on a fact or news item: add it to the golden or labelled evaluation set with the corrected value or label.",
-            "default": false
-          },
-          "corrected_value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Corrected Value",
-            "description": "Facts: the right value, in the fact's printed scale."
-          },
-          "corrected_value_as_written": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 40
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Corrected Value As Written",
-            "description": "Facts added to the golden set: the right number exactly as printed, when it differs from the stored one (e.g. '94,036')."
-          },
-          "corrected_snippet": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Corrected Snippet",
-            "description": "Facts added to the golden set: the document passage that states the right number, when the stored snippet does not contain it."
-          },
-          "corrected_label": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/NewsLabel"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "target_kind",
-          "target_id",
-          "rating"
-        ],
-        "title": "FeedbackIn"
-      },
-      "FeedbackOut": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "target_kind": {
-            "type": "string",
-            "enum": [
-              "fact",
-              "verdict",
-              "alert",
-              "news_item",
-              "story",
-              "report_sentence"
-            ],
-            "title": "Target Kind"
-          },
-          "target_id": {
-            "type": "integer",
-            "title": "Target Id"
-          },
-          "sentence_path": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sentence Path"
-          },
-          "rating": {
-            "type": "string",
-            "enum": [
-              "wrong",
-              "irrelevant",
-              "useful"
-            ],
-            "title": "Rating"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          },
-          "source_hosts": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Source Hosts"
-          },
-          "effects": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Effects",
-            "description": "What the feedback did: quarantined fact, verdict job, trust scores, eval candidate."
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "target_kind",
-          "target_id",
-          "sentence_path",
-          "rating",
-          "note",
-          "source_hosts",
-          "effects",
-          "created_at"
-        ],
-        "title": "FeedbackOut"
-      },
       "FetchPolicy": {
         "properties": {
           "rungs": {
@@ -49945,6 +50862,46 @@
           "source_url"
         ],
         "title": "ForwardObservationInput"
+      },
+      "FramingComparison": {
+        "properties": {
+          "outlets": {
+            "items": {
+              "$ref": "#/components/schemas/OutletFraming"
+            },
+            "type": "array",
+            "title": "Outlets"
+          },
+          "agreement": {
+            "type": "string",
+            "enum": [
+              "agree",
+              "conflict",
+              "divergent"
+            ],
+            "title": "Agreement"
+          },
+          "conflicts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Conflicts"
+          },
+          "divergences": {
+            "items": {
+              "$ref": "#/components/schemas/Divergence"
+            },
+            "type": "array",
+            "title": "Divergences"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outlets",
+          "agreement"
+        ],
+        "title": "FramingComparison"
       },
       "FredSeries": {
         "properties": {
@@ -56671,6 +57628,135 @@
         ],
         "title": "IdentityOverride"
       },
+      "ImpactChain": {
+        "properties": {
+          "relation": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "second_order",
+              "hypothesis"
+            ],
+            "title": "Relation"
+          },
+          "holding": {
+            "type": "string",
+            "title": "Holding"
+          },
+          "chain": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Chain",
+            "description": "Company symbols from the event to the holding."
+          },
+          "links": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Links"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight",
+            "description": "Portfolio share in the holding (exposure, not a return forecast); null for a hypothesis."
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "relation",
+          "holding",
+          "chain",
+          "confidence",
+          "weight"
+        ],
+        "title": "ImpactChain"
+      },
+      "ImpactResult": {
+        "properties": {
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "chains": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactChain"
+            },
+            "type": "array",
+            "title": "Chains"
+          },
+          "direct_weight": {
+            "type": "number",
+            "title": "Direct Weight"
+          },
+          "reached_weight": {
+            "type": "number",
+            "title": "Reached Weight"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "chains",
+          "direct_weight",
+          "reached_weight"
+        ],
+        "title": "ImpactResult"
+      },
       "ImportResult": {
         "properties": {
           "saved": {
@@ -60640,6 +61726,14 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Asks a search-capable model for recent news on holdings the wire covers thinly. Results are leads at the lowest tier: they never alert on their own. Off by default (it spends on web searches). Default: daily 06:20."
           },
+          "news_analysis": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Analyses new stories: novelty, threads, market context and themes in code, plus the model techniques selected in the news settings. Default: every 3 hours."
+          },
+          "news_brief": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Writes the morning brief (and on Mondays the weekly brief and the per-holding briefs) from stored stories, each line citing its items. Off by default (it spends on a model). Default: daily 06:30."
+          },
           "gap_research": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Searches reliable web pages for facts the structured sources left empty (next report date, shares outstanding, description); AI approves them. Default: Wednesdays 08:00."
@@ -61144,6 +62238,32 @@
           "detail"
         ],
         "title": "JurisdictionCoverage"
+      },
+      "KeyClaim": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "One checkable statement."
+          },
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id",
+            "description": "The item whose text contains the span."
+          },
+          "span": {
+            "type": "string",
+            "title": "Span",
+            "description": "Verbatim quote from that item's text supporting the claim."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "item_id",
+          "span"
+        ],
+        "title": "KeyClaim"
       },
       "KeyFigure": {
         "properties": {
@@ -62368,6 +63488,59 @@
           "unit"
         ],
         "title": "Line"
+      },
+      "LinkedAssumption": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "kpi",
+              "exit_condition",
+              "why_owned"
+            ],
+            "title": "Kind"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref"
+          },
+          "effect": {
+            "type": "string",
+            "enum": [
+              "strengthens",
+              "weakens",
+              "neutral"
+            ],
+            "title": "Effect"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "claim": {
+            "type": "string",
+            "title": "Claim"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "review",
+              "breach"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "ref",
+          "effect",
+          "reason",
+          "claim",
+          "status"
+        ],
+        "title": "LinkedAssumption"
       },
       "LinkedPair": {
         "properties": {
@@ -64055,6 +65228,57 @@
         "title": "MacroSettings",
         "description": "Macro series collected into `macro_series` (numbers in digests come only from here)."
       },
+      "Magnitude": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "The number as written, or null."
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit",
+            "description": "Unit or currency as written, or null."
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "The figure as it appears in the text."
+          },
+          "vs_expectation": {
+            "type": "string",
+            "enum": [
+              "above",
+              "in_line",
+              "below",
+              "unknown"
+            ],
+            "title": "Vs Expectation",
+            "default": "unknown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "unit",
+          "text"
+        ],
+        "title": "Magnitude"
+      },
       "ManagerChange": {
         "properties": {
           "cik": {
@@ -64958,6 +66182,76 @@
           "warnings"
         ],
         "title": "MappedExposure"
+      },
+      "MarketContext": {
+        "properties": {
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark"
+          },
+          "base_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Date"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/WindowMove"
+            },
+            "type": "array",
+            "title": "Windows"
+          },
+          "earnings_near": {
+            "type": "boolean",
+            "title": "Earnings Near"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "benchmark",
+          "base_date",
+          "windows",
+          "earnings_near",
+          "complete"
+        ],
+        "title": "MarketContext"
       },
       "MarketHoliday": {
         "properties": {
@@ -66887,6 +68181,179 @@
             "description": "How far back leads are asked for, and the window.",
             "default": 3
           },
+          "analysis_techniques": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "extraction",
+                "novelty",
+                "impact",
+                "thread",
+                "framing",
+                "claims",
+                "market",
+                "themes",
+                "thesis"
+              ]
+            },
+            "type": "array",
+            "title": "Analysis Techniques",
+            "description": "The analysis techniques that run. The default four are computed in code and cost nothing; the others call a model (extraction first: impact chains, framing, claim checks and thesis links read its output)."
+          },
+          "extraction_model": {
+            "type": "string",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Extraction Model",
+            "description": "Extracts the typed event (actors, magnitude, claims with cited spans) from a story's stored text.",
+            "default": "gpt-6-luna",
+            "examples": [
+              "claude-sonnet-5",
+              "gpt-6-luna"
+            ]
+          },
+          "extraction_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Effort",
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+          },
+          "analysis_model": {
+            "type": "string",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Analysis Model",
+            "description": "Writes impact chains, framing comparisons, claim checks and thesis links.",
+            "default": "gemini-3.8-flash",
+            "examples": [
+              "claude-sonnet-5",
+              "gpt-6-luna"
+            ]
+          },
+          "analysis_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Effort",
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+          },
+          "brief_model": {
+            "type": "string",
+            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Brief Model",
+            "description": "Writes the morning and weekly briefs.",
+            "default": "gemini-3.8-flash",
+            "examples": [
+              "claude-sonnet-5",
+              "gpt-6-luna"
+            ]
+          },
+          "brief_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brief Effort",
+            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+          },
+          "analysis_per_run": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Analysis Per Run",
+            "description": "Stories analysed by the model techniques per run (0: none); the most severe and newest first.",
+            "default": 25
+          },
+          "analysis_min_severity": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Analysis Min Severity",
+            "description": "Stories below this severity are not sent to a model for analysis.",
+            "default": 1
+          },
+          "framing_min_outlets": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 2.0,
+            "title": "Framing Min Outlets",
+            "description": "A framing comparison needs this many independent outlets on the story.",
+            "default": 3
+          },
+          "novelty_window_days": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Novelty Window Days",
+            "description": "How far back a story is compared for novelty.",
+            "default": 30
+          },
+          "novelty_repeat_similarity": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.5,
+            "title": "Novelty Repeat Similarity",
+            "description": "Cosine similarity at or above which a story repeats an earlier one.",
+            "default": 0.88
+          },
+          "novelty_update_similarity": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.3,
+            "title": "Novelty Update Similarity",
+            "description": "Cosine similarity at or above which a story updates an earlier one (below the repeat level).",
+            "default": 0.72
+          },
+          "thread_window_days": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Thread Window Days",
+            "description": "A story joins a thread whose last update is within this many days.",
+            "default": 21
+          },
+          "brief_max_lines": {
+            "type": "integer",
+            "maximum": 40.0,
+            "minimum": 3.0,
+            "title": "Brief Max Lines",
+            "description": "Most lines in one brief (the highest ranked).",
+            "default": 12
+          },
           "indirect_alert_min_severity": {
             "type": "integer",
             "maximum": 3.0,
@@ -67646,6 +69113,64 @@
         ],
         "title": "NotificationsConfigVersion"
       },
+      "NoveltyOut": {
+        "properties": {
+          "novelty": {
+            "type": "string",
+            "enum": [
+              "new",
+              "update",
+              "repeat",
+              "recycled"
+            ],
+            "title": "Novelty"
+          },
+          "surprise": {
+            "type": "string",
+            "enum": [
+              "none",
+              "in_line",
+              "above",
+              "below",
+              "unknown"
+            ],
+            "title": "Surprise"
+          },
+          "similarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Similarity"
+          },
+          "similar_story_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Similar Story Id"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "novelty",
+          "surprise",
+          "basis"
+        ],
+        "title": "NoveltyOut"
+      },
       "NportCoverage": {
         "properties": {
           "state": {
@@ -68087,6 +69612,56 @@
           "share"
         ],
         "title": "OperationLine"
+      },
+      "OutletFraming": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "headline_claim": {
+            "type": "string",
+            "title": "Headline Claim"
+          },
+          "emphasised_cause": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emphasised Cause"
+          },
+          "numbers_cited": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Numbers Cited"
+          },
+          "quotes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Quotes"
+          },
+          "omitted": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Omitted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "headline_claim"
+        ],
+        "title": "OutletFraming"
       },
       "Overview": {
         "properties": {
@@ -74600,6 +76175,12 @@
               "news_digest",
               "news_translation",
               "news_search_leads",
+              "news_extract",
+              "news_impact",
+              "news_framing",
+              "news_claims",
+              "news_thesis",
+              "news_brief",
               "research_writer",
               "monthly_review",
               "chat_assistant",
@@ -74666,6 +76247,12 @@
                 "news_digest",
                 "news_translation",
                 "news_search_leads",
+                "news_extract",
+                "news_impact",
+                "news_framing",
+                "news_claims",
+                "news_thesis",
+                "news_brief",
                 "research_writer",
                 "monthly_review",
                 "chat_assistant",
@@ -74710,6 +76297,12 @@
                 "news_digest",
                 "news_translation",
                 "news_search_leads",
+                "news_extract",
+                "news_impact",
+                "news_framing",
+                "news_claims",
+                "news_thesis",
+                "news_brief",
                 "research_writer",
                 "monthly_review",
                 "chat_assistant",
@@ -87921,6 +89514,107 @@
         ],
         "title": "Story"
       },
+      "StoryAnalysis": {
+        "properties": {
+          "story_id": {
+            "type": "integer",
+            "title": "Story Id"
+          },
+          "extraction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StoryExtraction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "novelty": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NoveltyOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImpactResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thread": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThreadStepOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "framing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FramingComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "claims": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClaimsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "market": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MarketContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thesis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "models": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Models",
+            "description": "The model behind each technique that used one."
+          }
+        },
+        "type": "object",
+        "required": [
+          "story_id"
+        ],
+        "title": "StoryAnalysis"
+      },
       "StoryClosing": {
         "properties": {
           "closed": {
@@ -88054,6 +89748,120 @@
           "history"
         ],
         "title": "StoryEvidence"
+      },
+      "StoryExtraction": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "actors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Actors"
+          },
+          "affected_entities": {
+            "items": {
+              "$ref": "#/components/schemas/AffectedEntity"
+            },
+            "type": "array",
+            "title": "Affected Entities"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "magnitude": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Magnitude"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "occurred": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred"
+          },
+          "announced": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Announced"
+          },
+          "effective": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "rumour",
+              "reported",
+              "confirmed",
+              "official"
+            ],
+            "title": "Status"
+          },
+          "key_claims": {
+            "items": {
+              "$ref": "#/components/schemas/KeyClaim"
+            },
+            "type": "array",
+            "title": "Key Claims"
+          },
+          "interpretation": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Interpretation"
+          },
+          "speculation": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Speculation"
+          },
+          "unknowns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknowns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "action",
+          "status"
+        ],
+        "title": "StoryExtraction"
       },
       "StoryOut": {
         "properties": {
@@ -88461,6 +90269,49 @@
           "body"
         ],
         "title": "StrategyConfigVersion"
+      },
+      "StudyRow": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "region": {
+            "type": "string",
+            "title": "Region"
+          },
+          "tier": {
+            "type": "integer",
+            "title": "Tier"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N"
+          },
+          "median_pct": {
+            "type": "number",
+            "title": "Median Pct"
+          },
+          "p25_pct": {
+            "type": "number",
+            "title": "P25 Pct"
+          },
+          "p75_pct": {
+            "type": "number",
+            "title": "P75 Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "region",
+          "tier",
+          "n",
+          "median_pct",
+          "p25_pct",
+          "p75_pct"
+        ],
+        "title": "StudyRow"
       },
       "StyleBand": {
         "properties": {
@@ -89160,6 +91011,59 @@
           "alerts"
         ],
         "title": "TestAlertResult"
+      },
+      "ThemeDay": {
+        "properties": {
+          "theme": {
+            "type": "string",
+            "title": "Theme"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "wire_items": {
+            "type": "integer",
+            "title": "Wire Items"
+          },
+          "stories": {
+            "type": "integer",
+            "title": "Stories"
+          },
+          "regions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Regions"
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "spike",
+                  "spread"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flag"
+          }
+        },
+        "type": "object",
+        "required": [
+          "theme",
+          "day",
+          "wire_items",
+          "stories",
+          "regions",
+          "flag"
+        ],
+        "title": "ThemeDay"
       },
       "ThemeDefinition": {
         "properties": {
@@ -90071,6 +91975,22 @@
         "title": "ThesisKPI",
         "description": "An absolute threshold the owner sets. v1 has no consensus-estimate comparisons."
       },
+      "ThesisOut": {
+        "properties": {
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedAssumption"
+            },
+            "type": "array",
+            "title": "Links"
+          }
+        },
+        "type": "object",
+        "required": [
+          "links"
+        ],
+        "title": "ThesisOut"
+      },
       "ThesisPrefill": {
         "properties": {
           "ticker": {
@@ -90234,6 +92154,187 @@
         },
         "type": "object",
         "title": "ThesisVerdictsRequest"
+      },
+      "ThreadDetail": {
+        "properties": {
+          "thread": {
+            "$ref": "#/components/schemas/ThreadOut"
+          },
+          "timeline": {
+            "items": {
+              "$ref": "#/components/schemas/ThreadStep"
+            },
+            "type": "array",
+            "title": "Timeline"
+          }
+        },
+        "type": "object",
+        "required": [
+          "thread",
+          "timeline"
+        ],
+        "title": "ThreadDetail"
+      },
+      "ThreadDiffOut": {
+        "properties": {
+          "new": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "New"
+          },
+          "changed": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Changed"
+          },
+          "retracted": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Retracted"
+          },
+          "unknown": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown"
+          }
+        },
+        "type": "object",
+        "title": "ThreadDiffOut"
+      },
+      "ThreadOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Opened At"
+          },
+          "last_update_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Update At"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "quiet",
+              "closed"
+            ],
+            "title": "State"
+          },
+          "stories": {
+            "type": "integer",
+            "title": "Stories"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "title",
+          "opened_at",
+          "last_update_at",
+          "state",
+          "stories"
+        ],
+        "title": "ThreadOut"
+      },
+      "ThreadStep": {
+        "properties": {
+          "story_id": {
+            "type": "integer",
+            "title": "Story Id"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "lifecycle": {
+            "type": "string",
+            "title": "Lifecycle"
+          },
+          "diff": {
+            "$ref": "#/components/schemas/ThreadDiffOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "story_id",
+          "headline",
+          "at",
+          "severity",
+          "lifecycle",
+          "diff"
+        ],
+        "title": "ThreadStep"
+      },
+      "ThreadStepOut": {
+        "properties": {
+          "thread_id": {
+            "type": "integer",
+            "title": "Thread Id"
+          },
+          "opened": {
+            "type": "boolean",
+            "title": "Opened"
+          },
+          "diff": {
+            "$ref": "#/components/schemas/ThreadDiffOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "thread_id",
+          "opened",
+          "diff"
+        ],
+        "title": "ThreadStepOut"
       },
       "TimelineMonth": {
         "properties": {
@@ -93360,6 +95461,55 @@
         ],
         "title": "WikidataSummary"
       },
+      "WindowMove": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "stock_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Pct"
+          },
+          "benchmark_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Pct"
+          },
+          "abnormal_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Abnormal Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "stock_pct",
+          "benchmark_pct",
+          "abnormal_pct"
+        ],
+        "title": "WindowMove"
+      },
       "WindowOut": {
         "properties": {
           "label": {
@@ -93511,6 +95661,216 @@
           "benchmark"
         ],
         "title": "WindowOut"
+      },
+      "WireItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "title_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title En"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          },
+          "outlet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlet"
+          },
+          "outlet_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlet Name"
+          },
+          "tier": {
+            "type": "integer",
+            "title": "Tier"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          },
+          "linked": {
+            "type": "boolean",
+            "title": "Linked"
+          },
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Topics"
+          },
+          "fetch_state": {
+            "type": "string",
+            "title": "Fetch State"
+          },
+          "paywall": {
+            "type": "string",
+            "title": "Paywall"
+          },
+          "state_media": {
+            "type": "boolean",
+            "title": "State Media"
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
+          "story_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Story Id"
+          },
+          "story_severity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Story Severity"
+          },
+          "story_lifecycle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Story Lifecycle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "headline",
+          "title_en",
+          "summary",
+          "language",
+          "region",
+          "outlet",
+          "outlet_name",
+          "tier",
+          "published_at",
+          "linked",
+          "topics",
+          "fetch_state",
+          "paywall",
+          "state_media",
+          "group_id",
+          "story_id",
+          "story_severity",
+          "story_lifecycle"
+        ],
+        "title": "WireItem"
+      },
+      "WirePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WireItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_before_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_before_id"
+        ],
+        "title": "WirePage"
       },
       "WorldBankIndicator": {
         "properties": {
@@ -95962,6 +98322,119 @@
         ],
         "title": "Check"
       },
+      "steward__news__read_analysis__FeedbackIn": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "enum": [
+              "item",
+              "story",
+              "claim",
+              "brief_line"
+            ],
+            "title": "Target"
+          },
+          "target_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Target Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "wrong_entity",
+              "duplicate",
+              "misread",
+              "missing_source",
+              "useful",
+              "not_useful"
+            ],
+            "title": "Kind"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "target_id",
+          "kind"
+        ],
+        "title": "FeedbackIn"
+      },
+      "steward__news__read_analysis__FeedbackOut": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "enum": [
+              "item",
+              "story",
+              "claim",
+              "brief_line"
+            ],
+            "title": "Target"
+          },
+          "target_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Target Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "wrong_entity",
+              "duplicate",
+              "misread",
+              "missing_source",
+              "useful",
+              "not_useful"
+            ],
+            "title": "Kind"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "target_id",
+          "kind",
+          "id",
+          "created_at"
+        ],
+        "title": "FeedbackOut"
+      },
       "steward__ownership__control_stakes_read__StakeChangeOut": {
         "properties": {
           "change_type": {
@@ -96076,6 +98549,214 @@
           "denominator"
         ],
         "title": "Check"
+      },
+      "steward__verify__feedback__FeedbackIn": {
+        "properties": {
+          "target_kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "verdict",
+              "alert",
+              "news_item",
+              "story",
+              "report_sentence"
+            ],
+            "title": "Target Kind"
+          },
+          "target_id": {
+            "type": "integer",
+            "maximum": 9.223372036854776e+18,
+            "minimum": 1.0,
+            "title": "Target Id",
+            "description": "The fact, verdict, alert, news item, story or report id."
+          },
+          "sentence_path": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z_]+(/[0-9a-z_]+)*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentence Path",
+            "description": "Report sentences only: where it sits in the report body, e.g. 'overview/0', 'sections/2/summary/1' (digest) or 'sentences/3' (impact note)."
+          },
+          "rating": {
+            "type": "string",
+            "enum": [
+              "wrong",
+              "irrelevant",
+              "useful"
+            ],
+            "title": "Rating"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "add_to_eval": {
+            "type": "boolean",
+            "title": "Add To Eval",
+            "description": "With rating 'wrong' on a fact or news item: add it to the golden or labelled evaluation set with the corrected value or label.",
+            "default": false
+          },
+          "corrected_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Value",
+            "description": "Facts: the right value, in the fact's printed scale."
+          },
+          "corrected_value_as_written": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Value As Written",
+            "description": "Facts added to the golden set: the right number exactly as printed, when it differs from the stored one (e.g. '94,036')."
+          },
+          "corrected_snippet": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Snippet",
+            "description": "Facts added to the golden set: the document passage that states the right number, when the stored snippet does not contain it."
+          },
+          "corrected_label": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NewsLabel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_kind",
+          "target_id",
+          "rating"
+        ],
+        "title": "FeedbackIn"
+      },
+      "steward__verify__feedback__FeedbackOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "target_kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "verdict",
+              "alert",
+              "news_item",
+              "story",
+              "report_sentence"
+            ],
+            "title": "Target Kind"
+          },
+          "target_id": {
+            "type": "integer",
+            "title": "Target Id"
+          },
+          "sentence_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentence Path"
+          },
+          "rating": {
+            "type": "string",
+            "enum": [
+              "wrong",
+              "irrelevant",
+              "useful"
+            ],
+            "title": "Rating"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "source_hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Hosts"
+          },
+          "effects": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Effects",
+            "description": "What the feedback did: quarantined fact, verdict job, trust scores, eval candidate."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "target_kind",
+          "target_id",
+          "sentence_path",
+          "rating",
+          "note",
+          "source_hosts",
+          "effects",
+          "created_at"
+        ],
+        "title": "FeedbackOut"
       }
     },
     "securitySchemes": {

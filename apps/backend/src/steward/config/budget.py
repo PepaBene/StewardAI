@@ -72,6 +72,8 @@ BudgetJobType = Literal[
     "ai_approvals",
     "ir_discovery",
     "news_ai_search",
+    "news_analysis",
+    "news_brief",
     "gap_research",
     "exposure_build",
     "disclosure_sources",

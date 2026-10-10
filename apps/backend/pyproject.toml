@@ -62,6 +62,7 @@ ignore = ["S101"]  # assert is fine in tests and invariants
 # Fixtures copied from live Japanese/Chinese pages: full-width brackets, long HTML rows.
 "tests/test_news_primary.py" = ["E501", "RUF001"]
 "tests/test_news_evidence.py" = ["RUF001"]
+"tests/test_news_analysis.py" = ["RUF001"]
 "tests/test_news_n3.py" = ["RUF001"]  # full-width Japanese/Chinese sample text
 
 [tool.mypy]

@@ -40,6 +40,7 @@ from steward.macro.collect import macro_collect_handler
 from steward.macro.public_collect import public_data_collect_handler
 from steward.monitor import monitor_handler
 from steward.news.ai_search import news_ai_search_handler
+from steward.news.analysis_job import news_analysis_handler, news_brief_handler
 from steward.news.digest import daily_digest_handler, weekly_digest_handler
 from steward.news.escalation import event_escalation_handler
 from steward.news.pipeline import news_ingest_handler
@@ -129,6 +130,8 @@ JobType = Literal[
     "ai_approvals",
     "ir_discovery",
     "news_ai_search",
+    "news_analysis",
+    "news_brief",
     "gap_research",
     "exposure_build",
     "disclosure_sources",
@@ -194,6 +197,8 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "ai_approvals": ai_approvals_handler,
     "ir_discovery": ir_discovery_handler,
     "news_ai_search": news_ai_search_handler,
+    "news_analysis": news_analysis_handler,
+    "news_brief": news_brief_handler,
     "gap_research": gap_research_handler,
     "exposure_build": exposure_build_handler,
     "disclosure_sources": disclosure_sources_handler,

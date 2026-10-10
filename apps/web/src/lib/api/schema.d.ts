@@ -1919,6 +1919,213 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/news-analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run News Analysis
+         * @description Analyse recent stories now: novelty, threads, market context, themes and the model
+         *     techniques selected in the news settings.
+         */
+        post: operations["run_news_analysis"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/news-brief": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run News Brief
+         * @description Write the morning brief now (on a Monday also the weekly and per-holding briefs).
+         */
+        post: operations["run_news_brief"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stories/{story_id}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Story Analysis
+         * @description What the analysis engine found for a story: the extracted event with its cited claims,
+         *     novelty, impact chains onto the portfolio, thread step, framing comparison, claim check,
+         *     market context and thesis links. A technique that has not run (or is off) is null.
+         */
+        get: operations["get_story_analysis"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Threads
+         * @description Developing situations with their story counts, newest update first.
+         */
+        get: operations["get_threads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/threads/{thread_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Thread
+         * @description A thread's timeline: each story with what it added to the thread.
+         */
+        get: operations["get_thread"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Wire
+         * @description Every fresh item from every enabled source, linked to a holding or not, newest first.
+         */
+        get: operations["get_wire"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/news/briefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Briefs
+         * @description Written briefs, newest first. Every line cites stored news items.
+         */
+        get: operations["get_briefs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/news/themes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Themes
+         * @description Daily wire and story counts per portfolio watch theme, with regime flags.
+         */
+        get: operations["get_themes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/news/event-study": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Event Study
+         * @description What stories of each type, region and outlet tier were followed by, from the owner's own
+         *     history: the median abnormal 3-day move with quartiles and the number of stories. A
+         *     description of the past, not a forecast.
+         */
+        get: operations["get_event_study"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/news/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get News Feedback */
+        get: operations["get_news_feedback"];
+        put?: never;
+        /**
+         * Post News Feedback
+         * @description Mark an item, story, claim or brief line (wrong entity, duplicate, misread, missing
+         *     source, useful, not useful). Feedback feeds the benchmark, never model training.
+         */
+        post: operations["post_news_feedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/jobs/digest": {
         parameters: {
             query?: never;
@@ -8154,6 +8361,26 @@ export interface components {
             /** Note */
             note: string;
         };
+        /** AffectedEntity */
+        AffectedEntity: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "company" | "sector" | "country" | "commodity" | "currency" | "rate";
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "up" | "down" | "mixed" | "unclear";
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "low" | "medium" | "high";
+        };
         /** AggregateReport */
         AggregateReport: {
             /**
@@ -9989,6 +10216,86 @@ export interface components {
             /** Unattributed Tickers */
             unattributed_tickers: string[];
         };
+        /** BriefBody */
+        BriefBody: {
+            /** Sections */
+            sections: components["schemas"]["BriefSection"][];
+            /**
+             * Suppressed
+             * @default 0
+             */
+            suppressed: number;
+            /**
+             * Generated Without Model
+             * @default true
+             */
+            generated_without_model: boolean;
+        };
+        /** BriefLine */
+        BriefLine: {
+            /** Story Id */
+            story_id: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Text */
+            text: string;
+            /** Why */
+            why?: string | null;
+            /** Watch */
+            watch?: string | null;
+            /** Item Ids */
+            item_ids: number[];
+            /** Severity */
+            severity: number;
+            /** Lifecycle */
+            lifecycle: string;
+            /** Novelty */
+            novelty?: string | null;
+            /** Score */
+            score: number;
+            /**
+             * Written By Model
+             * @default false
+             */
+            written_by_model: boolean;
+        };
+        /** BriefOut */
+        BriefOut: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "morning" | "weekly" | "holding";
+            /** Ticker */
+            ticker: string;
+            /**
+             * Period Start
+             * Format: date-time
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date-time
+             */
+            period_end: string;
+            body: components["schemas"]["BriefBody"];
+            /** Model */
+            model: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** BriefSection */
+        BriefSection: {
+            /** Title */
+            title: string;
+            /** Lines */
+            lines: components["schemas"]["BriefLine"][];
+        };
         /** Bucket */
         Bucket: {
             /** Key */
@@ -10100,7 +10407,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "news_ai_search" | "gap_research" | "exposure_build" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "news_ai_search" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -10779,6 +11086,22 @@ export interface components {
             /** Tolerance */
             tolerance: string;
         };
+        /** CheckedClaim */
+        CheckedClaim: {
+            /** Claim */
+            claim: string;
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "supported" | "contradicted" | "unverified";
+            /** Primary Url */
+            primary_url?: string | null;
+            /** Primary Outlet */
+            primary_outlet?: string | null;
+            /** Quote */
+            quote?: string | null;
+        };
         /** Checklist */
         Checklist: {
             /** Isin */
@@ -11026,6 +11349,11 @@ export interface components {
              * @description Reports whose sentences are checked. Alerts are composed in code from the source's own headline, so they have no model-written sentences to check.
              */
             applies_to?: ("daily_digest" | "weekly_digest" | "escalation")[];
+        };
+        /** ClaimsOut */
+        ClaimsOut: {
+            /** Claims */
+            claims: components["schemas"]["CheckedClaim"][];
         };
         /** ClosureConfirmation */
         ClosureConfirmation: {
@@ -13830,6 +14158,13 @@ export interface components {
              */
             verdicts_frozen: boolean;
         };
+        /** Divergence */
+        Divergence: {
+            /** Regions */
+            regions: string[];
+            /** Summary */
+            summary: string;
+        };
         /** DocumentVersionOut */
         DocumentVersionOut: {
             /** Id */
@@ -16028,88 +16363,6 @@ export interface components {
             /** Would Alert */
             would_alert: boolean;
         };
-        /** FeedbackIn */
-        FeedbackIn: {
-            /**
-             * Target Kind
-             * @enum {string}
-             */
-            target_kind: "fact" | "verdict" | "alert" | "news_item" | "story" | "report_sentence";
-            /**
-             * Target Id
-             * @description The fact, verdict, alert, news item, story or report id.
-             */
-            target_id: number;
-            /**
-             * Sentence Path
-             * @description Report sentences only: where it sits in the report body, e.g. 'overview/0', 'sections/2/summary/1' (digest) or 'sentences/3' (impact note).
-             */
-            sentence_path?: string | null;
-            /**
-             * Rating
-             * @enum {string}
-             */
-            rating: "wrong" | "irrelevant" | "useful";
-            /** Note */
-            note?: string | null;
-            /**
-             * Add To Eval
-             * @description With rating 'wrong' on a fact or news item: add it to the golden or labelled evaluation set with the corrected value or label.
-             * @default false
-             */
-            add_to_eval: boolean;
-            /**
-             * Corrected Value
-             * @description Facts: the right value, in the fact's printed scale.
-             */
-            corrected_value?: number | string | null;
-            /**
-             * Corrected Value As Written
-             * @description Facts added to the golden set: the right number exactly as printed, when it differs from the stored one (e.g. '94,036').
-             */
-            corrected_value_as_written?: string | null;
-            /**
-             * Corrected Snippet
-             * @description Facts added to the golden set: the document passage that states the right number, when the stored snippet does not contain it.
-             */
-            corrected_snippet?: string | null;
-            corrected_label?: components["schemas"]["NewsLabel"] | null;
-        };
-        /** FeedbackOut */
-        FeedbackOut: {
-            /** Id */
-            id: number;
-            /**
-             * Target Kind
-             * @enum {string}
-             */
-            target_kind: "fact" | "verdict" | "alert" | "news_item" | "story" | "report_sentence";
-            /** Target Id */
-            target_id: number;
-            /** Sentence Path */
-            sentence_path: string | null;
-            /**
-             * Rating
-             * @enum {string}
-             */
-            rating: "wrong" | "irrelevant" | "useful";
-            /** Note */
-            note: string | null;
-            /** Source Hosts */
-            source_hosts: string[];
-            /**
-             * Effects
-             * @description What the feedback did: quarantined fact, verdict job, trust scores, eval candidate.
-             */
-            effects: {
-                [key: string]: unknown;
-            };
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-        };
         /**
          * FetchPolicy
          * @description How far the article-text ladder (news/fulltext.py) may go for a source's items.
@@ -16419,6 +16672,20 @@ export interface components {
             raw?: {
                 [key: string]: unknown;
             };
+        };
+        /** FramingComparison */
+        FramingComparison: {
+            /** Outlets */
+            outlets: components["schemas"]["OutletFraming"][];
+            /**
+             * Agreement
+             * @enum {string}
+             */
+            agreement: "agree" | "conflict" | "divergent";
+            /** Conflicts */
+            conflicts?: string[];
+            /** Divergences */
+            divergences?: components["schemas"]["Divergence"][];
         };
         /** FredSeries */
         FredSeries: {
@@ -18745,6 +19012,50 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** ImpactChain */
+        ImpactChain: {
+            /**
+             * Relation
+             * @enum {string}
+             */
+            relation: "direct" | "second_order" | "hypothesis";
+            /** Holding */
+            holding: string;
+            /**
+             * Chain
+             * @description Company symbols from the event to the holding.
+             */
+            chain: string[];
+            /** Links */
+            links?: string[];
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /**
+             * Weight
+             * @description Portfolio share in the holding (exposure, not a return forecast); null for a hypothesis.
+             */
+            weight: number | null;
+            /** Severity */
+            severity?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** ImpactResult */
+        ImpactResult: {
+            /** Symbol */
+            symbol: string | null;
+            /** Chains */
+            chains: components["schemas"]["ImpactChain"][];
+            /** Direct Weight */
+            direct_weight: number;
+            /** Reached Weight */
+            reached_weight: number;
+            /** Notes */
+            notes?: string[];
+        };
         /** ImportResult */
         ImportResult: {
             /**
@@ -20119,6 +20430,10 @@ export interface components {
             ir_discovery?: components["schemas"]["JobSchedule"];
             /** @description Asks a search-capable model for recent news on holdings the wire covers thinly. Results are leads at the lowest tier: they never alert on their own. Off by default (it spends on web searches). Default: daily 06:20. */
             news_ai_search?: components["schemas"]["JobSchedule"];
+            /** @description Analyses new stories: novelty, threads, market context and themes in code, plus the model techniques selected in the news settings. Default: every 3 hours. */
+            news_analysis?: components["schemas"]["JobSchedule"];
+            /** @description Writes the morning brief (and on Mondays the weekly brief and the per-holding briefs) from stored stories, each line citing its items. Off by default (it spends on a model). Default: daily 06:30. */
+            news_brief?: components["schemas"]["JobSchedule"];
             /** @description Searches reliable web pages for facts the structured sources left empty (next report date, shares outstanding, description); AI approves them. Default: Wednesdays 08:00. */
             gap_research?: components["schemas"]["JobSchedule"];
             /** @description Builds each holding's revenue-by-country exposure from its latest annual SEC XBRL filing (reported basis). Your own exposure entries are never changed. Default: Tuesdays 05:50. */
@@ -20277,6 +20592,24 @@ export interface components {
             access: string;
             /** Detail */
             detail: string | null;
+        };
+        /** KeyClaim */
+        KeyClaim: {
+            /**
+             * Text
+             * @description One checkable statement.
+             */
+            text: string;
+            /**
+             * Item Id
+             * @description The item whose text contains the span.
+             */
+            item_id: number;
+            /**
+             * Span
+             * @description Verbatim quote from that item's text supporting the claim.
+             */
+            span: string;
         };
         /** KeyFigure */
         KeyFigure: {
@@ -20656,6 +20989,30 @@ export interface components {
             };
             /** Dimensions */
             dimensions?: components["schemas"]["DimensionDetail"][];
+        };
+        /** LinkedAssumption */
+        LinkedAssumption: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "kpi" | "exit_condition" | "why_owned";
+            /** Ref */
+            ref: string;
+            /**
+             * Effect
+             * @enum {string}
+             */
+            effect: "strengthens" | "weakens" | "neutral";
+            /** Reason */
+            reason: string;
+            /** Claim */
+            claim: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "supports" | "review" | "breach";
         };
         /** LinkedPair */
         LinkedPair: {
@@ -21248,6 +21605,30 @@ export interface components {
              */
             cnb?: components["schemas"]["CnbSeries"][];
         };
+        /** Magnitude */
+        Magnitude: {
+            /**
+             * Value
+             * @description The number as written, or null.
+             */
+            value: number | null;
+            /**
+             * Unit
+             * @description Unit or currency as written, or null.
+             */
+            unit: string | null;
+            /**
+             * Text
+             * @description The figure as it appears in the text.
+             */
+            text: string;
+            /**
+             * Vs Expectation
+             * @default unknown
+             * @enum {string}
+             */
+            vs_expectation: "above" | "in_line" | "below" | "unknown";
+        };
         /** ManagerChange */
         ManagerChange: {
             /** Cik */
@@ -21578,6 +21959,23 @@ export interface components {
             label: string;
             /** Warnings */
             warnings: string[];
+        };
+        /** MarketContext */
+        MarketContext: {
+            /** Symbol */
+            symbol: string | null;
+            /** Benchmark */
+            benchmark: string | null;
+            /** Base Date */
+            base_date: string | null;
+            /** Windows */
+            windows: components["schemas"]["WindowMove"][];
+            /** Earnings Near */
+            earnings_near: boolean;
+            /** Complete */
+            complete: boolean;
+            /** Notes */
+            notes?: string[];
         };
         /** MarketHoliday */
         MarketHoliday: {
@@ -22300,6 +22698,98 @@ export interface components {
              */
             ai_search_days: number;
             /**
+             * Analysis Techniques
+             * @description The analysis techniques that run. The default four are computed in code and cost nothing; the others call a model (extraction first: impact chains, framing, claim checks and thesis links read its output).
+             */
+            analysis_techniques?: ("extraction" | "novelty" | "impact" | "thread" | "framing" | "claims" | "market" | "themes" | "thesis")[];
+            /**
+             * Extraction Model
+             * @description Extracts the typed event (actors, magnitude, claims with cited spans) from a story's stored text.
+             * @default gpt-6-luna
+             * @example claude-sonnet-5
+             * @example gpt-6-luna
+             */
+            extraction_model: string;
+            /**
+             * Extraction Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            extraction_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Analysis Model
+             * @description Writes impact chains, framing comparisons, claim checks and thesis links.
+             * @default gemini-3.8-flash
+             * @example claude-sonnet-5
+             * @example gpt-6-luna
+             */
+            analysis_model: string;
+            /**
+             * Analysis Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            analysis_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Brief Model
+             * @description Writes the morning and weekly briefs.
+             * @default gemini-3.8-flash
+             * @example claude-sonnet-5
+             * @example gpt-6-luna
+             */
+            brief_model: string;
+            /**
+             * Brief Effort
+             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             */
+            brief_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Analysis Per Run
+             * @description Stories analysed by the model techniques per run (0: none); the most severe and newest first.
+             * @default 25
+             */
+            analysis_per_run: number;
+            /**
+             * Analysis Min Severity
+             * @description Stories below this severity are not sent to a model for analysis.
+             * @default 1
+             */
+            analysis_min_severity: number;
+            /**
+             * Framing Min Outlets
+             * @description A framing comparison needs this many independent outlets on the story.
+             * @default 3
+             */
+            framing_min_outlets: number;
+            /**
+             * Novelty Window Days
+             * @description How far back a story is compared for novelty.
+             * @default 30
+             */
+            novelty_window_days: number;
+            /**
+             * Novelty Repeat Similarity
+             * @description Cosine similarity at or above which a story repeats an earlier one.
+             * @default 0.88
+             */
+            novelty_repeat_similarity: number;
+            /**
+             * Novelty Update Similarity
+             * @description Cosine similarity at or above which a story updates an earlier one (below the repeat level).
+             * @default 0.72
+             */
+            novelty_update_similarity: number;
+            /**
+             * Thread Window Days
+             * @description A story joins a thread whose last update is within this many days.
+             * @default 21
+             */
+            thread_window_days: number;
+            /**
+             * Brief Max Lines
+             * @description Most lines in one brief (the highest ranked).
+             * @default 12
+             */
+            brief_max_lines: number;
+            /**
              * Indirect Alert Min Severity
              * @description A story that reaches its holding only through a competitor, supplier, customer or watch topic alerts only from this severity up (direct links alert from 1).
              * @default 2
@@ -22669,6 +23159,25 @@ export interface components {
             note: string | null;
             body: components["schemas"]["NotificationsConfig"];
         };
+        /** NoveltyOut */
+        NoveltyOut: {
+            /**
+             * Novelty
+             * @enum {string}
+             */
+            novelty: "new" | "update" | "repeat" | "recycled";
+            /**
+             * Surprise
+             * @enum {string}
+             */
+            surprise: "none" | "in_line" | "above" | "below" | "unknown";
+            /** Similarity */
+            similarity?: number | null;
+            /** Similar Story Id */
+            similar_story_id?: number | null;
+            /** Basis */
+            basis: string;
+        };
         /** NportCoverage */
         NportCoverage: {
             /**
@@ -22805,6 +23314,21 @@ export interface components {
             revenue: number | string | null;
             /** Share */
             share: number | string | null;
+        };
+        /** OutletFraming */
+        OutletFraming: {
+            /** Item Id */
+            item_id: number;
+            /** Headline Claim */
+            headline_claim: string;
+            /** Emphasised Cause */
+            emphasised_cause?: string | null;
+            /** Numbers Cited */
+            numbers_cited?: string[];
+            /** Quotes */
+            quotes?: string[];
+            /** Omitted */
+            omitted?: string[];
         };
         /** Overview */
         Overview: {
@@ -25036,7 +25560,7 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "news_translation" | "news_search_leads" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier" | "ir_discovery_search" | "ir_discovery_approve" | "web_gap_search" | "web_fact_approve" | "web_domain_tier" | "exposure_inputs" | "exposure_hs_mapping" | "dependency_extract" | "dependency_approve" | "listing_approval" | "peer_approval";
+            key: "earnings_extraction" | "earnings_locate" | "earnings_calendar" | "news_classification" | "news_corroboration" | "news_escalation" | "news_digest" | "news_translation" | "news_search_leads" | "news_extract" | "news_impact" | "news_framing" | "news_claims" | "news_thesis" | "news_brief" | "research_writer" | "monthly_review" | "chat_assistant" | "claim_verifier" | "ir_discovery_search" | "ir_discovery_approve" | "web_gap_search" | "web_fact_approve" | "web_domain_tier" | "exposure_inputs" | "exposure_hs_mapping" | "dependency_extract" | "dependency_approve" | "listing_approval" | "peer_approval";
             /** Title */
             title: string;
             /** Description */
@@ -29744,6 +30268,26 @@ export interface components {
             /** Cluster Id */
             cluster_id?: string | null;
         };
+        /** StoryAnalysis */
+        StoryAnalysis: {
+            /** Story Id */
+            story_id: number;
+            extraction?: components["schemas"]["StoryExtraction"] | null;
+            novelty?: components["schemas"]["NoveltyOut"] | null;
+            impact?: components["schemas"]["ImpactResult"] | null;
+            thread?: components["schemas"]["ThreadStepOut"] | null;
+            framing?: components["schemas"]["FramingComparison"] | null;
+            claims?: components["schemas"]["ClaimsOut"] | null;
+            market?: components["schemas"]["MarketContext"] | null;
+            thesis?: components["schemas"]["ThesisOut"] | null;
+            /**
+             * Models
+             * @description The model behind each technique that used one.
+             */
+            models?: {
+                [key: string]: string;
+            };
+        };
         /** StoryClosing */
         StoryClosing: {
             /** Closed */
@@ -29796,6 +30340,37 @@ export interface components {
              * @description Every lifecycle change, oldest first.
              */
             history: components["schemas"]["LifecycleStep"][];
+        };
+        /** StoryExtraction */
+        StoryExtraction: {
+            /** Event Type */
+            event_type: string;
+            /** Actors */
+            actors?: string[];
+            /** Affected Entities */
+            affected_entities?: components["schemas"]["AffectedEntity"][];
+            /** Action */
+            action: string;
+            magnitude?: components["schemas"]["Magnitude"] | null;
+            /** Occurred */
+            occurred?: string | null;
+            /** Announced */
+            announced?: string | null;
+            /** Effective */
+            effective?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "rumour" | "reported" | "confirmed" | "official";
+            /** Key Claims */
+            key_claims?: components["schemas"]["KeyClaim"][];
+            /** Interpretation */
+            interpretation?: string[];
+            /** Speculation */
+            speculation?: string[];
+            /** Unknowns */
+            unknowns?: string[];
         };
         /** StoryOut */
         StoryOut: {
@@ -29953,6 +30528,23 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["StrategyConfig"];
+        };
+        /** StudyRow */
+        StudyRow: {
+            /** Event Type */
+            event_type: string;
+            /** Region */
+            region: string;
+            /** Tier */
+            tier: number;
+            /** N */
+            n: number;
+            /** Median Pct */
+            median_pct: number;
+            /** P25 Pct */
+            p25_pct: number;
+            /** P75 Pct */
+            p75_pct: number;
         };
         /** StyleBand */
         StyleBand: {
@@ -30214,6 +30806,24 @@ export interface components {
             suppressed_reason: string | null;
             /** Alerts */
             alerts: components["schemas"]["AlertOut"][];
+        };
+        /** ThemeDay */
+        ThemeDay: {
+            /** Theme */
+            theme: string;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Wire Items */
+            wire_items: number;
+            /** Stories */
+            stories: number;
+            /** Regions */
+            regions: string[];
+            /** Flag */
+            flag: ("spike" | "spread") | null;
         };
         /** ThemeDefinition */
         ThemeDefinition: {
@@ -30584,6 +31194,11 @@ export interface components {
              */
             description: string;
         };
+        /** ThesisOut */
+        ThesisOut: {
+            /** Links */
+            links: components["schemas"]["LinkedAssumption"][];
+        };
         /** ThesisPrefill */
         ThesisPrefill: {
             /** Ticker */
@@ -30662,6 +31277,76 @@ export interface components {
              * @description One holding, or all when null.
              */
             ticker?: string | null;
+        };
+        /** ThreadDetail */
+        ThreadDetail: {
+            thread: components["schemas"]["ThreadOut"];
+            /** Timeline */
+            timeline: components["schemas"]["ThreadStep"][];
+        };
+        /** ThreadDiffOut */
+        ThreadDiffOut: {
+            /** New */
+            new?: string[];
+            /** Changed */
+            changed?: {
+                [key: string]: string;
+            }[];
+            /** Retracted */
+            retracted?: string[];
+            /** Unknown */
+            unknown?: string[];
+        };
+        /** ThreadOut */
+        ThreadOut: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Title */
+            title: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /**
+             * Last Update At
+             * Format: date-time
+             */
+            last_update_at: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "open" | "quiet" | "closed";
+            /** Stories */
+            stories: number;
+        };
+        /** ThreadStep */
+        ThreadStep: {
+            /** Story Id */
+            story_id: number;
+            /** Headline */
+            headline: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Severity */
+            severity: number | null;
+            /** Lifecycle */
+            lifecycle: string;
+            diff: components["schemas"]["ThreadDiffOut"];
+        };
+        /** ThreadStepOut */
+        ThreadStepOut: {
+            /** Thread Id */
+            thread_id: number;
+            /** Opened */
+            opened: boolean;
+            diff: components["schemas"]["ThreadDiffOut"];
         };
         /** TimelineMonth */
         TimelineMonth: {
@@ -31767,6 +32452,17 @@ export interface components {
              */
             fetched_at: string;
         };
+        /** WindowMove */
+        WindowMove: {
+            /** Days */
+            days: number;
+            /** Stock Pct */
+            stock_pct: number | null;
+            /** Benchmark Pct */
+            benchmark_pct: number | null;
+            /** Abnormal Pct */
+            abnormal_pct: number | null;
+        };
         /** WindowOut */
         WindowOut: {
             /** Label */
@@ -31806,6 +32502,59 @@ export interface components {
             /** Reason */
             reason: string | null;
             benchmark: components["schemas"]["BenchmarkOut"] | null;
+        };
+        /** WireItem */
+        WireItem: {
+            /** Id */
+            id: number;
+            /** Url */
+            url: string;
+            /** Headline */
+            headline: string;
+            /** Title En */
+            title_en: string | null;
+            /** Summary */
+            summary: string | null;
+            /** Language */
+            language: string | null;
+            /** Region */
+            region: string | null;
+            /** Outlet */
+            outlet: string | null;
+            /** Outlet Name */
+            outlet_name: string | null;
+            /** Tier */
+            tier: number;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /** Linked */
+            linked: boolean;
+            /** Topics */
+            topics: string[];
+            /** Fetch State */
+            fetch_state: string;
+            /** Paywall */
+            paywall: string;
+            /** State Media */
+            state_media: boolean;
+            /** Group Id */
+            group_id: number | null;
+            /** Story Id */
+            story_id: number | null;
+            /** Story Severity */
+            story_severity: number | null;
+            /** Story Lifecycle */
+            story_lifecycle: string | null;
+        };
+        /** WirePage */
+        WirePage: {
+            /** Items */
+            items: components["schemas"]["WireItem"][];
+            /** Next Before Id */
+            next_before_id: number | null;
         };
         /** WorldBankIndicator */
         WorldBankIndicator: {
@@ -32629,6 +33378,47 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** FeedbackIn */
+        steward__news__read_analysis__FeedbackIn: {
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "item" | "story" | "claim" | "brief_line";
+            /** Target Id */
+            target_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "wrong_entity" | "duplicate" | "misread" | "missing_source" | "useful" | "not_useful";
+            /** Note */
+            note?: string | null;
+        };
+        /** FeedbackOut */
+        steward__news__read_analysis__FeedbackOut: {
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "item" | "story" | "claim" | "brief_line";
+            /** Target Id */
+            target_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "wrong_entity" | "duplicate" | "misread" | "missing_source" | "useful" | "not_useful";
+            /** Note */
+            note?: string | null;
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** StakeChangeOut */
         steward__ownership__control_stakes_read__StakeChangeOut: {
             /** Change Type */
@@ -32662,6 +33452,88 @@ export interface components {
             issues: number;
             /** Note */
             note?: string | null;
+        };
+        /** FeedbackIn */
+        steward__verify__feedback__FeedbackIn: {
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "fact" | "verdict" | "alert" | "news_item" | "story" | "report_sentence";
+            /**
+             * Target Id
+             * @description The fact, verdict, alert, news item, story or report id.
+             */
+            target_id: number;
+            /**
+             * Sentence Path
+             * @description Report sentences only: where it sits in the report body, e.g. 'overview/0', 'sections/2/summary/1' (digest) or 'sentences/3' (impact note).
+             */
+            sentence_path?: string | null;
+            /**
+             * Rating
+             * @enum {string}
+             */
+            rating: "wrong" | "irrelevant" | "useful";
+            /** Note */
+            note?: string | null;
+            /**
+             * Add To Eval
+             * @description With rating 'wrong' on a fact or news item: add it to the golden or labelled evaluation set with the corrected value or label.
+             * @default false
+             */
+            add_to_eval: boolean;
+            /**
+             * Corrected Value
+             * @description Facts: the right value, in the fact's printed scale.
+             */
+            corrected_value?: number | string | null;
+            /**
+             * Corrected Value As Written
+             * @description Facts added to the golden set: the right number exactly as printed, when it differs from the stored one (e.g. '94,036').
+             */
+            corrected_value_as_written?: string | null;
+            /**
+             * Corrected Snippet
+             * @description Facts added to the golden set: the document passage that states the right number, when the stored snippet does not contain it.
+             */
+            corrected_snippet?: string | null;
+            corrected_label?: components["schemas"]["NewsLabel"] | null;
+        };
+        /** FeedbackOut */
+        steward__verify__feedback__FeedbackOut: {
+            /** Id */
+            id: number;
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "fact" | "verdict" | "alert" | "news_item" | "story" | "report_sentence";
+            /** Target Id */
+            target_id: number;
+            /** Sentence Path */
+            sentence_path: string | null;
+            /**
+             * Rating
+             * @enum {string}
+             */
+            rating: "wrong" | "irrelevant" | "useful";
+            /** Note */
+            note: string | null;
+            /** Source Hosts */
+            source_hosts: string[];
+            /**
+             * Effects
+             * @description What the feedback did: quarantined fact, verdict job, trust scores, eval candidate.
+             */
+            effects: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
     };
     responses: never;
@@ -35707,6 +36579,331 @@ export interface operations {
             };
         };
     };
+    run_news_analysis: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    run_news_brief: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+        };
+    };
+    get_story_analysis: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                story_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoryAnalysis"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_threads: {
+        parameters: {
+            query?: {
+                ticker?: string | null;
+                state?: ("open" | "quiet" | "closed") | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_thread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_wire: {
+        parameters: {
+            query?: {
+                region?: string | null;
+                language?: string | null;
+                outlet?: string | null;
+                tier?: number | null;
+                topic?: string | null;
+                linked?: boolean | null;
+                paywall?: ("open" | "metered" | "hard") | null;
+                q?: string | null;
+                before_id?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WirePage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_briefs: {
+        parameters: {
+            query?: {
+                kind?: ("morning" | "weekly" | "holding") | null;
+                ticker?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BriefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_themes: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeDay"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_event_study: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudyRow"][];
+                };
+            };
+        };
+    };
+    get_news_feedback: {
+        parameters: {
+            query?: {
+                target?: ("item" | "story" | "claim" | "brief_line") | null;
+                target_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["steward__news__read_analysis__FeedbackOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_news_feedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["steward__news__read_analysis__FeedbackIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["steward__news__read_analysis__FeedbackOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     run_digest_now: {
         parameters: {
             query?: never;
@@ -36719,7 +37916,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FeedbackOut"][];
+                    "application/json": components["schemas"]["steward__verify__feedback__FeedbackOut"][];
                 };
             };
             /** @description Validation Error */
@@ -36742,7 +37939,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["FeedbackIn"];
+                "application/json": components["schemas"]["steward__verify__feedback__FeedbackIn"];
             };
         };
         responses: {
@@ -36752,7 +37949,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FeedbackOut"];
+                    "application/json": components["schemas"]["steward__verify__feedback__FeedbackOut"];
                 };
             };
             /** @description Validation Error */

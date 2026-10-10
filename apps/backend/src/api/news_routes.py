@@ -14,6 +14,7 @@ from steward.config import EventRulesConfig, JobsConfig, NewsSourcesConfig, Noti
 from steward.config.common import Ticker
 from steward.config.event_rules import EVENT_DESCRIPTIONS, EVENT_TYPES, EventType
 from steward.config.store import load_active
+from steward.news.market import StudyRow
 from steward.news.read import (
     AlertOut,
     Confidence,
@@ -34,6 +35,27 @@ from steward.news.read import (
     resolve_story,
     set_story_closed,
     story_evidence,
+)
+from steward.news.read_analysis import (
+    BriefOut,
+    FeedbackIn,
+    FeedbackOut,
+    FeedbackTarget,
+    StoryAnalysis,
+    ThemeDay,
+    ThreadDetail,
+    ThreadOut,
+    WireFilters,
+    WirePage,
+    add_feedback,
+    list_briefs,
+    list_feedback,
+    list_threads,
+    story_analysis,
+    study,
+    theme_days,
+    thread_detail,
+    wire,
 )
 from steward.news.stats import NewsStats, SourcesHealth, news_stats, sources_health
 from steward.notify.alerts import create_alerts
@@ -293,6 +315,135 @@ async def run_macro_collect(pool: Pool, owner: Owner) -> JobSummary:
 async def run_news_ingest(pool: Pool, owner: Owner) -> JobSummary:
     """Run the news pipeline now: ingest, classify, corroborate, alert."""
     return await _enqueue(pool, "news_ingest", owner.user_id)
+
+
+@router.post("/jobs/news-analysis", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)
+async def run_news_analysis(pool: Pool, owner: Owner) -> JobSummary:
+    """Analyse recent stories now: novelty, threads, market context, themes and the model
+    techniques selected in the news settings."""
+    return await _enqueue(pool, "news_analysis", owner.user_id)
+
+
+@router.post("/jobs/news-brief", tags=["jobs"], status_code=status.HTTP_202_ACCEPTED)
+async def run_news_brief(pool: Pool, owner: Owner) -> JobSummary:
+    """Write the morning brief now (on a Monday also the weekly and per-holding briefs)."""
+    return await _enqueue(pool, "news_brief", owner.user_id)
+
+
+# ---------------------------------------------------------------------------
+# Analysis, threads, wire, briefs, themes, feedback (N6, N7)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/stories/{story_id}/analysis", tags=["news"])
+async def get_story_analysis(story_id: IdPath, pool: Pool, _owner: Owner) -> StoryAnalysis:
+    """What the analysis engine found for a story: the extracted event with its cited claims,
+    novelty, impact chains onto the portfolio, thread step, framing comparison, claim check,
+    market context and thesis links. A technique that has not run (or is off) is null."""
+    found = await story_analysis(pool, story_id)
+    if found is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No story {story_id}")
+    return found
+
+
+@router.get("/threads", tags=["news"])
+async def get_threads(
+    pool: Pool,
+    _owner: Owner,
+    ticker: Annotated[Ticker | None, Query()] = None,
+    state: Annotated[Literal["open", "quiet", "closed"] | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[ThreadOut]:
+    """Developing situations with their story counts, newest update first."""
+    return await list_threads(pool, ticker, state, limit)
+
+
+@router.get("/threads/{thread_id}", tags=["news"])
+async def get_thread(thread_id: IdPath, pool: Pool, _owner: Owner) -> ThreadDetail:
+    """A thread's timeline: each story with what it added to the thread."""
+    found = await thread_detail(pool, thread_id)
+    if found is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No thread {thread_id}")
+    return found
+
+
+@router.get("/wire", tags=["news"])
+async def get_wire(
+    pool: Pool,
+    _owner: Owner,
+    region: Annotated[str | None, Query(max_length=2)] = None,
+    language: Annotated[str | None, Query(max_length=8)] = None,
+    outlet: Annotated[str | None, Query(max_length=100)] = None,
+    tier: Annotated[int | None, Query(ge=1, le=3)] = None,
+    topic: Annotated[str | None, Query(max_length=60)] = None,
+    linked: bool | None = None,
+    paywall: Annotated[Literal["open", "metered", "hard"] | None, Query()] = None,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    before_id: Annotated[int | None, Query(ge=1, le=DB_ID_MAX)] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> WirePage:
+    """Every fresh item from every enabled source, linked to a holding or not, newest first."""
+    return await wire(
+        pool,
+        WireFilters(
+            region=region,
+            language=language,
+            outlet=outlet,
+            tier=tier,
+            topic=topic,
+            linked=linked,
+            paywall=paywall,
+            q=q,
+            before_id=before_id,
+            limit=limit,
+        ),
+    )
+
+
+@router.get("/news/briefs", tags=["news"])
+async def get_briefs(
+    pool: Pool,
+    _owner: Owner,
+    kind: Annotated[Literal["morning", "weekly", "holding"] | None, Query()] = None,
+    ticker: Annotated[Ticker | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> list[BriefOut]:
+    """Written briefs, newest first. Every line cites stored news items."""
+    return await list_briefs(pool, kind, ticker, limit)
+
+
+@router.get("/news/themes", tags=["news"])
+async def get_themes(
+    pool: Pool, _owner: Owner, days: Annotated[int, Query(ge=1, le=90)] = 14
+) -> list[ThemeDay]:
+    """Daily wire and story counts per portfolio watch theme, with regime flags."""
+    return await theme_days(pool, days)
+
+
+@router.get("/news/event-study", tags=["news"])
+async def get_event_study(pool: Pool, _owner: Owner) -> list[StudyRow]:
+    """What stories of each type, region and outlet tier were followed by, from the owner's own
+    history: the median abnormal 3-day move with quartiles and the number of stories. A
+    description of the past, not a forecast."""
+    return await study(pool)
+
+
+@router.post("/news/feedback", tags=["news"], status_code=status.HTTP_201_CREATED)
+async def post_news_feedback(body: FeedbackIn, pool: Pool, _owner: Owner) -> FeedbackOut:
+    """Mark an item, story, claim or brief line (wrong entity, duplicate, misread, missing
+    source, useful, not useful). Feedback feeds the benchmark, never model training."""
+    return await add_feedback(pool, body)
+
+
+@router.get("/news/feedback", tags=["news"])
+async def get_news_feedback(
+    pool: Pool,
+    _owner: Owner,
+    target: Annotated[FeedbackTarget | None, Query()] = None,
+    target_id: Annotated[str | None, Query(max_length=200)] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> list[FeedbackOut]:
+    return await list_feedback(pool, target, target_id, limit)
 
 
 class DigestRequest(BaseModel):

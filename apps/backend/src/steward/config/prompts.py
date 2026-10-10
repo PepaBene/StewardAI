@@ -29,6 +29,12 @@ PromptKey = Literal[
     "news_digest",
     "news_translation",
     "news_search_leads",
+    "news_extract",
+    "news_impact",
+    "news_framing",
+    "news_claims",
+    "news_thesis",
+    "news_brief",
     "research_writer",
     "monthly_review",
     "chat_assistant",
@@ -105,6 +111,39 @@ PROMPTS: dict[PromptKey, PromptInfo] = {
         "Searches the web for recent news on a thinly covered holding and lists article links "
         "as leads (never as facts).",
         "steward.news.ai_search:SYSTEM_PROMPT",
+    ),
+    "news_extract": PromptInfo(
+        "News event extraction",
+        "Extracts the typed event of a story (actors, magnitude, status, claims with cited "
+        "spans) from its stored text.",
+        "steward.news.extract:SYSTEM_PROMPT",
+    ),
+    "news_impact": PromptInfo(
+        "News impact chains",
+        "Proposes how a story reaches the portfolio's holdings; code checks every link against "
+        "the exposure graph.",
+        "steward.news.impact:SYSTEM_PROMPT",
+    ),
+    "news_framing": PromptInfo(
+        "News framing comparison",
+        "Compares how independent outlets and regions frame the same story.",
+        "steward.news.framing:SYSTEM_PROMPT",
+    ),
+    "news_claims": PromptInfo(
+        "News claim check",
+        "Checks a severe story's claims against the primary documents already stored.",
+        "steward.news.claims:SYSTEM_PROMPT",
+    ),
+    "news_thesis": PromptInfo(
+        "News thesis linkage",
+        "Says whether a story strengthens, weakens or does not touch a thesis assumption.",
+        "steward.news.thesis_link:SYSTEM_PROMPT",
+    ),
+    "news_brief": PromptInfo(
+        "News brief",
+        "Writes the morning, weekly and per-holding briefs from stored stories, every line "
+        "citing its items.",
+        "steward.news.brief:SYSTEM_PROMPT",
     ),
     "research_writer": PromptInfo(
         "Deep research writer",

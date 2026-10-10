@@ -251,6 +251,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "macro_collect",
         "monitor",
         "monthly_review",
+        "news_analysis",
         "news_ingest",
         "nport_holdings",
         "ownership_13f",

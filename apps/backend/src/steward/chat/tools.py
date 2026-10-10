@@ -78,6 +78,40 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "search_wire",
+        "description": "The news wire: every stored headline from every source, in any language "
+        "(English translations are searched too), linked to a holding or not. Use it for "
+        "questions about coverage ('what is the Japanese press saying about yen intervention', "
+        "'who reported the Siemens Energy guidance cut first'). Each item has its outlet, "
+        "region, tier and publication time; filters narrow by region (country code), language "
+        "and holding. Oldest-first ordering finds who reported first.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Words that must appear."},
+                "region": {"type": "string", "description": "Outlet country code, e.g. JP."},
+                "language": {"type": "string", "description": "Language code, e.g. ja."},
+                "ticker": {"type": "string"},
+                "days": {"type": "integer", "minimum": 1, "maximum": 90},
+                "oldest_first": {"type": "boolean"},
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "get_story_thread",
+        "description": "A developing situation as a timeline: each story in the thread with "
+        "what it added (new facts, changed facts, corrections, what is still unknown). Give a "
+        "story id from search_news or search_wire.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"story_id": {"type": "integer"}},
+            "required": ["story_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "search_reports",
         "description": "Full-text search over digests, monthly reviews, research reports "
         "and impact notes, newest first.",
@@ -420,6 +454,97 @@ class ChatTools:
                 }
             )
         return {"items": items}
+
+    async def _tool_search_wire(
+        self,
+        query: str,
+        region: str | None = None,
+        language: str | None = None,
+        ticker: str | None = None,
+        days: int = 14,
+        oldest_first: bool = False,
+    ) -> dict[str, Any]:
+        rows = await self.pool.fetch(
+            "select a.id, a.url, a.headline, a.title_en, a.summary, a.outlet, a.outlet_name,"
+            " a.region, a.language, a.tier, a.published_at, a.linked, i.cluster_id as story_id"
+            " from public.news_article a left join public.news_item i on i.id = a.news_item_id"
+            " where a.published_at >= $1 and ($2::text is null or a.region = upper($2))"
+            " and ($3::text is null or a.language = lower($3))"
+            " and ($4::text is null or $4 = any(i.tickers))"
+            " and (a.search @@ websearch_to_tsquery('simple', $5)"
+            " or coalesce(a.title_en, '') ilike '%' || $5 || '%')"
+            " order by case when $6 then extract(epoch from a.published_at)"
+            " else -extract(epoch from a.published_at) end limit 15",
+            dt.datetime.now(dt.UTC) - dt.timedelta(days=max(1, min(90, days))),
+            region,
+            language,
+            ticker,
+            query,
+            oldest_first,
+        )
+        items = []
+        for r in rows:
+            sid = self.registry.add(
+                "news_item",
+                f"wire:{r['id']}",
+                r["title_en"] or r["headline"],
+                url=r["url"],
+                tier=r["tier"],
+                snippet=(r["summary"] or "")[:600] or None,
+                as_of=str(r["published_at"].date()),
+            )
+            items.append(
+                {
+                    "source_id": sid,
+                    "headline": r["headline"],
+                    "headline_en": r["title_en"],
+                    "outlet": r["outlet_name"] or r["outlet"],
+                    "region": r["region"],
+                    "language": r["language"],
+                    "tier": r["tier"],
+                    "published": r["published_at"].isoformat(timespec="minutes"),
+                    "linked_to_holding": r["linked"],
+                    "story_id": r["story_id"],
+                }
+            )
+        return {"items": items, "note": "Wire items are headlines; they do not alert."}
+
+    async def _tool_get_story_thread(self, story_id: int) -> dict[str, Any]:
+        from steward.news.read_analysis import thread_detail
+
+        thread_id = await self.pool.fetchval(
+            "select thread_id from public.story_cluster where id = $1", story_id
+        )
+        if thread_id is None:
+            return {"error": f"story {story_id} is not in a thread"}
+        detail = await thread_detail(self.pool, thread_id)
+        if detail is None:
+            return {"error": f"no thread {thread_id}"}
+        steps = []
+        for step in detail.timeline:
+            sid = self.registry.add(
+                "observation",
+                f"story:{step.story_id}",
+                step.headline,
+                app_path="/news",
+                tier=2,
+                snippet=f"{step.lifecycle}; severity {step.severity}",
+            )
+            steps.append(
+                {
+                    "source_id": sid,
+                    "story_id": step.story_id,
+                    "headline": step.headline,
+                    "at": step.at.isoformat(timespec="minutes"),
+                    "severity": step.severity,
+                    "status": step.lifecycle,
+                    "new": step.diff.new,
+                    "changed": step.diff.changed,
+                    "corrected": step.diff.retracted,
+                    "still_unknown": step.diff.unknown,
+                }
+            )
+        return {"thread": detail.thread.title, "ticker": detail.thread.ticker, "steps": steps}
 
     async def _tool_search_reports(self, query: str) -> dict[str, Any]:
         rows = await self.pool.fetch(
