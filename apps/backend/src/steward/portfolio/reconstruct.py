@@ -265,7 +265,8 @@ async def rebuild_portfolio_history(ctx: JobContext) -> None:
         wanted = {*currencies.values(), *close_currency.values(), account_currency}
         start = min(t.day for t in txs)
         fx = await load_fx_history(pool, "ecb", wanted, start, first_day)
-        days = weekdays(start, first_day)
+        # The first real day is built even on a weekend: it is the check against the broker.
+        days = sorted({*weekdays(start, first_day), first_day})
         try:
             built = rebuild(txs, closes, close_currency, currencies, fx, account_currency, days)
         except ValueError as exc:
@@ -281,7 +282,9 @@ async def rebuild_portfolio_history(ctx: JobContext) -> None:
         }
         check_row = next((a for a in built.accounts if a.day == first_day), None)
         if check_row is None:
-            raise JobFailed(f"the first real day {first_day} could not be rebuilt")
+            raise JobFailed(
+                f"the first real day {first_day} could not be rebuilt: {built.skipped.get(first_day)}"
+            )
         mine = {p.ticker: p.quantity for p in built.positions if p.day == first_day}
         quantity_gap = max(
             (
