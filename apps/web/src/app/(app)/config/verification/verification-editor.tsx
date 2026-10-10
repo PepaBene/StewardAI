@@ -270,7 +270,7 @@ export function VerificationEditor() {
                 list="verifier-models"
                 spellCheck={false}
                 onChange={(v) => set({ claimModel: v })}
-                hint="A Claude model id."
+                hint="A gpt- or gemini- model id."
               />
               <SelectField
                 label="Effort"

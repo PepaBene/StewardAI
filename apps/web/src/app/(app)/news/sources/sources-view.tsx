@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/page-header";
 import { getBrowserApiClient } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 import { formatDateTime } from "@/lib/format";
+import { delayLabel, fetchMethods, responseTimeLabel } from "@/lib/news/stats";
 import { cn } from "@/lib/utils";
 
 type SourcesHealth = components["schemas"]["SourcesHealth"];
@@ -71,7 +72,7 @@ export function SourcesView() {
       ) : null}
       {load.kind === "ok" ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[56rem] text-left text-sm">
+          <table className="w-full min-w-[78rem] text-left text-sm">
             <caption className="sr-only">News sources and their health</caption>
             <thead className="text-xs text-text-muted">
               <tr className="border-b border-border">
@@ -82,6 +83,9 @@ export function SourcesView() {
                 <th className="pr-3 font-normal">Last success</th>
                 <th className="num pr-3 font-normal">Items a day</th>
                 <th className="num pr-3 font-normal">Kept for holdings</th>
+                <th className="pr-3 font-normal">Article text, last week</th>
+                <th className="pr-3 font-normal">Seen after publication</th>
+                <th className="num pr-3 font-normal">Answer time</th>
                 <th className="font-normal">Last error</th>
               </tr>
             </thead>
@@ -109,6 +113,13 @@ export function SourcesView() {
                   <td className="num pr-3">{s.last_success_at ? formatDateTime(s.last_success_at) : "never"}</td>
                   <td className="num pr-3">{(s.fetched_7d / 7).toFixed(1)}</td>
                   <td className="num pr-3">{s.stored_linked_7d}</td>
+                  <td className="pr-3 text-xs">
+                    {fetchMethods(s.fulltext_by_rung_7d)}
+                    {(s.fulltext_truncated_7d ?? 0) > 0 ? <span className="block text-text-muted">{s.fulltext_truncated_7d} cut off</span> : null}
+                    {(s.fulltext_failed_7d ?? 0) > 0 ? <span className="block text-text-muted">{s.fulltext_failed_7d} not fetched</span> : null}
+                  </td>
+                  <td className="pr-3 text-xs">{delayLabel(s.delay_p50_min, s.delay_p95_min)}</td>
+                  <td className="num pr-3 text-xs">{responseTimeLabel(s.avg_latency_ms)}</td>
                   <td className="text-xs [overflow-wrap:anywhere]">{s.last_error ?? ""}</td>
                 </tr>
               ))}

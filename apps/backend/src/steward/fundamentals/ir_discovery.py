@@ -1,10 +1,10 @@
 """Finding a holding's investor-relations pages without the owner typing them.
 
-For each holding whose profile has no `ir_url` (and that is off its cooldown), a Claude web
+For each holding whose profile has no `ir_url` (and that is off its cooldown), a model web
 search proposes the IR home, results and financial-calendar pages. Mechanical checks come first
 and can only block: every proposed URL must come from the search results (or share the IR
 page's domain), must not be on the deny list, must load as an HTML page over https, and the
-page must mention the company. A second Claude call, without search, then judges what is left
+page must mention the company. A second model call, without search, then judges what is left
 (is this the company's own investor site, is it the right entity) and a page is applied only
 at or above `min_confidence`.
 
@@ -23,13 +23,12 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, cast
 from urllib.parse import urlsplit
 
-import anthropic
 import httpx
 import pydantic
 from pydantic import BaseModel, Field
 
 from steward import __version__
-from steward.ai import AINotConfigured, Usage, create_client
+from steward.ai import AINotConfigured, Usage
 from steward.budget_guard import BudgetExceeded
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import IrDiscoverySettings, JobsConfig, effort_kwargs
@@ -40,8 +39,8 @@ from steward.fundamentals.ir import IrError, assert_fetchable
 from steward.jobs.runner import JobContext, JobFailed
 from steward.llm.cache import ResultCache
 from steward.llm.client import create_llm
-from steward.llm.routing import batch_collector, routing_client
-from steward.llm.types import provider_of
+from steward.llm.routing import RoutingClient, batch_collector, routing_client
+from steward.llm.types import LLMError
 from steward.research.polite import PoliteFetcher, build_fetcher
 from steward.settings import get_settings
 
@@ -199,42 +198,32 @@ async def inspect_page(fetcher: PoliteFetcher, url: str, names: list[str]) -> Fe
 
 
 async def search_pages(
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     cfg: IrDiscoverySettings,
     prompt: str,
     usage: Usage,
     system: str = SEARCH_SYSTEM,
 ) -> tuple[IrPages | None, set[str]]:
     tool = {
-        "type": "web_search_20250305"
-        if cfg.model.startswith("claude-haiku-4")
-        else "web_search_20260209",
+        "type": "web_search_20260209",
         "name": "web_search",
         "max_uses": cfg.max_searches,
         "blocked_domains": list(cfg.denied_domains),
     }
-    messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
-    seen: set[str] = set()
-    response = None
-    for _ in range(3):  # pause_turn continuations
-        response = await client.messages.parse(
-            model=cfg.model,
-            system=system,
-            messages=cast(Any, messages),
-            tools=cast(Any, [tool]),
-            output_format=IrPages,
-            **effort_kwargs(cfg.model, cfg.effort, 8000),
-        )
-        usage.add(response.usage)
-        seen |= _result_urls(response.content)
-        if response.stop_reason != "pause_turn":
-            break
-        messages.append({"role": "assistant", "content": response.content})
-    return (response.parsed_output if response else None), seen
+    response = await client.messages.parse(
+        model=cfg.model,
+        system=system,
+        messages=cast(Any, [{"role": "user", "content": prompt}]),
+        tools=cast(Any, [tool]),
+        output_format=IrPages,
+        **effort_kwargs(cfg.model, cfg.effort, 8000),
+    )
+    usage.add(response.usage)
+    return response.parsed_output, _result_urls(response.content)
 
 
 async def judge_pages(
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     cfg: IrDiscoverySettings,
     company: str,
     isin: str | None,
@@ -309,7 +298,7 @@ def probe_urls(profile: HoldingProfile, denied: list[str]) -> list[str]:
 
 async def discover_holding(
     ctx: JobContext,
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     fetcher: PoliteFetcher,
     cfg: IrDiscoverySettings,
     profile: HoldingProfile,
@@ -524,11 +513,8 @@ async def ir_discovery_handler(ctx: JobContext) -> None:
     async with ctx.step("register_pages") as step:
         step.detail["registered"] = await register_results_pages(ctx, profiles_stored.body)
     try:
-        anthropic_client = create_client(settings)
-        llm = create_llm(settings, anthropic_client)
-        client = routing_client(
-            anthropic_client, llm, ResultCache(ctx.pool, "ir_discovery", search_ttl_days=3)
-        )
+        llm = create_llm(settings)
+        client = routing_client(llm, ResultCache(ctx.pool, "ir_discovery", search_ttl_days=3))
     except AINotConfigured as exc:
         raise JobFailed(str(exc)) from exc
     last = {
@@ -602,17 +588,13 @@ async def ir_discovery_handler(ctx: JobContext) -> None:
                         usage,
                         prompts,
                     )
-                except (anthropic.APIError, pydantic.ValidationError, ValueError) as exc:
+                except (LLMError, pydantic.ValidationError, ValueError) as exc:
                     return "error", {"error": str(exc)[:200]}, {}
 
-            # With `use_batch` and an OpenAI or Google model every holding's search runs as one
+            # With `use_batch` every holding's search runs as one
             # batch, then every judgement as a second; the flows are independent of each other
             # and of the profiles, which are updated afterwards, one at a time.
-            if (
-                cfg.use_batch
-                and provider_of(cfg.model) != "anthropic"
-                and llm.configured(cfg.model)
-            ):
+            if cfg.use_batch and llm.configured(cfg.model):
                 with batch_collector(client, llm, cfg.batch_wait_minutes) as collector:
                     ran = await collector.run([discover(p) for _, p in due])
                 step.detail["batch_rounds"] = collector.rounds

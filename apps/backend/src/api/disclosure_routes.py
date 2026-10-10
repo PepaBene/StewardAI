@@ -37,6 +37,7 @@ from steward.disclosure.dependencies import AUDIT_LABELS
 from steward.disclosure.insiders import ECONOMIC_CLASSES
 from steward.disclosure.parse import ParseError, parse_html
 from steward.llm.client import create_llm
+from steward.llm.types import AINotConfigured
 from steward.settings import get_settings
 from steward.storage import StorageError
 
@@ -1411,7 +1412,12 @@ async def adjudication_prelabel(
     sample = await adjudication_sample(dataset, pool, _owner, size, seed)
     stored = await load_active(pool, "jobs", JobsConfig)
     model = (stored.body if stored else JobsConfig()).chat.model
-    llm = create_llm(get_settings(), None)
+    try:
+        llm = create_llm(get_settings())
+    except AINotConfigured:
+        raise HTTPException(
+            409, "no OpenAI or Google API key is set, so nothing can be suggested"
+        ) from None
     if not llm.configured(model):
         raise HTTPException(
             409, f"the chat model {model} has no API key, so nothing can be suggested"

@@ -5,7 +5,7 @@
 (quarterly) refreshes every holding. Each sets `instrument.next_report_date`:
 - from Finnhub's earnings calendar when FINNHUB_API_KEY is set and it lists the symbol;
 - otherwise from the company's IR financial calendar page (holding profile), read by a
-  Claude call whose every date must be quoted verbatim from the page and must visibly
+  model call whose every date must be quoted verbatim from the page and must visibly
   contain that day and month.
 A report date that has passed without a successful check is kept as
 `pending_report_date` when the refresh moves `next_report_date` on, so its retries still run.
@@ -23,14 +23,13 @@ import logging
 import re
 from typing import Any, Literal
 
-import anthropic
 import asyncpg
 import httpx
 import pydantic
 from pydantic import BaseModel, Field
 
 from steward import __version__
-from steward.ai import AINotConfigured, Usage, create_client
+from steward.ai import AINotConfigured, Usage
 from steward.budget_guard import BudgetExceeded
 from steward.config.holding_profiles import HoldingProfile
 from steward.config.jobs import EarningsCalendarSettings, effort_kwargs
@@ -41,8 +40,8 @@ from steward.earnings.check import load_config, local_today
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
 from steward.llm.client import LLM, create_llm
-from steward.llm.routing import routing_client
-from steward.llm.types import Message, Request, provider_of
+from steward.llm.routing import RoutingClient, routing_client
+from steward.llm.types import LLMError, Message, Request
 from steward.settings import get_settings
 from steward.sources.finnhub import FinnhubError, next_earnings_date
 
@@ -111,7 +110,7 @@ def date_in_text(date: dt.date, text: str) -> bool:
 
 
 async def dates_from_ir_page(
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     http: httpx.AsyncClient,
     profile: HoldingProfile,
     settings: EarningsCalendarSettings,
@@ -294,25 +293,21 @@ async def refresh_calendar(ctx: JobContext, *, full: bool) -> None:
     retry_days = max(config.jobs.earnings_check.check_days_after_report, default=0)
 
     end = today + dt.timedelta(days=cal_settings.lookahead_days)
-    client: anthropic.AsyncAnthropic | None
+    client: RoutingClient | None
     llm: LLM | None
     try:
-        anthropic_client = create_client(settings)
-        llm = create_llm(settings, anthropic_client)
-        client = routing_client(anthropic_client, llm)
+        llm = create_llm(settings)
+        client = routing_client(llm)
     except AINotConfigured:
         client = None
         llm = None
     finnhub_key = settings.finnhub_api_key.get_secret_value() if settings.finnhub_api_key else None
 
-    # With `use_batch` and an OpenAI or Google model, the IR pages that need the AI are read
+    # With `use_batch`, the IR pages that need the AI are read
     # in one batch after the structured sources have been tried for every holding.
     deferred: list[tuple[str, str, str]] | None = (
         []
-        if cal_settings.use_batch
-        and provider_of(cal_settings.model) != "anthropic"
-        and llm is not None
-        and llm.configured(cal_settings.model)
+        if cal_settings.use_batch and llm is not None and llm.configured(cal_settings.model)
         else None
     )
     async with httpx.AsyncClient(
@@ -391,7 +386,7 @@ async def _batch_pages(
 
 async def _find_date(
     http: httpx.AsyncClient,
-    client: anthropic.AsyncAnthropic | None,
+    client: RoutingClient | None,
     finnhub_key: str | None,
     profile: HoldingProfile,
     settings: EarningsCalendarSettings,
@@ -429,7 +424,7 @@ async def _find_date(
             )
         except (
             FetchError,
-            anthropic.APIError,
+            LLMError,
             httpx.HTTPError,
             pydantic.ValidationError,
             ValueError,
@@ -443,7 +438,7 @@ async def _find_date(
                 return date, source
             notes.append(f"ir calendar: {source}")
     elif profile.financial_calendar_url:
-        notes.append("ir calendar: ANTHROPIC_API_KEY not set")
+        notes.append("ir calendar: no AI provider key set")
     else:
         notes.append("ir calendar: no financial_calendar_url in the holding profile")
     step.detail["notes"] = notes

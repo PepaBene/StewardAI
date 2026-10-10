@@ -19,7 +19,7 @@ from dataclasses import dataclass
 import asyncpg
 from pydantic import BaseModel, Field
 
-from steward.ai import AINotConfigured, Usage, create_client
+from steward.ai import AINotConfigured, Usage
 from steward.config.jobs import JobsConfig
 from steward.config.news_sources import NewsSource
 from steward.config.prompts import load_prompts
@@ -205,10 +205,9 @@ async def news_ai_search_handler(ctx: JobContext) -> None:
     if news.ai_search_max_holdings == 0:
         return
     try:
-        client = create_client(settings)
-    except AINotConfigured:
-        client = None
-    llm = create_llm(settings, client)
+        llm = create_llm(settings)
+    except AINotConfigured as exc:
+        raise JobFailed(f"no API key for {news.search_lead_model}") from exc
     if not llm.configured(news.search_lead_model):
         raise JobFailed(f"no API key for {news.search_lead_model}")
     prompts = await load_prompts(ctx.pool)

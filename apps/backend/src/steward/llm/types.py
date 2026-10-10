@@ -13,19 +13,21 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-Provider = Literal["anthropic", "openai", "google"]
+Provider = Literal["openai", "google"]
 StopReason = Literal["end", "max_tokens", "refusal", "tool_use", "other"]
 
 
 def provider_of(model: str) -> Provider:
     """The provider that serves `model`, from its id prefix."""
-    if model.startswith("claude-"):
-        return "anthropic"
     if model.startswith("gpt-"):
         return "openai"
     if model.startswith("gemini-"):
         return "google"
-    raise ValueError(f"no provider is known for model {model!r}")
+    raise ValueError(f"no provider is known for model {model!r}: use a gpt-* or gemini-* model")
+
+
+class AINotConfigured(Exception):
+    """Neither an OpenAI nor a Google key is set, so no AI call can be made."""
 
 
 class LLMError(Exception):
@@ -72,7 +74,7 @@ class Message:
 @dataclass(frozen=True)
 class SearchSpec:
     """A web search the model may run. `allowed_domains` is enforced by the provider where it
-    can (Anthropic, OpenAI) and checked on the citations afterwards where it cannot (Google)."""
+    can (OpenAI) and checked on the citations afterwards where it cannot (Google)."""
 
     max_uses: int = 5
     allowed_domains: tuple[str, ...] = ()
@@ -92,8 +94,6 @@ class Request:
     # Static first, varying last; a stable key per job type lets OpenAI land related requests
     # on the same prefix cache. Ignored by the other providers.
     cache_key: str | None = None
-    # Anthropic only: mark the system prompt as a cache breakpoint.
-    cache_system: bool = False
 
 
 @dataclass(frozen=True)
@@ -110,10 +110,10 @@ def normalized_usage(
     cache_read_tokens: int = 0,
     searches: int = 0,
 ) -> Any:
-    """A usage block shaped like Anthropic's (`input_tokens` excludes cache reads and writes),
-    so `Usage.add`, `record_response` and the budget guard take it unchanged. Providers that
-    report cached tokens as a subset of the prompt (OpenAI, Google) are converted by the
-    adapter; adding them as they come would bill the cached tokens twice."""
+    """One usage block for every provider (`input_tokens` excludes cache reads and writes),
+    which `Usage.add`, `record_response` and the budget guard take. Providers report cached
+    tokens as a subset of the prompt (OpenAI, Google); the adapter converts them, because
+    adding them as they come would bill the cached tokens twice."""
     return SimpleNamespace(
         input_tokens=max(input_tokens, 0),
         output_tokens=max(output_tokens, 0),

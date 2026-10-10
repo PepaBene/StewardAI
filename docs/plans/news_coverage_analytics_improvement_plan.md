@@ -419,6 +419,28 @@ A second pass closed the gaps that need only code, tests against fakes and a loc
 
 Needs from the owner: `DART_API_KEY`, `EDINET_API_KEY`; Anthropic credit; the repo secret `OPENAI_API_KEY` and variable `NEWS_EVAL_ENABLED=true` for `.github/workflows/news-eval.yml`. Independent labelling and adjudication of a real-history benchmark, and browser verification, need a person.
 
+### Fourth pass (2026-10-10): Claude removed, AI-labelled real benchmark, ops, sources columns
+
+**Claude removed.** No Anthropic client, key, setting, price row, model id or doc remains; providers are OpenAI (`gpt-*`) and Google (`gemini-*`). Migration `20261101100000_remove_claude_models` writes new config versions that replace saved `claude-*` ids (haiku to `gpt-6-luna`, others to `gpt-6.1-sol`), drop their price rows and strip `anthropic` from prompt overrides (not yet applied to the owner's database). `evals/baseline.json` still names old models and must be re-recorded with a live run.
+
+**"Human work" done by AI, and labelled as such.** A person was asked for; the owner chose to have it done as AI. `tests/news/real_benchmark.json` holds 253 real headlines (the owner's stored news plus the latest items of the enabled feeds; English, German, Czech). Each was labelled blind by three AI models (the coding assistant, `gemini-3.8-flash`, `gpt-6.1-sol`); the stored label is the majority, and 13 three-way event-type splits were settled by the coding assistant. Agreement on event type: all three agree on 169 of 253 (67 %); pairs 71 %, 74 % and 83 %. On relevance all three agree on 164 of 253 (65 %), so the relevance label is the weakest. Most items are `other` (161 of 253) because the stored news is mostly EDGAR full-text hits and the feeds are general. **No human reviewed any label**; the set is a regression gate, not proof of accuracy. Live result of the production classifier (`gemini-3.8-flash`) on it: **event type 224/253 = 88.5 %**, rumour 252/253, affected holding 244/253, **relevance 174/253 = 69 %**. The weak segments are `regulatory_legal` (14/21), `product_business` (14/19), `management_change` (2/4) and GB (11/16); the baseline is `tests/news/real_baseline.json`, set `--set real`. The relevance gap is a real finding: the classifier marks more items relevant than the labellers did, or the labellers were stricter than the owner would be; only the owner can say which.
+
+**Browser verification** of the pages was not done in this pass.
+
+**SEDAR+, Bundesanzeiger, FCA NSM: decided not to build.**
+- SEDAR+ (Canada): no public API; the search is a script-driven session behind a terms-of-use page. Canadian holdings that also file with the SEC (Shopify, Royal Bank of Canada file 40-F and 6-K) are already read through the EDGAR collectors, and the Canadian outlets are RSS sources. Revisit only if the owner holds a Canadian issuer that does not file with the SEC.
+- Bundesanzeiger (Germany): the search is captcha-gated and has no feed. German issuer news comes from the Handelsblatt, FAZ and tagesschau feeds and from each company's own investor-relations releases (`ir_releases`). EQS-News (ad-hoc releases) has no RSS at `/feed/` (it returns the HTML page); not built.
+- FCA National Storage Mechanism (UK): the search API answered `Invalid index` for the index name tried and the real name is not published; probing further would mean reverse-engineering the web app. UK holdings are covered by Companies House, The Gazette, the Bank of England feed and, for AstraZeneca, its SEC filings.
+
+**Built in this pass:**
+- Sources page: per source, the fetch method of the stored article texts in the last week (feed text, page fetch, browser, official API, with cut-off and failed counts), the median and 95th-percentile delay between publication and first sight, and the average answer time.
+- Incident workflow: an incident on the Review report can be acknowledged or resolved with a note (`PUT /news/ops/incidents/{story_id}`, table `news_incident_review`); resolved ones leave the report.
+- Scheduled report: the first `news_analysis` run of each ISO week sends the ops report (cost, alerts, latency, AI-search cost, open incidents) through the normal alert routing. It rides the analysis job so no new job type was added; a failure there never fails the analysis.
+- AI-search cost: the ops report shows searches, cost, leads, new items stored, cost per search and cost per new item for `news_ai_search`. The lane is off by default and has not been run live, so there is no measured figure yet.
+- Golden sets for the model techniques: 14 cases for what the code keeps of an extraction and a sentiment answer (`tests/news/model_golden.json`, run by `python -m steward.news.eval_analysis`, no key needed). Impact notes, framing, claim checks, thesis links and briefs still have none.
+
+**Still open after this pass:** DART and EDINET live checks (no keys); the EDINET document link (no keyless URL verified); the framing-conflict status decision (the owner's); browser verification; a human review of the benchmark labels; re-recording `evals/baseline.json`; applying the Claude-removal migration; the relevance gap above.
+
 Suggested order if time is short: N0 → N1 → N3 → N2 (rungs 1–4) → N6.1–6.4 → N7 Wire/Brief → rest.
 
 ## 11. Success measures and owner decisions

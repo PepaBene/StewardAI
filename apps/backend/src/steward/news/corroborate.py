@@ -27,13 +27,14 @@ already came from. What the model says about support is never enough on its own.
 import datetime as dt
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol, cast
+from typing import Any, Literal, Protocol
 
-import anthropic
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
 from steward.config.jobs import effort_kwargs
+from steward.llm.routing import RoutingClient
+from steward.llm.types import LLMError
 from steward.news.normalize import host_of
 
 Status = Literal["confirmed", "unconfirmed", "disputed", "sentiment"]
@@ -149,12 +150,6 @@ class Corroborator(Protocol):
     ) -> tuple[SearchOutcome, Usage]: ...
 
 
-# Top-level automatic prompt caching: the breakpoint goes on the last block of the request
-# and moves forward as a loop grows it. Below the model's minimum prefix nothing is cached
-# and nothing extra is charged.
-AUTO_CACHE: dict[str, Any] = {"cache_control": {"type": "ephemeral"}}
-
-
 SEARCH_SYSTEM = """\
 You check whether a news claim, given in <claim>, is reported elsewhere. Search the web \
 (restricted to the allowed outlets, which are the only sources that count) for \
@@ -223,13 +218,10 @@ def _result_urls(content: list[Any]) -> set[str]:
     return urls
 
 
-class ClaudeCorroborator:
-    # Haiku 4.5 takes the basic web search tool; the dynamic-filtering version needs a newer model.
-    TOOL_BY_MODEL_PREFIX = (("claude-haiku-4", "web_search_20250305"),)
-
+class LLMCorroborator:
     def __init__(
         self,
-        client: anthropic.AsyncAnthropic,
+        client: RoutingClient,
         model: str,
         max_searches: int,
         system: str = SEARCH_SYSTEM,
@@ -241,15 +233,9 @@ class ClaudeCorroborator:
         self._max_searches = max_searches
         self._system = system
 
-    def _tool_type(self) -> str:
-        for prefix, tool in self.TOOL_BY_MODEL_PREFIX:
-            if self._model.startswith(prefix):
-                return tool
-        return "web_search_20260209"
-
     def _tool(self, request: SearchRequest) -> dict[str, Any]:
         return {
-            "type": self._tool_type(),
+            "type": "web_search",
             "name": "web_search",
             "max_uses": self._max_searches,
             "allowed_domains": list(request.domains),
@@ -267,32 +253,20 @@ class ClaudeCorroborator:
             f"</claim>\n\nAllowed outlets: {', '.join(request.domains)}\n"
             "Find independent reports of this claim, or reports that it is false."
         )
-        messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
-        seen: set[str] = set()
-        response = None
-        for _ in range(3):  # pause_turn continuations
-            try:
-                response = await self._client.messages.parse(
-                    model=self._model,
-                    system=self._system,
-                    messages=messages,  # type: ignore[arg-type]
-                    tools=cast(Any, [self._tool(request)]),
-                    output_format=CorroborationAnswer,
-                    **effort_kwargs(self._model, self._effort, 4000),
-                    # Automatic caching: the server caches after each search result inside
-                    # the request, so later sampling steps and a pause_turn continuation read
-                    # the searched pages at a tenth of the price instead of paying for them
-                    # again. (`parse` has no `cache_control` argument; the API takes it.)
-                    extra_body=AUTO_CACHE,
-                )
-            except anthropic.APIError as exc:
-                return SearchOutcome(SearchFinding(note=f"search failed: {exc}")), usage
-            usage.add(response.usage)
-            seen |= _result_urls(response.content)
-            if response.stop_reason != "pause_turn":
-                break
-            messages.append({"role": "assistant", "content": response.content})
-        answer = response.parsed_output if response is not None else None
+        try:
+            response = await self._client.messages.parse(
+                model=self._model,
+                system=self._system,
+                messages=[{"role": "user", "content": prompt}],
+                tools=[self._tool(request)],
+                output_format=CorroborationAnswer,
+                **effort_kwargs(self._model, self._effort, 4000),
+            )
+        except LLMError as exc:
+            return SearchOutcome(SearchFinding(note=f"search failed: {exc}")), usage
+        usage.add(response.usage)
+        seen = _result_urls(response.content)
+        answer = response.parsed_output
         if answer is None:
             return SearchOutcome(SearchFinding(note="no parseable answer")), usage
         supporting, rejected = verify_urls(

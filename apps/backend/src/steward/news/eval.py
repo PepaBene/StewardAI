@@ -4,7 +4,7 @@
     uv run python -m steward.news.eval --live     # classify with the configured model
 
 Phase 3 AC: event-type classification matches the label on at least 85% of items. The live
-run calls the Claude API (about $0.02 with Haiku 4.5) and needs ANTHROPIC_API_KEY. Without
+run calls the model API and needs OPENAI_API_KEY or GOOGLE_API_KEY. Without
 --live the labels are scored against themselves, which checks the harness, not the model.
 """
 
@@ -18,22 +18,23 @@ from pathlib import Path
 from typing import Any
 
 from steward.config.jobs import NewsSettings
-from steward.llm.routing import create_routing_client
+from steward.llm.client import create_llm
 from steward.news.classify import (
     Candidate,
     Classifier,
     ClassifyItem,
     ClassifyResult,
-    ClaudeClassifier,
     HoldingContext,
     Label,
+    LLMClassifier,
 )
 from steward.news.gate import check, load_baseline, make_baseline, save_baseline, wilson_interval
 from steward.settings import get_settings
 
 SET_PATH = Path(__file__).resolve().parents[3] / "tests" / "news" / "news_classification.json"
 BENCHMARK_PATH = SET_PATH.with_name("news_benchmark.json")
-SETS = {"classification": SET_PATH, "benchmark": BENCHMARK_PATH}
+REAL_PATH = SET_PATH.with_name("real_benchmark.json")
+SETS = {"classification": SET_PATH, "benchmark": BENCHMARK_PATH, "real": REAL_PATH}
 TARGET = 0.85
 
 HOLDINGS = [
@@ -223,13 +224,14 @@ async def evaluate(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--live", action="store_true", help="classify with the Claude API")
+    parser.add_argument("--live", action="store_true", help="classify with the model API")
     parser.add_argument("--model", default=NewsSettings().classification_model)
     parser.add_argument(
         "--set",
         choices=sorted(SETS),
         default="classification",
-        help="classification: the 100-item set; benchmark: the 150-item multi-region set",
+        help="classification: the 100-item set; benchmark: the 150-item multi-region set; "
+        "real: 253 real headlines, labelled by three AI models (no human review)",
     )
     parser.add_argument("--gate", type=Path, help="fail if a segment is worse than this baseline")
     parser.add_argument("--save-baseline", type=Path, help="write this run as the baseline")
@@ -241,8 +243,7 @@ def main() -> None:
     holdings = load_holdings(path)
     classifier: Classifier
     if args.live:
-        client, llm = create_routing_client(get_settings())
-        classifier = ClaudeClassifier(client, args.model, llm=llm)
+        classifier = LLMClassifier(create_llm(get_settings()), args.model)
     else:
         classifier = OracleClassifier(labelled)
     score = asyncio.run(evaluate(classifier, labelled, holdings=holdings))

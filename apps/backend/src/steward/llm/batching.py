@@ -7,12 +7,12 @@ flows then continue to their second call, which is the second batch, and so on. 
 themselves are written as ordinary code against the routing client; only the runner differs.
 
     collector = BatchCollector(llm, wait_minutes=60)
-    client.collector = collector          # the routing client sends gpt-/gemini- calls here
+    client.collector = collector          # the routing client sends its calls here
     results = await collector.run([flow(h) for h in holdings])
 
-A call to a Claude model is not collected (it goes straight to Anthropic). A call the batch
-did not answer (timeout, failure, the budget cap) is asked directly, so a flow never sees a
-batch failure. `run` returns each flow's result or the exception it raised, in order.
+A call the batch did not answer (timeout, failure, the budget cap) is asked directly, so a
+flow never sees a batch failure. `run` returns each flow's result or the exception it raised,
+in order.
 """
 
 import asyncio

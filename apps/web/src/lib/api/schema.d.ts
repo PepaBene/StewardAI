@@ -8470,14 +8470,15 @@ export interface components {
             /**
              * Model
              * @description Judges each suggestion from the evidence given.
-             * @default claude-sonnet-5
-             * @example claude-sonnet-5
+             * @default gpt-6.1-sol
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             model: string;
             /**
              * Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -10486,9 +10487,10 @@ export interface components {
             /**
              * Downgrade Model
              * @description The model non-critical requests use at the cap (`downgrade_noncritical`).
-             * @default claude-haiku-4-5
-             * @example claude-sonnet-5
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             downgrade_model: string;
             /**
@@ -11154,14 +11156,15 @@ export interface components {
         ChatSettings: {
             /**
              * Model
-             * @default claude-sonnet-5
-             * @example claude-sonnet-5
+             * @default gpt-6.1-sol
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             model: string;
             /**
              * Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -11172,7 +11175,7 @@ export interface components {
             rules_first: boolean;
             /**
              * Max Steps
-             * @description Claude calls plus tool rounds per answer.
+             * @description Model calls plus tool rounds per answer.
              * @default 30
              */
             max_steps: number;
@@ -11435,14 +11438,15 @@ export interface components {
             enabled: boolean;
             /**
              * Model
-             * @default claude-haiku-4-5
-             * @example claude-sonnet-5
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             model: string;
             /**
              * Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -13866,14 +13870,15 @@ export interface components {
         DigestSettings: {
             /**
              * Model
-             * @default claude-sonnet-5
-             * @example claude-sonnet-5
+             * @default gpt-6.1-sol
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             model: string;
             /**
              * Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -14440,14 +14445,15 @@ export interface components {
             /**
              * Model
              * @description Reads report dates off IR calendar pages.
-             * @default claude-haiku-4-5
-             * @example claude-sonnet-5
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             model: string;
             /**
              * Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -14498,17 +14504,19 @@ export interface components {
         EarningsCheckSettings: {
             /**
              * Extraction Model
-             * @default claude-sonnet-5
-             * @example claude-sonnet-5
+             * @default gpt-6.1-sol
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             extraction_model: string;
             /**
              * Locate Model
              * @description Searches for the release when EDGAR has none (non-US issuers).
-             * @default claude-sonnet-5
-             * @example claude-sonnet-5
+             * @default gpt-6.1-sol
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             locate_model: string;
             /**
@@ -14519,12 +14527,12 @@ export interface components {
             effort: "low" | "medium" | "high" | "xhigh" | "max";
             /**
              * Locate Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             locate_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
              * Max Steps
-             * @description Claude calls plus document fetches per run.
+             * @description Model calls plus document fetches per run.
              * @default 40
              */
             max_steps: number;
@@ -14757,19 +14765,20 @@ export interface components {
             enabled: boolean;
             /**
              * Model
-             * @default claude-sonnet-5
-             * @example claude-sonnet-5
+             * @default gpt-6.1-sol
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             model: string;
             /**
              * Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
              * Max Steps
-             * @description Claude calls plus web searches per escalation.
+             * @description Model calls plus web searches per escalation.
              * @default 30
              */
             max_steps: number;
@@ -15807,14 +15816,15 @@ export interface components {
             /**
              * Model
              * @description Reads annual reports for currencies and inputs.
-             * @default claude-sonnet-5
-             * @example claude-sonnet-5
+             * @default gpt-6.1-sol
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             model: string;
             /**
              * Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -17782,14 +17792,15 @@ export interface components {
             /**
              * Model
              * @description Searches for facts and approves them.
-             * @default claude-sonnet-5
-             * @example claude-sonnet-5
+             * @default gpt-6.1-sol
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             model: string;
             /**
              * Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -20071,14 +20082,15 @@ export interface components {
             /**
              * Model
              * @description Searches for the pages and approves them.
-             * @default claude-sonnet-5
-             * @example claude-sonnet-5
+             * @default gpt-6.1-sol
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             model: string;
             /**
              * Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -22491,7 +22503,7 @@ export interface components {
             cost_usd: number;
             /**
              * Provider
-             * @description anthropic, openai or google, from the model id.
+             * @description openai or google, from the model id.
              * @default unknown
              */
             provider: string;
@@ -22500,8 +22512,9 @@ export interface components {
         ModelPrice: {
             /**
              * Model
-             * @example claude-sonnet-5
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             model: string;
             /**
@@ -22874,14 +22887,15 @@ export interface components {
         NewsSettings: {
             /**
              * Classification Model
-             * @default claude-haiku-4-5
-             * @example claude-sonnet-5
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             classification_model: string;
             /**
              * Classification Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             classification_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -22904,14 +22918,15 @@ export interface components {
             classification_batch_wait_minutes: number;
             /**
              * Corroboration Model
-             * @default claude-haiku-4-5
-             * @example claude-sonnet-5
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             corroboration_model: string;
             /**
              * Corroboration Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             corroboration_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -22948,13 +22963,14 @@ export interface components {
              * Translation Model
              * @description Translates the headline and summary of non-English wire items to English (the original is kept). A cheap model: the work is volume, not judgement.
              * @default gpt-6-luna
-             * @example claude-sonnet-5
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             translation_model: string;
             /**
              * Translation Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             translation_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -22967,13 +22983,14 @@ export interface components {
              * Search Lead Model
              * @description The model that web-searches for recent news on thinly covered holdings.
              * @default gpt-6-luna
-             * @example claude-sonnet-5
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             search_lead_model: string;
             /**
              * Search Lead Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             search_lead_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -23009,39 +23026,42 @@ export interface components {
              * Extraction Model
              * @description Extracts the typed event (actors, magnitude, claims with cited spans) from a story's stored text.
              * @default gpt-6-luna
-             * @example claude-sonnet-5
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             extraction_model: string;
             /**
              * Extraction Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             extraction_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
              * Analysis Model
              * @description Writes impact chains, framing comparisons, claim checks and thesis links.
              * @default gemini-3.8-flash
-             * @example claude-sonnet-5
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             analysis_model: string;
             /**
              * Analysis Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             analysis_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
              * Brief Model
              * @description Writes the morning and weekly briefs.
              * @default gemini-3.8-flash
-             * @example claude-sonnet-5
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             brief_model: string;
             /**
              * Brief Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             brief_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -23120,13 +23140,14 @@ export interface components {
              * Triage Model
              * @description Triages each wire item: relevance to a global equity portfolio, topic, named entities and a one-line gloss. Decides what gets full text and analysis.
              * @default gpt-6-luna
-             * @example claude-sonnet-5
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             triage_model: string;
             /**
              * Triage Effort
-             * @description Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens).
+             * @description Unset: effort is not sent and the model's default applies.
              */
             triage_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
@@ -23176,8 +23197,9 @@ export interface components {
              * Embedding Model
              * @description Multilingual embedding of each wire item, used to group the same event reported in different languages. Needs GOOGLE_API_KEY.
              * @default gemini-embedding-2
-             * @example claude-sonnet-5
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             embedding_model: string;
             /**
@@ -25995,7 +26017,7 @@ export interface components {
              * @description The providers an override applies to. An override with no entry here applies to every provider; with an entry, only to those, and a step on another provider sends the built-in default (the default is the one the evals cover).
              */
             override_providers?: {
-                [key: string]: ("anthropic" | "openai" | "google")[];
+                [key: string]: ("openai" | "google")[];
             };
         };
         /** PromptsConfigVersion */
@@ -27512,9 +27534,10 @@ export interface components {
             depth: "brief" | "standard" | "deep";
             /**
              * Model
-             * @default claude-opus-5-5
-             * @example claude-sonnet-5
+             * @default gpt-6.1-sol
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             model: string;
             /**
@@ -27525,7 +27548,7 @@ export interface components {
             effort: "low" | "medium" | "high" | "xhigh" | "max";
             /**
              * Max Steps
-             * @description Claude calls plus web searches per run.
+             * @description Model calls plus web searches per run.
              * @default 60
              */
             max_steps: number;
@@ -27883,9 +27906,10 @@ export interface components {
         ReviewSettings: {
             /**
              * Model
-             * @default claude-opus-5-5
-             * @example claude-sonnet-5
+             * @default gpt-6.1-sol
+             * @example gpt-6.1-sol
              * @example gpt-6-luna
+             * @example gemini-3.8-flash
              */
             model: string;
             /**
@@ -27896,7 +27920,7 @@ export interface components {
             effort: "low" | "medium" | "high" | "xhigh" | "max";
             /**
              * Max Steps
-             * @description Claude calls per review.
+             * @description Model calls per review.
              * @default 10
              */
             max_steps: number;
@@ -30024,8 +30048,40 @@ export interface components {
              * @default 0
              */
             stored_wire_7d: number;
-            /** Avg Latency Ms */
+            /**
+             * Avg Latency Ms
+             * @description Average time the feed or API took to answer, last 7 days.
+             */
             avg_latency_ms?: number | null;
+            /**
+             * Fulltext By Rung 7D
+             * @description Article texts stored in the last 7 days per fetch method: '1' the feed's own text, '2' a polite page fetch with the extractor, '3' a browser render, '4' an official API.
+             */
+            fulltext_by_rung_7d?: {
+                [key: string]: number;
+            };
+            /**
+             * Fulltext Truncated 7D
+             * @description Of those, texts that look cut off (paywall, teaser).
+             * @default 0
+             */
+            fulltext_truncated_7d: number;
+            /**
+             * Fulltext Failed 7D
+             * @description Articles first seen in the last 7 days whose text fetch failed.
+             * @default 0
+             */
+            fulltext_failed_7d: number;
+            /**
+             * Delay P50 Min
+             * @description Median minutes from an article's publication to the app first seeing it, last 7 days.
+             */
+            delay_p50_min?: number | null;
+            /**
+             * Delay P95 Min
+             * @description 95th percentile of the same.
+             */
+            delay_p95_min?: number | null;
         };
         /** SourceRef */
         SourceRef: {

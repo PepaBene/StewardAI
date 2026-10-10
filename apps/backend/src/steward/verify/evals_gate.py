@@ -25,8 +25,8 @@ score. The check:
   passes) and commit the file.
 
 The evals run on Gemini (`EVAL_MODEL`, default `gemini-3.8-flash`, override with the
-EVALS_MODEL environment variable), never on a Claude model: the app does not call Claude, and
-the routing client refuses to. The model is part of each fingerprint, so changing it re-measures.
+EVALS_MODEL environment variable). The model is part of each fingerprint, so changing it
+re-measures.
 
 With no baseline file at all (a fresh repository), a run without a key warns and passes:
 no eval runs, so the model-facing code is unverified until a run with a key records one.
@@ -152,26 +152,26 @@ async def live_score(name: str) -> float:
 
     client, llm = create_routing_client(get_settings())
     if name == "earnings":
-        from steward.earnings.extract import ClaudeExtractor
+        from steward.earnings.extract import LLMExtractor
         from steward.earnings.golden import evaluate, load_cases, summarise
 
         settings = EarningsCheckSettings()
         cases = [c for c in load_cases() if FULL_EARNINGS or c.id in GATE_EARNINGS_CASES]
-        extractor = ClaudeExtractor(client, _eval_model(), settings.effort)
+        extractor = LLMExtractor(client, _eval_model(), settings.effort)
         return float(summarise(await evaluate(cases, extractor))["accuracy"])
     if name == "classification":
-        from steward.news.classify import ClaudeClassifier
+        from steward.news.classify import LLMClassifier
         from steward.news.eval import evaluate as evaluate_news
         from steward.news.eval import load_set
 
-        classifier = ClaudeClassifier(client, _eval_model(), llm=llm)
+        classifier = LLMClassifier(llm, _eval_model())
         return (await evaluate_news(classifier, load_set())).accuracy
-    from steward.verify.claims import ClaudeClaimVerifier
+    from steward.verify.claims import LLMClaimVerifier
     from steward.verify.eval import load_cases as load_claims
     from steward.verify.eval import score
 
     settings_c = ClaimVerifierSettings()
-    result = await score(load_claims(), ClaudeClaimVerifier(client, _eval_model()), settings_c)
+    result = await score(load_claims(), LLMClaimVerifier(client, _eval_model()), settings_c)
     # A verifier that flags faithful sentences is not passing, whatever it catches.
     return result.catch_rate if not result.faithful_flagged else 0.0
 

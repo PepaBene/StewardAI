@@ -81,8 +81,8 @@ const FULL: JobsConfig = {
   disclosure_alerts: { enabled: true, cron: "15 13 * * *", timezone: "UTC" },
   change_alerts: { enabled: true, cron: "55 7 * * *", timezone: "Europe/Prague" },
   earnings_check: {
-    extraction_model: "claude-opus-5-5",
-    locate_model: "claude-sonnet-5",
+    extraction_model: "gpt-6.1-sol",
+    locate_model: "gpt-6.1-sol",
     effort: "xhigh",
     locate_effort: "medium",
     max_steps: 12,
@@ -92,18 +92,18 @@ const FULL: JobsConfig = {
     xbrl_for_filings: true,
     kpi_history_periods: 12,
   },
-  earnings_calendar_settings: { model: "claude-haiku-4-5", effort: null, lookahead_days: 90, refresh_within_days: 21, use_batch: true, batch_wait_minutes: 60 },
-  ai_approval: { model: "claude-sonnet-5", effort: null, listings: true, peers: true, refresh_peers: true, peer_refresh_days: 30, peer_refresh_per_run: 8, min_confidence: 0.8, max_confirmed_peers: 8, max_calls_per_run: 40, use_sic: true, rules_first: true, use_batch: true, batch_wait_minutes: 60 },
-  exposure_build_settings: { model: "claude-sonnet-5", effort: null, filings_per_run: 6, extract_inputs: true, extract_dependencies: true, map_products: true },
-  gap_research_settings: { model: "claude-sonnet-5", effort: null, slots: ["next_report_date"], max_searches: 3, slots_per_run: 8, use_batch: true, batch_wait_minutes: 60, browser_fallback: false, cooldown_days: 30, min_confidence: 0.8, t1_domains: ["sec.gov"], t2_domains: ["reuters.com"], t3_domains: ["wikipedia.org"], denied_domains: ["reddit.com"] },
-  ir_discovery_settings: { model: "claude-sonnet-5", effort: null, max_searches: 4, holdings_per_run: 6, use_batch: true, batch_wait_minutes: 60, probe_first: true, browser_fallback: false, cooldown_days: 30, min_confidence: 0.8, denied_domains: ["wikipedia.org"], robots_exempt_domains: [] },
+  earnings_calendar_settings: { model: "gpt-6-luna", effort: null, lookahead_days: 90, refresh_within_days: 21, use_batch: true, batch_wait_minutes: 60 },
+  ai_approval: { model: "gpt-6.1-sol", effort: null, listings: true, peers: true, refresh_peers: true, peer_refresh_days: 30, peer_refresh_per_run: 8, min_confidence: 0.8, max_confirmed_peers: 8, max_calls_per_run: 40, use_sic: true, rules_first: true, use_batch: true, batch_wait_minutes: 60 },
+  exposure_build_settings: { model: "gpt-6.1-sol", effort: null, filings_per_run: 6, extract_inputs: true, extract_dependencies: true, map_products: true },
+  gap_research_settings: { model: "gpt-6.1-sol", effort: null, slots: ["next_report_date"], max_searches: 3, slots_per_run: 8, use_batch: true, batch_wait_minutes: 60, browser_fallback: false, cooldown_days: 30, min_confidence: 0.8, t1_domains: ["sec.gov"], t2_domains: ["reuters.com"], t3_domains: ["wikipedia.org"], denied_domains: ["reddit.com"] },
+  ir_discovery_settings: { model: "gpt-6.1-sol", effort: null, max_searches: 4, holdings_per_run: 6, use_batch: true, batch_wait_minutes: 60, probe_first: true, browser_fallback: false, cooldown_days: 30, min_confidence: 0.8, denied_domains: ["wikipedia.org"], robots_exempt_domains: [] },
   news: {
-    classification_model: "claude-haiku-4-5",
+    classification_model: "gpt-6-luna",
     classification_effort: null,
     classification_batch_size: 25,
     classification_use_batch: true,
     classification_batch_wait_minutes: 30,
-    corroboration_model: "claude-sonnet-5",
+    corroboration_model: "gpt-6.1-sol",
     corroboration_effort: "low",
     corroboration_max_searches: 5,
     corroboration_rounds: 0,
@@ -156,7 +156,7 @@ const FULL: JobsConfig = {
     fulltext_browser_fallback: false,
   },
   digest: {
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: "high",
     use_batch: true,
     batch_wait_minutes: 30,
@@ -167,7 +167,7 @@ const FULL: JobsConfig = {
   },
   escalation: {
     enabled: false,
-    model: "claude-opus-5-5",
+    model: "gpt-6.1-sol",
     effort: "max",
     max_steps: 9,
     max_searches: 0,
@@ -210,9 +210,9 @@ const FULL: JobsConfig = {
       { mic: "XETR", date: "2026-12-24", name: "Christmas Eve" },
     ],
   },
-  chat: { model: "claude-haiku-4-5", effort: null, max_steps: 9, max_searches: 0, history_messages: 20, source_tiers: [1, 2, 3], rules_first: true },
+  chat: { model: "gpt-6-luna", effort: null, max_steps: 9, max_searches: 0, history_messages: 20, source_tiers: [1, 2, 3], rules_first: true },
   review: {
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: "max",
     max_steps: 5,
     use_batch: true,
@@ -378,11 +378,11 @@ describe("jobs form: phase 5 schedules and settings", () => {
     expect(form.settings.review.values.effort).toBe("max");
     expect(form.settings.ownership.values.enabled).toBe(false);
     form.settings.review.values.liquidity_days = "0,5";
-    form.settings.chat.values.model = " claude-sonnet-5 ";
+    form.settings.chat.values.model = " gpt-6.1-sol ";
     form.settings.ownership.values.index_url = " https://example.test/13f ";
     const body = jobsToBody(form);
     expect(body.review!.liquidity_days).toBe(0.5);
-    expect(body.chat!.model).toBe("claude-sonnet-5");
+    expect(body.chat!.model).toBe("gpt-6.1-sol");
     expect(body.ownership!.index_url).toBe("https://example.test/13f");
   });
 

@@ -27,7 +27,7 @@ import asyncpg
 import httpx
 
 from steward import __version__, budget_guard
-from steward.ai import AINotConfigured, Usage, create_client
+from steward.ai import AINotConfigured, Usage
 from steward.config.event_rules import EVENT_DESCRIPTIONS, EventRulesConfig, with_default_services
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import EscalationSettings, JobsConfig, NewsSettings
@@ -48,7 +48,7 @@ from steward.documents.fetch import FetchError, NotModified
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
 from steward.llm.cache import ResultCache
-from steward.llm.client import create_llm
+from steward.llm.client import LLM, create_llm
 from steward.llm.routing import routing_client
 from steward.news.classify import SYSTEM_PROMPT as CLASSIFICATION_PROMPT
 from steward.news.classify import (
@@ -56,15 +56,15 @@ from steward.news.classify import (
     ClassificationError,
     Classifier,
     ClassifyItem,
-    ClaudeClassifier,
     HoldingContext,
     Label,
+    LLMClassifier,
 )
 from steward.news.cluster import ClusterMember, Fingerprint, best_cluster, simhash_cluster
 from steward.news.corroborate import (
     SEARCH_SYSTEM,
-    ClaudeCorroborator,
     Corroborator,
+    LLMCorroborator,
     OtherStory,
     SearchFinding,
     SearchRequest,
@@ -1109,7 +1109,7 @@ async def classify_pending(
         candidates = {c.ticker for item in items for c in item.candidates}
         context = [h for h in holdings.context if h.ticker in candidates]
         prepared.append((start, chunk, items, context))
-    # With `classification_use_batch` and a non-Claude model, the whole backlog goes to the
+    # With `classification_use_batch`, the whole backlog goes to the
     # provider's batch API in one request set; a group it did not answer is classified directly.
     answers: list[Any] = [None] * len(prepared)
     many = getattr(classifier, "classify_many", None)
@@ -1801,7 +1801,9 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
         touched |= classified
     else:
         async with ctx.step("classify") as step:
-            step.detail["skipped"] = "ANTHROPIC_API_KEY is not set; items stay unclassified"
+            step.detail["skipped"] = (
+                "no API key for the classification model; items stay unclassified"
+            )
     # EDGAR items are labelled by rule when stored; their stories need assessing too.
 
     async with ctx.step("assess") as step:
@@ -1908,23 +1910,21 @@ async def news_ingest_handler(ctx: JobContext) -> None:
     stored_jobs = await load_active(ctx.pool, "jobs", JobsConfig)
     news = (stored_jobs.body if stored_jobs else JobsConfig()).news
     try:
-        client = create_client(settings)
+        llm = create_llm(settings)
     except AINotConfigured:
-        client = None
-    llm = create_llm(settings, client)
+        llm = LLM()  # no key: the classifier, corroborator and translator stay off
     prompts = await load_prompts(ctx.pool)
     if llm.configured(news.classification_model):
-        classifier = ClaudeClassifier(
-            client,
+        classifier = LLMClassifier(
+            llm,
             news.classification_model,
             prompts.text("news_classification", CLASSIFICATION_PROMPT, news.classification_model),
             effort=news.classification_effort,
-            llm=llm,
             cache=ResultCache(ctx.pool, "news_classification"),
         )
-    if client is not None:
-        corroborator = ClaudeCorroborator(
-            routing_client(client, llm),
+    if llm.configured(news.corroboration_model):
+        corroborator = LLMCorroborator(
+            routing_client(llm),
             news.corroboration_model,
             news.corroboration_max_searches,
             prompts.text("news_corroboration", SEARCH_SYSTEM, news.corroboration_model),

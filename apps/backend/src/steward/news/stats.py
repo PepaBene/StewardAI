@@ -130,7 +130,27 @@ class SourceHealth(BaseModel):
     fetched_7d: int = 0
     stored_linked_7d: int = Field(default=0, description="Items that became story items.")
     stored_wire_7d: int = Field(default=0, description="Items kept on the wire only.")
-    avg_latency_ms: int | None = None
+    avg_latency_ms: int | None = Field(
+        default=None, description="Average time the feed or API took to answer, last 7 days."
+    )
+    fulltext_by_rung_7d: dict[str, int] = Field(
+        default_factory=dict,
+        description="Article texts stored in the last 7 days per fetch method: '1' the feed's own"
+        " text, '2' a polite page fetch with the extractor, '3' a browser render, '4' an"
+        " official API.",
+    )
+    fulltext_truncated_7d: int = Field(
+        default=0, description="Of those, texts that look cut off (paywall, teaser)."
+    )
+    fulltext_failed_7d: int = Field(
+        default=0, description="Articles first seen in the last 7 days whose text fetch failed."
+    )
+    delay_p50_min: int | None = Field(
+        default=None,
+        description="Median minutes from an article's publication to the app first seeing it,"
+        " last 7 days.",
+    )
+    delay_p95_min: int | None = Field(default=None, description="95th percentile of the same.")
 
 
 class SourcesHealth(BaseModel):
@@ -153,9 +173,47 @@ async def sources_health(pool: asyncpg.Pool, now: dt.datetime) -> SourcesHealth:
             " from public.source s join public.news_source_health h on h.source_id = s.id"
         )
     }
+    since = now - dt.timedelta(days=7)
+    rungs: dict[str, dict[str, int]] = {}
+    truncated: dict[str, int] = {}
+    for r in await pool.fetch(
+        "select coalesce(a.source_id, i.source_id) as source_id, f.rung,"
+        " count(*) as n, count(*) filter (where f.truncated) as cut"
+        " from public.news_fulltext f"
+        " left join public.news_article a on a.id = f.article_id"
+        " left join public.news_item i on i.id = f.news_item_id"
+        " where f.fetched_at >= $1 group by 1, 2",
+        since,
+    ):
+        if r["source_id"] is None:
+            continue
+        rungs.setdefault(r["source_id"], {})[str(r["rung"])] = r["n"]
+        truncated[r["source_id"]] = truncated.get(r["source_id"], 0) + r["cut"]
+    failed = {
+        r["source_id"]: r["n"]
+        for r in await pool.fetch(
+            "select source_id, count(*) as n from public.news_article"
+            " where first_seen_at >= $1 and fetch_state = 'failed' group by 1",
+            since,
+        )
+    }
+    delays = {
+        r["source_id"]: r
+        for r in await pool.fetch(
+            "select source_id,"
+            " percentile_cont(0.5) within group (order by extract(epoch from"
+            "   (first_seen_at - published_at)) / 60) as p50,"
+            " percentile_cont(0.95) within group (order by extract(epoch from"
+            "   (first_seen_at - published_at)) / 60) as p95"
+            " from public.news_article where first_seen_at >= $1 and published_at <= first_seen_at"
+            " group by 1",
+            since,
+        )
+    }
     out = []
     for source in config.sources:
         row = fetched.get(source.id)
+        delay = delays.get(source.id)
         last = row["last_fetched_at"] if row else None
         error = row["last_error"] if row else None
         out.append(
@@ -189,6 +247,11 @@ async def sources_health(pool: asyncpg.Pool, now: dt.datetime) -> SourcesHealth:
                 avg_latency_ms=int(row["avg_latency_ms"])
                 if row and row["avg_latency_ms"] is not None
                 else None,
+                fulltext_by_rung_7d=rungs.get(source.id, {}),
+                fulltext_truncated_7d=truncated.get(source.id, 0),
+                fulltext_failed_7d=failed.get(source.id, 0),
+                delay_p50_min=int(delay["p50"]) if delay and delay["p50"] is not None else None,
+                delay_p95_min=int(delay["p95"]) if delay and delay["p95"] is not None else None,
             )
         )
     return SourcesHealth(window_hours=hours, sources=out)

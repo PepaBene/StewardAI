@@ -18,7 +18,7 @@ import asyncpg
 import httpx
 
 from steward import __version__
-from steward.ai import AINotConfigured, Usage, create_client
+from steward.ai import AINotConfigured, Usage
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import JobsConfig
 from steward.config.prompts import load_prompts
@@ -307,8 +307,7 @@ async def _ai_steps(ctx: JobContext, rows: list[dict[str, Any]]) -> None:
     if not (cfg.map_products or cfg.extract_inputs or cfg.extract_dependencies):
         return
     try:
-        anthropic_client = create_client(settings)
-        client = routing_client(anthropic_client, create_llm(settings, anthropic_client))
+        client = routing_client(create_llm(settings))
     except AINotConfigured as exc:
         async with ctx.step("ai") as step:
             step.detail["skipped"] = str(exc)

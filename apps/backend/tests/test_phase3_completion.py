@@ -525,7 +525,7 @@ class FakeEscalator:
     async def write(self, request: Any, today: dt.date) -> DraftResult:
         self.requests.append(request)
         return DraftResult(
-            self.draft, Usage(model="claude-sonnet-5", input_tokens=1000), self.search_urls
+            self.draft, Usage(model="gpt-6.1-sol", input_tokens=1000), self.search_urls
         )
 
 

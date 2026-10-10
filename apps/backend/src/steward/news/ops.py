@@ -8,6 +8,7 @@ the report needs no model and costs nothing to run.
 import datetime as dt
 import json
 import math
+from typing import Literal
 
 import asyncpg
 from pydantic import BaseModel, Field
@@ -32,6 +33,8 @@ class Incident(BaseModel):
     severity: int | None
     first_seen: dt.datetime
     reason: str
+    status: Literal["open", "acknowledged", "resolved"] = "open"
+    note: str | None = None
 
 
 class AlertLatency(BaseModel):
@@ -52,6 +55,20 @@ class AlertVolume(BaseModel):
     indirect_per_day: float
 
 
+class AiSearchCost(BaseModel):
+    """What the AI search lane spent against what it brought in, from the job steps."""
+
+    runs: int
+    searches: int
+    cost_usd: float
+    leads: int = Field(description="Verified leads the model returned.")
+    new_items: int = Field(description="Leads stored as new wire items (the rest were known).")
+    cost_per_search: float | None
+    cost_per_new_item: float | None = Field(
+        description="Null while the lane has stored no new item."
+    )
+
+
 class OpsReport(BaseModel):
     days: int
     latency: AlertLatency
@@ -64,6 +81,7 @@ class OpsReport(BaseModel):
     )
     marks: dict[str, int]
     incidents: list[Incident]
+    ai_search: AiSearchCost
 
 
 async def job_costs(pool: asyncpg.Pool, since: dt.datetime) -> list[JobCost]:
@@ -104,6 +122,7 @@ async def useful_event_count(pool: asyncpg.Pool, since: dt.datetime) -> int:
 
 async def incidents(pool: asyncpg.Pool, since: dt.datetime, limit: int = 50) -> list[Incident]:
     rows = await pool.fetch(
+        "select u.*, rv.status, rv.note from ("
         "select 'unalerted_severe' as kind, c.id, c.headline, c.ticker, c.severity, c.first_seen,"
         "  'Severity 3 story with no alert sent or queued' as reason"
         " from public.story_cluster c"
@@ -119,7 +138,9 @@ async def incidents(pool: asyncpg.Pool, since: dt.datetime, limit: int = 50) -> 
         "   where a.cluster_id = c.id and a.status = 'sent')"
         "  and exists (select 1 from public.news_feedback f where f.target = 'story'"
         "   and f.target_id = c.id::text and f.kind = 'not_useful')"
-        " order by first_seen desc limit $2",
+        ") u left join public.news_incident_review rv on rv.kind = u.kind and rv.story_id = u.id"
+        " where coalesce(rv.status, 'open') <> 'resolved'"
+        " order by u.first_seen desc limit $2",
         since,
         limit,
     )
@@ -132,9 +153,74 @@ async def incidents(pool: asyncpg.Pool, since: dt.datetime, limit: int = 50) -> 
             severity=r["severity"],
             first_seen=r["first_seen"],
             reason=r["reason"],
+            status=r["status"] or "open",
+            note=r["note"],
         )
         for r in rows
     ]
+
+
+IncidentStatus = Literal["open", "acknowledged", "resolved"]
+
+
+async def set_incident_status(
+    pool: asyncpg.Pool,
+    kind: str,
+    story_id: int,
+    status: IncidentStatus,
+    note: str | None,
+) -> bool:
+    """Record the owner's handling of one incident. False when the story does not exist."""
+    if not await pool.fetchval(
+        "select exists (select 1 from public.story_cluster where id = $1)", story_id
+    ):
+        return False
+    await pool.execute(
+        "insert into public.news_incident_review (kind, story_id, status, note, updated_at)"
+        " values ($1, $2, $3, $4, now())"
+        " on conflict (kind, story_id) do update set status = excluded.status,"
+        " note = excluded.note, updated_at = now()",
+        kind,
+        story_id,
+        status,
+        note,
+    )
+    return True
+
+
+def _detail(raw: object) -> dict[str, object]:
+    if isinstance(raw, str):
+        raw = json.loads(raw)
+    return raw if isinstance(raw, dict) else {}
+
+
+async def ai_search_cost(pool: asyncpg.Pool, since: dt.datetime) -> AiSearchCost:
+    rows = await pool.fetch(
+        "select j.id as job_id, s.name, coalesce(s.searches, 0) as searches,"
+        " coalesce(s.cost_usd, 0) as cost, s.detail"
+        " from public.job j join public.job_step s on s.job_id = j.id"
+        " where j.job_type = 'news_ai_search' and j.created_at >= $1 and s.status = 'succeeded'",
+        since,
+    )
+    searches = leads = new_items = 0
+    cost = 0.0
+    for r in rows:
+        searches += r["searches"]
+        cost += float(r["cost"])
+        detail = _detail(r["detail"])
+        if r["name"] == "search":
+            leads += int(detail.get("leads", 0) or 0)  # type: ignore[call-overload]
+        elif r["name"] == "store":
+            new_items += int(detail.get("stored", 0) or 0)  # type: ignore[call-overload]
+    return AiSearchCost(
+        runs=len({r["job_id"] for r in rows}),
+        searches=searches,
+        cost_usd=round(cost, 6),
+        leads=leads,
+        new_items=new_items,
+        cost_per_search=round(cost / searches, 6) if searches else None,
+        cost_per_new_item=round(cost / new_items, 6) if new_items else None,
+    )
 
 
 def percentile(values: list[float], p: float) -> float | None:
@@ -217,4 +303,66 @@ async def ops_report(
         cost_per_useful_event=round(total / useful, 6) if useful else None,
         marks=await mark_counts(pool, since),
         incidents=await incidents(pool, since),
+        ai_search=await ai_search_cost(pool, since),
     )
+
+
+def weekly_text(report: OpsReport) -> str:
+    """The scheduled report as the plain text of one alert."""
+    open_ = [i for i in report.incidents if i.status == "open"]
+    lines = [
+        f"News operations, last {report.days} days: ${report.cost_usd:.2f} spent, "
+        f"{report.volume.total} alerts ({report.volume.indirect} indirect), "
+        f"{report.useful_events} useful events.",
+    ]
+    if report.latency.p50_minutes is not None:
+        lines.append(
+            f"Alert latency: median {report.latency.p50_minutes:.0f} min, "
+            f"95th percentile {report.latency.p95_minutes or 0:.0f} min."
+        )
+    search = report.ai_search
+    if search.runs:
+        per = f", ${search.cost_per_new_item:.3f} per new item" if search.cost_per_new_item else ""
+        lines.append(
+            f"AI search: {search.searches} searches, ${search.cost_usd:.2f}, "
+            f"{search.new_items} new items{per}."
+        )
+    lines.append(
+        f"{len(open_)} incident(s) open: review them on the News Review page."
+        if open_
+        else "No open incidents."
+    )
+    return "\n".join(lines)
+
+
+async def send_weekly_report(
+    pool: asyncpg.Pool, now: dt.datetime, job_id: int | None = None, days: int = 7
+) -> str:
+    """Send the ops report once per ISO week through the alert routing (the owner's
+    notification rules decide channel, quiet hours and cap). Returns what happened."""
+    from steward.config.notifications import NotificationsConfig
+    from steward.config.store import load_active
+    from steward.notify.alerts import create_alerts
+    from steward.notify.route import AlertRequest
+
+    year, week, _ = now.isocalendar()
+    key = f"news-ops:{year}-W{week:02d}"
+    if await pool.fetchval("select exists (select 1 from public.alert where dedupe_key = $1)", key):
+        return "already sent this week"
+    report = await ops_report(pool, days, now)
+    stored = await load_active(pool, "notifications", NotificationsConfig)
+    created = await create_alerts(
+        pool,
+        AlertRequest(
+            "system",
+            3 if any(i.status == "open" for i in report.incidents) else 1,
+            None,
+            "news_ops",
+        ),
+        weekly_text(report),
+        stored.body if stored else NotificationsConfig(),
+        now=now,
+        job_id=job_id,
+        dedupe_key=key,
+    )
+    return created.explanation

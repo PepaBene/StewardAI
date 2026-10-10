@@ -51,7 +51,7 @@ def test_sample_manifest_is_honest_about_what_was_captured() -> None:
     for s in slots:
         assert s["status"] in manifest["status_values"], s["slot"]
         if s["status"] == "captured_model_checked":
-            assert s["sha256"] and s["expected"] and s["captured_by"].startswith("claude-model")
+            assert s["sha256"] and s["expected"] and s["captured_by"].startswith("ai-model")
         if s["status"] == "rejected_unavailable":
             assert s["reason"], s["slot"]
     assert manifest["samples_per_category"] == 10

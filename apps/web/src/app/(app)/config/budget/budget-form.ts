@@ -39,13 +39,10 @@ export const JOB_TYPE_LABELS: Record<JobType, string> = Object.fromEntries(
 
 /** The backend's default prices, for when nothing is saved yet (a 404). */
 const DEFAULT_PRICES: [string, number, number][] = [
-  ["claude-fable-5-1", 10, 50],
-  ["claude-opus-4-8", 5, 25],
-  ["claude-haiku-4-5", 1, 5],
-  ["claude-sonnet-5", 2, 10],
-  ["claude-sonnet-4-6", 3, 15],
-  ["claude-opus-5", 5, 25],
-  ["claude-opus-5-5", 4, 20],
+  ["gemini-embedding-2", 0.15, 0],
+  ["gpt-6.1-sol", 2, 10],
+  ["gpt-6-luna", 0.1, 0.5],
+  ["gemini-3.8-flash", 0.75, 3.75],
 ];
 
 export const DEFAULT_BUDGET: BudgetConfig = {
@@ -62,7 +59,7 @@ export const DEFAULT_BUDGET: BudgetConfig = {
   monthly_cap_usd: null,
   warn_at_fraction: 0.8,
   at_cap: "pause_noncritical",
-  downgrade_model: "claude-haiku-4-5",
+  downgrade_model: "gpt-6-luna",
   critical_job_types: DEFAULT_CRITICAL,
   per_job_cap_usd: {},
   default_job_cap_usd: null,
@@ -128,7 +125,7 @@ export function budgetFromBody(body: BudgetConfig | null): BudgetForm {
     monthlyCap: text(b.monthly_cap_usd),
     warnPercent: fractionToPercent(b.warn_at_fraction ?? 0.8),
     atCap: b.at_cap ?? "pause_noncritical",
-    downgradeModel: b.downgrade_model ?? "claude-haiku-4-5",
+    downgradeModel: b.downgrade_model ?? "gpt-6-luna",
     critical: [...(b.critical_job_types ?? DEFAULT_CRITICAL)],
     jobCaps: Object.entries(b.per_job_cap_usd ?? {}).map(([jobType, cap]) => ({
       key: nextKey(),
@@ -180,7 +177,7 @@ export function validateBudgetForm(form: BudgetForm): FieldErrors {
   const add = (path: string, message: string) => (errors[path] = [...(errors[path] ?? []), message]);
   const seen = new Set<string>();
   (body.prices ?? []).forEach((p, i) => {
-    if (!/^claude-[a-z0-9.-]{1,64}$/.test(p.model)) add(`prices.${i}.model`, "A Claude model id, e.g. claude-sonnet-5.");
+    if (!/^(gpt|gemini)-[a-z0-9.-]{1,64}$/.test(p.model)) add(`prices.${i}.model`, "A gpt- or gemini- model id, e.g. gpt-6.1-sol.");
     else if (seen.has(p.model)) add(`prices.${i}.model`, "This model already has a price.");
     seen.add(p.model);
     if (!isNum(p.input_per_mtok) || p.input_per_mtok < 0) add(`prices.${i}.input_per_mtok`, "A number, 0 or more.");
@@ -195,7 +192,7 @@ export function validateBudgetForm(form: BudgetForm): FieldErrors {
     add("monthly_cap_usd", "An amount above 0, or empty for no cap.");
   if (!isNum(body.warn_at_fraction) || body.warn_at_fraction <= 0 || body.warn_at_fraction > 1)
     add("warn_at_fraction", "A percentage above 0 and at most 100.");
-  if (!/^claude-[a-z0-9.-]{1,64}$/.test(body.downgrade_model ?? "")) add("downgrade_model", "A Claude model id.");
+  if (!/^(gpt|gemini)-[a-z0-9.-]{1,64}$/.test(body.downgrade_model ?? "")) add("downgrade_model", "A gpt- or gemini- model id.");
   else if (body.at_cap === "downgrade_noncritical" && !seen.has(body.downgrade_model ?? ""))
     add("downgrade_model", "Add a price for this model first, so its steps are costed.");
   const jobs = new Set<string>();

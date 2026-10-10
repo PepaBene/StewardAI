@@ -9,13 +9,13 @@ final. Decisions are stored in `web_domain_tier` so a domain is judged once.
 
 from typing import Literal
 
-import anthropic
 import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
 from steward.config.jobs import GapResearchSettings, effort_kwargs
 from steward.fundamentals.ir_discovery import registrable
+from steward.llm.routing import RoutingClient
 
 DOMAIN_SYSTEM = """\
 You are a source-reliability editor. A web search for a fact about a listed company returned \
@@ -60,7 +60,7 @@ def learned_tier(learned: dict[str, str], host: str) -> str | None:
 
 
 async def judge_domain(
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     cfg: GapResearchSettings,
     domain: str,
     company: str,
@@ -81,7 +81,8 @@ async def judge_domain(
         **effort_kwargs(cfg.model, cfg.effort, 2000),
     )
     usage.add(response.usage)
-    return response.parsed_output
+    verdict: DomainVerdict | None = response.parsed_output
+    return verdict
 
 
 async def store_domain(

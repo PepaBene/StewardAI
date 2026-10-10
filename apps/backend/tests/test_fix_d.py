@@ -19,8 +19,8 @@ from steward.documents.fetch import FetchError, fetch_document, pdf_text
 from steward.documents.text import html_to_text
 from steward.earnings.calendar import _find_date, date_in_text
 from steward.earnings.check import _record_failed_usage, is_sec_url
-from steward.earnings.extract import ClaudeExtractor, ExtractionError, ExtractionRequest
-from steward.earnings.locate import ClaudeSearchLocator, LocateError, SearchRequest
+from steward.earnings.extract import ExtractionError, ExtractionRequest, LLMExtractor
+from steward.earnings.locate import LLMSearchLocator, LocateError, SearchRequest
 from steward.earnings.reconcile import FactToCheck, compare
 from steward.earnings.schema import ExtractedFigure
 from steward.earnings.units import (
@@ -271,7 +271,7 @@ async def test_unparseable_extraction_output_is_an_extraction_error() -> None:
     client: Any = _Client(_Messages(raises=_validation_error()))
     doc = fetch_module.Document("https://x.test", fetch_module.TEXT, b"text")
     with pytest.raises(ExtractionError, match="unparseable"):
-        await ClaudeExtractor(client, "m", "low").extract(doc, "text", REQUEST)
+        await LLMExtractor(client, "m", "low").extract(doc, "text", REQUEST)
 
 
 async def test_a_truncated_extraction_carries_its_usage() -> None:
@@ -282,7 +282,7 @@ async def test_a_truncated_extraction_carries_its_usage() -> None:
     client: Any = _Client(_Messages(response=response))
     doc = fetch_module.Document("https://x.test", fetch_module.TEXT, b"text")
     with pytest.raises(ExtractionError) as info:
-        await ClaudeExtractor(client, "m", "low").extract(doc, "text", REQUEST)
+        await LLMExtractor(client, "m", "low").extract(doc, "text", REQUEST)
     assert info.value.usage is not None and info.value.usage.output_tokens == 32000
 
     class Step:
@@ -301,7 +301,7 @@ async def test_unparseable_search_output_is_a_locate_error() -> None:
     client: Any = _Client(_Messages(raises=_validation_error()))
     request = SearchRequest("AAPL", "Apple", dt.date(2025, 7, 31), (2025, "Q3"), ["x.test"], [])
     with pytest.raises(LocateError):
-        await ClaudeSearchLocator(client, "m", 3).locate(request)
+        await LLMSearchLocator(client, "m", 3).locate(request)
 
 
 async def test_unparseable_calendar_output_is_a_note_not_a_crash(

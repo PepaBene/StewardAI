@@ -1,0 +1,106 @@
+{
+  "note": "Golden cases for the model techniques. Each case is a story and what a model returned for it; the expected value is what the code must keep after verification. They test the checking code, not the model, so they run without a key. Written by the coding assistant (an AI model), not reviewed by a human.",
+  "extraction": [
+    {
+      "id": "ex-quote-in-text",
+      "items": [{"id": 1, "headline": "Acme raises 2026 outlook", "body": "Acme Corp raised its full-year revenue guidance to $12.4 billion on Tuesday."}],
+      "raw": {"event_type": "guidance_change", "action": "raised guidance", "status": "official",
+              "magnitude": {"value": 12.4, "unit": "USD billion", "text": "$12.4 billion"},
+              "key_claims": [{"text": "Acme raised guidance", "item_id": 1, "span": "raised its full-year revenue guidance to $12.4 billion"}]},
+      "expect": {"claims": 1, "magnitude": true, "event_type": "guidance_change"}
+    },
+    {
+      "id": "ex-invented-quote",
+      "items": [{"id": 1, "headline": "Acme raises 2026 outlook", "body": "Acme Corp raised its full-year revenue guidance on Tuesday."}],
+      "raw": {"event_type": "guidance_change", "action": "raised guidance", "status": "official",
+              "key_claims": [{"text": "Acme will double output", "item_id": 1, "span": "Acme will double its output next year"}]},
+      "expect": {"claims": 0}
+    },
+    {
+      "id": "ex-one-bad-claim-dropped",
+      "items": [{"id": 1, "headline": "Beta to buy Gamma", "body": "Beta Ltd agreed to buy Gamma Inc for 3.1 billion euros in cash."}],
+      "raw": {"event_type": "m_and_a", "action": "acquisition", "status": "official",
+              "key_claims": [
+                {"text": "Beta buys Gamma", "item_id": 1, "span": "agreed to buy Gamma Inc for 3.1 billion euros"},
+                {"text": "Regulators object", "item_id": 1, "span": "regulators have already objected"}]},
+      "expect": {"claims": 1, "event_type": "m_and_a"}
+    },
+    {
+      "id": "ex-number-not-in-text",
+      "items": [{"id": 1, "headline": "Delta cuts dividend", "body": "Delta plc cut its quarterly dividend sharply on Monday."}],
+      "raw": {"event_type": "dividend_cut", "action": "cut dividend", "status": "official",
+              "magnitude": {"value": 40, "unit": "%", "text": "40%"},
+              "key_claims": [{"text": "Dividend cut", "item_id": 1, "span": "cut its quarterly dividend sharply"}]},
+      "expect": {"claims": 1, "magnitude": false}
+    },
+    {
+      "id": "ex-unknown-event-type",
+      "items": [{"id": 1, "headline": "Epsilon opens a plant", "body": "Epsilon SA opened a new battery plant in Poland."}],
+      "raw": {"event_type": "plant_opening", "action": "opened plant", "status": "reported",
+              "key_claims": [{"text": "Plant opened", "item_id": 1, "span": "opened a new battery plant in Poland"}]},
+      "expect": {"claims": 1, "event_type": "other"}
+    },
+    {
+      "id": "ex-bad-date-dropped",
+      "items": [{"id": 1, "headline": "Zeta CEO resigns", "body": "Zeta Group's chief executive resigned effective next month."}],
+      "raw": {"event_type": "management_change", "action": "CEO resigns", "status": "official",
+              "effective": "next month", "occurred": "2026-10-09",
+              "key_claims": [{"text": "CEO resigns", "item_id": 1, "span": "chief executive resigned effective next month"}]},
+      "expect": {"claims": 1, "effective": null, "occurred": "2026-10-09"}
+    },
+    {
+      "id": "ex-wrong-item-falls-back-to-story",
+      "items": [{"id": 1, "headline": "Eta wins contract", "body": "Eta Corp won a 500 million dollar defence contract."},
+                {"id": 2, "headline": "Eta contract details", "body": "The award runs for five years."}],
+      "raw": {"event_type": "product_business", "action": "contract win", "status": "reported",
+              "key_claims": [{"text": "Five-year award", "item_id": 99, "span": "The award runs for five years"}]},
+      "expect": {"claims": 1}
+    },
+    {
+      "id": "ex-case-and-spacing-tolerated",
+      "items": [{"id": 1, "headline": "Theta results", "body": "Theta   reported  quarterly profit of 1.2 billion dollars."}],
+      "raw": {"event_type": "earnings_release", "action": "results", "status": "official",
+              "key_claims": [{"text": "Profit", "item_id": 1, "span": "Theta reported quarterly profit of 1.2 billion dollars"}]},
+      "expect": {"claims": 1}
+    }
+  ],
+  "sentiment": [
+    {
+      "id": "se-kept",
+      "items": [{"id": 1, "headline": "Iota beats", "body": "Iota shares surged after it beat profit forecasts by a wide margin."}],
+      "raw": [{"entity": "Iota", "direction": "positive", "strength": 0.8, "item_id": 1, "span": "Iota shares surged after it beat profit forecasts"}],
+      "expect": {"aspects": 1, "intensity": 0.8}
+    },
+    {
+      "id": "se-span-not-in-item",
+      "items": [{"id": 1, "headline": "Kappa slips", "body": "Kappa shares slipped in quiet trade."}],
+      "raw": [{"entity": "Kappa", "direction": "negative", "strength": 0.9, "item_id": 1, "span": "Kappa faces a fraud probe"}],
+      "expect": {"aspects": 0, "intensity": 0.0}
+    },
+    {
+      "id": "se-strength-clamped",
+      "items": [{"id": 1, "headline": "Lambda jumps", "body": "Lambda stock jumped on takeover talk."}],
+      "raw": [{"entity": "Lambda", "direction": "positive", "strength": 3.5, "item_id": 1, "span": "Lambda stock jumped on takeover talk"}],
+      "expect": {"aspects": 1, "intensity": 1.0}
+    },
+    {
+      "id": "se-neutral-has-no-strength",
+      "items": [{"id": 1, "headline": "Mu holds", "body": "Mu kept its rating unchanged on Friday."}],
+      "raw": [{"entity": "Mu", "direction": "neutral", "strength": 0.7, "item_id": 1, "span": "Mu kept its rating unchanged"}],
+      "expect": {"aspects": 1, "intensity": 0.0}
+    },
+    {
+      "id": "se-one-reading-per-entity",
+      "items": [{"id": 1, "headline": "Nu falls", "body": "Nu fell sharply. Nu also warned on margins."}],
+      "raw": [{"entity": "Nu", "direction": "negative", "strength": 0.4, "item_id": 1, "span": "Nu fell sharply"},
+              {"entity": "NU ", "direction": "negative", "strength": 0.7, "item_id": 1, "span": "Nu also warned on margins"}],
+      "expect": {"aspects": 1, "intensity": 0.7}
+    },
+    {
+      "id": "se-unknown-item",
+      "items": [{"id": 1, "headline": "Xi flat", "body": "Xi ended flat."}],
+      "raw": [{"entity": "Xi", "direction": "mixed", "strength": 0.5, "item_id": 7, "span": "Xi ended flat"}],
+      "expect": {"aspects": 0, "intensity": 0.0}
+    }
+  ]
+}

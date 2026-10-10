@@ -104,9 +104,7 @@ class RuleChatAssistant:
             if result is not None:
                 return result
         if self._inner is None:
-            return AssistantResult(
-                None, Usage(model=self._model), {}, "ANTHROPIC_API_KEY is not set"
-            )
+            return AssistantResult(None, Usage(model=self._model), {}, "no AI provider key is set")
         return await self._inner.answer(history, question, tools, today)
 
     async def _from_report_date(self, question: str, tools: ChatTools) -> AssistantResult | None:

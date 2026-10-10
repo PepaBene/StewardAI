@@ -242,16 +242,16 @@ async def test_readiness_follows_the_worker_heartbeat(
 
 async def test_step_cost_uses_the_budget_prices(backend_pool: asyncpg.Pool) -> None:
     budget = BudgetConfig(
-        prices=[ModelPrice(model="claude-sonnet-5", input_per_mtok=3.3, output_per_mtok=12.7)],
+        prices=[ModelPrice(model="gpt-6.1-sol", input_per_mtok=3.3, output_per_mtok=12.7)],
         web_search_per_1000=11,
     )
     async with backend_pool.acquire() as conn:
         await save_config(conn, "budget", budget, created_by=None)
 
     usages = [
-        StepUsage("claude-sonnet-5", 123_456, 7_890, 1_000, 55_000, 3, False),
-        StepUsage("claude-sonnet-5", 1_000_000, 200_000, 0, 0, 0, True),
-        StepUsage("claude-unknown-9", 10, 10),
+        StepUsage("gpt-6.1-sol", 123_456, 7_890, 1_000, 55_000, 3, False),
+        StepUsage("gpt-6.1-sol", 1_000_000, 200_000, 0, 0, 0, True),
+        StepUsage("gpt-unknown-9", 10, 10),
     ]
 
     async def handler(ctx: JobContext) -> None:

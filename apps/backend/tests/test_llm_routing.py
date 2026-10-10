@@ -1,4 +1,3 @@
-from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -6,21 +5,11 @@ import pytest
 from pydantic import BaseModel
 
 from steward.llm.client import LLM
-from steward.llm.routing import ClaudeDisabled, RoutingClient
+from steward.llm.routing import RoutingClient
 
 
 class Out(BaseModel):
     label: str
-
-
-class FakeAnthropic:
-    def __init__(self) -> None:
-        self.calls: list[dict[str, Any]] = []
-        self.messages = SimpleNamespace(parse=self.parse)
-
-    async def parse(self, **kwargs: Any) -> str:
-        self.calls.append(kwargs)
-        return "anthropic answer"
 
 
 ANSWER = {
@@ -32,29 +21,27 @@ ANSWER = {
 }
 
 
-def routed(seen: list[httpx.Request]) -> tuple[RoutingClient, FakeAnthropic]:
+def routed(seen: list[httpx.Request]) -> RoutingClient:
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
         return httpx.Response(200, json=ANSWER)
 
     http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    fake = FakeAnthropic()
-    llm = LLM(openai_key="k", http=http)
-    return RoutingClient(fake, llm), fake  # type: ignore[arg-type]
+    return RoutingClient(LLM(openai_key="k", http=http))
 
 
-async def test_a_claude_model_is_refused_and_nothing_is_sent() -> None:
+async def test_an_unknown_model_id_is_refused_and_nothing_is_sent() -> None:
     seen: list[httpx.Request] = []
-    client, fake = routed(seen)
-    with pytest.raises(ClaudeDisabled, match="Claude is not used"):
-        await client.messages.parse(model="claude-sonnet-5", system="s", messages=[])
-    assert not fake.calls and not seen
+    client = routed(seen)
+    with pytest.raises(ValueError, match="gpt-\\* or gemini-\\*"):
+        await client.messages.parse(model="other-model-1", system="s", messages=[])
+    assert not seen
 
 
-async def test_another_providers_model_answers_in_the_anthropic_shape() -> None:
+async def test_a_model_answers_in_the_response_shape_call_sites_read() -> None:
     seen: list[httpx.Request] = []
-    client, fake = routed(seen)
-    out = await client.messages.parse(
+    client = routed(seen)
+    out: Any = await client.messages.parse(
         model="gpt-6-luna",
         system=[{"type": "text", "text": "Be brief."}],
         messages=[
@@ -72,9 +59,9 @@ async def test_another_providers_model_answers_in_the_anthropic_shape() -> None:
         ],
         output_format=Out,
         max_tokens=500,
-        output_config={"effort": "low"},
+        effort="low",
     )
     assert out.parsed_output == Out(label="ok") and out.stop_reason == "end_turn"
-    assert out.usage.input_tokens == 10 and not fake.calls
+    assert out.usage.input_tokens == 10
     body = seen[0].read().decode()
     assert "page text" in body and '"effort":"low"' in body.replace(" ", "")

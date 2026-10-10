@@ -1,41 +1,29 @@
-"""A drop-in for the Anthropic client that routes `messages.parse` by model id.
+"""The client call sites use: `client.messages.parse(...)` routed to OpenAI or Google by model id.
 
-Call sites written against `client.messages.parse(model=..., system=..., messages=...,
-output_format=..., **effort_kwargs(...))` keep working unchanged: a Claude model goes to the
-Anthropic client as before, a `gpt-` or `gemini-` model goes through `LLM.complete` and its
-answer comes back shaped like an Anthropic response (`parsed_output`, `usage`, `stop_reason`,
-`content`). Everything else (`with_options`, batches, streaming) is the Anthropic client's own,
-so a call that needs it stays on Claude models.
+A call site passes `model=..., system=..., messages=..., output_format=..., **effort_kwargs(...)`
+and gets back a response object with `parsed_output`, `usage`, `stop_reason` and `content` (text
+blocks, plus a `web_search_tool_result` block with the pages a search cited). The request goes
+through `LLM.complete`, so every call is capped, counted and priced by the Budget config.
 
-Only plain structured-output calls and web-search calls with a `web_search*` tool are
-translated; a call with other tools, or a call that reads Anthropic content blocks such as
-`pause_turn` or citation results, must not be pointed at another provider's model.
+Only plain structured-output calls and calls with a `web_search*` tool are translated. A model
+id that is not a `gpt-` or `gemini-` model is refused (`provider_of`).
 """
 
 from collections.abc import Iterator
 from contextlib import contextmanager
 from types import SimpleNamespace
-from typing import Any, cast
-
-import anthropic
-import httpx
+from typing import Any
 
 from steward.llm.batching import BatchCollector
 from steward.llm.cache import ResultCache, request_key
 from steward.llm.client import LLM
 from steward.llm.types import (
-    LLMError,
     Message,
     Request,
     SearchSpec,
     normalized_usage,
     provider_of,
 )
-
-
-class ClaudeDisabled(RuntimeError):
-    """A job asked for a Claude model; Claude is never used."""
-
 
 _STOP = {"end": "end_turn", "max_tokens": "max_tokens", "refusal": "refusal", "other": "end_turn"}
 
@@ -99,26 +87,13 @@ def _result_urls(content: Any) -> list[list[str]]:
 
 
 def _effort(kwargs: dict[str, Any]) -> str | None:
-    config = kwargs.get("output_config")
-    effort = config.get("effort") if isinstance(config, dict) else None
-    if effort is None:
-        thinking = kwargs.get("thinking")
-        if isinstance(thinking, dict) and thinking.get("budget_tokens"):
-            effort = "high"  # an Anthropic thinking budget: another provider has no such knob
+    effort = kwargs.get("effort")
     return str(effort) if effort else None
 
 
 class _Messages:
     def __init__(self, owner: "RoutingClient") -> None:
         self._owner = owner
-
-    def __getattr__(self, name: str) -> Any:
-        # Everything but `parse` (the Message Batches API: `messages.batches`) is the
-        # Anthropic client's own.
-        anthropic_client = self._owner.anthropic
-        if name.startswith("_") or anthropic_client is None:
-            raise AttributeError(name)
-        return getattr(anthropic_client.messages, name)
 
     async def parse(self, **kwargs: Any) -> Any:
         cache = self._owner.cache
@@ -130,7 +105,7 @@ class _Messages:
         if searching and (
             cache.search_ttl_days is None
             or _search(tools) is None
-            # Continuations carry Anthropic content blocks: not a stable key.
+            # A continuation turn is not a stable key.
             or any(not isinstance(m.get("content"), str) for m in kwargs.get("messages", []))
         ):
             return await self._send(kwargs)
@@ -172,13 +147,9 @@ class _Messages:
 
     async def _send(self, kwargs: dict[str, Any]) -> Any:
         model = str(kwargs.get("model", ""))
-        if provider_of(model) == "anthropic":
-            # The owner's rule: Claude models are never called. A config that still names one
-            # fails the job loudly instead of quietly spending on the wrong provider.
-            raise ClaudeDisabled(
-                f"{model} is a Claude model and Claude is not used; set a gpt-* or gemini-* "
-                "model for this job in the config"
-            )
+        # A model id that is neither gpt-* nor gemini-* fails here, loudly, instead of
+        # quietly spending on a provider the app does not use.
+        provider_of(model)
         system = kwargs.get("system") or ""
         request = Request(
             model=model,
@@ -196,23 +167,17 @@ class _Messages:
             if isinstance(kwargs.get("timeout"), int | float)
             else 120.0,
         )
-        try:
-            collector = self._owner.collector
-            if collector is not None:
-                done = await collector.submit(request)
-            else:
-                done = await self._owner.llm.complete(request)
-        except LLMError as exc:
-            # Call sites already skip or retry on `anthropic.APIError`; another provider's
-            # failure is reported the same way (BudgetExceeded is not an LLMError and passes).
-            raise anthropic.APIConnectionError(
-                message=str(exc),
-                request=cast(Any, httpx.Request("POST", "https://llm.invalid")),
-            ) from exc
+        collector = self._owner.collector
+        # An `LLMError` is the call sites' "API error": they skip or retry on it, and
+        # `BudgetExceeded` (not an `LLMError`) passes through.
+        if collector is not None:
+            done = await collector.submit(request)
+        else:
+            done = await self._owner.llm.complete(request)
         content: list[Any] = [SimpleNamespace(type="text", text=done.text, citations=None)]
         if done.citations:
-            # The pages the answer cites, shaped like Anthropic's search-result block, which
-            # the search call sites read to check every source against the allowed tiers.
+            # The pages the answer cites, as the search-result block the search call sites
+            # read to check every source against the allowed tiers.
             content.append(
                 SimpleNamespace(
                     type="web_search_tool_result",
@@ -229,78 +194,57 @@ class _Messages:
 
 
 class RoutingClient:
-    def __init__(
-        self,
-        anthropic_client: anthropic.AsyncAnthropic | None,
-        llm: LLM,
-        cache: ResultCache | None = None,
-    ) -> None:
-        self.anthropic = anthropic_client
+    def __init__(self, llm: LLM, cache: ResultCache | None = None) -> None:
         self.llm = llm
         self.cache = cache
-        # Set to a BatchCollector to send gpt-/gemini- calls through the provider's batch API.
+        # Set to a BatchCollector to send calls through the provider's batch API.
         self.collector: BatchCollector | None = None
         self.messages = _Messages(self)
 
-    def __getattr__(self, name: str) -> Any:
-        if self.anthropic is None:
-            raise AttributeError(name)
-        return getattr(self.anthropic, name)
+
+ModelClient = RoutingClient
 
 
-def create_routing_client(settings: Any) -> tuple[anthropic.AsyncAnthropic, LLM]:
-    """The routing client and its `LLM` from the settings, for scripts (the evals): Anthropic
-    is optional here, so a script can evaluate an OpenAI or Google model alone."""
-    from steward.ai import AINotConfigured, create_client
+def create_routing_client(settings: Any) -> tuple[RoutingClient, LLM]:
+    """The client and its `LLM` from the settings, for scripts (the evals)."""
     from steward.llm.client import create_llm
 
-    try:
-        base: anthropic.AsyncAnthropic | None = create_client(settings)
-    except AINotConfigured:
-        base = None
-    llm = create_llm(settings, base)
-    return routing_client(base, llm), llm
+    llm = create_llm(settings)
+    return routing_client(llm), llm
 
 
 @contextmanager
 def batch_collector(
-    client: anthropic.AsyncAnthropic, llm: LLM, wait_minutes: float
+    client: RoutingClient, llm: LLM, wait_minutes: float
 ) -> Iterator[BatchCollector]:
-    """A collector the `client` (from `routing_client`) sends its non-Claude calls to while the
-    block runs; run the per-holding flows with `collector.run` inside it."""
+    """A collector the `client` sends its calls to while the block runs; run the per-holding
+    flows with `collector.run` inside it."""
     collector = BatchCollector(llm, wait_minutes)
-    routing = cast(RoutingClient, client)
-    routing.collector = collector
+    client.collector = collector
     try:
         yield collector
     finally:
-        routing.collector = None
+        client.collector = None
 
 
 async def parse_many(
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     calls: list[dict[str, Any]],
     *,
     batch: bool = False,
     wait_minutes: float = 60.0,
 ) -> list[Any]:
     """`client.messages.parse(**kwargs)` for each of `calls`, in order: the response, or the
-    exception a call raised (`BudgetExceeded` is raised). With `batch` and an OpenAI or Google
-    model the calls go to the provider's batch API as one batch (about half the price)."""
+    exception a call raised (`BudgetExceeded` is raised). With `batch` the calls go to the
+    provider's batch API as one batch (about half the price)."""
     from steward.budget_guard import BudgetExceeded
 
     async def one(kwargs: dict[str, Any]) -> Any:
         return await client.messages.parse(**kwargs)
 
-    routing = cast(RoutingClient, client)
     models = {str(kw.get("model", "")) for kw in calls}
-    if (
-        batch
-        and len(models) == 1
-        and provider_of(next(iter(models))) != "anthropic"
-        and routing.llm.configured(next(iter(models)))
-    ):
-        with batch_collector(client, routing.llm, wait_minutes) as collector:
+    if batch and len(models) == 1 and client.llm.configured(next(iter(models))):
+        with batch_collector(client, client.llm, wait_minutes) as collector:
             out = await collector.run([one(kw) for kw in calls])
     else:
         out = []
@@ -317,11 +261,17 @@ async def parse_many(
     return out
 
 
-def routing_client(
-    anthropic_client: anthropic.AsyncAnthropic | None,
-    llm: LLM,
-    cache: ResultCache | None = None,
-) -> anthropic.AsyncAnthropic:
-    """The routing client, typed as the Anthropic client the call sites expect. With a
-    `cache`, a structured call (no tools) whose request repeats exactly is answered from it."""
-    return cast(anthropic.AsyncAnthropic, RoutingClient(anthropic_client, llm, cache))
+def routing_client(llm: LLM, cache: ResultCache | None = None) -> RoutingClient:
+    """The client for `llm`. With a `cache`, a structured call (no tools) whose request repeats
+    exactly is answered from it."""
+    return RoutingClient(llm, cache)
+
+
+__all__ = [
+    "ModelClient",
+    "RoutingClient",
+    "batch_collector",
+    "create_routing_client",
+    "parse_many",
+    "routing_client",
+]

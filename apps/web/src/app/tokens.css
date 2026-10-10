@@ -1,6 +1,5 @@
 /*
- * StewardAI colour tokens — "Industry" redesign (Claude Design project "Modern fintech
- * app redesign"): one dominant blue (#2F6BFF) on a light technical ground, square
+ * StewardAI colour tokens — "Industry" redesign ("Modern fintech app redesign"): one dominant blue (#2F6BFF) on a light technical ground, square
  * hairline frames. Semantic roles below are unchanged from the Ledger design system;
  * only their values moved onto the new palette. The ONLY file in src/ allowed
  * to contain colour literals. `npm run lint:colors` (also run by `npm test`)

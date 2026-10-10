@@ -3,7 +3,7 @@ a large price move, linked to the holding's thesis.
 
 The job is queued by the news pipeline (once per confirmed story at or above the configured
 severity) and by the price-history job (a close-to-close move beyond the event rules'
-threshold). One Claude call (Sonnet 5 by default) gets the story's stored sources (or the
+threshold). One model call gets the story's stored sources (or the
 price move and the holding's recent stories), the thesis (why it is owned, its KPIs and
 exit conditions) and a web search restricted to the outlet tiers in the Jobs config (1 and
 2 by default), capped by its step and search budget. It returns a structured note; code
@@ -21,13 +21,12 @@ import datetime as dt
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
-import anthropic
 import asyncpg
 from pydantic import BaseModel, Field
 
-from steward.ai import AINotConfigured, Usage, create_client
+from steward.ai import AINotConfigured, Usage
 from steward.config.event_rules import EVENT_DESCRIPTIONS
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import EscalationSettings, JobsConfig, effort_kwargs
@@ -39,8 +38,9 @@ from steward.config.verification import ClaimVerifierSettings, VerificationConfi
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, JobFailed, create_job
 from steward.llm.client import create_llm
-from steward.llm.routing import routing_client
-from steward.news.corroborate import AUTO_CACHE, _result_urls
+from steward.llm.routing import RoutingClient, routing_client
+from steward.llm.types import LLMError
+from steward.news.corroborate import _result_urls
 from steward.settings import get_settings
 from steward.verify.claims import SYSTEM as CLAIM_SYSTEM
 from steward.verify.claims import (
@@ -49,7 +49,7 @@ from steward.verify.claims import (
     ClaimCheckOutcome,
     ClaimCheckSummary,
     ClaimVerifier,
-    ClaudeClaimVerifier,
+    LLMClaimVerifier,
     check_claims,
 )
 
@@ -167,12 +167,10 @@ class DraftResult:
     titles: dict[str, str] = field(default_factory=dict)
 
 
-class ClaudeEscalator:
-    TOOL_BY_MODEL_PREFIX = (("claude-haiku-4", "web_search_20250305"),)
-
+class LLMEscalator:
     def __init__(
         self,
-        client: anthropic.AsyncAnthropic,
+        client: RoutingClient,
         settings: EscalationSettings,
         system: str = SYSTEM,
     ) -> None:
@@ -181,12 +179,8 @@ class ClaudeEscalator:
         self._system = system
 
     def _tool(self, domains: tuple[str, ...]) -> dict[str, Any]:
-        tool_type = next(
-            (t for p, t in self.TOOL_BY_MODEL_PREFIX if self._settings.model.startswith(p)),
-            "web_search_20260209",
-        )
         return {
-            "type": tool_type,
+            "type": "web_search",
             "name": "web_search",
             "max_uses": min(self._settings.max_searches, max(0, self._settings.max_steps - 1)),
             "allowed_domains": list(domains),
@@ -204,34 +198,22 @@ class ClaudeEscalator:
                 f"Today is {today.isoformat()}. Write the impact note for this event.",
             }
         ]
-        seen: set[str] = set()
-        titles: dict[str, str] = {}
-        response = None
-        calls = 0
-        while calls < max(1, self._settings.max_steps):
-            calls += 1
-            try:
-                response = await self._client.messages.parse(
-                    model=self._settings.model,
-                    system=self._system,
-                    messages=cast(Any, messages),
-                    tools=cast(Any, tools if tools else anthropic.omit),
-                    output_format=ImpactDraft,
-                    **effort_kwargs(self._settings.model, self._settings.effort, 4000),
-                    # With web search, later sampling steps and pause_turn continuations
-                    # re-read the prefix cached; one call without tools would only pay the
-                    # cache write premium.
-                    extra_body=AUTO_CACHE if tools else None,
-                )
-            except anthropic.APIError as exc:
-                return DraftResult(None, usage, seen, f"escalation call failed: {exc}")
-            usage.add(response.usage)
-            seen |= _result_urls(response.content)
-            titles |= result_titles(response.content)
-            if response.stop_reason != "pause_turn":
-                break
-            messages.append({"role": "assistant", "content": response.content})
-        draft = response.parsed_output if response is not None else None
+        extra: dict[str, Any] = {"tools": tools} if tools else {}
+        try:
+            response = await self._client.messages.parse(
+                model=self._settings.model,
+                system=self._system,
+                messages=messages,
+                output_format=ImpactDraft,
+                **extra,
+                **effort_kwargs(self._settings.model, self._settings.effort, 4000),
+            )
+        except LLMError as exc:
+            return DraftResult(None, usage, set(), f"escalation call failed: {exc}")
+        usage.add(response.usage)
+        seen = _result_urls(response.content)
+        titles = result_titles(response.content)
+        draft = response.parsed_output
         return DraftResult(draft, usage, seen, None if draft else "no parseable note", titles)
 
 
@@ -519,7 +501,7 @@ async def queue_escalation(
 
 @dataclass
 class EscalationDeps:
-    writer: ClaudeEscalator | None
+    writer: LLMEscalator | None
     now: dt.datetime
     app_url: str | None = None
     claim_verifier: ClaimVerifier | None = None
@@ -601,7 +583,7 @@ async def run_escalation(ctx: JobContext, deps: EscalationDeps) -> int:
 
     async with ctx.step("impact_note") as step:
         if deps.writer is None:
-            body = code_only_body(request, "ANTHROPIC_API_KEY is not set")
+            body = code_only_body(request, "no OpenAI or Google API key is set")
         else:
             result = await deps.writer.write(request, deps.now.date())
             step.usage = result.usage.step_usage()
@@ -649,17 +631,16 @@ async def event_escalation_handler(ctx: JobContext) -> None:
     claim_settings = (
         stored_verification.body if stored_verification else VerificationConfig()
     ).claim_verifier
-    writer: ClaudeEscalator | None
+    writer: LLMEscalator | None
     verifier: ClaimVerifier | None
     try:
-        anthropic_client = create_client(settings)
-        client = routing_client(anthropic_client, create_llm(settings, anthropic_client))
+        client = routing_client(create_llm(settings))
     except AINotConfigured:
         writer = verifier = None
     else:
         prompts = await load_prompts(ctx.pool)
-        writer = ClaudeEscalator(client, escalation, prompts.text("news_escalation", SYSTEM))
-        verifier = ClaudeClaimVerifier(
+        writer = LLMEscalator(client, escalation, prompts.text("news_escalation", SYSTEM))
+        verifier = LLMClaimVerifier(
             client,
             claim_settings.model,
             prompts.text("claim_verifier", CLAIM_SYSTEM),

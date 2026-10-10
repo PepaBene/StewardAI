@@ -16,7 +16,7 @@ from steward.config.event_rules import EVENT_DESCRIPTIONS, EVENT_TYPES, EventTyp
 from steward.config.store import load_active
 from steward.news.market import StudyRow
 from steward.news.marks_export import CandidateCase, marks_candidates
-from steward.news.ops import OpsReport, ops_report
+from steward.news.ops import IncidentStatus, OpsReport, ops_report, set_incident_status
 from steward.news.read import (
     AlertOut,
     Confidence,
@@ -440,6 +440,22 @@ async def get_news_ops(
     and the incidents to review: severe stories nobody was alerted to, and alerts marked not
     useful."""
     return await ops_report(pool, days)
+
+
+class IncidentUpdate(BaseModel):
+    kind: Literal["unalerted_severe", "alert_not_useful"]
+    status: IncidentStatus
+    note: str | None = Field(default=None, max_length=1000)
+
+
+@router.put("/news/ops/incidents/{story_id}", tags=["news"], status_code=status.HTTP_204_NO_CONTENT)
+async def put_incident_status(
+    story_id: int, body: IncidentUpdate, pool: Pool, _owner: Owner
+) -> None:
+    """Acknowledge or resolve an incident from the ops report. A resolved incident leaves the
+    report; an acknowledged one stays, marked as seen."""
+    if not await set_incident_status(pool, body.kind, story_id, body.status, body.note):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No story {story_id}")
 
 
 @router.get("/news/marks/candidates", tags=["news"])

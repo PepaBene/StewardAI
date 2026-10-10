@@ -19,7 +19,7 @@ from typing import Any, cast
 import asyncpg
 import httpx
 
-from steward.ai import AINotConfigured, Usage, create_client
+from steward.ai import AINotConfigured, Usage
 from steward.budget_guard import BudgetExceeded
 from steward.config.jobs import JobsConfig, NewsSettings
 from steward.config.news_sources import NewsSourcesConfig
@@ -37,7 +37,7 @@ from steward.news import brief as briefs
 from steward.news import claims as claim_checks
 from steward.news import extract as extraction
 from steward.news import framing as framings
-from steward.news import gdelt_theme
+from steward.news import gdelt_theme, ops
 from steward.news import impact as impacts
 from steward.news import market as markets
 from steward.news import novelty as novelties
@@ -185,12 +185,10 @@ async def resolve_quiet_stories(pool: asyncpg.Pool, now: dt.datetime, days: int)
 
 
 def make_llm() -> LLM:
-    settings = get_settings()
     try:
-        client = create_client(settings)
+        return create_llm(get_settings())
     except AINotConfigured:
-        client = None
-    return create_llm(settings, client)
+        return LLM()  # no key: every `llm_ready` check is false and the steps are skipped
 
 
 def thesis_for(theses: ThesesConfig | None, ticker: str | None) -> ThesisConfig | None:
@@ -649,6 +647,13 @@ async def news_analysis_handler(ctx: JobContext) -> None:
                     await run.thesis(story, theses, usage)
             step.detail.update(run.counts.detail())
             step.usage = usage.step_usage()
+    # The scheduled ops report rides this job: the first run of each ISO week sends it. A failure
+    # here never fails the analysis.
+    async with ctx.step("ops_report") as step:
+        try:
+            step.detail.update(sent=await ops.send_weekly_report(ctx.pool, now, ctx.job_id))
+        except Exception as exc:
+            step.detail.update(error=str(exc)[:200])
 
 
 async def write_theme_briefs(

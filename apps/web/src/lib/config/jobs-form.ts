@@ -392,8 +392,8 @@ export const DEFAULT_JOBS: JobsConfig = {
     SCHEDULE_KEYS.map((k) => [k, { enabled: !OFF_BY_DEFAULT.includes(k), cron: SCHEDULES[k].cron, timezone: DEFAULT_TIMEZONE }]),
   ) as Record<ScheduleKey, JobSchedule>),
   earnings_check: {
-    extraction_model: "claude-sonnet-5",
-    locate_model: "claude-sonnet-5",
+    extraction_model: "gpt-6.1-sol",
+    locate_model: "gpt-6.1-sol",
     effort: "high",
     locate_effort: null,
     max_steps: 40,
@@ -403,9 +403,9 @@ export const DEFAULT_JOBS: JobsConfig = {
     xbrl_for_filings: true,
     kpi_history_periods: 8,
   },
-  earnings_calendar_settings: { model: "claude-haiku-4-5", effort: null, lookahead_days: 120, refresh_within_days: 14, use_batch: true, batch_wait_minutes: 60 },
+  earnings_calendar_settings: { model: "gpt-6-luna", effort: null, lookahead_days: 120, refresh_within_days: 14, use_batch: true, batch_wait_minutes: 60 },
   ai_approval: {
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: null,
     listings: true,
     peers: true,
@@ -421,7 +421,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     batch_wait_minutes: 60,
   },
   ir_discovery_settings: {
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: null,
     max_searches: 4,
     holdings_per_run: 6,
@@ -448,7 +448,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     robots_exempt_domains: [],
   },
   exposure_build_settings: {
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: null,
     filings_per_run: 6,
     extract_inputs: true,
@@ -456,7 +456,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     map_products: true,
   },
   gap_research_settings: {
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: null,
     slots: ["next_report_date", "shares_outstanding", "company_description"],
     max_searches: 3,
@@ -507,12 +507,12 @@ export const DEFAULT_JOBS: JobsConfig = {
     ],
   },
   news: {
-    classification_model: "claude-haiku-4-5",
+    classification_model: "gpt-6-luna",
     classification_effort: null,
     classification_batch_size: 50,
     classification_use_batch: true,
     classification_batch_wait_minutes: 30,
-    corroboration_model: "claude-haiku-4-5",
+    corroboration_model: "gpt-6-luna",
     corroboration_effort: null,
     corroboration_max_searches: 10,
     corroboration_rounds: 3,
@@ -565,7 +565,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     fulltext_browser_fallback: false,
   },
   digest: {
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: null,
     use_batch: true,
     batch_wait_minutes: 60,
@@ -576,7 +576,7 @@ export const DEFAULT_JOBS: JobsConfig = {
   },
   escalation: {
     enabled: true,
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: null,
     max_steps: 30,
     max_searches: 15,
@@ -652,9 +652,9 @@ export const DEFAULT_JOBS: JobsConfig = {
     intraday_cache_seconds: 120,
   },
   calendar: { holiday_countries: ["CZ", "US", "DE", "GB"], exchange_closures: [] },
-  chat: { model: "claude-sonnet-5", effort: null, max_steps: 30, max_searches: 15, history_messages: 100, source_tiers: [1, 2], rules_first: true },
+  chat: { model: "gpt-6.1-sol", effort: null, max_steps: 30, max_searches: 15, history_messages: 100, source_tiers: [1, 2], rules_first: true },
   review: {
-    model: "claude-opus-5-5",
+    model: "gpt-6.1-sol",
     effort: "high",
     max_steps: 10,
     use_batch: true,
@@ -693,19 +693,10 @@ export const DEFAULT_JOBS: JobsConfig = {
   xbrl: { enabled: true, quarterly: true, read_ads_ratio: true, max_document_mb: 40 },
 };
 
-/** Model ids offered as suggestions; any `claude-…` id is accepted. */
-export const MODEL_SUGGESTIONS = [
-  "claude-fable-5-1",
-  "claude-opus-5-5",
-  "claude-opus-5",
-  "claude-opus-4-8",
-  "claude-sonnet-5",
-  "claude-sonnet-4-6",
-  "claude-haiku-4-5",
-];
+/** Model ids offered as suggestions; any `gpt-…` or `gemini-…` id is accepted. */
+export const MODEL_SUGGESTIONS = ["gpt-6.1-sol", "gpt-6-luna", "gemini-3.8-flash"];
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
-export const EFFORT_OPTIONAL_HINT =
-  "Model default: effort is not sent. On Haiku 4 models the level sets an extended-thinking budget (low 2k to max 32k tokens).";
+export const EFFORT_OPTIONAL_HINT = "Model default: effort is not sent.";
 export const TIERS = [1, 2, 3] as const;
 
 /** "2, 1, 2" -> [1, 2]: outlet tiers, ascending and unique; anything else is dropped. */
@@ -752,7 +743,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "locate_model", label: "Locate model", kind: "model", hint: "Searches for the release when EDGAR has none." },
       { key: "effort", label: "Extraction effort", kind: "effort" },
       { key: "locate_effort", label: "Locate effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
-      { key: "max_steps", label: "Step cap per run", kind: "int", min: 2, max: 200, hint: "Claude calls plus document fetches." },
+      { key: "max_steps", label: "Step cap per run", kind: "int", min: 2, max: 200, hint: "Model calls plus document fetches." },
       { key: "max_searches", label: "Web searches per run", kind: "int", min: 0, max: 100 },
       { key: "check_days_after_report", label: "Days after the report date to check", kind: "int-list", hint: "Comma separated, e.g. 1, 2, 4 (retries until the release is found)." },
       { key: "max_document_mb", label: "Largest document (MB)", kind: "int", min: 1, max: 32 },
@@ -914,7 +905,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "enabled", label: "Write impact notes", kind: "bool", hint: "Off: no escalation is queued." },
       { key: "model", label: "Model", kind: "model" },
       { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
-      { key: "max_steps", label: "Step cap per note", kind: "int", min: 1, max: 100, hint: "Claude calls plus web searches." },
+      { key: "max_steps", label: "Step cap per note", kind: "int", min: 1, max: 100, hint: "Model calls plus web searches." },
       { key: "max_searches", label: "Web searches per note", kind: "int", min: 0, max: 50, hint: "Restricted to the outlet tiers below." },
       { key: "source_tiers", label: "Outlet tiers web search may use", kind: "tiers", hint: "Tiers are set per domain in Config: News sources." },
       { key: "min_severity", label: "Escalate stories from severity", kind: "severity" },
@@ -980,7 +971,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
     fields: [
       { key: "model", label: "Model", kind: "model" },
       { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
-      { key: "max_steps", label: "Step cap per answer", kind: "int", min: 1, max: 100, hint: "Claude calls plus tool rounds." },
+      { key: "max_steps", label: "Step cap per answer", kind: "int", min: 1, max: 100, hint: "Model calls plus tool rounds." },
       { key: "max_searches", label: "Web searches per answer", kind: "int", min: 0, max: 50 },
       { key: "history_messages", label: "Earlier messages sent along", kind: "int", min: 2, max: 500 },
       { key: "rules_first", label: "Answer portfolio value and cash questions from the database", kind: "bool", hint: "Short, closed questions only; no model call. Everything else goes to the assistant." },
@@ -993,7 +984,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
     fields: [
       { key: "model", label: "Model", kind: "model" },
       { key: "effort", label: "Effort", kind: "effort" },
-      { key: "max_steps", label: "Claude calls per review", kind: "int", min: 1, max: 50 },
+      { key: "max_steps", label: "Model calls per review", kind: "int", min: 1, max: 50 },
       { key: "use_batch", label: "Propose through the Batch API (half price)", kind: "bool" },
       { key: "batch_wait_minutes", label: "Wait for the batch (minutes)", kind: "int", min: 1, max: 720, hint: "Then the actions are proposed directly." },
       {

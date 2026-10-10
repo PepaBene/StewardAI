@@ -247,6 +247,6 @@
     }
   ],
   "absent_metrics": [],
-  "labelled_by": "claude (AI-read from the document; owner has not hand-checked)",
+  "labelled_by": "AI model (AI-read from the document; owner has not hand-checked)",
   "notes": "Microsoft labels gross profit as 'Gross margin' in its income statement; that line is used for gross_profit. Adjusted EPS = Microsoft's non-GAAP EPS excluding the impact from investments in OpenAI (release's GAAP to non-GAAP table). XBRL crosscheck of reported figures: 10 match, 0 mismatch, 0 not checkable."
 }

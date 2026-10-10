@@ -18,12 +18,13 @@ from api.auth import AuthenticatedUser, require_owner
 from api.budget_routes import router as budget_router
 from api.db import get_pool, get_pool_or_error
 from steward import budget_guard
-from steward.ai import BudgetedAnthropic
 from steward.budget_guard import BudgetExceeded, month_bounds, month_of, month_spend
 from steward.config.budget import BudgetConfig, BudgetJobType
 from steward.config.store import save_config
 from steward.jobs.registry import JOB_HANDLERS, JobType
 from steward.jobs.runner import JobContext, StepUsage, create_job, current_job, run_job
+from steward.llm.client import LLM
+from steward.llm.types import Message, Request
 
 OWNER = "7f0c3d4e-0000-4000-8000-000000000001"
 NOW = dt.datetime(2026, 9, 15, 12, tzinfo=dt.UTC)
@@ -57,7 +58,7 @@ def test_an_old_saved_budget_stays_valid_with_no_caps() -> None:
         {"critical_job_types": ["chat", "chat"]},
         {"at_cap": "stop_everything"},
         # The downgrade model must be priced, or its steps would cost nothing.
-        {"at_cap": "downgrade_noncritical", "downgrade_model": "claude-unknown-1"},
+        {"at_cap": "downgrade_noncritical", "downgrade_model": "gpt-unknown-1"},
     ],
 )
 def test_invalid_budget_limits_are_rejected(body: dict[str, Any]) -> None:
@@ -130,7 +131,7 @@ async def test_under_the_cap_the_request_goes_as_asked(backend_pool: asyncpg.Poo
     other = await create_job(backend_pool, "research", "manual")
     await _step(backend_pool, other, "5", NOW)
     ctx = await _ctx(backend_pool, "daily_digest")
-    assert await budget_guard.before_request(ctx, "claude-sonnet-5", now=NOW) == "claude-sonnet-5"
+    assert await budget_guard.before_request(ctx, "gpt-6.1-sol", now=NOW) == "gpt-6.1-sol"
 
 
 @pytest.mark.db
@@ -142,14 +143,12 @@ async def test_at_the_cap_non_critical_jobs_are_paused(backend_pool: asyncpg.Poo
     await _step(backend_pool, other, "100", NOW - dt.timedelta(days=40))
     ctx = await _ctx(backend_pool, "daily_digest")
     with pytest.raises(BudgetExceeded) as exc:
-        await budget_guard.before_request(ctx, "claude-sonnet-5", now=NOW)
+        await budget_guard.before_request(ctx, "gpt-6.1-sol", now=NOW)
     assert str(exc.value) == (
         "monthly AI budget reached ($10.50 of $10.00); non-critical jobs paused"
     )
     critical = await _ctx(backend_pool, "earnings_check")
-    assert (
-        await budget_guard.before_request(critical, "claude-sonnet-5", now=NOW) == "claude-sonnet-5"
-    )
+    assert await budget_guard.before_request(critical, "gpt-6.1-sol", now=NOW) == "gpt-6.1-sol"
 
 
 @pytest.mark.db
@@ -158,7 +157,7 @@ async def test_alert_only_keeps_every_job_running(backend_pool: asyncpg.Pool) ->
     other = await create_job(backend_pool, "research", "manual")
     await _step(backend_pool, other, "11", NOW)
     ctx = await _ctx(backend_pool, "daily_digest")
-    assert await budget_guard.before_request(ctx, "claude-sonnet-5", now=NOW) == "claude-sonnet-5"
+    assert await budget_guard.before_request(ctx, "gpt-6.1-sol", now=NOW) == "gpt-6.1-sol"
 
 
 @pytest.mark.db
@@ -167,17 +166,18 @@ async def test_at_the_cap_non_critical_jobs_are_downgraded(backend_pool: asyncpg
     other = await create_job(backend_pool, "research", "manual")
     await _step(backend_pool, other, "10", NOW)
     ctx = await _ctx(backend_pool, "research")
-    model = await budget_guard.before_request(ctx, "claude-opus-5-5", now=NOW)
-    assert model == "claude-haiku-4-5"
+    model = await budget_guard.before_request(ctx, "gpt-6.1-sol", now=NOW)
+    assert model == "gpt-6-luna"
     # The step is recorded and priced as the model actually used.
     async with ctx.step("write") as step:
-        step.usage = StepUsage(model="claude-opus-5-5", input_tokens=1_000_000)
+        step.usage = StepUsage(model="gpt-6.1-sol", input_tokens=1_000_000)
     row = await backend_pool.fetchrow(
         "select model, cost_usd, detail from public.job_step where job_id = $1", ctx.job_id
     )
-    assert row["model"] == "claude-haiku-4-5"
-    assert row["cost_usd"] == Decimal("1.000000")
-    assert json.loads(row["detail"])["budget_downgrade"]["from"] == "claude-opus-5-5"
+    assert row["model"] == "gpt-6-luna"
+    # 1M input tokens at gpt-6-luna's $0.10 per million.
+    assert row["cost_usd"] == Decimal("0.100000")
+    assert json.loads(row["detail"])["budget_downgrade"]["from"] == "gpt-6.1-sol"
 
 
 @pytest.mark.db
@@ -187,10 +187,10 @@ async def test_the_warning_and_the_cap_alert_once_a_month(backend_pool: asyncpg.
     await _step(backend_pool, other, "6", NOW)
     for _ in range(2):
         ctx = await _ctx(backend_pool, "earnings_check")
-        await budget_guard.before_request(ctx, "claude-sonnet-5", now=NOW)
+        await budget_guard.before_request(ctx, "gpt-6.1-sol", now=NOW)
     await _step(backend_pool, other, "5", NOW)
     ctx = await _ctx(backend_pool, "earnings_check")
-    await budget_guard.before_request(ctx, "claude-sonnet-5", now=NOW)
+    await budget_guard.before_request(ctx, "gpt-6.1-sol", now=NOW)
     keys = [
         r["dedupe_key"]
         for r in await backend_pool.fetch(
@@ -204,53 +204,42 @@ async def test_the_warning_and_the_cap_alert_once_a_month(backend_pool: asyncpg.
 async def test_a_run_over_its_own_cap_is_stopped(backend_pool: asyncpg.Pool) -> None:
     await _budget(backend_pool, per_job_cap_usd={"research": 1.0})
     ctx = await _ctx(backend_pool, "research")
-    assert await budget_guard.before_request(ctx, "claude-sonnet-5", now=NOW) == "claude-sonnet-5"
+    assert await budget_guard.before_request(ctx, "gpt-6.1-sol", now=NOW) == "gpt-6.1-sol"
     # A response's cost counts before its step is recorded: 100k output tokens of
-    # claude-sonnet-5 at $10/Mtok = $1.
+    # gpt-6.1-sol at $10/Mtok = $1.
     usage = type("U", (), {"input_tokens": 0, "output_tokens": 100_000})()
-    budget_guard.after_response(ctx, "claude-sonnet-5", usage)
+    budget_guard.after_response(ctx, "gpt-6.1-sol", usage)
     with pytest.raises(BudgetExceeded, match=r"one research run reached \(\$1.00 of \$1.00\)"):
-        await budget_guard.before_request(ctx, "claude-sonnet-5", now=NOW)
+        await budget_guard.before_request(ctx, "gpt-6.1-sol", now=NOW)
     # Other job types have no cap.
     other = await _ctx(backend_pool, "daily_digest")
-    await budget_guard.before_request(other, "claude-sonnet-5", now=NOW)
+    await budget_guard.before_request(other, "gpt-6.1-sol", now=NOW)
 
 
 @pytest.mark.db
 async def test_the_client_applies_the_guard_inside_a_job(backend_pool: asyncpg.Pool) -> None:
-    """The Anthropic client every call site gets from steward.ai: a paused job fails before
-    anything is sent; a downgraded request is sent to the cheaper model."""
+    """The client every call site gets from steward.llm: a paused job fails before anything is
+    sent; a downgraded request is sent to the cheaper model."""
     sent: list[dict[str, Any]] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
         body = json.loads(request.content)
         sent.append(body)
-        return httpx2.Response(
-            200,
-            json={
-                "id": "msg_1",
-                "type": "message",
-                "role": "assistant",
-                "model": body["model"],
-                "content": [{"type": "text", "text": "ok"}],
-                "stop_reason": "end_turn",
-                "stop_sequence": None,
-                "usage": {"input_tokens": 10, "output_tokens": 5},
-            },
-        )
+        return httpx2.Response(200, json=_openai_answer(10, 5))
 
-    client = BudgetedAnthropic(
-        api_key="test", http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+    client = LLM(
+        openai_key="test", http=httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
     )
-    params: dict[str, Any] = {
-        "model": "claude-opus-5-5",
-        "max_tokens": 10,
-        "messages": [{"role": "user", "content": "hi"}],
-        "output_config": {"effort": "high"},
-    }
+    req = Request(
+        model="gpt-6.1-sol",
+        system="s",
+        messages=(Message(role="user", text="hi"),),
+        effort="high",
+        max_tokens=16,
+    )
     # Outside a job: no guard.
-    await client.messages.create(**params)
-    assert sent[-1]["model"] == "claude-opus-5-5"
+    await client.complete(req)
+    assert sent[-1]["model"] == "gpt-6.1-sol"
 
     await _budget(backend_pool, monthly_cap_usd=1, at_cap="downgrade_noncritical")
     other = await create_job(backend_pool, "research", "manual")
@@ -258,13 +247,13 @@ async def test_the_client_applies_the_guard_inside_a_job(backend_pool: asyncpg.P
 
     async def job(ctx: JobContext) -> None:
         async with ctx.step("ask") as step:
-            response = await client.messages.create(**params)
-            step.usage = StepUsage(model="claude-opus-5-5", input_tokens=10, output_tokens=5)
-            assert response.model == "claude-haiku-4-5"
+            response = await client.complete(req)
+            step.usage = StepUsage(model="gpt-6.1-sol", input_tokens=10, output_tokens=5)
+            assert response.model == "gpt-6-luna"
 
     assert await run_job(backend_pool, "daily_digest", job, trigger="manual") == "succeeded"
-    assert sent[-1]["model"] == "claude-haiku-4-5"
-    assert "effort" not in sent[-1].get("output_config", {})
+    assert sent[-1]["model"] == "gpt-6-luna"
+    assert "reasoning" not in sent[-1]
     assert current_job.get() is None
 
     await _budget(backend_pool, monthly_cap_usd=1)
@@ -285,33 +274,18 @@ async def test_a_failed_step_still_records_what_its_requests_cost(
     raises after a response, and one whose call site counts less than came back, keep it."""
 
     def handler(request: httpx2.Request) -> httpx2.Response:
-        body = json.loads(request.content)
-        return httpx2.Response(
-            200,
-            json={
-                "id": "msg_1",
-                "type": "message",
-                "role": "assistant",
-                "model": body["model"],
-                "content": [{"type": "text", "text": "ok"}],
-                "stop_reason": "end_turn",
-                "stop_sequence": None,
-                "usage": {"input_tokens": 1_000_000, "output_tokens": 100_000},
-            },
-        )
+        return httpx2.Response(200, json=_openai_answer(1_000_000, 100_000))
 
-    client = BudgetedAnthropic(
-        api_key="test", http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+    client = LLM(
+        openai_key="test", http=httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
     )
-    params: dict[str, Any] = {
-        "model": "claude-sonnet-5",
-        "max_tokens": 10,
-        "messages": [{"role": "user", "content": "hi"}],
-    }
+    req = Request(
+        model="gpt-6.1-sol", system="s", messages=(Message(role="user", text="hi"),), max_tokens=16
+    )
 
     async def job(ctx: JobContext) -> None:
         async with ctx.step("fails_after_response"):
-            await client.messages.create(**params)
+            await client.complete(req)
             raise RuntimeError("the process stopped before the call site counted it")
 
     assert await run_job(backend_pool, "daily_digest", job, trigger="manual") == "failed"
@@ -322,7 +296,7 @@ async def test_a_failed_step_still_records_what_its_requests_cost(
         " order by s.id desc limit 1"
     )
     assert row["status"] == "failed"
-    assert row["model"] == "claude-sonnet-5"
+    assert row["model"] == "gpt-6.1-sol"
     assert (row["input_tokens"], row["output_tokens"]) == (1_000_000, 100_000)
     # 1M input at $2 plus 100k output at $10 per million.
     assert row["cost_usd"] == Decimal("3.000000")
@@ -330,8 +304,8 @@ async def test_a_failed_step_still_records_what_its_requests_cost(
 
     async def undercounted(ctx: JobContext) -> None:
         async with ctx.step("undercounted") as step:
-            await client.messages.create(**params)
-            step.usage = StepUsage(model="claude-sonnet-5", input_tokens=10, output_tokens=5)
+            await client.complete(req)
+            step.usage = StepUsage(model="gpt-6.1-sol", input_tokens=10, output_tokens=5)
 
     assert await run_job(backend_pool, "daily_digest", undercounted, trigger="manual") == (
         "succeeded"
@@ -383,12 +357,12 @@ async def test_a_failed_step_records_the_cost_of_its_requests_without_a_database
 
     with pytest.raises(RuntimeError):
         async with ctx.step("ask"):
-            await record_response("claude-sonnet-5", Usage())
+            await record_response("gpt-6.1-sol", Usage())
             raise RuntimeError("stopped before the call site counted it")
 
     args = pool.rows[1]["args"]
     # status, detail, error, model, input, output, searches, cost
-    assert args[3:8] == ("claude-sonnet-5", 1_000_000, 100_000, 0, Decimal("3.000000"))
+    assert args[3:8] == ("gpt-6.1-sol", 1_000_000, 100_000, 0, Decimal("3.000000"))
     assert "usage_from_requests" in args[1]
 
 
@@ -422,12 +396,12 @@ async def test_the_summary_total_is_the_sum_of_step_costs(
     costs = ["0.004999", "0.004999", "0.004999", "1.333333", "0.666667", "0.000001"]
     research = [await create_job(backend_pool, "research", "manual") for _ in range(2)]
     digest = await create_job(backend_pool, "daily_digest", "schedule")
-    await _step(backend_pool, research[0], costs[0], NOW, "claude-opus-5-5")
-    await _step(backend_pool, research[0], costs[1], NOW, "claude-sonnet-5")
-    await _step(backend_pool, research[1], costs[2], NOW, "claude-opus-5-5")
-    await _step(backend_pool, digest, costs[3], NOW, "claude-sonnet-5")
-    await _step(backend_pool, digest, costs[4], NOW, "claude-sonnet-5")
-    await _step(backend_pool, digest, costs[5], NOW, "claude-sonnet-5")
+    await _step(backend_pool, research[0], costs[0], NOW, "gpt-6.1-sol")
+    await _step(backend_pool, research[0], costs[1], NOW, "gpt-6.1-sol")
+    await _step(backend_pool, research[1], costs[2], NOW, "gpt-6.1-sol")
+    await _step(backend_pool, digest, costs[3], NOW, "gpt-6.1-sol")
+    await _step(backend_pool, digest, costs[4], NOW, "gpt-6.1-sol")
+    await _step(backend_pool, digest, costs[5], NOW, "gpt-6.1-sol")
     await _step(backend_pool, digest, None, NOW)
     await _step(backend_pool, digest, "9", NOW - dt.timedelta(days=40))
 
@@ -453,29 +427,33 @@ async def test_the_summary_total_is_the_sum_of_step_costs(
     assert empty["total_usd"] == 0 and empty["by_job_type"] == []
 
 
-def test_downgrade_to_haiku_keeps_the_request_valid() -> None:
-    from steward.ai import _downgrade
+def test_a_downgrade_drops_effort_and_the_cache_key() -> None:
+    from steward.llm.client import _downgraded
+    from steward.llm.types import SearchSpec
 
-    params = {
-        "model": "claude-sonnet-5",
-        "output_config": {"effort": "high", "format": {"type": "json_schema"}},
-        "thinking": {"type": "adaptive"},
-        "tools": [
-            {"type": "web_search_20260209", "name": "web_search", "max_uses": 3},
-            {"type": "web_fetch_20260209", "name": "web_fetch"},
-            {"name": "custom", "input_schema": {}},
+    req = Request(
+        model="gpt-6.1-sol",
+        system="s",
+        messages=(Message(role="user", text="hi"),),
+        effort="high",
+        search=SearchSpec(max_uses=3),
+        cache_key="k",
+    )
+    same = _downgraded(req, "gpt-6-luna")
+    assert (same.model, same.effort, same.cache_key) == ("gpt-6-luna", None, None)
+    assert same.search == req.search
+    # Another provider's search tool is not the same tool, so it is dropped.
+    assert _downgraded(req, "gemini-3.8-flash").search is None
+
+
+def _openai_answer(input_tokens: int, output_tokens: int) -> dict[str, Any]:
+    return {
+        "status": "completed",
+        "output": [
+            {
+                "type": "message",
+                "content": [{"type": "output_text", "text": "ok", "annotations": []}],
+            }
         ],
+        "usage": {"input_tokens": input_tokens, "output_tokens": output_tokens},
     }
-    out = _downgrade(params, "claude-haiku-4-5")
-    assert out["model"] == "claude-haiku-4-5"
-    assert out["output_config"] == {"format": {"type": "json_schema"}}
-    assert "thinking" not in out
-    assert [t.get("type") for t in out["tools"]] == [
-        "web_search_20250305",
-        "web_fetch_20250910",
-        None,
-    ]
-    assert out["tools"][0]["max_uses"] == 3
-    # Another target keeps the tools and thinking as they were.
-    other = _downgrade(params, "claude-sonnet-5")
-    assert other["tools"] == params["tools"] and other["thinking"] == {"type": "adaptive"}

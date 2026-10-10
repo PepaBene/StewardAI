@@ -85,8 +85,8 @@ def cron_trigger(expression: str, tz: ZoneInfo) -> CronTrigger:
 ModelId = Annotated[
     str,
     Field(
-        pattern=r"^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
-        examples=["claude-sonnet-5", "gpt-6-luna"],
+        pattern=r"^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+        examples=["gpt-6.1-sol", "gpt-6-luna", "gemini-3.8-flash"],
     ),
 ]
 
@@ -106,68 +106,26 @@ AnalysisTechnique = Literal[
 ]
 # The techniques computed in code, which cost nothing and so run by default.
 CODE_TECHNIQUES: tuple[AnalysisTechnique, ...] = ("novelty", "thread", "market", "themes")
-EFFORT_HELP = (
-    "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level "
-    "sets an extended-thinking budget instead (low 2k to max 32k tokens)."
-)
+EFFORT_HELP = "Unset: effort is not sent and the model's default applies."
 # Web-search tiers: 1 the company, regulators and statistics offices; 2 established outlets;
 # 3 everything else on the allow-list.
 SourceTier = Literal[1, 2, 3]
 DEFAULT_SOURCE_TIERS: tuple[SourceTier, ...] = (1, 2)
 
 
-def supports_effort(model: str) -> bool:
-    """Haiku 4 models reject the effort parameter."""
-    return not model.startswith("claude-haiku-4")
-
-
-# Claude Haiku 4 models take no effort parameter; their equivalent is extended thinking with
-# a token budget, sized per effort level.
-THINKING_BUDGET: dict[str, int] = {
-    "low": 2048,
-    "medium": 4096,
-    "high": 8192,
-    "xhigh": 16384,
-    "max": 32000,
-}
-
-
-def reasoning_kwargs(
-    model: str,
-    effort: str | None,
-    max_tokens: int,
-    output_config: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """`max_tokens`, `output_config` and `thinking` for a Messages call at `effort`.
-
-    Models that take effort get it in `output_config` (merged with `output_config`, e.g. a
-    response format). Haiku 4 models get extended thinking with `THINKING_BUDGET[effort]`
-    tokens instead, and `max_tokens` grows by that budget so the answer keeps its room.
-    No effort: nothing is added (the model's default)."""
-    config = dict(output_config or {})
+def effort_kwargs(model: str, effort: str | None, max_tokens: int) -> dict[str, Any]:
+    """`max_tokens` and `effort` for a `client.messages.parse` call. No effort: nothing is
+    added and the model's default applies. `model` is accepted so a call site need not know
+    which models take an effort level."""
+    del model
     out: dict[str, Any] = {"max_tokens": max_tokens}
     if effort is not None:
-        if supports_effort(model):
-            # xhigh arrived with Opus 4.7; the 4.6 models top out at high below max.
-            if effort == "xhigh" and model.endswith("-4-6"):
-                effort = "high"
-            config["effort"] = effort
-        else:
-            budget = THINKING_BUDGET[effort]
-            out["thinking"] = {"type": "enabled", "budget_tokens": budget}
-            out["max_tokens"] = max_tokens + budget
-    if config:
-        out["output_config"] = config
+        out["effort"] = effort
     return out
 
 
-def effort_kwargs(model: str, effort: str | None, max_tokens: int) -> dict[str, Any]:
-    """`reasoning_kwargs` without a response format."""
-    return reasoning_kwargs(model, effort, max_tokens)
-
-
 def check_effort(model: str, effort: str | None, field: str) -> None:
-    """Every effort level is valid for every model (Haiku 4 maps it to a thinking budget)."""
+    """Every effort level is valid for every model."""
     del model, effort, field
 
 
@@ -180,15 +138,15 @@ def _unique_tiers(tiers: list[int]) -> list[int]:
 class EarningsCheckSettings(ConfigModel):
     """The earnings thesis check: find the release, extract figures, validate, judge KPIs."""
 
-    extraction_model: ModelId = "claude-sonnet-5"
+    extraction_model: ModelId = "gpt-6.1-sol"
     locate_model: ModelId = Field(
-        default="claude-sonnet-5",
+        default="gpt-6.1-sol",
         description="Searches for the release when EDGAR has none (non-US issuers).",
     )
     effort: Effort = "high"
     locate_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_steps: int = Field(
-        default=40, ge=2, le=200, description="Claude calls plus document fetches per run."
+        default=40, ge=2, le=200, description="Model calls plus document fetches per run."
     )
     max_searches: int = Field(default=20, ge=0, le=100, description="Web searches per run.")
     check_days_after_report: list[Annotated[int, Field(ge=0, le=30)]] = Field(
@@ -220,7 +178,7 @@ class EarningsCalendarSettings(ConfigModel):
     """Next report dates: Finnhub for US issuers, the IR calendar page otherwise."""
 
     model: ModelId = Field(
-        default="claude-haiku-4-5", description="Reads report dates off IR calendar pages."
+        default="gpt-6-luna", description="Reads report dates off IR calendar pages."
     )
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     lookahead_days: int = Field(default=120, ge=7, le=400)
@@ -249,7 +207,7 @@ class AiApprovalSettings(ConfigModel):
     is recorded with its reasons and the owner can overturn it (an owner decision is final)."""
 
     model: ModelId = Field(
-        default="claude-sonnet-5", description="Judges each suggestion from the evidence given."
+        default="gpt-6.1-sol", description="Judges each suggestion from the evidence given."
     )
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     listings: bool = Field(default=True, description="Approve suggested listing matches.")
@@ -300,7 +258,7 @@ class ExposureBuildSettings(ConfigModel):
     when a verbatim quote in the filing prints it."""
 
     model: ModelId = Field(
-        default="claude-sonnet-5", description="Reads annual reports for currencies and inputs."
+        default="gpt-6.1-sol", description="Reads annual reports for currencies and inputs."
     )
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     filings_per_run: int = Field(
@@ -325,7 +283,7 @@ class IrDiscoverySettings(ConfigModel):
     AI approve them. Pages the owner already set are never changed."""
 
     model: ModelId = Field(
-        default="claude-sonnet-5", description="Searches for the pages and approves them."
+        default="gpt-6.1-sol", description="Searches for the pages and approves them."
     )
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_searches: int = Field(
@@ -411,7 +369,7 @@ class GapResearchSettings(ConfigModel):
     structured data and are approved by AI against the source tiers below."""
 
     model: ModelId = Field(
-        default="claude-sonnet-5", description="Searches for facts and approves them."
+        default="gpt-6.1-sol", description="Searches for facts and approves them."
     )
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     slots: list[GapSlotKey] = Field(
@@ -507,7 +465,7 @@ class GapResearchSettings(ConfigModel):
 class NewsSettings(ConfigModel):
     """The news pipeline after ingest: classification, corroboration."""
 
-    classification_model: ModelId = "claude-haiku-4-5"
+    classification_model: ModelId = "gpt-6-luna"
     classification_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     classification_batch_size: int = Field(
         default=50, ge=5, le=100, description="Items per classification call."
@@ -522,7 +480,7 @@ class NewsSettings(ConfigModel):
     classification_batch_wait_minutes: float = Field(
         default=30, ge=1, le=1440, description="How long a classification batch is waited for."
     )
-    corroboration_model: ModelId = "claude-haiku-4-5"
+    corroboration_model: ModelId = "gpt-6-luna"
     corroboration_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     corroboration_max_searches: int = Field(
         default=10, ge=0, le=50, description="Web searches per corroboration call."
@@ -764,7 +722,7 @@ class NewsSettings(ConfigModel):
 
 
 class DigestSettings(ConfigModel):
-    model: ModelId = "claude-sonnet-5"
+    model: ModelId = "gpt-6.1-sol"
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     use_batch: bool = Field(
         default=True, description="Write the summary through the Batch API (half price)."
@@ -970,10 +928,10 @@ class EscalationSettings(ConfigModel):
     """Event escalation: an impact note on a confirmed severity-2+ story or a price move."""
 
     enabled: bool = True
-    model: ModelId = "claude-sonnet-5"
+    model: ModelId = "gpt-6.1-sol"
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_steps: int = Field(
-        default=30, ge=1, le=100, description="Claude calls plus web searches per escalation."
+        default=30, ge=1, le=100, description="Model calls plus web searches per escalation."
     )
     max_searches: int = Field(default=15, ge=0, le=50)
     min_severity: int = Field(default=2, ge=1, le=3)
@@ -1477,7 +1435,7 @@ class MonitorSettings(ConfigModel):
 class ChatSettings(ConfigModel):
     """The chat panel's assistant: DB tools, web search on tiered outlets, cited answers."""
 
-    model: ModelId = "claude-sonnet-5"
+    model: ModelId = "gpt-6.1-sol"
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     rules_first: bool = Field(
         default=True,
@@ -1485,7 +1443,7 @@ class ChatSettings(ConfigModel):
         "the database with a template (no model call); everything else goes to the assistant.",
     )
     max_steps: int = Field(
-        default=30, ge=1, le=100, description="Claude calls plus tool rounds per answer."
+        default=30, ge=1, le=100, description="Model calls plus tool rounds per answer."
     )
     max_searches: int = Field(default=15, ge=0, le=50, description="Web searches per answer.")
     history_messages: int = Field(
@@ -1508,9 +1466,9 @@ class ChatSettings(ConfigModel):
 class ReviewSettings(ConfigModel):
     """The monthly review: compliance and figures in code, proposed actions by the model."""
 
-    model: ModelId = "claude-opus-5-5"
+    model: ModelId = "gpt-6.1-sol"
     effort: Effort = "high"
-    max_steps: int = Field(default=10, ge=1, le=50, description="Claude calls per review.")
+    max_steps: int = Field(default=10, ge=1, le=50, description="Model calls per review.")
     use_batch: bool = Field(
         default=True, description="Propose the actions through the Batch API (half price)."
     )

@@ -53,12 +53,6 @@ class Settings(BaseSettings):
     t212_api_key: SecretStr | None = None
     t212_api_secret: SecretStr | None = None
 
-    # Claude API (extraction, report-date extraction). Read by the Anthropic SDK client.
-    anthropic_api_key: SecretStr | None = None
-    # Only needed for an organization-level key not scoped to one workspace: every request
-    # is sent with this workspace's id, otherwise the API refuses with "This API key is not
-    # scoped to a workspace" (visible in the Console next to the workspace's name).
-    anthropic_workspace_id: str | None = None
     # OpenAI (gpt-6.1-sol, gpt-6-luna) and Google (gemini-3.8-flash): see steward.llm.
     openai_api_key: SecretStr | None = None
     google_api_key: SecretStr | None = None
@@ -139,7 +133,6 @@ class Settings(BaseSettings):
             self.supabase_jwt_secret,
             self.t212_api_key,
             self.t212_api_secret,
-            self.anthropic_api_key,
             self.openai_api_key,
             self.google_api_key,
             self.supabase_secret_key,

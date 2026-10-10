@@ -258,7 +258,7 @@ class PromptsConfig(ConfigModel):
         description="System prompt text per AI step, replacing the built-in default.",
     )
 
-    override_providers: dict[PromptKey, list[Literal["anthropic", "openai", "google"]]] = Field(
+    override_providers: dict[PromptKey, list[Literal["openai", "google"]]] = Field(
         default_factory=dict,
         description="The providers an override applies to. An override with no entry here"
         " applies to every provider; with an entry, only to those, and a step on another"

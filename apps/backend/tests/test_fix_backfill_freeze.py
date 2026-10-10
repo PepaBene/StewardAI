@@ -16,7 +16,8 @@ import asyncpg
 import pytest
 
 from steward.jobs.runner import LOCK_NAMESPACE, JobContext, close_interrupted_runs, create_job
-from steward.news.classify import REQUEST_TIMEOUT, ClaudeClassifier
+from steward.llm.types import Request
+from steward.news.classify import REQUEST_TIMEOUT, LLMClassifier
 from worker import backfill as backfill_module
 
 
@@ -25,21 +26,13 @@ async def _status(pool: asyncpg.Pool, job_id: int) -> str:
     return value
 
 
-class _FakeMessages:
+class _FakeLLM:
     def __init__(self) -> None:
-        self.calls: list[dict[str, Any]] = []
+        self.calls: list[Request] = []
 
-    async def parse(self, **kwargs: Any) -> Any:
-        self.calls.append(kwargs)
+    async def complete(self, request: Request) -> Any:
+        self.calls.append(request)
         raise RuntimeError("not reached")
-
-
-class _FakeClient:
-    def __init__(self) -> None:
-        self.messages = _FakeMessages()
-
-    def with_options(self, **_kwargs: Any) -> "_FakeClient":
-        return self
 
 
 async def test_classification_requests_use_the_short_timeout() -> None:
@@ -47,7 +40,7 @@ async def test_classification_requests_use_the_short_timeout() -> None:
 
     from steward.news.classify import ClassifyItem
 
-    client = _FakeClient()
+    llm = _FakeLLM()
     item = ClassifyItem(
         index=0,
         headline="Example",
@@ -58,11 +51,11 @@ async def test_classification_requests_use_the_short_timeout() -> None:
         candidates=(),
     )
     with pytest.raises(RuntimeError, match="not reached"):
-        await ClaudeClassifier(client, "claude-haiku-4-5").classify(
+        await LLMClassifier(llm, "gpt-6-luna").classify(  # type: ignore[arg-type]
             items=[item], holdings=[], today=dt.date(2026, 1, 1)
         )
-    assert len(client.messages.calls) == 1
-    assert client.messages.calls[0]["timeout"] == REQUEST_TIMEOUT == 90.0
+    assert len(llm.calls) == 1
+    assert llm.calls[0].timeout == REQUEST_TIMEOUT == 90.0
 
 
 @pytest.mark.db

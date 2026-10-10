@@ -74,7 +74,7 @@ const BODY: ReviewBody = {
     { id: "S2", kind: "position", ref: "snapshot:2026-09-30", title: "Snapshot", app_path: "/", tier: 1 },
     { id: "S3", kind: "verdict", ref: "5", title: "Verdict", app_path: "/holdings/AAPL_US_EQ", tier: 1 },
   ],
-  model: "claude-opus-5-5",
+  model: "gpt-6.1-sol",
   notes: [],
 };
 

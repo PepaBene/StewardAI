@@ -187,6 +187,6 @@
     }
   ],
   "absent_metrics": [],
-  "labelled_by": "claude (AI-read from the document; owner has not hand-checked)",
+  "labelled_by": "AI model (AI-read from the document; owner has not hand-checked)",
   "notes": "IFRS figures from '(A.1) Consolidated Income Statements - Quarter'. net_income = 'Profit (loss) after tax' (total, including non-controlling interests); the release also prints 'Attributable to owners of parent' just below it. Adjusted operating_income = the non-IFRS column of the key-figures table. SAP prints non-IFRS EPS only on a basic basis, so no adjusted eps_diluted is labelled. report_date is the release date printed in the document; the 6-K was filed on 2026-07-28. Non-US filer: no XBRL crosscheck (crosscheck is null)."
 }

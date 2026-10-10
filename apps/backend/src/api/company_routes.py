@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
-from steward.ai import AINotConfigured, create_client
+from steward.ai import AINotConfigured
 from steward.company import (
     autoevidence,
     evidence,
@@ -233,9 +233,9 @@ async def post_thesis_draft(
     jobs = await load_active(pool, "jobs", JobsConfig)
     model = (jobs.body if jobs else JobsConfig()).chat.model
     try:
-        llm = create_llm(get_settings(), create_client(get_settings()))
-    except AINotConfigured:
-        llm = create_llm(get_settings(), None)
+        llm = create_llm(get_settings())
+    except AINotConfigured as err:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(err)) from err
     try:
         # Inside a job, so the Budget config's caps apply and the cost is recorded.
         return await thesis_draft.draft_within_budget(pool, llm, model, built)

@@ -116,7 +116,7 @@ export function ReviewView() {
       <PageHeader
         kicker="Research & Verification"
         title="Review queue"
-        description="Figures Claude extracted that need your eyes before they count toward a verdict."
+        description="Figures the model extracted that need your eyes before they count toward a verdict."
         aside={
           <Button
             variant="ghost"

@@ -41,7 +41,7 @@ export const DEFAULT_VERIFICATION: VerificationConfig = {
   trust: { wrong_penalty: 0.2, useful_reward: 0.05, demote_below: 0.6 },
   claim_verifier: {
     enabled: true,
-    model: "claude-haiku-4-5",
+    model: "gpt-6-luna",
     effort: null,
     mode: "strip",
     numeric_check: true,
@@ -190,7 +190,7 @@ export function verificationToBody(form: VerificationForm): VerificationConfig {
 }
 
 const METRIC = /^[a-z][a-z0-9_]{0,63}$/;
-const MODEL = /^claude-[a-z0-9.-]{1,64}$/;
+const MODEL = /^(gpt|gemini)-[a-z0-9.-]{1,64}$/;
 
 function num(value: string): number | null {
   const t = normaliseSeparators(value).replace(/\s*%$/, "");
@@ -242,7 +242,7 @@ export function validateVerificationForm(form: VerificationForm): FieldErrors {
   checkNumber(errors, "trust.wrong_penalty", form.wrongPenalty, { min: 0, max: 1 });
   checkNumber(errors, "trust.useful_reward", form.usefulReward, { min: 0, max: 1 });
   checkNumber(errors, "trust.demote_below", form.demoteBelow, { min: 0, max: 1 });
-  if (!MODEL.test(form.claimModel.trim())) errors["claim_verifier.model"] = ["A Claude model id, e.g. claude-haiku-4-5."];
+  if (!MODEL.test(form.claimModel.trim())) errors["claim_verifier.model"] = ["A gpt- or gemini- model id, e.g. gpt-6-luna."];
   return errors;
 }
 

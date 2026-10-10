@@ -1,0 +1,4652 @@
+{
+ "provenance": {
+  "kind": "AI-labelled, not human-labelled",
+  "text": "Items are the owner's stored news plus the latest items of the enabled feeds (10 Oct 2026). Each item was labelled independently by three AI models (the Claude coding assistant, gemini-3.8-flash, gpt-6.1-sol); the stored label is the majority vote on every field, and three-way event-type splits were settled by the coding assistant. No human reviewed the labels. Treat results on this set as a regression gate, not as proof of accuracy."
+ },
+ "holdings": [
+  {
+   "ticker": "NVDA",
+   "name": "NVIDIA",
+   "relations": [
+    "AMD",
+    "TSMC",
+    "Broadcom"
+   ]
+  },
+  {
+   "ticker": "GOOGL",
+   "name": "Alphabet",
+   "relations": [
+    "Google",
+    "DeepMind",
+    "Waymo"
+   ]
+  },
+  {
+   "ticker": "ORCL",
+   "name": "Oracle",
+   "relations": [
+    "OpenAI",
+    "Stargate"
+   ]
+  },
+  {
+   "ticker": "AVGO",
+   "name": "Broadcom",
+   "relations": []
+  },
+  {
+   "ticker": "FB",
+   "name": "Meta Platforms",
+   "relations": [
+    "Facebook",
+    "Instagram",
+    "WhatsApp"
+   ]
+  },
+  {
+   "ticker": "VRT",
+   "name": "Vertiv",
+   "relations": []
+  },
+  {
+   "ticker": "TSM",
+   "name": "Taiwan Semiconductor",
+   "relations": [
+    "TSMC"
+   ]
+  },
+  {
+   "ticker": "AMD",
+   "name": "Advanced Micro Devices",
+   "relations": [
+    "NVIDIA",
+    "Intel"
+   ]
+  },
+  {
+   "ticker": "AAPL",
+   "name": "Apple",
+   "relations": [
+    "Samsung",
+    "Foxconn",
+    "TSMC"
+   ]
+  },
+  {
+   "ticker": "CSCO",
+   "name": "Cisco",
+   "relations": []
+  },
+  {
+   "ticker": "GE",
+   "name": "General Electric",
+   "relations": []
+  },
+  {
+   "ticker": "CIEN",
+   "name": "Ciena",
+   "relations": []
+  },
+  {
+   "ticker": "UNH",
+   "name": "UnitedHealth",
+   "relations": []
+  },
+  {
+   "ticker": "CELH",
+   "name": "Celsius Holdings",
+   "relations": []
+  },
+  {
+   "ticker": "INTU",
+   "name": "Intuit",
+   "relations": []
+  },
+  {
+   "ticker": "UBER",
+   "name": "Uber",
+   "relations": []
+  },
+  {
+   "ticker": "BA",
+   "name": "Boeing",
+   "relations": [
+    "Airbus"
+   ]
+  },
+  {
+   "ticker": "NFLX",
+   "name": "Netflix",
+   "relations": []
+  },
+  {
+   "ticker": "ASML",
+   "name": "ASML",
+   "relations": []
+  },
+  {
+   "ticker": "KO",
+   "name": "Coca-Cola",
+   "relations": []
+  },
+  {
+   "ticker": "NU",
+   "name": "Nu Holdings",
+   "relations": []
+  },
+  {
+   "ticker": "QNT",
+   "name": "Quant Network",
+   "relations": []
+  },
+  {
+   "ticker": "7203",
+   "name": "Toyota",
+   "relations": []
+  },
+  {
+   "ticker": "0700",
+   "name": "Tencent",
+   "relations": []
+  },
+  {
+   "ticker": "9988",
+   "name": "Alibaba",
+   "relations": []
+  },
+  {
+   "ticker": "SAP",
+   "name": "SAP",
+   "relations": [
+    "Oracle"
+   ]
+  },
+  {
+   "ticker": "SIE",
+   "name": "Siemens",
+   "relations": []
+  },
+  {
+   "ticker": "SHOP",
+   "name": "Shopify",
+   "relations": []
+  },
+  {
+   "ticker": "RY",
+   "name": "Royal Bank of Canada",
+   "relations": []
+  },
+  {
+   "ticker": "AZN",
+   "name": "AstraZeneca",
+   "relations": []
+  },
+  {
+   "ticker": "005930",
+   "name": "Samsung Electronics",
+   "relations": []
+  },
+  {
+   "ticker": "D05",
+   "name": "DBS Group",
+   "relations": []
+  },
+  {
+   "ticker": "INFY",
+   "name": "Infosys",
+   "relations": []
+  }
+ ],
+ "items": [
+  {
+   "id": "real-001",
+   "headline": "Constellation deal with Google is 'a monster deal,' says Melius' James West",
+   "summary": "Google's parent Alphabet is nearing a multi-year deal to ​buy nuclear energy from ‌Constellation Energy for $1 billion or more according to reports. James West, Melius Energy and Power Research head, joins 'Power Lunch' to discuss.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T14:47:08+00:00",
+   "candidates": [
+    "AVGO",
+    "CIEN",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "GOOGL",
+    "relevant": true,
+    "rumour": true
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-002",
+   "headline": "Cramer's Mad Dash: Apple",
+   "summary": "CNBC’s Jim Cramer delivers his daily Mad Dash.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-09T09:32:19+00:00",
+   "candidates": [
+    "AAPL",
+    "AVGO",
+    "TSM"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "AAPL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-003",
+   "headline": "Final Trades: XLV, DAL, GOOGL, NET",
+   "summary": "The final trades of the day with CNBC's Melissa Lee and the 'Fast Money' traders.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-07T18:07:11+00:00",
+   "candidates": [
+    "GOOGL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "GOOGL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-004",
+   "headline": "Boeing flags 737 Max software glitch affecting some automated approach functions",
+   "summary": "Boeing identified a software issue on some 737 Max aircraft that can affect automated vertical navigation functions after a missed approach.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-09-26T16:30:40+00:00",
+   "candidates": [
+    "BA"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "BA",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-005",
+   "headline": "Melius' Ben Reitzes: Open-model and token usage are rising, benefiting neoclouds and cloud providers",
+   "summary": "Ben Reitzes, head of technology research at Melius Research, joins 'Squawk on the Street' to discuss the rebound in AI stocks following Thursday’s sell-off, tied to OpenAI’s revenue report.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-09T10:47:22+00:00",
+   "candidates": [
+    "AVGO",
+    "GOOGL",
+    "NVDA",
+    "ORCL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-006",
+   "headline": "Stocks bounce back after sell-off tied to OpenAI's revenue report",
+   "summary": "Stocks rose on Friday, supported by the tech sector, following a losing session in which an underwhelming revenue report from OpenAI took some steam out of the high-flying artificial intelligence trade. CNBC's Seema Mody discusses.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-09T13:59:42+00:00",
+   "candidates": [
+    "AVGO",
+    "GOOGL",
+    "NVDA",
+    "ORCL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-007",
+   "headline": "Google ordered to halt work on two data centers in ‘Texas of Europe’",
+   "summary": "Finland has emerged as a key location for data centers amid the AI boom.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-07T05:26:02+00:00",
+   "candidates": [
+    "AVGO",
+    "CIEN",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": "GOOGL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-008",
+   "headline": "OpenAI and Anthropic poach Trump officials as industry fights for Washington’s trust",
+   "summary": "AI labs have been looking to people with political experience as frontier tech is increasingly viewed as a national security issue.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-09T07:00:01+00:00",
+   "candidates": [
+    "AVGO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-009",
+   "headline": "Tony Wang on what Apple's smart home push means for investors",
+   "summary": "Tony Wang, portfolio manager at T.Rowe Price Global Science and Technology Fund, joins 'Squawk on the Street' to discuss Apple's push to home devices, the capital needed to support it, and more.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-07T12:09:20+00:00",
+   "candidates": [
+    "AAPL",
+    "AVGO",
+    "TSM"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "AAPL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-010",
+   "headline": "Meta partners with companies to set standards for doing business with AI bots",
+   "summary": "CNBC's Andrew Ross Sorkin reports on the latest news.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-07T06:44:24+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO",
+    "CSCO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "FB",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-011",
+   "headline": "AI-related stocks give you the most opportunity for something to go right, says Jim Cramer",
+   "summary": "'Mad Money' host Jim Cramer talks the day's record market action and how to get in on it.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T19:05:51+00:00",
+   "candidates": [
+    "FB"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-012",
+   "headline": "First look: Amazon's new Alexa tablets",
+   "summary": "Amazon just unveiled a set of new, pricier Alexa tablets and said it's ditching its budget-friendly Fire lineup, marking a significant shift in the e-commerce juggernaut's devices strategy. The company unveiled 8-inch, 11-inch and 12-inch models, which start at $230 and run up to $550 for a version equipped with Amazon's \"Nanomatte\" display technology that was developed in partnership with Corning to \"dramatically reduce screen glare.\" CNBC's Annie Palmer gets a first look.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-08T08:59:01+00:00",
+   "candidates": [
+    "AAPL",
+    "CELH",
+    "CIEN",
+    "CSCO",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-013",
+   "headline": "Stock futures rise as tech shares rebound following sell-off",
+   "summary": "CNBC’s Morgan Brennan reports on the news affecting markets.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-09T07:13:00+00:00",
+   "candidates": [
+    "AAPL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-014",
+   "headline": "The Pre-Market Rundown 2: October 6, 2026",
+   "summary": "CNBC brings you fast, accurate, and actionable business news and market updates.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T08:39:22+00:00",
+   "candidates": [
+    "FB"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-015",
+   "headline": "Stocks making the biggest moves premarket: Constellation Energy, Option Care Health, Lennar, P&G and more",
+   "summary": "These are the stocks posting the largest moves in early trading.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T07:50:50+00:00",
+   "candidates": [
+    "AMD"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-016",
+   "headline": "Dan Ives on Nvidia: It's the one chip in the world fueling the AI revolution",
+   "summary": "Dan Ives, Yorkville Ives partner and senior managing director, joins 'Closing Bell' to discuss Nvidia stock's record run and where it's headed from here.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-05T15:36:05+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "TSM"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "NVDA",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-017",
+   "headline": "Nvidia GPUs are everywhere. Here are the ways companies are accessing them",
+   "summary": "One industry researcher identified over 300 neoclouds that can provide GPU capacity, up about 55% in less than a year.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-10T07:00:01+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "TSM"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "NVDA",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-018",
+   "headline": "Nvidia's $6 trillion milestone looms. Here's when options traders see it happening",
+   "summary": "Nvidia will likely cross the $6 trillion threshold by the end of this month, according to options traders.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-05T07:57:23+00:00",
+   "candidates": [
+    "NVDA"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "NVDA",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-019",
+   "headline": "CNBC Daily Open: The return of panda diplomacy",
+   "summary": "Chinese leader Xi Jinping promised two giant pandas to Zoo Atlanta, reviving Beijing's decades-old charm offensive to the U.S.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-09-25T02:42:52+00:00",
+   "candidates": [
+    "ORCL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-020",
+   "headline": "The blue-collar AI job market is booming. Will data center backlash make it go bust?",
+   "summary": "The public has soured on AI data centers and states are slowing development, but for HVAC, plumbing, welding, and electrical workers, it's been a jobs boom.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-09-26T09:43:07+00:00",
+   "candidates": [
+    "ORCL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-021",
+   "headline": "Nuclear deal boosts Constellation Energy",
+   "summary": "CNBC's Pippa Stevens reports on Constellation Energy's 20-year power deal with Google.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T11:21:25+00:00",
+   "candidates": [
+    "AVGO",
+    "CIEN",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "GOOGL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-022",
+   "headline": "Final Trades: UnitedHealth, Clearway Energy, EQT Corp and the GPIQ",
+   "summary": "The Investment Committee give you their top stocks to watch for the second half.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T15:03:31+00:00",
+   "candidates": [
+    "UNH"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "UNH",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-023",
+   "headline": "NYC council speaker: Need for regulation was big takeaway from NYC AI hearing",
+   "summary": "Julie Menin, New York City Council speaker, joins 'The Exchange' to discuss senior leaders from Anthropic, OpenAI, Google and Meta testifying under oath during a Monday New York City Council hearing.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T13:26:09+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO",
+    "CIEN",
+    "CSCO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-024",
+   "headline": "Stocks making the biggest moves midday: Chipotle, Starbucks, Skydance, Marathon Petroleum & more",
+   "summary": "Here are some of the companies making headlines in midday trading.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-08T13:14:38+00:00",
+   "candidates": [
+    "AVGO"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-025",
+   "headline": "Oracle's New Mexico data center unlikely to be canceled, says D.A. Davidson's Gil Luria",
+   "summary": "Gil Luria, head of technology research at D.A. Davidson, discusses the pushbacks from state and local governments as data center buildouts.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-09-24T15:39:02+00:00",
+   "candidates": [
+    "ORCL"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "ORCL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-026",
+   "headline": "Trump awarding medals to Musk, Dell, Nadella and other tech execs at science summit",
+   "summary": "President Trump is giving awards to a number of top tech executives at a summit on Thursday.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-07T17:31:23+00:00",
+   "candidates": [
+    "NVDA"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-027",
+   "headline": "Oracle Japan shares surge 7% after record fiscal first quarter, bucking selloff of U.S. parent",
+   "summary": "Oracle Japan shares surged after the company reported record fiscal first-quarter sales and profits.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-09-24T21:56:24+00:00",
+   "candidates": [
+    "ORCL"
+   ],
+   "expected": {
+    "event_type": "earnings_release",
+    "affected_ticker": "ORCL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-028",
+   "headline": "AI startup Manus raises $500 million in first funding round since Meta breakup",
+   "summary": "The deal is handing the AI agent developer fresh capital after Beijing forced Meta to unwind its roughly $2 billion acquisition.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-08T02:32:57+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO",
+    "CSCO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-029",
+   "headline": "Trade Tracker: Jenny Harrington buys Alphabet Convertible Preferred",
+   "summary": "Jenny Harrington, Gilman Hill Asset Management CEO, joins CNBC's 'Halftime Report' to detail her latest portfolio move.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T15:01:06+00:00",
+   "candidates": [
+    "GOOGL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "GOOGL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-030",
+   "headline": "Final Trades: Visa, Disney, Netflix and the IYJ",
+   "summary": "The Investment Committee give you their top stocks to watch for the second half.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-08T13:16:56+00:00",
+   "candidates": [
+    "NFLX"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "NFLX",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-031",
+   "headline": "AI hacks now operating at machine speed, not hacker speed, says Fmr. White House CIO Theresa Payton",
+   "summary": "Theresa Payton, Former White House Chief Information Officer and Fortalice Solutions CEO, joins 'Closing Bell Overtime' to talk AI regulation, looming AI fears, and AI leaders testifying on AI risks.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-05T17:09:31+00:00",
+   "candidates": [
+    "NVDA"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-032",
+   "headline": "Stocks making the biggest moves midday: Marvell, Moderna, Lamb Weston, Constellation Energy & more",
+   "summary": "Here are some of the companies making headlines in midday trading.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T13:00:28+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-033",
+   "headline": "Unity CEO on Google partnership: Hope to bring Unity's game development platform to new creators",
+   "summary": "Unity CEO Matthew Bromberg joins 'Squawk box' to discuss details of the company's new strategic partnership with Google, the launch of 'Unity Spark' later this year, integration of AI, and more.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-07T09:01:07+00:00",
+   "candidates": [
+    "AVGO",
+    "CIEN",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "GOOGL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-034",
+   "headline": "Kalshi traders see high odds that more than 5,100 data centers will be planned or operating before 2027",
+   "summary": "Despite the growing backlash against data centers, Kalshi odds show the buildout will continue to expand.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-09T07:54:04+00:00",
+   "candidates": [
+    "ORCL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-035",
+   "headline": "Meta's Muse assistant tops app charts. Now it needs to become a habit",
+   "summary": "Meta’s Muse is free for now as the company searches for a business surrounding its personal AI agent.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-07T07:00:01+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO",
+    "CSCO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "FB",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-036",
+   "headline": "Market Open: October 9, 2026",
+   "summary": "CNBC brings you fast, accurate, and actionable business news and market updates.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-09T10:10:47+00:00",
+   "candidates": [
+    "AAPL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-037",
+   "headline": "Jensen Huang sees his job as making sure the AI ecosystem can thrive, says D.A. Davidson’s Gil Luria",
+   "summary": "Nvidia has authorized an additional $150 billion to its share buyback program. Nvidia has also announced an AI safety platform. Gil Luria, D.A. Davidson managing director, joins 'Squawk on the Street' to discuss.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-09-28T11:28:18+00:00",
+   "candidates": [
+    "NVDA"
+   ],
+   "expected": {
+    "event_type": "capital_allocation",
+    "affected_ticker": "NVDA",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-038",
+   "headline": "Hollywood takes on Zuckerberg, Musk and Altman amid widespread anxiety over AI",
+   "summary": "New films about Zuckerberg, Musk, Altman and AI arrive as public concern about the technology and its leaders rises.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-10T08:00:01+00:00",
+   "candidates": [
+    "FB"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "FB",
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-039",
+   "headline": "Final Trades: SK Hynix, Airbnb, Meta and ServiceTitan",
+   "summary": "The Investment Committee gives you their top stocks to watch for the second half.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-07T13:40:17+00:00",
+   "candidates": [
+    "AMD",
+    "ASML",
+    "AVGO",
+    "CSCO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "FB",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-040",
+   "headline": "Bernstein’s Stacy Rasgon on Nvidia boosting buyback: Something investors have been looking for",
+   "summary": "Nvidia has authorized an additional $150 billion to its share buyback program. Stacy Rasgon, Bernstein senior analyst, joins 'Squawk on the Street' to discuss.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-09-28T10:38:23+00:00",
+   "candidates": [
+    "NVDA"
+   ],
+   "expected": {
+    "event_type": "capital_allocation",
+    "affected_ticker": "NVDA",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-041",
+   "headline": "Melissa Otto: Nvidia is the bellwether of the AI trade",
+   "summary": "Melissa Otto, Head of Research at Visible Alpha at S&P Global, discusses Nvidia's AI dominance, market concentration, emerging markets, energy stocks, diversification and consumer sector valuations.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-08T06:56:49+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO",
+    "FB",
+    "GOOGL",
+    "KO",
+    "NVDA",
+    "ORCL",
+    "TSM"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "NVDA",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-042",
+   "headline": "Google DeepMind's Lila Ibrahim, world's top AI 'readiness' officer, on preparing for what's to come",
+   "summary": "Google DeepMind Chief AI Readiness Officer Lila Ibrahim may be the only person with that title, and as intelligence risks rise, she takes it very seriously.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T10:00:01+00:00",
+   "candidates": [
+    "AVGO",
+    "CIEN",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "GOOGL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-043",
+   "headline": "'Fast Money' traders talk a divergence in the record market rally",
+   "summary": "The 'Fast Money' traders talk a divergence in the record market rally.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T17:43:26+00:00",
+   "candidates": [
+    "NVDA"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-044",
+   "headline": "How to do your own bookkeeping as a small business owner",
+   "summary": "Learn how to keep accurate records, stay organized and prepare for tax season with accounting software like QuickBooks Free.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-07T13:52:10+00:00",
+   "candidates": [
+    "INTU"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "INTU",
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-045",
+   "headline": "Final Trade: PBR, GTLB, XLE, GOOGL",
+   "summary": "The final trades of the day with CNBC's Melissa Lee and the 'Fast Money' traders.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-08T18:03:36+00:00",
+   "candidates": [
+    "GOOGL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "GOOGL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-046",
+   "headline": "Nvidia share buyback plan gets $150 billion boost",
+   "summary": "CNBC's Jim Cramer and Carl Quintanilla discuss Nvidia as the semiconductor giant has authorized an additional $150 billion to its share buyback program.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-09-28T09:28:59+00:00",
+   "candidates": [
+    "NVDA"
+   ],
+   "expected": {
+    "event_type": "capital_allocation",
+    "affected_ticker": "NVDA",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-047",
+   "headline": "Nvidia, Oracle, CoreWeave and other AI stocks sink on OpenAI revenue report",
+   "summary": "OpenAI has told investors that it hit roughly $50 billion in annualized revenue at the end of September, CNBC confirmed.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-08T14:14:54+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "TSM"
+   ],
+   "expected": {
+    "event_type": "sector_competitor",
+    "affected_ticker": "NVDA",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-048",
+   "headline": "Meta Muse popularity lifts AMD stock to fresh highs as AI agents juice CPU sales",
+   "summary": "The personal agent boom is lifting the fortunes of AMD and Intel, which have outperformed their megacap tech peers over the past month.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T07:00:01+00:00",
+   "candidates": [
+    "AMD",
+    "ASML",
+    "AVGO",
+    "CSCO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "TSM",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "AMD",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-049",
+   "headline": "Morgan Stanley backs up report that Apple cut iPhone 18 Pro component orders by at least 15%",
+   "summary": "CNBC's MacKenzie Sigalos reports on the bank’s own supply-chain checks corroborating the Nikkei report and why the unusually early production cuts are getting Wall Street’s attention.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-09T18:04:49+00:00",
+   "candidates": [
+    "AAPL",
+    "AVGO",
+    "TSM"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "AAPL",
+    "relevant": true,
+    "rumour": true
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-050",
+   "headline": "Wells Fargo’s Ohsung Kwon: 2027 will be a year of AI applications over AI buildout",
+   "summary": "Ohsung Kwon, Wells Fargo chief equity strategist, joins CNBC's 'Squawk on the Street' to discuss his AI outlook, the impact of rate increases on markets, and more.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-07T11:36:31+00:00",
+   "candidates": [
+    "FB"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-051",
+   "headline": "Apple's iPhone 18 Pro demand in question: Here's what you need to know",
+   "summary": "CNBC's MacKenzie Sigalos joins CNBC's 'Halftime Report' to report on softer demand for Apple's iPhone 18 Pro.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-09T12:28:13+00:00",
+   "candidates": [
+    "AAPL",
+    "AVGO",
+    "TSM"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "AAPL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-052",
+   "headline": "CNBC Daily Open: 'Red' diesel to hit U.S. highways",
+   "summary": "U.S. President Donald Trump signed an executive order allowing diesel normally reserved for off-road use to hit U.S. public roads and highways.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T02:06:35+00:00",
+   "candidates": [
+    "NVDA"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-053",
+   "headline": "Watch CNBC’s full discussion with the ‘Squawk on the Street’ crew",
+   "summary": "CNBC's Carl Quintanilla, David Faber, and Jim Cramer discuss the news on the day.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-07T09:28:46+00:00",
+   "candidates": [
+    "INTU"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-054",
+   "headline": "Apollo, banks in talks to finance SpaceX's $40 billion Nvidia GPU purchase",
+   "summary": "Since SpaceX's record-breaking IPO in June, rates have sold off, and yields on its bonds have risen, along with other AI-related bonds.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-07T12:32:30+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "TSM"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "NVDA",
+    "relevant": true,
+    "rumour": true
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-055",
+   "headline": "Meta, Walmart, Stripe, and Sierra partner to establish rules for personal AI agents",
+   "summary": "CNBC's Kate Rooney reports on companies teaming up to create a new rulebook for AI agents.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T14:21:29+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO",
+    "CELH",
+    "CSCO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "FB",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-056",
+   "headline": "Apple’s iPhone 18 Pro demand in question: What you should know",
+   "summary": "CNBC's MacKenzie Sigalos reports on softer demand for Apple’s iPhone 18 Pro.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-09T15:27:38+00:00",
+   "candidates": [
+    "AAPL",
+    "AVGO",
+    "TSM"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "AAPL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-057",
+   "headline": "The state of the AI trade",
+   "summary": "The Investment Committee debates the state of the AI trade and whether the rally is getting too narrow.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-09T12:57:50+00:00",
+   "candidates": [
+    "NVDA"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-058",
+   "headline": "Post Market Wrap: October 6, 2026",
+   "summary": "CNBC brings you fast, accurate, and actionable business news and market updates.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T18:09:03+00:00",
+   "candidates": [
+    "GOOGL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-059",
+   "headline": "Cramer's lightning round: 'I think Ciena is very good'",
+   "summary": "\"Mad Money\" host Jim Cramer rings the lightning round bell, which means he's giving his answers to callers' stock questions at rapid speed.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-05T18:55:01+00:00",
+   "candidates": [
+    "CIEN"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "CIEN",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-060",
+   "headline": "Options Action: Alphabet lights up",
+   "summary": "CNBC’s Oliver Renick joins ‘Squawk on the Street’ to discuss the latest Options Action.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-08T11:18:54+00:00",
+   "candidates": [
+    "GOOGL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "GOOGL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-061",
+   "headline": "Options Action: Massive chip trades for the tape",
+   "summary": "CNBC’s Oliver Renick joins ‘Squawk on the Street’ to discuss the latest Options Action.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-09T11:11:26+00:00",
+   "candidates": [
+    "NVDA"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-062",
+   "headline": "Anthropic, OpenAI, Meta and Google executives testify under oath at NYC council meeting",
+   "summary": "Senior leaders from Anthropic, OpenAI, Google and Meta are slated to testify under oath during a New York City Council hearing. CNBC's Ashley Capoot reports.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-05T14:01:33+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO",
+    "CIEN",
+    "CSCO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": "FB",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-063",
+   "headline": "Margin pressures raise the stakes on Q3 earnings: Strategist",
+   "summary": "Principal Asset Management's Chief Global Strategist, Seema Shah says that AI capex cycle is maturing, putting focus on fundamentals and debt management. She says that markets are expecting very strong Q3 earnings growth with forecasts for next year at 15%, despite challenging interest-rate environment.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-07T01:36:46+00:00",
+   "candidates": [
+    "GOOGL",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-064",
+   "headline": "Stocks making the biggest moves midday: Oracle, Everpure, Meta Platforms, Nebius, Bloom Energy, MGM & more",
+   "summary": "Here are some of the companies making headlines in midday trading.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-09-24T12:21:43+00:00",
+   "candidates": [
+    "FB",
+    "ORCL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-065",
+   "headline": "Consumer AI agents reduce the friction of discovery, says Wells Fargo’s Ken Gawrelski",
+   "summary": "Ken Gawrelski, Wells Fargo senior internet analyst, joins 'Power Lunch' to discuss how AI agents will drive sales.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-06T14:28:39+00:00",
+   "candidates": [
+    "FB"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-066",
+   "headline": "Meta's Muse can shop and check out for you. Here's how it works",
+   "summary": "Meta announced a slate of Muse partnerships with Walmart, Gap, Sephora, Expedia, Wayfair, Best Buy and others.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-03T08:00:01+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO",
+    "CELH",
+    "CSCO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": "FB",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-067",
+   "headline": "Trump bought up to $25 million in Meta and millions in SpaceX debt in August",
+   "summary": "Trump disclosed 517 August trades, including up to $5 million in debt from SpaceX, a major Pentagon contractor and NASA launch provider.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-08T09:18:47+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO",
+    "CSCO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "FB",
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-068",
+   "headline": "Dan Niles: Public cloud compute will be next phase of Meta monetizing AI",
+   "summary": "Dan Niles, founder of Niles Investment Management, joins CNBC's 'Squawk on the Street' to discuss his call on Meta and what's next for the tech giant.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-05T12:15:46+00:00",
+   "candidates": [
+    "AMD",
+    "AVGO",
+    "CSCO",
+    "FB",
+    "GOOGL",
+    "NVDA",
+    "ORCL",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": "FB",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-069",
+   "headline": "Apple faces $5.7 billion patent infringement verdict over iPhone and Apple Watch haptics",
+   "summary": "A federal jury awarded Taction Technology more than $5.7 billion after finding Apple infringed claims from two haptics patents. Apple plans to appeal.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-09-26T10:55:59+00:00",
+   "candidates": [
+    "AAPL"
+   ],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": "AAPL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-070",
+   "headline": "America’s data center fight is a preview of what's to come for the rest of the world",
+   "summary": "America’s fight over data centers is going global. Communities across Europe and Asia are pushing back over the rising costs of the AI infrastructure boom.",
+   "outlet": "cnbc.com",
+   "published_at": "2026-10-03T01:00:01+00:00",
+   "candidates": [
+    "GOOGL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "finnhub-company-news"
+  },
+  {
+   "id": "real-071",
+   "headline": "Taiwan Semiconductor Manufacturing files insider transaction report (Form 4)",
+   "summary": "SEC filing 0001046179-26-000692, filed 2026-10-08.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-08T10:21:25+00:00",
+   "candidates": [
+    "TSM"
+   ],
+   "expected": {
+    "event_type": "insider_transaction",
+    "affected_ticker": "TSM",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-filings"
+  },
+  {
+   "id": "real-072",
+   "headline": "Apple files insider transaction report (Form 4)",
+   "summary": "SEC filing 0001140361-26-037584, filed 2026-09-24.",
+   "outlet": "sec.gov",
+   "published_at": "2026-09-24T22:30:07+00:00",
+   "candidates": [
+    "AAPL"
+   ],
+   "expected": {
+    "event_type": "insider_transaction",
+    "affected_ticker": "AAPL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-filings"
+  },
+  {
+   "id": "real-073",
+   "headline": "General Electric files insider transaction report (Form 4)",
+   "summary": "SEC filing 0001868758-26-000013, filed 2026-10-02.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-02T20:06:36+00:00",
+   "candidates": [
+    "GE"
+   ],
+   "expected": {
+    "event_type": "insider_transaction",
+    "affected_ticker": "GE",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-filings"
+  },
+  {
+   "id": "real-074",
+   "headline": "Netflix files insider transaction report (Form 4)",
+   "summary": "SEC filing 0001065280-26-000287, filed 2026-10-02.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-02T20:05:31+00:00",
+   "candidates": [
+    "NFLX"
+   ],
+   "expected": {
+    "event_type": "insider_transaction",
+    "affected_ticker": "NFLX",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-filings"
+  },
+  {
+   "id": "real-075",
+   "headline": "Ciena files insider transaction report (Form 4)",
+   "summary": "SEC filing 0002080157-26-000015, filed 2026-10-06.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-06T23:55:37+00:00",
+   "candidates": [
+    "CIEN"
+   ],
+   "expected": {
+    "event_type": "insider_transaction",
+    "affected_ticker": "CIEN",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-filings"
+  },
+  {
+   "id": "real-076",
+   "headline": "Vertiv files insider transaction report (Form 4)",
+   "summary": "SEC filing 0001628280-26-063565, filed 2026-09-25.",
+   "outlet": "sec.gov",
+   "published_at": "2026-09-25T20:07:11+00:00",
+   "candidates": [
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "insider_transaction",
+    "affected_ticker": "VRT",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-filings"
+  },
+  {
+   "id": "real-077",
+   "headline": "UnitedHealth files insider transaction report (Form 4)",
+   "summary": "SEC filing 0000731766-26-000229, filed 2026-09-24.",
+   "outlet": "sec.gov",
+   "published_at": "2026-09-24T20:13:14+00:00",
+   "candidates": [
+    "UNH"
+   ],
+   "expected": {
+    "event_type": "insider_transaction",
+    "affected_ticker": "UNH",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-filings"
+  },
+  {
+   "id": "real-078",
+   "headline": "Intuit files insider transaction report (Form 4)",
+   "summary": "SEC filing 0001628280-26-065126, filed 2026-10-05.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-05T23:05:30+00:00",
+   "candidates": [
+    "INTU"
+   ],
+   "expected": {
+    "event_type": "insider_transaction",
+    "affected_ticker": "INTU",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-filings"
+  },
+  {
+   "id": "real-079",
+   "headline": "NU files insider transaction report (Form 4)",
+   "summary": "SEC filing 0000950103-26-015323, filed 2026-10-07.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-07T21:53:48+00:00",
+   "candidates": [
+    "NU"
+   ],
+   "expected": {
+    "event_type": "insider_transaction",
+    "affected_ticker": "NU",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-filings"
+  },
+  {
+   "id": "real-080",
+   "headline": "Alphabet (Class A) files insider transaction report (Form 4)",
+   "summary": "SEC filing 0001193125-26-412669, filed 2026-10-02.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-02T22:05:42+00:00",
+   "candidates": [
+    "GOOGL"
+   ],
+   "expected": {
+    "event_type": "insider_transaction",
+    "affected_ticker": "GOOGL",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-filings"
+  },
+  {
+   "id": "real-081",
+   "headline": "CONSTELLATION BRANDS, INC. 8-K mentions “tariffs”",
+   "summary": "SEC filing 0000016918-26-000039 (8-K) mentions the watch topic “tariffs”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-06T12:00:00+00:00",
+   "candidates": [
+    "AAPL",
+    "GE",
+    "TSM",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-082",
+   "headline": "KE Holdings Inc. 6-K mentions “buybacks”",
+   "summary": "SEC filing 0001104659-26-113456 (6-K) mentions the watch topic “buybacks”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-05T12:00:00+00:00",
+   "candidates": [
+    "UBER"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-083",
+   "headline": "POWERCOMPUTE, INC. 8-K mentions “tariffs”",
+   "summary": "SEC filing 0001193125-26-417469 (8-K) mentions the watch topic “tariffs”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-08T12:00:00+00:00",
+   "candidates": [
+    "AAPL",
+    "GE",
+    "TSM",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-084",
+   "headline": "Millrose Properties, Inc. 8-K mentions “government contracts”",
+   "summary": "SEC filing 0001193125-26-415565 (8-K) mentions the watch topic “government contracts”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-06T12:00:00+00:00",
+   "candidates": [
+    "QNT"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-085",
+   "headline": "newcleo plc 6-K mentions “supply chain”",
+   "summary": "SEC filing 0001140361-26-038557 (6-K) mentions the watch topic “supply chain”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-05T12:00:00+00:00",
+   "candidates": [
+    "GE"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-086",
+   "headline": "Evogene Ltd. 6-K mentions “guidance”",
+   "summary": "SEC filing 0001178913-26-004722 (6-K) mentions the watch topic “guidance”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-06T12:00:00+00:00",
+   "candidates": [
+    "UNH"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-087",
+   "headline": "OMEGA HEALTHCARE INVESTORS INC 8-K mentions “tariffs”",
+   "summary": "SEC filing 0001104659-26-113450 (8-K) mentions the watch topic “tariffs”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-05T12:00:00+00:00",
+   "candidates": [
+    "AAPL",
+    "GE",
+    "TSM",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-088",
+   "headline": "Venture Global, Inc. 8-K mentions “guidance”",
+   "summary": "SEC filing 0002007855-26-000069 (8-K) mentions the watch topic “guidance”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-07T12:00:00+00:00",
+   "candidates": [
+    "UNH"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-089",
+   "headline": "TERAWULF INC. 8-K mentions “tariffs”",
+   "summary": "SEC filing 0001628280-26-064757 (8-K) mentions the watch topic “tariffs”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-05T12:00:00+00:00",
+   "candidates": [
+    "AAPL",
+    "GE",
+    "TSM",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-090",
+   "headline": "Distribution Solutions Group, Inc. 8-K mentions “supply chain”",
+   "summary": "SEC filing 0001193125-26-413150 (8-K) mentions the watch topic “supply chain”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-05T12:00:00+00:00",
+   "candidates": [
+    "GE"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-091",
+   "headline": "CENOVUS ENERGY INC. 6-K mentions “guidance”",
+   "summary": "SEC filing 0001193125-26-413353 (6-K) mentions the watch topic “guidance”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-05T12:00:00+00:00",
+   "candidates": [
+    "UNH"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-092",
+   "headline": "PEMBINA PIPELINE CORP 6-K mentions “tariffs”",
+   "summary": "SEC filing 0001546066-26-000074 (6-K) mentions the watch topic “tariffs”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-06T12:00:00+00:00",
+   "candidates": [
+    "AAPL",
+    "GE",
+    "TSM",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-093",
+   "headline": "RPM INTERNATIONAL INC/DE/ 10-Q mentions “supply chain”",
+   "summary": "SEC filing 0001193125-26-415321 (10-Q) mentions the watch topic “supply chain”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-06T12:00:00+00:00",
+   "candidates": [
+    "GE"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-094",
+   "headline": "ZTO Express Inc. 6-K mentions “buybacks”",
+   "summary": "SEC filing 0001104659-26-113482 (6-K) mentions the watch topic “buybacks”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-05T12:00:00+00:00",
+   "candidates": [
+    "UBER"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-095",
+   "headline": "Crescent Energy Co 8-K mentions “remaining performance obligations”",
+   "summary": "SEC filing 0001628280-26-065385 (8-K) mentions the watch topic “remaining performance obligations”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-08T12:00:00+00:00",
+   "candidates": [
+    "ORCL"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-096",
+   "headline": "EMERA INC 6-K mentions “tariffs”",
+   "summary": "SEC filing 0001193125-26-415553 (6-K) mentions the watch topic “tariffs”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-06T12:00:00+00:00",
+   "candidates": [
+    "AAPL",
+    "GE",
+    "TSM",
+    "VRT"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-097",
+   "headline": "AURORA CANNABIS INC 6-K mentions “supply chain”",
+   "summary": "SEC filing 0001279569-26-000960 (6-K) mentions the watch topic “supply chain”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-08T12:00:00+00:00",
+   "candidates": [
+    "GE"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-098",
+   "headline": "AMASS BRANDS 8-K mentions “guidance”",
+   "summary": "SEC filing 0001575872-26-000675 (8-K) mentions the watch topic “guidance”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-06T12:00:00+00:00",
+   "candidates": [
+    "UNH"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-099",
+   "headline": "W&T OFFSHORE INC 8-K mentions “free cash flow”",
+   "summary": "SEC filing 0001104659-26-114390 (8-K) mentions the watch topic “free cash flow”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-07T12:00:00+00:00",
+   "candidates": [
+    "BA",
+    "UBER"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-100",
+   "headline": "Grayscale Bittensor Trust 8-K mentions “guidance”",
+   "summary": "SEC filing 0001193125-26-414207 (8-K) mentions the watch topic “guidance”.",
+   "outlet": "sec.gov",
+   "published_at": "2026-10-05T12:00:00+00:00",
+   "candidates": [
+    "UNH"
+   ],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "edgar-full-text"
+  },
+  {
+   "id": "real-101",
+   "headline": "Piero Cipollone: Interview with Corriere della Sera",
+   "summary": "",
+   "outlet": "ecb.europa.eu",
+   "published_at": "2026-10-08T06:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "central_bank",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "ecb-press"
+  },
+  {
+   "id": "real-102",
+   "headline": "Philip R. Lane: Diagnostic Challenges for ECB Monetary Policy",
+   "summary": "",
+   "outlet": "ecb.europa.eu",
+   "published_at": "2026-10-05T08:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "central_bank",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "ecb-press"
+  },
+  {
+   "id": "real-103",
+   "headline": "Piero Cipollone: Money in the digital age: digital euro, tokenisation and the role of central banks",
+   "summary": "",
+   "outlet": "ecb.europa.eu",
+   "published_at": "2026-10-06T13:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "central_bank",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "ecb-press"
+  },
+  {
+   "id": "real-104",
+   "headline": "ECB Executive Board member Isabel Schnabel to resign to take senior role at IMF",
+   "summary": "",
+   "outlet": "ecb.europa.eu",
+   "published_at": "2026-09-24T12:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "management_change",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "ecb-press"
+  },
+  {
+   "id": "real-105",
+   "headline": "Euro area HICP inflation, annual rate: 3.8% for 2026-09 (previous 3.2%)",
+   "summary": "Euro area HICP inflation, annual rate released on 2026-10-02: 3.8% for 2026-09, against 3.2% for 2026-08. Source: https://ec.europa.eu/eurostat/databrowser/view/prc_hicp_minr/default/table",
+   "outlet": "ec.europa.eu",
+   "published_at": "2026-10-05T16:30:40.221425+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "macro_surprise",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "macro-data"
+  },
+  {
+   "id": "real-106",
+   "headline": "CZ Unemployment rate: 2.9% for 2022-11 (previous 2.1%)",
+   "summary": "CZ Unemployment rate released on 2026-09-22: 2.9% for 2022-11, against 2.1% for 2022-10. Source: https://ec.europa.eu/eurostat/databrowser/view/une_rt_m/default/table",
+   "outlet": "ec.europa.eu",
+   "published_at": "2026-09-27T09:40:27.580430+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "macro_surprise",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "macro-data"
+  },
+  {
+   "id": "real-107",
+   "headline": "CZ Unemployment rate: 3% for 2020-07 (previous 2.6%)",
+   "summary": "CZ Unemployment rate released on 2026-09-22: 3% for 2020-07, against 2.6% for 2020-06. Source: https://ec.europa.eu/eurostat/databrowser/view/une_rt_m/default/table",
+   "outlet": "ec.europa.eu",
+   "published_at": "2026-09-27T09:40:27.580430+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "macro_surprise",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "macro-data"
+  },
+  {
+   "id": "real-108",
+   "headline": "CZ Unemployment rate: 3.2% for 2020-10 (previous 2.8%)",
+   "summary": "CZ Unemployment rate released on 2026-09-22: 3.2% for 2020-10, against 2.8% for 2020-09. Source: https://ec.europa.eu/eurostat/databrowser/view/une_rt_m/default/table",
+   "outlet": "ec.europa.eu",
+   "published_at": "2026-09-27T09:40:27.580430+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "macro_surprise",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "macro-data"
+  },
+  {
+   "id": "real-109",
+   "headline": "CNB economic data now available in a clearer, more interactive form and in one place",
+   "summary": "From Thursday 8 October, the Czech National Bank’s statistics are available through a redesigned and modernised Statistics section of the CNB website and a new version of the ARAD database, ...",
+   "outlet": "cnb.cz",
+   "published_at": "2026-10-08T12:50:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "cnb-press"
+  },
+  {
+   "id": "real-110",
+   "headline": "Lumír Šatran appointed Director of the Moravia Regional Division",
+   "summary": "At its meeting on 8 October 2026, the Bank Board of the Czech National Bank (CNB) appointed Lumír Šatran Director of the Moravia Regional Division in the Cash and Payments Department following a ...",
+   "outlet": "cnb.cz",
+   "published_at": "2026-10-09T11:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "management_change",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "cnb-press"
+  },
+  {
+   "id": "real-111",
+   "headline": "Minutes of the Federal Open Market Committee, September 15-16, 2026",
+   "summary": "Minutes of the Federal Open Market Committee, September 15-16, 2026",
+   "outlet": "federalreserve.gov",
+   "published_at": "2026-10-07T18:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "central_bank",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "fed-press"
+  },
+  {
+   "id": "real-112",
+   "headline": "AI Debt Issuance Defies Rising Yields as SpaceX, Broadcom Plan Major Deals",
+   "summary": "When financing gets more expensive, companies usually slow down their bond sales. Tech companies have instead been ramping up this year, and talk this week of potential big financings from SpaceX and Broadcom Inc. only amplified investor fears about the wave of coming debt.",
+   "outlet": "bloomberg.com",
+   "published_at": "2026-10-10T19:00:00+00:00",
+   "candidates": [
+    "AVGO"
+   ],
+   "expected": {
+    "event_type": "capital_allocation",
+    "affected_ticker": "AVGO",
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bloomberg-markets"
+  },
+  {
+   "id": "real-113",
+   "headline": "Strong Earnings Keep US Stocks in Favor",
+   "summary": "PNC Asset Management Chief Investment Officer Amanda Agati tells Bloomberg This Weekend that strong corporate fundamentals and resilient consumer spending could support US stocks as investors head into third-quarter earnings season. Speaking with hosts David Gura and Christina Ruffini, Agati says investors will be watching for evidence that AI investment is generating returns beyond the largest technology companies, while strong US earnings growth keeps her favoring domestic equities over develo",
+   "outlet": "bloomberg.com",
+   "published_at": "2026-10-10T17:37:41+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bloomberg-markets"
+  },
+  {
+   "id": "real-114",
+   "headline": "Phenomenal Time To Be Investor, Not Consumer: Amoroso",
+   "summary": "Anastasia Amoroso, chief investment strategist with Partners Group, joins Scarlet Fu and Tom Keene on \"Bloomberg Money.\" They discuss the bullish sentiment in the stock market, the potential for volatility in the near future, and rising global yields. (Source: Bloomberg)",
+   "outlet": "bloomberg.com",
+   "published_at": "2026-10-09T19:27:37+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bloomberg-markets"
+  },
+  {
+   "id": "real-115",
+   "headline": "Pointed! Bloomberg's Weekly News Quiz For Risk-Takers",
+   "summary": "Pointed offers a strategic twist to the news quiz format, testing not just players’ knowledge of the news but also their confidence in their answers. Join Bloomberg's Lisa Mateo, Christina Ruffini and David Gura as they play and check out the quiz for yourself at Bloomberg.com (Source: Bloomberg)",
+   "outlet": "bloomberg.com",
+   "published_at": "2026-10-10T17:18:11+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bloomberg-markets"
+  },
+  {
+   "id": "real-116",
+   "headline": "Trump Suggests Ukraine Needs a New President, Blasting Zelenskyy",
+   "summary": "President Donald Trump demanded that Volodymyr Zelenskyy halt attacks on Russian oil refineries and suggested he should consider stepping aside as Ukraine’s president, escalating a fight centered on securing more diesel supplies for the US ahead of the midterm elections.",
+   "outlet": "bloomberg.com",
+   "published_at": "2026-10-10T17:43:20+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bloomberg-politics"
+  },
+  {
+   "id": "real-117",
+   "headline": "Saudi Arabia Suspends Riyadh Airport Operations After Attack",
+   "summary": "Saudi Arabia said it temporarily suspended operations at the Riyadh airport Saturday after an “enemy” attack as air traffic was disrupted for the third time this week amid an intensifying conflict with Yemen’s Houthis.",
+   "outlet": "bloomberg.com",
+   "published_at": "2026-10-10T16:47:10+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bloomberg-politics"
+  },
+  {
+   "id": "real-118",
+   "headline": "Trump Turns to Russia as Diesel Prices Rise",
+   "summary": "Bloomberg Congressional Reporter Caitlin Reilly and ABC News State Department Reporter Shannon Kingston join hosts David Gura and Christina Ruffini on Bloomberg This Weekend to discuss President Donald Trump's agreement to obtain Russian diesel as rising energy costs put pressure on Republicans ahead of the midterm elections. They examine Ukraine's objections to the deal, disagreements over tariffs and the Iran war in competitive Senate races, and Secretary of State Marco Rubio's foreign policy",
+   "outlet": "bloomberg.com",
+   "published_at": "2026-10-10T15:10:25+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bloomberg-politics"
+  },
+  {
+   "id": "real-119",
+   "headline": "Supreme Court Recusals in Spotlight as Alito Drops From Oil Case",
+   "summary": "Justice Samuel Alito’s decision not to take part in a major climate-change case because of his wife’s stock holdings is putting renewed focus on the US Supreme Court’s recusal practices as it kicks off its new nine-month term.",
+   "outlet": "bloomberg.com",
+   "published_at": "2026-10-10T15:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bloomberg-politics"
+  },
+  {
+   "id": "real-120",
+   "headline": "Nvidia Explores Deal Options With Reflection AI, Financial Times Says",
+   "summary": "Nvidia Corp. is in early-stage negotiations to acquire or further invest in startup Reflection AI, an American developer of open-weight models, the Financial Times reported.",
+   "outlet": "bloomberg.com",
+   "published_at": "2026-10-10T18:52:58+00:00",
+   "candidates": [
+    "NVDA"
+   ],
+   "expected": {
+    "event_type": "m_and_a",
+    "affected_ticker": "NVDA",
+    "relevant": true,
+    "rumour": true
+   },
+   "language": "en",
+   "source": "bloomberg-technology"
+  },
+  {
+   "id": "real-121",
+   "headline": "Microsoft CEO Nadella Calls for ‘Emergency Brake’ on Advanced AI",
+   "summary": "Microsoft Corp. Chief Executive Officer Satya Nadella said companies should treat powerful artificial intelligence models as potential insider threats, assume they could be compromised and create an “emergency brake” system to prevent agentic models from going rogue.",
+   "outlet": "bloomberg.com",
+   "published_at": "2026-10-10T18:35:59+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bloomberg-technology"
+  },
+  {
+   "id": "real-122",
+   "headline": "Anthropic AI Model Went Rogue, Submitted Fake Tip to Police",
+   "summary": "Anthropic PBC said its Claude AI model carried out additional unintended actions on the digital systems of outside organizations, including submitting a false tip in a police homicide case, prompting a warning from the Trump administration for artificial intelligence companies to secure their systems.",
+   "outlet": "bloomberg.com",
+   "published_at": "2026-10-10T00:08:39+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bloomberg-technology"
+  },
+  {
+   "id": "real-123",
+   "headline": "Bloomberg This Weekend | Diesel Deal Struck with Putin, Isaias Makes Landfall",
+   "summary": "The news doesn’t stop when markets close. Hosts David Gura, Christina Ruffini and Lisa Mateo bring clarity, context and a bit of humor to the weekend’s biggest headlines, LIVE from New York. Joined by Nancy Yousef - The Atlantic Staff Writer, Bill Wadell - AccuWeather Reporter, Kevin Roose - Tech Journalist, Author “The AGI Chronicles,” Shannon Kingston - ABC News State Department Reporter, Jesse Cole - Banana Ball Championship League Owner, Amanda Agati - PNC Asset MGMT Group Chief Investment O",
+   "outlet": "bloomberg.com",
+   "published_at": "2026-10-10T15:55:31+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bloomberg-technology"
+  },
+  {
+   "id": "real-124",
+   "headline": "Nvidia in talks to acquire US ‘open’ model start-up Reflection AI",
+   "summary": "Donald Trump’s administration hopes the company will rival cheap Chinese alternatives such as DeepSeek",
+   "outlet": "ft.com",
+   "published_at": "2026-10-10T18:14:28+00:00",
+   "candidates": [
+    "NVDA"
+   ],
+   "expected": {
+    "event_type": "m_and_a",
+    "affected_ticker": "NVDA",
+    "relevant": true,
+    "rumour": true
+   },
+   "language": "en",
+   "source": "ft-home"
+  },
+  {
+   "id": "real-125",
+   "headline": "AI borrowing slows as investors grow wary of debt binge",
+   "summary": "Appetite for financing infrastructure boom is tested after months of record-breaking bond issuance",
+   "outlet": "ft.com",
+   "published_at": "2026-10-10T11:00:07+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "ft-home"
+  },
+  {
+   "id": "real-126",
+   "headline": "Napa Valley’s hangover",
+   "summary": "People are drinking less. Vines are being ripped up. Winemakers are going bust. Can the Disneyland of wine survive the downturn?",
+   "outlet": "ft.com",
+   "published_at": "2026-10-10T04:00:26+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "ft-home"
+  },
+  {
+   "id": "real-127",
+   "headline": "The danger of pessimism fatigue",
+   "summary": "Too many have cried wolf about too many things and the public is now perilously nonchalant",
+   "outlet": "ft.com",
+   "published_at": "2026-10-10T04:00:37+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "ft-home"
+  },
+  {
+   "id": "real-128",
+   "headline": "India’s central bank tries to shore up rupee as it nears record lows",
+   "summary": "Rise in energy costs due to US-Israel war on Iran has put downward pressure on the currency of the world’s fastest-growing major economy",
+   "outlet": "ft.com",
+   "published_at": "2026-10-10T11:57:36+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "central_bank",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "ft-markets"
+  },
+  {
+   "id": "real-129",
+   "headline": "Oil and gas production disrupted as Hurricane Isaias hits US",
+   "summary": "More than 800,000 households were left without power as the first major Atlantic storm of the season swept Florida, Alabama and Georgia",
+   "outlet": "ft.com",
+   "published_at": "2026-10-10T10:58:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "macro_surprise",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "ft-markets"
+  },
+  {
+   "id": "real-130",
+   "headline": "The US productivity-pay gap",
+   "summary": "Workers’ share of output is shrinking",
+   "outlet": "ft.com",
+   "published_at": "2026-10-10T09:30:07+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "ft-markets"
+  },
+  {
+   "id": "real-131",
+   "headline": "Reality bites for the Gulf and sport",
+   "summary": "Also in today’s newsletter: Gianni Infantino’s re-election campaign and the NFL pushback against prediction markets",
+   "outlet": "ft.com",
+   "published_at": "2026-10-10T08:00:07+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "ft-companies"
+  },
+  {
+   "id": "real-132",
+   "headline": "Trump announces deal for Russian diesel as Zelensky calls it a gift to Putin",
+   "summary": "Ukraine's president sharply criticised the move, calling it an \"investment in war that must be ended, not prolonged\".",
+   "outlet": "bbc.co.uk",
+   "published_at": "2026-10-10T14:24:14+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bbc-business"
+  },
+  {
+   "id": "real-133",
+   "headline": "Analysis: Trump's shock Russia deal highlights mounting pressure to curb fuel prices",
+   "summary": "The US president hopes to ease his party's pain before next month's midterm elections, writes the BBC's North America correspondent.",
+   "outlet": "bbc.co.uk",
+   "published_at": "2026-10-09T22:30:22+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bbc-business"
+  },
+  {
+   "id": "real-134",
+   "headline": "Boots has a new owner: Three ways it could affect you",
+   "summary": "The stalwart of Britain's High Street has been sold to a Canadian billionaire family. What will that mean for you?",
+   "outlet": "bbc.co.uk",
+   "published_at": "2026-10-09T23:01:14+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "m_and_a",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bbc-business"
+  },
+  {
+   "id": "real-135",
+   "headline": "Burnham promises to curb non-compete rules in job contracts",
+   "summary": "The prime minister says restrictions on what workers can do after leaving roles have \"gone too far\".",
+   "outlet": "bbc.co.uk",
+   "published_at": "2026-10-09T16:15:30+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bbc-business"
+  },
+  {
+   "id": "real-136",
+   "headline": "'Time for Ukraine to get new president,' says Trump after Zelensky condemns diesel deal",
+   "summary": "Ukraine's leader had said the deal with Russia to release diesel into the US would help Moscow fund the war.",
+   "outlet": "bbc.co.uk",
+   "published_at": "2026-10-10T19:28:28+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bbc-world"
+  },
+  {
+   "id": "real-137",
+   "headline": "Russian glide bomb attack on Zaporizhzhia kills at least 15 people",
+   "summary": "Volodymyr Zelensky says the attack, which left children dead, was Russia expressing its \"thanks\" for a US diesel deal.",
+   "outlet": "bbc.co.uk",
+   "published_at": "2026-10-10T14:16:50+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bbc-world"
+  },
+  {
+   "id": "real-138",
+   "headline": "Several injured in attack on airport in Saudi capital Riyadh",
+   "summary": "The US embassy says it is \"aware of attacks on King Khalid International Airport\", which come days after Yemen's Houthis said they had struck it.",
+   "outlet": "bbc.co.uk",
+   "published_at": "2026-10-10T18:37:10+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bbc-world"
+  },
+  {
+   "id": "real-139",
+   "headline": "US murderer Christa Pike discharged from hospital 10 days after failed execution",
+   "summary": "Pike's lawyers say she is \"grateful\" to the medical team who cared for her after she survived two lethal injections last month.",
+   "outlet": "bbc.co.uk",
+   "published_at": "2026-10-10T17:44:26+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bbc-world"
+  },
+  {
+   "id": "real-140",
+   "headline": "Why is it so hard to put out Indonesian fires shrouding the region in toxic smog?",
+   "summary": "We explain why Indonesia’s peatland fires are so difficult to battle and produce so much haze.",
+   "outlet": "bbc.co.uk",
+   "published_at": "2026-10-09T09:37:56+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bbc-asia"
+  },
+  {
+   "id": "real-141",
+   "headline": "Meet India's feisty Gen Z protester who is taking on Modi",
+   "summary": "Neha Bora has emerged as one of the most recognisable faces from India's recent Gen Z-led protests.",
+   "outlet": "bbc.co.uk",
+   "published_at": "2026-10-09T07:19:24+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bbc-asia"
+  },
+  {
+   "id": "real-142",
+   "headline": "Thai Queen makes first solo flight in fighter jet",
+   "summary": "Thailand’s Queen Suthida made her first solo flight in a fighter jet, according to the Thai Royal Household.",
+   "outlet": "bbc.co.uk",
+   "published_at": "2026-10-09T19:48:26+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bbc-asia"
+  },
+  {
+   "id": "real-143",
+   "headline": "Why Elon Musk is taking on India's richest man over Starlink",
+   "summary": "Musk has taken pot-shots at Reliance owner Mukesh Ambani as Starlink struggles to launch in India.",
+   "outlet": "bbc.co.uk",
+   "published_at": "2026-10-09T06:42:37+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bbc-asia"
+  },
+  {
+   "id": "real-144",
+   "headline": "Zelenskyy furious as Trump announces deal to buy Russian diesel",
+   "summary": "US president says agreement needed to lower fuel prices, but move likely to create fresh crisis with Ukraine and Nato allies Donald Trump is on a fresh collision course with Volodymyr Zelenskyy and European allies after his stunning agreement to buy Russian diesel upended years of US and western pressure on the Kremlin to end its war against Ukraine. Zelenskyy reacted furiously to Trump’s announcement of the deal with Vladimir Putin on Friday, calling it “absolutely terrible” and “not fair and n",
+   "outlet": "theguardian.com",
+   "published_at": "2026-10-10T10:09:46+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "guardian-business"
+  },
+  {
+   "id": "real-145",
+   "headline": "Telegraph owner poised to make newsroom job cuts in investment promise U-turn",
+   "summary": "Exclusive: German media group Axel Springer said to be planning between 50 and 100 editorial redundancies The new owner of the Telegraph is preparing to make significant job cuts to its newsroom, just months after stating it would invest in the title to make it the “leading centre-right media outlet in the English-speaking world”. Axel Springer, the German media company overseen by its billionaire chief executive, Mathias Döpfner, is understood to be examining proposals that would make between 5",
+   "outlet": "theguardian.com",
+   "published_at": "2026-10-10T10:31:21+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": true
+   },
+   "language": "en",
+   "source": "guardian-business"
+  },
+  {
+   "id": "real-146",
+   "headline": "Create new pre-apprenticeship scheme to close youth unemployment gap, says Milburn",
+   "summary": "Exclusive: Former minister’s review warns that dramatic action is needed over huge drop in youth apprenticeship starts A national apprenticeship readiness scheme should be introduced in England to close the gap for young people between leaving school and starting work, the government is to be told. Alan Milburn, who is leading a major review into Britain’s youth jobs crisis, will call for a new “national pre-apprenticeship route” to offer young people further education, training and work experie",
+   "outlet": "theguardian.com",
+   "published_at": "2026-10-10T05:00:47+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "guardian-business"
+  },
+  {
+   "id": "real-147",
+   "headline": "‘Our town is making jeans again’: meet the firm reviving jobs and skills in Wales",
+   "summary": "In the first article in a series on high end British manufacturing, we visit the Hiut Denim factory in Cardigan Worn on the streets of London’s Soho, San Francisco or Sydney, every pair of high-end jeans made by Hiut Denim comes from the rather unlikely location of a small coastal town in west Wales. Cardigan, with a population of just 4,200, has a proud history of denim production and was once home to Britain’s largest jeans factory, even if the town’s name recalls a different garment entirely.",
+   "outlet": "theguardian.com",
+   "published_at": "2026-10-10T11:00:55+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "guardian-business"
+  },
+  {
+   "id": "real-148",
+   "headline": "Irish property group in talks about rescue deal for Poundland",
+   "summary": "The privately owned Irish company which this week finalised the purchase of NCP, the car parks giant, has emerged as the mystery party backing Poundland's bosses as they race to agree a takeover of the discount retailer.",
+   "outlet": "news.sky.com",
+   "published_at": "2026-10-10T06:26:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "m_and_a",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": true
+   },
+   "language": "en",
+   "source": "sky-business"
+  },
+  {
+   "id": "real-149",
+   "headline": "Further taxes on warehouses ruled out ahead of budget after M&S and John Lewis issue warnings",
+   "summary": "Further taxes on warehouses have been ruled out by the chancellor ahead of the budget, Sky News understands, after a warning was issued the boss of a high street giant.",
+   "outlet": "news.sky.com",
+   "published_at": "2026-10-10T11:10:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "sky-business"
+  },
+  {
+   "id": "real-150",
+   "headline": "London-listed Gamma joins chorus of opposition to BT's TalkTalk rescue",
+   "summary": "The London-listed company in takeover talks with one of TalkTalk's spurned suitors has joined the chorus of opposition to BT Group's £400m rescue of TalkTalk Telecom Group.",
+   "outlet": "news.sky.com",
+   "published_at": "2026-10-09T15:01:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "m_and_a",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "sky-business"
+  },
+  {
+   "id": "real-151",
+   "headline": "Football watchdog to unveil levy proposals as report lays bare game's financial peril",
+   "summary": "English football's new watchdog will unveil details within days of its new funding levy as it lays bare the scale of the financial perils plaguing the game's professional pyramid.",
+   "outlet": "news.sky.com",
+   "published_at": "2026-10-09T10:20:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "sky-business"
+  },
+  {
+   "id": "real-152",
+   "headline": "Japan PM Takaichi works to shed reflationist label on market, US pressure",
+   "summary": "",
+   "outlet": "asia.nikkei.com",
+   "published_at": "2026-10-10T00:00:00Z",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "nikkei-asia"
+  },
+  {
+   "id": "real-153",
+   "headline": "UK-Japan-Italy fighter plans Japan design center with '1,000' staff",
+   "summary": "",
+   "outlet": "asia.nikkei.com",
+   "published_at": "2026-10-10T00:00:00Z",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "nikkei-asia"
+  },
+  {
+   "id": "real-154",
+   "headline": "Dutch greenhouse firms in China pivot to selling software",
+   "summary": "",
+   "outlet": "asia.nikkei.com",
+   "published_at": "2026-10-10T00:00:00Z",
+   "candidates": [],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "nikkei-asia"
+  },
+  {
+   "id": "real-155",
+   "headline": "Trump sanctions will not break the ICC, court's special adviser declares",
+   "summary": "",
+   "outlet": "asia.nikkei.com",
+   "published_at": "2026-10-10T00:00:00Z",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "nikkei-asia"
+  },
+  {
+   "id": "real-156",
+   "headline": "Germany eyes joining GCAP fighter jet project with U.K, Italy and Japan",
+   "summary": "There has been mounting speculation the group could open the door to Germany after a rival Franco-German fighter program collapsed in June.",
+   "outlet": "japantimes.co.jp",
+   "published_at": "2026-10-10T05:02:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": true
+   },
+   "language": "en",
+   "source": "japan-times"
+  },
+  {
+   "id": "real-157",
+   "headline": "Taiwan’s leader says increasing defense spending to ‘deter war’",
+   "summary": "Taiwan has earmarked a record NT$1.1 trillion in defense spending for 2027, which accounts for more than 3% of GDP.",
+   "outlet": "japantimes.co.jp",
+   "published_at": "2026-10-10T04:29:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "japan-times"
+  },
+  {
+   "id": "real-158",
+   "headline": "Takaichi again in a bind as U.S. threatens to ‘end’ ICC",
+   "summary": "Japan, which hosts roughly 60,000 U.S. service members and depends on Washington for its security, will need to walk a fine line as it pushes back.",
+   "outlet": "japantimes.co.jp",
+   "published_at": "2026-10-10T04:29:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "japan-times"
+  },
+  {
+   "id": "real-159",
+   "headline": "Anthropic cites new AI misbehavior, some on government sites",
+   "summary": "The incident prompted a warning from U.S. President Donald Trump's administration for artificial intelligence companies to secure their systems.",
+   "outlet": "japantimes.co.jp",
+   "published_at": "2026-10-10T02:04:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "japan-times"
+  },
+  {
+   "id": "real-160",
+   "headline": "Better protection needed as violent cryptocurrency robberies surge",
+   "summary": "Cryptocurrency’s promise of financial freedom carries a cost the industry must confront: growing wealth can make its owners more attractive targets for violent criminals. Protecting digital assets while treating the physical safety of their holders as a personal matter is an inadequate approach to financial security. The industry must take responsibility for designing products and services which account for the reality that people can be threatened into surrendering their assets. The rise in...",
+   "outlet": "scmp.com",
+   "published_at": "2026-10-10T08:30:05+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "scmp-business"
+  },
+  {
+   "id": "real-161",
+   "headline": "Gen Z overtakes older collectors as art market spending rebounds globally: report",
+   "summary": "Gen Z high-net-worth collectors have overtaken older generations as the art market’s biggest spenders, with average fine art expenditure more than twice that of older collectors, helping drive a global sales rebound to nearly US$60 billion, according to the latest Art Basel and UBS market insights. The surge came as mainland China and Hong Kong continued to play pivotal roles in the global art market’s growth, according to the Art Basel and UBS Survey of Global Collecting 2026, released earlier.",
+   "outlet": "scmp.com",
+   "published_at": "2026-10-10T06:00:15+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "scmp-business"
+  },
+  {
+   "id": "real-162",
+   "headline": "China wants 5 innovative drugs with US$1 billion returns by 2030. Which might they be?",
+   "summary": "The increasing global appeal of Chinese firms’ novel therapies has propelled the country’s rise as a biomedical powerhouse, but China has yet to produce a drug to rival all-time best-selling Western blockbusters in sales. Beijing has set ambitious new five-year targets to boost its global presence, including at least five products with annual global sales surpassing US$1 billion by 2030. The goal is achievable, according to some analysts. Jefferies’ head of Asia healthcare research Cui Cui noted",
+   "outlet": "scmp.com",
+   "published_at": "2026-10-10T00:00:20+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "scmp-business"
+  },
+  {
+   "id": "real-163",
+   "headline": "K&K offers extra warranty to One Stanley homebuyers amid building defects furore",
+   "summary": "Developer K&amp;K Property has announced plans to offer a six-year structural warranty to homeowners at its luxury One Stanley development, as the company seeks to move on from a growing furore over alleged construction defects at the complex. “As the developer of the One Stanley development project, we attach great importance to the recent public attention surrounding one of the detached houses in the project,” the company said in a statement released late on Friday. One Stanley, a collection o",
+   "outlet": "scmp.com",
+   "published_at": "2026-10-09T13:50:15+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "scmp-business"
+  },
+  {
+   "id": "real-164",
+   "headline": "Are Chinese military aircraft already using a new joint air facility in Laos?",
+   "summary": "Chinese military aircraft may already be using a new joint aviation facility in Laos, with satellite imagery showing twice as many K-8/JL-8-family trainer aircraft there as the Laotian air force is assessed to possess. Eight of the two-seat trainer and light-attack aircraft were visible at Ban Keun Airport in commercial satellite imagery taken on September 30, according to Reuters, which first reported the images. More than two dozen military and support vehicles were also visible. The image was",
+   "outlet": "scmp.com",
+   "published_at": "2026-10-10T14:00:06+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "scmp-china"
+  },
+  {
+   "id": "real-165",
+   "headline": "China’s Zhejiang province calls to limit tech giants’ power over online traffic",
+   "summary": "Communist Party officials in eastern China’s Zhejiang province have called for greater oversight of major internet platforms and their “traffic power”, warning that online traffic and algorithms had evolved into a force capable of shaping public discussion and sentiment. The publicity department of the Zhejiang provincial party committee published the commentary on social media on Thursday, saying traffic could no longer be viewed simply as a data resource. Zhejiang’s capital city, Hangzhou, is.",
+   "outlet": "scmp.com",
+   "published_at": "2026-10-10T12:00:07+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "scmp-china"
+  },
+  {
+   "id": "real-166",
+   "headline": "Cracks in security? Qing dynasty ceramics damaged in British Museum display",
+   "summary": "Two Chinese ceramics at the British Museum have been damaged while on display and are being restored, sparking fresh debate over how museums should safely exhibit fragile cultural treasures. The museum confirmed on Friday that a bowl had fallen from its shelf and landed on a small box on the bottom shelf, damaging both pieces. “Both objects are already with our expert conservation team for complete restoration,” the museum said. The museum, which said the incident occurred on October 4, noted...",
+   "outlet": "scmp.com",
+   "published_at": "2026-10-10T11:02:16+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "scmp-china"
+  },
+  {
+   "id": "real-167",
+   "headline": "Taiwanese leader welcomes talks between Washington and Beijing ‘to reduce risk of war’",
+   "summary": "Taiwanese leader William Lai Ching-te has welcomed talks between Washington and Beijing aimed at reducing the risk of conflict. Lai’s annual Double Tenth address on Saturday, marking the anniversary of the foundation of the Republic of China, Taiwan’s official name, also called for democracies to work together to safeguard regional peace and for the Taiwanese people’s right to exist to be respected. He also warned that mainland China was trying to put pressure on the island to change the status.",
+   "outlet": "scmp.com",
+   "published_at": "2026-10-10T10:09:31+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "scmp-china"
+  },
+  {
+   "id": "real-168",
+   "headline": "India unveils tough curbs on dollar demand to defend rupee",
+   "summary": "The central bank will open a special window to meet the daily dollar requirements of three state-run oil-marketing companies.",
+   "outlet": "straitstimes.com",
+   "published_at": "2026-10-10T07:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "central_bank",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "straits-times"
+  },
+  {
+   "id": "real-169",
+   "headline": "When couples love their properties more than each other",
+   "summary": "If you have no intention of sharing your investment properties, you should not include a joint owner for the real estate.",
+   "outlet": "straitstimes.com",
+   "published_at": "2026-10-09T21:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "straits-times"
+  },
+  {
+   "id": "real-170",
+   "headline": "Wall Street posts weekly gains with earnings, inflation data on tap",
+   "summary": "The Dow Jones Industrial Average rose 423.31 points, or 0.83%, to 51,654.95.",
+   "outlet": "straitstimes.com",
+   "published_at": "2026-10-09T20:37:03+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "straits-times"
+  },
+  {
+   "id": "real-171",
+   "headline": "MAS flags risks of using AI agents in digital-asset trading",
+   "summary": "AI agents may increasingly act on behalf of individuals and institutions.",
+   "outlet": "straitstimes.com",
+   "published_at": "2026-10-09T15:10:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "straits-times"
+  },
+  {
+   "id": "real-172",
+   "headline": "(LEAD) Ceiling material collapses in Daegu building, injures 38",
+   "summary": "DAEGU, Oct. 10 (Yonhap) -- Large sections of ceiling finish material collapsed i...",
+   "outlet": "en.yna.co.kr",
+   "published_at": "2026-10-10T12:39:26+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "yonhap"
+  },
+  {
+   "id": "real-173",
+   "headline": "KBO's Eagles decide not to re-sign manager Kim Kyung-moon",
+   "summary": "SEOUL, Oct. 10 (Yonhap) -- The Hanwha Eagles announced Saturday they will not br...",
+   "outlet": "en.yna.co.kr",
+   "published_at": "2026-10-10T07:10:56+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "management_change",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "yonhap"
+  },
+  {
+   "id": "real-174",
+   "headline": "Today in Korean history",
+   "summary": "Oct. 11",
+   "outlet": "en.yna.co.kr",
+   "published_at": "2026-10-10T05:00:01+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "yonhap"
+  },
+  {
+   "id": "real-175",
+   "headline": "Ceiling material collapses in Daegu building, injures 38",
+   "summary": "DAEGU, Oct. 10 (Yonhap) -- Large sections of ceiling finish material collapsed i...",
+   "outlet": "en.yna.co.kr",
+   "published_at": "2026-10-10T04:31:56+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "yonhap"
+  },
+  {
+   "id": "real-176",
+   "headline": "Sebi’s CAS guidelines likely within a week, says chief Tuhin Kanta Pandey",
+   "summary": "Sebi chairman Tuhin Kanta Pandey said the regulator expects to issue guidelines on the settlement-price mechanism for derivatives on expiry days within a week. The move follows a review of the Closing Auction Session. Sebi is also working on simpler regulations, easier market access, lower compliance costs and stronger technological resilience.",
+   "outlet": "economictimes.indiatimes.com",
+   "published_at": "2026-10-10T13:58:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "economic-times"
+  },
+  {
+   "id": "real-177",
+   "headline": "Industrial, warehousing space leasing hits record 59.1 mn sq ft in top 24 cities in Jan-Sep: Savills",
+   "summary": "From January to September, leasing of industrial and warehousing spaces surged across major cities in India, propelled by demand from sectors like light manufacturing, e-commerce, and third-party logistics. Tier-I cities alone accounted for 47.2 million sq ft of leasing. Additionally, fresh supply increased to 68.9 million sq ft, signaling promising market trends as consumption patterns shift and supply chains are being optimized.",
+   "outlet": "economictimes.indiatimes.com",
+   "published_at": "2026-10-10T11:27:20+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "economic-times"
+  },
+  {
+   "id": "real-178",
+   "headline": "BPTP sells 150 apartments in its new housing project at Faridabad",
+   "summary": "BPTP Ltd has achieved a remarkable feat by selling 150 luxury apartments in Faridabad, translating to a total revenue of Rs 150 crore. Their housing development, dubbed 'SkyNest', has accumulated around Rs 750 crore in sales thus far, with each flat averaging Rs 5 crore. As a prominent player in the real estate market, BPTP has developed over 25,000 residences over the past twenty years.",
+   "outlet": "economictimes.indiatimes.com",
+   "published_at": "2026-10-10T11:26:30+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "product_business",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "economic-times"
+  },
+  {
+   "id": "real-179",
+   "headline": "Adani Green Energy H1 Update: Operational capacity rises 24% YoY to 20,763 MW, energy sales jump 32%",
+   "summary": "Adani Green Energy reported a 24% year-on-year rise in operational capacity to 20,763 MW in H1FY27, while energy sales jumped 32% to 25,747 million units. The company added 4,083 MW of greenfield capacity and expanded its battery storage portfolio. Its board will consider Q2FY27 financial results on October 21.",
+   "outlet": "economictimes.indiatimes.com",
+   "published_at": "2026-10-10T10:52:59+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "earnings_release",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "economic-times"
+  },
+  {
+   "id": "real-180",
+   "headline": "Week Ahead: US inflation data, major bank earnings to drive Wall Street",
+   "summary": "September Consumer Price Index report in focus as investors assess prospects of Federal Reserve rate hike in December",
+   "outlet": "livemint.com",
+   "published_at": "2026-10-10T18:12:57+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "livemint"
+  },
+  {
+   "id": "real-181",
+   "headline": "This Tata Group stock falls 13% in 3 months, but Motilal Oswal sees 21% upside on 'resilient growth' - Do you own?",
+   "summary": "Tata Consumer Products share price has declined nearly 13.88% in three months. Motilal Oswal sees 21% upside potential in the stock",
+   "outlet": "livemint.com",
+   "published_at": "2026-10-10T16:09:32+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "analyst_rating",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "livemint"
+  },
+  {
+   "id": "real-182",
+   "headline": "Larsen &amp; Toubro shares: 114% return in 5 yrs, Motilal Oswal sees 19% more upside stock | Target price",
+   "summary": "Larsen &amp;amp; Toubro shares have fallen 10.6% in 2026 so far, despite delivering 114% returns over five years. Motilal Oswal sees nearly 19% upside, citing order growth, domestic project execution and opportunities across multiple international markets.",
+   "outlet": "livemint.com",
+   "published_at": "2026-10-10T15:28:32+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "analyst_rating",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "livemint"
+  },
+  {
+   "id": "real-183",
+   "headline": "HCL Tech Q2 results 2026 preview, expectations: Will IT giant deliver strong growth? Profit, revenue, dividend history",
+   "summary": "HCL Technologies is expected to report modest sequential revenue growth in Q2FY27, supported by IT services and engineering work, with acquisitions adding to growth.&amp;nbsp;",
+   "outlet": "livemint.com",
+   "published_at": "2026-10-10T15:03:13+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "livemint"
+  },
+  {
+   "id": "real-184",
+   "headline": "Finland, the world's happiest nation, faces a glum winter",
+   "summary": "Finns have many reasons to feel content, but the country's pile of debt is not one of them. Russia's war in Ukraine has added to the fiscal burden. Can the Nordic nation absorb another shock?",
+   "outlet": "dw.com",
+   "published_at": "2026-10-09T08:12:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "dw-business"
+  },
+  {
+   "id": "real-185",
+   "headline": "How a multibillion-dollar oilfield has ignited the UK-Argentina feud over the Falklands",
+   "summary": "Argentina and the UK once fought a war over the Falkland Islands. Now, the multibillion-dollar Sea Lion oil project has reignited old tensions, with Buenos Aires seeking to put a stop to the plans.",
+   "outlet": "dw.com",
+   "published_at": "2026-10-08T11:40:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "dw-business"
+  },
+  {
+   "id": "real-186",
+   "headline": "Merz, Macron seek tougher EU measures against unfair trade",
+   "summary": "Emmanuel Macron and Friedrich Merz have written to Ursula von der Leyen, calling for tougher EU mechanisms against unfair trade practices by other states. They name no names but seem to have China or the US in mind.",
+   "outlet": "dw.com",
+   "published_at": "2026-10-05T17:23:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "dw-business"
+  },
+  {
+   "id": "real-187",
+   "headline": "Euro plummets against US dollar: Has the next financial crisis begun?",
+   "summary": "The euro has fallen to a 17-month low against the dollar. That will make inflation worse in the EU, where political worries and concern over French debt are already troubling investors. Is a fiscal crisis at hand?",
+   "outlet": "dw.com",
+   "published_at": "2026-10-05T14:28:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "macro_surprise",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "dw-business"
+  },
+  {
+   "id": "real-188",
+   "headline": "Arbeitnehmerhaftung: Wie ein Gerichtsurteil leitende Angestellte in den Ruin treiben könnte",
+   "summary": "Ein Urteil verschärft potenziell die Haftungsrisiken für leitende Angestellte: Verursachen sie Schäden, riskieren sie, mit ihrem Privatvermögen zu haften.",
+   "outlet": "handelsblatt.com",
+   "published_at": "2026-10-10T13:59:49+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "de",
+   "source": "handelsblatt"
+  },
+  {
+   "id": "real-189",
+   "headline": "US-Börsen: Techwerte erholen sich nach neuer KI-Angst – Wall Street schließt im Plus",
+   "summary": "Ein erneuter Angriff der USA auf den Iran ist nicht abzusehen, was für Beruhigung am Ölmarkt sorgt. Ein Medienbericht beschwichtigt Anleger, die eine KI-Blase fürchten.",
+   "outlet": "handelsblatt.com",
+   "published_at": "2026-10-09T20:11:45+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "de",
+   "source": "handelsblatt"
+  },
+  {
+   "id": "real-190",
+   "headline": "Dax aktuell: Dax schließt wieder über 25.000 Punkten – T-Aktie fällt nach Musk-Ankündigung deutlich",
+   "summary": "Nach Turbulenzen an den Öl- und Anleihemärkten schöpfen Anleger zum Wochenende etwas Hoffnung – von einer nachhaltigen Entspannung sind die Werte aber noch weit entfernt.",
+   "outlet": "handelsblatt.com",
+   "published_at": "2026-10-09T15:53:23+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "de",
+   "source": "handelsblatt"
+  },
+  {
+   "id": "real-191",
+   "headline": "USA: Trump will erneut Entlassung von Notenbank-Direktorin prüfen",
+   "summary": "Trump will die Fed-Direktorin Lisa Cook loswerden, doch der Supreme Court setzte ihm Grenzen. Nun startet der US-Präsident einen neuen Anlauf.",
+   "outlet": "handelsblatt.com",
+   "published_at": "2026-10-09T15:27:16+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "central_bank",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "de",
+   "source": "handelsblatt"
+  },
+  {
+   "id": "real-192",
+   "headline": "Geldanlage: Hedgefonds sind gar nicht so böse",
+   "summary": "Für Ausschläge an den Finanzmärkten werden häufig Hedgefonds verantwortlich gemacht. Das ist ein falsches Spiel.",
+   "outlet": "faz.net",
+   "published_at": "2026-10-10T14:08:44+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "de",
+   "source": "faz-finanzen"
+  },
+  {
+   "id": "real-193",
+   "headline": "Neue Sorgen: Börsencrash durch die KI",
+   "summary": "Die Künstliche Intelligenz hat schon große Schäden in Unternehmen und öffentlichen Verwaltungen angerichtet. Sie könnte auch die Finanzmärkte in Turbulenzen stürzen.",
+   "outlet": "faz.net",
+   "published_at": "2026-10-10T05:52:18+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "de",
+   "source": "faz-finanzen"
+  },
+  {
+   "id": "real-194",
+   "headline": "Börsenwoche: Der verflixte Ölpreis",
+   "summary": "Der Ölpreis bestimmt derzeit, wie der Aktienmarkt läuft. Dabei sind die Nachrichten von der Straße von Hormus oft widersprüchlich. Was soll man glauben?",
+   "outlet": "faz.net",
+   "published_at": "2026-10-09T15:21:46+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "de",
+   "source": "faz-finanzen"
+  },
+  {
+   "id": "real-195",
+   "headline": "KI-Hype: Hitzewallungen an der Börse",
+   "summary": "Open AI verdirbt die Party an den Märkten. Der starre Fokus der Anleger auf die Giganten ist völlig unnötig.",
+   "outlet": "faz.net",
+   "published_at": "2026-10-09T13:14:59+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "de",
+   "source": "faz-finanzen"
+  },
+  {
+   "id": "real-196",
+   "headline": "Wie Start-ups in Deutschland trotz Hürden Erfolg haben können",
+   "summary": "Ein Berliner KI-Start-up zeigt, wie deutsche Gründer es auf die Weltbühne schaffen. Doch viele aufstrebende Unternehmen werden in ihrem Potenzial immer noch ausgebremst. Dabei gebe es viel Talent, sagt ein Gründer. Von A. Kartschall.",
+   "outlet": "tagesschau.de",
+   "published_at": "2026-10-10T13:07:24+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "de",
+   "source": "tagesschau-wirtschaft"
+  },
+  {
+   "id": "real-197",
+   "headline": "Deutschland bleibt beim Nein zu russischem Öl",
+   "summary": "Auch nach Trumps Dieseldeal mit Putin will die Bundesregierung auf russisches Öl verzichten. Die Grünen werfen der US-Regierung Skrupellosigkeit vor. Die Spritpreise in Deutschland reagierten nicht.",
+   "outlet": "tagesschau.de",
+   "published_at": "2026-10-10T12:04:32+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "de",
+   "source": "tagesschau-wirtschaft"
+  },
+  {
+   "id": "real-198",
+   "headline": "Trump kündigt russische Diesellieferungen an",
+   "summary": "Wegen der hohen Spritpreise steht Trump innenpolitisch unter wachsendem Druck. Nun verkündet der US-Präsident einen Deal mit Russland, der die Lieferung von zunächst 300.000 Tonnen Diesel für die USA und den Weltmarkt umfasst. Kiew ist empört.",
+   "outlet": "tagesschau.de",
+   "published_at": "2026-10-10T02:43:04+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "de",
+   "source": "tagesschau-wirtschaft"
+  },
+  {
+   "id": "real-199",
+   "headline": "Weniger Hybridfahrzeug-Exporte: EU und China wenden Eskalation vorerst ab",
+   "summary": "China akzeptiert EU-Handelsbeschränkungen für Hybridfahrzeuge. Doch wie nachhaltig wirkt dieses Zugeständnis? Und wie geht es in anderen Wirtschaftsbereichen weiter? Von Christoph Kober.",
+   "outlet": "tagesschau.de",
+   "published_at": "2026-10-10T10:15:19+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "de",
+   "source": "tagesschau-wirtschaft"
+  },
+  {
+   "id": "real-200",
+   "headline": "Stelco says it is proceeding with Ontario layoffs after Ottawa issues ultimatum",
+   "summary": "Company says in letter it is not violating Investment Canada Act commitments",
+   "outlet": "theglobeandmail.com",
+   "published_at": "2026-10-10T14:38:52+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "globe-and-mail-business"
+  },
+  {
+   "id": "real-201",
+   "headline": "Ottawa raises $2-billion in latest green-bond issue",
+   "summary": "Program that targets investments in conservation projects, environmentally friendly infrastructure has raised $19.5-billion since 2022",
+   "outlet": "theglobeandmail.com",
+   "published_at": "2026-10-09T21:39:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "capital_allocation",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "globe-and-mail-business"
+  },
+  {
+   "id": "real-202",
+   "headline": "Startups are hiring low-paid gig workers to train robots on manual labour",
+   "summary": "We got a firsthand look at what it’s like to record yourself for AI-powered humanoid robots to learn from",
+   "outlet": "theglobeandmail.com",
+   "published_at": "2026-10-09T10:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "globe-and-mail-business"
+  },
+  {
+   "id": "real-203",
+   "headline": "Emera’s bid for energy powerhouse, Weston family to buy U.K.’s Boots and Stelco’s exit from galvanized steel: Must-read business and investing stories",
+   "summary": "Plus, Canada sheds 68,000 jobs in September and unemployment rate climbs to 6.5%",
+   "outlet": "theglobeandmail.com",
+   "published_at": "2026-10-10T13:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "m_and_a",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "globe-and-mail-business"
+  },
+  {
+   "id": "real-204",
+   "headline": "Energy firm merger creates a powerful combination: FP Video explains",
+   "summary": "Plus, how ongoing trade tensions with the U.S. will impact your shopping this holiday season",
+   "outlet": "financialpost.com",
+   "published_at": "2026-10-10T11:00:43+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "m_and_a",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "financial-post"
+  },
+  {
+   "id": "real-205",
+   "headline": "William Watson: What Statistics Canada data said one day in October",
+   "summary": "Central planning of labour would be a disaster. Still, you wonder if we wouldn't do better with fewer lawyers and more engineers",
+   "outlet": "financialpost.com",
+   "published_at": "2026-10-10T10:00:33+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "financial-post"
+  },
+  {
+   "id": "real-206",
+   "headline": "The U.S. is going to the moon for a resource Canada has at scale",
+   "summary": "Chris Cassin: Stockpiling helium-3 could give us a bargaining chip in trade talks, but we aren't doing it",
+   "outlet": "financialpost.com",
+   "published_at": "2026-10-10T10:00:25+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "financial-post"
+  },
+  {
+   "id": "real-207",
+   "headline": "Opinion: The port of Churchill needs a more modest vision",
+   "summary": "Big ambitions are not bad. But a smaller-scale vision for Churchill would be more achievable and of greater ultimate benefit",
+   "outlet": "financialpost.com",
+   "published_at": "2026-10-10T10:00:12+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "financial-post"
+  },
+  {
+   "id": "real-208",
+   "headline": "Stelco says Hamilton layoffs still happening despite Ottawa's threats of legal action",
+   "summary": "Hamilton-based steelmaker Stelco says it will proceed with hundreds of layoffs, despite threats of legal action from the federal government.",
+   "outlet": "cbc.ca",
+   "published_at": "2026-10-10T18:14:09+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "cbc-business"
+  },
+  {
+   "id": "real-209",
+   "headline": "AI photos are making it harder to know what you're booking on Airbnb. Here's what to look out for",
+   "summary": "Josh Wells was excited to explore Montreal on his first trip outside the U.S. But as he scrolled through listings on Airbnb, he noticed something odd: Several host profile pictures and one listing had what appeared to be AI-generated pictures.",
+   "outlet": "cbc.ca",
+   "published_at": "2026-10-10T08:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "cbc-business"
+  },
+  {
+   "id": "real-210",
+   "headline": "Canadian economy lost 68,000 jobs in September, marking second straight month of surprise declines",
+   "summary": "Before the two monthly declines, Statistics Canada data showed employment trending upward, with 181,000 jobs added between April and July. But losses in August and September snapped that hot streak.",
+   "outlet": "cbc.ca",
+   "published_at": "2026-10-09T12:42:10+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "macro_surprise",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "cbc-business"
+  },
+  {
+   "id": "real-211",
+   "headline": "Canada can't launch rockets on its own. A handful of companies want to change that",
+   "summary": "Canada has long relied on its allies to get technologies like satellites into space. But as the cross-border relationship with the U.S. changes, a handful of companies — including the newest player, Canada Rocket Company — are trying to change that and capitalize on a growing market.",
+   "outlet": "cbc.ca",
+   "published_at": "2026-10-09T08:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "cbc-business"
+  },
+  {
+   "id": "real-212",
+   "headline": "Trump says Ukraine needs a new president who will agree to end the war",
+   "summary": "US leader suggests Zelenskyy has not done enough to end the war amid tensions with Kyiv over a diesel deal with Russia.",
+   "outlet": "aljazeera.com",
+   "published_at": "2026-10-10T19:32:37+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "aljazeera"
+  },
+  {
+   "id": "real-213",
+   "headline": "Barcelona beat Getafe as Gordon scores his first goal",
+   "summary": "Barcelona make it six wins from six with a 3-0 win against Getafe as Anthony Gordon scores his first goal for club.",
+   "outlet": "aljazeera.com",
+   "published_at": "2026-10-10T19:26:22+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "aljazeera"
+  },
+  {
+   "id": "real-214",
+   "headline": "Ronaldo suspended by Portugal FA after leaving camp and criticising coach",
+   "summary": "Portugal star Cristiano Ronaldo suspended by his country&#039;s football association for walkout during Nations League games.",
+   "outlet": "aljazeera.com",
+   "published_at": "2026-10-10T19:23:26+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "aljazeera"
+  },
+  {
+   "id": "real-215",
+   "headline": "Trump calls for new president in Ukraine",
+   "summary": "US President Trump criticised Ukraine’s Volodymyr Zelenskyy as he called for new leadership in Ukraine.",
+   "outlet": "aljazeera.com",
+   "published_at": "2026-10-10T18:50:23+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "aljazeera"
+  },
+  {
+   "id": "real-216",
+   "headline": "‘I feel like a loser’: My stock portfolio is swinging wildly. Is it finally time to worry?",
+   "summary": "“I presume these are sophisticated investors taking a profit.”",
+   "outlet": "marketwatch.com",
+   "published_at": "2026-10-10T18:31:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "marketwatch-top"
+  },
+  {
+   "id": "real-217",
+   "headline": "Elon Musk is now richer than any American ever — and it’s not even close",
+   "summary": "Musk’s trillioniare status means he’s wealthier than his next three contemporaries combined — and also worth more than historical tycoons like John D. Rockefeller.",
+   "outlet": "marketwatch.com",
+   "published_at": "2026-10-10T16:50:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "marketwatch-top"
+  },
+  {
+   "id": "real-218",
+   "headline": "A friend in her 80s fell down her basement stairs. Is this a hidden danger lurking in people’s home?",
+   "summary": "“She developed pleural effusion — fluid between the lungs and ribs — compressing her lungs and making it hard for her to breathe.”",
+   "outlet": "marketwatch.com",
+   "published_at": "2026-10-10T16:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "marketwatch-top"
+  },
+  {
+   "id": "real-219",
+   "headline": "‘I have no children’: My aunt gave me $50,000 for a down payment. Now she wants me to leave my home to her two children.",
+   "summary": "“The house cost $385,000. With my savings, her $50,000 and a small mortgage, I was able to close.”",
+   "outlet": "marketwatch.com",
+   "published_at": "2026-10-10T15:30:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "marketwatch-top"
+  },
+  {
+   "id": "real-220",
+   "headline": "Stock Market News, Oct. 9, 2026: Stocks Rise as Tech Shakes Off Thursday Selloff",
+   "summary": "Dollar set for fourth straight week of gains on higher Fed rate expectations",
+   "outlet": "wsj.com",
+   "published_at": "2026-10-09T08:23:12+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "wsj-markets"
+  },
+  {
+   "id": "real-221",
+   "headline": "At Robinhood’s Mecca for Risk-Loving Traders, Everyone Has a Tale of Getting Rich",
+   "summary": "The stock market is back at records. These everyday Americans are one reason why.",
+   "outlet": "wsj.com",
+   "published_at": "2026-10-10T02:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "wsj-markets"
+  },
+  {
+   "id": "real-222",
+   "headline": "Kalshi Examines Bets on Trump’s Pick for New White House Press Secretary",
+   "summary": "The prediction market is examining a series of trades that correctly predicted the appointment of Katie Zacharia, who wasn’t previously seen as a front-runner.",
+   "outlet": "wsj.com",
+   "published_at": "2026-10-09T21:47:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "wsj-markets"
+  },
+  {
+   "id": "real-223",
+   "headline": "As Yields Surged, Small-Cap Stocks Were Hit Hard",
+   "summary": "The Russell 2000, which tracks the shares of small companies, closed Friday on a five-week losing streak.",
+   "outlet": "wsj.com",
+   "published_at": "2026-10-09T21:45:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "wsj-markets"
+  },
+  {
+   "id": "real-224",
+   "headline": "Spojení největší haly světa s politikou se nekoná. Nové hnutí se za Dědkovy peníze na pardubickou radnici nedostalo",
+   "summary": "Nové hnutí Srdcem pro Pardubice ve volbách propadlo. Stranu podporuje známý podnikatel Petr Dědek, který ve městě hodlá postavit nejvyšší hokejovou halu na světě. Čelil v této souvislosti kritice, že stál se svými penězi u zrodu nové strany právě...",
+   "outlet": "domaci.hn.cz",
+   "published_at": "2026-10-10T18:17:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "cs",
+   "source": "hn-cz"
+  },
+  {
+   "id": "real-225",
+   "headline": "Malý hranatý velikán",
+   "summary": "Plečnik vyhrává na&nbsp;výšku, Kia na&nbsp;praktičnost. Kostel na&nbsp;pražském náměstí byl symbolem monumentální architektury nové republiky. S&nbsp;autem, se kterým dnes stojíme pod ním, ladí. EV2 s&nbsp;ním má společnou myšlenku&nbsp;– takhle vypadá symetrická funkčnost.",
+   "outlet": "procne.hn.cz",
+   "published_at": "2026-10-10T18:13:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "cs",
+   "source": "hn-cz"
+  },
+  {
+   "id": "real-226",
+   "headline": "Radost ve štábu lidovců. Grolich vítězství rozdílem třídy oslavil tancem a zpěvem. Spolu s celou šlapanickou Orlovnou",
+   "summary": "Dvacet minut po 18. hodině propukají v sále historické budovy Orlovny ve Šlapanicích na okraji Brna lidovecké oslavy naplno. Výsledek předsedy strany Jana Grolicha ve vyškovském senátním obvodu právě překonal 60 procent. Kdo je vítěz, je při sečtení...",
+   "outlet": "domaci.hn.cz",
+   "published_at": "2026-10-10T18:08:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "cs",
+   "source": "hn-cz"
+  },
+  {
+   "id": "real-227",
+   "headline": "Kdo ovládne Prahu? Starostům komplikují jednání předvolební spory, ODS by za post primátora &bdquo;skousla&ldquo; i Babišovo ANO",
+   "summary": "Kdo povede Prahu v příštích čtyřech letech? Starostové mají podle průběžných výsledků nakročeno k vítězství v komunálních volbách a už řeší, s kým by mohli v hlavním městě vládnout. V jejich pražském volebním štábu má v nejbližší době zasednout...",
+   "outlet": "domaci.hn.cz",
+   "published_at": "2026-10-10T17:52:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "cs",
+   "source": "hn-cz"
+  },
+  {
+   "id": "real-228",
+   "headline": "Vláda chystá novou daň. Za mimořádný zisk ale může považovat i běžnou výrobu",
+   "summary": "Vláda chce postihnout mimořádné výnosy rafinerií. Konstrukce nové mimořádné daně ale může zdanit i běžné zvýšení výroby, nikoliv pouze mimořádné zisky. Ve hře je víc než jedna firma. Jde o předvídatelnost českého podnikatelského prostředí.",
+   "outlet": "e15.cz",
+   "published_at": "2026-10-10T16:35:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "regulatory_legal",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "cs",
+   "source": "e15"
+  },
+  {
+   "id": "real-229",
+   "headline": "PŘEHLEDNĚ: Volební kalendář. Jaké volby Česko čekají do roku 2033",
+   "summary": "V říjnu 2026 se konají komunální volby a volby do Senátu. Až v roce 2027 čekají Česko volební prázdniny – samozřejmě za předpokladu, že vše půjde podle plánu a nebude zapotřebí vyhlásit předčasné volby. Podívejte se na volební kalendář do roku 2033.",
+   "outlet": "e15.cz",
+   "published_at": "2026-10-10T10:53:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "cs",
+   "source": "e15"
+  },
+  {
+   "id": "real-230",
+   "headline": "Češi se musí připravit na další zdražování. Z Evropy přichází ještě větší hrozba",
+   "summary": "V Česku i v celé Evropě zrychluje inflace, přičemž další růst cen se v budoucnu očekává zejména kvůli drahým energiím, pohonným hmotám a potravinám. Evropská centrální banka váhá se zvýšením úrokových sazeb pro boj s inflací, protože by tím zkomplikovala splácení vysokých státních dluhů v zemích eurozóny, píše Reflex.cz. Největší hrozbou je aktuálně špatná finanční a politická situace Francie, jejíž obří dluhy a rostoucí úroky vyvolávají mezi investory nedůvěru a obavy z masivní dluhové krize.",
+   "outlet": "e15.cz",
+   "published_at": "2026-10-10T09:30:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "macro_surprise",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "cs",
+   "source": "e15"
+  },
+  {
+   "id": "real-231",
+   "headline": "Trump se dohodl s Putinem. Zradil Ukrajinu kvůli naftě, kritizují demokraté",
+   "summary": "Donald Trump se s Vladimirem Putinem dohodl na okamžitých dodávkách více než 300 tisíc tun nafty na americký a světový trh. Demokratičtí lídři v Senátu označili krok za zradu Ukrajiny, evropských spojenců i americké bezpečnosti. Kritika zaznívá také od republikánů a ukrajinského prezidenta Volodymyra Zelenského.",
+   "outlet": "e15.cz",
+   "published_at": "2026-10-10T06:30:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "cs",
+   "source": "e15"
+  },
+  {
+   "id": "real-232",
+   "headline": "Pět nejzajímavějších momentů voleb",
+   "summary": "Písničkář Pavel Helan se songem „Ty, hejtmane“ dotáhl šéfa lidovců k výhře už v prvním kole. Hvězdný Michal David si s „nonstopem“ bude muset ještě počkat na finálové klání, jestli jím podporovaná kandidátka ANO projde do Senátu.",
+   "outlet": "seznamzpravy.cz",
+   "published_at": "2026-10-10T19:19:43+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "seznam-zpravy"
+  },
+  {
+   "id": "real-233",
+   "headline": "Co rozhodovalo o Senátu. Pýcha se opozici nevyplatila, někde ANO zatím vydělalo",
+   "summary": "V některých senátních obvodech se potvrdilo, že kdyby opozice netříštila síly, mohla uspět už v prvním kole. Příkladem může být Plzeň. V České Lípě se naopak ukázalo, že hnutí STAN i ANO vsadila na silné kandidáty.",
+   "outlet": "seznamzpravy.cz",
+   "published_at": "2026-10-10T18:44:15+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "seznam-zpravy"
+  },
+  {
+   "id": "real-234",
+   "headline": "Babiš: V Praze je dlouhodobě budovaná nenávist vůči mé osobě",
+   "summary": "Druhým dnem dnes vyvrcholily komunální a senátní volby. Seznam Zprávy nyní sledují dění ve štábech stran a také sčítání hlasů v online reportáži.",
+   "outlet": "seznamzpravy.cz",
+   "published_at": "2026-10-10T06:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "seznam-zpravy"
+  },
+  {
+   "id": "real-235",
+   "headline": "Leštění opozičních značek vyhrál STAN. A k čemu mu to bude dobré?",
+   "summary": "Jestli opozice nechce být opozicí do soudného dne, musí se dát do pohybu a spojovat. To je zpráva z voleb.",
+   "outlet": "seznamzpravy.cz",
+   "published_at": "2026-10-10T19:06:50+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "seznam-zpravy"
+  },
+  {
+   "id": "real-236",
+   "headline": "Federal Reserve issues FOMC statement",
+   "summary": "Federal Reserve issues FOMC statement",
+   "outlet": "federalreserve.gov",
+   "published_at": "2026-09-16T18:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "central_bank",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "fed-press"
+  },
+  {
+   "id": "real-237",
+   "headline": "Federal Reserve Board and Federal Open Market Committee release economic projections from the September 15-16 FOMC meeting",
+   "summary": "Federal Reserve Board and Federal Open Market Committee release economic projections from the September 15-16 FOMC meeting",
+   "outlet": "federalreserve.gov",
+   "published_at": "2026-09-16T18:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "central_bank",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "fed-press"
+  },
+  {
+   "id": "real-238",
+   "headline": "Twenty-fifth Meeting of the \"Council for Cooperation on Financial Stability\"",
+   "summary": "",
+   "outlet": "boj.or.jp",
+   "published_at": "2026-10-09T09:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "central_bank",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "boj-whatsnew"
+  },
+  {
+   "id": "real-239",
+   "headline": "Amendment to \"Prices of Eligible Collateral\"",
+   "summary": "",
+   "outlet": "boj.or.jp",
+   "published_at": "2026-10-09T07:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "central_bank",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "boj-whatsnew"
+  },
+  {
+   "id": "real-240",
+   "headline": "IMES Discussion Paper Series (2026)",
+   "summary": "",
+   "outlet": "boj.or.jp",
+   "published_at": "2026-10-09T02:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "boj-whatsnew"
+  },
+  {
+   "id": "real-241",
+   "headline": "Regional Economic Report (Summary) (Oct. 2026)",
+   "summary": "",
+   "outlet": "boj.or.jp",
+   "published_at": "2026-10-08T05:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "central_bank",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "boj-whatsnew"
+  },
+  {
+   "id": "real-242",
+   "headline": "CMORG holds sector-wide cloud outage simulation exercise",
+   "summary": "The Cross-Market Operational Resilience Group (CMORG) yesterday (8 October 2026) completed its biennial simulation exercise, known as SIMEX26, focused this year on a global cloud services disruption.",
+   "outlet": "bankofengland.co.uk",
+   "published_at": "2026-10-09T09:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "boe-news"
+  },
+  {
+   "id": "real-243",
+   "headline": "Bank of England announces the four animals that will feature on our next series of banknotes",
+   "summary": "The Atlantic puffin, barn owl, buff-tailed bumblebee and European hedgehog will represent UK wildlife and feature as the central images on our next series of banknotes.",
+   "outlet": "bankofengland.co.uk",
+   "published_at": "2026-10-07T23:01:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "boe-news"
+  },
+  {
+   "id": "real-244",
+   "headline": "Minutes of the London FXJSC Legal Sub Committee Meeting – 16 June 2026",
+   "summary": "The Bank of England provides the Secretariat to the London Foreign Exchange Joint Standing Committee (FXJSC) Legal Sub-Committee. The FXJSC is made up of market participants, infrastructure providers and the UK financial regulators.",
+   "outlet": "bankofengland.co.uk",
+   "published_at": "2026-10-07T13:36:25+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "boe-news"
+  },
+  {
+   "id": "real-245",
+   "headline": "Minutes of the London FXJSC Operations Sub-Committee Meeting – 16 June 2026",
+   "summary": "The Bank of England chairs the London Foreign Exchange Joint Standing Committee (FXJSC) Operations and Legal Sub-Committees. The FXJSC is made up of market participants, infrastructure providers and the UK financial regulators.",
+   "outlet": "bankofengland.co.uk",
+   "published_at": "2026-10-07T09:49:25+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "boe-news"
+  },
+  {
+   "id": "real-246",
+   "headline": "Invitation to bid – Federal Treasury discount paper (Bubills)",
+   "summary": "",
+   "outlet": "bundesbank.de",
+   "published_at": "2026-10-09T07:00:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bundesbank-press"
+  },
+  {
+   "id": "real-247",
+   "headline": "Announcement of a multi-ISIN auction – Reopening of two Federal bonds",
+   "summary": "",
+   "outlet": "bundesbank.de",
+   "published_at": "2026-10-08T07:45:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bundesbank-press"
+  },
+  {
+   "id": "real-248",
+   "headline": "Auction result– Federal bond issue",
+   "summary": "",
+   "outlet": "bundesbank.de",
+   "published_at": "2026-10-07T09:30:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bundesbank-press"
+  },
+  {
+   "id": "real-249",
+   "headline": "Announcement of auction– Reopening of five-year Federal notes (Bundesobligationen – “Bobls”) series 194 by auction",
+   "summary": "",
+   "outlet": "bundesbank.de",
+   "published_at": "2026-10-07T07:30:00+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "bundesbank-press"
+  },
+  {
+   "id": "real-250",
+   "headline": "Bank of Canada Board launches process to fill external Deputy Governor position",
+   "summary": "The Board of Directors of the Bank of Canada has initiated a recruitment process to fill the external Deputy Governor position left vacant by the appointment of Nicolas Vincent as a full-time Deputy Governor.",
+   "outlet": "bankofcanada.ca",
+   "published_at": "2026-09-10T11:00:09+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "management_change",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "boc-press"
+  },
+  {
+   "id": "real-251",
+   "headline": "Bank of Canada unveils new vertical $20 bank note",
+   "summary": "Her Excellency the Right Honourable Louise Arbour, Governor General of Canada, and the Honourable Wayne Long, Secretary of State (Canada Revenue Agency and Financial Institutions), joined Bank of Canada Governor Tiff Macklem today at an event to unveil Canada’s new vertical $20 bank note featuring a portrait of His Majesty King Charles III.",
+   "outlet": "bankofcanada.ca",
+   "published_at": "2026-09-03T13:20:16+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "boc-press"
+  },
+  {
+   "id": "real-252",
+   "headline": "Bank of Canada maintains the policy rate at 2¼%",
+   "summary": "The Bank of Canada today held its target for the overnight rate at 2.25%, with the Bank Rate at 2.5% and the deposit rate at 2.20%.",
+   "outlet": "bankofcanada.ca",
+   "published_at": "2026-09-02T09:47:53+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "central_bank",
+    "affected_ticker": null,
+    "relevant": true,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "boc-press"
+  },
+  {
+   "id": "real-253",
+   "headline": "G7 2026 Cross-Border Coordination Exercise (CBCE)",
+   "summary": "The G7 Cyber Expert Group (CEG) successfully concluded its 2026 Cross-border coordination exercise (CBCE) on May 18, 2026. This exercise demonstrates the Group’s ongoing commitment to strengthening cyber resilience across the G7 financial sector.",
+   "outlet": "bankofcanada.ca",
+   "published_at": "2026-07-31T09:30:53+00:00",
+   "candidates": [],
+   "expected": {
+    "event_type": "other",
+    "affected_ticker": null,
+    "relevant": false,
+    "rumour": false
+   },
+   "language": "en",
+   "source": "boc-press"
+  }
+ ]
+}

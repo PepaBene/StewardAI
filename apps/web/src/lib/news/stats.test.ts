@@ -98,6 +98,8 @@ describe("healthSummary", () => {
       fetched_7d: 0,
       stored_linked_7d: 0,
       stored_wire_7d: 0,
+      fulltext_truncated_7d: 0,
+      fulltext_failed_7d: 0,
       consecutive_failures: 0,
       backoff_until: null,
       last_success_at: null,

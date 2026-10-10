@@ -116,7 +116,7 @@ def plan_catch_up(
             logger.info("catch-up: %s is already running; left to that run", item.job_type)
             continue
         if item.job_type in NEEDS_AI and not has_ai:
-            logger.info("catch-up: skipping %s (ANTHROPIC_API_KEY is not set)", item.job_type)
+            logger.info("catch-up: skipping %s (no AI provider key is set)", item.job_type)
             continue
         plan.append(item)
     return plan

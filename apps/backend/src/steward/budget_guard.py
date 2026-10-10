@@ -1,7 +1,7 @@
 """The Budget config's spend limits, checked before every AI request of a job.
 
-`steward.ai.create_client` returns a client whose every Messages request (single and batch)
-first asks `before_request` here, for the job running in the current task
+The model client in `steward.llm` makes every request (single and batch)
+first ask `before_request` here, for the job running in the current task
 (`steward.jobs.runner.current_job`; requests outside a job, such as the eval scripts, are not
 limited). The check is one small query per request:
 
@@ -38,7 +38,6 @@ from steward.config.notifications import NotificationsConfig
 from steward.config.store import load_active
 from steward.costs import PriceTable
 from steward.jobs.runner import JobContext, JobFailed
-from steward.llm.types import provider_of
 from steward.notify.alerts import create_alerts
 from steward.notify.route import AlertRequest
 
@@ -48,8 +47,8 @@ BUDGET_TZ = ZoneInfo("Europe/Prague")
 
 
 class BudgetExceeded(JobFailed):
-    """A request refused by the Budget config's caps. It is not an `anthropic.APIError`, so
-    call sites that retry or skip on API errors let it fail the step and the job."""
+    """A request refused by the Budget config's caps. It is not an `LLMError`, so
+    call sites that retry or skip on model errors let it fail the step and the job."""
 
 
 def month_of(moment: dt.datetime) -> str:
@@ -117,10 +116,12 @@ async def before_request(
     model: str,
     *,
     now: dt.datetime | None = None,
-    can_switch_provider: bool = False,
+    can_switch_provider: bool = True,
 ) -> str:
     """The model to send a request of `ctx`'s job with (`model`, or the downgrade model at
-    the monthly cap); raises `BudgetExceeded` when the request must not be sent."""
+    the monthly cap); raises `BudgetExceeded` when the request must not be sent.
+    `can_switch_provider` is accepted for existing callers and has no effect."""
+    del can_switch_provider
     state = await _state(ctx)
     cfg = state.config
     now = now or dt.datetime.now(dt.UTC)
@@ -176,13 +177,6 @@ async def before_request(
     if cfg.at_cap == "pause_noncritical":
         raise BudgetExceeded(
             f"monthly AI budget reached ({_usd(total)} of {_usd(cap)}); non-critical jobs paused"
-        )
-    if provider_of(cfg.downgrade_model) != provider_of(model) and not can_switch_provider:
-        # A raw Anthropic request cannot be re-sent to another provider's model; calls made
-        # through `steward.llm` can, so only those survive a cross-provider downgrade.
-        raise BudgetExceeded(
-            f"monthly AI budget reached ({_usd(total)} of {_usd(cap)}); this call cannot move to"
-            f" {cfg.downgrade_model} and is paused"
         )
     if model != cfg.downgrade_model:
         state.downgraded[model] = cfg.downgrade_model

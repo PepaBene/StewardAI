@@ -8,12 +8,10 @@ import json
 import zipfile
 from decimal import Decimal
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
 import asyncpg
 import pytest
-from anthropic.types import ToolUseBlock
 
 from steward.ai import Usage
 from steward.chat.assistant import (
@@ -21,13 +19,14 @@ from steward.chat.assistant import (
     AssistantResult,
     ChatAnswerDraft,
     ChatDeps,
-    ClaudeChatAssistant,
+    LLMChatAssistant,
     run_chat,
 )
 from steward.chat.tools import ChatTools
 from steward.config.jobs import ChatSettings
 from steward.config.strategy import StrategyConfig
 from steward.jobs.runner import JobContext, create_job, run_job
+from steward.llm.types import Completion, Request, ToolCall, normalized_usage
 from steward.ownership.read import holding_ownership
 from steward.portfolio.drift import (
     BucketDrift,
@@ -273,25 +272,34 @@ def test_the_trend_uses_the_newest_fact_per_quarter() -> None:
 # ---------------------------------------------------------------------------
 
 
-class _FakeMessages:
+class _FakeLLM:
     def __init__(self, searches: list[int]) -> None:
         self.searches = searches
-        self.tools: list[list[dict[str, Any]]] = []
+        self.requests: list[Request] = []
 
-    async def parse(self, **kwargs: Any) -> Any:
-        self.tools.append([t for t in kwargs["tools"] if t.get("name") == "web_search"])
-        n = len(self.tools)
-        usage = SimpleNamespace(
-            input_tokens=1, output_tokens=1,
-            server_tool_use=SimpleNamespace(web_search_requests=self.searches[n - 1]),
-        )  # fmt: skip
+    async def complete(self, request: Request) -> Completion:
+        self.requests.append(request)
+        n = len(self.requests)
+        usage = normalized_usage(input_tokens=1, output_tokens=1, searches=self.searches[n - 1])
         if n < len(self.searches):
-            block = ToolUseBlock(id=f"t{n}", name="portfolio", input={}, type="tool_use")
-            return SimpleNamespace(
-                usage=usage, content=[block], stop_reason="tool_use", parsed_output=None
+            return Completion(
+                model=request.model,
+                provider="openai",
+                text="",
+                parsed=None,
+                stop_reason="tool_use",
+                usage=usage,
+                tool_calls=[ToolCall(f"t{n}", "portfolio", {})],
             )
         draft = ChatAnswerDraft(sentences=[AnswerSentence(text="Done.")])
-        return SimpleNamespace(usage=usage, content=[], stop_reason="end_turn", parsed_output=draft)
+        return Completion(
+            model=request.model,
+            provider="openai",
+            text="",
+            parsed=draft,
+            stop_reason="end",
+            usage=usage,
+        )
 
 
 class _FakeTools:
@@ -300,16 +308,15 @@ class _FakeTools:
 
 
 async def test_the_search_budget_is_per_answer_not_per_request() -> None:
-    messages = _FakeMessages([2, 1, 0])
-    client = SimpleNamespace(messages=messages)
-    assistant = ClaudeChatAssistant(
-        client,  # type: ignore[arg-type]
+    llm = _FakeLLM([2, 1, 0])
+    assistant = LLMChatAssistant(
+        llm,  # type: ignore[arg-type]
         ChatSettings(max_searches=3),
         ("reuters.com",),
     )
     result = await assistant.answer([], "Q?", _FakeTools(), dt.date(2026, 9, 1))  # type: ignore[arg-type]
     assert result.draft is not None
-    assert [[t["max_uses"] for t in call] for call in messages.tools] == [[3], [1], []]
+    assert [r.search.max_uses if r.search else None for r in llm.requests] == [3, 1, None]
 
 
 # ---------------------------------------------------------------------------

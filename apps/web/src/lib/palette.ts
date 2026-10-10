@@ -84,7 +84,7 @@ export const CONFIG_PAGES = [
   { href: "/config/notifications", label: "Notifications", keywords: "alerts telegram email quiet hours channels weekends holidays monitoring system alerts replay preview" },
   { href: "/config/verification", label: "Verification", keywords: "sanity bounds tolerance corroboration trust penalty reward demote claim verifier strip mark numeric check" },
   { href: "/config/research-profiles", label: "Research profiles", keywords: "research sections depth model effort searches tiers peers valuation language quick standard" },
-  { href: "/config/prompts", label: "Prompts", keywords: "system prompts ai instructions tone override customize reset default evals claude" },
+  { href: "/config/prompts", label: "Prompts", keywords: "system prompts ai instructions tone override customize reset default evals" },
 ] as const;
 
 /** Pages that are not a section or a config editor. */

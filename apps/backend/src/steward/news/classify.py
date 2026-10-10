@@ -15,10 +15,8 @@ import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Literal, Protocol, cast
+from typing import Literal, Protocol
 
-import anthropic
-from anthropic.types import MessageParam
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
@@ -26,7 +24,6 @@ from steward.config.event_rules import (
     CLASSIFIABLE_EVENT_TYPES,
     EVENT_DESCRIPTIONS,
 )
-from steward.config.jobs import effort_kwargs
 from steward.llm.cache import ResultCache, request_key
 from steward.llm.client import LLM
 from steward.llm.types import (
@@ -267,36 +264,26 @@ def check_label(raw: ItemLabel, item: ClassifyItem, holdings: dict[str, HoldingC
 
 # A batch is small (no tools, no web search): a request that has not finished in this long
 # is very unlikely to still succeed, so it is worth failing fast instead of waiting out the
-# client's default 300s timeout on every attempt, which turned one slow or flaky connection
+# client's default timeout on every attempt, which turned one slow or flaky connection
 # into a very long stall.
 REQUEST_TIMEOUT = 90.0
-# The client's own default max_retries (see `ai.create_client`) means an uncapped call can
-# retry several times, each up to REQUEST_TIMEOUT, before giving up: a batch that is
-# genuinely slow (not failing) can then take several minutes end to end even though each
-# attempt is bounded, which reads as a freeze from the CLI. One retry is enough for a
-# transient blip on a call this cheap and fast; it halves the worst case instead.
-REQUEST_MAX_RETRIES = 1
 
 
-class ClaudeClassifier:
+class LLMClassifier:
     def __init__(
         self,
-        client: anthropic.AsyncAnthropic | None,
+        llm: LLM,
         model: str,
         instructions: str = SYSTEM_PROMPT,
         effort: str | None = None,
-        llm: LLM | None = None,
         cache: ResultCache | None = None,
     ) -> None:
-        # Answers for a non-Claude model, kept so a repeated identical batch costs nothing.
+        # Answers are kept so a repeated identical batch costs nothing.
         self._cache = cache
-        self._client = client
         self._model = model
         self._effort = effort
         self._system = system_prompt(instructions)
-        # Set when `model` belongs to another provider (gpt-/gemini-): the call then goes
-        # through the provider-neutral interface instead of the Anthropic client.
-        self._llm = llm if provider_of(model) != "anthropic" else None
+        self._llm = llm
 
     async def classify(
         self,
@@ -312,50 +299,8 @@ class ClaudeClassifier:
             f"Today is {today.isoformat()}. Label these {len(items)} items; return exactly one "
             f"label per index.\n\n{items_block(items)}"
         )
-        if self._llm is not None:
-            return await self._classify_other(items, holdings, user, usage, result)
-        assert self._client is not None, "an Anthropic model needs the Anthropic client"
-        try:
-            response = await self._client.with_options(
-                max_retries=REQUEST_MAX_RETRIES
-            ).messages.parse(
-                model=self._model,
-                # No cache breakpoint: the prefix (about 600 tokens of instructions and event
-                # types plus the holdings block, which is filtered to each batch's candidates
-                # and so differs between batches) stays under Haiku 4.5's 4096-token cacheable
-                # minimum, and a marker past it would pay the write premium with no read.
-                system=[
-                    {"type": "text", "text": self._system},
-                    {"type": "text", "text": holdings_block(holdings)},
-                ],
-                messages=[cast(MessageParam, {"role": "user", "content": user})],
-                output_format=ClassificationOutput,
-                timeout=REQUEST_TIMEOUT,
-                **effort_kwargs(self._model, self._effort, 12000),
-            )
-        except anthropic.APIError as exc:
-            raise ClassificationError(f"classification call failed: {exc}") from exc
-        usage.add(response.usage)
-        if response.stop_reason in ("refusal", "max_tokens"):
-            raise ClassificationError(
-                f"classification stopped early ({response.stop_reason})", usage
-            )
-        parsed = response.parsed_output
-        if parsed is None:
-            raise ClassificationError("classification returned no parseable JSON", usage)
-        return self._label(parsed, items, holdings, result), usage
-
-    async def _classify_other(
-        self,
-        items: Sequence[ClassifyItem],
-        holdings: Sequence[HoldingContext],
-        user: str,
-        usage: Usage,
-        result: ClassifyResult,
-    ) -> tuple[ClassifyResult, Usage]:
-        """The same call on an OpenAI or Google model. The static instructions come first and
-        the holdings block (which differs between batches) after them, then the items."""
-        assert self._llm is not None
+        # The static instructions come first and the holdings block (which differs between
+        # batches) after them, then the items.
         request = self._request(holdings, user)
         done = await self._cached(request)
         if done is None:
@@ -439,8 +384,8 @@ class ClaudeClassifier:
     ) -> list[tuple[ClassifyResult, Usage] | ClassificationError | None]:
         """Several groups of items through the provider's batch API (half price), in group
         order. A group the batch did not answer is None (classify it directly); one whose answer
-        was unusable is its `ClassificationError`. Only for a non-Claude model."""
-        if self._llm is None or not groups:
+        was unusable is its `ClassificationError`."""
+        if not groups:
             return [None] * len(groups)
         requests = [
             self._request(

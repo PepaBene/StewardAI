@@ -46,7 +46,7 @@ from steward.documents import fetch as fetch_module
 from steward.earnings import calendar as calendar_module
 from steward.earnings.calendar import dates_from_ir_page
 from steward.earnings.check import LoadedConfig
-from steward.earnings.locate import ClaudeSearchLocator, SearchRequest
+from steward.earnings.locate import LLMSearchLocator, SearchRequest
 from steward.earnings.verdicts import FactRow, judge_thesis
 from steward.news import digest as digest_module
 from steward.news import escalation as escalation_module
@@ -54,12 +54,12 @@ from steward.news.classify import (
     Candidate,
     ClassificationOutput,
     ClassifyItem,
-    ClaudeClassifier,
+    LLMClassifier,
 )
-from steward.news.corroborate import ClaudeCorroborator
+from steward.news.corroborate import LLMCorroborator
 from steward.news.corroborate import SearchRequest as CorroborationRequest
-from steward.news.digest import ClaudeDigestWriter, gather, period_text
-from steward.news.escalation import ClaudeEscalator, EscalationInput, price_move_input
+from steward.news.digest import LLMDigestWriter, gather, period_text
+from steward.news.escalation import EscalationInput, LLMEscalator, price_move_input
 from steward.news.feeds import google_news_url
 from steward.news.pipeline import queue_earnings_check
 from steward.portfolio.breaches import evaluate, record_breaches
@@ -68,7 +68,7 @@ from steward.research import gather as research_gather
 from steward.research.sources import Registry
 from steward.review import monthly
 from steward.sources.wikidata import WikidataClient
-from steward.verify.claims import Claim, ClaudeClaimVerifier
+from steward.verify.claims import Claim, LLMClaimVerifier
 
 OVERRIDE = "The owner's claim verifier prompt."
 
@@ -92,6 +92,29 @@ class _Messages:
     async def parse(self, **kwargs: Any) -> Any:
         self.calls.append(kwargs)
         return _response(self.parsed)
+
+
+class _LLM:
+    """Stands in for `LLM` where a call site builds a `Request` and calls `complete`."""
+
+    def __init__(self, parsed: Any) -> None:
+        self.parsed = parsed
+        self.requests: list[Any] = []
+
+    async def complete_batch(self, requests: Any, **_kwargs: Any) -> list[None]:
+        self.requests.extend(requests)
+        return [None] * len(requests)
+
+    async def complete(self, request: Any) -> Any:
+        self.requests.append(request)
+        return SimpleNamespace(
+            parsed=self.parsed,
+            stop_reason="end",
+            usage=_response(None).usage,
+            model=request.model,
+            text="",
+            citations=[],
+        )
 
 
 class _Client:
@@ -174,41 +197,34 @@ def test_other_old_bodies_validate_with_todays_defaults() -> None:
 @pytest.mark.parametrize(
     ("model", "body"),
     [
-        (EarningsCheckSettings, {"locate_model": "claude-haiku-4-5", "locate_effort": "low"}),
+        (EarningsCheckSettings, {"locate_model": "gpt-6-luna", "locate_effort": "low"}),
         (EarningsCalendarSettings, {"effort": "low"}),  # default model is Haiku 4.5
         (NewsSettings, {"classification_effort": "low"}),
         (NewsSettings, {"corroboration_effort": "high"}),
-        (DigestSettings, {"model": "claude-haiku-4-5", "effort": "low"}),
-        (EscalationSettings, {"model": "claude-haiku-4-5", "effort": "low"}),
-        (ChatSettings, {"model": "claude-haiku-4-5", "effort": "max"}),
+        (DigestSettings, {"model": "gpt-6-luna", "effort": "low"}),
+        (EscalationSettings, {"model": "gpt-6-luna", "effort": "low"}),
+        (ChatSettings, {"model": "gpt-6-luna", "effort": "max"}),
         (ClaimVerifierSettings, {"effort": "low"}),  # default model is Haiku 4.5
     ],
 )
-def test_effort_on_haiku_4_is_accepted(model: Any, body: dict[str, Any]) -> None:
-    # Haiku 4 maps the level to an extended-thinking budget (see reasoning_kwargs).
+def test_effort_is_accepted_on_every_model(model: Any, body: dict[str, Any]) -> None:
     model.model_validate(body)
 
 
 def test_effort_on_a_model_that_takes_it_is_accepted() -> None:
     assert (
-        NewsSettings(corroboration_model="claude-sonnet-5", corroboration_effort="low")
+        NewsSettings(corroboration_model="gpt-6.1-sol", corroboration_effort="low")
     ).corroboration_effort == "low"
-    assert ClaimVerifierSettings(model="claude-sonnet-5", effort="medium").effort == "medium"
-    assert EarningsCalendarSettings(model="claude-sonnet-5", effort="xhigh").effort == "xhigh"
+    assert ClaimVerifierSettings(model="gpt-6.1-sol", effort="medium").effort == "medium"
+    assert EarningsCalendarSettings(model="gpt-6.1-sol", effort="xhigh").effort == "xhigh"
     with pytest.raises(ValidationError):
         ChatSettings.model_validate({"effort": "extreme"})
 
 
 def test_effort_kwargs() -> None:
-    assert effort_kwargs("claude-sonnet-5", None, 100) == {"max_tokens": 100}
-    assert effort_kwargs("claude-haiku-4-5", "low", 100) == {
-        "max_tokens": 2148,
-        "thinking": {"type": "enabled", "budget_tokens": 2048},
-    }
-    assert effort_kwargs("claude-sonnet-5", "low", 100) == {
-        "max_tokens": 100,
-        "output_config": {"effort": "low"},
-    }
+    assert effort_kwargs("gpt-6.1-sol", None, 100) == {"max_tokens": 100}
+    assert effort_kwargs("gpt-6-luna", "low", 100) == {"max_tokens": 100, "effort": "low"}
+    assert effort_kwargs("gemini-3.8-flash", "high", 100) == {"max_tokens": 100, "effort": "high"}
 
 
 REQUEST = SearchRequest("AAPL", "Apple", dt.date(2025, 7, 31), (2025, "Q3"), ["x.test"], [])
@@ -217,21 +233,13 @@ REQUEST = SearchRequest("AAPL", "Apple", dt.date(2025, 7, 31), (2025, "Q3"), ["x
 async def test_locate_sends_effort_only_when_set() -> None:
     answer = SimpleNamespace(url=None, reason="none")
     default: Any = _Client(answer)
-    await ClaudeSearchLocator(default, "claude-sonnet-5", 3).locate(REQUEST)
-    assert "output_config" not in default.messages.calls[0]
+    await LLMSearchLocator(default, "gpt-6.1-sol", 3).locate(REQUEST)
+    assert "effort" not in default.messages.calls[0]
     client: Any = _Client(answer)
-    await ClaudeSearchLocator(client, "claude-sonnet-5", 3, effort="low").locate(REQUEST)
-    assert client.messages.calls[0]["output_config"] == {"effort": "low"}
-    assert client.messages.calls[0]["tools"][0]["type"] == "web_search_20260209"
-
-
-async def test_locate_on_haiku_uses_the_older_search_tool_and_no_effort() -> None:
-    client: Any = _Client(SimpleNamespace(url=None, reason="none"))
-    await ClaudeSearchLocator(client, "claude-haiku-4-5", 3, effort="low").locate(REQUEST)
-    call = client.messages.calls[0]
-    assert call["tools"][0]["type"] == "web_search_20250305"
-    assert call["tools"][0]["allowed_domains"] == ["x.test"]
-    assert "output_config" not in call
+    await LLMSearchLocator(client, "gpt-6.1-sol", 3, effort="low").locate(REQUEST)
+    assert client.messages.calls[0]["effort"] == "low"
+    assert client.messages.calls[0]["tools"][0]["type"] == "web_search"
+    assert client.messages.calls[0]["tools"][0]["allowed_domains"] == ["x.test"]
 
 
 async def test_classifier_and_corroborator_send_effort() -> None:
@@ -244,16 +252,14 @@ async def test_classifier_and_corroborator_send_effort() -> None:
         published_at=dt.datetime(2026, 9, 1, tzinfo=dt.UTC),
         candidates=(Candidate("AAPL_US_EQ", "name", "Apple"),),
     )
-    client: Any = _Client(ClassificationOutput(items=[]))
-    classifier = ClaudeClassifier(client, "claude-sonnet-5", effort="medium")
+    llm: Any = _LLM(ClassificationOutput(items=[]))
+    classifier = LLMClassifier(llm, "gpt-6.1-sol", effort="medium")
     await classifier.classify([item], [], dt.date(2026, 9, 1))
-    assert client.messages.calls[0]["output_config"] == {"effort": "medium"}
+    assert llm.requests[0].effort == "medium"
 
-    haiku: Any = _Client(ClassificationOutput(items=[]))
-    await ClaudeClassifier(haiku, "claude-haiku-4-5", effort="medium").classify(
-        [item], [], dt.date(2026, 9, 1)
-    )
-    assert "output_config" not in haiku.messages.calls[0]
+    plain: Any = _LLM(ClassificationOutput(items=[]))
+    await LLMClassifier(plain, "gpt-6-luna").classify([item], [], dt.date(2026, 9, 1))
+    assert plain.requests[0].effort is None
 
     corro: Any = _Client(None)
     request = CorroborationRequest(
@@ -264,10 +270,8 @@ async def test_classifier_and_corroborator_send_effort() -> None:
         own_outlets=frozenset(),
         domains=("reuters.com",),
     )
-    await ClaudeCorroborator(corro, "claude-sonnet-5", 2, effort="high").search(
-        request, lambda _: 2
-    )
-    assert corro.messages.calls[0]["output_config"] == {"effort": "high"}
+    await LLMCorroborator(corro, "gpt-6.1-sol", 2, effort="high").search(request, lambda _: 2)
+    assert corro.messages.calls[0]["effort"] == "high"
 
 
 async def test_calendar_sends_effort(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -278,20 +282,18 @@ async def test_calendar_sends_effort(monkeypatch: pytest.MonkeyPatch) -> None:
     profile = HoldingProfile(ticker="X_US_EQ", financial_calendar_url="https://ir.test/cal")
     for settings, expected in (
         (EarningsCalendarSettings(), None),
-        (EarningsCalendarSettings(model="claude-sonnet-5", effort="low"), {"effort": "low"}),
+        (EarningsCalendarSettings(model="gpt-6.1-sol", effort="low"), "low"),
     ):
         client: Any = _Client(SimpleNamespace(entries=[]))
         await dates_from_ir_page(client, None, profile, settings, dt.date(2026, 9, 1))  # type: ignore[arg-type]
-        assert client.messages.calls[0].get("output_config") == expected
+        assert client.messages.calls[0].get("effort") == expected
 
 
 async def test_claim_verifier_and_escalator_send_effort() -> None:
     client: Any = _Client(SimpleNamespace(verdicts=[]))
     claims = [Claim(0, "Sentence.", ("Snippet.",))]
-    await ClaudeClaimVerifier(client, "claude-sonnet-5", effort="low").check(
-        claims, dt.date(2026, 9, 1)
-    )
-    assert client.messages.calls[0]["output_config"] == {"effort": "low"}
+    await LLMClaimVerifier(client, "gpt-6.1-sol", effort="low").check(claims, dt.date(2026, 9, 1))
+    assert client.messages.calls[0]["effort"] == "low"
 
     esc: Any = _Client(None)
     request = EscalationInput(
@@ -307,24 +309,26 @@ async def test_claim_verifier_and_escalator_send_effort() -> None:
         thesis=None,
         domains=(),
     )
-    await ClaudeEscalator(esc, EscalationSettings(effort="xhigh")).write(
-        request, dt.date(2026, 9, 1)
-    )
-    assert esc.messages.calls[0]["output_config"] == {"effort": "xhigh"}
+    await LLMEscalator(esc, EscalationSettings(effort="xhigh")).write(request, dt.date(2026, 9, 1))
+    assert esc.messages.calls[0]["effort"] == "xhigh"
     plain: Any = _Client(None)
-    await ClaudeEscalator(plain, EscalationSettings()).write(request, dt.date(2026, 9, 1))
-    assert "output_config" not in plain.messages.calls[0]
+    await LLMEscalator(plain, EscalationSettings()).write(request, dt.date(2026, 9, 1))
+    assert "effort" not in plain.messages.calls[0]
 
 
-def test_digest_params_merge_effort_with_the_format() -> None:
-    client: Any = object()
-    plain = ClaudeDigestWriter(client, DigestSettings())._params("m", dt.date(2026, 9, 1))
-    assert set(plain["output_config"]) == {"format"}
-    params = ClaudeDigestWriter(client, DigestSettings(effort="medium"))._params(
-        "m", dt.date(2026, 9, 1)
-    )
-    assert params["output_config"]["effort"] == "medium"
-    assert params["output_config"]["format"]["type"] == "json_schema"
+async def test_digest_request_carries_the_effort_and_the_schema() -> None:
+    from steward.news.digest import DigestDraft
+
+    plain: Any = _LLM(DigestDraft(overview=[], sections=[]))
+    with contextlib.suppress(Exception):
+        await LLMDigestWriter(plain, DigestSettings()).write("m", dt.date(2026, 9, 1))
+    assert plain.requests[0].effort is None and plain.requests[0].schema is DigestDraft
+    medium: Any = _LLM(DigestDraft(overview=[], sections=[]))
+    with contextlib.suppress(Exception):
+        await LLMDigestWriter(medium, DigestSettings(effort="medium")).write(
+            "m", dt.date(2026, 9, 1)
+        )
+    assert medium.requests[0].effort == "medium"
 
 
 # ---------------------------------------------------------------------------
@@ -339,13 +343,13 @@ def _patch_handler_deps(monkeypatch: pytest.MonkeyPatch, module: Any, verificati
     async def fake_prompts(_pool: Any) -> PromptsConfig:
         return PromptsConfig(overrides={"claim_verifier": OVERRIDE})
 
-    monkeypatch.setattr(module, "create_client", lambda _settings: object())
+    monkeypatch.setattr(module, "create_llm", lambda _settings: object())
     monkeypatch.setattr(module, "load_active", fake_load_active)
     monkeypatch.setattr(module, "load_prompts", fake_prompts)
 
 
 VERIFICATION = VerificationConfig.model_validate(
-    {"claim_verifier": {"model": "claude-sonnet-5", "effort": "low"}}
+    {"claim_verifier": {"model": "gpt-6.1-sol", "effort": "low"}}
 )
 
 
@@ -678,30 +682,6 @@ async def test_research_top_holders(monkeypatch: pytest.MonkeyPatch) -> None:
     assert profile.top_holders == 5
 
 
-def test_effort_maps_to_the_model() -> None:
-    from steward.config.jobs import THINKING_BUDGET, reasoning_kwargs
-
-    fmt = {"format": {"type": "json_schema"}}
-    # Models that take effort get it in output_config, merged with the format.
-    assert reasoning_kwargs("claude-sonnet-5", "high", 8000, fmt) == {
-        "max_tokens": 8000,
-        "output_config": {"format": {"type": "json_schema"}, "effort": "high"},
-    }
-    # Haiku 4 gets the equivalent: extended thinking, with max_tokens grown by the budget.
-    out = reasoning_kwargs("claude-haiku-4-5", "medium", 4000, fmt)
-    assert out == {
-        "max_tokens": 4000 + THINKING_BUDGET["medium"],
-        "thinking": {"type": "enabled", "budget_tokens": THINKING_BUDGET["medium"]},
-        "output_config": {"format": {"type": "json_schema"}},
-    }
-    assert out["thinking"]["budget_tokens"] >= 1024
-    # xhigh is not a 4.6 level.
-    assert reasoning_kwargs("claude-sonnet-4-6", "xhigh", 100)["output_config"] == {
-        "effort": "high"
-    }
-    # No effort: nothing but max_tokens (the model's default).
-    assert reasoning_kwargs("claude-haiku-4-5", None, 4000) == {"max_tokens": 4000}
-    assert reasoning_kwargs("claude-opus-5-5", None, 4000, fmt) == {
-        "max_tokens": 4000,
-        "output_config": fmt,
-    }
+def test_no_effort_sends_only_max_tokens() -> None:
+    assert effort_kwargs("gpt-6-luna", None, 4000) == {"max_tokens": 4000}
+    assert effort_kwargs("gpt-6.1-sol", "xhigh", 100) == {"max_tokens": 100, "effort": "xhigh"}

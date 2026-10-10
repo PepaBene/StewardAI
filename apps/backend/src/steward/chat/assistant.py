@@ -1,7 +1,7 @@
 """`chat` (queued per user message: params {conversation_id, message_id}): the chat panel's
 answer.
 
-The assistant (Sonnet 5 by default, `jobs.chat`) gets the conversation so far and the
+The assistant (the `jobs.chat` model) gets the conversation so far and the
 question, calls the read-only tools and web search (outlets of the tiers in
 `jobs.chat.source_tiers`, 1 and 2 by default) within its step cap, and answers in sentences
 that each cite registry ids or search-result URLs. Code keeps a citation only if it can
@@ -14,15 +14,13 @@ import datetime as dt
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol, cast
+from typing import Any, Literal, Protocol
 
-import anthropic
-from anthropic.types import MessageParam, ToolUseBlock
 from pydantic import BaseModel, Field
 
-from steward.ai import AINotConfigured, Usage, create_client
+from steward.ai import AINotConfigured, Usage
 from steward.chat.tools import TOOL_DEFINITIONS, ChatTools, QueryEmbedder
-from steward.config.jobs import ChatSettings, JobsConfig, effort_kwargs
+from steward.config.jobs import ChatSettings, JobsConfig
 from steward.config.news_sources import NewsSourcesConfig
 from steward.config.prompts import load_prompts
 from steward.config.store import load_active
@@ -35,12 +33,9 @@ from steward.llm.types import (
     Request,
     SearchSpec,
     ToolSpec,
-    provider_of,
 )
-from steward.news.corroborate import AUTO_CACHE
 from steward.news.normalize import host_of
 from steward.research.sources import Registry, Source
-from steward.research.writer import result_titles, web_search_tool
 from steward.settings import get_settings
 from steward.verify.claims import Claim, check_claims
 
@@ -139,28 +134,25 @@ class ChatAssistant(Protocol):
     ) -> AssistantResult: ...
 
 
-class ClaudeChatAssistant:
+class LLMChatAssistant:
     def __init__(
         self,
-        client: anthropic.AsyncAnthropic,
+        llm: LLM,
         settings: ChatSettings,
         domains: tuple[str, ...],
         system: str = SYSTEM,
-        llm: LLM | None = None,
     ) -> None:
-        self._client = client
+        self._llm = llm
         self._settings = settings
         self._domains = domains
         self._system = system
-        self._llm = llm
 
-    async def _answer_other(
+    async def answer(
         self, history: list[dict[str, str]], question: str, tools: ChatTools, today: dt.date
     ) -> AssistantResult:
-        """The same loop on an OpenAI or Google model: the app's read tools are plain function
-        calls, the web search is the provider's own, and the answer is the same structured
-        draft. The history is sent as plain turns, in a stable order so the prefix caches."""
-        assert self._llm is not None
+        """The loop: the app's read tools are plain function calls, the web search is the
+        provider's own, and the answer is a structured draft. The history is sent as plain
+        turns, in a stable order so the prefix caches."""
         usage = Usage(model=self._settings.model)
         specs = tuple(
             ToolSpec(t["name"], t["description"], t["input_schema"]) for t in TOOL_DEFINITIONS
@@ -215,74 +207,6 @@ class ClaudeChatAssistant:
             return AssistantResult(draft, usage, titles, draft_note(draft))
         return AssistantResult(None, usage, titles, "the step cap was reached before an answer")
 
-    async def answer(
-        self, history: list[dict[str, str]], question: str, tools: ChatTools, today: dt.date
-    ) -> AssistantResult:
-        if provider_of(self._settings.model) != "anthropic":
-            return await self._answer_other(history, question, tools, today)
-        usage = Usage(model=self._settings.model)
-        # `max_uses` caps one API request, and an answer takes several: pass what is left of
-        # the per-answer budget each time, and drop web search once it is spent.
-        searches_left = self._settings.max_searches if self._domains else 0
-        paused = False
-        messages: list[dict[str, Any]] = [
-            *cached_history(history),
-            {"role": "user", "content": f"Today is {today.isoformat()}.\n\n{question}"},
-        ]
-        titles: dict[str, str] = {}
-        for _ in range(self._settings.max_steps):
-            definitions: list[Any] = list(TOOL_DEFINITIONS)
-            # A paused turn resumes a search in flight, so it keeps the tool (at least one use).
-            if searches_left > 0 or paused:
-                definitions.append(
-                    web_search_tool(self._settings.model, max(searches_left, 1), self._domains)
-                )
-            try:
-                response = await self._client.messages.parse(
-                    model=self._settings.model,
-                    system=self._system,
-                    messages=cast(list[MessageParam], messages),
-                    tools=cast(Any, definitions),
-                    output_format=ChatAnswerDraft,
-                    **effort_kwargs(self._settings.model, self._settings.effort, 8000),
-                    # Each step resends the whole growing transcript (tool results, search
-                    # pages): automatic caching lets it read the previous step's prefix at a
-                    # tenth of the input price. Messages are only appended, never edited, so
-                    # the prefix stays byte-stable; the web search tool's max_uses changing
-                    # after a search is the one thing that rewrites it.
-                    extra_body=AUTO_CACHE,
-                )
-            except anthropic.APIError as exc:
-                return AssistantResult(None, usage, titles, f"the call failed: {exc}"[:300])
-            usage.add(response.usage)
-            searches_left = max(0, searches_left - searches_used(response))
-            paused = response.stop_reason == "pause_turn"
-            titles |= result_titles(response.content)
-            if response.stop_reason == "refusal":
-                return AssistantResult(None, usage, titles, "the model declined")
-            if response.stop_reason == "pause_turn":
-                messages.append({"role": "assistant", "content": response.content})
-                continue
-            if response.stop_reason == "tool_use":
-                messages.append({"role": "assistant", "content": response.content})
-                results = []
-                for block in response.content:
-                    if isinstance(block, ToolUseBlock):
-                        output = await tools.call(block.name, dict(block.input or {}))
-                        results.append(
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": block.id,
-                                "content": json.dumps(output, default=str)[:200_000],
-                            }
-                        )
-                messages.append({"role": "user", "content": results})
-                continue
-            return AssistantResult(
-                response.parsed_output, usage, titles, draft_note(response.parsed_output)
-            )
-        return AssistantResult(None, usage, titles, "the step cap was reached before an answer")
-
 
 def draft_note(draft: ChatAnswerDraft | None) -> str | None:
     """The note to show alongside a draft: nothing for a normal answer, "no parseable
@@ -293,33 +217,6 @@ def draft_note(draft: ChatAnswerDraft | None) -> str | None:
     if draft is None:
         return "no parseable answer"
     return draft.insufficient_evidence
-
-
-def cached_history(history: list[dict[str, str]]) -> list[dict[str, Any]]:
-    """The earlier messages of the conversation as text blocks, with a cache breakpoint on the
-    last one: a follow-up question within the cache lifetime (5 minutes) reads the history
-    the previous answer's request wrote instead of paying for it again. Every message has the
-    same block form whether or not it carries the marker, so the prefix matches."""
-    out: list[dict[str, Any]] = [
-        {"role": m["role"], "content": [{"type": "text", "text": m["content"]}]} for m in history
-    ]
-    if out:
-        out[-1]["content"][0]["cache_control"] = {"type": "ephemeral"}
-    return out
-
-
-def searches_used(response: Any) -> int:
-    """Web searches one response ran: the usage count, else its web search call blocks."""
-    server = getattr(getattr(response, "usage", None), "server_tool_use", None)
-    count = getattr(server, "web_search_requests", None)
-    if isinstance(count, int):
-        return count
-    return sum(
-        1
-        for block in getattr(response, "content", None) or []
-        if getattr(block, "type", None) == "server_tool_use"
-        and getattr(block, "name", None) == "web_search"
-    )
 
 
 def finish_answer(
@@ -451,7 +348,9 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
     tools = ChatTools(pool, registry, conversation_id, message_id, embedder)
     async with ctx.step("answer") as step:
         if deps.assistant is None:
-            result = AssistantResult(None, Usage(model="none"), {}, "ANTHROPIC_API_KEY is not set")
+            result = AssistantResult(
+                None, Usage(model="none"), {}, "no OpenAI or Google API key is set"
+            )
         else:
             result = await deps.assistant.answer(
                 history, question["content"], tools, deps.now.date()
@@ -531,27 +430,21 @@ async def _run_chat_job(ctx: JobContext) -> None:
     jobs = await load_active(ctx.pool, "jobs", JobsConfig)
     sources = await load_active(ctx.pool, "news_sources", NewsSourcesConfig)
     chat_settings = (jobs.body if jobs else JobsConfig()).chat
-    if provider_of(chat_settings.model) == "anthropic":
-        raise JobFailed(
-            f"{chat_settings.model} is a Claude model and Claude is not used; "
-            "set a gpt-* or gemini-* chat model in the jobs config"
-        )
     registry = sources.body if sources else NewsSourcesConfig()
     domains = tuple(
         d.domain for d in registry.domain_tiers if d.tier in chat_settings.source_tiers
     )[:60]
     try:
-        client = create_client(settings)
+        llm = create_llm(settings)
     except AINotConfigured:
         assistant: ChatAssistant | None = None
     else:
         prompts = await load_prompts(ctx.pool)
-        assistant = ClaudeChatAssistant(
-            client,
+        assistant = LLMChatAssistant(
+            llm,
             chat_settings,
             domains,
             prompts.text("chat_assistant", SYSTEM, chat_settings.model),
-            llm=create_llm(settings, client),
         )
     if chat_settings.rules_first:
         # Closed questions (portfolio value, cash) are answered from the read models.

@@ -1,10 +1,8 @@
-"""The extraction call: one Claude request per document, no tools, structured JSON out.
+"""The extraction call: one model request per document, no tools, structured JSON out.
 
 The document arrives as a document content block that code fetched and archived; the
 model cannot fetch anything else, and its output is only a claim until the validator has
-checked it. The system prompt carries a cache breakpoint, but at ~600 tokens it is below
-the minimum cacheable prefix, and each document is read once, so nothing is cached in
-practice (and nothing is charged for the breakpoint).
+checked it.
 """
 
 import base64
@@ -12,15 +10,15 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
-import anthropic
 import pydantic
-from anthropic.types import MessageParam
 
 from steward.ai import Usage
 from steward.config.jobs import effort_kwargs
 from steward.documents.fetch import PDF, Document
 from steward.earnings.periods import period_label
 from steward.earnings.schema import ExtractionResult
+from steward.llm.routing import RoutingClient
+from steward.llm.types import LLMError
 
 
 class ExtractionError(Exception):
@@ -135,10 +133,10 @@ def document_blocks(document: Document, text: str) -> list[dict[str, Any]]:
     return blocks
 
 
-class ClaudeExtractor:
+class LLMExtractor:
     def __init__(
         self,
-        client: anthropic.AsyncAnthropic,
+        client: RoutingClient,
         model: str,
         effort: str,
         system: str = SYSTEM_PROMPT,
@@ -160,14 +158,12 @@ class ClaudeExtractor:
         try:
             response = await self._client.messages.parse(
                 model=self._model,
-                system=[
-                    {"type": "text", "text": self._system, "cache_control": {"type": "ephemeral"}}
-                ],
-                messages=[cast(MessageParam, {"role": "user", "content": content})],
+                system=self._system,
+                messages=[cast(Any, {"role": "user", "content": content})],
                 **effort_kwargs(self._model, self._effort, 32000),
                 output_format=ExtractionResult,
             )
-        except anthropic.APIError as exc:
+        except LLMError as exc:
             raise ExtractionError(f"extraction call failed: {exc}") from exc
         except (pydantic.ValidationError, ValueError) as exc:
             # The SDK parses the output inside `parse`, before the stop reason can be looked

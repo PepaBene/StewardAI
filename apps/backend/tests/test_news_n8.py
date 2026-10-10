@@ -16,7 +16,7 @@ from steward.news.gate import (
     save_baseline,
     wilson_interval,
 )
-from steward.news.ops import ops_report
+from steward.news.ops import ops_report, send_weekly_report, set_incident_status
 
 NOW = dt.datetime(2026, 10, 10, 12, 0, tzinfo=dt.UTC)
 
@@ -146,6 +146,78 @@ async def test_ops_report_costs_useful_events_and_incidents(backend_pool: asyncp
     assert report.marks == {"not_useful": 1, "useful": 1}
     by_kind = {i.kind: i.story_id for i in report.incidents}
     assert by_kind == {"unalerted_severe": missed, "alert_not_useful": rejected}
+
+
+@pytest.mark.db
+async def test_a_resolved_incident_leaves_the_report_and_an_acknowledged_one_stays(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    pool = backend_pool
+    missed = await story(pool, "severe and silent", 3)
+    noisy = await story(pool, "severe and silent too", 3)
+    first = await ops_report(pool, days=30)
+    assert {i.story_id: i.status for i in first.incidents} == {missed: "open", noisy: "open"}
+
+    assert await set_incident_status(pool, "unalerted_severe", missed, "acknowledged", "looking")
+    assert await set_incident_status(pool, "unalerted_severe", noisy, "resolved", None)
+    assert not await set_incident_status(pool, "unalerted_severe", 999_999, "resolved", None)
+
+    after = await ops_report(pool, days=30)
+    assert [(i.story_id, i.status, i.note) for i in after.incidents] == [
+        (missed, "acknowledged", "looking")
+    ]
+
+
+@pytest.mark.db
+async def test_the_ai_search_lane_reports_its_cost_per_new_item(backend_pool: asyncpg.Pool) -> None:
+    pool = backend_pool
+    job_id = await pool.fetchval(
+        "insert into public.job (job_type, trigger, status) values ('news_ai_search', 'schedule',"
+        " 'succeeded') returning id"
+    )
+    for index, (name, searches, cost, detail) in enumerate(
+        (
+            ("search", 4, 0.08, '{"leads": 6}'),
+            ("store", 0, 0, '{"stored": 2}'),
+        )
+    ):
+        await pool.execute(
+            "insert into public.job_step (job_id, step_index, name, status, searches, cost_usd,"
+            " detail) values ($1, $2, $3, 'succeeded', $4, $5, $6::jsonb)",
+            job_id,
+            index,
+            name,
+            searches,
+            cost,
+            detail,
+        )
+    search = (await ops_report(pool, days=30)).ai_search
+    assert (search.runs, search.searches, search.leads, search.new_items) == (1, 4, 6, 2)
+    assert search.cost_usd == pytest.approx(0.08)
+    assert search.cost_per_search == pytest.approx(0.02)
+    assert search.cost_per_new_item == pytest.approx(0.04)
+    later = NOW + dt.timedelta(days=400)
+    empty = (await ops_report(pool, days=1, now=later)).ai_search
+    assert empty.runs == 0 and empty.cost_per_new_item is None
+
+
+@pytest.mark.db
+async def test_the_weekly_report_is_sent_once_per_week(
+    backend_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pool = backend_pool
+    monkeypatch.setattr("steward.notify.alerts.configured_channels", lambda _s: {"email"})
+    await story(pool, "severe and silent", 3)
+    first = await send_weekly_report(pool, NOW)
+    assert "already" not in first
+    key = "news-ops:2026-W41"
+    row = await pool.fetchrow("select message from public.alert where dedupe_key = $1", key)
+    assert row is not None, first
+    assert "1 incident(s) open" in row["message"]
+    assert await send_weekly_report(pool, NOW) == "already sent this week"
+    # The next ISO week builds a new report. Its window holds no open incident, so the routing
+    # keeps it for the digest and writes no alert row.
+    assert await send_weekly_report(pool, NOW + dt.timedelta(days=7)) != "already sent this week"
 
 
 @pytest.mark.db

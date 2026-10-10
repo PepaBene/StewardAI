@@ -159,6 +159,6 @@
     }
   ],
   "absent_metrics": [],
-  "labelled_by": "claude (AI-read from the document; owner has not hand-checked)",
+  "labelled_by": "AI model (AI-read from the document; owner has not hand-checked)",
   "notes": "Substitute for ASML (see README). IFRS, DKK million. Quarterly figures come from 'APPENDIX 2: INCOME STATEMENT' (columns 9M 2025, 9M 2024, Q3 2025, Q3 2024). The Operating profit and NET PROFIT rows contain a stray visible cell printed in the source HTML (e.g. '91602000000'), which is kept in the snippet as converted. No adjusted metrics are presented for the quarter. Non-US filer: no XBRL crosscheck (crosscheck is null)."
 }

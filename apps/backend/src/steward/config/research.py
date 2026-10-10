@@ -49,10 +49,10 @@ class ResearchProfile(ConfigModel):
         default="standard",
         description="Sentences per model-written section: brief 3, standard 6, deep 12.",
     )
-    model: ModelId = "claude-opus-5-5"
+    model: ModelId = "gpt-6.1-sol"
     effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
     max_steps: int = Field(
-        default=60, ge=1, le=200, description="Claude calls plus web searches per run."
+        default=60, ge=1, le=200, description="Model calls plus web searches per run."
     )
     max_searches: int = Field(default=40, ge=0, le=100)
     source_tiers: list[Tier] = Field(
@@ -104,7 +104,7 @@ def _defaults() -> list[ResearchProfile]:
             name="Quick screen",
             sections=["business", "financial_trend", "valuation", "strategy_fit"],
             depth="brief",
-            model="claude-sonnet-5",
+            model="gpt-6.1-sol",
             effort="medium",
             max_steps=20,
             max_searches=10,

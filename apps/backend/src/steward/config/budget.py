@@ -117,18 +117,7 @@ class ModelPrice(ConfigModel):
 
 
 def _default_prices() -> list[ModelPrice]:
-    table = {
-        "claude-fable-5-1": (10, 50),
-        "claude-opus-4-8": (5, 25),
-        "claude-haiku-4-5": (1, 5),
-        "claude-sonnet-5": (2, 10),
-        "claude-sonnet-4-6": (3, 15),
-        "claude-opus-5": (5, 25),
-        "claude-opus-5-5": (4, 20),
-    }
-    prices = [
-        ModelPrice(model=m, input_per_mtok=i, output_per_mtok=o) for m, (i, o) in table.items()
-    ]
+    prices: list[ModelPrice] = []
     # Embedding model: input only. PROVISIONAL list price (the plan flags it unverified; the
     # embedding API reports no usage, so tokens are estimated). Check against the provider's
     # price page and correct here; the news embedding cost is ~$1/month at this rate.
@@ -201,7 +190,7 @@ class BudgetConfig(ConfigModel):
         " AI request; or run their requests on `downgrade_model`.",
     )
     downgrade_model: ModelId = Field(
-        default="claude-haiku-4-5",
+        default="gpt-6-luna",
         description="The model non-critical requests use at the cap (`downgrade_noncritical`).",
     )
     critical_job_types: list[BudgetJobType] = Field(

@@ -61,7 +61,7 @@ export const DEFAULT_RESEARCH_PROFILES: ResearchProfilesConfig = {
         "open_questions",
       ],
       depth: "standard",
-      model: "claude-opus-5-5",
+      model: "gpt-6.1-sol",
       effort: "high",
       max_steps: 60,
       max_searches: 40,
@@ -76,7 +76,7 @@ export const DEFAULT_RESEARCH_PROFILES: ResearchProfilesConfig = {
       name: "Quick screen",
       sections: ["business", "financial_trend", "valuation", "strategy_fit"],
       depth: "brief",
-      model: "claude-sonnet-5",
+      model: "gpt-6.1-sol",
       effort: "medium",
       max_steps: 20,
       max_searches: 10,
@@ -127,7 +127,7 @@ export function newProfile(existingIds: readonly string[] = []): ProfileForm {
     name: "New profile",
     sections: ["business", "financial_trend", "valuation", "strategy_fit"],
     depth: "standard",
-    model: "claude-opus-5-5",
+    model: "gpt-6.1-sol",
     effort: "high",
     max_steps: "20",
     max_searches: "15",
@@ -186,7 +186,7 @@ function profileFromBody(p: ResearchProfile): ProfileForm {
     name,
     sections: [...sections],
     depth: depth ?? "standard",
-    model: model ?? "claude-opus-5-5",
+    model: model ?? "gpt-6.1-sol",
     effort: effort ?? "high",
     max_steps: String(max_steps ?? 20),
     max_searches: String(max_searches ?? 15),
@@ -285,7 +285,7 @@ export function validateResearchProfiles(form: ResearchProfilesForm): FieldError
     if (!p.name.trim()) add(`profiles.${i}.name`, "Give the profile a name.");
     else if (p.name.trim().length > BOUNDS.name.max) add(`profiles.${i}.name`, `At most ${BOUNDS.name.max} characters.`);
     if (p.sections.length === 0) add(`profiles.${i}.sections`, "Pick at least one section.");
-    if (!/^claude-/.test(p.model.trim())) add(`profiles.${i}.model`, "A Claude model id, e.g. claude-opus-5-5.");
+    if (!/^(gpt|gemini)-/.test(p.model.trim())) add(`profiles.${i}.model`, "A gpt- or gemini- model id, e.g. gpt-6.1-sol.");
     const steps = intIn(p.max_steps, BOUNDS.max_steps.min, BOUNDS.max_steps.max);
     if (steps) add(`profiles.${i}.max_steps`, steps);
     const searches = intIn(p.max_searches, BOUNDS.max_searches.min, BOUNDS.max_searches.max);

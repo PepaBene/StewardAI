@@ -42,22 +42,12 @@ class FakeLLM:
 
 
 def test_the_key_changes_with_prompt_model_and_effort() -> None:
-    base = request_key("claude-sonnet-5", "sys", [{"role": "user", "content": "a"}], Out, None)
-    assert base == request_key(
-        "claude-sonnet-5", "sys", [{"role": "user", "content": "a"}], Out, None
-    )
-    assert base != request_key(
-        "claude-sonnet-5", "sys2", [{"role": "user", "content": "a"}], Out, None
-    )
-    assert base != request_key(
-        "claude-haiku-4-5", "sys", [{"role": "user", "content": "a"}], Out, None
-    )
-    assert base != request_key(
-        "claude-sonnet-5", "sys", [{"role": "user", "content": "b"}], Out, None
-    )
-    assert base != request_key(
-        "claude-sonnet-5", "sys", [{"role": "user", "content": "a"}], Out, "low"
-    )
+    base = request_key("gpt-6.1-sol", "sys", [{"role": "user", "content": "a"}], Out, None)
+    assert base == request_key("gpt-6.1-sol", "sys", [{"role": "user", "content": "a"}], Out, None)
+    assert base != request_key("gpt-6.1-sol", "sys2", [{"role": "user", "content": "a"}], Out, None)
+    assert base != request_key("gpt-6-luna", "sys", [{"role": "user", "content": "a"}], Out, None)
+    assert base != request_key("gpt-6.1-sol", "sys", [{"role": "user", "content": "b"}], Out, None)
+    assert base != request_key("gpt-6.1-sol", "sys", [{"role": "user", "content": "a"}], Out, "low")
 
 
 async def test_a_repeated_request_is_answered_from_the_cache() -> None:

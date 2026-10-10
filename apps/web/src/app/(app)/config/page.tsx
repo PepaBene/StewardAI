@@ -23,7 +23,7 @@ const DOMAINS: { slug: ConfigDomainSlug; href: string; title: string; body: stri
     slug: "jobs",
     href: "/config/jobs",
     title: "Jobs",
-    body: "When each scheduled job runs, whether it runs, its time zone, the models and caps of the jobs that call Claude (including chat and the monthly review), reference data, price benchmarks, the holiday calendar and 13F ownership with tracked managers.",
+    body: "When each scheduled job runs, whether it runs, its time zone, the models and caps of the jobs that call a model (including chat and the monthly review), reference data, price benchmarks, the holiday calendar and 13F ownership with tracked managers.",
   },
   {
     slug: "theses",

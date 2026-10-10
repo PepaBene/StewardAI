@@ -19,13 +19,12 @@ import re
 from dataclasses import dataclass
 from typing import Any, Literal
 
-import anthropic
 import asyncpg
 import httpx
 from pydantic import BaseModel, Field
 
 from steward import __version__
-from steward.ai import AINotConfigured, Usage, create_client
+from steward.ai import AINotConfigured, Usage
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import AiApprovalSettings, JobsConfig, effort_kwargs
 from steward.config.prompts import load_prompts
@@ -34,7 +33,7 @@ from steward.free_sources import collect_finnhub_research, set_peer_status
 from steward.jobs.runner import JobContext, JobFailed
 from steward.llm.cache import ResultCache
 from steward.llm.client import create_llm
-from steward.llm.routing import parse_many, routing_client
+from steward.llm.routing import RoutingClient, parse_many, routing_client
 from steward.reference.listings import ListingDecisionError, confirm_listing
 from steward.settings import get_settings
 from steward.sources.edgar import EdgarClient, EdgarError
@@ -155,7 +154,7 @@ def listing_checks(
 
 async def approve_listings(
     ctx: JobContext,
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     cfg: AiApprovalSettings,
     profiles: HoldingProfilesConfig,
     budget: dict[str, int],
@@ -358,7 +357,7 @@ _SUFFIXES = frozenset(
 
 async def approve_peers(
     ctx: JobContext,
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     cfg: AiApprovalSettings,
     profiles: HoldingProfilesConfig,
     http: httpx.AsyncClient,
@@ -603,10 +602,8 @@ async def ai_approvals_handler(ctx: JobContext) -> None:
         if not (cfg.listings or cfg.peers):
             return
         try:
-            anthropic_client = create_client(settings)
             client = routing_client(
-                anthropic_client,
-                create_llm(settings, anthropic_client),
+                create_llm(settings),
                 # A suggestion judged on identical evidence is not judged again.
                 ResultCache(ctx.pool, "ai_approvals"),
             )

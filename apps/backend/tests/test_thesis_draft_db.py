@@ -60,7 +60,7 @@ async def test_a_draft_under_the_cap_runs_as_a_recorded_job(
     await _cap(backend_pool, 10)
     await _spent(backend_pool, "2")
 
-    out = await thesis_draft.draft_within_budget(backend_pool, None, "claude-sonnet-5", REPORT)  # type: ignore[arg-type]
+    out = await thesis_draft.draft_within_budget(backend_pool, None, "gpt-6.1-sol", REPORT)  # type: ignore[arg-type]
     assert out == "DRAFT"
     assert await _draft_jobs(backend_pool) == ["succeeded"]
 
@@ -73,7 +73,7 @@ async def test_at_the_monthly_cap_the_draft_is_refused_and_the_job_fails(
     await _spent(backend_pool, "10.50")
 
     with pytest.raises(thesis_draft.DraftBudgetRefused, match="monthly AI budget reached"):
-        await thesis_draft.draft_within_budget(backend_pool, None, "claude-sonnet-5", REPORT)  # type: ignore[arg-type]
+        await thesis_draft.draft_within_budget(backend_pool, None, "gpt-6.1-sol", REPORT)  # type: ignore[arg-type]
     assert await _draft_jobs(backend_pool) == ["failed"]
     error = await backend_pool.fetchval(
         "select error from public.job where job_type = 'thesis_draft'"

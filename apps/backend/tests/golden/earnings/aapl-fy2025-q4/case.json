@@ -229,6 +229,6 @@
     }
   ],
   "absent_metrics": [],
-  "labelled_by": "claude (AI-read from the document; owner has not hand-checked)",
+  "labelled_by": "AI model (AI-read from the document; owner has not hand-checked)",
   "notes": "Apple labels gross profit as 'Gross margin' in its condensed consolidated statement of operations; that line is used for gross_profit. The release also mentions a non-GAAP diluted EPS for Q4 fiscal 2024 (excluding the one-time State Aid tax charge) but no separate non-GAAP figure for the current quarter, so no adjusted figures are labelled. XBRL crosscheck of reported figures: 8 match, 0 mismatch, 2 not checkable. 8 fourth-quarter values were checked against annual minus nine-month XBRL facts (source 'xbrl_derived'). Fourth-quarter diluted EPS has no quarterly XBRL fact and cannot be derived by subtraction."
 }

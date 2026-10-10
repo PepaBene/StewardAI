@@ -10,26 +10,23 @@ written by code, each line linked to its item or fact.
 A day with no severity-2+ events still produces and sends a digest that says so explicitly.
 """
 
-import asyncio
 import datetime as dt
 import json
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, Protocol, cast
+from typing import Literal, Protocol
 
-import anthropic
 import asyncpg
 import httpx
-from anthropic import transform_schema
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
 from steward import __version__
-from steward.ai import AINotConfigured, Usage, create_client
+from steward.ai import AINotConfigured, Usage
 from steward.config.event_rules import EVENT_DESCRIPTIONS
 from steward.config.holding_profiles import HoldingProfilesConfig
-from steward.config.jobs import DigestSettings, JobsConfig, reasoning_kwargs
+from steward.config.jobs import DigestSettings, JobsConfig
 from steward.config.notifications import NotificationsConfig
 from steward.config.prompts import load_prompts
 from steward.config.store import load_active
@@ -39,7 +36,7 @@ from steward.earnings.read import EvidenceRelation, FactCheck, evidence_relation
 from steward.jobs.runner import JobContext, JobHandler
 from steward.llm.client import LLM, create_llm
 from steward.llm.routing import routing_client
-from steward.llm.types import LLMError, Message, Request, provider_of
+from steward.llm.types import LLMError, Message, Request
 from steward.news.link import short_name
 from steward.notify.channels import (
     MISSING_CHANNEL_HELP,
@@ -56,7 +53,7 @@ from steward.verify.claims import (
     ClaimCheckOutcome,
     ClaimCheckSummary,
     ClaimVerifier,
-    ClaudeClaimVerifier,
+    LLMClaimVerifier,
     check_claims,
 )
 
@@ -337,50 +334,22 @@ review, and you may say that.
 """
 
 
-def _output_config() -> dict[str, Any]:
-    """The response format."""
-    return {
-        "format": {
-            "type": "json_schema",
-            "schema": transform_schema(DigestDraft.model_json_schema()),
-        }
-    }
-
-
-class ClaudeDigestWriter:
+class LLMDigestWriter:
     def __init__(
         self,
-        client: anthropic.AsyncAnthropic,
+        llm: LLM,
         settings: DigestSettings,
         poll_seconds: float = 30.0,
         system: str = SYSTEM_PROMPT,
-        llm: LLM | None = None,
     ) -> None:
-        self._client = client
+        self._llm = llm
         self._settings = settings
         self._poll = poll_seconds
         self._system = system
-        self._llm = llm
 
-    def _params(self, material: str, today: dt.date) -> dict[str, Any]:
-        return {
-            "model": self._settings.model,
-            "system": self._system,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": f"Today is {today.isoformat()}.\n\nMaterial:\n{material}",
-                }
-            ],
-            # max_tokens, output_config (format and effort) and, on Haiku 4, thinking.
-            **reasoning_kwargs(self._settings.model, self._settings.effort, 8000, _output_config()),
-        }
-
-    async def _write_other(self, material: str, today: dt.date) -> tuple[DigestDraft, Usage]:
-        """The draft from an OpenAI or Google model: through the provider's batch API (half
-        price) when `use_batch` is set, falling back to a direct call when the batch does not
-        finish in time or fails, as the Claude path does."""
-        assert self._llm is not None
+    async def write(self, material: str, today: dt.date) -> tuple[DigestDraft, Usage]:
+        """The draft, through the provider's batch API (half price) when `use_batch` is set,
+        falling back to a direct call when the batch does not finish in time or fails."""
         usage = Usage(model=self._settings.model)
         request = Request(
             model=self._settings.model,
@@ -411,69 +380,6 @@ class ClaudeDigestWriter:
         if not isinstance(done.parsed, DigestDraft):
             raise DigestError("digest draft is not valid JSON for the schema")
         return done.parsed, usage
-
-    async def write(self, material: str, today: dt.date) -> tuple[DigestDraft, Usage]:
-        if provider_of(self._settings.model) != "anthropic":
-            return await self._write_other(material, today)
-        params = self._params(material, today)
-        if self._settings.use_batch:
-            draft = await self._write_batch(params)
-            if draft is not None:
-                return draft
-        return await self._write_direct(params)
-
-    async def _write_direct(self, params: dict[str, Any]) -> tuple[DigestDraft, Usage]:
-        usage = Usage(model=self._settings.model)
-        try:
-            response = await self._client.messages.create(**cast(Any, params))
-        except anthropic.APIError as exc:
-            raise DigestError(f"digest call failed: {exc}") from exc
-        usage.add(response.usage)
-        try:
-            return _parse_draft(response.content, response.stop_reason), usage
-        except DigestError as exc:
-            exc.usage = usage  # billed even though the draft is unusable
-            raise
-
-    async def _write_batch(self, params: dict[str, Any]) -> tuple[DigestDraft, Usage] | None:
-        """The draft through the Batch API, or None to fall back to a direct call (the batch
-        did not finish in time or failed)."""
-        usage = Usage(model=self._settings.model, batch=True)
-        try:
-            batch = await self._client.messages.batches.create(
-                requests=[{"custom_id": "digest", "params": cast(Any, params)}]
-            )
-            deadline = asyncio.get_running_loop().time() + self._settings.batch_wait_minutes * 60
-            while batch.processing_status != "ended":
-                if asyncio.get_running_loop().time() > deadline:
-                    await self._client.messages.batches.cancel(batch.id)
-                    logger.warning("digest batch %s not done in time; writing directly", batch.id)
-                    return None
-                await asyncio.sleep(self._poll)
-                batch = await self._client.messages.batches.retrieve(batch.id)
-            async for result in await self._client.messages.batches.results(batch.id):
-                if result.custom_id != "digest":
-                    continue
-                if result.result.type != "succeeded":
-                    logger.warning("digest batch request %s", result.result.type)
-                    return None
-                message = result.result.message
-                usage.add(message.usage)
-                return _parse_draft(message.content, message.stop_reason), usage
-        except (anthropic.APIError, DigestError) as exc:
-            logger.warning("digest batch failed (%s); writing directly", exc)
-            return None
-        return None
-
-
-def _parse_draft(content: Sequence[Any], stop_reason: str | None) -> DigestDraft:
-    if stop_reason in ("refusal", "max_tokens"):
-        raise DigestError(f"digest stopped early ({stop_reason})")
-    text = "".join(getattr(b, "text", "") for b in content if getattr(b, "type", "") == "text")
-    try:
-        return DigestDraft.model_validate_json(text)
-    except ValidationError as exc:
-        raise DigestError(f"digest draft is not valid JSON for the schema: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -936,7 +842,7 @@ async def build_digest(
             body.dropped_sentences = dropped
             body.writer = usage.model
     elif not nothing:
-        note = "summary not written: ANTHROPIC_API_KEY is not set"
+        note = "summary not written: no OpenAI or Google API key is set"
     return body, usage, note
 
 
@@ -1123,20 +1029,18 @@ def _handler(kind: DigestKind) -> JobHandler:
         writer: DigestWriter | None
         verifier: ClaimVerifier | None
         try:
-            client = create_client(settings)
+            llm = create_llm(settings)
         except AINotConfigured:
             writer = verifier = None
         else:
             prompts = await load_prompts(ctx.pool)
-            llm = create_llm(settings, client)
-            writer = ClaudeDigestWriter(
-                client,
+            writer = LLMDigestWriter(
+                llm,
                 digest_settings,
                 system=prompts.text("news_digest", SYSTEM_PROMPT, digest_settings.model),
-                llm=llm,
             )
-            verifier = ClaudeClaimVerifier(
-                routing_client(client, llm),
+            verifier = LLMClaimVerifier(
+                routing_client(llm),
                 claim_settings.model,
                 prompts.text("claim_verifier", CLAIM_SYSTEM, claim_settings.model),
                 effort=claim_settings.effort,

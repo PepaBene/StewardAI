@@ -7,26 +7,26 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from anthropic.types import ToolUseBlock
 
 from steward.chat.assistant import SYSTEM as CHAT_SYSTEM
-from steward.chat.assistant import AnswerSentence, ChatAnswerDraft, ClaudeChatAssistant
+from steward.chat.assistant import AnswerSentence, ChatAnswerDraft, LLMChatAssistant
 from steward.config.event_rules import CLASSIFIABLE_EVENT_TYPES
 from steward.config.jobs import ChatSettings, DigestSettings, EscalationSettings
 from steward.config.prompts import PromptsConfig, default_text
+from steward.llm.types import Completion, Request, StopReason, ToolCall, normalized_usage
 from steward.news.classify import (
     SYSTEM_PROMPT,
     Candidate,
     ClassificationError,
     ClassificationOutput,
     ClassifyItem,
-    ClaudeClassifier,
+    LLMClassifier,
     items_block,
     system_prompt,
 )
-from steward.news.corroborate import ClaudeCorroborator, CorroborationAnswer, SearchRequest
-from steward.news.digest import ClaudeDigestWriter
-from steward.news.escalation import ClaudeEscalator, EscalationInput, ImpactDraft
+from steward.news.corroborate import CorroborationAnswer, LLMCorroborator, SearchRequest
+from steward.news.digest import DigestDraft, LLMDigestWriter
+from steward.news.escalation import EscalationInput, ImpactDraft, LLMEscalator
 
 OVERRIDE = "Custom instructions from the owner, long enough to be valid."
 
@@ -52,6 +52,32 @@ class _Recorder:
 
     async def create(self, **kwargs: Any) -> Any:
         return await self.parse(**kwargs)
+
+
+def _completion(
+    parsed: Any = None, stop_reason: StopReason = "end", tool_calls: list[ToolCall] | None = None
+) -> Completion:
+    return Completion(
+        model="gpt-6-luna",
+        provider="openai",
+        text="",
+        parsed=parsed,
+        stop_reason=stop_reason,
+        usage=normalized_usage(input_tokens=10, output_tokens=5),
+        tool_calls=tool_calls or [],
+    )
+
+
+class _FakeLLM:
+    """Stands in for `LLM`: records each request and replays canned completions."""
+
+    def __init__(self, responses: list[Completion]) -> None:
+        self.calls: list[Request] = []
+        self._responses = responses
+
+    async def complete(self, request: Request) -> Completion:
+        self.calls.append(request)
+        return self._responses[len(self.calls) - 1]
 
 
 def _item(index: int = 0, summary: str | None = "Apple said it would buy back shares.") -> Any:
@@ -88,32 +114,29 @@ def test_an_override_gets_the_event_types_appended() -> None:
 
 async def test_the_classification_override_reaches_the_request() -> None:
     parsed = ClassificationOutput(items=[])
-    response = SimpleNamespace(usage=_usage(), stop_reason="end_turn", parsed_output=parsed)
-    recorder = _Recorder([response, response])
-    client = SimpleNamespace(messages=recorder)
-    client.with_options = lambda **_kwargs: client
-    await ClaudeClassifier(client, "claude-haiku-4-5").classify(  # type: ignore[arg-type]
+    llm = _FakeLLM([_completion(parsed), _completion(parsed)])
+    await LLMClassifier(llm, "gpt-6-luna").classify(  # type: ignore[arg-type]
         [_item()], [], dt.date(2026, 9, 1)
     )
     config = PromptsConfig(overrides={"news_classification": OVERRIDE})
-    await ClaudeClassifier(
-        client,  # type: ignore[arg-type]
-        "claude-haiku-4-5",
+    await LLMClassifier(
+        llm,  # type: ignore[arg-type]
+        "gpt-6-luna",
         config.text("news_classification", SYSTEM_PROMPT),
     ).classify([_item()], [], dt.date(2026, 9, 1))
-    default_system, override_system = (c["system"][0]["text"] for c in recorder.calls)
-    assert default_system == system_prompt()
-    assert override_system == system_prompt(OVERRIDE)
-    # The sub-minimum prefix carries no cache marker (it would only pay the write premium).
-    assert all("cache_control" not in block for c in recorder.calls for block in c["system"])
+    default, override = llm.calls
+    # The holdings block follows the static instructions.
+    assert default.system.startswith(system_prompt())
+    assert override.system.startswith(system_prompt(OVERRIDE))
+    assert OVERRIDE not in default.system
+    # Related requests share one cache key so the provider lands them on the same prefix.
+    assert default.cache_key == override.cache_key == "news_classification"
 
 
 async def test_a_failed_classification_still_reports_its_usage() -> None:
-    response = SimpleNamespace(usage=_usage(), stop_reason="max_tokens", parsed_output=None)
-    client = SimpleNamespace(messages=_Recorder([response]))
-    client.with_options = lambda **_kwargs: client
+    llm = _FakeLLM([_completion(None, "max_tokens")])
     with pytest.raises(ClassificationError) as caught:
-        await ClaudeClassifier(client, "claude-haiku-4-5").classify(  # type: ignore[arg-type]
+        await LLMClassifier(llm, "gpt-6-luna").classify(  # type: ignore[arg-type]
             [_item()], [], dt.date(2026, 9, 1)
         )
     assert caught.value.usage is not None
@@ -132,14 +155,13 @@ def test_a_summary_that_repeats_the_headline_is_sent_once() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_the_corroboration_override_and_cache_reach_the_request() -> None:
+async def test_the_corroboration_override_and_search_reach_the_request() -> None:
     answer = CorroborationAnswer(verdict="not_found", note="Nothing found.")
-    paused = SimpleNamespace(usage=_usage(), content=[], stop_reason="pause_turn")
     done = SimpleNamespace(usage=_usage(), content=[], stop_reason="end_turn", parsed_output=answer)
-    recorder = _Recorder([paused, done])
-    corroborator = ClaudeCorroborator(
+    recorder = _Recorder([done])
+    corroborator = LLMCorroborator(
         SimpleNamespace(messages=recorder),  # type: ignore[arg-type]
-        "claude-haiku-4-5",
+        "gpt-6-luna",
         3,
         OVERRIDE,
     )
@@ -152,10 +174,10 @@ async def test_the_corroboration_override_and_cache_reach_the_request() -> None:
         domains=("bloomberg.com",),
     )
     await corroborator.search(request, lambda host: 2)
-    assert len(recorder.calls) == 2
-    for call in recorder.calls:
-        assert call["system"] == OVERRIDE
-        assert call["extra_body"] == {"cache_control": {"type": "ephemeral"}}
+    [call] = recorder.calls
+    assert call["system"] == OVERRIDE
+    [tool] = call["tools"]
+    assert tool["type"] == "web_search" and tool["allowed_domains"] == ["bloomberg.com"]
 
 
 def _escalation_input(domains: tuple[str, ...]) -> EscalationInput:
@@ -174,11 +196,11 @@ def _escalation_input(domains: tuple[str, ...]) -> EscalationInput:
     )
 
 
-async def test_the_escalation_override_and_cache_reach_the_request() -> None:
+async def test_the_escalation_override_and_search_reach_the_request() -> None:
     draft = ImpactDraft(headline="h", sentences=[], none_applies=True, rationale="r")
     done = SimpleNamespace(usage=_usage(), content=[], stop_reason="end_turn", parsed_output=draft)
     recorder = _Recorder([done, done])
-    writer = ClaudeEscalator(
+    writer = LLMEscalator(
         SimpleNamespace(messages=recorder),  # type: ignore[arg-type]
         EscalationSettings(),
         OVERRIDE,
@@ -187,9 +209,9 @@ async def test_the_escalation_override_and_cache_reach_the_request() -> None:
     await writer.write(_escalation_input(()), dt.date(2026, 9, 1))
     with_search, without = recorder.calls
     assert with_search["system"] == without["system"] == OVERRIDE
-    assert with_search["extra_body"] == {"cache_control": {"type": "ephemeral"}}
-    # A single call without tools has nothing to read back: no cache write premium.
-    assert without["extra_body"] is None
+    assert with_search["tools"][0]["allowed_domains"] == ["reuters.com"]
+    # Without source domains there is nothing to search.
+    assert "tools" not in without
 
 
 # ---------------------------------------------------------------------------
@@ -202,14 +224,12 @@ class _Tools:
         return {"ok": True}
 
 
-async def test_the_chat_loop_caches_every_step_and_the_history() -> None:
-    block = ToolUseBlock(id="t1", name="portfolio", input={}, type="tool_use")
-    step = SimpleNamespace(usage=_usage(), content=[block], stop_reason="tool_use")
+async def test_the_chat_loop_keeps_a_stable_prefix_and_one_cache_key() -> None:
+    step = _completion(None, "tool_use", [ToolCall("t1", "portfolio", {})])
     draft = ChatAnswerDraft(sentences=[AnswerSentence(text="Done.")])
-    done = SimpleNamespace(usage=_usage(), content=[], stop_reason="end_turn", parsed_output=draft)
-    recorder = _Recorder([step, done])
-    assistant = ClaudeChatAssistant(
-        SimpleNamespace(messages=recorder),  # type: ignore[arg-type]
+    llm = _FakeLLM([step, _completion(draft)])
+    assistant = LLMChatAssistant(
+        llm,  # type: ignore[arg-type]
         ChatSettings(),
         (),
         OVERRIDE,
@@ -220,16 +240,18 @@ async def test_the_chat_loop_caches_every_step_and_the_history() -> None:
     ]
     result = await assistant.answer(history, "And MSFT?", _Tools(), dt.date(2026, 9, 1))  # type: ignore[arg-type]
     assert result.draft is not None
-    assert len(recorder.calls) == 2
-    for call in recorder.calls:
-        assert call["system"] == OVERRIDE
-        assert call["extra_body"] == {"cache_control": {"type": "ephemeral"}}
-    first, second = (c["messages"] for c in recorder.calls)
-    # The second step resends the first step's messages unchanged (a byte-stable prefix).
+    assert len(llm.calls) == 2
+    for call in llm.calls:
+        assert call.system == OVERRIDE
+        assert call.cache_key == "chat"
+    first, second = (c.messages for c in llm.calls)
+    # The second step resends the first step's messages unchanged (a byte-stable prefix),
+    # then adds the assistant's tool call and the tool's result.
     assert second[: len(first)] == first
-    # The last history message carries a breakpoint for the next question's request.
-    assert first[1]["content"][0]["cache_control"] == {"type": "ephemeral"}
-    assert "cache_control" not in first[0]["content"][0]
+    assert [m.role for m in second[len(first) :]] == ["assistant", "tool"]
+    # The history is sent as plain turns before the new question.
+    assert [m.text for m in first[:2]] == ["How is Apple doing?", "Fine."]
+    assert "And MSFT?" in first[2].text
 
 
 def test_the_default_chat_prompt_is_the_module_constant() -> None:
@@ -242,13 +264,11 @@ def test_the_default_chat_prompt_is_the_module_constant() -> None:
 
 
 async def test_the_digest_override_reaches_the_request() -> None:
-    text = SimpleNamespace(type="text", text='{"overview": [], "sections": []}')
-    response = SimpleNamespace(usage=_usage(), content=[text], stop_reason="end_turn")
-    recorder = _Recorder([response])
-    writer = ClaudeDigestWriter(
-        SimpleNamespace(messages=recorder),  # type: ignore[arg-type]
+    llm = _FakeLLM([_completion(DigestDraft(overview=[], sections=[]))])
+    writer = LLMDigestWriter(
+        llm,  # type: ignore[arg-type]
         DigestSettings(use_batch=False),
         system=OVERRIDE,
     )
     await writer.write("material", dt.date(2026, 9, 1))
-    assert recorder.calls[0]["system"] == OVERRIDE
+    assert llm.calls[0].system == OVERRIDE

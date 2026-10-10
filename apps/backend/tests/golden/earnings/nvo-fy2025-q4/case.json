@@ -187,6 +187,6 @@
     }
   ],
   "absent_metrics": [],
-  "labelled_by": "claude (AI-read from the document; owner has not hand-checked)",
+  "labelled_by": "AI model (AI-read from the document; owner has not hand-checked)",
   "notes": "Substitute for ASML (see README). IFRS, DKK million. Q4 revenue/gross profit/operating profit/net profit come from the Q4 'PROFIT AND LOSS | Q4 2025 | Q4 2024' table; diluted EPS (reported and adjusted) only appears for the quarter in 'APPENDIX 1: QUARTERLY NUMBERS IN DKK' (columns Q4..Q1 2025 then Q4..Q1 2024). The release's main income statement is full-year only. Non-US filer: no XBRL crosscheck (crosscheck is null)."
 }

@@ -44,7 +44,7 @@ const BODY: ResearchBody = {
   profile_id: "standard",
   profile_name: "Standard workup",
   depth: "standard",
-  model: "claude-opus-5-5",
+  model: "gpt-6.1-sol",
   language: "en",
   sections: [
     {
