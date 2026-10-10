@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import datetime as dt
 from typing import Literal
+from urllib.parse import urlparse
 
 import asyncpg
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 SubjectKind = Literal["security", "etf", "corporate_action", "cash_flow_window"]
 AuditResult = Literal["match", "mismatch", "not_checkable"]
@@ -88,6 +89,28 @@ class AuditIn(BaseModel):
     result: AuditResult
     note: str | None = Field(default=None, max_length=1000)
     audited_on: dt.date | None = Field(default=None, description="Defaults to today.")
+
+    @field_validator("source_url")
+    @classmethod
+    def _real_url(cls, url: str | None) -> str | None:
+        if url is None or not url.strip():
+            return None
+        parsed = urlparse(url.strip())
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError("The source link must be an http(s) address.")
+        return url.strip()
+
+    @field_validator("feature")
+    @classmethod
+    def _known_feature(cls, feature: str) -> str:
+        # Imported here: the readiness module imports this one.
+        from steward.release.readiness import FEATURES
+
+        wanted = _squash(feature)
+        for f in FEATURES:
+            if _squash(f.id) == wanted:
+                return f.id
+        raise ValueError(f"Unknown feature {feature!r}; use a release-gate feature id.")
 
     @model_validator(mode="after")
     def _needs_source(self) -> AuditIn:

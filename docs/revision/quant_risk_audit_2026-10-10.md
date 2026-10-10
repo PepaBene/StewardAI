@@ -34,7 +34,7 @@ R1 to R35 are all addressed (not committed), with regression tests in `tests/tes
 - R2: `bootstrap.simulate(start_drawdown=...)`; the tail report passes the book's drawdown from its one-year peak and shows it as `start_drawdown`.
 - R3: `trade_risk.findings_for` runs the tail inputs (`full=False`) when an ES or drawdown-probability limit is set; the stale `NOT_MODELLED` line is reworded.
 - R4: `es_95_month` is the larger of historical and filtered historical (the documented definition); the web headline sentence drops Cornish-Fisher too.
-- R5/R26: migration `20261027100000_quant_audit_fixes.sql` keys snapshots on a content hash; NaN is written as null.
+- R5/R26: migration `20261027100010_quant_audit_fixes.sql` keys snapshots on a content hash; NaN is written as null.
 - R6: the allocator uses `price_in_unit`.
 - R7: `BadZipFile` and `ValueError` are caught per file.
 - R8: same migration drops the `authenticated` insert on `switch_log`.
@@ -151,7 +151,7 @@ R1 to R35 are all addressed (not committed), with regression tests in `tests/tes
 
 ### R8 (medium). `switch_log` can be written directly by a signed-in user
 
-- Where: `supabase/migrations/20261025100000_switch_log.sql:27-30`.
+- Where: `supabase/migrations/20261025100010_switch_log.sql:27-30`.
 - Defect: the migration grants `select, insert` to `authenticated` and adds `switch_log_owner_insert`. Migration `20261023100000_audit_fixes.sql:3-18` had revoked this path on every append-only table ("written only through the API").
 - Scenario: an insert through PostgREST skips the checks in `journal/switches.py:85-98`: the future-date check, the price lookup and the ranking snapshot.
 - Fix: grant only `select` to `authenticated` and drop the insert policy. Add the matching rollback note.

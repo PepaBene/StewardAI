@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type {
   EventRulesConfig,
   EventType,
@@ -448,7 +449,7 @@ export function parseSurpriseBands(text: string): Record<string, number | string
   return Object.fromEntries(
     lines(text).map((line) => {
       const [key, band = ""] = line.split(/\s+/);
-      return [key.toLowerCase(), numberOrText(band.replace(",", "."))];
+      return [key.toLowerCase(), numberOrText(normaliseSeparators(band))];
     }),
   );
 }
@@ -494,7 +495,7 @@ export function eventRulesToBody(form: EventRulesForm): EventRulesConfig {
     insider_cluster_count: numberOrText(form.insider_cluster_count) as number,
     insider_cluster_days: numberOrText(form.insider_cluster_days) as number,
     recycled_after_days: numberOrText(form.recycled_after_days) as number,
-    price_move_threshold_pct: numberOrText(form.price_move_threshold_pct.replace(",", ".")) as number,
+    price_move_threshold_pct: numberOrText(normaliseSeparators(form.price_move_threshold_pct)) as number,
     macro_surprise_bands: parseSurpriseBands(form.macro_surprise_bands) as Record<string, number>,
     // The pattern is a regular expression: sent as typed (only trailing spaces trimmed).
     announcement_types: form.announcement_types.map((r) => ({

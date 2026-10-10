@@ -6294,7 +6294,8 @@ export interface paths {
         };
         /**
          * List Journal
-         * @description Journal entries, newest decision first, optionally for one security.
+         * @description Journal entries, newest decision first, optionally for one security. `offset` skips that
+         *     many newer entries so older ones can be read in pages.
          */
         get: operations["list_journal"];
         put?: never;
@@ -7400,7 +7401,7 @@ export interface paths {
         post?: never;
         /**
          * Retire Owner Weight
-         * @description Retire a weight. It stops applying from now; replays before now still see it.
+         * @description Retire a weight you assigned. It stops applying from now; replays before now still see it.
          */
         delete: operations["retire_owner_weight"];
         options?: never;
@@ -8498,6 +8499,14 @@ export interface components {
              * Format: date-time
              */
             since: string;
+            /**
+             * Needs Switch Off
+             * @description Switched on, but the release gate no longer allows it (an input went stale, an audit mismatch was entered, ...). Switch it off; nothing does so for you.
+             * @default false
+             */
+            needs_switch_off: boolean;
+            /** Gate Note */
+            gate_note?: string | null;
         };
         /** ActivationIn */
         ActivationIn: {
@@ -8574,6 +8583,16 @@ export interface components {
             must_review: boolean;
             /** Review Reasons */
             review_reasons?: string[];
+            /**
+             * Saved Value
+             * @description The label already saved for this item and counted by the gate.
+             */
+            saved_value?: string | null;
+            /**
+             * Saved Kind
+             * @description Who made it: person or accepted_suggestion.
+             */
+            saved_kind?: string | null;
         };
         /** AdjudicationSampleOut */
         AdjudicationSampleOut: {
@@ -13516,7 +13535,7 @@ export interface components {
             /** Evidence Id */
             evidence_id: number;
             /** Document Version Id */
-            document_version_id: number;
+            document_version_id: number | null;
             /** Source Url */
             source_url: string | null;
             /** Quote */
@@ -26646,6 +26665,11 @@ export interface components {
             not_yet_filed: string[];
             /** Reports */
             reports: components["schemas"]["ReportCheckOut"][];
+            /**
+             * Unapplied Reports
+             * @description Reports with only an amendment of no stated type: not read, not counted.
+             */
+            unapplied_reports?: components["schemas"]["UnappliedReportOut"][];
         };
         /** QueueContradiction */
         QueueContradiction: {
@@ -31588,6 +31612,8 @@ export interface components {
             tier: number;
             /** Rumour */
             rumour: boolean;
+            /** Cluster Id */
+            cluster_id?: string | null;
         };
         /** StoryOut */
         StoryOut: {
@@ -33371,6 +33397,21 @@ export interface components {
              */
             demote_below: number;
         };
+        /** UnappliedReportOut */
+        UnappliedReportOut: {
+            /** Cik */
+            cik: string;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /**
+             * Flags
+             * @description Why no filing of this report could be applied.
+             */
+            flags: string[];
+        };
         /** UnbridgedAxisOut */
         UnbridgedAxisOut: {
             /** Axis */
@@ -34064,6 +34105,12 @@ export interface components {
              * @default true
              */
             xirr_annualized: boolean;
+            /**
+             * Opening Gap Days
+             * @description Days between the window's nominal start and the stored day it opens on; above 0 the window is slightly longer than its label.
+             * @default 0
+             */
+            opening_gap_days: number;
             /** Reason */
             reason: string | null;
             benchmark: components["schemas"]["BenchmarkOut"] | null;
@@ -45726,6 +45773,7 @@ export interface operations {
             query?: {
                 ticker?: string | null;
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -47954,6 +48002,8 @@ export interface operations {
                 start: number;
                 end: number;
                 context?: number;
+                /** @description Show only what was known by this time. */
+                as_of?: string | null;
             };
             header?: never;
             path: {

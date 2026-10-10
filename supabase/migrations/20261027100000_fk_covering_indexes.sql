@@ -1,6 +1,5 @@
--- Covering indexes for foreign keys added without one (tests/test_phase8_fk_indexes.py): a delete
--- or update on the referenced row otherwise scans the whole referencing table.
-
+-- Foreign keys added by the deal, estimate and pilot migrations had no covering index, so a
+-- delete on the parent table (or a join from the child) scanned the child. One index each.
 create index if not exists deal_document_document_version_id_idx
   on public.deal_document (document_version_id);
 create index if not exists deal_event_issuer_id_idx

@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type { components } from "@/lib/api/schema";
 
 type Schemas = components["schemas"];
@@ -114,8 +115,10 @@ export type GridView = { rowShifts: number[]; colShifts: number[]; at: (row: num
 
 /** The sensitivity cells as a growth × discount-rate matrix. */
 export function gridMatrix(cells: readonly { growth_shift: Num; rate_shift: Num; value: Num }[]): GridView {
-  const g = [...new Set(cells.map((c) => toNumber(c.growth_shift) ?? 0))].sort((a, b) => a - b);
-  const r = [...new Set(cells.map((c) => toNumber(c.rate_shift) ?? 0))].sort((a, b) => a - b);
+  // a cell with an unknown shift cannot be placed on the grid, so it is left out rather than shown as 0
+  cells = cells.filter((c) => toNumber(c.growth_shift) !== null && toNumber(c.rate_shift) !== null);
+  const g = [...new Set(cells.map((c) => toNumber(c.growth_shift) as number))].sort((a, b) => a - b);
+  const r = [...new Set(cells.map((c) => toNumber(c.rate_shift) as number))].sort((a, b) => a - b);
   const map = new Map(cells.map((c) => [`${toNumber(c.growth_shift)}|${toNumber(c.rate_shift)}`, toNumber(c.value)]));
   return { rowShifts: g, colShifts: r, at: (i, j) => map.get(`${g[i]}|${r[j]}`) ?? null };
 }
@@ -128,7 +131,7 @@ export function rangePosition(value: number | null, low: number | null, high: nu
 
 /** Percent typed by the owner → fraction (and back), so assumptions are edited the way they are read. */
 export function percentToFraction(text: string): number | null {
-  const n = Number(text.trim().replace(",", ".").replace(/%$/, ""));
+  const n = Number(normaliseSeparators(text).replace(/%$/, ""));
   return text.trim() === "" || !Number.isFinite(n) ? null : n / 100;
 }
 
@@ -142,7 +145,9 @@ export function percentileLabel(p: Num): string | null {
   const n = toNumber(p);
   if (n === null) return null;
   const pct = Math.round(n * 100);
-  return `${pct}th percentile`;
+  const teen = pct % 100 >= 11 && pct % 100 <= 13;
+  const suffix = teen ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[pct % 10] ?? "th";
+  return `${pct}${suffix} percentile`;
 }
 
 export const SCENARIO_ORDER = ["bear", "base", "bull"];

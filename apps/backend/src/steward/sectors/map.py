@@ -257,7 +257,8 @@ async def load_profiles(pool: asyncpg.Pool) -> list[Profile]:
     rows = await pool.fetch(
         "select distinct on (ticker, metric) ticker, metric, text_value"
         " from public.company_research_observation"
-        " where dataset = 'profile' and metric in ('sector','industry','country')"
+        " where dataset = 'profile' and provider = 'fmp'"
+        " and metric in ('sector','industry','country')"
         " order by ticker, metric, known_at desc, id desc"
     )
     got: dict[str, dict[str, str | None]] = defaultdict(dict)

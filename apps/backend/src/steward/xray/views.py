@@ -9,7 +9,7 @@ Unknown weight is its own bucket and is never spread over the known ones.
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Literal
 
@@ -389,7 +389,13 @@ def pieces(leaf: Leaf, dimension: Dimension, ctx: ViewContext) -> list[Piece]:
         return [Piece(UNCLASSIFIED, 1.0, "none")]
     out = [Piece(s.value, s.share, s.basis, "owner mapping" if s.basis == "owner" else "reported")
            for s in slices if s.share > 0]  # fmt: skip
-    rest = 1.0 - sum(p.share for p in out)
+    reported = sum(p.share for p in out)
+    if reported > 1.0 + 1e-9:
+        # Slices that add to more than the whole would count a leaf above its weight: scale them
+        # back to a whole rather than let the view over-count.
+        out = [replace(p, share=p.share / reported) for p in out]
+        reported = 1.0
+    rest = 1.0 - reported
     if rest > 1e-9:
         out.append(Piece(UNCLASSIFIED, rest, "none"))
     return out

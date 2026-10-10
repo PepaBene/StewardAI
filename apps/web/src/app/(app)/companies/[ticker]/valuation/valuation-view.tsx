@@ -1,5 +1,6 @@
 "use client";
 
+import { normaliseSeparators } from "@/lib/number-input";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
@@ -54,13 +55,13 @@ function fromDraft(d: Draft): Assumptions | string {
   const rf = percentToFraction(d.risk_free);
   const erp = percentToFraction(d.equity_risk_premium);
   const extra = percentToFraction(d.extra_premium);
-  const beta = Number(d.beta.replace(",", "."));
+  const beta = Number(normaliseSeparators(d.beta));
   if (terminal === null || rf === null || erp === null || extra === null || !Number.isFinite(beta)) {
     return `${d.name}: terminal growth, risk-free rate, equity risk premium, extra premium and beta must be numbers.`;
   }
   const override = d.discount_rate.trim() === "" ? null : percentToFraction(d.discount_rate);
   if (d.discount_rate.trim() !== "" && override === null) return `${d.name}: the discount-rate override is not a number.`;
-  const fcf = d.base_fcf.trim() === "" ? null : Number(d.base_fcf.replace(",", "."));
+  const fcf = d.base_fcf.trim() === "" ? null : Number(normaliseSeparators(d.base_fcf));
   if (fcf !== null && !Number.isFinite(fcf)) return `${d.name}: starting free cash flow is not a number.`;
   return {
     name: d.name,
@@ -140,7 +141,7 @@ function Results({ v }: { v: Valuation }) {
         <div className="overflow-x-auto border border-border">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-surface-sunken text-left">
+              <tr className="bg-surface-muted text-left">
                 <th scope="col" className="px-3 py-1.5 font-medium">Scenario</th>
                 <th scope="col" className="px-2 py-1.5 text-right font-medium">Discount rate</th>
                 <th scope="col" className="px-2 py-1.5 text-right font-medium">Enterprise value</th>
@@ -402,7 +403,7 @@ export function ValuationView({ ticker }: { ticker: string }) {
                   ))}
                 </div>
                 <div className="flex items-center gap-3">
-                  <button type="button" onClick={() => run()} disabled={running} className="border border-accent bg-surface px-4 py-1.5 text-sm font-semibold hover:bg-surface-sunken disabled:opacity-50">
+                  <button type="button" onClick={() => run()} disabled={running} className="border border-accent bg-surface px-4 py-1.5 text-sm font-semibold hover:bg-surface-muted disabled:opacity-50">
                     {running ? "Computing…" : "Compute values"}
                   </button>
                   {problem ? <p role="alert" className="text-sm text-loss">{problem}</p> : null}

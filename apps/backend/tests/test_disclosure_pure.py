@@ -136,7 +136,7 @@ def test_dates_are_kept_apart_and_missing_ones_explained() -> None:
     assert annual.known_at == dt.datetime(2026, 2, 20, 23, 59, 59, tzinfo=dt.UTC)
     assert "accepted_at" in annual.date_notes and "published_at" in annual.date_notes
     accepted = by_acc["0000001234-26-000007"]
-    assert accepted.known_at == accepted.accepted_at == dt.datetime(2026, 3, 1, 14, tzinfo=dt.UTC)
+    assert accepted.known_at == accepted.accepted_at == dt.datetime(2026, 3, 1, 9, tzinfo=dt.UTC)
 
 
 def test_amendment_points_at_the_original_of_the_same_period() -> None:

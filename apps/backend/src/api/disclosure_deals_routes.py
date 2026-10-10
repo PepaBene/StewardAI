@@ -43,7 +43,7 @@ class DealTransitionOut(BaseModel):
         description="When it became known; never earlier than the record."
     )
     evidence_id: int
-    document_version_id: int
+    document_version_id: int | None
     source_url: str | None
     quote: str | None
     span_start: int | None

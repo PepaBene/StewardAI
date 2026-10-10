@@ -1,4 +1,5 @@
 import { exposureOrder, relationshipOrder, weightText, type LookThrough } from "@/lib/disclosure/look-through";
+import { safeHref } from "@/lib/reference/identity";
 
 const TH = "border-b border-border px-2 py-1.5 text-left text-xs font-semibold text-text-muted";
 const TD = "border-b border-border-soft px-2 py-1.5 align-top";
@@ -69,7 +70,7 @@ export function RelationshipTable({ view }: { view: LookThrough }) {
                 {r.source_url ? (
                   <>
                     {" "}
-                    <a href={r.source_url} target="_blank" rel="noopener noreferrer" className="text-accent-ink hover:underline">filing</a>
+                    <a href={safeHref(r.source_url) ?? undefined} target="_blank" rel="noopener noreferrer" className="text-accent-ink hover:underline">filing</a>
                   </>
                 ) : null}
               </td>

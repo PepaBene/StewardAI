@@ -618,6 +618,12 @@ class ReportCheckOut(BaseModel):
     confidential_treatment: Literal["none_indicated", "requested", "unknown"]
 
 
+class UnappliedReportOut(BaseModel):
+    cik: str
+    period: dt.date
+    flags: list[str] = Field(description="Why no filing of this report could be applied.")
+
+
 class QuarterOut(BaseModel):
     period: dt.date | None = Field(description="The one quarter the manager lane shows.")
     managers_filed: int
@@ -625,6 +631,10 @@ class QuarterOut(BaseModel):
     fell_back: bool = Field(description="No quarter reached the bar; the best-covered is shown.")
     not_yet_filed: list[str] = Field(description="Managers named, not carried forward.")
     reports: list[ReportCheckOut]
+    unapplied_reports: list[UnappliedReportOut] = Field(
+        default_factory=list,
+        description="Reports with only an amendment of no stated type: not read, not counted.",
+    )
 
 
 class OwnershipOut(BaseModel):
@@ -1149,14 +1159,16 @@ async def add_owner_weight(
 
 @router.delete("/holdings/{ticker}/dependency-weights/{weight_id}", status_code=204)
 async def retire_owner_weight(
-    ticker: TickerPath, weight_id: IdPath, pool: Pool, _owner: Owner
+    ticker: TickerPath, weight_id: IdPath, pool: Pool, owner: Owner
 ) -> None:
-    """Retire a weight. It stops applying from now; replays before now still see it."""
+    """Retire a weight you assigned. It stops applying from now; replays before now still see it."""
     done = await pool.fetchval(
         """update public.owner_dependency_weight set retired_at = now()
-            where id = $1 and ticker = $2 and retired_at is null returning id""",
+            where id = $1 and ticker = $2 and assigned_by = $3 and retired_at is null
+        returning id""",
         weight_id,
         ticker.upper(),
+        f"owner:{owner.user_id}",
     )
     if done is None:
         raise HTTPException(404, "no active weight with that id for this holding")
@@ -1281,6 +1293,12 @@ class AdjudicationItemOut(BaseModel):
     suggestion_reason: str | None = None
     must_review: bool = True
     review_reasons: list[str] = Field(default_factory=list)
+    saved_value: str | None = Field(
+        default=None, description="The label already saved for this item and counted by the gate."
+    )
+    saved_kind: str | None = Field(
+        default=None, description="Who made it: person or accepted_suggestion."
+    )
 
 
 class PrelabelOut(BaseModel):
@@ -1345,6 +1363,7 @@ async def adjudication_sample(
         raise HTTPException(422, f"no sampler exists yet for {dataset}")
     sample_key = f"{dataset}:{seed}:{size}"
     given = await adjudication_assist.suggestions(pool, dataset, sample_key)
+    saved = await adjudication.saved_labels(pool, dataset, sample_key)
     return AdjudicationSampleOut(
         dataset=dataset,
         sample_key=sample_key,
@@ -1358,6 +1377,8 @@ async def adjudication_sample(
                 suggestion_reason=s["rationale"] if s else None,
                 must_review=s["must_review"] if s else True,
                 review_reasons=list(s["review_reasons"]) if s else [],
+                saved_value=saved[i.item_ref][0] if i.item_ref in saved else None,
+                saved_kind=saved[i.item_ref][1] if i.item_ref in saved else None,
             )
             for i in items
         ],
@@ -1427,12 +1448,16 @@ async def adjudication_label(
     dataset: Dataset, body: LabelIn, pool: Pool, owner: Owner
 ) -> DisclosureCreatedOut:
     try:
+        # The machine's value comes from the server's own data, not from the request.
+        machine_value = await adjudication.machine_value_for(
+            pool, dataset, body.sample_key, body.item_ref
+        )
         new_id = await adjudication.record(
             pool,
             dataset=dataset,
             sample_key=body.sample_key,
             item_ref=body.item_ref,
-            machine_value=body.machine_value,
+            machine_value=machine_value,
             human_value=body.human_value,
             by=f"owner:{owner.user_id}",
             note=body.note,
@@ -1507,14 +1532,17 @@ async def version_span(
     storage: Storage,
     _owner: Owner,
     context: Annotated[int, Query(ge=0, le=2000)] = 400,
+    as_of: AsOf = None,
 ) -> SpanText:
     """The archived document text around a cited span. The archived bytes are re-parsed with the
     parser version that produced the offsets; `stale_parser` flags a version mismatch."""
     if end < start:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "end must not precede start")
     row = await pool.fetchrow(
-        "select archive_path, parser_version from public.source_document_version where id=$1",
+        "select archive_path, parser_version from public.source_document_version"
+        " where id=$1 and ($2::timestamptz is null or known_at <= $2)",
         version_id,
+        as_of,
     )
     if row is None or not row["archive_path"]:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No archived copy of that version")
@@ -1532,7 +1560,8 @@ async def version_span(
     return SpanText(
         version_id=version_id,
         parser_version=doc.parser_version,
-        stale_parser=row["parser_version"] not in (None, doc.parser_version),
+        # an unrecorded parser version cannot be shown to match, so it is flagged too
+        stale_parser=row["parser_version"] != doc.parser_version,
         before=doc.text[max(0, start - context) : start],
         span=doc.text[start:end],
         after=doc.text[end : end + context],

@@ -146,7 +146,7 @@ function NavForm({ isin, currency: defaultCurrency, onSaved }: { isin: string; c
         <textarea value={pasted} onChange={(e) => setPasted(e.target.value)} rows={3} className="num w-full border border-border bg-surface px-2 py-1.5 font-mono text-xs" />
       </label>
       <div className="flex items-center gap-3 sm:col-span-4">
-        <button type="submit" disabled={busy} className="border border-accent px-4 py-1.5 text-sm font-semibold hover:bg-surface-sunken disabled:opacity-50">Save NAV</button>
+        <button type="submit" disabled={busy} className="border border-accent px-4 py-1.5 text-sm font-semibold hover:bg-surface-muted disabled:opacity-50">Save NAV</button>
         {error ? <p role="alert" className="text-sm text-loss">{error}</p> : null}
         {saved ? <p role="status" className="text-sm text-text-muted">{saved}</p> : null}
       </div>
@@ -184,7 +184,7 @@ function NavPanel({ isin, v, onSaved }: { isin: string; v: PerformanceView; onSa
           <div className="overflow-x-auto border border-border">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-surface-sunken text-right">
+                <tr className="bg-surface-muted text-right">
                   <th scope="col" className="px-3 py-1.5 text-left font-medium">NAV date</th>
                   <th scope="col" className="px-2 py-1.5 font-medium">NAV</th>
                   <th scope="col" className="px-2 py-1.5 font-medium">Listing close</th>
@@ -313,7 +313,7 @@ export function PerformanceTab({ isin }: { isin: string }) {
                 <div className="overflow-x-auto border border-border">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-surface-sunken text-right">
+                      <tr className="bg-surface-muted text-right">
                         <th scope="col" className="px-3 py-1.5 text-left font-medium">Window</th>
                         <th scope="col" className="px-2 py-1.5 font-medium">Listing price</th>
                         <th scope="col" className="px-2 py-1.5 font-medium">With distributions</th>

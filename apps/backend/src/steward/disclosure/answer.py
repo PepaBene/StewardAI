@@ -11,6 +11,7 @@ figures are quoted from the filing as stored.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import re
 from collections.abc import Iterable
 from decimal import Decimal
@@ -189,16 +190,59 @@ def compose(
     for e in evidence:
         who = "an undisclosed counterparty" if e["anonymous"] else (e["counterparty"] or "")
         val = f" reported as {e['value']}" if e["value"] else ""
-        subject = f"{e['label']}{(' with ' + who) if who else ''}"
-        lines.append(f"{subject}{val}, from {e['source']}, known {e['known_at'].date()}.")
+        period = f" for the period ended {e['period_end']}" if e.get("period_end") else ""
+        part = f" ({e['segment']})" if e.get("segment") else ""
+        subject = f"{e['label']}{part}{(' with ' + who) if who else ''}"
+        lines.append(f"{subject}{val}{period}, from {e['source']}, known {e['known_at'].date()}.")
     text = f"For {ticker} as of {as_of.date()}: " + " ".join(lines)
     quoted = [
         " ".join(str(e[k] or "") for k in ("value", "quote", "counterparty", "label", "source"))
         for e in evidence
     ]
-    dates = [f"{e['known_at'].date()} {as_of.date()}" for e in evidence]
+    dates = [f"{e['known_at'].date()} {as_of.date()} {e.get('period_end') or ''}" for e in evidence]
     grounded = numbers_grounded(text, [*quoted, *dates, ticker])
     return {"text": text if grounded else None, "limits": limits, "grounded": grounded}
+
+
+_JUDGEMENT = re.compile(
+    r"\b(beat|beats|missed?|misses|exceed\w*|surpass\w*|outperform\w*|underperform\w*|grew|grow\w*"
+    r"|rose|rise\w*|fell|fall\w*|drop\w*|declin\w*|increas\w*|decreas\w*|surg\w*|plung\w*"
+    r"|record|strong\w*|weak\w*|improv\w*|deteriorat\w*|better|worse|higher|lower|up|down)\b",
+    re.IGNORECASE,
+)
+
+
+def _judgement_words(text: str) -> set[str]:
+    return {m.lower() for m in _JUDGEMENT.findall(text)}
+
+
+# Words a rewrite may add freely: they join facts and carry none.
+_GLUE = frozenset(
+    "a an the and or but of in on at to for from by with as is are was were be been being it its "
+    "this that these those which who whom whose has have had also then than so such not no per "
+    "about after before during over under into out up down within while when where there their "
+    "they he she his her we our you your i".split()
+)
+_APOSTROPHES = "'" + chr(0x2019)
+_PROSE_WORD = re.compile(f"[A-Za-z][A-Za-z{_APOSTROPHES}-]*")
+
+
+def _stem(word: str) -> str:
+    w = word.lower().strip(_APOSTROPHES + "-")
+    for suffix in ("'s", chr(0x2019) + "s", "ies", "es", "s"):
+        if len(w) > len(suffix) + 3 and w.endswith(suffix):
+            return w[: -len(suffix)]
+    return w
+
+
+def _added_words(text: str, allowed_text: str) -> set[str]:
+    """Content words in `text` that the facts it was written from do not contain."""
+    known = {_stem(w) for w in _PROSE_WORD.findall(allowed_text)}
+    return {
+        _stem(w)
+        for w in _PROSE_WORD.findall(text)
+        if w.lower() not in _GLUE and _stem(w) not in known
+    }
 
 
 PHRASE_SYSTEM = (
@@ -244,7 +288,24 @@ async def phrase(
     ]
     if not numbers_grounded(text, [template, *quoted]):
         return None
+    # Numbers alone do not make a rewrite faithful: "beat", "grew" or "record" are claims too.
+    if _judgement_words(text) - _judgement_words(template + " " + " ".join(quoted)):
+        return None
+    # A rewrite may reorder and connect the facts but not bring new words of its own: a word the
+    # template and evidence lack is a claim nobody checked. Such a rewrite is dropped.
+    if _added_words(text, template + " " + " ".join(quoted)):
+        return None
     return text
+
+
+def _dimensions(observation: dict[str, Any]) -> dict[str, Any]:
+    dims = observation.get("dimensions") or {}
+    if isinstance(dims, str):
+        try:
+            dims = json.loads(dims)
+        except ValueError:
+            return {"unreadable": dims}
+    return dict(dims) if isinstance(dims, dict) else {"unreadable": dims}
 
 
 async def answer(
@@ -259,6 +320,8 @@ async def answer(
         }
     claims = await asof.claims_as_of(pool, issuer_id, as_of, verified_only=True, limit=200)
     obs = await asof.observations_as_of(pool, issuer_id, as_of, verified_only=True, limit=200)
+    # A segment or dimensional value is not the company total: "Revenue" must not quote one.
+    obs = [o for o in obs if not o.get("segment") and not _dimensions(o)]
     rows = [_evidence_row("claim", c) for c in claims] + [
         _evidence_row("observation", o) for o in obs
     ]

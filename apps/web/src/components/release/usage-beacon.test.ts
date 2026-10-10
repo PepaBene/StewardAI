@@ -10,6 +10,7 @@ describe("USAGE_PATH", () => {
     expect(USAGE_PATH.test("/companies/AAPL")).toBe(true);
     expect(USAGE_PATH.test("/funds/IE00B5BMR087")).toBe(true);
     expect(USAGE_PATH.test("/")).toBe(true);
+    expect(USAGE_PATH.test("/companies/BRK.B")).toBe(true);
   });
 
   it("rejects query strings, spaces and overlong paths", () => {

@@ -41,6 +41,11 @@ export function CompositionStrip({ buckets, label }: { buckets: readonly XrayBuc
             </span>
           );
         })}
+        {Math.abs(total - 1) > 0.005 ? (
+          <span className="basis-full">
+            The shares add up to {formatPercent(total, { decimals: 1 })}, so each bar is drawn as its part of that total.
+          </span>
+        ) : null}
       </figcaption>
     </figure>
   );

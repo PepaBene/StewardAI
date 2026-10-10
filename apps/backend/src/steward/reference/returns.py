@@ -26,6 +26,7 @@ from steward.free_sources import (
     compute_returns,
 )
 from steward.jobs.runner import JobContext
+from steward.portfolio.reconstruct import rebuild_portfolio_history
 from steward.reference.identity import holding_tickers
 from steward.reference.listings import resolve_series_listing
 from steward.reference.price_series import (
@@ -251,3 +252,5 @@ async def run_returns_refresh(ctx: JobContext, today: dt.date) -> None:
 
 async def returns_refresh_handler(ctx: JobContext) -> None:
     await run_returns_refresh(ctx, dt.datetime.now(dt.UTC).date())
+    # Same inputs (the chosen closes), same cadence: keep the pre-snapshot history in step.
+    await rebuild_portfolio_history(ctx)

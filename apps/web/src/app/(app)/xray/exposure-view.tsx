@@ -43,7 +43,7 @@ export function ExposureView() {
 
 function Coverage({ data, asOf }: { data: XrayData; asOf: string }) {
   const currency = data.base_currency ?? "";
-  const unknown = data.unknown?.unknown_fund_weight ?? 0;
+  const unknown = data.unknown?.unknown_fund_weight ?? null;
   return (
     <Blueprint className="px-[22px] py-4">
       <PanelHeading kicker="What this is built from" title="Your holdings and each fund's published holdings" />
@@ -61,7 +61,7 @@ function Coverage({ data, asOf }: { data: XrayData; asOf: string }) {
           {currency ? formatMoney(data.total_value, currency, { decimals: 0 }) : "—"}
         </Fact>
         <Fact label="Unknown fund weight" note="Hatched in every view, never spread over known holdings">
-          <Pct value={unknown} />
+          {unknown === null ? "—" : <Pct value={unknown} />}
         </Fact>
         <Fact label="Issuers scored" note="For size, style and fundamentals">
           <span className="num">

@@ -103,7 +103,7 @@ async def candidates_for(
 ) -> list[Candidate]:
     cutoff = as_of or dt.datetime.now(dt.UTC)
     found: list[Candidate] = []
-    if cik:
+    if cik and str(cik).strip().isdigit():  # a non-numeric CIK matches nothing
         for row in await pool.fetch(
             "select id from public.issuer where cik=$1", str(int(cik)).zfill(10)
         ) + await pool.fetch("select id from public.issuer where cik=$1", str(int(cik))):
@@ -161,7 +161,8 @@ async def resolve_mention(
             mention.strip(),
         )
         assert row is not None
-        return {"id": row["id"], "status": "confirmed", "issuer_id": None, "anonymous": True}
+        # the stored status: a person may have rejected this mapping since it was first written
+        return {"id": row["id"], "status": row["status"], "issuer_id": None, "anonymous": True}
     candidates = await candidates_for(
         pool, mention, cik=cik, lei=lei, isin=isin, figi=figi, as_of=as_of
     )
@@ -173,6 +174,7 @@ async def resolve_mention(
            values($1,$2,$3,$4,$5,$6,$7::jsonb,$8)
            on conflict (coalesce(document_version_id,0), lower(mention), mention_kind)
            do update set candidate_ids = excluded.candidate_ids, score = excluded.score
+              where public.disclosure_entity_mapping.status in ('suggested', 'unresolved')
            returning id, status, issuer_id""",
         document_version_id,
         mention.strip(),
@@ -185,6 +187,16 @@ async def resolve_mention(
         ),
         chosen.basis if chosen else "name",
     )
+    if row is None:
+        # a person already decided this mapping; a rescan must not overwrite what they decided
+        row = await pool.fetchrow(
+            """select id, status, issuer_id from public.disclosure_entity_mapping
+                where coalesce(document_version_id,0) = coalesce($1,0)
+                  and lower(mention) = lower($2) and mention_kind = $3""",
+            document_version_id,
+            mention.strip(),
+            mention_kind,
+        )
     assert row is not None
     return {
         "id": row["id"],

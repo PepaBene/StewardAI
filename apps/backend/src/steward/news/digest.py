@@ -388,7 +388,9 @@ class ClaudeDigestWriter:
             messages=(Message("user", f"Today is {today.isoformat()}.\n\nMaterial:\n{material}"),),
             schema=DigestDraft,
             effort=self._settings.effort,
-            max_tokens=8000,
+            # OpenAI and Google count their reasoning against this limit, so 8000 cut the
+            # 16-section weekly digest off; it is a ceiling, not a cost.
+            max_tokens=32000,
             cache_key="digest",
         )
         done = None

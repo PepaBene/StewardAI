@@ -174,16 +174,31 @@ def default_scenarios(annual: StatementsView) -> list[Assumptions]:
     return [bear, base, bull]
 
 
-def _net_debt(f: Mapping[str, Decimal | None]) -> tuple[Decimal | None, str]:
+NO_DEBT_LIMITATION = (
+    "Cash is filed but no financial debt concept is mapped for this company, so net debt is unknown "
+    "and the DCF per-share value is withheld: debt filed under an unmapped or extension concept "
+    "would otherwise be ignored and overstate the value. Enter a net debt in your scenarios to "
+    "override."
+)
+NO_DEBT_REASON = (
+    "net debt unknown: debt or cash is not filed, or cash is filed with no financial debt concept "
+    "mapped (debt is not assumed to be zero); enter a net debt in the scenario to value per share"
+)
+
+
+def _net_debt(
+    f: Mapping[str, Decimal | None], as_of: dt.date | None = None
+) -> tuple[Decimal | None, str]:
+    at = f" (balance sheet {as_of})" if as_of else ""
     debt, cash = debt_of(f), f.get("cash")
     if cash is None:
         return None, "debt or cash not filed"
     if debt is None:
-        # A filed balance sheet with no debt concept is a company without financial debt.
+        # Absent debt is not zero debt: it may sit under a concept we do not map. Withheld.
         if f.get("total_assets") is None and f.get("equity") is None:
             return None, "debt or cash not filed"
-        return cash * -1, "no debt filed; taken as zero, so net debt is minus cash; leases excluded"
-    return debt - cash, "filed financial debt − cash; leases excluded"
+        return None, f"cash filed but no debt concept mapped; net debt withheld{at}"
+    return debt - cash, f"filed financial debt − cash; leases excluded{at}"
 
 
 def build_valuation(
@@ -209,7 +224,10 @@ def build_valuation(
     bal_src = ttm_fig if ttm_fig is not None else f_latest
     cfo, capex = use.get("cash_from_operations"), use.get("capex")
     fcf = None if cfo is None or capex is None else cfo - abs(capex)
-    net_debt_filed, nd_note = _net_debt(bal_src)
+    bal_end = ttm.end if ttm_fig is not None and ttm is not None else last_annual_end
+    net_debt_filed, nd_note = _net_debt(bal_src, bal_end)
+    if net_debt_filed is None and nd_note.startswith("cash filed but no debt"):
+        warnings.append(NO_DEBT_LIMITATION)
     nci = bal_src.get("noncontrolling_interest")
     shares = market.shares or use.get("weighted_shares_diluted") or use.get("weighted_shares_basic")
     hit = market.price_on(dt.date.today())
@@ -261,7 +279,11 @@ def build_valuation(
                 margin_of_safety(r.value_per_share.value, price), "fraction"
             )
     values = [r.value_per_share.value for r in results if r.value_per_share.value is not None]
-    sel = next((r for r in results if r.selected), results[0] if results else None)
+    # With nothing selected the grid and reverse DCF read the base case, not the first (bear) one.
+    sel = next(
+        (r for r in results if r.selected),
+        next((r for r in results if r.name == "base"), results[0] if results else None),
+    )
     grid: list[GridCell] = []
     if sel is not None:
         grid = _grid(sel.assumptions, fcf, net_debt_filed, nci, shares)
@@ -354,6 +376,10 @@ def _dcf(
             "n/m: starting free cash flow is not positive; enter a base figure to model a turnaround",
             inputs=inputs,
         ), flows
+    if inputs.net_debt is None:
+        from steward.analytics.contract import unavailable
+
+        return unavailable("per_share", version("dcf"), NO_DEBT_REASON, inputs=inputs), flows
     return dcf_per_share(inputs), flows
 
 

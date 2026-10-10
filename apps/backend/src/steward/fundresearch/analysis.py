@@ -35,7 +35,7 @@ from steward.analytics.exposure import (
     pe_from_yield,
     portfolio_earnings_yield,
 )
-from steward.fundresearch.data import FundData, FundListing
+from steward.fundresearch.data import FundData, FundListing, lending_answer
 from steward.funds.aggregate import IssuerRef, issuer_for
 
 ZERO = Decimal(0)
@@ -1266,12 +1266,12 @@ def build_checklist(
             )
         )
     else:
-        yes = lend.value.strip().lower() in ("yes", "true", "lends", "y")
+        answer = lending_answer(lend.value)
         crit.append(
             Criterion(
                 id="lending",
                 label="Securities lending",
-                status="watch" if yes else "good",
+                status="watch" if answer == "yes" else "good" if answer == "no" else "unknown",
                 observed=lend.value
                 + (f"; revenue share to the fund: {share.value}" if share else ""),
                 rule="No lending is good; lending is watch, with the share of revenue returned to the fund noted",

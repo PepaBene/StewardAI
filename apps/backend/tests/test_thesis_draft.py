@@ -11,6 +11,7 @@ from steward.thesis import draft
 from steward.thesis.draft import DraftLine, DraftUnavailable, DraftVariant, ModelDraft
 
 FACTS = [f"fact {i}" for i in range(1, 8)]
+FACTS[1] = "fact 2: operating margin 20%"
 
 
 def test_lines_without_a_real_fact_are_dropped_and_counted() -> None:
@@ -133,3 +134,48 @@ async def test_a_draft_is_built_from_the_model_answer() -> None:
     out = await draft.draft_thesis(_FakeLLM(parsed), "gpt-5", _report(8))  # type: ignore[arg-type]
     assert out.why_owned is not None and out.why_owned.facts == ["Research, T: s2"]
     assert out.facts_used == 8
+
+
+# ------------------------------------------------------------- numbers_supported (D27)
+
+NUM_FACTS = [
+    "Figure, Revenue FY2024: 1234567.891 money",
+    "Figure, Operating margin FY2024: 0.2047 fraction",
+    "Figure, Net debt FY2024: 2500000000 money",
+    "Figure, Dividend yield FY2024: 3.4 percent",
+]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Revenue was 1,234,567.89.",  # thousands separators, rounded to the shown precision
+        "Revenue was 1234568.",  # rounded to a whole number
+        "Margin is 20.47%.",  # fraction written as a percent
+        "Margin is about 20.5%.",  # percent, rounded
+        "Net debt is 2.5bn.",  # scaled unit
+        "Net debt is 2,500 million.",  # another scale of the same figure
+        "Net debt is 2.5 billion.",
+        "Revenue was 1.23m.",  # million, rounded
+        "Revenue was 1,235k.",  # thousand, rounded
+        "Yield is 0.034 of the price.",  # percent written back as a fraction
+    ],
+)
+def test_numbers_that_match_a_fact_after_normalising_are_supported(text: str) -> None:
+    assert draft.numbers_supported(text, NUM_FACTS)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Revenue was 1,334,567.",
+        "Margin is 25%.",
+        "Net debt is 3.5bn.",
+        "Net debt is 2.5m.",  # right digits, wrong unit
+        "Dividend of 7.9 per share.",
+    ],
+)
+def test_numbers_no_fact_supports_are_still_dropped(text: str) -> None:
+    assert not draft.numbers_supported(text, NUM_FACTS)
+    line = DraftLine(text=text, facts=[1])
+    assert draft.resolve(ModelDraft(why_owned=line), NUM_FACTS, None, "X").why_owned is None

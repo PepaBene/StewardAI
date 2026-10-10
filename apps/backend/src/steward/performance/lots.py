@@ -143,6 +143,12 @@ def build_lots(
     for s in pending:
         _apply_spin_off(s, queues, pooled_cost, pooled_qty)
     book.lots = [lot for q in queues.values() for lot in q if lot.remaining_quantity > 0]
+    if method == "average":
+        # The pooled cost is what the realized gains used, so the open lots show it too; the FIFO
+        # unit cost would contradict the method the owner chose. Purchase dates stay per lot.
+        for lot in book.lots:
+            if pooled_qty[lot.ticker] > 0:
+                lot.unit_cost = pooled_cost[lot.ticker] / pooled_qty[lot.ticker]
     book.lots.sort(key=lambda lot: (lot.ticker, lot.bought_on, lot.lot_id))
     return book
 

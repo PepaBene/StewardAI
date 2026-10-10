@@ -13,6 +13,7 @@ import { Field, SELECT_CLASS } from "@/components/reference/form-bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { useUrlTicker } from "@/lib/disclosure/url-ticker";
 import { allLines, choices, defaultChoice, type EstimatesView } from "@/lib/disclosure/estimates";
 import { SAMPLE_EST_DAY, SAMPLE_EST_TICKER, sampleEstimates } from "@/lib/disclosure/fixtures-estimates";
 import { dayOf, endOfDayMs, formatDay } from "@/lib/disclosure/model";
@@ -28,7 +29,8 @@ const SECTIONS = [
   { id: "coverage", label: "Coverage" },
 ] as const;
 
-const TICKER = /^[A-Za-z0-9._-]{1,32}$/;
+// A ticker with no segment made only of dots: "." and ".." would normalise the request path to another route.
+const TICKER = /^(?!\.+$)[A-Za-z0-9._-]{1,32}$/;
 const DAY_MS = 86_400_000;
 
 /**
@@ -38,9 +40,10 @@ const DAY_MS = 86_400_000;
  */
 export function EstimatesPageView() {
   const [until] = useState(() => Date.now());
-  const [cutoff, setCutoff] = useState(() => endOfDayMs(SAMPLE_EST_DAY));
-  const [input, setInput] = useState("");
-  const [ticker, setTicker] = useState<string | null>(null);
+  const fromUrl = useUrlTicker();
+  const [cutoff, setCutoff] = useState(() => (fromUrl ? until : endOfDayMs(SAMPLE_EST_DAY)));
+  const [input, setInput] = useState(fromUrl ?? "");
+  const [ticker, setTicker] = useState<string | null>(fromUrl);
   const [error, setError] = useState<string | undefined>();
   const [pick, setPick] = useState<string>("");
   const [segPick, setSegPick] = useState(0);

@@ -109,6 +109,10 @@ async def ingest_document_version(
             record.amends_external_id,
             record.known_at,
         )
+    notes = dict(record.date_notes)
+    if record.amends_external_id and amends is None:
+        # The original is not stored yet: remember which one it is, so it is linked on arrival.
+        notes["amends_external_id"] = record.amends_external_id
     version_id: int = await pool.fetchval(
         """insert into public.source_document_version
              (document_id, content_hash, filed_at, accepted_at, published_at, retrieved_at,
@@ -126,12 +130,23 @@ async def ingest_document_version(
         amends,
         len(content),
         archive_path,
-        json.dumps(record.date_notes),
+        json.dumps(notes),
         quarantine_reason is not None,
         quarantine_reason,
         parser_version,
     )
     await mark_superseded(pool, document_id)
+    await pool.execute(  # amendments stored before this original arrived
+        """update public.source_document_version c set amends_version_id = $1
+            where c.amends_version_id is null and c.known_at >= $3
+              and c.date_notes->>'amends_external_id' = $2
+              and exists (select 1 from public.source_document x
+                           where x.id = c.document_id and x.regulator = $4)""",
+        version_id,
+        record.external_id,
+        record.known_at,
+        record.regulator,
+    )
     return IngestResult(document_id, version_id, True, quarantine_reason is not None)
 
 
@@ -234,7 +249,20 @@ async def record_observation(
               dimensions, document_version_id, evidence_id, source_precedence, parser_version,
               event_effective_at, known_at, supersedes_id)
            values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18,$19,$20,
-                  $21,$22,$23)
+                  $21,$22,
+                  coalesce($23::bigint,
+                     (select o.id from public.disclosure_observation o
+                        join public.source_document_version av
+                          on av.id = (select amends_version_id from public.source_document_version
+                                       where id = $17)
+                       where o.document_version_id = av.id and o.metric = $1
+                         and coalesce(o.segment,'') = coalesce($4,'')
+                         and coalesce(o.period_start, date '0001-01-01')
+                             = coalesce($5, date '0001-01-01')
+                         and o.period_end = $6 and o.unit = $12
+                         and coalesce(o.currency,'') = coalesce($14,'')
+                         and o.dimensions = $16::jsonb
+                       order by o.id desc limit 1)))
            on conflict (document_version_id, metric, coalesce(segment,''),
                         coalesce(period_start, date '0001-01-01'), period_end, unit,
                         coalesce(currency,''), md5(dimensions::text), parser_version) do nothing

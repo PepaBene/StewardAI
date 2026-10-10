@@ -43,6 +43,13 @@ class Story(BaseModel):
     ticker: str
     tier: int
     rumour: bool
+    cluster_id: str | None = None
+
+    @property
+    def event_key(self) -> str:
+        """Stable identity of the event: the cluster, not the story that currently represents it
+        (a tier 1 article joining the cluster takes over as representative)."""
+        return self.cluster_id or str(self.id)
 
 
 class FeedItem(BaseModel):
@@ -133,7 +140,8 @@ async def chain_and_indicators(
 async def load_stories(pool: asyncpg.Pool, since: dt.date) -> list[Story]:
     rows = await pool.fetch(
         "select distinct on (coalesce(cluster_id::text, id::text)) id, headline, url,"
-        " outlet_name as outlet, published_at, event_type, affected_ticker as ticker, tier, rumour"
+        " outlet_name as outlet, published_at, event_type, affected_ticker as ticker, tier, rumour,"
+        " cluster_id::text as cluster_id"
         " from public.news_item"
         " where relevant and affected_ticker is not null and event_type = any($1::text[])"
         " and published_at >= $2"

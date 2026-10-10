@@ -51,6 +51,14 @@ async def _company(pool: Pool, ticker: str) -> service.Company:
     return company
 
 
+async def _require_covered(pool: Pool, ticker: str) -> None:
+    """404 for a ticker outside the universe, so notes and groups are not saved against it."""
+    if not await pool.fetchval(
+        "select 1 from public.investment_universe where ticker=$1 limit 1", ticker
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"{ticker} is not in the covered universe")
+
+
 @router.get("/{ticker}/overview", response_model=evidence.Overview)
 async def get_overview(ticker: TickerPath, pool: Pool, owner: Owner) -> evidence.Overview:
     """Issuer facts, the other listings of the same issuer, provider profile, latest segments,
@@ -248,7 +256,7 @@ async def _ratios_view(
         peer_values, scope_label, excluded = await service.peer_values_for(
             pool, company, peers, owner_id, group_id
         )
-    fwd = await evidence.forward_eps(pool, ticker)
+    fwd = await evidence.forward_eps(pool, ticker, company.market.currency)
     out = ratios.build_ratios(
         ticker,
         company.annual,
@@ -381,7 +389,10 @@ async def save_report(
     """Stores the report as it stands with your conclusion as a new version; nothing is overwritten."""
     company = await _company(pool, ticker)
     built = await _report(pool, company, owner.user_id)
-    return await report.save_version(pool, owner.user_id, built, body.conclusion.strip())
+    try:
+        return await report.save_version(pool, owner.user_id, built, body.conclusion.strip())
+    except service.VersionConflict as err:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(err)) from err
 
 
 @router.get("/{ticker}/report/versions", response_model=list[report.ReportVersionSummary])
@@ -455,6 +466,7 @@ async def list_peer_groups(ticker: TickerPath, pool: Pool, owner: Owner) -> list
 async def save_peer_group(
     ticker: TickerPath, body: service.PeerGroupIn, pool: Pool, owner: Owner
 ) -> service.PeerGroup:
+    await _require_covered(pool, ticker)
     return await service.save_group(pool, owner.user_id, ticker, body)
 
 
@@ -521,20 +533,23 @@ async def save_scenarios(
     )
     from steward.analytics.contract import input_hash
 
-    return await service.save_scenario(
-        pool,
-        owner.user_id,
-        ticker,
-        body,
-        input_hash(
-            {
-                "statements": company.annual.input_hash,
-                "request": body.request.model_dump(mode="json"),
-                "price": result.price,
-            }
-        ),
-        result.model_dump(mode="json"),
-    )
+    try:
+        return await service.save_scenario(
+            pool,
+            owner.user_id,
+            ticker,
+            body,
+            input_hash(
+                {
+                    "statements": company.annual.input_hash,
+                    "request": body.request.model_dump(mode="json"),
+                    "price": result.price,
+                }
+            ),
+            result.model_dump(mode="json"),
+        )
+    except service.VersionConflict as err:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(err)) from err
 
 
 @router.get("/{ticker}/estimates", response_model=evidence.Estimates)
@@ -600,6 +615,7 @@ async def add_case_item(
 ) -> evidence.CaseItem:
     if (problem := evidence.case_input_problem(body)) is not None:
         raise HTTPException(422, problem)
+    await _require_covered(pool, ticker)
     item = await evidence.save_case_item(pool, owner.user_id, ticker, body)
     assert item is not None
     return item

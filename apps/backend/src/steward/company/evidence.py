@@ -12,17 +12,21 @@ from __future__ import annotations
 import datetime as dt
 import json
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 import asyncpg
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from steward.analytics.contract import SourceRef, rounded
 from steward.analytics.versions import version
 from steward.company.ratios import figures_by_column
 from steward.company.statements import StatementsView
+from steward.config.holding_profiles import HoldingProfilesConfig
+from steward.config.store import load_active
+from steward.reference.price_series import choose_series, holding_symbols
 
 PROFILE_METRICS = ("sector", "industry", "description", "employees", "ceo", "website", "ipo_date")
 
@@ -136,6 +140,65 @@ class Overview(BaseModel):
     method_version: str
 
 
+def _single_axis(dimensions: Any) -> tuple[str, str] | None:
+    """(axis, member) of a fact broken out on exactly one axis; None for a total or a cross-cut."""
+    dims = _json(dimensions)
+    members = dims.get("members") or dims.get("typed") or {}
+    if isinstance(members, list):
+        members = {str(p[0]): p[1] for p in members if isinstance(p, (list, tuple)) and len(p) == 2}
+    if not isinstance(members, dict) or len(members) != 1:
+        return None
+    ((axis, member),) = members.items()
+    return str(axis), str(member)
+
+
+_AXIS_PREFERENCE = ("BusinessSegments", "OperatingSegments", "ProductOrService", "Geograph")
+
+
+def segment_lines(rows: list[dict[str, Any]]) -> list[SegmentLine]:
+    """Revenue of the latest full-year period on one axis: annual-length facts only, the latest
+    filing's value when a figure was restated, and a single axis so that geography, products and
+    segments (each of which adds up to the same revenue) are never summed together."""
+    latest: dict[tuple[str, str, dt.date, dt.date], dict[str, Any]] = {}
+    for r in rows:
+        axis = _single_axis(r["dimensions"])
+        start, end = r["period_start"], r["period_end"]
+        if axis is None or start is None or not 330 <= (end - start).days <= 380:
+            continue
+        key = (*axis, start, end)
+        if key not in latest or (r["known_at"], r["id"]) > (
+            latest[key]["known_at"],
+            latest[key]["id"],
+        ):
+            latest[key] = r
+    if not latest:
+        return []
+    period_end = max(end for _, _, _, end in latest)
+    by_axis: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+    for (axis_name, member, _start, end), r in latest.items():
+        if end == period_end:
+            by_axis.setdefault(axis_name, []).append((member, r))
+
+    def rank(axis: str) -> tuple[int, Decimal]:
+        order = next(
+            (i for i, p in enumerate(_AXIS_PREFERENCE) if p in axis), len(_AXIS_PREFERENCE)
+        )
+        return order, -sum((r["value"] for _, r in by_axis[axis] if r["value"] > 0), Decimal(0))
+
+    chosen = by_axis[min(by_axis, key=rank)]
+    chosen.sort(key=lambda m: -m[1]["value"])
+    total = sum((r["value"] for _, r in chosen if r["value"] > 0), Decimal(0))
+    return [
+        SegmentLine(
+            label=member.split(":")[-1],
+            value=r["value"],
+            share=rounded(r["value"] / total, "fraction") if total > 0 else None,
+            period_end=period_end,
+        )
+        for member, r in chosen[:12]
+    ]
+
+
 async def overview(pool: asyncpg.Pool, ticker: str) -> Overview | None:
     u = await pool.fetchrow(
         """select u.ticker, u.name, u.isin, u.country, u.mic, u.exchange, u.currency, u.status,
@@ -178,38 +241,14 @@ async def overview(pool: asyncpg.Pool, ticker: str) -> Overview | None:
     )
     profile = [ProfileFact(**dict(r)) for r in prof if r["value"]]
     seg_rows = await pool.fetch(
-        """select concept, label, dimensions, period_end, value
+        """select dimensions, period_start, period_end, value, known_at, id
            from public.financial_statement_fact
            where ticker=$1 and statement='segment' and value is not null
-             and concept in ('us-gaap:Revenues','us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax','ifrs-full:Revenue')
-             and period_end = (select max(period_end) from public.financial_statement_fact where ticker=$1 and statement='segment')
-           order by value desc limit 12""",
+             and period_start is not null
+             and concept in ('us-gaap:Revenues','us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax','ifrs-full:Revenue')""",
         ticker,
     )
-    total = sum((r["value"] for r in seg_rows if r["value"] and r["value"] > 0), Decimal(0))
-    segments: list[SegmentLine] = []
-    for r in seg_rows:
-        dims = _json(r["dimensions"])
-        members = dims.get("members") or dims.get("typed") or {}
-        if isinstance(members, list):
-            members = {
-                str(p[0]): p[1] for p in members if isinstance(p, (list, tuple)) and len(p) == 2
-            }
-        label = (
-            ", ".join(str(v).split(":")[-1] for v in members.values())
-            if isinstance(members, dict) and members
-            else (r["label"] or "Segment")
-        )
-        segments.append(
-            SegmentLine(
-                label=label,
-                value=r["value"],
-                share=rounded(r["value"] / total, "fraction")
-                if total > 0 and r["value"] is not None
-                else None,
-                period_end=r["period_end"],
-            )
-        )
+    segments = segment_lines([dict(r) for r in seg_rows])
     comp = await pool.fetch(
         """select distinct object_name from public.company_graph_edge
            where subject_key=$1 and edge_type='competitor' and status='confirmed' order by object_name limit 12""",
@@ -248,12 +287,21 @@ async def overview(pool: asyncpg.Pool, ticker: str) -> Overview | None:
                 source=a["source_url"],
             )
         )
+    # The instrument's symbol is Stooq style; the stored bars may be Yahoo style, so the series
+    # is chosen the way every other reader does (newest stored bar, Stooq on a tie).
     bar = None
-    if u["price_symbol"]:
+    profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
+    symbols = await holding_symbols(
+        pool, [ticker], profiles.body if profiles else HoldingProfilesConfig()
+    )
+    ref = (await choose_series(pool, symbols))[ticker]
+    if ref is not None:
         bar = await pool.fetchrow(
-            """select date, close from public.price_bar where symbol=$1 and bar_type='adjusted' and access_state='available'
+            """select date, close from public.price_bar where symbol=$1 and source=$2
+               and bar_type='adjusted' and access_state='available'
                order by date desc limit 1""",
-            u["price_symbol"],
+            ref.symbol,
+            ref.source,
         )
     years = await pool.fetchval(
         "select count(distinct period_end) from public.financial_statement_fact where ticker=$1 and statement='income' and period_start is not null and period_end-period_start between 330 and 380",
@@ -424,6 +472,21 @@ def _complete(r: Mapping[str, Any]) -> bool:
     )
 
 
+def _eps_known_at(annual: StatementsView | None) -> dict[dt.date, dt.datetime | None]:
+    """When each fiscal year's diluted EPS was first filed, by period end."""
+    if annual is None:
+        return {}
+    ends = {c.id: c.end for c in annual.columns if c.kind == "annual"}
+    out: dict[dt.date, dt.datetime | None] = {}
+    for table in annual.statements:
+        for line in table.lines:
+            if line.key == "eps_diluted":
+                out.update(
+                    {ends[cid]: cell.known_at for cid, cell in line.cells.items() if cid in ends}
+                )
+    return out
+
+
 async def estimates(pool: asyncpg.Pool, ticker: str, annual: StatementsView | None) -> Estimates:
     state = await pool.fetchval(
         "select state from public.provider_access where provider='fmp' and endpoint='analyst_estimates'"
@@ -445,6 +508,8 @@ async def estimates(pool: asyncpg.Pool, ticker: str, annual: StatementsView | No
     if annual is not None:
         fig = figures_by_column(annual)
         actuals = {c.end: fig[c.id] for c in annual.columns if c.kind == "annual"}
+    actual_known = _eps_known_at(annual)
+    scored: set[tuple[dt.date, str | None, str | None]] = set()
     points: list[EstimatePoint] = []
     for r in rows:
         d = dict(r)
@@ -458,10 +523,11 @@ async def estimates(pool: asyncpg.Pool, ticker: str, annual: StatementsView | No
             and d["period_end"]
             and d["value"]
         ):
-            hit = next(
-                (a for end, a in actuals.items() if abs((end - d["period_end"]).days) <= 10), None
+            hit_end, hit = next(
+                ((end, a) for end, a in actuals.items() if abs((end - d["period_end"]).days) <= 10),
+                (None, None),
             )
-            if hit is None:
+            if hit is None or hit_end is None:
                 why = "no filed fiscal year ends near this estimate's period"
             elif not complete:
                 why = "estimate metadata is incomplete (basis, currency or analyst count), so no surprise is computed"
@@ -469,9 +535,20 @@ async def estimates(pool: asyncpg.Pool, ticker: str, annual: StatementsView | No
                 "eps_diluted"
             ) is None:
                 why = f"estimate basis '{d['basis']}' is not the filed diluted EPS basis"
+            elif (
+                annual is None
+                or not annual.currency
+                or (d["currency"] or "").upper() != annual.currency.upper()
+            ):
+                why = f"estimate currency {d['currency']} differs from the filed {annual.currency if annual else None}, so no surprise is computed"
+            elif (published := actual_known.get(hit_end)) is None or d["known_at"] > published:
+                why = "estimate was not known before the actual was filed, so it is not a forecast of it"
+            elif (key := (hit_end, d["provider"], d["basis"])) in scored:
+                why = "a later estimate of this period from the same provider is the one scored"
             elif d["value"] == 0:
                 why = "estimate is zero"
             else:
+                scored.add(key)
                 surprise = rounded((hit["eps_diluted"] - d["value"]) / abs(d["value"]), "fraction")
         points.append(
             EstimatePoint(
@@ -519,8 +596,11 @@ async def estimates(pool: asyncpg.Pool, ticker: str, annual: StatementsView | No
     )
 
 
-async def forward_eps(pool: asyncpg.Pool, ticker: str) -> Decimal | None:
-    """The next fiscal year's published EPS consensus, only with access and full metadata."""
+async def forward_eps(
+    pool: asyncpg.Pool, ticker: str, price_currency: str | None
+) -> Decimal | None:
+    """The next fiscal year's published EPS consensus, only with access and full metadata, and
+    only in the currency the price is quoted in (a forward P/E divides one by the other)."""
     state = await pool.fetchval(
         "select state from public.provider_access where provider='fmp' and endpoint='analyst_estimates'"
     )
@@ -532,7 +612,10 @@ async def forward_eps(pool: asyncpg.Pool, ticker: str) -> Decimal | None:
              and period_end > current_date order by period_end, known_at desc limit 1""",
         ticker,
     )
-    return r["value"] if r and _complete(dict(r)) else None
+    if r is None or not _complete(dict(r)) or not price_currency or r["currency"] != price_currency:
+        return None
+    value: Decimal | None = r["value"]
+    return value
 
 
 # ------------------------------------------------------------------------------ network
@@ -730,22 +813,75 @@ def _growth(now: Decimal | None, before: Decimal | None) -> Decimal | None:
     return rounded(now / before - 1, "fraction")
 
 
+def announced_by_fiscal_year(
+    rows: Sequence[Mapping[str, Any]],
+    period_ends: Sequence[dt.date],
+    currency: str | None,
+    primary_listing: int | None = None,
+) -> tuple[dict[dt.date, Decimal], list[str]]:
+    """Confirmed cash dividends per share, summed by the fiscal year (keyed by its period end) that
+    contains the ex-date, to sit beside that year's cash paid, plus notes on what was left out.
+
+    Only the statement currency counts (an unlabelled amount is kept). With the company's primary
+    listing known, only that listing counts. Without it, identical ex-date and amount rows are
+    de-duplicated across listings and sources; if the listings still disagree, the announced figure
+    is withheld and the ambiguity is flagged rather than one listing silently chosen."""
+    notes: list[str] = []
+    usable = [
+        r
+        for r in rows
+        if r.get("currency") is None
+        or currency is None
+        or str(r["currency"]).upper() == currency.upper()
+    ]
+    if primary_listing is not None:
+        usable = [r for r in usable if r.get("listing_id") == primary_listing]
+    else:
+        per_listing: dict[Any, set[tuple[dt.date, Decimal]]] = {}
+        for r in usable:
+            per_listing.setdefault(r.get("listing_id"), set()).add((r["ex_date"], r["cash_amount"]))
+        if len({frozenset(s) for s in per_listing.values()}) > 1:
+            notes.append(
+                "Announced dividends differ between listings and no primary listing is recorded, "
+                "so no announced figure is shown."
+            )
+            return {}, notes
+    seen: set[tuple[dt.date, Decimal]] = set()
+    ends = sorted(period_ends)
+    out: dict[dt.date, Decimal] = {}
+    for r in sorted(usable, key=lambda r: r["ex_date"]):
+        key = (r["ex_date"], r["cash_amount"])
+        if key in seen:  # the same dividend carried by another listing or source
+            continue
+        seen.add(key)
+        ex = r["ex_date"]
+        for i, end in enumerate(ends):
+            start = ends[i - 1] if i else end - dt.timedelta(days=366)
+            if start < ex <= end:
+                out[end] = out.get(end, Decimal(0)) + r["cash_amount"]
+                break
+    return out, notes
+
+
 async def capital_allocation(
     pool: asyncpg.Pool, ticker: str, annual: StatementsView
 ) -> CapitalAllocation:
     fig = figures_by_column(annual)
     cols = [c for c in annual.columns if c.kind == "annual"]
-    paid_per_share: dict[int, Decimal] = {}
     div_rows = await pool.fetch(
-        """select a.ex_date, a.cash_amount from public.corporate_action a join public.security_listing l on l.id=a.listing_id
+        """select a.ex_date, a.cash_amount, a.currency, a.listing_id, k.listing_id as primary_listing
+           from public.corporate_action a join public.security_listing l on l.id=a.listing_id
            join public.instrument_security_link k on k.listing_id=l.id
            where k.ticker=$1 and a.action_type='cash_dividend' and a.status='confirmed' and a.cash_amount is not null""",
         ticker,
     )
-    for r in div_rows:
-        paid_per_share[r["ex_date"].year] = (
-            paid_per_share.get(r["ex_date"].year, Decimal(0)) + r["cash_amount"]
-        )
+    # `instrument_security_link` holds one listing per ticker: it is the company's own (primary) one.
+    primary = next(
+        (r["primary_listing"] for r in div_rows if r["primary_listing"] is not None), None
+    )
+    paid_per_share, dividend_notes = announced_by_fiscal_year(
+        [dict(r) for r in div_rows], [c.end for c in cols], annual.currency, primary
+    )
     # Repurchases the equity note reports as made in the year, to set beside the cash paid.
     note_repurchased: dict[dt.date, Decimal] = {}
     for r in await pool.fetch(
@@ -773,7 +909,7 @@ async def capital_allocation(
             returned = rounded((abs(div or Decimal(0)) + abs(buy or Decimal(0))) / fcf, "fraction")
         fps = None if fcf is None or not shares else rounded(fcf / shares, "per_share")
         recon = None
-        announced = paid_per_share.get(c.end.year)
+        announced = paid_per_share.get(c.end)
         if announced is not None and div is not None and shares:
             paid = abs(div) / shares
             gap = abs(paid - announced) / announced if announced else None
@@ -845,7 +981,7 @@ async def capital_allocation(
                 source_url=r["source_url"],
             )
         )
-    warnings = []
+    warnings = list(dividend_notes)
     if not any(y.fcf is not None for y in years):
         warnings.append(
             "No filed operating cash flow and capital expenditure, so free cash flow is not available."
@@ -1007,6 +1143,15 @@ MOAT_TYPES = ("switching_costs", "scale", "ip", "network_effects", "regulation",
 class Citation(BaseModel):
     url: str = Field(min_length=8, max_length=2000)
     passage: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("url")
+    @classmethod
+    def _web_address(cls, value: str) -> str:
+        """Only an http(s) address with a host: a javascript: or data: URL would run when clicked."""
+        parts = urlsplit(value.strip())
+        if parts.scheme.lower() not in ("http", "https") or not parts.hostname:
+            raise ValueError("a citation URL must be an http or https address")
+        return value.strip()
 
 
 class CaseItemIn(BaseModel):

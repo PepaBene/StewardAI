@@ -670,13 +670,21 @@ async def gather_risk_inputs(
         or limits.max_country_weight is not None
     )
     xray_done = False
-    if wants_xray and (owner := get_settings().owner_user_id):
+    owner = get_settings().owner_user_id
+    if wants_xray and owner:
         try:
             await _xray_inputs(pool, owner, limits, inputs)
             xray_done = True
         except Exception as exc:
             log.warning("x-ray measurement failed: %s", exc)
             inputs.unavailable["xray"] = str(exc)
+    if not xray_done:
+        # A configured limit that could not be measured is reported, never silently dropped.
+        why = inputs.unavailable.get("xray") or "no owner configured (OWNER_USER_ID)"
+        if limits.max_sector_weight is not None:
+            inputs.unavailable["sector"] = why
+        if limits.max_country_weight is not None:
+            inputs.unavailable["country"] = why
     if limits.max_look_through_weight is not None and not xray_done:
         # No owner configured or the X-Ray failed: the older look-through still answers overlap.
         try:

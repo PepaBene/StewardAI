@@ -66,7 +66,7 @@ async def seed(admin_url: str) -> None:
             await conn.execute(
                 "insert into public.fund_factsheet (fund_isin, as_of, source, snapshot_id, provider, fund_name, fund_currency, total_assets, total_assets_currency, expense_ratio,"
                 " benchmark_name, distribution_policy, holdings_count, equity_weight, total_weight, residual_weight, reconciles)"
-                " values ($1,$2,'ishares_json',$3,'ishares',$4,'USD',500000000,'USD',0.002,'Test index','accumulating',$5,0.99,0.99,0.01,true)",
+                " values ($1,$2,'ishares_json',$3,'ishares',$4,'USD',500000000,'USD',0.002,'Test index','distributing',$5,0.99,0.99,0.01,true)",
                 isin,
                 as_of,
                 sid,
@@ -155,6 +155,13 @@ async def test_style_performance_and_bond(api: httpx.AsyncClient) -> None:
     assert p["nav_available"] is False and p["benchmark"] is None
     assert p["suggested_benchmark"] == "^idx"  # exact label match with the factsheet
     assert {o["symbol"]: o["basis"] for o in p["benchmark_options"]}["^idx"] == "price"
+    # A difference needs a recorded benchmark currency to match the listing's (F3).
+    for key, value in (("benchmark_symbol", "^idx"), ("benchmark_currency", "USD")):
+        recorded = await api.put(
+            f"/funds/{A}/facts",
+            json={"key": key, "value": value, "source_url": "https://x.test/doc"},
+        )
+        assert recorded.status_code == 201
     p = (await api.get(f"/funds/{A}/performance?benchmark=^idx")).json()
     one = next(x for x in p["periods"] if x["label"] == "1 year")
     assert one["compared_on"] == "price" and Decimal(one["difference"]) < 0
@@ -221,11 +228,9 @@ async def test_facts_are_append_only_validated_and_drive_the_checklist(
         cl["summary_available"] is True
     )  # diversification is judged from two issuers: a concern, but known
     assert by["diversification"]["status"] == "concern"
-    assert by["tracking"]["status"] in (
-        "good",
-        "watch",
-        "concern",
-    )  # the matched benchmark was suggested by name
+    # The benchmark was suggested by name but no currency is recorded for it, so the difference
+    # is withheld (F3) and the criterion is unknown rather than guessed.
+    assert by["tracking"]["status"] == "unknown"
 
 
 async def test_compare_overlap_and_share_classes(api: httpx.AsyncClient) -> None:
@@ -280,6 +285,7 @@ async def test_benchmark_facts_nav_and_saved_comparisons(
 
     # An owner-recorded benchmark is used when none is passed, with its recorded basis.
     assert await put("benchmark_symbol", "^idx") == 201
+    assert await put("benchmark_currency", "USD") == 201  # a difference needs matched currency
     p = (await api.get(f"/funds/{A}/performance")).json()
     assert p["benchmark"]["symbol"] == "^idx" and "recorded" in p["benchmark"]["note"]
     assert p["nav"] is None

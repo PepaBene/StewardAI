@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type { components, paths } from "@/lib/api/schema";
 
 type S = components["schemas"];
@@ -146,7 +147,7 @@ export function activeBar(active: number, maxAbs: number): { side: "over" | "und
 
 /** Parse a typed weight in percent ("12.5" or "12,5") into a fraction 0-1, or null. */
 export function weightToFraction(text: string): number | null {
-  const t = text.trim().replace(",", ".");
+  const t = normaliseSeparators(text);
   if (t === "" || !/^\d+(\.\d+)?$/.test(t)) return null;
   const n = Number(t);
   return n >= 0 && n <= 100 ? n / 100 : null;

@@ -19,6 +19,7 @@ import {
   type StakeChainView,
   type StakeEvent,
 } from "@/lib/disclosure/ownership";
+import { safeHref } from "@/lib/reference/identity";
 import { cn } from "@/lib/utils";
 
 /**
@@ -246,14 +247,14 @@ export function StakeChain({ chain }: { chain: StakeChainView }) {
             <ul className="space-y-0.5 text-xs text-text-muted">
               {s.exhibits.map((x) => (
                 <li key={x.label}>
-                  {x.url ? <a href={x.url} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">{x.label}</a> : x.label}
+                  {safeHref(x.url) ? <a href={safeHref(x.url) ?? undefined} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">{x.label}</a> : x.label}
                   {x.description ? `: ${x.description}` : ""}
                 </li>
               ))}
             </ul>
           ) : null}
           <p className="text-xs">
-            <a href={s.source_url} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">Open the filing</a>
+            <a href={safeHref(s.source_url) ?? undefined} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">Open the filing</a>
           </p>
         </li>
       ))}

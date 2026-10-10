@@ -30,6 +30,7 @@ import {
   type SideConflict,
 } from "@/lib/disclosure/dependencies";
 import { DECISION_LABEL, DECISION_RESULT, decisionBody, decisionsFor, toStatus, type GraphDecision } from "@/lib/relationships/relationships";
+import { safeHref } from "@/lib/reference/identity";
 import { cn } from "@/lib/utils";
 
 const SCREEN_LABEL: Record<string, string> = {
@@ -342,7 +343,7 @@ export function SuggestedEdges({ ticker, claims, editable = false, onChanged }: 
           <p className="text-xs text-text-muted">
             Known from <span className="num">{formatDay(c.known_at)}</span>.{" "}
             {c.source_url ? (
-              <a href={c.source_url} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">Open the source</a>
+              <a href={safeHref(c.source_url) ?? undefined} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">Open the source</a>
             ) : null}
           </p>
           <EntityNote claim={c} />
@@ -414,7 +415,9 @@ export function OwnerWeights({ ticker, weights, editable, onChanged }: { ticker:
   const [basis, setBasis] = useState<(typeof OWNER_DENOMINATORS)[number]["value"]>("total_revenue");
   const [note, setNote] = useState("");
   const [state, setState] = useState<SaveState>({ kind: "idle" });
-  const share = Number(percent) / 100;
+  const share = Number((Number(percent) / 100).toPrecision(12)); // 14.1 % is 0.141, not 0.14100000000000001
+  const today = new Date();
+  const localDay = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const problem = !key.trim() ? "Enter the counterparty’s ticker or id." : !Number.isFinite(share) || percent.trim() === "" || share < 0 || share > 1 ? "Enter a percentage from 0 to 100." : note.trim().length < 10 ? "Say where this estimate comes from (at least 10 characters)." : undefined;
   const [touched, setTouched] = useState(false);
 
@@ -427,7 +430,7 @@ export function OwnerWeights({ ticker, weights, editable, onChanged }: { ticker:
       () =>
         getBrowserApiClient().POST("/disclosures/holdings/{ticker}/dependency-weights", {
           params: { path: { ticker } },
-          body: { counterparty_key: key.trim().toUpperCase(), counterparty_name: name.trim() || null, share: String(share), denominator: basis, as_of: new Date().toISOString().slice(0, 10), note: note.trim() },
+          body: { counterparty_key: key.trim().toUpperCase(), counterparty_name: name.trim() || null, share: String(share), denominator: basis, as_of: localDay, note: note.trim() },
         }),
       "Saved as your own estimate.",
     );

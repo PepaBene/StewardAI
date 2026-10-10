@@ -289,7 +289,7 @@ async def _children(
                   left join public.source_document_version dv on dv.id = v.document_version_id
                   left join public.source_document d on d.id = dv.document_id
                  where v.deal_id = any($1::bigint[]) and v.known_at <= $2
-                 order by v.version_no, v.id""",  # noqa: S608
+                 order by v.known_at, v.version_no, v.id""",  # noqa: S608
             ids,
             when,
         ),

@@ -356,6 +356,37 @@ def revision_pairs(values: Iterable[Value]) -> list[Pair]:
 
 
 # ------------------------------------------------------------------------------- surprise
+def basis_class(basis: str | None) -> str | None:
+    """'adjusted' or 'reported' (GAAP, IFRS, and the filing mirror's as_filed, restated and
+    recast), or None when no basis is stated. Estimates say GAAP or adjusted; mirrored actuals say
+    as_filed, so their labels are compared by class, never by spelling."""
+    if basis is None:
+        return None
+    b = basis.lower().replace("-", "_")
+    if b in ("adjusted", "adjusted_non_gaap", "non_gaap", "non_ifrs", "underlying"):
+        return "adjusted"
+    if b in ("gaap", "ifrs", "as_filed", "restated", "recast", "reported"):
+        return "reported"
+    return None
+
+
+def basis_conflict(estimate: str | None, actual: str | None) -> bool:
+    """Both bases are known and they are not the same kind. Different standards (GAAP against
+    IFRS) also differ."""
+    a, b = basis_class(estimate), basis_class(actual)
+    if a is None or b is None:
+        return False
+    if a != b:
+        return True
+    pure = {"gaap", "ifrs"}
+    return (
+        a == "reported"
+        and (estimate or "").lower() in pure
+        and (actual or "").lower() in pure
+        and (estimate or "").lower() != (actual or "").lower()
+    )
+
+
 @dataclass(frozen=True)
 class Actual:
     """A reported figure, normally from `disclosure_observation`."""
@@ -526,10 +557,11 @@ def surprise(
         warnings.append("currency differs between estimate and actual")
     if est.unit != actual.unit:
         warnings.append("unit differs between estimate and actual")
-    if actual.basis is not None and est.basis != actual.basis:
+    if basis_conflict(est.basis, actual.basis):
         warnings.append(f"basis differs: estimate is {est.basis}, actual is {actual.basis}")
-    if actual.basis is None:
-        warnings.append("the actual's basis is not stated, so basis equality is unverified")
+    elif basis_class(actual.basis) is None or basis_class(est.basis) is None:
+        # An unstated basis cannot be shown equal, so nothing is scored on it.
+        warnings.append("basis differs or is unknown: the basis is not stated on one side")
     if est.analyst_count is None:
         warnings.append("analyst count not stated")
     if est.panel_method is None:
@@ -626,24 +658,37 @@ def segment_bridge(
     pre-release set. The additive totals count only additive segments that BOTH have an estimate
     and an actual, so a missing estimate never makes a total look like a miss."""
     mapping = {k.lower(): v.lower() for k, v in (segment_map or {}).items()}
+    # Keyed by segment and period start: a fiscal year and its Q4 end on the same day.
     est = {
-        (v.segment or "").lower(): v
+        ((v.segment or "").lower(), v.period_start): v
         for v in sorted(estimates, key=lambda v: (v.known_at, v.id))
         if v.metric.lower() == metric.lower()
         and v.segment
         and v.period_end == period_end
         and not problems(v)
     }
+    # Also keyed by basis: a segment reported both as filed and adjusted is two actuals, each
+    # compared (or refused) on its own basis, never one overwriting the other.
     act = {
-        a.segment.lower(): a
+        (a.segment.lower(), a.period_start, basis_class(a.basis) or ""): a
         for a in actuals
         if a.segment and a.metric.lower() == metric.lower() and a.period_end == period_end
     }
     lines: list[SegmentLine] = []
     used: set[str] = set()
     inputs: list[str] = []
-    for key, a in sorted(act.items()):
-        e = next((v for k, v in est.items() if mapping.get(k, k) == key), None)
+    for (key, _start, _basis), a in sorted(
+        act.items(), key=lambda kv: (kv[0][0], kv[0][1] or dt.date.min, kv[0][2])
+    ):
+        e = next(
+            (
+                v
+                for (k, start), v in est.items()
+                if mapping.get(k, k) == key
+                and (a.period_start is None or start is None or start == a.period_start)
+            ),
+            None,
+        )
         flags: list[str] = []
         if a.non_additive:
             flags.append("elimination or non-additive line")
@@ -687,6 +732,9 @@ def segment_bridge(
         if status == "scored" and (e.currency != a.currency or e.unit != a.unit):
             status = "not_comparable"
             flags.append("currency or unit differs")
+        if status == "scored" and basis_conflict(e.basis, a.basis):
+            status = "not_comparable"
+            flags.append(f"basis differs: estimate is {e.basis}, actual is {a.basis}")
         if status == "scored" and e_base is None:
             status = "not_comparable"
         delta = pct = None
@@ -713,7 +761,7 @@ def segment_bridge(
                 a.evidence_id,
             )
         )
-    unmapped = tuple(sorted(v.segment or "" for k, v in est.items() if k not in used))
+    unmapped = tuple(sorted(v.segment or "" for k, v in est.items() if k[0] not in used))
     scored = [ln for ln in lines if ln.status == "scored" and not ln.non_additive]
     est_total = (
         sum((ln.estimate for ln in scored if ln.estimate is not None), ZERO) if scored else None

@@ -274,7 +274,8 @@ def plan(
                 name=h.name if h else None,
                 action=action,
                 value_now=r["value"],
-                weight_now=r["value"] / total_now,
+                # On the total after the deposit, the basis the band is judged on.
+                weight_now=r["value"] / after_deposit,
                 target_weight=target.target_weight,
                 lower=max(0.0, target.target_weight - target.band),
                 upper=target.target_weight + target.band,

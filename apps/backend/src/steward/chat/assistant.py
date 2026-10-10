@@ -506,6 +506,18 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
 
 
 async def chat_handler(ctx: JobContext) -> None:
+    try:
+        await _run_chat_job(ctx)
+    except Exception:
+        # The job failed before it wrote an answer: the question must not stay pending.
+        await ctx.pool.execute(
+            "update public.chat_message set status = 'failed' where id = $1 and status = 'pending'",
+            int(ctx.params.get("message_id", 0)),
+        )
+        raise
+
+
+async def _run_chat_job(ctx: JobContext) -> None:
     settings = get_settings()
     jobs = await load_active(ctx.pool, "jobs", JobsConfig)
     sources = await load_active(ctx.pool, "news_sources", NewsSourcesConfig)
@@ -542,12 +554,4 @@ async def chat_handler(ctx: JobContext) -> None:
         from steward.chat.rules import RuleChatAssistant
 
         assistant = RuleChatAssistant(assistant, chat_settings.model)
-    try:
-        await run_chat(ctx, ChatDeps(assistant=assistant, now=dt.datetime.now(dt.UTC)))
-    except Exception:
-        # The job failed before it wrote an answer: the question must not stay pending.
-        await ctx.pool.execute(
-            "update public.chat_message set status = 'failed' where id = $1 and status = 'pending'",
-            int(ctx.params.get("message_id", 0)),
-        )
-        raise
+    await run_chat(ctx, ChatDeps(assistant=assistant, now=dt.datetime.now(dt.UTC)))

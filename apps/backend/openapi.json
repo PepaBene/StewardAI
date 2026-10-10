@@ -19423,7 +19423,7 @@
           "journal"
         ],
         "summary": "List Journal",
-        "description": "Journal entries, newest decision first, optionally for one security.",
+        "description": "Journal entries, newest decision first, optionally for one security. `offset` skips that\nmany newer entries so older ones can be read in pages.",
         "operationId": "list_journal",
         "security": [
           {
@@ -19458,6 +19458,18 @@
               "minimum": 1,
               "default": 200,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
             }
           }
         ],
@@ -22969,7 +22981,7 @@
           "disclosures"
         ],
         "summary": "Retire Owner Weight",
-        "description": "Retire a weight. It stops applying from now; replays before now still see it.",
+        "description": "Retire a weight you assigned. It stops applying from now; replays before now still see it.",
         "operationId": "retire_owner_weight",
         "security": [
           {
@@ -23736,6 +23748,25 @@
               "default": 400,
               "title": "Context"
             }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show only what was known by this time.",
+              "title": "As Of"
+            },
+            "description": "Show only what was known by this time."
           }
         ],
         "responses": {
@@ -26545,6 +26576,23 @@
             "type": "string",
             "format": "date-time",
             "title": "Since"
+          },
+          "needs_switch_off": {
+            "type": "boolean",
+            "title": "Needs Switch Off",
+            "description": "Switched on, but the release gate no longer allows it (an input went stale, an audit mismatch was entered, ...). Switch it off; nothing does so for you.",
+            "default": false
+          },
+          "gate_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gate Note"
           }
         },
         "type": "object",
@@ -26760,6 +26808,30 @@
             },
             "type": "array",
             "title": "Review Reasons"
+          },
+          "saved_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved Value",
+            "description": "The label already saved for this item and counted by the gate."
+          },
+          "saved_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved Kind",
+            "description": "Who made it: person or accepted_suggestion."
           }
         },
         "type": "object",
@@ -41573,7 +41645,14 @@
             "title": "Evidence Id"
           },
           "document_version_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Document Version Id"
           },
           "source_url": {
@@ -73044,7 +73123,8 @@
           },
           "peers": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$"
             },
             "type": "array",
             "maxItems": 40,
@@ -79039,6 +79119,14 @@
             },
             "type": "array",
             "title": "Reports"
+          },
+          "unapplied_reports": {
+            "items": {
+              "$ref": "#/components/schemas/UnappliedReportOut"
+            },
+            "type": "array",
+            "title": "Unapplied Reports",
+            "description": "Reports with only an amendment of no stated type: not read, not counted."
           }
         },
         "type": "object",
@@ -93042,6 +93130,17 @@
           "rumour": {
             "type": "boolean",
             "title": "Rumour"
+          },
+          "cluster_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Id"
           }
         },
         "type": "object",
@@ -97793,6 +97892,34 @@
         "title": "TrustSettings",
         "description": "Source trust (layer 1): owner feedback moves a source's score between 0 and 1."
       },
+      "UnappliedReportOut": {
+        "properties": {
+          "cik": {
+            "type": "string",
+            "title": "Cik"
+          },
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags",
+            "description": "Why no filing of this report could be applied."
+          }
+        },
+        "type": "object",
+        "required": [
+          "cik",
+          "period",
+          "flags"
+        ],
+        "title": "UnappliedReportOut"
+      },
       "UnbridgedAxisOut": {
         "properties": {
           "axis": {
@@ -98079,7 +98206,7 @@
         "properties": {
           "path": {
             "type": "string",
-            "pattern": "^/[A-Za-z0-9/_-]{0,120}$",
+            "pattern": "^/[A-Za-z0-9/_.-]{0,120}$",
             "title": "Path"
           }
         },
@@ -99823,6 +99950,12 @@
             "title": "Xirr Annualized",
             "description": "False when the window is under a year: `xirr` is then the money-weighted return over the window itself, not an annual rate.",
             "default": true
+          },
+          "opening_gap_days": {
+            "type": "integer",
+            "title": "Opening Gap Days",
+            "description": "Days between the window's nominal start and the stored day it opens on; above 0 the window is slightly longer than its label.",
+            "default": 0
           },
           "reason": {
             "anyOf": [

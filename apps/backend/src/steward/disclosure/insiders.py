@@ -371,12 +371,13 @@ def clusters(
     return found
 
 
-def position_change(tx: InsiderTx) -> Decimal | None:
+def position_change(tx: InsiderTx, cls: str | None = None) -> Decimal | None:
     """Percent change of the insider's holding in this line caused by the trade, from the
-    post-trade holding the form reports. None when it cannot be worked out."""
+    post-trade holding the form reports. None when it cannot be worked out. `cls` is the class in
+    force (the owner's override if there is one); it defaults to the classifier's."""
     if tx.shares is None or tx.shares_after is None or tx.derivative:
         return None
-    sign = -1 if tx.economic_class == "open_market_sell" else 1
+    sign = -1 if (cls or tx.economic_class) == "open_market_sell" else 1
     before = tx.shares_after - sign * tx.shares
     if before <= 0:
         return None

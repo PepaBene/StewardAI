@@ -80,6 +80,11 @@ class WindowOut(BaseModel):
         description="False when the window is under a year: `xirr` is then the money-weighted "
         "return over the window itself, not an annual rate.",
     )
+    opening_gap_days: int = Field(
+        default=0,
+        description="Days between the window's nominal start and the stored day it opens on; "
+        "above 0 the window is slightly longer than its label.",
+    )
     reason: str | None
     benchmark: BenchmarkOut | None
 

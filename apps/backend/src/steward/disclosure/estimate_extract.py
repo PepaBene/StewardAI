@@ -153,8 +153,12 @@ def parse_number(raw: str) -> tuple[Decimal | None, str | None]:
     s = raw.strip()
     if s.lower() in NOT_STATED:
         return None, None
-    neg = s.startswith("(") and s.endswith(")")
-    s = re.sub(r"[\s$€£%()]", "", s).replace("−", "-")  # noqa: RUF001
+    # A trailing footnote marker ("1.20 (1)", "1.20 [2]") is not part of the number.
+    s = re.sub(r"(?<=\d)\s+(?:\(\d{1,2}\)|\[\d{1,2}\])$", "", s)
+    s = re.sub(r"(?<=\))\s+(?:\(\d{1,2}\)|\[\d{1,2}\])$", "", s)
+    bare = re.sub(r"[\s$€£%]", "", s)  # "$(1.20)" is as negative as "(1.20)"
+    neg = bare.startswith("(") and bare.endswith(")")
+    s = bare.replace("(", "").replace(")", "").replace("−", "-")  # noqa: RUF001
     # A comma is a thousands separator only between groups of three digits; "1,2,3" or "1,5" is a
     # different convention, and reading it as 123 or 15 would invent a number.
     if "," in s and not re.fullmatch(r"[-+]?\d{1,3}(,\d{3})+(\.\d+)?", s):
@@ -202,7 +206,7 @@ def explicit_periods(text: str) -> dict[str, dt.date]:
     """ "Q3 FY2026 is the quarter ended 28 June 2026" -> {"FY2026Q3": 2026-06-28}."""
     out: dict[str, dt.date] = {}
     for m in re.finditer(
-        r"(Q[1-4]\s*FY\s*\d{2,4}|FY\s*\d{2,4}\s*Q[1-4])\s*(?:is|=|means|covers)\s+(?:the\s+)?"
+        r"(Q[1-4]\s*FY\s*\d{2,4}|FY\s*\d{2,4}\s*Q[1-4]|FY\s*\d{2,4})\s*(?:is|=|means|covers)\s+(?:the\s+)?"
         r"(?:quarter|three\s+months|year|twelve\s+months)\s+ended\s+([^.;\n]+)",
         text,
         re.I,
@@ -235,8 +239,9 @@ def normalise_period(label: str) -> str | None:
 def period_dates(
     label: str, fy_end: tuple[int, int, str] | None, explicit: dict[str, dt.date]
 ) -> tuple[dt.date | None, dt.date | None]:
-    """(start, end) of a normalised label. Fiscal years are named by the calendar year in which
-    they end. An explicit sentence overrides the computed end."""
+    """(start, end) of a normalised label. Fiscal years are assumed to be named by the calendar
+    year in which they end; a retailer that names them by the start year says so in an explicit
+    "FY2025 is the year ended 31 January 2026" sentence, which overrides the computed end."""
     m = re.fullmatch(r"FY(\d{4})(?:Q([1-4]))?", label)
     if not m:
         return None, None
@@ -280,13 +285,32 @@ def range_problems(nums: dict[str, Decimal | None]) -> list[str]:
     return out
 
 
-def _unit_for(metric: str, header_text: str) -> tuple[str, int]:
+_SCALE_WORD = r"\b(thousands?|millions?|billions?|mn|bn)\b"
+
+
+def _states_units(header_text: str, document_text: str) -> bool:
+    """True when the file says the amounts are in whole currency units ("in USD", "in dollars",
+    "whole units"); only then is a scale of 0 a statement rather than a silence."""
+    return bool(
+        re.search(
+            r"\b(?:whole|actual)\s+(?:units|dollars|euros)\b|\bin\s+(?:units|ones)\b",
+            header_text + " " + document_text,
+            re.I,
+        )
+    )
+
+
+def _unit_for(metric: str, header_text: str, document_text: str = "") -> tuple[str, int]:
+    """The table's own header names the scale; a caption outside the table ("(in millions)")
+    is read from the document text only as "in <scale>" so a stray word is not taken for it."""
     low = metric.lower()
     if "per share" in low or re.search(r"\beps\b", low) or "dividend" in low:
         return "per_share", 0
     if "margin" in low or "growth" in low or "%" in low or re.search(r"\brate\b", low):
         return "percent", 0
-    m = re.search(r"\b(thousands?|millions?|billions?|mn|bn)\b", header_text, re.I)
+    m = re.search(_SCALE_WORD, header_text, re.I) or re.search(
+        r"\bin\s+" + _SCALE_WORD, document_text, re.I
+    )
     return "amount", SCALES[m[1].lower()] if m else 0
 
 
@@ -299,10 +323,19 @@ def _currency(text: str) -> str | None:
     return None
 
 
+_NON_STANDARD = re.compile(r"\bnon[-\s]?(?:GAAP|IFRS)\b", re.I)
+
+
+def _standards(text: str) -> tuple[bool, bool]:
+    """(names IFRS, names GAAP), where "non-GAAP" and "non-IFRS" name neither standard."""
+    plain = _NON_STANDARD.sub(" ", text)
+    return bool(re.search(r"\bIFRS\b", plain)), bool(re.search(r"\bGAAP\b", plain))
+
+
 def _basis(text: str) -> str | None:
-    if re.search(r"adjusted|non-?gaap|non-?ifrs|underlying", text, re.I):
+    if re.search(r"adjusted|underlying", text, re.I) or _NON_STANDARD.search(text):
         return "adjusted"
-    has_ifrs, has_gaap = bool(re.search(r"\bIFRS\b", text)), bool(re.search(r"\bGAAP\b", text))
+    has_ifrs, has_gaap = _standards(text)
     if has_ifrs and not has_gaap:
         return "IFRS"
     if has_gaap and not has_ifrs:
@@ -312,7 +345,7 @@ def _basis(text: str) -> str | None:
 
 def _reporting_standard(text: str) -> str | None:
     """The accounting standard the file names, ignoring the word 'adjusted'."""
-    has_ifrs, has_gaap = bool(re.search(r"\bIFRS\b", text)), bool(re.search(r"\bGAAP\b", text))
+    has_ifrs, has_gaap = _standards(text)
     return "IFRS" if has_ifrs and not has_gaap else "GAAP" if has_gaap and not has_ifrs else None
 
 
@@ -432,6 +465,12 @@ def _extract(
             start_d, end_d = period_dates(fiscal, fy, explicit) if fiscal else (None, None)
             if fiscal and end_d is None:
                 row_issues.append("fiscal period cannot be placed on the calendar")
+            elif fiscal and fy is not None and fy[0] in (1, 2) and fiscal not in explicit:
+                # A year ending in January or February is named by its end year by some
+                # companies and by its start year by others (retailers); only a sentence settles it.
+                row_issues.append(
+                    "fiscal year naming is ambiguous for a year ending in January or February"
+                )
             nums: dict[str, Decimal | None] = {}
             for name in ("mean", "median", "high", "low"):
                 v, prob = parse_number(cell(name))
@@ -447,12 +486,14 @@ def _extract(
             if all(v is None for v in nums.values()):
                 row_issues.append("no value is stated")
             row_issues.extend(range_problems(nums))
-            unit, scale = _unit_for(metric, head_text)
+            unit, scale = _unit_for(metric, head_text, text)
             row_basis = _basis(metric) or table_basis or doc_standard
             if row_basis is None:
                 row_issues.append("reported or adjusted basis not stated")
             if unit != "percent" and cur is None and unit in ("amount", "per_share"):
                 row_issues.append("currency not stated")
+            if unit == "amount" and scale == 0 and not _states_units(head_text, text):
+                row_issues.append("scale not stated (in thousands, millions or billions)")
             segment = seg_raw or None
             values.append(
                 ExtractedValue(

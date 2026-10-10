@@ -54,9 +54,11 @@ class ScreenRequest(BaseModel):
     )
 
 
-async def universe_tickers(pool: Pool, universe: str) -> list[str]:
+async def universe_tickers(pool: Pool, universe: str, owner_id: object) -> list[str]:
     if universe == "watchlist":
-        rows = await pool.fetch("select distinct ticker from public.watchlist_item")
+        rows = await pool.fetch(
+            "select distinct ticker from public.watchlist_item where owner_id=$1", owner_id
+        )
     elif universe == "holdings":
         rows = await pool.fetch(
             """select distinct ticker from public.position_snapshot
@@ -70,12 +72,12 @@ async def universe_tickers(pool: Pool, universe: str) -> list[str]:
 
 
 @router.post("/screens/run", response_model=ScreenResult)
-async def run_screen_route(body: ScreenRequest, pool: Pool, _owner: Owner) -> ScreenResult:
+async def run_screen_route(body: ScreenRequest, pool: Pool, owner: Owner) -> ScreenResult:
     """Run numeric filters over each issuer's latest computable period. Every issuer left out
     is counted with its reason; a missing metric is excluded or flagged, never read as zero."""
     if len({(f.metric, f.op) for f in body.filters}) != len(body.filters):
         raise HTTPException(422, "each metric can have one gte and one lte filter at most")
-    tickers = await universe_tickers(pool, body.universe)
+    tickers = await universe_tickers(pool, body.universe, owner.user_id)
     facts = (
         await pool.fetch(
             """select ticker,concept,period_start,period_end,basis,value,unit,dimensions,known_at,
@@ -106,15 +108,20 @@ async def run_screen_route(body: ScreenRequest, pool: Pool, _owner: Owner) -> Sc
         names={r["t212_ticker"]: r["name"] for r in name_rows if r["name"]},
         missing=body.missing,
         sort_by=body.sort_by,
-        limit=body.limit,
+        # The gate filter must see every match, or matches past the limit never get a turn.
+        limit=max(len(tickers), 1) if body.valuation_gate_only else body.limit,
         universe=label,
         universe_definition=definition,
     )
-    return await _with_gates(pool, result, body.as_of, body.valuation_gate_only)
+    return await _with_gates(pool, result, body.as_of, body.valuation_gate_only, body.limit)
 
 
 async def _with_gates(
-    pool: Pool, result: ScreenResult, as_of: dt.datetime | None, only_passing: bool = False
+    pool: Pool,
+    result: ScreenResult,
+    as_of: dt.datetime | None,
+    only_passing: bool = False,
+    limit: int = 100,
 ) -> ScreenResult:
     """Attach each row's valuation gate. A row whose issuer or period has no gate says so (null),
     so a screen never reads a missing gate as a pass. The filters themselves are not changed."""
@@ -142,8 +149,9 @@ async def _with_gates(
             r for r in result.rows if r.valuation_gate and r.valuation_gate.usable_for_valuation
         ]
         dropped = len(result.rows) - len(kept)
-        result.rows = kept
-        result.shown = len(kept)
+        result.matched = len(kept)
+        result.rows = kept[:limit]
+        result.shown = len(result.rows)
         result.caveats = [
             *result.caveats,
             f"{dropped} matching rows were left out because their period did not pass the "

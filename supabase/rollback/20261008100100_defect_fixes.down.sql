@@ -1,4 +1,4 @@
--- Rollback for supabase/migrations/20261008100000_defect_fixes.sql.
+-- Rollback for supabase/migrations/20261008100100_defect_fixes.sql.
 -- Run it in a transaction, newest migration first. The migration file itself is never edited.
 -- DATA LOSS: adjudication history rows are dropped with the table.
 -- hs_concordance.source_url / source_sha256 are dropped only while they hold nothing: production

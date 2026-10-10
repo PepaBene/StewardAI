@@ -184,7 +184,7 @@ export function HoldingsTab({ isin }: { isin: string }) {
                 <div className="overflow-x-auto border border-border">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-surface-sunken text-left">
+                      <tr className="bg-surface-muted text-left">
                         <th scope="col" className="px-3 py-1.5 font-medium">Issuer</th>
                         <th scope="col" className="px-2 py-1.5 text-right font-medium">Weight</th>
                         <th scope="col" className="px-2 py-1.5 font-medium">Sector</th>
@@ -246,7 +246,7 @@ export function HoldingsTab({ isin }: { isin: string }) {
               <div className="overflow-x-auto border border-border">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-surface-sunken text-left">
+                    <tr className="bg-surface-muted text-left">
                       <th scope="col" className="px-3 py-1.5 font-medium">Group</th>
                       <th scope="col" className="px-2 py-1.5 text-right font-medium">Fund</th>
                       <th scope="col" className="px-2 py-1.5 text-right font-medium">Index</th>
@@ -461,7 +461,7 @@ export function BondTab({ isin }: { isin: string }) {
                   <div className="overflow-x-auto border border-border">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-surface-sunken text-right">
+                        <tr className="bg-surface-muted text-right">
                           <th scope="col" className="px-3 py-1.5 text-left font-medium">Spread move</th>
                           <th scope="col" className="px-2 py-1.5 font-medium">Investment grade</th>
                           <th scope="col" className="px-2 py-1.5 font-medium">Below investment grade</th>

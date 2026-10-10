@@ -1,5 +1,6 @@
 "use client";
 
+import { normaliseSeparators } from "@/lib/number-input";
 import Link from "next/link";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 
@@ -94,12 +95,12 @@ export function ReturnsPanel({ ticker }: { ticker: string }) {
   const [wh, setWh] = useState("");
   const [applied, setApplied] = useState({ start, end, wh: "" });
   const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(start) && /^\d{4}-\d{2}-\d{2}$/.test(end) && end >= start;
-  const whNum = wh.trim() === "" ? 0 : Number(wh.replace(",", ".")) / 100;
+  const whNum = wh.trim() === "" ? 0 : Number(normaliseSeparators(wh)) / 100;
   const whOk = Number.isFinite(whNum) && whNum >= 0 && whNum < 1;
   const fetcher = useCallback(
     () =>
       getBrowserApiClient().GET("/holdings/{ticker}/returns", {
-        params: { path: { ticker }, query: { start: applied.start, end: applied.end, withholding_rate: applied.wh.trim() === "" ? 0 : Number(applied.wh.replace(",", ".")) / 100 } },
+        params: { path: { ticker }, query: { start: applied.start, end: applied.end, withholding_rate: applied.wh.trim() === "" ? 0 : Number(normaliseSeparators(applied.wh)) / 100 } },
       }),
     [ticker, applied],
   );

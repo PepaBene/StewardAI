@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type { FieldErrors } from "@/lib/api/validation-errors";
 import { fractionToPercent, percentToFraction } from "@/lib/config/strategy-form";
 
@@ -141,7 +142,7 @@ export function budgetFromBody(body: BudgetConfig | null): BudgetForm {
 
 /** A typed number, or the text as typed for the backend to reject. */
 function num(value: string): number {
-  const cleaned = value.trim().replace(",", ".");
+  const cleaned = normaliseSeparators(value);
   const n = Number(cleaned);
   return (cleaned !== "" && Number.isFinite(n) ? n : value.trim()) as number;
 }

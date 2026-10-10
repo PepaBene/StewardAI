@@ -154,11 +154,22 @@ def _points(body: Any, component: str) -> dict[str, dict[str, Any]]:
         containers = body["componentsByNameMap"][component]["containersByNameMap"]
     except (KeyError, TypeError) as exc:
         raise IssuerReadError(f"iShares {component}: component missing from the response") from exc
+    if not isinstance(containers, dict):
+        raise IssuerReadError(f"iShares {component}: component missing from the response")
     out: dict[str, dict[str, Any]] = {}
     for cname, c in containers.items():
-        for name, dp in (c.get("dataPointsByNameMap") or {}).items():
-            out[f"{cname}.{name}"] = dp
+        named = c.get("dataPointsByNameMap") if isinstance(c, dict) else None
+        if not isinstance(named, dict):
+            continue  # a node that is not an object carries no data points
+        for name, dp in named.items():
+            if isinstance(dp, dict):
+                out[f"{cname}.{name}"] = dp
     return out
+
+
+def _value(points: dict[str, dict[str, Any]], key: str, field: str) -> Any:
+    """`points[key][field]`, or None when the point is absent."""
+    return points.get(key, {}).get(field)
 
 
 def _shown(points: dict[str, dict[str, Any]], key: str) -> str | None:
@@ -215,7 +226,7 @@ def parse_ishares(
     head = _points(header, "fundHeader")
     amount_text, as_of_text = (
         _shown(head, "fundNav.navAmount"),
-        (head.get("fundNav.navAmount") or {}).get("formattedAsOfDate"),
+        _value(head, "fundNav.navAmount", "formattedAsOfDate"),
     )
     currency = _shown(facts, "default.seriesBaseCurrencyCode")
     as_of = parse_issuer_date(as_of_text)
@@ -262,8 +273,8 @@ def parse_ishares_lending(sec_lending: Any, today: dt.date) -> IssuerReading:
             f"the issuer's lending statistics are dated {as_of_text!r}: not current"
         )
     else:
-        row: Any = (points.get("summary.oneYear") or {}).get("value")
-        kinds: Any = (points.get("summary.returnTypes") or {}).get("value")
+        row: Any = _value(points, "summary.oneYear", "value")
+        kinds: Any = _value(points, "summary.returnTypes", "value")
         on_loan: Decimal | None
         try:
             on_loan = Decimal(str(row[list(kinds).index("avgOnLoan")]).replace(",", ""))
@@ -299,8 +310,8 @@ _BASIS = (
 def parse_ishares_benchmark(performance: Any, portfolio_id: str) -> BenchmarkSeries | None:
     """The benchmark's 'growth of 10,000' series with its dates, or None when absent."""
     chart = _points(performance, "performance")
-    data = chart.get("chart.benchmarkData") or {}
-    values, dates = data.get("value"), data.get("asOfDate")
+    values = _value(chart, "chart.benchmarkData", "value")
+    dates = _value(chart, "chart.benchmarkData", "asOfDate")
     name = _shown(chart, "chart.benchmarkName")
     currency = _shown(chart, "chart.benchmarkCurrencySymbol")
     if (
@@ -435,10 +446,20 @@ def host_family(url: str) -> str:
     return host
 
 
+AUTO_PASSAGE_SUFFIX = "(read automatically from the issuer's data)"
+
+
 @dataclass(frozen=True)
 class RecordedFact:
     value: str
     source_url: str
+    passage: str | None = None
+
+    @property
+    def automatic(self) -> bool:
+        """Written by this sync, not entered by the owner: the host of an owner's source URL
+        (an ishares.com page) says nothing about who recorded the value."""
+        return (self.passage or "").endswith(AUTO_PASSAGE_SUFFIX)
 
 
 @dataclass
@@ -460,7 +481,7 @@ def plan_fact_writes(
             plan.writes[key] = cand
         elif latest.value.strip().lower() == cand.value.strip().lower():
             plan.unchanged.append(key)
-        elif host_family(latest.source_url) == host_family(source_url):
+        elif latest.automatic and host_family(latest.source_url) == host_family(source_url):
             plan.writes[key] = cand
         else:
             plan.conflicts[key] = (
@@ -471,20 +492,24 @@ def plan_fact_writes(
 
 def plan_nav_write(
     reading: NavReading | None,
-    existing: list[tuple[Decimal, str, str]],
+    existing: list[tuple[Decimal, str, str, str | None]],
     source_url: str,
 ) -> Literal["write", "unchanged", "conflict", "none"]:
-    """`existing` are the recorded (nav, currency, source_url) rows for the reading's date, newest
-    last. A first reading for the date is written; the same figure is unchanged; a different one
-    from the issuer's own source family is a revision (written); from elsewhere, a conflict."""
+    """`existing` are the recorded (nav, currency, source_url, origin) rows for the reading's
+    date, newest last. A first reading for the date is written; the same figure is unchanged; a
+    different one is a revision (written) only over a row the sync itself wrote from the issuer's
+    own source family. An owner-entered row, or one of unknown origin (null, written before origin
+    was recorded), is never superseded, whatever page it cites: a conflict."""
     if reading is None:
         return "none"
     if not existing:
         return "write"
-    nav, currency, src = existing[-1]
+    nav, currency, src, origin = existing[-1]
     if nav == reading.nav and currency == reading.currency:
         return "unchanged"
-    return "write" if host_family(src) == host_family(source_url) else "conflict"
+    if origin == "issuer" and host_family(src) == host_family(source_url):
+        return "write"
+    return "conflict"
 
 
 # ------------------------------------------------------------------------ fetch and store
@@ -583,9 +608,9 @@ async def store_reading(
     pool: asyncpg.Pool, owner_id: uuid.UUID, reading: IssuerReading
 ) -> dict[str, Any]:
     recorded = {
-        r["key"]: RecordedFact(r["value"], r["source_url"])
+        r["key"]: RecordedFact(r["value"], r["source_url"], r["passage"])
         for r in await pool.fetch(
-            """select distinct on (key) key, value, source_url from public.fund_owner_fact
+            """select distinct on (key) key, value, source_url, passage from public.fund_owner_fact
                where owner_id=$1 and fund_isin=$2 order by key, id desc""",
             owner_id,
             reading.isin,
@@ -604,14 +629,14 @@ async def store_reading(
                 key,
                 cand.value[:500],
                 reading.source_url,
-                f"{cand.passage} (read automatically from the issuer's data)"[:1000],
+                f"{cand.passage[: 1000 - len(AUTO_PASSAGE_SUFFIX) - 1]} {AUTO_PASSAGE_SUFFIX}",
                 reading.as_of,
             )
         if reading.nav is not None:
             existing = [
-                (r["nav"], r["currency"], r["source_url"])
+                (r["nav"], r["currency"], r["source_url"], r["origin"])
                 for r in await conn.fetch(
-                    """select nav, currency, source_url from public.fund_nav_point
+                    """select nav, currency, source_url, origin from public.fund_nav_point
                        where owner_id=$1 and fund_isin=$2 and as_of=$3 order by id""",
                     owner_id,
                     reading.isin,
@@ -622,8 +647,8 @@ async def store_reading(
             if nav_state == "write":
                 await conn.execute(
                     """insert into public.fund_nav_point
-                       (owner_id, fund_isin, as_of, nav, currency, source_url)
-                       values ($1,$2,$3,$4,$5,$6)""",
+                       (owner_id, fund_isin, as_of, nav, currency, source_url, origin)
+                       values ($1,$2,$3,$4,$5,$6,'issuer')""",
                     owner_id,
                     reading.isin,
                     reading.nav.as_of,
@@ -671,7 +696,12 @@ async def store_benchmark(conn: asyncpg.Connection, reading: IssuerReading) -> i
            on conflict (subject_kind, subject_key) do update set label = excluded.label,
              total_return_available = excluded.total_return_available, reason = excluded.reason,
              source_url = excluded.source_url, evidence = excluded.evidence, checked_at = now()
-           where public.fund_index_coverage.origin = 'derived'""",
+           where public.fund_index_coverage.origin = 'derived'
+             and (public.fund_index_coverage.label, public.fund_index_coverage.total_return_available,
+                  public.fund_index_coverage.reason, public.fund_index_coverage.source_url,
+                  public.fund_index_coverage.evidence)
+                 is distinct from (excluded.label, excluded.total_return_available, excluded.reason,
+                  excluded.source_url, excluded.evidence)""",
         series.symbol,
         series.name,
         None if series.basis is None else series.basis == "total",

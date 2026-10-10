@@ -41,14 +41,15 @@ function detailOf(error: unknown): string {
   return "";
 }
 
-/** Growth of 100 at the first rebalance, one point per rebalance date and one at the end. */
+/** Growth of 100 at the first rebalance, one point per rebalance date and one at the end.
+ * A period with no return is skipped, as the backend skips it in the cumulative figures. */
 function growth(periods: BacktestPeriod[], pick: (p: BacktestPeriod) => string | number | null | undefined): LinePoint[] {
   if (periods.length === 0) return [];
   let level = 100;
   const points: LinePoint[] = [{ date: periods[0].start, value: level }];
   for (const p of periods) {
     const r = toNumber(pick(p));
-    if (r === null) return points;
+    if (r === null) continue;
     level *= 1 + r;
     points.push({ date: p.end, value: Math.round(level * 100) / 100 });
   }
@@ -276,7 +277,7 @@ function Result({ r }: { r: BacktestResponse }) {
         <div className="overflow-x-auto border border-border">
           <table className="w-full min-w-[44rem] text-sm">
             <thead>
-              <tr className="bg-surface-sunken text-right text-xs text-text-muted">
+              <tr className="bg-surface-muted text-right text-xs text-text-muted">
                 <th scope="col" className="px-3 py-1.5 text-left font-medium">Period</th>
                 <th scope="col" className="px-2 py-1.5 font-medium">Members</th>
                 <th scope="col" className="px-2 py-1.5 font-medium">Matched</th>

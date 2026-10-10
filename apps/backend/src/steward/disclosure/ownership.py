@@ -62,7 +62,9 @@ def effective_reports(
             groups[(f.cik, f.period)].append(f)
     out: dict[tuple[str, dt.date], EffectiveReport] = {}
     for (cik, period), rows in groups.items():
-        rows.sort(key=lambda r: (r.known_at, r.accession))
+        # An amendment never sorts before the original it amends, even when both are known at
+        # the same moment (end of the filing day): the HR is applied first.
+        rows.sort(key=lambda r: (r.known_at, r.submission_type != "13F-HR", r.accession))
         accessions: list[str] = []
         flags: list[str] = []
         known = rows[0].known_at
@@ -166,8 +168,9 @@ def effective_positions(
             acc[(h.cusip, h.title_of_class, h.put_call)].append(h)
     lines: list[PositionLine] = []
     for (cusip, title, pc), rows in sorted(acc.items(), key=lambda kv: (kv[0][0], str(kv[0]))):
-        has_shares = any(r.shares is not None for r in rows)
-        has_value = any(r.value_usd is not None for r in rows)
+        # a total with a missing part is not a total, so it is not published
+        has_shares = all(r.shares is not None for r in rows)
+        has_value = all(r.value_usd is not None for r in rows)
         lines.append(
             PositionLine(
                 cusip,
@@ -304,6 +307,28 @@ class LaneEntry:
         return (self.filed - self.report_date).days
 
 
+STALE_STAKE_DAYS = 548  # about 18 months: a 13G is refreshed at least yearly while it stands
+
+
+def one_stake_per_position(
+    rows: Sequence[tuple[str, Decimal | None, Decimal | None, dt.date | None, dt.datetime]],
+) -> set[int]:
+    """Indexes (into `rows`: filer, shares, percent, event date, known_at) to keep, so a parent
+    and its subsidiary, or the members of a group, who each file the same stake are counted once.
+    Two filers reporting the same share count, percent and event date are one stake; the
+    latest-known filing of them is kept. A row with no share count is never merged."""
+    best: dict[tuple[object, ...], int] = {}
+    keep: set[int] = set()
+    for i, (_filer, shares, percent, event, known) in enumerate(rows):
+        if shares is None:
+            keep.add(i)
+            continue
+        key = (shares, percent, event)
+        if key not in best or known > rows[best[key]][4]:
+            best[key] = i
+    return keep | set(best.values())
+
+
 @dataclass(frozen=True)
 class Lane:
     key: LaneKey
@@ -334,6 +359,7 @@ def build_lane(
     denominator: Decimal | None,
     *,
     covered: bool = True,
+    as_of: dt.date | None = None,
 ) -> Lane:
     """One lane: its entries, its own total, and its remainder against the denominator."""
     notes: list[str] = []
@@ -373,6 +399,17 @@ def build_lane(
         )
     if key == "control_13dg":
         notes.append("The total is a floor: each filing shows its largest reporting person.")
+        if as_of is not None:
+            stale = sum(
+                1
+                for e in entries
+                if e.report_date is not None and (as_of - e.report_date).days > STALE_STAKE_DAYS
+            )
+            if stale:
+                notes.append(
+                    f"{stale} stake(s) were last reported over 18 months before this date and "
+                    "may no longer stand."
+                )
     dates = {e.report_date for e in entries if e.report_date is not None}
     if len(dates) > 1:
         notes.append(f"Entries are measured on {len(dates)} different dates; the total mixes them.")
@@ -406,6 +443,7 @@ def build_view(
     denominator_as_of: dt.date | None = None,
     *,
     not_covered: Iterable[LaneKey] = (),
+    as_of: dt.date | None = None,
 ) -> OwnershipView:
     missing = set(not_covered)
     order: tuple[LaneKey, ...] = (
@@ -415,7 +453,8 @@ def build_view(
         "national_voting",
     )
     built = tuple(
-        build_lane(k, lanes.get(k, ()), denominator, covered=k not in missing) for k in order
+        build_lane(k, lanes.get(k, ()), denominator, covered=k not in missing, as_of=as_of)
+        for k in order
     )
     warnings: list[str] = []
     live = {ln.key for ln in built if ln.status == "covered"}

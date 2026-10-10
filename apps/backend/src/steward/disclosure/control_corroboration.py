@@ -181,15 +181,21 @@ def compare_psc(
             reported,
         )
     # A PSC that ended before the reported date describes a past position.
+    # With no reported date, a ceased entry cannot be shown to cover it, so it is not current.
     current = [
-        p for p in named if not (p.ceased_on and reported.as_of and p.ceased_on <= reported.as_of)
+        p
+        for p in named
+        if not p.ceased_on or (reported.as_of is not None and p.ceased_on > reported.as_of)
     ]
     if not current:
         ended = max(p.ceased_on for p in named if p.ceased_on)
+        when = (
+            "before the reported date" if reported.as_of else "and the reported stake has no date"
+        )
         return _result(
             "psc",
             "not_comparable",
-            f"the PSC entry ended on {ended}, before the reported date",
+            f"the PSC entry ended on {ended}, {when}",
             reported,
             control_as_of=ended,
             matched=named[0].name,

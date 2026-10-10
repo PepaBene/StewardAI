@@ -12,6 +12,7 @@ import { Field } from "@/components/reference/form-bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { useUrlTicker } from "@/lib/disclosure/url-ticker";
 import type { DependencyView, PortfolioDependencies } from "@/lib/disclosure/dependencies";
 import { SAMPLE_DEP_DAY, SAMPLE_DEP_TICKER, SAMPLE_NAMES, sampleDependencies, samplePortfolio } from "@/lib/disclosure/fixtures-dependencies";
 import { dayOf, endOfDayMs, formatDay } from "@/lib/disclosure/model";
@@ -36,10 +37,11 @@ const DAY_MS = 86_400_000;
  */
 export function NetworkPageView() {
   const [until] = useState(() => Date.now());
-  const [cutoff, setCutoff] = useState(() => endOfDayMs(SAMPLE_DEP_DAY));
+  const fromUrl = useUrlTicker();
+  const [cutoff, setCutoff] = useState(() => (fromUrl ? until : endOfDayMs(SAMPLE_DEP_DAY)));
   const [shock, setShock] = useState(0.2);
-  const [input, setInput] = useState("");
-  const [ticker, setTicker] = useState<string | null>(null);
+  const [input, setInput] = useState(fromUrl ?? "");
+  const [ticker, setTicker] = useState<string | null>(fromUrl);
   const [error, setError] = useState<string | undefined>();
   // "Show" and every edit bump this so the same inputs fetch again
   const [nonce, setNonce] = useState(0);

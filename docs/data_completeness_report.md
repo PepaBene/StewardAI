@@ -12,7 +12,54 @@ areas are largely empty: earnings facts, thesis verdicts, IR sources and release
 web-researched slots. The web research was blocked until today by three faults (below), all
 fixed in code; its results are pending.
 
-## Coverage (holdings covered, of 30)
+## Update 2026-10-07 (supersedes the 2026-10-06 table where it differs)
+
+All fixes below are deployed (last commit `c804420`; the 13F migration `form13f_dataset_tickers`
+is applied in production).
+
+| Data | Now | Change and cause |
+| --- | --- | --- |
+| CIK | 24 | Meta's CIK now written from the profile |
+| Institutional holdings (13F) | 24 | Nu's CINS read from its Cayman ISIN; AstraZeneca's ADR matched by issuer name; a data set is re-read when a holding is added |
+| Next report date | 21 | no change; see "Report dates" below |
+| Relationship disclosures | 17 holdings, 100 rows (57 confirmed, 43 suggested then sent to AI approval) | `exposure_build` re-run on the fixed search; AZN 29, TSM 2, VRT 1 |
+| FMP profiles / estimates | 24 / 13 | the estimates gate no longer stops other holdings' profiles; 11 holdings are not covered by the free plan, the other 6 are non-US listings |
+| IR pages | owner-entered for BA, CELH, FB, GOOGL, NFLX, AAPL, NVDA, ORCL, UBER, VRT; discovered for PM, AZN, UNH, TSM | sites that refuse the worker's cloud address are read from the owner's machine (`uv run python -m worker.backfill ir_releases`) |
+| Earnings facts | 26+ holdings (TSM 20 and Daiichi 16 figures now verified; Meta 18) | TWD/NT$ currency markers and fiscal-year relabelling |
+
+### What was wrong, and is fixed
+
+1. IR discovery and gap research answered "none" for most holdings. Gemini's batch mode
+   returns no grounding sources, so the search now runs as direct calls and only the
+   structured answer is batched.
+2. A search answer with no sources was cached for 3 days and replayed. It is no longer
+   cached; 40 such entries were deleted.
+3. The FMP estimates gate was closed by a one-off HTTP 400, which stopped the loop and left
+   profiles for 3 holdings.
+4. The CNB press feed moved (old address returned 404).
+5. Claude is never called; any `claude-*` model in the config fails the job.
+
+### Report dates (ASML, AZN, TSM, QNT)
+
+The search found them on the companies' own sites: ASML 2026-10-14, TSM 2026-10-15,
+AZN 2026-10-30. None can be approved, because approval loads the page and finds the quoted
+text: AstraZeneca returns HTTP 403 to scripts, ASML's site times out, TSMC's calendar is
+built by JavaScript so a plain fetch lacks the quote. QNT has no published date. These need
+an owner-entered date or a browser-rendered check.
+
+### Still open
+
+- `weekly_digest` has never succeeded (one run, interrupted by a restart on 2026-09-27); it
+  emails the owner, so it has not been triggered. `monthly_review` succeeded (report 4).
+- ASML, Broadcom and Quantinuum IR sites refuse connections even from the owner's machine.
+- No relationships for FB, GE, GOOGL, NFLX, NU, ORCL, QNT, UBER: their filings probably name
+  no customer or supplier concentration.
+- News stories (18 of 30): mostly the sources carry nothing for the rest. TSM and UBER hold
+  70 and 46 items that are other companies' 8-Ks matching "tariffs", correctly irrelevant.
+- `EDINET_API_KEY` for CSG, Chugai and Daiichi.
+- The unexplained worker restarts (possible out-of-memory with the browser fallback).
+
+## Coverage on 2026-10-06 (holdings covered, of 30)
 
 | Data | Covered | Missing | Why / status |
 | --- | --- | --- | --- |

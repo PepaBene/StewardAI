@@ -59,6 +59,7 @@ from steward.jobs.runner import JobContext
 from steward.notify.channels import ChannelError, EmailChannel
 from steward.settings import Settings, get_settings
 from steward.sources.gleif import GleifClient
+from steward.sources.governor import QuotaExceeded
 from steward.storage import EvidenceStore
 
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
@@ -70,8 +71,14 @@ type Pool = asyncpg.Pool
 
 
 def new_filings(filings: list[DiscoveredFiling], cursor: dict[str, str]) -> list[DiscoveredFiling]:
-    """The newest `FILINGS_PER_ISSUER` filings after the issuer's stored cursor."""
-    return incremental(filings, cursor)[-FILINGS_PER_ISSUER:]
+    """`FILINGS_PER_ISSUER` filings after the issuer's stored cursor. With a cursor these are the
+    OLDEST new ones, because the cursor then moves to the newest of them: after an outage the
+    rest follow on the next runs instead of being skipped. A first run has no history to catch
+    up on and starts from the newest."""
+    new = incremental(filings, cursor)
+    if cursor and cursor.get("known_at"):
+        return new[:FILINGS_PER_ISSUER]
+    return new[-FILINGS_PER_ISSUER:]
 
 
 def advance_cursor(
@@ -157,7 +164,8 @@ async def disclosure_ingest_handler(ctx: JobContext) -> None:
                         issuer["id"],
                         discover_filings(cik, submissions, forms=CURRENT_REPORT_FORMS),
                     )
-                    filings = new_filings(discover_filings(cik, submissions, forms=FORMS), cursor)
+                    found = discover_filings(cik, submissions, forms=FORMS)
+                    filings = new_filings(found, cursor)
                     outcome = await ingest_filings(
                         ctx.pool,
                         issuer_id=issuer["id"],
@@ -167,21 +175,30 @@ async def disclosure_ingest_handler(ctx: JobContext) -> None:
                         store=store,
                     )
                 except SourceNotEnabled as exc:
+                    step.detail.update(totals)
                     step.detail["skipped"] = str(exc)
                     return
-                except (FetchFailure, httpx.HTTPError, ValueError) as exc:
+                except QuotaExceeded as exc:  # includes HardBlocked: the source is closed to us
+                    errors.append(f"issuer {issuer['id']}: {type(exc).__name__}, run stopped")
+                    break
+                except (
+                    FetchFailure,
+                    httpx.HTTPError,
+                    ValueError,
+                    RuntimeError,
+                    asyncpg.PostgresError,
+                ) as exc:
                     errors.append(f"issuer {issuer['id']}: {type(exc).__name__}")
                     continue
                 totals["ingested"] += outcome.ingested
                 totals["unchanged"] += outcome.unchanged
                 totals["failed"] += outcome.failed
                 if outcome.failed == 0:  # a failed filing is read again on the next run
-                    await save_cursor(
-                        ctx.pool,
-                        SUBMISSIONS_SOURCE,
-                        cik,
-                        advance_cursor(filings, cursor, listing.validators),
-                    )
+                    moved = advance_cursor(filings, cursor, listing.validators)
+                    if incremental(found, moved):  # more are waiting: read the listing again
+                        moved.pop("etag", None)
+                        moved.pop("last_modified", None)
+                    await save_cursor(ctx.pool, SUBMISSIONS_SOURCE, cik, moved)
             step.detail.update(totals)
             step.detail["errors"] = errors
         async with ctx.step("backfill") as step:

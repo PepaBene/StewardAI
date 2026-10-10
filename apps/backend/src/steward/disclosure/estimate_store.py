@@ -237,7 +237,9 @@ async def collect_consensus(
                     got.content if isinstance(got.content, bytes) else str(got.content).encode(),
                 ),
             )
-        except asyncpg.PostgresError as exc:
+        except (asyncpg.PostgresError, ValueError) as exc:
+            # ParseError (an empty or unreadable IR page) is a ValueError: one page never stops
+            # the other sources.
             totals["failed"] += 1
             totals["errors"].append(f"{r['source_key']}: {type(exc).__name__}")
             continue

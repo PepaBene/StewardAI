@@ -24,8 +24,11 @@ from steward.disclosure.deals import NUMERIC_TERMS
 
 SCALE = {
     "billion": Decimal(10) ** 9,
+    "bln": Decimal(10) ** 9,
     "bn": Decimal(10) ** 9,
+    "b": Decimal(10) ** 9,
     "million": Decimal(10) ** 6,
+    "mn": Decimal(10) ** 6,
     "mm": Decimal(10) ** 6,
     "m": Decimal(10) ** 6,
     "thousand": Decimal(10) ** 3,
@@ -33,6 +36,7 @@ SCALE = {
 }
 CURRENCY = {
     "$": "USD", "US$": "USD", "USD": "USD", "C$": "CAD", "CAD": "CAD",
+    "A$": "AUD", "AUD": "AUD", "HK$": "HKD", "HKD": "HKD", "NZ$": "NZD", "NZD": "NZD",
     "€": "EUR", "EUR": "EUR", "£": "GBP", "GBP": "GBP",
 }  # fmt: skip
 ITEM_MEANING = {
@@ -46,8 +50,9 @@ ITEM_MEANING = {
     "9.01": "Financial statements and exhibits",
 }
 MONEY = (
-    r"(?P<cur>US\$|C\$|\$|€|£|USD|EUR|GBP|CAD)\s?(?P<num>\d[\d,]*(?:\.\d+)?)"
-    r"(?:\s?(?P<scale>billion|million|thousand|bn|mm|m|k)(?![A-Za-z]))?"
+    r"(?P<cur>US\$|C\$|A\$|HK\$|NZ\$|\$|€|£|USD|EUR|GBP|CAD|AUD|HKD|NZD)\s?"
+    r"(?P<num>\d[\d,]*(?:\.\d+)?)"
+    r"(?:\s?(?P<scale>billion|bln|bn|b|million|mn|mm|m|thousand|k)(?![A-Za-z]))?"
 )
 SKIP = r"[^.$€£]"
 FLAGS = re.IGNORECASE
@@ -272,11 +277,23 @@ DEBT_WORDS = re.compile(
     r"\b(?:notes?|debentures?|coupon|bonds?|per\s+annum|interest\s+rate|loan|credit)\b", FLAGS
 )
 STAKE_WORDS = re.compile(r"stake|equity|ownership|shares", FLAGS)
+_CONDITION = re.compile(r"minimum|condition|at least|threshold", FLAGS)
 _PCT_RULES = _pct_rules()
 _MIX = re.compile(
     r"(\d{1,3}(?:\.\d+)?)%\s+(?:in\s+)?cash(?:\s+and|,)\s+(\d{1,3}(?:\.\d+)?)%\s+(?:in\s+)?(?:stock|shares)",
     FLAGS,
 )
+
+
+_HELD = re.compile(
+    r"\b(?:had|has|have|held|holds|holding|balance of|reserves? of)\b[^.;]{0,40}$", FLAGS
+)
+
+
+def _is_consideration(sentence: str, cand: re.Match[str]) -> bool:
+    """A cash or stock figure is consideration only in a sentence about the deal, and not when
+    it is a balance the company holds ("The Company had $1.2 billion in cash")."""
+    return bool(DEAL_WORDS.search(sentence)) and not _HELD.search(sentence[: cand.start()])
 
 
 def guess_type(text: str) -> str | None:
@@ -285,6 +302,20 @@ def guess_type(text: str) -> str | None:
         if re.search(pattern, low):
             return kind
     return None
+
+
+_SIDE_KINDS = frozenset({"debt_issuance", "buyback"})
+
+
+def _deal_type(lead: str, document: str, has_parties: bool) -> str | None:
+    """The party sentence types the deal. Only when it carries no hint does the rest of the
+    document speak, and then never as a financing or repurchase: a document that names two
+    parties is about them, and a credit facility or buyback it mentions is a side matter."""
+    kind = guess_type(lead)
+    if kind is not None or not has_parties:
+        return kind or guess_type(document)
+    low = document.lower()
+    return next((k for p, k in TYPE_HINTS if k not in _SIDE_KINDS and re.search(p, low)), None)
 
 
 def norm_party(name: str) -> str:
@@ -329,6 +360,8 @@ def extract(text: str) -> Extracted:
                     cand.start() < pe and ps < cand.end() for ps, pe in per_share
                 ):
                     continue
+                if name in PER_SHARE_EXCLUDES and not _is_consideration(s, cand):
+                    continue
                 m = cand
                 break
             if not m:
@@ -349,6 +382,12 @@ def extract(text: str) -> Extracted:
             m = rx.search(s)
             if m and name == "stake_pct" and DEBT_WORDS.search(s) and not STAKE_WORDS.search(m[0]):
                 m = None  # "5.25% senior notes", "% interest rate": a coupon, not a stake
+            if (
+                m
+                and name == "stake_pct"
+                and _CONDITION.search(s[max(0, m.start() - 60) : m.start()])
+            ):
+                m = None  # "minimum condition of 51%": a threshold of the offer, not the stake
             if m and name not in found:
                 raw = Decimal(m.group(1))
                 v = raw / 100 if name == "stake_pct" else raw
@@ -374,9 +413,12 @@ def extract(text: str) -> Extracted:
     joined = " ".join(live)
     pm = PARTIES.search(" ".join(s for s in live))
     parties = (pm.group("a").strip(), pm.group("b").strip().rstrip(".,")) if pm else ()
+    # The sentence that names the parties types the deal; a credit facility or repurchase named
+    # elsewhere in the document does not.
+    lead = next((s for s in live if pm and pm.group(0) in s), "") if pm else ""
     return Extracted(
         tuple((m.group(1), m.start()) for m in ITEM.finditer(text)),
-        guess_type(joined),
+        _deal_type(lead, joined, bool(pm)),
         parties,
         announce_dates[0] if announce_dates else (any_dates[0] if any_dates else None),
         unaffected_date,

@@ -20,7 +20,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -47,13 +47,28 @@ def role_from_position(position: str | None) -> ins.Role:
     return "other"
 
 
-def dedupe(txs: Sequence[ins.InsiderTx]) -> list[ins.InsiderTx]:
+def dedupe(txs: Sequence[ins.InsiderTx], amendments: Collection[str] = ()) -> list[ins.InsiderTx]:
     """One row per identical trade (person, day, class, volume, price), keeping the earliest known:
     an amendment that repeats a notice is not a second trade. Two identical lines inside one
-    notice are two trades (a split fill at one price) and both stay."""
+    notice are two trades (a split fill at one price) and both stay.
+
+    A notice named in `amendments` replaces what earlier notices said about the same person, day
+    and class, even when its price or volume differ: that is a correction, not a second trade."""
+    rows = sorted(txs, key=lambda r: (r.known_at, r.accession, r.row_index))
+    for notice in sorted({t.accession for t in rows if t.accession in amendments}):
+        mine = [t for t in rows if t.accession == notice]
+        corrected = {(t.insider, t.tx_date, t.economic_class) for t in mine}
+        known = min(t.known_at for t in mine)
+        rows = [
+            t
+            for t in rows
+            if t.accession == notice
+            or t.known_at >= known
+            or (t.insider, t.tx_date, t.economic_class) not in corrected
+        ]
     first_notice: dict[tuple[Any, ...], str] = {}
     kept: list[ins.InsiderTx] = []
-    for t in sorted(txs, key=lambda r: (r.known_at, r.accession, r.row_index)):
+    for t in rows:
         key = (t.insider, t.tx_date, t.economic_class, t.shares, t.price)
         notice = first_notice.setdefault(key, t.accession)
         if notice == t.accession:
@@ -84,6 +99,7 @@ async def pdmr_activity(
     )
     if not rows:
         return None
+    amended = {f"pdmr:{r['id']}" for r in rows if r["is_amendment"]}
     by_currency: dict[str, list[ins.InsiderTx]] = defaultdict(list)
     urls: dict[tuple[str, int], str] = {}
     meta: dict[tuple[str, int], Any] = {}
@@ -111,7 +127,7 @@ async def pdmr_activity(
     visible_total = 0
     nets: list[dict[str, Any]] = []
     for currency, txs in sorted(by_currency.items()):
-        unique = dedupe(ins.visible(txs, when))
+        unique = dedupe(ins.visible(txs, when), amended)
         visible_total += len(unique)
         view = ins.build_view(unique, when)
         nets += [
@@ -130,7 +146,7 @@ async def pdmr_activity(
             }
             for n in view.net
         ]
-    shown = dedupe(ins.visible([t for txs in by_currency.values() for t in txs], when))
+    shown = dedupe(ins.visible([t for txs in by_currency.values() for t in txs], when), amended)
     transactions = [
         {
             "notice": t.accession,

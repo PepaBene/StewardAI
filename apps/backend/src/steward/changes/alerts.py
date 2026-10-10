@@ -48,6 +48,9 @@ class Change:
     kind: str  # "deal" or "patent"
     severity: int
     message: str
+    # Keys this change was alerted under before the key format changed: if any exists, the change
+    # was already alerted and must not alert again.
+    legacy_keys: tuple[str, ...] = ()
 
 
 async def held_symbols(pool: asyncpg.Pool) -> dict[str, str]:
@@ -63,20 +66,33 @@ async def find_changes(pool: asyncpg.Pool, now: dt.datetime) -> list[Change]:
     held = await held_symbols(pool)
     out: list[Change] = []
     deals = await pool.fetch(
-        "select id, headline, url, affected_ticker, published_at from public.news_item"
+        "select id, cluster_id::text as cluster_id, headline, url, affected_ticker, published_at"
+        " from public.news_item"
         " where relevant and event_type = 'm_and_a' and tier = 1 and not rumour"
-        " and affected_ticker is not null and published_at >= $1",
+        " and affected_ticker is not null and published_at >= $1"
+        " order by published_at, id",
         now - dt.timedelta(days=DEAL_DAYS),
     )
+    # Before the cluster key, each news item alerted under its own id: keep those as legacy keys.
+    legacy_by_deal: dict[str, list[str]] = {}
     for r in deals:
-        if symbol_of(r["affected_ticker"]) in held:
+        legacy_by_deal.setdefault(f"change:deal:{r['cluster_id'] or r['id']}", []).append(
+            f"change:deal:{r['id']}"
+        )
+    seen_deals: set[str] = set()
+    for r in deals:
+        # One alert per deal: two sources reporting the same cluster are one event.
+        deal_key = f"change:deal:{r['cluster_id'] or r['id']}"
+        if symbol_of(r["affected_ticker"]) in held and deal_key not in seen_deals:
+            seen_deals.add(deal_key)
             out.append(
                 Change(
-                    key=f"change:deal:{r['id']}",
+                    key=deal_key,
                     ticker=r["affected_ticker"],
                     kind="deal",
                     severity=DEAL_SEVERITY,
                     message=f"Deal news at {r['affected_ticker']}: {r['headline']} ({r['url']})",
+                    legacy_keys=tuple(legacy_by_deal[deal_key]),
                 )
             )
     patents = await pool.fetch(
@@ -161,7 +177,7 @@ async def find_event_changes(pool: asyncpg.Pool, owner_id: str, now: dt.datetime
         top = item.top
         out.append(
             Change(
-                key=f"change:event:{item.story.id}:{item.direction}",
+                key=f"change:event:{item.story.event_key}:{item.direction}",
                 ticker=top.end,
                 kind="event",
                 severity=EVENT_SEVERITY,
@@ -170,6 +186,7 @@ async def find_event_changes(pool: asyncpg.Pool, owner_id: str, now: dt.datetime
                     f"{top.end} ({top.weight:.1%} of the portfolio) {item.direction}, "
                     f"weakest link {top.confidence}."
                 ),
+                legacy_keys=(f"change:event:{item.story.id}:{item.direction}",),
             )
         )
     return out
@@ -182,6 +199,11 @@ async def raise_alerts(
     notify = stored.body if stored else NotificationsConfig()
     created = 0
     for c in changes:
+        if c.legacy_keys and await pool.fetchval(
+            "select exists (select 1 from public.alert where dedupe_key = any($1::text[]))",
+            list(c.legacy_keys),
+        ):
+            continue  # alerted before the key format changed
         result = await create_alerts(
             pool,
             AlertRequest("portfolio", c.severity, c.ticker, f"{c.kind}_change"),

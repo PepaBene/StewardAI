@@ -114,8 +114,10 @@ def build_series(key: str, obs: Sequence[Obs], view: View = "restated") -> Serie
         elif days > QUARTER_DAYS[1]:
             cumulative[start][end] = val
     # Quarters that were filed only as year-to-date figures: this period's cumulative minus the
-    # previous one's, when the two end one quarter apart.
-    for start, by_end in cumulative.items():
+    # previous one's, when the two end one quarter apart. A share count is a period average, not
+    # a flow: two year-to-date averages do not subtract to a quarter's average, so none is built.
+    counts = any(o.unit.lower() == "shares" for o in obs)
+    for start, by_end in () if counts else cumulative.items():
         ends = sorted(by_end)
         for prev, cur in itertools.pairwise(ends):
             if cur in series.quarter or not _within((cur - prev).days, QUARTER_DAYS):
@@ -133,17 +135,74 @@ def build_series(key: str, obs: Sequence[Obs], view: View = "restated") -> Serie
                 restated=a.restated or b.restated,
                 original=None,
             )
-    series.ttm, series.ttm_end = _ttm(series)
+    series.ttm, series.ttm_end = _ttm(series, counts=counts)
+    if series.ttm is None and not counts:
+        series.ttm, series.ttm_end = _ttm_from_ytd(series, cumulative)
     return series
 
 
-def _ttm(series: Series) -> tuple[Val | None, dt.date | None]:
+def _ttm_from_ytd(
+    series: Series, cumulative: dict[dt.date, dict[dt.date, Val]]
+) -> tuple[Val | None, dt.date | None]:
+    """Trailing twelve months as the last fiscal year plus this year's year-to-date minus the
+    same period a year earlier, for when the individual quarters were not stored. Needs all
+    three filed figures; a missing one leaves the TTM absent."""
+    best: tuple[dt.date, dt.date, Val] | None = None  # (start, end, value) of the newest YTD
+    for start, by_end in cumulative.items():
+        for end, val in by_end.items():
+            days = (end - start).days
+            if days > QUARTER_DAYS[1] and not _within(days, ANNUAL_DAYS):  # a partial year
+                if best is None or end > best[1]:
+                    best = (start, end, val)
+    if best is None:
+        return None, None
+    start, end, current = best
+    year = dt.timedelta(days=364)
+    fiscal_year = next(
+        (
+            v
+            for e, v in series.annual.items()
+            if abs((e - (start - dt.timedelta(days=1))).days) <= MATCH_DAYS
+        ),
+        None,
+    )
+    prior = next(
+        (
+            v
+            for s, by_end in cumulative.items()
+            if abs((s - (start - year)).days) <= MATCH_DAYS
+            for e, v in by_end.items()
+            if abs((e - (end - year)).days) <= MATCH_DAYS
+        ),
+        None,
+    )
+    if fiscal_year is None or prior is None:
+        return None, None
+    return (
+        Val(
+            fiscal_year.value + current.value - prior.value,
+            current.obs,
+            derived="last fiscal year + year-to-date − the same period a year earlier",
+            restated=fiscal_year.restated or current.restated or prior.restated,
+        ),
+        end,
+    )
+
+
+def _ttm(series: Series, *, counts: bool = False) -> tuple[Val | None, dt.date | None]:
     last_q = max(series.quarter, default=None)
     last_a = max(series.annual, default=None)
     if last_a is not None and (last_q is None or last_a >= last_q - dt.timedelta(days=MATCH_DAYS)):
         return series.annual[last_a], last_a
     if last_q is None:
         return None, None
+    if counts:
+        # Four quarterly share counts are not added up: the latest quarter's is the TTM figure.
+        newest = series.quarter[last_q]
+        latest = Val(
+            newest.value, newest.obs, derived="latest quarter, share counts are not summed"
+        )
+        return latest, last_q
     ends = [last_q]
     for _ in range(3):
         before = [e for e in series.quarter if _within((ends[-1] - e).days, QUARTER_DAYS)]

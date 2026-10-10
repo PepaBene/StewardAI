@@ -11,6 +11,8 @@ left to the owner, because no input here supports them.
 from __future__ import annotations
 
 import logging
+import re
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
 import asyncpg
@@ -23,6 +25,7 @@ from steward.llm.types import LLMError, Message, Request
 logger = logging.getLogger("steward.thesis.draft")
 
 MAX_FACTS = 60
+MAX_CONFLICT_FACTS = 15
 
 SYSTEM = """\
 You help an investor write down why they own a stock. You receive a numbered list of FACTS \
@@ -127,16 +130,84 @@ def facts_for(report: CompanyReport) -> list[str]:
         shown = ", ".join(f"{label} {share:.0%}" for label, share in seg.lines if share is not None)
         if shown:
             out.append(f"Revenue by {seg.breakdown} {seg.period or ''}: {shown}".replace("  ", " "))
-    for c in report.conflicts:
-        out.append(f"Conflict ({c.area}): {c.text}")
-    return out[:MAX_FACTS]
+    conflicts = [f"Conflict ({c.area}): {c.text}" for c in report.conflicts]
+    # Conflict warnings are kept first: the cap trims research, figures and segments, never them.
+    conflicts = conflicts[:MAX_CONFLICT_FACTS]
+    out = out[: max(0, MAX_FACTS - len(conflicts))]
+    return out + conflicts
+
+
+_NUMBER = re.compile(
+    r"(?<![\w.])-?\d[\d,]*(?:\.\d+)?"
+    r"(?:(?:k|m|mn|bn|b|tn)\b|\s?(?:thousand|million|billion|trillion)\b)?",
+    re.IGNORECASE,
+)
+_SCALES = {
+    "k": Decimal(10) ** 3,
+    "thousand": Decimal(10) ** 3,
+    "m": Decimal(10) ** 6,
+    "mn": Decimal(10) ** 6,
+    "million": Decimal(10) ** 6,
+    "b": Decimal(10) ** 9,
+    "bn": Decimal(10) ** 9,
+    "billion": Decimal(10) ** 9,
+    "tn": Decimal(10) ** 12,
+    "trillion": Decimal(10) ** 12,
+}
+_ALLOWED_NUMBERS = {Decimal(40)}  # the pre-mortem loss level the instructions themselves state
+
+
+def _numbers(text: str) -> list[tuple[Decimal, int, Decimal]]:
+    """(value as written, decimal places written, unit multiplier) for each figure in `text`.
+    Thousands separators are removed; a k/m/bn/billion suffix sets the multiplier."""
+    found: list[tuple[Decimal, int, Decimal]] = []
+    for m in _NUMBER.finditer(text):
+        token = m.group()
+        suffix = re.search(r"[a-z]+$", token, re.IGNORECASE)
+        scale = _SCALES[suffix.group().lower()] if suffix else Decimal(1)
+        raw = (token[: suffix.start()] if suffix else token).strip().replace(",", "").rstrip(".")
+        try:
+            value = Decimal(raw)
+        except InvalidOperation:
+            continue
+        found.append((value, len(raw.split(".")[1]) if "." in raw else 0, scale))
+    return found
+
+
+def numbers_supported(text: str, facts: list[str]) -> bool:
+    """True when every figure in `text` is a fact's figure, allowing for: thousands separators,
+    a percentage of a fraction (x100, either way), rounding to the precision the text shows, and
+    a scaled unit (1.2bn for 1,200,000,000). Bare whole numbers up to ten are ordinary words,
+    not figures. A figure no fact supports makes the line unsupported."""
+    pool = [
+        v for fact in facts for value, _, scale in _numbers(fact) for v in {value, value * scale}
+    ]
+    for value, places, scale in _numbers(text):
+        if scale == 1 and (
+            value in _ALLOWED_NUMBERS or (value == value.to_integral_value() and abs(value) <= 10)
+        ):
+            continue
+        quantum = Decimal(1).scaleb(-places)
+        supported = False
+        for p in pool:
+            for factor in (Decimal(1), Decimal(100), Decimal("0.01")):
+                if (p * factor / scale).quantize(quantum, ROUND_HALF_UP) == value:
+                    supported = True
+                    break
+            if supported:
+                break
+        if not supported:
+            return False
+    return True
 
 
 def _resolve(line: DraftLine | None, facts: list[str]) -> ThesisDraftLine | None:
     if line is None:
         return None
     cited = [facts[i - 1] for i in dict.fromkeys(line.facts) if 1 <= i <= len(facts)]
-    return ThesisDraftLine(text=line.text.strip(), facts=cited) if cited else None
+    if not cited or not numbers_supported(line.text, facts):
+        return None
+    return ThesisDraftLine(text=line.text.strip(), facts=cited)
 
 
 def resolve(model: ModelDraft, facts: list[str], model_id: str | None, ticker: str) -> ThesisDraft:
@@ -161,7 +232,7 @@ def resolve(model: ModelDraft, facts: list[str], model_id: str | None, ticker: s
     if model.variant_perception is not None:
         v = model.variant_perception
         cited = [facts[i - 1] for i in dict.fromkeys(v.facts) if 1 <= i <= len(facts)]
-        if cited:
+        if cited and numbers_supported(f"{v.belief} {v.disproof}", facts):
             variant = ThesisDraftVariant(
                 belief=v.belief.strip(), disproof=v.disproof.strip(), facts=cited
             )

@@ -8,6 +8,7 @@ Scenario (EUR account, EUR base): a 1000 deposit on day 1; a buy of 10 AAA at 50
 import datetime as dt
 from collections.abc import AsyncIterator
 from decimal import Decimal
+from pathlib import Path
 
 import asyncpg
 import httpx
@@ -17,6 +18,8 @@ from api.auth import AuthenticatedUser, require_owner
 from api.db import get_pool, get_pool_or_error
 from api.main import create_app
 from tests.conftest import MigratedDatabase
+
+ROLLBACK_DIR = Path(__file__).resolve().parents[3] / "supabase" / "rollback"
 
 OWNER = "7f0c3d4e-0000-4000-8000-0000000000bb"
 pytestmark = pytest.mark.db
@@ -361,9 +364,7 @@ async def test_performance_alerts_are_raised_once_and_can_be_turned_off(
 async def test_the_performance_rollbacks_remove_what_their_migrations_added(
     api: httpx.AsyncClient, migrated_db: MigratedDatabase
 ) -> None:
-    from pathlib import Path
-
-    rollback_dir = Path(__file__).resolve().parents[3] / "supabase" / "rollback"  # noqa: ASYNC240
+    rollback_dir = ROLLBACK_DIR
     await api.put("/portfolio/performance/settings", json={"core_tickers": ["AAA_US_EQ"]})
     await api.put(
         "/portfolio/performance/settings",

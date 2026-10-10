@@ -160,8 +160,9 @@ def build_comparison(prepared: Sequence[Prepared]) -> FundComparison:
         elif key:
             seen[key] = f.isin
         funds.append(f)
-    # Classes the issuer gave no shared portfolio id (or from different issuers) are still one
-    # portfolio when their holdings are the same issuers at the same weights.
+    # Classes the issuer gave no shared portfolio id are still one portfolio when their holdings are
+    # the same issuers at the same weights, from the same provider and the same holdings date.
+    # Funds of different providers that track one index look alike without being one portfolio.
     weights = {
         p.fund.isin: (_issuer_weights(p.rows)[0] if p.view.row_count else {}) for p in prepared
     }
@@ -170,6 +171,10 @@ def build_comparison(prepared: Sequence[Prepared]) -> FundComparison:
             continue
         for earlier in funds[:i]:
             if earlier.duplicate_of is not None or not weights[earlier.isin]:
+                continue
+            if not f.provider or f.provider != earlier.provider:
+                continue
+            if f.holdings_as_of != earlier.holdings_as_of:
                 continue
             if set(weights[f.isin]) != set(weights[earlier.isin]):
                 continue

@@ -34,7 +34,7 @@ export function ProviderPanel({
   const keyless = catalogue.keyless_count ?? 0;
   const locked = providers.filter((p) => p.state !== "available");
   return (
-    <div className="space-y-2 border border-border-soft bg-surface-sunken px-4 py-3 text-sm">
+    <div className="space-y-2 border border-border-soft bg-surface-muted px-4 py-3 text-sm">
       <label className="flex items-start gap-2">
         <input type="checkbox" checked={basic} onChange={(e) => onBasic(e.target.checked)} className="mt-1" />
         <span>

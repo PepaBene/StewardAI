@@ -45,6 +45,16 @@ def test_capital_observations_are_computed_over_the_window_with_stated_inputs():
     assert cagr is not None and abs(cagr - D("0.8166")) < D("0.001")  # (0.33/0.10) ** 0.5 - 1
 
 
+def test_cash_returned_counts_only_years_with_both_dividends_and_buybacks():
+    years = [
+        year("FY2022", D(100), D(20), D(30), None, None, None),
+        year("FY2023", D(200), D(40), None, None, None, None),  # buybacks not filed: not zero
+    ]
+    obs = {o.id: o for o in ae.capital_observations(years)}
+    assert obs["cash_returned"].value == D("0.5")  # (20 + 30) / 100, FY2023 left out
+    assert "1 of 2 years" in obs["cash_returned"].detail
+
+
 def test_fcf_per_share_growth_uses_calendar_years_not_the_count_of_positive_years():
     years = [
         year("FY2022", D(100), None, None, None, None, D("0.10")),

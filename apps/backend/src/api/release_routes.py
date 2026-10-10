@@ -22,7 +22,8 @@ class PilotStart(BaseModel):
     length_days: int = Field(default=pilot.DEFAULT_DAYS, ge=7, le=120)
 
 
-USAGE_PATH = r"^/[A-Za-z0-9/_-]{0,120}$"  # mixed case: /companies/AAPL, /funds/IE00B5BMR087
+# mixed case, dots inside a ticker: /companies/AAPL, /companies/BRK.B, /funds/IE00B5BMR087
+USAGE_PATH = r"^/[A-Za-z0-9/_.-]{0,120}$"
 
 
 class UsageIn(BaseModel):
@@ -44,7 +45,8 @@ async def get_readiness(pool: Pool, owner: Owner) -> readiness.Readiness:
 @router.get("/release/activation")
 async def get_activation(pool: Pool, owner: Owner) -> list[activation.Activation]:
     """Which features you have switched on (the newest decision per feature)."""
-    return await activation.list_current(pool, owner.user_id)
+    gate = await readiness.build_readiness(pool, owner.user_id)
+    return activation.with_gate(await activation.list_current(pool, owner.user_id), gate)
 
 
 @router.post("/release/activation")
@@ -60,7 +62,7 @@ async def set_activation(
     except activation.ActivationRefused as exc:
         raise HTTPException(409, str(exc)) from None
     await activation.record(pool, owner.user_id, body)
-    return await activation.list_current(pool, owner.user_id)
+    return activation.with_gate(await activation.list_current(pool, owner.user_id), gate)
 
 
 @router.get("/release/audit")

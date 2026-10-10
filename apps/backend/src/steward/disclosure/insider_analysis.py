@@ -171,6 +171,10 @@ async def insider_activity(
     overrides = await _overrides(pool, txs)
     view = ins.build_view(txs, when, overrides=overrides)
     outstanding = Decimal(context["shares_outstanding"]) if context["shares_outstanding"] else None
+    if outstanding is not None and splits:
+        # The trades are in today's share count, so the count they are divided by must be too.
+        counted_on = context["shares_outstanding_as_of"]
+        outstanding, _ = ins.adjust_for_splits(outstanding, None, counted_on, splits, when.date())
     shown = sorted(
         ins.visible(txs, when),
         key=lambda t: (t.tx_date or t.filed, t.accession, t.row_index),
@@ -215,7 +219,7 @@ async def insider_activity(
                 "price": _s(t.price),
                 "value": _s(None if t.shares is None or t.price is None else t.shares * t.price),
                 "shares_after": _s(t.shares_after),
-                "position_change_percent": _s(ins.position_change(t)),
+                "position_change_percent": _s(ins.position_change(t, cls)),
                 "caveats": ins.caveats(t),
                 "source_url": urls[t.key],
             }
@@ -279,6 +283,34 @@ async def insider_activity(
         "splits_applied": len(splits),
         "transactions": detail,
     }
+
+
+async def discretionary_buys(
+    pool: Pool, ticker: str, as_of: dt.datetime, window_days: int
+) -> tuple[int, dt.datetime | None]:
+    """Open-market buys in the trailing window, counted exactly as the net view counts them: the
+    filings known and not yet superseded at `as_of`, the owner's class overrides applied, bundled
+    exercise-and-sell lines left out, and a buy with no plan indicator counted (only a stated
+    10b5-1 plan excludes it). Returns the count and the latest filing time seen."""
+    when = _aware(as_of)
+    txs, _ = await _rows(pool, ticker)
+    if not txs:
+        return 0, None
+    overrides = await _overrides(pool, txs)
+    rows = ins.visible(txs, when)
+    bundled = {r for b in ins.find_bundles(rows, overrides, when) for r in b.rows}
+    start = when.date() - dt.timedelta(days=window_days)
+    count = sum(
+        1
+        for t in rows
+        if t.tx_date is not None
+        and start < t.tx_date <= when.date()
+        and (cls := ins.effective_class(t, overrides, when)) == "open_market_buy"
+        and ins.countable(t, cls)
+        and t.key not in bundled
+        and t.plan is not True
+    )
+    return count, max((t.known_at for t in rows), default=None)
 
 
 async def pending_alerts(

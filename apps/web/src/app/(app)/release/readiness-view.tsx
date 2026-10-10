@@ -27,19 +27,29 @@ const fetchActivation = () => getBrowserApiClient().GET("/release/activation");
 export function ReadinessView() {
   const { state } = useApiResource(fetchReadiness);
   const { state: activation, reload } = useApiResource(fetchActivation);
-  const on = new Set(activation.kind === "ok" ? activation.data.filter((a) => a.active).map((a) => a.feature) : []);
+  // Unknown is not off: until the switches have loaded no feature shows a state or a button.
+  const on = activation.kind === "ok" ? new Set(activation.data.filter((a) => a.active).map((a) => a.feature)) : null;
   return (
-    <ResourceGate state={state} label="the release checks">
-      {(readiness) => <Body readiness={readiness} on={on} onChanged={reload} />}
-    </ResourceGate>
+    <div className="flex flex-col gap-5">
+      {activation.kind === "error" ? (
+        <p role="alert" className="border border-warning-signal/40 bg-warning-signal-subtle px-3 py-2 text-sm">
+          The switches could not be loaded ({activation.title}), so which features are on is unknown and none can be changed.{" "}
+          <button type="button" className="underline underline-offset-2" onClick={() => reload()}>Try again</button>
+        </p>
+      ) : null}
+      <ResourceGate state={state} label="the release checks">
+        {(readiness) => <Body readiness={readiness} on={on} onChanged={reload} />}
+      </ResourceGate>
+    </div>
   );
 }
 
 /** Switch a feature on or off. The server refuses a switch-on the gate does not allow and says why. */
-function Switch({ feature, isOn, onChanged }: { feature: FeatureReadiness; isOn: boolean; onChanged: () => void }) {
+function Switch({ feature, isOn, onChanged }: { feature: FeatureReadiness; isOn: boolean | null; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   async function toggle() {
+    if (isOn === null) return;
     setBusy(true);
     setProblem(null);
     const res = await getBrowserApiClient().POST("/release/activation", { body: { feature: feature.id, active: !isOn } });
@@ -47,21 +57,31 @@ function Switch({ feature, isOn, onChanged }: { feature: FeatureReadiness; isOn:
     if (!res.response.ok) return setProblem(problemText(res.error, "That could not be saved."));
     onChanged();
   }
+  const unknown = isOn === null;
   const blocked = !isOn && !feature.can_activate;
+  const failing = isOn === true && !feature.can_activate;
   return (
     <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border-soft pt-3">
-      <Button type="button" variant={isOn ? "outline" : "default"} disabled={busy || blocked} onClick={() => void toggle()}>
+      <Button type="button" variant={isOn ? "outline" : "default"} disabled={busy || blocked || unknown} onClick={() => void toggle()}>
         {busy ? "Saving…" : isOn ? "Switch off" : "Switch on"}
       </Button>
       <p className="text-sm">
-        {isOn ? "On: you switched this feature on." : blocked ? "Off: the checkpoints above must all pass first." : "Off: all checkpoints passed."}
+        {unknown
+          ? "Whether this feature is on is not known yet."
+          : failing
+            ? "On, but it no longer passes the checkpoints above. Switch it off."
+            : isOn
+              ? "On: you switched this feature on."
+              : blocked
+                ? "Off: the checkpoints above must all pass first."
+                : "Off: all checkpoints passed."}
       </p>
       <Problem>{problem}</Problem>
     </div>
   );
 }
 
-function Body({ readiness, on, onChanged }: { readiness: Readiness; on: Set<string>; onChanged: () => void }) {
+function Body({ readiness, on, onChanged }: { readiness: Readiness; on: Set<string> | null; onChanged: () => void }) {
   const total = readiness.features.length;
   return (
     <div className="flex flex-col gap-5">
@@ -85,7 +105,7 @@ function Body({ readiness, on, onChanged }: { readiness: Readiness; on: Set<stri
       <ul className="flex flex-col gap-3">
         {readiness.features.map((f) => (
           <li key={f.id}>
-            <FeatureGate feature={f} zeroCostPassed={readiness.zero_cost_passed} isOn={on.has(f.id)} onChanged={onChanged} />
+            <FeatureGate feature={f} zeroCostPassed={readiness.zero_cost_passed} isOn={on === null ? null : on.has(f.id)} onChanged={onChanged} />
           </li>
         ))}
       </ul>
@@ -101,7 +121,7 @@ function FeatureGate({
 }: {
   feature: FeatureReadiness;
   zeroCostPassed: boolean;
-  isOn: boolean;
+  isOn: boolean | null;
   onChanged: () => void;
 }) {
   const status = STATUS_LABEL[feature.status];
@@ -116,7 +136,7 @@ function FeatureGate({
         </div>
         <p className="flex items-center gap-2 text-sm font-semibold">
           <StatusDot tone={TONE[feature.status]} />
-          {feature.can_activate ? "May be switched on" : `Stays off: ${status.label.toLowerCase()}`}
+          {feature.can_activate ? "May be switched on" : isOn ? `Should be off: ${status.label.toLowerCase()}` : `Stays off: ${status.label.toLowerCase()}`}
         </p>
       </div>
 

@@ -110,6 +110,20 @@ def classify_failure(
     return "retrieval_failed", retry_after_at(retry_after, now=now) if status_code == 429 else None
 
 
+FAIR_ACCESS_COOLDOWN = dt.timedelta(hours=1)
+SERVER_ERROR_BACKOFF = dt.timedelta(minutes=5)
+
+
+def backoff_until(status_code: int, now: dt.datetime) -> dt.datetime | None:
+    """The wait to record when the server gave none: a 403 (SEC fair-access block) latches the
+    endpoint for an hour, a 5xx for a few minutes, so a run does not keep hammering it."""
+    if status_code == 403:
+        return now + FAIR_ACCESS_COOLDOWN
+    if status_code >= 500:
+        return now + SERVER_ERROR_BACKOFF
+    return None
+
+
 def safe_url(url: str) -> str:
     parts = urlsplit(url)
     return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
@@ -227,6 +241,8 @@ class DisclosureFetcher:
                 state, retry_at = classify_failure(
                     status, body, response.headers.get("Retry-After")
                 )
+                if retry_at is None and state != "paid_only":
+                    retry_at = backoff_until(status, started)
                 await record_access(
                     self._pool,
                     provider,

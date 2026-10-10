@@ -25,13 +25,43 @@ import {
 } from "@/lib/journal/journal";
 import { cn } from "@/lib/utils";
 
-const fetchEntries = () => getBrowserApiClient().GET("/journal", { params: { query: {} } });
+// The most the server returns in one request; a full page means older entries exist.
+const JOURNAL_LIMIT = 500;
+const fetchEntries = () => getBrowserApiClient().GET("/journal", { params: { query: { limit: JOURNAL_LIMIT } } });
 
 export function JournalView() {
   const { state, reload } = useApiResource(fetchEntries);
   const formRef = useRef<HTMLDivElement>(null);
   const [form, setForm] = useState<EntryForm>(EMPTY_FORM);
   const [filter, setFilter] = useState("");
+  const [older, setOlder] = useState<JournalEntry[]>([]);
+  const [exhausted, setExhausted] = useState(false);
+  const [olderProblem, setOlderProblem] = useState<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+
+  async function loadOlder(firstPageSize: number) {
+    if (loadingOlder) return;
+    setLoadingOlder(true);
+    setOlderProblem(null);
+    try {
+      const r = await getBrowserApiClient().GET("/journal", { params: { query: { limit: JOURNAL_LIMIT, offset: firstPageSize + older.length } } });
+      if (!r.data) {
+        setOlderProblem("Older decisions could not be loaded. Try again.");
+      } else {
+        setOlder((o) => [...o, ...r.data]);
+        if (r.data.length < JOURNAL_LIMIT) setExhausted(true);
+      }
+    } catch {
+      setOlderProblem("Older decisions could not be loaded. Try again.");
+    }
+    setLoadingOlder(false);
+  }
+
+  function saved() {
+    setOlder([]); // a new entry shifts every page
+    setExhausted(false);
+    reload();
+  }
 
   function review(entry: JournalEntry) {
     setForm({
@@ -47,10 +77,21 @@ export function JournalView() {
   return (
     <div className="flex flex-col gap-5">
       <div ref={formRef}>
-        <EntryFormPanel form={form} setForm={setForm} onSaved={reload} />
+        <EntryFormPanel form={form} setForm={setForm} onSaved={saved} />
       </div>
       <ResourceGate state={state} label="the journal">
-        {(entries) => <Ledger entries={entries} filter={filter} setFilter={setFilter} onReview={review} />}
+        {(entries) => (
+          <Ledger
+            entries={[...entries, ...older]}
+            hasMore={entries.length >= JOURNAL_LIMIT && !exhausted}
+            loadingMore={loadingOlder}
+            moreProblem={olderProblem}
+            onMore={() => void loadOlder(entries.length)}
+            filter={filter}
+            setFilter={setFilter}
+            onReview={review}
+          />
+        )}
       </ResourceGate>
     </div>
   );
@@ -170,7 +211,25 @@ function EntryFormPanel({ form, setForm, onSaved }: { form: EntryForm; setForm: 
   );
 }
 
-function Ledger({ entries, filter, setFilter, onReview }: { entries: JournalEntry[]; filter: string; setFilter: (v: string) => void; onReview: (e: JournalEntry) => void }) {
+function Ledger({
+  entries,
+  hasMore,
+  loadingMore,
+  moreProblem,
+  onMore,
+  filter,
+  setFilter,
+  onReview,
+}: {
+  entries: JournalEntry[];
+  hasMore: boolean;
+  loadingMore: boolean;
+  moreProblem: string | null;
+  onMore: () => void;
+  filter: string;
+  setFilter: (v: string) => void;
+  onReview: (e: JournalEntry) => void;
+}) {
   const shown = entries.filter((e) => filter.trim() === "" || (e.ticker ?? "portfolio").toLowerCase().includes(filter.trim().toLowerCase()));
   const reviewedIds = new Set(entries.map((e) => e.parent_id).filter((id): id is number => id !== null));
   return (
@@ -178,7 +237,7 @@ function Ledger({ entries, filter, setFilter, onReview }: { entries: JournalEntr
       <PanelHeading
         level={2}
         kicker="Ledger"
-        title={entries.length === 0 ? "No decisions recorded yet" : `${entries.length} decision${entries.length === 1 ? "" : "s"}`}
+        title={entries.length === 0 ? "No decisions recorded yet" : hasMore ? `The latest ${entries.length} decisions` : `${entries.length} decision${entries.length === 1 ? "" : "s"}`}
         action={
           entries.length > 0 ? (
             <Field label="Filter by ticker" className="w-40">
@@ -187,6 +246,15 @@ function Ledger({ entries, filter, setFilter, onReview }: { entries: JournalEntr
           ) : null
         }
       />
+      {hasMore ? (
+        <p role="note" className="mt-2 max-w-prose text-sm text-text-muted">
+          Older decisions exist but are not listed yet.{" "}
+          <Button type="button" size="sm" variant="outline" disabled={loadingMore} onClick={onMore}>
+            {loadingMore ? "Loading…" : "Load older decisions"}
+          </Button>
+          {moreProblem ? <span role="alert" className="ml-2 text-loss">{moreProblem}</span> : null}
+        </p>
+      ) : null}
       {entries.length === 0 ? (
         <p className="mt-2 max-w-prose text-sm text-text-muted">Record the next buy, sale or pass above. The scorecard needs at least five decisions of a kind before it reports a figure.</p>
       ) : shown.length === 0 ? (

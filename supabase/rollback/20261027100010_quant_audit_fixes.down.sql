@@ -1,4 +1,4 @@
--- Rollback for supabase/migrations/20261027100000_quant_audit_fixes.sql.
+-- Rollback for supabase/migrations/20261027100010_quant_audit_fixes.sql.
 -- Run it in a transaction, newest migration first. The migration file itself is never edited.
 -- DATA LOSS: keeps one saved report per kind, scope, data date and method version (the oldest);
 -- the later ones are deleted.

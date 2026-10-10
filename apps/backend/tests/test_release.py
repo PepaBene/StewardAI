@@ -158,8 +158,54 @@ def test_ready_needs_audit_and_zero_cost() -> None:
     counts = {"holdings": 12}
     assert assess(f, {}, counts, [], True).status == "ready"
     assert not assess(f, {}, counts, [], True).can_activate  # no audit yet
-    assert assess(f, {}, counts, passed_audit("x"), True).can_activate
-    assert not assess(f, {}, counts, passed_audit("x"), False).can_activate  # zero-cost failed
+    # Three matched facts on two subjects pass the feature's own audit but not the whole ledger.
+    thin = assess(f, {}, counts, passed_audit("x"), True)
+    assert thin.audit == "passed"
+    assert not thin.can_activate
+    full = complete_ledger("x")
+    assert audit.summarize(full).complete
+    assert assess(f, {}, counts, full, True).can_activate
+    assert not assess(f, {}, counts, full, False).can_activate  # zero-cost failed
+
+
+def complete_ledger(feature: str) -> list[AuditRow]:
+    regions = ["EU", "US", "Asia"]
+    rows = [
+        row(i + 1, "security", f"S{i}", "match", region=regions[i % 3], feature=feature)
+        for i in range(20)
+    ]
+    for kind, n in (("etf", 5), ("corporate_action", 3), ("cash_flow_window", 2)):
+        rows += [
+            row(100 + len(rows) + i, kind, f"{kind}{i}", "match", feature=feature) for i in range(n)
+        ]
+    return rows
+
+
+def test_audit_source_link_and_feature_are_validated() -> None:
+    base = dict(subject_kind="etf", subject="IWDA", field="ter", displayed="0.2%", result="match",
+                source_value="0.20%")  # fmt: skip
+    for bad_url in ("x", "javascript:alert(1)", "ftp://a.b/c", "https://"):
+        with pytest.raises(ValidationError):
+            AuditIn(**base, feature="funds", source_url=bad_url)  # type: ignore[arg-type]
+    with pytest.raises(ValidationError):
+        AuditIn(**base, feature="nonsense", source_url="https://a.b/c")  # type: ignore[arg-type]
+    ok = AuditIn(**base, feature=" Funds ", source_url="https://a.b/c")  # type: ignore[arg-type]
+    assert ok.feature == "funds"
+
+
+def test_an_active_feature_whose_gate_now_fails_is_flagged_for_switch_off() -> None:
+    from steward.release.activation import Activation, with_gate
+    from steward.release.readiness import Readiness
+
+    f = Feature("x", "X", "M0", needs=("holdings",))
+    state = assess(f, {}, {"holdings": 12}, passed_audit("x"), True)  # thin ledger: not activatable
+    gate = Readiness(as_of=dt.date(2026, 10, 1), features=[state], zero_cost_passed=True,
+                     zero_cost_violations=0, ready=1, activatable=0)  # fmt: skip
+    on = Activation(feature="x", active=True, note=None, since=NOW)
+    off = Activation(feature="x", active=False, note=None, since=NOW)
+    flagged, quiet = with_gate([on], gate)[0], with_gate([off], gate)[0]
+    assert flagged.needs_switch_off and flagged.gate_note
+    assert not quiet.needs_switch_off
 
 
 def test_mismatch_in_audit_blocks_activation() -> None:

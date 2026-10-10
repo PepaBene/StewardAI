@@ -51,7 +51,7 @@ function Sparkline({ row }: { row: RatioRow }) {
 
 function Drill({ row, view }: { row: RatioRow; view: RatiosView }) {
   return (
-    <div className="grid gap-x-8 gap-y-3 bg-surface-sunken px-4 py-3 text-sm lg:grid-cols-2">
+    <div className="grid gap-x-8 gap-y-3 bg-surface-muted px-4 py-3 text-sm lg:grid-cols-2">
       <dl className="space-y-1.5">
         <div>
           <dt className="text-xs text-text-muted">Formula</dt>
@@ -243,7 +243,7 @@ export function RatiosTab({ ticker }: { ticker: string }) {
             <div className="overflow-x-auto border border-border">
               <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="bg-surface-sunken text-left">
+                  <tr className="bg-surface-muted text-left">
                     <th scope="col" className="min-w-56 px-3 py-1.5 font-medium">Ratio</th>
                     <th scope="col" className="px-2 py-1.5 text-right font-medium">Latest</th>
                     <th scope="col" className="px-2 py-1.5 font-medium">History</th>

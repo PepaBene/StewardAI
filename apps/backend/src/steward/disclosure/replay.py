@@ -74,7 +74,7 @@ async def holdings_at(
     """Positions of the latest snapshot on or before `as_of`, and that snapshot's date."""
     day = await pool.fetchval(
         "select max(snapshot_date) from public.position_snapshot where snapshot_date <= $1",
-        as_of.date(),
+        as_of.astimezone(dt.UTC).date(),  # the snapshot day is a UTC day, not the caller's
     )
     if day is None:
         return None, []
@@ -131,7 +131,7 @@ def _deals(view: dict[str, Any]) -> list[dict[str, Any]]:
         out.append(
             item(
                 str(d.get("title") or d.get("name") or f"deal {ident}"),
-                None,
+                d.get("known_at"),
                 str(d.get("state") or ""),
                 ident,
             )
@@ -143,7 +143,7 @@ def _ownership(view: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         item(
             f"{ln['title']}: {e['holder']}",
-            None,
+            e.get("known_at"),
             "; ".join(
                 p
                 for p in (
@@ -164,7 +164,7 @@ def _insiders(view: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         item(
             f"{t['insider']} ({t.get('role') or 'role not stated'})",
-            None,
+            t.get("known_at"),
             "; ".join(
                 str(p)
                 for p in (t.get("tx_date"), t.get("code"), t.get("shares"), t.get("price"))
@@ -202,7 +202,7 @@ async def replay(
     now: dt.datetime | None = None,
     reader: Callable[..., Any] | None = None,
 ) -> dict[str, Any]:
-    when = _aware(as_of)
+    when = _aware(as_of).astimezone(dt.UTC)  # day comparisons below are UTC days
     today = _aware(now or dt.datetime.now(dt.UTC))
     read = reader or _read
     snapshot_day, positions = await holdings_at(pool, when)

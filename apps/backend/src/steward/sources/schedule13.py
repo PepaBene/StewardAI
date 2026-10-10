@@ -226,11 +226,14 @@ def _intent(root: ET.Element) -> str | None:
     return flat or None
 
 
-_EXHIBIT = re.compile(r"(?=\b(?:Exhibit|Ex\.)\s*\d+(?:\.\d+)?\b)", re.I)
+# A label is a number ("99.1") or a single capital letter ("Exhibit A"); the letter is matched
+# case-sensitively so that "Exhibit a copy of" is not a label.
+_LABEL = r"(?:\d+(?:\.\d+)?|(?-i:[A-Z]))"
+_EXHIBIT = re.compile(rf"(?=\b(?:Exhibit|Ex\.)\s*{_LABEL}\b)", re.I)
 _DASHES = re.escape("-" + chr(0x2013) + chr(0x2014))  # hyphen, en dash, em dash
-_EXHIBIT_HEAD = re.compile(
-    rf"^((?:Exhibit|Ex\.)\s*\d+(?:\.\d+)?)\s*[:{_DASHES}.]?\s*(.*)$", re.I | re.S
-)
+_EXHIBIT_HEAD = re.compile(rf"^((?:Exhibit|Ex\.)\s*{_LABEL})\s*[:{_DASHES}.]?\s*(.*)$", re.I | re.S)
+# "incorporated by reference to Exhibit 99.1" mentions an exhibit; it does not list one.
+_CITED = re.compile(r"\b(?:to|in|see|and|of|with|by|under|from|as)\s*$", re.I)
 
 
 def parse_exhibits(text: str | None) -> tuple[tuple[str, str | None], ...]:
@@ -239,10 +242,15 @@ def parse_exhibits(text: str | None) -> tuple[tuple[str, str | None], ...]:
     yields no rows, and a label with no description keeps a null description."""
     if not text:
         return ()
+    flat = " ".join(text.split())
+    starts = [m.start() for m in _EXHIBIT.finditer(flat) if not _CITED.search(flat[: m.start()])]
     out: list[tuple[str, str | None]] = []
-    for chunk in _EXHIBIT.split(" ".join(text.split())):
-        m = _EXHIBIT_HEAD.match(chunk.strip())
-        if m:
+    seen: set[str] = set()
+    for i, start in enumerate(starts):
+        stop = starts[i + 1] if i + 1 < len(starts) else len(flat)
+        m = _EXHIBIT_HEAD.match(flat[start:stop].strip())
+        if m and m.group(1).strip().lower() not in seen:
+            seen.add(m.group(1).strip().lower())
             description = m.group(2).strip(" .;") or None
             out.append((m.group(1).strip(), description))
     return tuple(out)

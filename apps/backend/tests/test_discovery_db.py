@@ -242,7 +242,9 @@ async def test_universe_snapshots_keep_delisted_names_for_past_dates(
     past = (await api.post("/discover/stocks", json={"as_of": "2021-12-31"})).json()
     assert past["universe_size"] == 3  # OLD was still listed on 2021-12-31
     no_data = {k for g in past["excluded"] for k in g["keys"]}
-    assert no_data == {"BBB_US_EQ", "OLD_US_EQ"} and past["matched"] == 1  # counted, not dropped
+    # AAA's statements were only filed in 2026: a 2021 view must not see them (D2), so every name
+    # is counted as no-data rather than dropped.
+    assert no_data == {"AAA_US_EQ", "BBB_US_EQ", "OLD_US_EQ"} and past["matched"] == 0
     now = (
         await api.post(
             "/discover/stocks", json={"universe": "snapshot", "snapshot_id": first["id"]}

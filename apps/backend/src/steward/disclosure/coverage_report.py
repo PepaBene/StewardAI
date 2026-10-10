@@ -380,7 +380,10 @@ def period_rows(
     holdings: Sequence[Holding], issuer_years: Iterable[tuple[int, str]]
 ) -> list[dict[str, Any]]:
     """Financial coverage by fiscal year: how many held issuers (and how much value) have it."""
-    value_by_issuer = {h.issuer_id: h.value for h in holdings if h.issuer_id is not None}
+    value_by_issuer: dict[int, Decimal] = defaultdict(Decimal)
+    for h in holdings:  # dual-class tickers of one issuer add up; they are not overwritten
+        if h.issuer_id is not None:
+            value_by_issuer[h.issuer_id] += h.value
     total_issuers = len(value_by_issuer)
     denominator = sum((h.value for h in holdings), Decimal(0))
     years: dict[str, set[int]] = defaultdict(set)
@@ -481,7 +484,7 @@ def release_order(quality: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
 HOLDINGS_SQL = """
 select p.ticker, p.value_account, n.isin, i.country, i.id as issuer_id, p.snapshot_date
   from public.position_snapshot p
-  join public.instrument n on n.t212_ticker = p.ticker
+  left join public.instrument n on n.t212_ticker = p.ticker
   left join public.issuer i on i.cik = n.cik
  where p.snapshot_date = (select max(snapshot_date) from public.account_snapshot
                            where snapshot_date <= $1::date)
@@ -616,7 +619,10 @@ async def load_coverage_states(
     pool: Pool, holdings: Sequence[Holding]
 ) -> dict[tuple[str, str], str]:
     """The recorded coverage state per (ticker, dataset); the worst one when several exist."""
-    by_issuer = {h.issuer_id: h.ticker for h in holdings if h.issuer_id is not None}
+    by_issuer: dict[int, list[str]] = defaultdict(list)
+    for h in holdings:  # one issuer can hold several tickers (dual-class)
+        if h.issuer_id is not None:
+            by_issuer[h.issuer_id].append(h.ticker)
     if not by_issuer:
         return {}
     rows = await pool.fetch(
@@ -627,7 +633,8 @@ async def load_coverage_states(
     )
     grouped: dict[tuple[str, str], list[str]] = defaultdict(list)
     for r in rows:
-        grouped[(by_issuer[int(r["issuer_id"])], r["dataset"])].append(r["state"])
+        for ticker in by_issuer[int(r["issuer_id"])]:
+            grouped[(ticker, r["dataset"])].append(r["state"])
     return {k: s for k, v in grouped.items() if (s := worst_state(v)) is not None}
 
 

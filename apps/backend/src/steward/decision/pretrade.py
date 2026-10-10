@@ -37,7 +37,7 @@ from steward.config.strategy import StrategyConfig
 from steward.decision import covariance
 from steward.decision.covariance import CovModel
 from steward.decision.lot_impact import SaleImpact
-from steward.fx.convert import price_in_unit
+from steward.fx.convert import normalise_currency, price_in_unit
 from steward.portfolio.breaches import Finding, evaluate
 from steward.portfolio.drift import DriftReport
 
@@ -138,6 +138,8 @@ class PretradeResult(BaseModel):
     disclaimer: str
 
 
+MIN_MODEL_COVERAGE = 0.8  # share of invested weight the covariance model must cover to judge a cap
+
 DISCLAIMER = (
     "A pass/flag list against your own stated principles. It never blocks a trade, places one, "
     "or states a tax liability; the holding-period facts and the exemption headroom are your "
@@ -184,6 +186,8 @@ class PretradeContext:
     exemption_limit: float | None = None
     year_proceeds_so_far: float | None = None
     sale_within_test_exemption_ccy: dict[str, float | None] = field(default_factory=dict)
+    sale_base_per_account: dict[str, float] = field(default_factory=dict)
+    unmodelled: list[str] = field(default_factory=list)  # holdings with no usable price history
     warn_months: float = 6.0
     extra_checks: list[PretradeCheck] = field(default_factory=list)
     horizon_years: float = 3.0
@@ -450,11 +454,27 @@ def _risk_budget(t: TradeLeg, ctx: PretradeContext) -> PretradeCheck:
         )  # fmt: skip
     cap = ctx.rules.risk_contribution_cap
     vol_after = covariance.volatility(model, ctx.weights_after)
+    invested = sum(ctx.weights_after.values())
+    modelled = sum(w for k, w in ctx.weights_after.items() if model.index(k) is not None)
+    coverage = modelled / invested if invested > 0 else 0.0
     detail = (
         f"After the trade this stock accounts for {_pct(after)} of the portfolio's volatility "
         f"(before: {_pct(before)}); portfolio volatility is {_pct(vol_after)} a year on "
         f"{model.observations} shared trading days."
     )
+    if coverage < 1 - 1e-9:
+        left = ", ".join(sorted(set(ctx.unmodelled) | set(model.left_out)))
+        detail += (
+            f" The model covers {_pct(coverage)} of the invested weight; the share is of the "
+            f"modelled holdings only{f' (not modelled: {left})' if left else ''}."
+        )
+    if coverage < MIN_MODEL_COVERAGE:
+        return PretradeCheck(
+            **base, status="unavailable", title="Risk budget not checked",
+            detail=detail + f" That is under {_pct(MIN_MODEL_COVERAGE)}, too little to judge a "
+            "cap on the share of the whole portfolio's volatility.",
+            values={"contribution_modelled": after, "coverage": coverage},
+        )  # fmt: skip
     values: dict[str, float | str | None] = {
         "contribution_before": before, "contribution_after": after, "volatility_after": vol_after,
     }  # fmt: skip
@@ -652,8 +672,9 @@ def _switch_checks(sell: TradeLeg, buy: TradeLeg, ctx: PretradeContext) -> list[
             )
         )
     else:
-        quoted_a = fa.currency or ctx.base_currency
-        quoted_b = fb.currency or ctx.base_currency
+        # GBX is pence of GBP: the same currency as a GBP base, so no conversion is charged.
+        quoted_a = normalise_currency(fa.currency or ctx.base_currency)[0]
+        quoted_b = normalise_currency(fb.currency or ctx.base_currency)[0]
         fx_a = rules.fx_cost_bps if quoted_a != ctx.base_currency else 0.0
         fx_b = rules.fx_cost_bps if quoted_b != ctx.base_currency else 0.0
         costs = (
@@ -817,9 +838,13 @@ def _tax_estimate(sell: TradeLeg, impact: SaleImpact | None, ctx: PretradeContex
         return None
     if ctx.year_proceeds_so_far + within <= ctx.exemption_limit:
         return 0.0
+    # The lots are in the account currency and `impact` already covers exactly the units sold, so
+    # the gain only needs converting to the base currency the hurdle is stated in.
+    to_base = ctx.sale_base_per_account.get(sell.ticker)
+    if to_base is None:
+        to_base = sell.value_base / impact.gross_proceeds
     gain_inside = sum(max(0.0, lot.gain) for lot in impact.lots if not lot.passed)
-    share = sell.value_base / impact.gross_proceeds if impact.gross_proceeds else 0.0
-    return gain_inside * share * ctx.rules.short_term_tax_rate
+    return gain_inside * to_base * ctx.rules.short_term_tax_rate
 
 
 # ------------------------------------------------------------------------- portfolio-level

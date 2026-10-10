@@ -20,6 +20,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from enum import StrEnum
+from itertools import pairwise
 from zoneinfo import ZoneInfo
 
 ZERO = Decimal(0)
@@ -112,6 +113,10 @@ def classify(raw: RawTransaction, account_currency: str | None = None) -> Ledger
     if needs_fx:
         flags.append(f"in {raw.currency}, not the account currency {account_currency}")
     fees = sum(raw.fee_amounts, ZERO)
+    # Trades take their direction from the side, so only the magnitude matters. Dividends and
+    # deposits keep the sign they arrived with: a negative row is a correction or a reversal and
+    # must reduce income / cash, never add to it. A withdrawal or fee is an outflow whichever sign
+    # the broker used, so it is booked by magnitude.
     gross = abs(raw.amount)
     quantity = ZERO
     kind: Kind
@@ -130,13 +135,23 @@ def classify(raw: RawTransaction, account_currency: str | None = None) -> Ledger
             )
         cash = _trade_cash(kind, gross, fees, raw.fee_basis)
     elif raw.type == "dividend":
-        kind, cash = Kind.DIVIDEND, gross
+        kind, gross, cash = Kind.DIVIDEND, raw.amount, raw.amount
+        if raw.amount < 0:
+            flags.append("negative dividend row (correction or reversal) booked as a deduction")
     elif raw.type == "cash" and (raw.subtype or "").upper() in CASH_SUBTYPES:
         kind = CASH_SUBTYPES[(raw.subtype or "").upper()]
         if kind is Kind.DEPOSIT:
-            cash = gross
+            gross = cash = raw.amount
+            if raw.amount < 0:
+                flags.append("negative deposit row (reversal) booked as cash out")
         elif kind is Kind.WITHDRAWAL or kind is Kind.FEE:
             cash = -gross
+            if raw.amount > 0:
+                # Trading212 reports these as negative amounts (the repo's history and fixtures
+                # all do), so a positive row may be a reversal or refund. It is still booked as
+                # an outflow, because the API does not document the sign; the flag makes the
+                # owner check it, and the cash check shows a break if it was wrong.
+                flags.append(f"positive {kind.value} row: booked as an outflow, may be a reversal")
         else:  # a transfer keeps the sign Trading212 reported
             cash = raw.amount
     else:
@@ -342,6 +357,35 @@ class CashReconciliation:
     unsupported: int
 
 
+def in_interval(
+    entry: LedgerEntry,
+    start_date: dt.date,
+    end_date: dt.date,
+    start_at: dt.datetime | None = None,
+    end_at: dt.datetime | None = None,
+) -> bool:
+    """Whether the entry falls after the opening snapshot and up to the closing one. With both
+    capture times it is exact, so a deposit made after a day's snapshot (taken in the evening)
+    belongs to the next interval, whose closing value contains it; without them it falls back to
+    the calendar day."""
+    stamp = entry.occurred_at
+    if start_at is not None and end_at is not None and stamp.tzinfo is not None:
+        return start_at < stamp <= end_at
+    return start_date < entry.day <= end_date
+
+
+def bucket_snapshot(
+    entry: LedgerEntry, snapshots: Sequence[tuple[dt.date, dt.datetime | None]]
+) -> dt.date | None:
+    """The snapshot day whose interval (the previous snapshot, up to this one) contains the
+    entry, by capture time where both are known and by calendar day otherwise, so trades and
+    income land in the same interval as the flows `in_interval` places."""
+    for (before, before_at), (after, after_at) in pairwise(snapshots):
+        if in_interval(entry, before, after, before_at, after_at):
+            return after
+    return None
+
+
 def reconcile_cash(
     entries: Sequence[LedgerEntry],
     *,
@@ -350,10 +394,13 @@ def reconcile_cash(
     opening_cash: Decimal,
     closing_cash: Decimal,
     tolerance: Decimal = Decimal("1"),
+    start_at: dt.datetime | None = None,
+    end_at: dt.datetime | None = None,
 ) -> CashReconciliation:
-    """Cash change between two snapshot days explained by the ledger entries after the opening
-    day's snapshot and up to and including the closing day's."""
-    window = [e for e in entries if start_date < e.day <= end_date]
+    """Cash change between two snapshots explained by the ledger entries after the opening
+    snapshot and up to and including the closing one (`start_at` / `end_at` are their capture
+    times; the calendar days are the fallback)."""
+    window = [e for e in entries if in_interval(e, start_date, end_date, start_at, end_at)]
     expected = sum((e.cash_effect for e in window), ZERO)
     actual = closing_cash - opening_cash
     difference = actual - expected

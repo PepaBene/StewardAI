@@ -66,6 +66,7 @@ _TERMS = (
     ("minimum_purchase", re.compile(r"minimum (purchase|commitment|volume)s?", re.I)),
     ("termination", re.compile(r"\bterminat(e|ion|ed)\b|\bnotice of non-?renewal\b", re.I)),
 )
+_COUNTERPARTY_WORDS = re.compile(r"customers?|suppliers?|vendors?|distributors?|clients?", re.I)
 _FALSE_SUBJECT = {"The Company", "We", "Our", "The", "Revenue", "Revenues", "Sales", "Net Sales"}
 # A residual bucket or a region is not a counterparty: "All Other", "Non-U.S. customers".
 _RESIDUAL = re.compile(
@@ -230,14 +231,19 @@ def _from_table(text: str, out: Extraction) -> None:
     """Rows of `name | 23% | 19%` under a `| 2025 | 2024 |` header: one draft per year column."""
     years: list[str] = []
     pos = 0
+    caption = ""  # the last line that is not a table row: what the table below is about
+    context = ""  # caption plus the header row's first cell: this table's own wording
     for line in text.splitlines(keepends=True):
         start, pos = pos, pos + len(line)
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         if len(cells) < 2:
+            if line.strip():
+                caption = line.strip()
             continue
         found = [re.fullmatch(r"(?:FY\s?)?(20\d\d)", c) for c in cells[1:]]
         if all(found) and found:
             years = [f"FY{m.group(1)}" for m in found if m]
+            context = f"{caption} {cells[0]}"
             continue
         pct = [re.fullmatch(_NUM, c) for c in cells[1:]]
         if not years or len(pct) != len(years) or not all(pct) or not cells[0]:
@@ -246,6 +252,12 @@ def _from_table(text: str, out: Extraction) -> None:
         if _RESIDUAL.match(who):
             continue
         anonymous = bool(_ANONYMOUS.match(who))
+        # "Automotive 30 %" under a segment or product table is not a customer.
+        if not anonymous and not _COUNTERPARTY_WORDS.search(context):
+            out.skipped.append(
+                Skipped(start, pos, line.strip(), "row of a table that is not about counterparties")
+            )
+            continue
         for year, m in zip(years, pct, strict=True):
             assert m is not None
             share = _fraction(m.group(1))
@@ -254,12 +266,12 @@ def _from_table(text: str, out: Extraction) -> None:
             out.drafts.append(
                 Draft(
                     "anonymous" if anonymous else "named",
-                    "customer",
+                    _relationship(context, who),
                     None if anonymous else who,
                     who if anonymous else None,
                     None,
                     share,
-                    _denominator(text),
+                    _denominator(context),
                     year,
                     start,
                     pos,

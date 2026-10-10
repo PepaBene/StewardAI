@@ -61,6 +61,7 @@ async def upsert_disclosure(
     decision_reason: str | None = None,
     origin: str = "owner_review",
     claim_label: str | None = None,
+    denominator_kind: str | None = None,
 ) -> int:
     """Insert or refresh a disclosure; a decided row keeps its status and reported figures.
 
@@ -80,12 +81,14 @@ async def upsert_disclosure(
         """insert into public.relationship_disclosure as t
            (ticker,relationship,direction,counterparty_key,counterparty_name,anonymous_counterparty,
             reported_share,share_basis,fiscal_period,valid_from,valid_to,evidence_id,passage,
-            source_url,source,status,decision_reason,decided_at,origin,claim_label)
+            source_url,source,status,decision_reason,decided_at,origin,claim_label,
+            denominator_kind)
            values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-                  case when $16 in ('confirmed','rejected') then now() else null end,$18,$19)
+                  case when $16 in ('confirmed','rejected') then now() else null end,$18,$19,$20)
            on conflict (ticker,relationship,direction,
                         (coalesce(counterparty_key_norm, 'anon:' || md5(passage))),
-                        (coalesce(fiscal_period, '')),source_url)
+                        (coalesce(fiscal_period, '')),source_url,
+                        (coalesce(denominator_kind, '')))
            do update set
              counterparty_name=coalesce(t.counterparty_name,excluded.counterparty_name),
              claim_label=coalesce(t.claim_label,excluded.claim_label),
@@ -127,6 +130,7 @@ async def upsert_disclosure(
         decision_reason,
         origin,
         claim_label,
+        denominator_kind,
     )
     return row_id
 

@@ -117,6 +117,24 @@ async def test_a_closing_filing_joins_the_deal_and_adds_a_state_not_a_term_versi
     assert await backend_pool.fetchval("select count(*) from public.deal_term_version") == 1
 
 
+async def test_a_closing_8k_without_the_party_sentence_closes_the_only_open_deal(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    issuer = await prepare(backend_pool)
+    first = await store(
+        backend_pool, issuer, filing("0000011111-26-000001", "8-K", "1.01", 5), PRESS
+    )
+    closing = await store(
+        backend_pool,
+        issuer,
+        filing("0000011111-26-000002", "8-K", "2.01", 12),
+        "Item 2.01 Completion of Acquisition. The transaction was completed on October 12, 2026.",
+    )
+    assert closing.deal_id == first.deal_id and closing.state == "closed"
+    assert closing.rejected_transition is None
+    assert await backend_pool.fetchval("select count(*) from public.deal_state_transition") == 2
+
+
 async def test_a_changed_price_adds_a_version_that_supersedes_the_first(
     backend_pool: asyncpg.Pool,
 ) -> None:

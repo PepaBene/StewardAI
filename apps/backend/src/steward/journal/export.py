@@ -63,7 +63,7 @@ class OwnerReport(BaseModel):
 async def build_report(
     pool: asyncpg.Pool, owner_id: str, since: dt.date | None = None
 ) -> OwnerReport:
-    rows = await entries.list_entries(pool, owner_id, limit=2000)
+    rows = await entries.list_entries(pool, owner_id, limit=None)
     card = await journal_service.scorecard(pool, owner_id, since)
     snoozes = await snooze.list_rows(pool, owner_id)
     # The same snoozes as the cockpit page: set-aside issues are listed under "set aside".

@@ -207,7 +207,8 @@ class XrayData:
     expense_ratios: dict[str, Decimal] = field(default_factory=dict)
     profiles: dict[str, Profile] = field(default_factory=dict)  # by ticker
     revenue: dict[str, dict[str, list[RevenueSlice]]] = field(default_factory=dict)
-    tolerance: float = 0.01
+    # Float rounding only: a dropped leaf of even 0.1 % of the portfolio must not read "reconciles".
+    tolerance: float = 1e-6
 
 
 @dataclass

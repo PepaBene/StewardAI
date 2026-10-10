@@ -28,6 +28,7 @@ from steward.disclosure.financials import (
     build_segment_report,
     check_free_cash_flow,
     check_gross_profit,
+    concept_choice,
     metric_for,
     release_gate,
     segment_metric_for,
@@ -138,7 +139,8 @@ async def statements(
              from public.financial_statement_fact
             where issuer_id = $1 and known_at <= $2 and value is not null
               and statement = any($3::text[])
-              and coalesce(dimensions->'members', '[]'::jsonb) = '[]'::jsonb""",
+              and coalesce(dimensions->'members', '[]'::jsonb) = '[]'::jsonb
+            order by known_at, accession, id""",
         issuer_id,
         when,
         list(_STATEMENTS),
@@ -154,10 +156,20 @@ async def statements(
     rows = [r for r in rows if not (r["currency"] and r["currency"] != reporting)]
     facts: list[FiledFact] = []
     unmapped = 0
+    # Two concepts for one metric and period (net income, debt, leases) would make "latest"
+    # arbitrary and read as a restatement: keep the metric's preferred concept per period.
+    choice = concept_choice(
+        (r["concept"], (m.key, r["period_start"], r["period_end"]))
+        for r in rows
+        if (m := metric_for(r["concept"])) is not None
+    )
     for r in rows:
         metric = metric_for(r["concept"])
         if metric is None:
             unmapped += 1
+            continue
+        slot = (metric.key, r["period_start"], r["period_end"])
+        if choice.get(slot, r["concept"]) != r["concept"]:
             continue
         facts.append(
             FiledFact(

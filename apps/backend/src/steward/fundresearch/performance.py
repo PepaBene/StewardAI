@@ -34,6 +34,7 @@ ONE = Decimal(1)
 Basis = Literal["price", "total", "unknown"]
 PERIODS: tuple[tuple[str, int], ...] = (("1 year", 365), ("3 years", 3 * 365), ("5 years", 5 * 365))
 START_TOLERANCE_DAYS = 7
+MAX_PRICE_STALE_DAYS = 7
 MIN_SESSIONS = 30
 MAX_CHART_POINTS = 300
 Closes = list[tuple[dt.date, Decimal]]
@@ -143,7 +144,9 @@ def build_nav(points: Sequence[Any], closes: Closes, listing_currency: str | Non
         premium = None
         if listing is None:
             reason = "no listing close within a few days before this date"
-        elif listing_currency and p.currency != listing_currency:
+        elif not listing_currency:
+            reason = f"the listing's currency is not recorded, so the {p.currency} NAV cannot be compared"
+        elif p.currency != listing_currency:
             reason = f"NAV is in {p.currency} and the listing in {listing_currency}"
         elif p.nav <= 0:
             reason = "non-positive NAV"
@@ -338,19 +341,36 @@ def build_performance(
         else "Fund listing only; no benchmark is compared.",
     )
     bench_basis: Basis = benchmark.basis if (benchmark and use_bench) else "unknown"
+    # A difference is drawn only when both currencies are known and equal: an unrecorded currency
+    # is not assumed to match.
+    currency_note: str | None = None
     if benchmark and use_bench:
         if benchmark.currency is None:
+            currency_note = "the benchmark's currency is not recorded, so no difference is drawn"
             warnings.append(
-                "The benchmark's currency is not recorded; the difference assumes it matches the listing currency."
+                "The benchmark's currency is not recorded; the difference is withheld rather than assumed to match the listing."
             )
-        elif ccy and benchmark.currency != ccy:
+        elif ccy is None:
+            currency_note = "the listing's currency is not recorded, so no difference is drawn"
+            warnings.append(
+                "The listing's currency is not recorded; the difference is withheld rather than assumed to match the benchmark."
+            )
+        elif benchmark.currency != ccy:
+            currency_note = "currencies differ"
             warnings.append(
                 f"The benchmark is in {benchmark.currency} and the listing in {ccy}; the difference mixes currencies and is withheld."
             )
-
-    mismatch_currency = bool(
-        benchmark and use_bench and benchmark.currency and ccy and benchmark.currency != ccy
+    accumulating_vs_price = bool(
+        benchmark and use_bench and bench_basis == "price" and policy == "accumulating"
     )
+    stale_days = (as_of - end).days
+    stale_reason = (
+        f"the latest price is {end}, {stale_days} days before {as_of}"
+        if stale_days > MAX_PRICE_STALE_DAYS
+        else None
+    )
+    if stale_reason:
+        warnings.append(f"Returns are withheld: {stale_reason}.")
     periods: list[PeriodReturn] = []
     targets = [(label, days) for label, days in PERIODS] + [
         ("Since the series starts", (end - fund_aligned[0][0]).days)
@@ -366,6 +386,21 @@ def build_performance(
                 if hit and (end - dt.timedelta(days=days) - hit[0]).days <= START_TOLERANCE_DAYS
                 else None
             )
+        if stale_reason is not None:
+            periods.append(
+                PeriodReturn(
+                    label=label,
+                    start=None,
+                    end=end,
+                    fund_price=unavailable("fraction", version("price_return"), stale_reason),
+                    fund_total=None,
+                    benchmark=None,
+                    compared_on=None,
+                    difference=None,
+                    difference_annualised=None,
+                )
+            )
+            continue
         if start_d is None or start_d >= end:
             periods.append(
                 PeriodReturn(
@@ -401,8 +436,10 @@ def build_performance(
                 (end, b[end]),
                 currency=benchmark.currency or "" if benchmark else "",
             )
-            if mismatch_currency:
-                note = "currencies differ"
+            if currency_note:
+                note = currency_note
+            elif accumulating_vs_price:
+                note = "an accumulating fund's price includes reinvested income and a price-return index does not, so no difference is drawn"
             elif bench_basis == "price":
                 compared = "price"
                 if fp.value is not None and bm.value is not None:
@@ -437,7 +474,8 @@ def build_performance(
         )
 
     frets = daily_returns(fund_aligned)
-    fvals = [r for _, r in frets]
+    # The fund's own risk uses every stored session, so it does not change with the benchmark chosen.
+    fvals = [r for _, r in daily_returns(closes)]
     risk_rows = [
         RiskStat(
             id="volatility",
@@ -457,7 +495,7 @@ def build_performance(
         ),
     ]
     te: AnalyticsResult | None = None
-    if use_bench and bench_basis == "price" and not mismatch_currency:
+    if use_bench and bench_basis == "price" and not currency_note and not accumulating_vs_price:
         diffs = [a - b for (_, a), (_, b) in zip(frets, daily_returns(bench_aligned), strict=True)]
         te = risk.volatility(diffs)
     elif use_bench:

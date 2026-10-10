@@ -282,9 +282,9 @@ def _shareholder_yield(p: Period) -> RatioValue:
         return _missing("market cap")
     if p.market_cap <= 0:
         return _nm("non-positive market cap")
-    if div is None and buy is None:
-        return _missing("dividends or buybacks paid")
-    return RatioValue((abs(div or ZERO) + abs(buy or ZERO)) / p.market_cap)
+    if div is None or buy is None:
+        return _missing("dividends and buybacks paid")
+    return RatioValue((abs(div) + abs(buy)) / p.market_cap)
 
 
 def _ev(p: Period) -> Decimal | None:

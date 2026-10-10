@@ -158,8 +158,10 @@ async def test_filing_amendment_and_restatement_at_three_cutoffs(
     assert after["observations"][0]["value"] == Decimal("950000000")
     assert after["observations"][0]["envelope"]["known_at"] == T2
 
-    # at the middle cutoff the amendment link must not be visible even on the original row
-    assert by_version[v1]["is_current"] is True
+    # a full amendment replaces the original once known; before that the original is in force
+    assert by_version[v1]["is_current"] is False
+    assert by_version[v2]["is_current"] is True
+    assert between["documents"][0]["is_current"] is True
 
 
 async def test_event_effective_date_never_admits_a_row(backend_pool: asyncpg.Pool) -> None:

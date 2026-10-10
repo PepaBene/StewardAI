@@ -118,7 +118,7 @@ async def scorecard(
     reason: str | None = None,
 ) -> Scorecard:
     today = dt.date.today()
-    entries = await list_entries(pool, owner_id, limit=2000)
+    entries = await list_entries(pool, owner_id, limit=None)
     switch_outcomes: list[SwitchOutcome] | None
     try:
         switch_outcomes = await switches.outcomes(

@@ -13,6 +13,7 @@ import { Field } from "@/components/reference/form-bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { useUrlTicker } from "@/lib/disclosure/url-ticker";
 import { filterDeals, TYPE_LABEL, type DealFilter, type HoldingDeals, type PortfolioDeals } from "@/lib/disclosure/deals";
 import { SAMPLE_DEAL_DAY, SAMPLE_DEAL_NAMES, SAMPLE_DEAL_TICKER, sampleDeals, samplePortfolioDeals } from "@/lib/disclosure/fixtures-deals";
 import { dayOf, endOfDayMs, formatDay } from "@/lib/disclosure/model";
@@ -38,11 +39,12 @@ const DAY_MS = 86_400_000;
  */
 export function DealsPageView() {
   const [until] = useState(() => Date.now());
-  const [cutoff, setCutoff] = useState(() => endOfDayMs(SAMPLE_DEAL_DAY));
-  const [input, setInput] = useState("");
+  const fromUrl = useUrlTicker();
+  const [cutoff, setCutoff] = useState(() => (fromUrl ? until : endOfDayMs(SAMPLE_DEAL_DAY)));
+  const [input, setInput] = useState(fromUrl ?? "");
   const [offerInput, setOfferInput] = useState("");
   const [offer, setOffer] = useState<number | null>(null);
-  const [ticker, setTicker] = useState<string | null>(null);
+  const [ticker, setTicker] = useState<string | null>(fromUrl);
   const [error, setError] = useState<string | undefined>();
   const [offerError, setOfferError] = useState<string | undefined>();
   const [filter, setFilter] = useState<DealFilter>({ type: "", state: "" });

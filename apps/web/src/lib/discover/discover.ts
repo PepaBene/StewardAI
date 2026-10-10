@@ -1,4 +1,5 @@
 import type { components } from "@/lib/api/schema";
+import { normaliseSeparators } from "@/lib/number-input";
 
 type Schemas = components["schemas"];
 export type DiscoveryResult = Schemas["DiscoveryResult"];
@@ -102,7 +103,7 @@ export function buildFilters(drafts: readonly FilterDraft[], catalogue: readonly
       filters.push({ metric: d.metric, op: "in", value: values, definition_version: info.definition_version, period: info.period });
       continue;
     }
-    const typed = d.value.trim().replace(",", ".");
+    const typed = normaliseSeparators(d.value);
     const n = typed === "" ? NaN : Number(typed);
     if (!Number.isFinite(n)) {
       errors.push(`${info.label}: enter a number.`);

@@ -21,7 +21,7 @@ function points(v: string | number | null | undefined): string | null {
 /** A 0 to 100 scale with the three band edges (20, 60, 100) marked; the marker is the score. */
 function ScaleBar({ score, label }: { score: number | null; label: string }) {
   return (
-    <div role="img" aria-label={score === null ? `${label}: no score` : `${label}: ${score.toFixed(0)} of 100`} className="relative h-2 w-full border border-border bg-surface-sunken">
+    <div role="img" aria-label={score === null ? `${label}: no score` : `${label}: ${score.toFixed(0)} of 100`} className="relative h-2 w-full border border-border bg-surface-muted">
       {[20, 60].map((edge) => (
         <span key={edge} className="absolute inset-y-0 w-px bg-border" style={{ left: `${edge}%` }} />
       ))}
@@ -68,7 +68,7 @@ function ComponentPanel({ c }: { c: RubricComponent }) {
       <div className="overflow-x-auto border border-border">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-surface-sunken text-xs">
+            <tr className="bg-surface-muted text-xs">
               <th scope="col" className="px-3 py-1.5 text-left font-medium">Indicator</th>
               <th scope="col" className="px-2 py-1.5 text-right font-medium">Value</th>
               <th scope="col" className="px-2 py-1.5 text-right font-medium">Thresholds</th>

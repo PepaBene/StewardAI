@@ -246,8 +246,8 @@ def twr(
 
 XIRR_LOWER = Decimal("-0.9999")
 XIRR_UPPER = Decimal(100)
-MAX_PUBLISHED_RATE = Decimal(10) ** 12  # beyond this the rate cannot be rounded to 4 places
 XIRR_TOLERANCE = Decimal("1e-12")
+XIRR_MAX_REPORTABLE = Decimal("1e12")  # beyond this the rate cannot be rounded or read
 
 
 def _npv(rate: Decimal, flows: Sequence[tuple[dt.date, Decimal]]) -> Decimal:
@@ -257,6 +257,20 @@ def _npv(rate: Decimal, flows: Sequence[tuple[dt.date, Decimal]]) -> Decimal:
         (amount / base ** (Decimal((day - origin).days) / DAYS_PER_YEAR) for day, amount in flows),
         ZERO,
     )
+
+
+def _npv_sign_changes(
+    flows: Sequence[tuple[dt.date, Decimal]], low: Decimal, high: Decimal, steps: int = 600
+) -> int:
+    """Sign changes of NPV on a grid spaced evenly in log(1 + rate); more than one means the
+    flows have several rates and bisection would return an arbitrary one."""
+    ratio = (ONE + high) / (ONE + low)
+    signs: list[bool] = []
+    for i in range(steps + 1):
+        value = _npv((ONE + low) * ratio ** (Decimal(i) / steps) - ONE, flows)
+        if value != 0:
+            signs.append(value > 0)
+    return sum(1 for a, b in pairwise(signs) if a != b)
 
 
 def xirr(
@@ -289,6 +303,8 @@ def xirr(
         return unavailable(
             "fraction", method, "no stable root within the solver bounds", inputs=inputs
         )
+    elif _npv_sign_changes(ordered, low, high) > 1:
+        return unavailable("fraction", method, "more than one rate fits these flows", inputs=inputs)
     else:
         for _ in range(400):
             mid = (low + high) / 2
@@ -300,10 +316,9 @@ def xirr(
             else:
                 high = mid
         root = (low + high) / 2
-    if abs(root) > MAX_PUBLISHED_RATE:
-        # A short window can put the root at an annual rate too large to round or to mean much.
+    if root > XIRR_MAX_REPORTABLE:
         return unavailable(
-            "fraction", method, "the annual rate is too large to publish", inputs=inputs
+            "fraction", method, "the annual rate is too large to be meaningful", inputs=inputs
         )
     return result(root, "fraction", method, as_of=ordered[-1][0], inputs=inputs)
 
@@ -334,7 +349,6 @@ def attribution_bridge(
     """
     method = version("attribution")
     gain = end_value - start_value - net_flows
-    residual = gain - sum(components.values(), ZERO)
     inputs = {
         "start": start_value,
         "end": end_value,
@@ -363,8 +377,12 @@ def attribution_bridge(
         warnings=warnings,
         inputs=inputs,
     )
+    shown = {k: rounded(v, "money") or ZERO for k, v in components.items()}
+    # Round the components first and derive the residual from the rounded gain, so the figures
+    # that are displayed add up to the displayed gain to the cent.
+    shown_residual = (rounded(gain, "money") or ZERO) - sum(shown.values(), ZERO)
     return Bridge(
         **base.model_dump(),
-        components={k: rounded(v, "money") or ZERO for k, v in components.items()},
-        residual=rounded(residual, "money") or ZERO,
+        components=shown,
+        residual=shown_residual,
     )

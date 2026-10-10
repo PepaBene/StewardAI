@@ -27,9 +27,11 @@ async def list_journal(
     owner: Owner,
     ticker: Annotated[str | None, Query(max_length=40)] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 200,
+    offset: Annotated[int, Query(ge=0, le=100_000)] = 0,
 ) -> list[JournalEntry]:
-    """Journal entries, newest decision first, optionally for one security."""
-    return await entries.list_entries(pool, owner.user_id, ticker, limit)
+    """Journal entries, newest decision first, optionally for one security. `offset` skips that
+    many newer entries so older ones can be read in pages."""
+    return await entries.list_entries(pool, owner.user_id, ticker, limit, offset)
 
 
 @router.post("/journal", status_code=201)
@@ -106,7 +108,7 @@ async def export_report_pdf(
 @router.get("/journal/export/entries.csv", response_class=PlainTextResponse)
 async def export_entries_csv(pool: Pool, owner: Owner) -> PlainTextResponse:
     """Every journal entry as CSV, oldest decision last."""
-    rows = await entries.list_entries(pool, owner.user_id, limit=2000)
+    rows = await entries.list_entries(pool, owner.user_id, limit=None)
     return PlainTextResponse(
         owner_export.journal_csv(rows),
         media_type="text/csv",

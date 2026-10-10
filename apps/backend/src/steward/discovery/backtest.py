@@ -90,6 +90,18 @@ def _price_on(closes: Closes, day: dt.date) -> tuple[dt.date, Decimal] | None:
     return best
 
 
+def _fill_price(closes: Closes, day: dt.date) -> tuple[dt.date, Decimal] | None:
+    """First close after `day`: the signal is read from `day`'s close, so the trade fills at the
+    next session's, never at the price the signal was computed from."""
+    best: tuple[dt.date, Decimal] | None = None
+    for d, p in closes:
+        if d > day and (best is None or d < best[0]):
+            best = (d, p)
+    if best is None or (best[0] - day).days > MAX_ENTRY_GAP_DAYS or best[1] <= 0:
+        return None
+    return best
+
+
 def _last_price(closes: Closes, day: dt.date) -> tuple[dt.date, Decimal] | None:
     """Last close on or before `day` with no recency limit (a delisted name's final price)."""
     best: tuple[dt.date, Decimal] | None = None
@@ -146,11 +158,14 @@ def run_backtest(
         if p_end <= p_start:
             warnings.append(f"{p_start}: the period ends on or before it starts and was skipped")
             continue
+        # A period that ends at the next rebalance exits at the same next-session close the
+        # following period enters at; the last one ends on the end date's own close.
+        exit_price = _price_on if p_end == end else _fill_price
         picked = sorted(set(picks.get(p_start, ())))
         entries: dict[str, Decimal] = {}
         dropped: list[str] = []
         for t in picked:
-            quote = _price_on(closes.get(t, ()), p_start)
+            quote = _fill_price(closes.get(t, ()), p_start)
             if quote is None:
                 dropped.append(t)
             else:
@@ -163,7 +178,7 @@ def run_backtest(
         if names:
             total = ZERO
             for t in names:
-                exit_quote = _price_on(closes.get(t, ()), p_end)
+                exit_quote = exit_price(closes.get(t, ()), p_end)
                 ended = exit_quote is None
                 if ended:
                     exit_quote = _last_price(closes.get(t, ()), p_end)
@@ -188,7 +203,7 @@ def run_backtest(
         drifted = {h.ticker: h.weight * (ONE + h.return_) / denom for h in held} if denom else {}
         bench_r: Decimal | None = None
         if benchmark is not None:
-            a, b = _price_on(benchmark, p_start), _price_on(benchmark, p_end)
+            a, b = _fill_price(benchmark, p_start), exit_price(benchmark, p_end)
             if a is not None and b is not None:
                 bench_r = b[1] / a[1] - ONE
                 bench_chain *= ONE + bench_r

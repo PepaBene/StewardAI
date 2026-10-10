@@ -3,6 +3,8 @@
 import datetime as dt
 from decimal import Decimal
 
+import pytest
+
 from steward.analytics.returns import Dividend
 from steward.fundresearch import analysis, compare, performance
 from steward.fundresearch.data import Fact, FundData, FundListing
@@ -212,6 +214,37 @@ def test_checklist_abstains_when_critical_inputs_missing():
     assert cl.summary_available is False and "Replication method" in (cl.abstain_reason or "")
 
 
+@pytest.mark.parametrize(
+    ("text", "status"),
+    [
+        ("yes", "watch"),
+        ("Yes (up to 10%)", "watch"),
+        ("no", "good"),
+        ("No lending", "good"),
+        ("unknown", "unknown"),
+        ("partial", "unknown"),
+    ],
+)
+def test_lending_free_text_is_scored_by_its_meaning(text, status):
+    fact = Fact(
+        key="securities_lending",
+        value=text,
+        source_url="https://x.test/l",
+        recorded_at=dt.datetime(2026, 9, 1, tzinfo=dt.UTC),
+    )
+    data = fund(
+        rows=[row("A", "US0000000001", 1.0)],
+        sheet={"as_of": DAY},
+        facts={"securities_lending": fact},
+    )
+    _, hv = views(data)
+    st = analysis.build_style(data.isin, DAY, [], D(0))
+    cl = analysis.build_checklist(
+        data, hv, st, today=DAY, tracking_difference=None, tracking_note=None
+    )
+    assert next(c for c in cl.criteria if c.id == "lending").status == status
+
+
 def test_tracking_criterion_stays_unknown_without_an_expense_ratio():
     data = fund(
         rows=[row(f"S{i}", f"US00000000{i:02d}", 0.05) for i in range(20)],
@@ -334,7 +367,7 @@ def perf(bench_basis, *, policy="accumulating", bench_ccy="USD", divs=(), n=800)
 
 
 def test_matched_price_basis_gives_a_difference_and_tracking_error():
-    v = perf("price")
+    v = perf("price", policy="distributing")
     one = next(p for p in v.periods if p.label == "1 year")
     assert (
         one.compared_on == "price" and one.difference is not None and one.difference < 0
@@ -368,6 +401,54 @@ def test_unknown_basis_and_currency_mismatch_withhold_the_difference():
     mism = perf("price", bench_ccy="EUR")
     assert all(p.difference is None for p in mism.periods)
     assert any("currencies" in w for w in mism.warnings)
+
+
+def test_accumulating_fund_is_not_compared_with_a_price_return_index():
+    v = perf("price", policy="accumulating")
+    assert all(p.difference is None for p in v.periods)
+    assert any("accumulating" in (p.note or "") for p in v.periods if p.start)
+    assert v.tracking_error is not None and v.tracking_error.value is None
+
+
+def test_unrecorded_benchmark_or_listing_currency_withholds_the_difference():
+    none_ccy = perf("price", policy="distributing", bench_ccy=None)
+    assert all(p.difference is None for p in none_ccy.periods)
+    assert any("currency is not recorded" in w for w in none_ccy.warnings)
+    assert none_ccy.tracking_error is not None and none_ccy.tracking_error.value is None
+
+
+def test_stale_last_bar_withholds_period_returns():
+    data = fund(
+        rows=[row("A", "US0000000001", 1.0)],
+        sheet={"distribution_policy": "distributing", "as_of": DAY},
+    )
+    f = closes(DAY - dt.timedelta(days=1200), 600, D("0.0004"))
+    v = performance.build_performance(
+        data, data.listings[0], f, [], True, None, [], [], None, f[-1][0] + dt.timedelta(days=60)
+    )
+    assert all(p.fund_price.value is None for p in v.periods)
+    assert any("days before" in w for w in v.warnings)
+    assert "days before" in (v.periods[0].fund_price.warnings[0])
+
+
+def test_fund_volatility_does_not_depend_on_the_benchmark_dates():
+    data = fund(
+        rows=[row("A", "US0000000001", 1.0)],
+        sheet={"distribution_policy": "distributing", "as_of": DAY},
+    )
+    f = closes(DAY - dt.timedelta(days=900), 600, D("0.0004"))
+    f = [(d, c * (1 + D("0.01") * (i % 3))) for i, (d, c) in enumerate(f)]
+    sparse = [(d, c) for i, (d, c) in enumerate(f) if i % 2 == 0]
+    info = performance.BenchmarkInfo(symbol="^i", label="I", basis="price", currency="USD", note="")
+    end = f[-1][0]
+    alone = performance.build_performance(
+        data, data.listings[0], f, [], True, None, [], [], None, end
+    )
+    with_bench = performance.build_performance(
+        data, data.listings[0], f, [], True, info, sparse, [], None, end
+    )
+    vol = lambda v: next(r for r in v.risk if r.id == "volatility").fund.value  # noqa: E731
+    assert vol(alone) == vol(with_bench)
 
 
 def test_distributions_make_total_return_exceed_price_return():
@@ -478,6 +559,18 @@ def test_two_share_classes_of_one_portfolio_are_not_compared():
     assert any("share class" in w for w in out.warnings)
 
 
+def test_different_providers_on_one_index_are_not_inferred_as_one_portfolio():
+    rows = [row("A", "US0000000001", 0.6), row("B", "US0000000002", 0.4)]
+    a = prepared("IE00AAAAAAA1", rows, portfolio=None)
+    b = prepared("LU00BBBBBBB2", rows, portfolio=None)
+    b = compare.Prepared(
+        fund=b.fund.model_copy(update={"provider": "spdr"}), rows=b.rows, view=b.view, style=b.style
+    )
+    out = compare.build_comparison([a, b])
+    assert all(f.duplicate_of is None for f in out.funds)
+    assert not any(p.skipped for p in out.pairs)
+
+
 def test_identical_holdings_without_a_portfolio_id_are_inferred_as_one_portfolio():
     rows = [row("A", "US0000000001", 0.6), row("B", "US0000000002", 0.4)]
     a = prepared("IE00AAAAAAA1", rows, portfolio=None)
@@ -567,6 +660,18 @@ def test_nav_premium_needs_matching_currency_and_a_near_close():
     assert by[dt.date(2026, 9, 29)].premium == D("0.02")
     assert "EUR" in by[dt.date(2026, 9, 30)].reason
     assert "no listing close" in by[dt.date(2026, 1, 5)].reason
+
+
+def test_nav_premium_is_withheld_when_the_listing_currency_is_unknown():
+    from steward.fundresearch.data import NavPoint
+
+    pts = [
+        NavPoint(
+            as_of=dt.date(2026, 9, 29), nav=D("100"), currency="USD", source_url="https://x.test/n"
+        )
+    ]
+    view = performance.build_nav_for_listing(pts, [(dt.date(2026, 9, 29), D("102"))], None)
+    assert view.points[0].premium is None and "not recorded" in view.points[0].reason
 
 
 def test_nav_premium_scales_pence_listing_closes_to_the_major_unit():

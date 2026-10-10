@@ -10,10 +10,10 @@ import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import asyncpg
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from steward.analytics.contract import input_hash, rounded
 from steward.analytics.ratio_set import COMPANY_RATIOS
@@ -26,6 +26,7 @@ from steward.company.ratios import (
     PeerExcluded,
     build_peer_values,
     build_periods,
+    evaluate,
     figures_by_column,
     is_financial_issuer,
     market_from,
@@ -122,9 +123,50 @@ class PeerGroup(BaseModel):
     peers: list[str]
 
 
+PeerTicker = Annotated[
+    str, StringConstraints(strip_whitespace=True, pattern=r"^[A-Za-z0-9._-]{1,32}$")
+]
+
+
 class PeerGroupIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
-    peers: list[str] = Field(min_length=1, max_length=40)
+    peers: list[PeerTicker] = Field(min_length=1, max_length=40)
+
+
+def clean_peers(peers: list[str], ticker: str) -> list[str]:
+    """Peer tickers as given, without the company itself. Trading212 tickers are case-sensitive
+    (VUSAl_EQ), so the case is kept; only a repeat or the company's own ticker is dropped."""
+    own = ticker.casefold()
+    return sorted({p for p in (p.strip() for p in peers) if p and p.casefold() != own})
+
+
+def match_universe(stored: list[str], universe: list[str]) -> tuple[list[str], list[PeerExcluded]]:
+    """Map stored peers to the covered universe's actual-cased tickers: an exact match first, else
+    the single case-insensitive match. An ambiguous one is dropped with a note; a peer with no match
+    is kept as stored, so the loader reports it as not covered."""
+    known = set(universe)
+    by_fold: dict[str, list[str]] = {}
+    for u in sorted(known):
+        by_fold.setdefault(u.casefold(), []).append(u)
+    out: list[str] = []
+    notes: list[PeerExcluded] = []
+    for p in stored:
+        if p in known:
+            hit = p
+        else:
+            cands = by_fold.get(p.casefold(), [])
+            if len(cands) > 1:
+                notes.append(
+                    PeerExcluded(
+                        ticker=p,
+                        reason=f"ambiguous: matches {', '.join(cands)} when case is ignored; re-save the group with the exact ticker",
+                    )
+                )
+                continue
+            hit = cands[0] if cands else p
+        if hit not in out:
+            out.append(hit)
+    return out, notes
 
 
 async def list_groups(pool: asyncpg.Pool, owner_id: Any, ticker: str) -> list[PeerGroup]:
@@ -139,9 +181,7 @@ async def list_groups(pool: asyncpg.Pool, owner_id: Any, ticker: str) -> list[Pe
 async def save_group(
     pool: asyncpg.Pool, owner_id: Any, ticker: str, body: PeerGroupIn
 ) -> PeerGroup:
-    peers = sorted(
-        {p.strip().upper() for p in body.peers if p.strip() and p.strip().upper() != ticker.upper()}
-    )
+    peers = clean_peers(body.peers, ticker)
     r = await pool.fetchrow(
         """insert into public.company_peer_group (owner_id, ticker, name, peers) values ($1,$2,$3,$4)
            on conflict (owner_id, ticker, name) do update set peers=excluded.peers, updated_at=now()
@@ -189,7 +229,21 @@ async def resolve_peers(
             owner_id,
             company.ticker,
         )
-        rows = [{"t": p} for p in (row["peers"] if row else [])]
+        stored = list(row["peers"]) if row else []
+        universe = (
+            [
+                r["ticker"]
+                for r in await pool.fetch(
+                    "select ticker from public.investment_universe where lower(ticker) = any($1::text[])",
+                    [p.casefold() for p in stored],
+                )
+            ]
+            if stored
+            else []
+        )
+        resolved, unresolved = match_universe(stored, universe)
+        excluded.extend(unresolved)
+        rows = [{"t": p} for p in resolved]
         label = f"saved group {row['name']}" if row else "saved group (not found)"
     else:
         if not company.sector:
@@ -439,11 +493,17 @@ async def compare(
         company.market,
         financial=is_financial_issuer(company.sector, company.industry),
     )
-    subject_col, subject_period = subject_pairs[-1] if subject_pairs else (None, None)
+    # Peers are loaded on their last fiscal year, so the company is read on its own: a TTM point
+    # (the newest pair when a quarter is newer) would not be comparable with them.
+    subject_col, subject_period = next(
+        ((c, p) for c, p in reversed(subject_pairs) if c.kind == "annual"), (None, None)
+    )
     values, stale = build_peer_values(peer_views, subject_col.end if subject_col else None)
     excluded = [*pre_excluded, *dropped, *stale]
     subject_values: dict[str, RatioValue] = (
-        {r.id: r.fn(subject_period) for r in COMPANY_RATIOS.values()} if subject_period else {}
+        {r.id: evaluate(subject_period, r) for r in COMPANY_RATIOS.values()}
+        if subject_period
+        else {}
     )
     companies = [
         CompareCompany(
@@ -645,6 +705,10 @@ async def list_scenarios(pool: asyncpg.Pool, owner_id: Any, ticker: str) -> list
     return [_saved(r) for r in rows]
 
 
+class VersionConflict(Exception):
+    """Two saves raced for the same version number; the route answers 409."""
+
+
 async def save_scenario(
     pool: asyncpg.Pool,
     owner_id: Any,
@@ -659,25 +723,34 @@ async def save_scenario(
             "selected": body.request.selected,
         }
     )
-    async with pool.acquire() as con, con.transaction():
-        nxt = await con.fetchval(
-            "select coalesce(max(version), 0) + 1 from public.company_valuation_scenario where owner_id=$1 and ticker=$2 and name=$3",
-            owner_id,
-            ticker,
-            body.name.strip(),
-        )
-        r = await con.fetchrow(
-            """insert into public.company_valuation_scenario (owner_id, ticker, name, version, assumptions, method_version, input_hash, note, result)
-               values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9::jsonb) returning *""",
-            owner_id,
-            ticker,
-            body.name.strip(),
-            nxt,
-            payload,
-            version("valuation_scenarios"),
-            hash_,
-            body.note,
-            json.dumps(result) if result is not None else None,
-        )
+    name = body.name.strip()
+    try:
+        async with pool.acquire() as con, con.transaction():
+            # One save per owner, ticker and name at a time, so max+1 cannot hand out a number twice.
+            await con.execute(
+                "select pg_advisory_xact_lock(hashtext($1))",
+                f"company_valuation_scenario:{owner_id}:{ticker}:{name}",
+            )
+            nxt = await con.fetchval(
+                "select coalesce(max(version), 0) + 1 from public.company_valuation_scenario where owner_id=$1 and ticker=$2 and name=$3",
+                owner_id,
+                ticker,
+                name,
+            )
+            r = await con.fetchrow(
+                """insert into public.company_valuation_scenario (owner_id, ticker, name, version, assumptions, method_version, input_hash, note, result)
+                   values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9::jsonb) returning *""",
+                owner_id,
+                ticker,
+                name,
+                nxt,
+                payload,
+                version("valuation_scenarios"),
+                hash_,
+                body.note,
+                json.dumps(result) if result is not None else None,
+            )
+    except asyncpg.UniqueViolationError as err:
+        raise VersionConflict("Another save took this version number; try again.") from err
     assert r is not None
     return _saved(r)

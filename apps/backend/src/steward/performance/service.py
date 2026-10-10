@@ -48,7 +48,9 @@ from steward.performance.ledger import (
     Split,
     apply_mergers,
     apply_splits,
+    bucket_snapshot,
     build_ledger,
+    in_interval,
     position_breaks,
     reconcile_cash,
     spin_off_units,
@@ -73,10 +75,11 @@ def _d(value: float | Decimal | None) -> Decimal | None:
 
 
 async def _snapshots(pool: asyncpg.Pool) -> list[asyncpg.Record]:
-    """Daily account snapshots in the latest snapshot's base currency, oldest first."""
+    """Daily account snapshots in the latest snapshot's base currency, oldest first. The days
+    before the first Trading212 snapshot are the ones rebuilt from the ledger."""
     rows: list[asyncpg.Record] = await pool.fetch(
-        "select snapshot_date, total_base, cash_base, invested_base, account_currency,"
-        " base_currency, fx_rate, total_value, invested_value from public.account_snapshot"
+        "select snapshot_date, captured_at, total_base, cash_base, invested_base, account_currency,"
+        " base_currency, fx_rate, total_value, invested_value from public.account_history"
         " order by snapshot_date"
     )
     if not rows:
@@ -169,7 +172,14 @@ def _day_values(snapshots: list[asyncpg.Record], ledger: list[LedgerEntry]) -> l
                     (
                         e.external_flow
                         for e in ledger
-                        if e.kind in EXTERNAL_KINDS and previous < e.day <= snap["snapshot_date"]
+                        if e.kind in EXTERNAL_KINDS
+                        and in_interval(
+                            e,
+                            previous,
+                            snap["snapshot_date"],
+                            snapshots[i - 1].get("captured_at"),
+                            snap.get("captured_at"),
+                        )
                     ),
                     ZERO,
                 )
@@ -192,6 +202,8 @@ def _cash_checks(
                 opening_cash=before["total_value"] - before["invested_value"],
                 closing_cash=after["total_value"] - after["invested_value"],
                 tolerance=max(tolerance, abs(after["total_value"]) * Decimal("0.0001")),
+                start_at=before.get("captured_at"),
+                end_at=after.get("captured_at"),
             )
         )
     return checks
@@ -376,7 +388,10 @@ async def performance_report(
     windows: list[r.WindowOut] = []
     for window_label in WINDOW_LABELS:
         start = window_start(window_label, days[-1].date)
-        missing = _missing_weight(checks, start, latest["total_value"])
+        # The window opens on the last stored day on or before its nominal start (up to a week
+        # earlier), so cash breaks between that day and the start belong to the window too.
+        opened = max((d.date for d in days if start is not None and d.date <= start), default=None)
+        missing = _missing_weight(checks, opened or start, latest["total_value"])
         w = window_return(days, window_label, missing_weight=missing)
         benchmark_out = None
         if label is not None:
@@ -406,13 +421,18 @@ async def performance_report(
                 xirr=r.figure(w.xirr),
                 xirr_annualized=w.xirr_annualized,
                 reason=w.reason,
+                opening_gap_days=w.opening_gap_days,
                 benchmark=benchmark_out,
             )
         )
     index = _cumulative_index(days)
     bench_index: list[r.PerformanceSeriesPoint] = []
     if bench_series:
-        base_close = next((c for d, c in bench_series if d >= first_day), None)
+        # Same convention as the window figures: the last close on or before the first valuation
+        # day, falling back to the first close after it only when none exists earlier.
+        base_close = next((c for d, c in reversed(bench_series) if d <= first_day), None) or next(
+            (c for d, c in bench_series if d >= first_day), None
+        )
         if base_close:
             bench_index = [
                 r.PerformanceSeriesPoint(date=d, value=float(Decimal(100) * c / base_close))
@@ -668,19 +688,17 @@ async def attribution_report(
         for x in pos_rows
     ]  # fmt: skip
     meta = {x["ticker"]: x for x in pos_rows}
-    snapshot_days = [s["snapshot_date"] for s in window]
 
-    def snapshot_day(day: dt.date) -> dt.date | None:
-        return next((d for d in snapshot_days if d >= day), None)
-
+    snapshot_stamps = [(s["snapshot_date"], s.get("captured_at")) for s in window]
     trades: list[Trade] = []
     income: list[Amount] = []
     costs: list[Amount] = []
     for e in ledger:
-        if e.needs_fx or not (start_date < e.day <= end):
+        if e.needs_fx:
             continue
-        # An event belongs to the interval ending on the next snapshot day, at that day's rate.
-        bucket = snapshot_day(e.day)
+        # An event belongs to the interval it falls in (by capture time where known), at the
+        # closing snapshot day's rate: the same interval its flow is counted in.
+        bucket = bucket_snapshot(e, snapshot_stamps)
         if bucket is None:
             continue
         rate = rate_by_day.get(bucket, ONE)
@@ -831,7 +849,7 @@ async def load_record(pool: asyncpg.Pool, settings: PerformanceSettings) -> Reco
     ledger = await _ledger(pool, account_currency, settings)
     rows = await pool.fetch(
         "select snapshot_date, ticker, quantity, current_price, fx_rate, value_base"
-        " from public.position_snapshot where base_currency = $1 order by snapshot_date",
+        " from public.position_history where base_currency = $1 order by snapshot_date",
         snapshots[-1]["base_currency"],
     )
     positions = [PositionDay(x["snapshot_date"], x["ticker"], x["quantity"], x["current_price"],
@@ -841,11 +859,11 @@ async def load_record(pool: asyncpg.Pool, settings: PerformanceSettings) -> Reco
     trades: list[Trade] = []
     income: list[Amount] = []
     costs: list[Amount] = []
-    first = valuation_days[0]
+    stamps = [(s["snapshot_date"], s.get("captured_at")) for s in snapshots]
     for e in ledger:
-        if e.needs_fx or e.day <= first or not e.ticker:
+        if e.needs_fx or not e.ticker:
             continue
-        nearest = next((d for d in valuation_days if d >= e.day), None)
+        nearest = bucket_snapshot(e, stamps)  # the interval it falls in, by capture time
         if nearest is None:
             continue
         rate = rate_by_day[nearest]

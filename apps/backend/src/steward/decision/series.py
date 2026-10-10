@@ -114,7 +114,7 @@ async def holding_returns(
     weights (of invested value)."""
     rows = await pool.fetch(
         "select snapshot_date, ticker, quantity, avg_price, fx_rate, value_base"
-        " from public.position_snapshot where snapshot_date >= $1 order by ticker, snapshot_date",
+        " from public.position_history where snapshot_date >= $1 order by ticker, snapshot_date",
         since,
     )
     by_ticker: dict[str, list[asyncpg.Record]] = {}

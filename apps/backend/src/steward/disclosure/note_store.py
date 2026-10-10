@@ -65,6 +65,7 @@ def build_note_fact_rows(
         if sched is None:
             continue
         mult = sched.unit.multiplier
+        table_start = shift(min((r.start for r in sched.rows), default=0))
         for r in sched.rows:
             out.append(
                 {
@@ -79,6 +80,7 @@ def build_note_fact_rows(
                         "reasons": list(r.reasons),
                         "start": shift(r.start),
                         "end": shift(r.end),
+                        "table_start": table_start,
                         "raw": r.raw,
                         "columns": list(r.columns),
                         "dash": r.dash,
@@ -211,16 +213,25 @@ async def load_note_rows(
     out: dict[dt.date, list[StoredNote]] = defaultdict(list)
     for (end, _), items in grouped.items():
         latest = max(items, key=lambda it: (it[0]["known_at"], it[0]["accession"]))[0]
-        for r, note in items:
-            if r["accession"] != latest["accession"]:
-                continue
+        mine = [it for it in items if it[0]["accession"] == latest["accession"]]
+        # A parser-version bump stores the same buckets again; only the newest extractor's rows
+        # of the filing are read, so the old and new copies are never both kept.
+        newest = max(str(n.get("extractor") or "") for _, n in mine)
+        mine = [it for it in mine if str(it[1].get("extractor") or "") == newest]
+        # Two tables of one schedule in a filing would merge bucket by bucket: send them to review.
+        tables = len({str(n.get("table_start")) for _, n in mine})
+        for r, note in mine:
+            status = str(note.get("status", "review"))
+            reasons = tuple(note.get("reasons") or ())
+            if tables > 1:
+                status, reasons = "review", (*reasons, "more than one table of this schedule")
             out[end].append(
                 StoredNote(
                     str(note.get("schedule")),
                     note.get("bucket"),
                     None if r["value"] is None else Decimal(str(r["value"])),
-                    str(note.get("status", "review")),
-                    tuple(note.get("reasons") or ()),
+                    status,
+                    reasons,
                     bool(note.get("dash")),
                     note,
                     r["accession"],

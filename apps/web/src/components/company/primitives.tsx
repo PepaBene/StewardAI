@@ -58,8 +58,10 @@ export function Absent({ reason, className }: { reason?: string | null; classNam
 
 /** A source link that opens in a new tab only when external. */
 export function SourceLink({ href, children }: { href: string | null | undefined; children: ReactNode }) {
-  if (!href) return <span className="text-text-muted">{children}</span>;
   const external = isExternalUrl(href);
+  // an http(s) address or a path inside the app; anything else (javascript:, data:) is not a link
+  const internal = typeof href === "string" && href.startsWith("/") && !href.startsWith("//");
+  if (!href || (!external && !internal)) return <span className="text-text-muted">{children}</span>;
   return (
     <a
       href={href}

@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type { components } from "@/lib/api/schema";
 
 type S = components["schemas"];
@@ -88,7 +89,7 @@ export function buildEntry(form: EntryForm): BuiltEntry {
   }
   let price: number | null = null;
   if (form.price.trim() !== "") {
-    price = Number(form.price.trim().replace(",", "."));
+    price = Number(normaliseSeparators(form.price));
     if (!Number.isFinite(price) || price <= 0) return { ok: false, error: "The price must be a positive number, or blank." };
   }
   const parent = form.parent_id.trim() === "" ? null : Number(form.parent_id);

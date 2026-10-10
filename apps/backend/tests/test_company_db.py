@@ -227,7 +227,8 @@ async def test_peer_groups_and_evidence_tabs_run(
             json={"name": "Core", "peers": ["bbb_us_eq", "AAA_US_EQ", "CCC_US_EQ"]},
         )
     ).json()
-    assert saved["peers"] == ["BBB_US_EQ", "CCC_US_EQ"]  # sorted, upper-cased, never itself
+    # sorted, never itself; the case is kept (Trading212 tickers are case-sensitive, D20)
+    assert saved["peers"] == ["CCC_US_EQ", "bbb_us_eq"]
     compare = (
         await api.get(f"/companies/{TICKER}/peers?scope=group&group_id={saved['id']}")
     ).json()
@@ -236,7 +237,7 @@ async def test_peer_groups_and_evidence_tabs_run(
         and compare["rows"]
         and any("comparable peers" in w for w in compare["warnings"])
     )
-    assert {e["ticker"] for e in compare["excluded"]} == {"BBB_US_EQ", "CCC_US_EQ"}
+    assert {e["ticker"] for e in compare["excluded"]} == {"bbb_us_eq", "CCC_US_EQ"}
     assert (await api.delete(f"/companies/{TICKER}/peer-groups/{saved['id']}")).status_code == 204
 
     overview = (await api.get(f"/companies/{TICKER}/overview")).json()

@@ -31,6 +31,7 @@ export function AlertsPageView() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [unreadCapped, setUnreadCapped] = useState(false);
   const acking = useRef(new Set<number>());
+  const [recentLimit, setRecentLimit] = useState(RECENT_LIMIT);
 
   // Unread alerts are fetched on their own, so a long history of read ones can never push an unread one out of the list.
   const load = useCallback(async () => {
@@ -38,7 +39,7 @@ export function AlertsPageView() {
       const api = getBrowserApiClient();
       const [unread, recent] = await Promise.all([
         api.GET("/disclosures/alerts", { params: { query: { include_acknowledged: false, limit: UNREAD_LIMIT } } }),
-        api.GET("/disclosures/alerts", { params: { query: { include_acknowledged: true, limit: RECENT_LIMIT } } }),
+        api.GET("/disclosures/alerts", { params: { query: { include_acknowledged: true, limit: recentLimit } } }),
       ]);
       if (unread.data && recent.data) {
         const unreadIds = new Set(unread.data.map((x) => x.id));
@@ -54,7 +55,7 @@ export function AlertsPageView() {
       setAlerts(null);
       setLoadError(`Backend unreachable: ${e instanceof Error ? e.message : String(e)}`);
     }
-  }, []);
+  }, [recentLimit]);
 
   const loadDigest = useCallback(async () => {
     try {
@@ -190,8 +191,13 @@ export function AlertsPageView() {
       <Panel id="done" title="Already read" description="Kept so you can look back; nothing is deleted.">
         <label className="mb-2 flex items-center gap-2 text-sm">
           <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} className="size-4" />
-          Show {done.length} read {done.length === 1 ? "alert" : "alerts"}
+          {done.length >= recentLimit ? `Show the newest ${done.length} read alerts` : `Show ${done.length} read ${done.length === 1 ? "alert" : "alerts"}`}
         </label>
+        {done.length >= recentLimit && recentLimit < 500 ? (
+          <Button type="button" size="sm" variant="outline" className="mb-2" onClick={() => setRecentLimit((n) => Math.min(500, n + 100))}>
+            Load older read alerts
+          </Button>
+        ) : null}
         {showDone ? done.length === 0 ? <p className="text-sm text-text-muted">No alert has been marked as read.</p> : <AlertList alerts={byKnown(done)} /> : null}
       </Panel>
     </div>
@@ -212,7 +218,7 @@ function AlertList({ alerts, onAcknowledge }: { alerts: readonly DisclosureAlert
               {a.acknowledged_at ? <> · read <span className="num">{formatDay(a.acknowledged_at)}</span></> : null}
             </p>
             <p className="text-xs">
-              <Link href={`${ALERT_HREF[a.kind]}`} className="text-accent-ink hover:underline">Open the full view</Link>
+              <Link href={`${ALERT_HREF[a.kind]}?ticker=${encodeURIComponent(a.ticker)}`} className="text-accent-ink hover:underline">Open the full view</Link>
               {a.source_url ? (
                 <>
                   {" "}
