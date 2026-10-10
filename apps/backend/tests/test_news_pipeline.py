@@ -575,7 +575,8 @@ async def test_phase3_tables_follow_the_access_model(migrated_db: MigratedDataba
                 ("authenticated", "insert", False),
                 ("app_backend", "select", True),
                 ("app_backend", "update", True),
-                ("app_backend", "delete", False),
+                # N3 lets the dedupe step remove the empty story it merges into an older one.
+                ("app_backend", "delete", table == "story_cluster"),
             ):
                 got = await conn.fetchval(
                     "select has_table_privilege($1, $2, $3)", role, f"public.{table}", privilege

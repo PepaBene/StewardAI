@@ -17,7 +17,14 @@ IR = {"investor.apple.com"}
 
 
 def source(**kw: object) -> NewsSource:
-    base: dict[str, object] = {"id": "s", "name": "S", "tier": 2, "type": "rss"}
+    base: dict[str, object] = {
+        "id": "s",
+        "name": "S",
+        "tier": 2,
+        "type": "rss",
+    }
+    if kw.get("type", "rss") in ("rss", "news_sitemap"):
+        base["url"] = "https://x.test/feed"
     return NewsSource.model_validate({**base, **kw})
 
 
