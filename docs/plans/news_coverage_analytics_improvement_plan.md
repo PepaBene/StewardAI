@@ -1,151 +1,339 @@
-# StewardAI news coverage and analytics improvement plan
+# StewardAI news: coverage, full-text and interpretation plan
 
-**Status:** research-backed proposal  
-**Date:** 2026-09-30  
-**Scope:** News as an event input for portfolio oversight, research, and alerts
+**Status:** research-backed proposal, revision 2  
+**Date:** 2026-10-10 (rev 1: 2026-09-30)  
+**Scope:** make news the main event driver: a wide global wire, deep stories for holdings, and an analysis layer that explains what a story means for this portfolio.
 
-## Executive recommendation
+## 0. What changed in this revision
 
-Improve the event signal and its trustworthiness before broadening headline volume. StewardAI already has a strong pipeline foundation: configurable sources, URL normalization, stale/blocked-source filtering, syndicated-story clustering, holding linkage, classification, severity rules, corroboration, alert routing, and news-focused tests/evaluation fixtures (`apps/backend/src/steward/news/pipeline.py`, `apps/backend/src/steward/news/`). The plan should extend those foundations around source coverage, provenance, event resolution, analytics quality, and feedback.
+Rev 1 was built for a multi-user commercial product: licence-first, headline-light, "do not build a news mirror". The product is a **single-user, self-hosted** copilot (`README.md`), and the owner now wants news to be the main event driver, with Bloomberg, FT, Reuters, BBC and reliable Japan, China, Asia, Germany, Canada and UK coverage, headlines **and** full reports, and strong analysis. So:
 
-Use a **source hierarchy**:
+1. **Coverage first, in three lanes** (section 3): a broad *Wire* of every headline, a *Stories* lane for portfolio and watch-topic events, and *Primary* official sources. Rev 1 kept only holding-matched items; the schema comment says "Items that match no holding are never stored" (`supabase/migrations/20260925200207_phase3_news.sql:132`). That is the biggest single limit on "powerful" and it goes.
+2. **Full text through an access ladder** (section 5), not a blanket ban. Personal, local analysis of lawfully fetched text is in scope. Paywall circumvention, and redistribution, are out.
+3. **Interpretation is the product** (section 6): event extraction, impact chains onto holdings, novelty, story threads, cross-country framing, thesis links, briefings, ask-the-news. Rev 1's evidence, corroboration and benchmark work stays, as the trust layer under it.
+4. Rights language is now a **personal-use risk register** with owner decisions (section 11), not a vendor-licence gate. Licence risk is not zero: publisher terms still restrict automated access, and the owner carries that risk.
 
-1. **Primary evidence first:** regulatory filings and regulator notices, company investor-relations releases, exchange notices, central banks/statistical agencies, courts and other relevant public bodies.
-2. **Licensed professional news feeds** when commercial redistribution and latency justify their cost. Evaluate one financial feed vendor against the actual portfolio universe and display/use rights before committing.
-3. **Permitted RSS/Atom and publisher APIs** for additional reputable reporting. Store metadata and short feed excerpts where terms permit; send users to the publisher for the article.
-4. **Broad discovery aggregators** (for example GDELT) for coverage-gap discovery and corroboration, not as the sole source of a high-severity event.
-5. **Targeted page fetching/scraping only as a governed fallback** for a named source that offers no usable feed/API and whose terms/robots policy and rights have been reviewed. Do not build a full-text news mirror.
+## 0a. Constraints from the owner (2026-10-10)
 
-Keep the current event pipeline. Add an explicit evidence/provenance layer and measure missed events, false escalations, duplicate reduction, and source diversity. Rank evidence quality and event materiality separately from article sentiment; do not present sentiment as a return forecast.
+$10/month for news, no existing news subscriptions. Consequences, applied throughout: free sources only (the Wire, the Reuters sitemap, GDELT, official APIs); Bloomberg, FT, Reuters and Nikkei are headline + summary + link with analysis of what is lawfully readable; subscription-session fetching is dropped; the money goes to model inference under the funnel and sub-budgets in section 8a.
 
-## What exists today
+## 1. Where the code is today (verified 2026-10-10)
 
-The pipeline docstring describes an end-to-end `news_ingest` flow: read configured sources, normalize and freshness-filter, drop blocked/stale/non-matching items and existing URLs, cluster syndicated copies, classify new items, assess event/severity/corroboration, then create and dispatch matching alerts. The code imports collectors for EDGAR, Finnhub, Google News, generic pages and RSS, along with separate regulatory and EDGAR full-text-search collection. This is a good base for incremental improvement.
+- Pipeline `apps/backend/src/steward/news/` (6.4k lines): `feeds.py` (RSS, page, EDGAR, Finnhub, Google News, Alpha Vantage collectors), `regulatory.py` (RNS, EQS, EDGAR full-text search), `normalize.py`, `cluster.py`, `link.py` (holding matching), `classify.py` (Claude classifier, event types), `corroborate.py`, `escalation*.py`, `digest.py`, `pipeline.py` (`news_ingest` job).
+- Config `apps/backend/src/steward/config/news_sources.py`: `SourceType` = rss, page, edgar, finnhub, google_news, rns, eqs, edgar_fts, alpha_vantage; trust tiers 1–3 per source and per outlet domain; `freshness_hours=72`; tier 3 off by default. Default sources are only EDGAR, Finnhub, Fed, ECB and ČNB feeds (Google News, RNS, EQS, Alpha Vantage are shipped **disabled**).
+- Tables: `source`, `story_cluster`, `news_item`, `alert`, `report`. Items matching no holding are dropped before storage (macro sources excepted).
+- Already available for full text: `research/polite.py` (`PoliteFetcher`: robots, per-host rate limit, SSRF guard) and `research/browser.py` (`BrowserRenderer`, Playwright, optional). Reuse both; do not write a second fetcher.
+- Web: `apps/web/src/app/(app)/news/news-view.tsx` shows a holding-linked feed with severity, tier, price reaction and source stats; `components/news/*` holds the pieces.
+- Related plans to align with, not duplicate: `agentic_workflows_and_rag_plan.md` (embeddings = `gemini-embedding-2`, news indexed as headline+summary, 12–24 month vector retention; inbox alerts), `multi_provider_model_routing_plan.md` (model routing), `exposures_and_dependencies_plan.md` (exposure graph this plan's impact chains need), `free_data_sources_implementation_plan.md` (Alpha Vantage news sentiment item D3.8).
 
-Likely risks to address (verify against current runtime configuration during implementation):
+## 2. Live source probe (curl, 2026-10-10, UA `Mozilla/5.0 StewardAI-research`)
 
-- Configured sources and thresholds may give uneven geography, language, asset-class, or event-type coverage.
-- Matching a story to a holding is not equivalent to proving that the holding is materially affected; entity aliases, subsidiaries, suppliers, and fund look-through need explicit confidence and relation types.
-- News articles are noisy proxies for events: duplicated wire copies, revisions, rumors, opinion, and delayed publication can distort counts and sentiment.
-- Current pipeline summary suggests unmatched stories are discarded. That can hide important macro, sector, supply-chain, or portfolio-wide events unless they are captured through explicit watch topics.
-- “Confirmed” needs transparent evidence: independent sources should be genuinely independent, and primary-source confirmation should be distinguishable from multiple syndicated copies.
-- Evaluation fixtures are present, but production observability and a labeled recall/precision benchmark should drive tuning.
+HTTP 200 with parsable items unless noted. "Items" = entries in the feed at probe time. This shows reachability only, **not** reuse terms.
 
-## Research findings and source choices
+| Outlet | Feed | Result | Gives |
+|---|---|---|---|
+| Bloomberg | `feeds.bloomberg.com/{markets,politics,technology}/news.rss` | 200, 20 each | headline, summary, link (full text paywalled) |
+| Financial Times | `ft.com/rss/home`, `ft.com/{markets,companies}?format=rss` | 200, 11 / 25 / 25 | headline, short summary, link (paywalled) |
+| Reuters | `feeds.reuters.com/...` | dead (connection fails; Reuters ended RSS in 2020) | – |
+| Reuters | `reuters.com/arc/outboundfeeds/news-sitemap-index/?outputType=xml` → paged `news-sitemap/?outputType=xml&from=N` | 200, Google News sitemap | title, URL, publication time, language, image, in near real time; no summary |
+| BBC | `feeds.bbci.co.uk/news/{business,world,world/asia}/rss.xml` | 200, 52 / 30 / 17 | headline, summary, link (full text open to read) |
+| Nikkei Asia | `asia.nikkei.com/rss/feed/nar` | 200, 50 | headline, summary (partly paywalled) |
+| Japan Times | `japantimes.co.jp/feed/` | 200, 30 | headline, summary |
+| NHK World | `…/nhkworld/en/news/feeds/` | **404** (find current URL) | – |
+| SCMP | `scmp.com/rss/92/feed` (business), `/4/feed` (China) | 200, 50 each | headline, summary |
+| Caixin Global | `caixinglobal.com/rss/` | **403** (bot block; use Playwright or Google News fallback) | – |
+| Xinhua | `xinhuanet.com/english/rss/businessrss.xml` | 200, 20 | state media: label as such |
+| China Daily | `bizchina_rss.xml` | **404** | – |
+| Straits Times | `straitstimes.com/news/business/rss.xml` | 200, 24 | headline, summary |
+| Korea Herald / Yonhap | `kh_Business`, `en.yna.co.kr/RSS/news.xml` | 200, 50 / 101 | headline, summary |
+| DW | `rss.dw.com/rdf/rss-en-bus` | 200, 20 | headline, summary; full text open |
+| Handelsblatt / FAZ / Tagesschau | finanzen, aktuell/finanzen, wirtschaft | 200, 20 / 29 / 39 | German headline, summary |
+| Globe and Mail / Financial Post / CBC | business feeds | 200, 100 / 10 / 20 | headline, summary |
+| Guardian / Sky | business feeds | 200, 40 / 10 | headline, summary |
+| Telegraph | business RSS | **402** (payment required) | – |
+| Al Jazeera, Economic Times, Mint, CNBC, MarketWatch, WSJ (Dow Jones public) | RSS | 200, 25 / 50 / 35 / 30 / 10 / 61 | headline, summary |
+| BoJ, BoE, Bank of Canada | RSS | 200, 51 / 50 / 10 | primary macro |
 
-### Coverage and acquisition
+Not yet probed (do in N1): Bundesbank, PBoC, HKEXnews, GDELT DOC, Google News per-outlet queries, TDnet/EDINET, DART, CNINFO, SEDAR+, Companies House.
 
-- **SEC EDGAR:** use SEC-hosted submissions/XBRL APIs and RSS for US filings, with required identification and responsible request behavior. These are primary-source event records, not ordinary press coverage. SEC describes its APIs and provides official RSS feeds: [EDGAR APIs](https://www.sec.gov/submit-filings/filer-support-resources/how-do-i-guides/understand-edgar-application-programming-interfaces-apis), [SEC RSS feeds](https://www.sec.gov/about/rss-feeds).
-- **Finnhub:** its documented company-news endpoint provides headline, timestamp, summary, URL, source, and related symbols; the docs describe North American company coverage and a separate premium news-sentiment endpoint with US-only coverage. It is a useful candidate connector, but do not infer commercial display, archival, or redistribution rights from API availability; get written confirmation for the intended product. [Finnhub API documentation](https://finnhub.io/docs/api/quote).
-- **NewsAPI:** its current pricing page says the free Developer plan is for development/testing only, has delayed articles, and production requires a paid plan; it says full article text is not provided. The terms restrict reproducing/republishing copyrighted material and building a competing news database. This makes it unsuitable as a default production source without a plan and permitted-use confirmation. [Pricing](https://newsapi.org/pricing), [terms](https://newsapi.org/terms).
-- **GDELT:** useful to discover international coverage gaps and find corroborating mentions across a broad news corpus. Its DOC API is a search/discovery service; validate its update cadence, language/entity matching, and rights for the actual endpoint and intended use. Treat returned mentions as leads, not proof. [GDELT DOC API overview](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/), [GDELT API guide](https://docs.gdeltcloud.com/API_DOCUMENTATION_GUIDE).
-- **Event Registry:** a commercial alternative to evaluate if broad multilingual event clustering and source/topic analytics would save engineering effort; its product describes global source coverage, entity/category/sentiment enrichment, and event grouping. Request a portfolio-specific coverage sample and exact product display/storage rights before selecting it. [Event Registry](https://research.eventregistry.org/).
-- **Licensed wires:** Reuters Connect / LSEG News are the higher-cost route when reliable low-latency global coverage and explicit customer display rights matter. LSEG explicitly says separate licenses/approvals may be needed for use beyond internal programmatic use. [Reuters Connect](https://reutersagency.com/content-delivery-platforms/reuters-connect/), [LSEG News Service](https://developers.lseg.com/en/product/news/overview).
-- **Publisher RSS and scraping:** RSS is not a blanket content license. Publisher terms vary; for example, Le Monde states its RSS use is personal/non-professional unless authorized and paid. Use source-specific rights checks rather than assuming public accessibility grants commercial redistribution. [Le Monde RSS terms example](https://www.lemonde.fr/en/rss/article/2022/06/23/the-rss-feeds-of-monde-fr_5987755_165.html).
+Web research (cited in section 12): GDELT updates every 15 minutes, machine-translates 65 languages, DOC 2.0 searches a rolling 3-month window with source-country, language, theme and domain operators, and the Global Knowledge Graph gives people, organisations, locations, themes and tone. Reuters/LSEG enterprise feeds are quote-only; Reuters public consumer tiers (about $15 and $35 a month) are websites, not APIs. Among open extractors, trafilatura scored F1 0.958 on the Scrapinghub benchmark vs newspaper4k 0.949 and Mozilla Readability 0.947.
 
-### Analytical design
+## 3. Target architecture: three lanes
 
-Build the internal unit of analysis as a **story/event**, with articles as source evidence. Maintain the original headline/excerpt and link provenance, but calculate event status from evidence, not from the number of copies. Materiality, confidence, novelty, and portfolio exposure are separate dimensions. Use price reaction as retrospective context and evaluation—not a label that can leak future information into live alerts.
+```
+ Primary (tier 1)   SEC/EDGAR, RNS/EQS, EDINET/TDnet, HKEX/CNINFO, DART, SEDAR+, central banks,
+                    statistics offices, issuer IR      ─┐
+ Wire (tier 2)      Bloomberg, FT, Reuters(sitemap), BBC, Nikkei, SCMP, DW, Handelsblatt,  ├─► fetch ─► normalise ─► dedupe
+                    Globe&Mail, … + Google News per outlet + licensed API if bought       │      (url, simhash, embedding)
+ Discovery (lead)   GDELT DOC/GKG, Alpha Vantage, Finnhub                               ─┘
+                                           │
+        ┌──────────────────────────────────┼──────────────────────────────────┐
+        ▼                                  ▼                                  ▼
+  WIRE lane: every item kept     STORIES lane: items linked to a       ANALYSIS lane (section 6):
+  (headline, summary, link,      holding, watch topic or exposure →    event extraction → impact chains →
+  language, translation,         story_cluster/event, corroboration,   novelty → threads → interpretation
+  embedding), searchable,        severity, alerts (existing pipeline)  briefs, ask-the-news
+  filterable by region/outlet
+```
 
-## Proposed work plan
+Rules:
 
-### Phase 0 — Establish a measurable baseline (1–2 weeks)
+- **Wire is wide and cheap.** Keep every fresh item's metadata and embedding (headline+summary), so macro, sector, geopolitical and supply-chain news is searchable even when no holding name appears. Retention: metadata and embeddings 24 months (aligned with the RAG plan), extracted full text 90 days unless the story is linked to a holding, thesis or alert.
+- **Stories stay precise.** The existing link, classify, corroborate, escalate path runs on linked items only; the wire lane feeds it through entity linking, watch topics and exposure links (section 6.3).
+- **Analysis runs on a funnel**, never on the whole wire (section 8, cost).
+- Source tier still decides alerting: tier-2 outlets can raise a story, tier-3 and discovery items cannot alert alone.
 
-1. Inventory the active `news_sources` config and log effective source, geography/language, asset coverage, polling cadence, latency, source tier, fields retained, cost, and terms/rights owner.
-2. Instrument each source and each pipeline stage with counts, timing, errors, stale/drop reasons, unmatched entities, duplicate/cluster rate, model failures, and alert outcomes. Avoid logging article body text unnecessarily.
-3. Create a labeled benchmark of 100–200 historical portfolio-relevant events, stratified across holdings, macro/sector events, geography, event type, and severity. Include missed-event examples and hard negatives (rumors, opinion, stale/recycled stories, unrelated same-name entities).
-4. Report baseline event recall, precision, alert precision, time-to-ingest, time-to-confirm, entity-link accuracy, duplicate suppression, and source concentration. Add confidence intervals and per-segment results; aggregate scores can hide blind spots.
+## 4. Source plan: named outlets and regions
 
-**Exit criteria:** baseline dashboard and a reproducible benchmark; every dropped item has a reason; every alert can be traced to its evidence and configuration/model version.
+Add these as config (no deploy; `news_sources` is versioned config). Items marked **new type** need a collector.
 
-### Phase 1 — Improve evidence model and event resolution (2–4 weeks)
+| Region / need | Sources | How |
+|---|---|---|
+| Bloomberg, FT | public RSS above | `rss`; headline + summary + link only (no subscription, section 0a) |
+| Reuters | news sitemap | **new type `news_sitemap`**: poll the sitemap index every 2–5 min, take new `<news:news>` entries (title, time, language), fetch the article through the ladder. Fallback: Google News query `site:reuters.com` per topic/holding |
+| BBC | business, world, Asia, tech RSS | `rss`; article body is open: ladder rung 2 |
+| UK | Guardian (also Open Platform API, key, full text—confirm terms), Sky, FT, BBC, Telegraph via Google News (RSS is 402), RNS, BoE, ONS, Companies House (free REST/stream) | `rss`, `api`, existing `rns` |
+| Japan | Nikkei Asia, Japan Times, NHK (find new feed), Kyodo/Mainichi English; **primary**: EDINET API v2 (free key), TDnet (JPX, paid; fallback JPX site page), BoJ, MoF | `rss`; **new types `edinet`, `tdnet`** |
+| China / HK | SCMP, Caixin (via Playwright or Google News while 403), Xinhua and CGTN (state media, labelled), Yicai/Sina via GDELT; **primary**: HKEXnews, CNINFO/SSE/SZSE announcements, PBoC, NBS | `rss`, `page`, **new types `hkex`, `cninfo`** |
+| Wider Asia | Straits Times, Korea Herald, Yonhap, Economic Times, Mint, Nikkei Asia; **primary**: DART (OpenDART free API), MAS, RBI, SGX | `rss`, **new type `dart`** |
+| Germany | Handelsblatt, FAZ, Tagesschau, DW, Börsen-Zeitung via Google News; **primary**: EQS (shipped, off), Bundesbank, BaFin, Bundesanzeiger (no public API: page fetch) | `rss`, existing `eqs` |
+| Canada | Globe and Mail, Financial Post, CBC, BNN via Google News; **primary**: SEDAR+ (no API: governed page/RSS, N6), Bank of Canada, StatCan | `rss` |
+| Czech (existing owner market) | ČNB (shipped), Hospodářské noviny, E15, Seznam Zprávy (already tiered) | add feeds |
+| Global discovery | GDELT DOC per holding/topic and per country; GKG themes | **new type `gdelt`** |
+| US wires | EDGAR (shipped), Finnhub (shipped), CNBC, MarketWatch, WSJ public feeds | `rss` |
 
-1. Extend story records with typed evidence and provenance: publisher/source ID and tier, first-seen/published/updated times, canonical URL, feed/API identifier, language, excerpt rights/expiry, primary-vs-secondary, independent-source group, and fetch/license status.
-2. Track events separately from article clusters. Add event lifecycle states (reported, corroborated, primary-confirmed, disputed, corrected, resolved) and preserve revisions/corrections rather than silently overwriting.
-3. Make corroboration independence-aware: syndication groups count once; company release/filing plus independent reporting are distinct evidence; conflicting sources trigger disputed status. Show the supporting evidence behind a confirmation.
-4. Upgrade entity linking with identifier-backed aliases (ticker/exchange, ISIN/LEI/CIK where available), subsidiaries, brands, executives, key counterparties, and fund look-through. Store link type and confidence, then use stricter alert thresholds for indirect exposure.
-5. Add explicit portfolio-level watch topics for macro, regulation, rates, currencies, sectors, and key supply-chain/counterparty risks so relevant non-holding stories are not lost at the holding-match gate.
+Add `region` (ISO country of outlet), `language`, `bias_note` (state media, tabloid, trade press) and `paywall` (`open`, `metered`, `hard`) fields to `NewsSource`; `domain_tiers` gains the new outlets (Nikkei, SCMP, Handelsblatt, Globe and Mail, BBC, DW, Straits Times and so on at tier 2; Xinhua/CGTN tier 2 with a `state_media` flag that caps them as sole corroboration for political topics).
 
-**Exit criteria:** improved benchmark recall without material loss of alert precision; users can inspect why an event is linked, confirmed, disputed, or escalated.
+Paid upgrade path (not planned, owner has $10/month and no subscriptions, section 0a): enterprise feeds (LSEG News / Reuters Connect, Bloomberg Enterprise, Dow Jones/Factiva) are quote-only and out of reach. Bloomberg, FT and Reuters therefore stay **headline + summary + link**, and the analysis layer works from those plus the same story's open coverage elsewhere (BBC, Guardian, DW, CNBC, primary filings, GDELT). That is the main cost of the free route: for those three outlets the app interprets what the summary and the corroborating open sources say, and labels the depth ("summary only").
 
-### Phase 2 — Fill the highest-value coverage gaps (2–6 weeks, parallel by source class)
+## 5. Full-text acquisition ladder (per source, in order, stop at first success)
 
-1. Run a coverage audit against the actual holdings/watch topics: for each instrument, test official newsroom, regulator/exchange, major market-language sources, and current aggregators over a fixed period. Prioritize uncovered high-risk holdings and event classes.
-2. Add or improve official-source adapters first (issuer IR feeds/pages, exchange notices, central banks/statistical offices, regulators, courts as relevant). Preserve a source catalog and per-source freshness/health check.
-3. Add a second independent news provider only where the audit shows gaps or the source improves latency, language, or independence. Pilot with a bounded portfolio subset and score it on unique material events, not raw article count.
-4. Use GDELT or a commercial event aggregator as discovery/backfill where multilingual coverage is weak. Require corroboration or label it as unverified discovery.
-5. Build source-health handling: conditional requests/ETags, bounded retries and backoff, per-domain rate limits, circuit breakers, parser-change detection, and source outage visibility. A dead feed should not appear as “no news.”
+| Rung | Method | Applies to | Stored |
+|---|---|---|---|
+| 1 | Feed `content:encoded` or summary | most RSS | text |
+| 2 | `PoliteFetcher` + **trafilatura** (fallback newspaper4k, readability) | open pages: BBC, DW, Guardian, Globe (metered), government and IR pages | text, language, byline, authored time |
+| 3 | Same URL through `BrowserRenderer` (Playwright) | JS-rendered pages, bot-gated feeds like Caixin | text |
+| 4 | Official API with a key (Guardian Open Platform, EDINET, DART, Companies House) | where it exists | text/structured |
+| – | **Dropped (rev 2.1):** owner-subscription session fetching. The owner has no subscriptions and a $10/month budget; revisit only if a subscription is bought | | |
+| – | Never: bypass or spoof paywalls, rotate IPs or accounts, use archive mirrors to defeat paywalls, share the text | | |
 
-**Vendor decision gate:** compare coverage of benchmark events, median/95th percentile latency, entity/tag quality, historical depth, status/SLA, attribution/display rules, caching and retention, derived analytics/model use, geographic scope, and all-in cost. Obtain written confirmation of rights for snippets, user display, model processing, and retention/deletion before launch.
+Notes:
 
-### Phase 3 — Upgrade analytics and user-facing explanations (2–4 weeks)
+- With no subscriptions, FT, Bloomberg, Reuters and Nikkei stay headline + summary + AI analysis of the summary, with a link. Open-body outlets (BBC, Guardian API, DW, government and IR pages, metered Globe and Mail within its free allowance) get full text through rungs 1–4.
+- Per-source `FetchPolicy`: ladder rungs allowed, max requests/hour, retention days, `display` (`full`, `excerpt`, `link_only`). UI shows only what policy allows; analysis may use more than display shows.
+- Each stored text keeps: canonical URL, content hash, fetched-at, rung used, extractor version, and a flag when extraction looks truncated (paywall stub). Truncation detection prevents analysing a paywall stub as if it were the article.
+- Dependency choice: trafilatura as default, based on the published benchmark above; verify on 30 real articles per outlet in N2 (accuracy of body, byline and date) before relying on it.
 
-1. Keep existing event types/severity rules, but tune them against the benchmark and expose event-level confidence, materiality, novelty, evidence count/independence, and direct-vs-indirect portfolio exposure separately.
-2. Add event timelines and company/topic “what changed” summaries grounded in cited source links. Summaries should state known facts, disputed facts, and unknowns, and avoid expanding the licensed excerpt.
-3. Replace undifferentiated sentiment with calibrated, aspect-aware signals: direction/uncertainty, target entity, evidence span, and model confidence. Separate factual event classification from emotional tone and opinion/editorial content.
-4. Add event novelty/relevance ranking: portfolio exposure × event materiality × confidence × freshness, with source quality and duplicate count handled explicitly. Suppress repeated copies while preserving updates and new facts.
-5. Surface price/volume reaction windows as “observed market reaction” with benchmark context (market/sector movement and earnings calendar where available). Keep it retrospective, not predictive language.
-6. Add user feedback actions (relevant/not relevant, wrong entity, duplicate, misclassified, missing source) and feed adjudicated feedback into benchmark/eval—not directly into unreviewed model training.
+## 6. Analysis and interpretation engine (the main investment)
 
-**Exit criteria:** users can understand why an event matters, what evidence supports it, what remains uncertain, and how it affects their holdings or watch topics.
+Everything below produces **structured, cited, versioned** records. The LLM never invents facts: each claim cites a span of the stored text, and spans are verified by string match before saving (reuse the existing `verify` and citation components, `components/news/citation.tsx`).
 
-### Phase 4 — Governed scraping only where it earns its cost (ongoing)
+### 6.1 Event extraction (per story, after clustering)
+Typed schema: `event_type` (existing taxonomy plus macro, geopolitical, regulation, supply-chain, labour, cyber, natural disaster), `actors`, `affected_entities` (company, sector, country, commodity, currency, rate), `action`, `magnitude` (value, unit, vs expectation), `time` (occurred, announced, effective), `status` (rumour, reported, confirmed, official), `direction` per entity with confidence, `key_claims[]` each with source span, `unknowns[]`. Fact, interpretation and speculation are separate fields so the UI never blends them.
 
-Scraping can help discover issuer/agency announcements when no stable RSS/API exists, but should be the last-mile adapter for a finite, documented source list—not a general web crawler.
+### 6.2 Novelty and surprise
+Embedding distance to the previous 30 days of the same entities/topic, plus extracted magnitude vs prior guidance or consensus when available (company guidance in the data layer). Output `novelty` (new, update, repeat, recycled) and `surprise` (none, in line, above, below, unknown). Repeats are suppressed, not deleted. Rationale: market reactions concentrate on new information, and recycled stories are a known false-alert source.
 
-For each candidate site:
+### 6.3 Impact chains onto the portfolio
+Use the exposure graph (`exposures_and_dependencies_plan.md`): holdings, subsidiaries, suppliers/customers (confirmed edges only), sectors, countries of revenue, currencies, commodities, rates, ETF look-through. For each material story, the model proposes chains (`story → entity → relation → holding`) with a relation type and confidence; code, not the model, checks that each edge exists in the graph or is labelled `hypothesis`. Output per holding: direct / second-order / hypothesis, plus an exposure-weighted portfolio impact in percent of NAV (exposure, not a return forecast). This also fixes the holding-match gate: a story about Taiwan export controls reaches an owner of TSMC suppliers through the graph without naming them.
 
-- Review terms of service, robots directives, publisher RSS/API terms, applicable jurisdiction, and rights for commercial use and model processing. Robots permission alone is not a content license; public accessibility alone does not establish display/retention rights.
-- Prefer RSS, sitemap, JSON-LD metadata, or an official press-release API over HTML extraction. Fetch only necessary metadata and minimal permitted excerpt; retain canonical URL and send readers to the source.
-- Identify the crawler, obey explicit blocks, use low request rates/caching/conditional requests, honor `Retry-After`, avoid login/paywall circumvention, and stop on access denial or legal request.
-- Version selectors/parsers, monitor field completeness and layout changes, quarantine malformed results, and use source-specific kill switches.
-- Record approval, contact, allowed fields, excerpt limits, retention/deletion policy, and last review date per source. Recheck when terms or publisher behavior changes.
+### 6.4 Story threads and "what changed"
+A thread groups stories on one developing situation (a merger, a strike, a tariff dispute). Each update is diffed against the thread's last state into: new facts, changed facts, retractions or corrections, still-unknown. Timeline view per thread and per holding. Prevents ten articles from reading as ten events.
 
-Do not scrape full-text articles to reconstruct a commercial news corpus. If full text is needed for the product, pursue a license that expressly permits ingestion, model processing, customer-facing display, caching, and the intended retention period.
+### 6.5 Cross-source and cross-country comparison
+For stories with 3+ independent outlets, extract each outlet's framing: headline claim, emphasised cause, numbers cited, quotes, what is omitted. Show agreement, conflict (disputed status feeds the existing corroboration state) and regional divergence (for example Japanese vs Western coverage of the same BoJ move; Chinese state media vs SCMP vs Reuters on a tariff). Outlet metadata (`region`, `state_media`, `bias_note`) is context to the model and to the reader, never a score applied silently.
 
-### Phase 5 — Continuous evaluation and operations (ongoing)
+### 6.6 Claim checking
+For high-severity stories only: extract checkable claims (numbers, dates, named acts), match them to primary sources already in the system (filings, IR releases, central-bank data, price data) and mark `supported`, `contradicted`, `unverified`. Cites the primary document.
 
-- Run the benchmark after changes to source config, entity mapping, prompts/models, clustering, or severity rules. Keep a versioned holdout set and human adjudication log.
-- Monitor event recall proxies from primary-source calendars/filings, alert precision feedback, false positives per user/week, source outages, stale-item fraction, latency, unique-event yield by source, and cost per useful event.
-- Set release gates on segment regressions (for example language, geography, high-severity event types), not only an overall score.
-- Perform incident reviews for missed high-severity events and incorrect escalations; update source coverage or evidence rules with a recorded rationale.
+### 6.7 Market context
+After publication, attach observed price/volume move versus sector and market benchmark over standard windows, plus earnings-calendar proximity (existing price-reaction component). Retrospective labelling only. Build an internal event-study table (event type × region × outlet tier → abnormal return distribution) from the owner's own history to show "stories like this moved holdings by X median" with sample size and uncertainty. No predictive claims; display `n` and dispersion.
 
-## Suggested success measures
+### 6.8 Themes and narratives
+Maintain 20–40 portfolio-relevant themes (rates path, China demand, AI capex, energy, EU regulation, FX, tariffs). Track daily story volume, GDELT tone and attention per theme and region, and flag regime changes (volume spike, tone shift, new cross-border spread). Weekly narrative summary per theme with the three strongest threads.
 
-| Measure | Definition | Initial goal for pilot |
-|---|---|---:|
-| High-priority event recall | Labeled material events ingested and linked / all labeled material events | Improve by at least 15 percentage points over baseline |
-| Alert precision | Human-confirmed useful alerts / reviewed alerts | At least 80% before broadening alert volume |
-| Direct entity-link precision | Correct direct issuer links / reviewed direct links | At least 95% |
-| Duplicate burden | Article items represented per event after clustering | Reduce by 50% while retaining distinct updates |
-| High-severity latency | Published-to-ingested and published-to-confirmed p50/p95 | Establish baseline, then improve without reducing evidence quality |
-| Source concentration | Share of confirmed events dependent on top source/provider | No single provider dominates independently corroborated events |
-| User correction rate | Wrong entity, irrelevant, duplicate, or misleading reports per reviewed event | Trend down by segment |
-| Cost efficiency | Incremental source + inference cost per unique useful event | Set after source pilot; compare monthly |
+### 6.9 Thesis and risk linkage
+Map extracted events to thesis KPIs and risk limits (`ai_research_thesis_improvement_plan.md`). A story can strengthen, weaken or be neutral to a thesis assumption, with the cited reason. Only owner-confirmed or primary-confirmed events may mark a thesis breach; others create a review prompt, matching the rule in `free_data_sources_implementation_plan.md` D5.6.
 
-Treat these numbers as pilot targets and recalibrate with actual user volume and baseline results.
+### 6.10 Briefings and ask-the-news
+- **Morning brief** (regional order: Asia close, Europe open, US pre-market): what happened overnight by theme, ranked by portfolio exposure × materiality × novelty, each line cited, with "why it matters to you" and "what to watch next".
+- **Per-holding "what changed this week"**, **weekly macro/regional digest** (Japan, China, Europe, Canada, UK sections).
+- **Ask-the-news** chat over the wire + stories (RAG with `gemini-embedding-2`, hybrid with the existing Postgres full-text search from `20260929110000_news_search.sql`): "what is Japanese press saying about yen intervention", "who covered the Siemens Energy guidance cut first", answers with citations and source tier shown. Shares tools with the agentic plan; do not build a second chat stack.
 
-## Recommended implementation order
+### 6.11 Sentiment, bounded
+Aspect-level direction and uncertainty per target entity (6.1), tone from GDELT as an attention feature, an LLM-scored headline signal as one input to ranking. The Lopez-Lira and Tang study reports predictive correlation for LLM headline scores, concentrated in smaller stocks and bad news, and itself warns against relying on it for decisions; so sentiment ranks and annotates, it never triggers an alert and never appears as a forecast.
 
-1. Baseline source inventory, telemetry, and event benchmark.
-2. Provenance/independence-aware evidence and event lifecycle.
-3. Holding/watch-topic coverage audit and primary-source gaps.
-4. One bounded provider/source pilot chosen by unique benchmark coverage and clear rights.
-5. Calibrated ranking, evidence-backed explanations, user feedback, and ongoing evaluation.
-6. Targeted scraping only for explicitly approved, high-value sources with no suitable feed/API.
+### 6.12 AI search lane (leads, not a feed)
+The app's existing search-capable models find news the feeds miss. No new vendor or SDK: the lane is one more call site of the existing `LLM.complete(Request)` interface (section 6.13) using the `web_search` tool through `SearchSpec`, which already runs on OpenAI (`gpt-6-luna`/`sol`) and Google (`gemini-3.8-flash` grounding) and returns citations in the shape the source-tier checks expect. Exa/Tavily-style search APIs are not added.
 
-This sequencing makes it possible to tell whether a new source actually catches important events and whether analytics improve, instead of rewarding volume.
+**Search is the expensive part.** `docs/plans/multi_provider_model_routing_plan.md` prices web search at $10 per 1,000 calls (OpenAI) and $14 per 1,000 (Google), and `BudgetConfig.web_search_per_1000` defaults to $10. A $1–2.5 search allowance buys only about 100–250 searches a month, **and the existing news steps already spend searches**: corroboration (`corroboration_max_searches=10` per call, `corroboration_rounds=3` per unconfirmed story), escalation, `gap_research` and `ir_discovery` (their results are already cached 3 days). So there is one shared search pool, and the AI search lane must earn its share. The lane therefore has these uses, in priority order:
 
-## Decisions to make before implementation
+1. **On-demand ask-the-news (6.10).** When the stored wire cannot answer a question, the chat may search live and says so. Cost only when asked.
+2. **Weekly gap sweep, not daily.** Only for holdings the N0 coverage audit marks thin (few wire items in 14 days, no primary source, non-English home market). One call per such holding per week, batched through `BatchCollector`/`parse_many` so the round is one provider batch where batch pricing applies to the model.
+3. **Reuse the corroboration search.** Before adding any call, let the existing corroboration/escalation searches write their cited URLs into the Wire as `ai_search` leads: their results are already paid for.
 
-The plan can start with baseline work now. Vendor selection and scraping scope need these product facts documented during Phase 0: launch markets and supported languages; portfolio instrument/geography mix; expected user count and business model; headline/snippet display requirements; acceptable data/inference budget; and required alert latency. Keep the acquisition layer provider-neutral so those choices do not lock the event schema to a vendor.
+Rules:
 
-## Research references
+- **Leads only.** Output is a list of URLs plus the model's one-line reason. The prose is discarded and never stored as a fact. The pipeline fetches each URL through the ladder (section 5), runs the normal dedupe, linking, classification and corroboration, and the item enters the Wire as `source=ai_search`, tier by the outlet's domain tier (`NewsSourcesConfig.domain_tier`), flagged `discovered_by_ai`. Citations from outlets outside `allowed_domains` or the tiered list are rejected after the fact (as the Google path already does).
+- **No alert on its own.** An AI-discovered item can raise a story only when corroborated by a non-AI source or a primary filing, the same rule as GDELT and tier-3 items.
+- **Verification before display.** A URL that does not resolve, or whose fetched text does not support the model's reason (checked by the existing claim verifier, `verify/claims.py`), is dropped and counted as a false lead.
+- **Own cap.** A per-job-type monthly cap in the budget config (new, section 6.13). At the cap the sweep stops; ingestion, triage and chat on stored news continue.
+- **Metric:** leads that become unique, material, verified events per dollar. If near zero after a month, drop the sweep (use 1 and 3 only).
+- **Limits it cannot fix:** search indexes lag the feeds, results are not exhaustive, and paywalled pages stay stubs. It supplements the feeds, never replaces them.
 
-- [SEC EDGAR APIs](https://www.sec.gov/submit-filings/filer-support-resources/how-do-i-guides/understand-edgar-application-programming-interfaces-apis) and [SEC RSS](https://www.sec.gov/about/rss-feeds)
-- [Finnhub API documentation](https://finnhub.io/docs/api/quote)
-- [NewsAPI pricing](https://newsapi.org/pricing) and [terms](https://newsapi.org/terms)
-- [GDELT DOC API overview](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) and [API guide](https://docs.gdeltcloud.com/API_DOCUMENTATION_GUIDE)
-- [Event Registry platform](https://research.eventregistry.org/)
-- [Reuters Connect](https://reutersagency.com/content-delivery-platforms/reuters-connect/) and [LSEG News Service](https://developers.lseg.com/en/product/news/overview)
-- [Publisher RSS terms example: Le Monde](https://www.lemonde.fr/en/rss/article/2022/06/23/the-rss-feeds-of-monde-fr_5987755_165.html)
+### 6.13 Integration with the existing AI architecture (binding rules for every AI step in this plan)
+
+Nothing in this plan adds a second AI stack. Each AI step is a call site of what exists:
+
+| Concern | Existing piece to use | What this plan adds |
+|---|---|---|
+| Calling models | `LLM.complete(Request)` via `routing_client` (`steward/llm/routing.py`, `client.py`); structured output with a pydantic schema; effort levels; function tools | Only new schemas (`StoryExtraction`, `ImpactChain`, `ThreadDiff`, `FramingComparison`, `Brief`, `SearchLeads`) |
+| Model per step | `NewsSettings` / `JobsConfig` fields with `ModelId` and `Effort` (as `classification_model`, `corroboration_model`); tiers from the routing plan: **luna** (low effort) for volume, **flash** for analysis, **sol** only for escalation and rare deep reads | New fields: `triage_model`, `extraction_model`, `analysis_model`, `brief_model`, `search_lead_model`, each with effort; defaults luna / luna / flash / flash / luna |
+| Prompts | `PromptsConfig` (`config/prompts.py`): one editable system prompt per step, with `override_providers` | New `PromptKey`s: `news_triage`, `news_extract`, `news_impact`, `news_thread`, `news_framing`, `news_brief`, `news_search_leads`, each with a default text and eval cases |
+| Cost recording and caps | `budget_guard.before_request`, per-step usage recorded to `job_step`, `BudgetConfig` prices, `monthly_cap_usd` with warning and `downgrade_model`, per-run caps via `per_job_cap_usd` / `job_cap` | Each stage is its own job type or step (`news_triage`, `news_analysis`, `news_brief`, `news_ai_search`) so spend is visible per stage in `GET /costs/summary`. **Gap:** the budget config has a per-run cap and one global monthly cap, but no per-job-type monthly cap; add `per_job_monthly_cap_usd` so a runaway stage cannot eat the whole $10 |
+| Repeats and bulk | `ResultCache` (`ai_result_cache`, exact repeated structured calls), provider prefix caching, `BatchCollector`/`parse_many`/`LLM.complete_batch` (50% off, `use_batch`, `batch_wait_minutes`, falls back to a direct call) | Triage and backfill use batch; cache key includes model, prompt text and content hash so an unchanged article costs nothing twice |
+| Rules before AI | "Do it in code, not with AI" (routing plan), `rules_first`, `date_check`, `quote_check` | Language detect, URL/SimHash dedupe, 8-K item rules, exact entity-alias matches, sitemap/feed parsing and span verification are code; the model decides only what code cannot |
+| Claim integrity | `verify/claims.py` claim verifier, `chat` source registration (`_register_claim`, `_register_context`) and figure checks | Every extracted claim and brief sentence goes through the same verifier and source registry; uncited output is not saved |
+| Exposure and impact | `exposures/` module and the chat tools `event_paths` (`analytics_tools.event_reach`) and `theme_exposure`; `relationships` data | Impact chains (6.3) call `event_reach` for the graph path; the model only writes the explanation and a confidence, never invents an edge |
+| Chat / ask-the-news | `chat/assistant.py` tool loop and `chat/tools.py` (`search_news`, `search_reports`, `holding`, `event_paths`, `country_context`) | New tools only: `search_wire`, `get_story_thread`, `web_news_search` (the 6.12 lane). No second chat stack |
+| Jobs | `jobs/runner.py` (`create_job`, `JobContext`, steps), the scheduler, `news_ingest` | New jobs `news_triage`, `news_analysis`, `news_brief`, `news_ai_search` registered the same way; analysis consumes the queue `news_ingest` fills |
+| Evaluation gates | `news/eval.py`, `tests/news/news_classification.json`, `verify/evals_gate.py`, per-provider `--live --model` runs | Golden sets for extraction, impact chains, thread diffs, framing and leads; a step moves to a cheaper model only when its gate passes, as the routing plan already requires |
+| Embeddings | `gemini-embedding-2` and the RAG tables from `agentic_workflows_and_rag_plan.md` | Wire rows reuse that index; no second vector store |
+| Budget presets | `switch_models.py` | Add the new steps with the luna/flash defaults above |
+
+Rule of thumb: if a step can be done by an existing function, call it; if it needs a model, it goes through `LLM.complete` with a registered prompt, a pydantic schema, a job type for cost, a cache key, and a golden-set eval.
+
+## 7. Dedupe, language and ranking
+
+- Dedupe in three stages: canonical URL (existing), SimHash/MinHash of normalised text, then embedding similarity within a time window (extend `cluster.py`). Wire copies (Reuters/AP/Bloomberg syndication) form one independence group for corroboration.
+- Language: detect per item; **translate headline+summary to English on ingest** with a cheap model, keep the original; translate full text only when an item enters analysis. Embeddings: `gemini-embedding-2` (already chosen in the RAG plan) is multilingual, so cross-language clustering works without translating first; compare on 50 JP/ZH/DE pairs in N3.
+- Ranking = exposure × materiality × novelty × confidence × freshness, with source tier and duplicate count explicit and visible, unchanged from rev 1.
+
+## 8. Cost and funnel
+
+Funnel per fetch cycle: all items → dedupe (code) → embedding (`gemini-embedding-2`) → **luna triage** (relevance, entities, topic, language, English headline) → only linked or high-relevance items get extraction (6.1) and full text fetch → only material or high-exposure stories get impact chains, framing comparison and claim check on **flash**. All calls go through the existing `LLM.complete`/`routing_client`, `budget_guard` and `job_step` recording (section 6.13). The N0 baseline sizes the real daily item count and today's news spend (`GET /costs/summary`) before any figure below is trusted. Prompt-cache the stable prefix, use batch endpoints for triage and backfill.
+
+### 8a. The $10/month envelope (owner decision D1, 2026-10-10)
+
+Assumption to confirm: $10 is the ceiling for **new** news spend on top of what the news jobs cost today (classification, corroboration, escalation, digests); N0 reads today's figure from `GET /costs/summary` and, if the existing steps already use most of it, the existing searches are the first thing to trim. Everything else in the plan is free: RSS, the Reuters sitemap, GDELT, official filing APIs, trafilatura, Playwright, and the Postgres you already run.
+
+Illustrative split using the **routing plan's list prices (2026-10-06)**: luna $0.10 in / $0.50 out per 1M, flash $0.75 / $3.75 (doubles 2027-01-01), sol $2 / $10, batch 50% off, search $10–14 per 1,000. Volumes are my assumptions; replace both with N0's measurements:
+
+| Stage (job type) | Volume assumption | Model | Target |
+|---|---|---|---|
+| Embeddings, headline + summary | ~3,000 items/day ≈ 7M tokens/month | `gemini-embedding-2` (~$0.20/M from a third-party page, unconfirmed), batch | ~$1 |
+| Triage + English headline (`news_triage`) | 90k items/month × ~150 in / ~40 out ≈ 13.5M in, 3.6M out | luna low effort, batch | ~$2 (reasoning tokens count as output: the main uncertainty) |
+| Extraction on linked stories (`news_analysis`, 6.1–6.2) | ~60 stories/day × ~2.5k in, ~600 out | luna | ~$1 |
+| Deep analysis + brief (`news_analysis`, `news_brief`, 6.3–6.9) | ~10 material stories/day × ~4k in, ~1.5k out, plus 1 brief/day | flash; sol only on rare escalation | ~$3 |
+| Search (shared pool: AI search lane, plus the existing corroboration/escalation searches if they are trimmed into it) | ~180–250 searches/month at $10–14/1k | luna search / flash grounding | ~$2.5 |
+| Reserve | | | ~$0.5 |
+
+At these prices flash on all 60 stories/day would cost about $6/month for extraction alone, which is why extraction starts on luna and flash is reserved for material stories.
+
+How the plan stays inside it:
+
+1. **Per-job-type monthly caps.** The budget config today has a per-run cap (`per_job_cap_usd`) and one global `monthly_cap_usd`, with the 80% warning and the `downgrade_model` at the cap. Add `per_job_monthly_cap_usd` (section 6.13) so each stage above has its own ceiling. At its cap a stage degrades (skip deep analysis, keep triage), never stops ingestion. Wire items are always stored and embedded; analysis is what gets rationed.
+2. **Hard rule: analysis is lazy.** Deep analysis runs for the top-N stories by exposure × materiality each day, and on demand when you open a story or ask a question. Unopened low-exposure stories get only triage.
+3. **Tighten the wire first if cost bites:** drop low-yield feeds (measured by the N0 "unique useful events per source" report) before dropping analysis depth; cap embeddings to items that pass triage.
+4. Use batch endpoints for backfill and re-analysis (50% off where offered), prompt caching on the stable system prefix, and cache by content hash so an updated article only pays for the diff.
+5. N0 reports actual tokens and dollars per stage per day, so by the end of week one the table above is replaced with measured numbers. If the measured cost exceeds $10, the order of cuts is: translation of non-linked items, then embeddings of non-linked items, then daily-brief depth.
+
+## 9. Product surface (UI work follows the `frontend-design` skill, inside the Industry design system)
+
+1. **Wire**: live stream of all items, filters by region, language, outlet, tier, theme, "linked to my holdings", paywall status, with translation toggle and a one-line AI gloss on materiality.
+2. **Stories**: threads with timeline, evidence table (independent groups, primary sources), conflict state, impact chain to holdings, price reaction.
+3. **Brief**: morning and weekly briefs with citations.
+4. **Ask**: chat over the news corpus.
+5. **Sources**: health per feed (last success, items/day, error, latency, parser drift), per-outlet policy and rung, an "outlet unreachable" state that never renders as "no news".
+6. Feedback controls on every item and claim (wrong entity, duplicate, misread, missing source) feed the benchmark, not model training.
+
+## 10. Phases (each: steps → verify)
+
+### N0 Baseline and benchmark (1 week, start now)
+- [ ] Instrument per source and stage: items in/out, drop reasons (including the new "unmatched but kept to wire"), latency, cost, errors. → verify: dashboard backed by a SQL view; every drop has a reason.
+- [ ] Build 150-event labelled benchmark (holdings, macro, regional, hard negatives, missed examples) stratified by region/language/event type. → verify: reproducible eval run in `news/eval.py`, per-segment recall/precision with intervals.
+- [ ] Probe remaining sources (Section 2 "not yet probed") and record terms/rate notes per source. → verify: source catalog doc rows complete.
+
+### N1 Wire lane and source expansion (1–2 weeks)
+- [ ] Migration: `news_article` (wire row: source, canonical url, title, summary, lang, title_en, published_at, region, simhash, embedding, linked boolean, fetch_state) next to existing `news_item`; stop dropping unmatched items (store to wire with `linked=false`). → verify: test that an unmatched item is stored, not alerted.
+- [ ] New config fields `region`, `language`, `paywall`, `state_media`, `FetchPolicy`; new types `news_sitemap`, `gdelt`. Add the section 4 feeds as seeded, individually switchable sources; Telegraph/Caixin/NHK/China Daily marked `needs_alt`. → verify: `news_sources` schema tests; source-health shows each feed live.
+- [ ] Source health: ETag/If-Modified-Since, backoff, circuit breaker, parser-drift alert, outlet-down banner. → verify: kill a feed in test, banner appears, no "no news".
+
+- [ ] AI plumbing (6.13): add `per_job_monthly_cap_usd` to `BudgetConfig`; add the `NewsSettings` model/effort fields and `PromptKey`s with default prompts; register job types `news_triage`, `news_analysis`, `news_brief`, `news_ai_search`; add them to `switch_models.py`. → verify: config schema tests; a capped stage degrades without stopping `news_ingest`; per-stage spend shows in `GET /costs/summary`.
+- [ ] AI search lane (6.12) through the existing `LLM.complete` + `SearchSpec` on the current OpenAI and Google models (no new vendor): measure cost per search call on luna and flash for 20 held tickers, URL validity, unique finds vs the feeds; implement the leads-only `ai_search` source type, reusing corroboration/escalation citations first. → verify: false-lead rate and cost per verified unique event reported; an `ai_search` item alone never alerts (test).
+
+### N2 Full-text ladder (1–2 weeks)
+- [ ] `news/fulltext.py` implementing rungs 1–4 on top of `PoliteFetcher`/`BrowserRenderer`, trafilatura extractor, truncation/paywall-stub detector, content hash, retention job. → verify: 30 articles per outlet scored for body/date/byline; stub detection test with saved paywall HTML fixtures.
+
+### N3 Language, dedupe, translation (1 week)
+- [ ] Language detect, headline translation, multilingual embedding clustering, SimHash stage, syndication independence groups. → verify: JP/ZH/DE benchmark pairs cluster correctly; duplicate burden target met.
+
+### N4 Official multi-country primary sources (2–4 weeks, parallel)
+- [ ] EDINET, DART, Companies House, HKEXnews, CNINFO, TDnet (page or paid), Bundesbank/BoJ/BoE/BoC macro; SEDAR+ and Bundesanzeiger only through a reviewed governed fetch (old Phase 4 rules apply: robots, rate limit, kill switch). Ship each as its own source type with an event mapping. → verify: per-country filings of a held issuer appear within an agreed latency vs the official site.
+
+### N5 Evidence model and event lifecycle (rev 1 Phase 1, 2–3 weeks)
+- [ ] Typed provenance, independence groups, lifecycle states (reported, corroborated, primary-confirmed, disputed, corrected, resolved), identifier-backed entity linking, watch topics. → verify: rev 1 exit criteria.
+
+### N6 Analysis engine (4–6 weeks, ordered)
+- [ ] 6.1 extraction schema + span verification → 6.2 novelty → 6.3 impact chains (needs exposure graph) → 6.4 threads and diffs → 6.5 framing comparison → 6.6 claim check → 6.7 market context → 6.8 themes → 6.9 thesis linkage. Each ships behind its own flag, as a `LLM.complete` call site with a registered prompt, pydantic schema, job type, `ResultCache` key and golden-set eval (section 6.13), starting on luna and moving to flash only where the eval requires it; 6.3 calls the existing `event_reach` exposure path instead of new graph code. → verify: per-technique eval set (see section 11 metrics) run with `news/eval.py --live --model <id>` per provider, human-adjudicated sample of 100 outputs, zero uncited claims in saved output.
+
+### N7 Surface (3–4 weeks, parallel with N6 once 6.1 exists)
+- [ ] Wire, Stories, Brief, Ask, Sources pages, feedback controls, inbox alerts through the existing alert routing. → verify: Playwright run of each page once, one screenshot per page per the repo guardrails.
+
+### N8 Evaluation and operations (ongoing)
+- [ ] Benchmark on every change to sources, prompts, models, clustering, severity; segment release gates (language, region, event type); incident review for missed high-severity events; monthly cost per useful event. 
+
+Suggested order if time is short: N0 → N1 → N3 → N2 (rungs 1–4) → N6.1–6.4 → N7 Wire/Brief → rest.
+
+## 11. Success measures and owner decisions
+
+| Measure | Pilot target |
+|---|---|
+| Named-outlet coverage | Bloomberg, FT, Reuters, BBC, Nikkei, SCMP, DW, Handelsblatt, Globe and Mail all ingesting with health green ≥ 98% of polls |
+| Material-event recall (benchmark) | +20 points over N0 baseline, no segment (region/language) regressing |
+| Alert precision | ≥ 80% before widening alert volume; wire items alone never alert |
+| Time from publication to visible | p50 < 5 min for feed/sitemap sources, p95 < 20 min |
+| Cited-claim integrity | 100% of saved claims have a verified span; unsupported claims blocked |
+| Impact-chain precision | ≥ 85% of "direct/second-order" chains accepted by owner review; hypotheses labelled as such |
+| Duplicate burden | −50% items per event; syndication counted once |
+| Cost | Cap set after N0 from measured volume; monthly ceiling and warning via `budget_guard` |
+
+**Owner decisions needed:**
+
+- **D1 (decided 2026-10-10)** Budget is $10/month for news, no existing subscriptions: free sources only, spend goes to model inference (section 8).
+- **D2 (closed)** Subscription-session fetching dropped for lack of subscriptions.
+- **D3** Are state-media sources (Xinhua, CGTN) wanted at all, labelled and capped? Default: on, labelled.
+- **D4** Languages to read natively beyond English (Japanese, Chinese, German first?) versus English-language editions only in v1. Default: English editions plus German/Japanese/Chinese via translation in N3.
+- **D5** Retention of extracted full text (default 90 days; linked stories longer).
+
+## 12. Risks and controls
+
+| Risk | Control |
+|---|---|
+| Publisher blocks, layout changes, 402/403s (already seen: Caixin, Telegraph) | feed health + parser drift alerts, per-source kill switch, Google News per-outlet query as fallback, never evade blocks |
+| Paywall stub analysed as an article | truncation detector; analysis refuses stub text, uses summary only and says so |
+| LLM misreads or invents | span-verified claims, fact/interpretation/speculation fields, eval sets, human-adjudicated sample before each feature ships |
+| Over-alerting from a wider wire | wire lane cannot alert; stories need linkage and corroboration; tier-3 and discovery never alert alone |
+| Translation errors on JP/ZH/DE | keep originals, show "machine translated", confidence on entity names, native-language entity aliases in linking |
+| Cost creep | funnel, caps, per-stage cost telemetry, batch for backfill |
+| Source bias or state-media framing | metadata shown to reader, cross-country comparison rather than a hidden score |
+| Terms and legal exposure of automated access | personal local use, low rates, no redistribution, per-source policy record, owner decisions D1–D2 recorded |
+| Sentiment treated as a forecast | bounded to ranking and annotation (6.11) |
+
+## 13. What stays from rev 1
+
+Source hierarchy (primary first), independence-aware corroboration, event lifecycle, identifier-backed entity linking, watch topics, benchmark with segment gates, provenance per source, user feedback into the benchmark, governed scraping rules for sites without feeds, and the success-measure discipline. Rev 1's licence-gating of every source is relaxed to the personal-use register above; its "no full-text mirror" rule becomes "full text is stored locally for analysis under per-source retention, displayed per `FetchPolicy`, never redistributed".
+
+## 14. References
+
+- [SEC EDGAR APIs](https://www.sec.gov/submit-filings/filer-support-resources/how-do-i-guides/understand-edgar-application-programming-interfaces-apis) · [SEC RSS](https://www.sec.gov/about/rss-feeds)
+- [GDELT DOC 2.0 API](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) · [GDELT 2.0 and translation](https://blog.gdeltproject.org/?p=3976) · [GDELT API guide](https://docs.gdeltcloud.com/API_DOCUMENTATION_GUIDE)
+- [Reuters RSS ended (2020) and alternatives](https://www.fivefilters.org/category/feed-control/page/2/) · [Reuters Connect / API provider overview](https://providers.apievangelist.com/providers/reuters/) · [LSEG News](https://developers.lseg.com/en/product/news/overview)
+- [Bloomberg real-time news feeds (enterprise)](https://bloomberg.com/company/press/bloomberg-launches-customizable-real-time-news-feeds-for-enhanced-systematic-workflows)
+- [Trafilatura evaluation](https://trafilatura.readthedocs.io/en/latest/_sources/evaluation.rst.txt) · [Scrapinghub article extraction benchmark](https://www.sourcepulse.org/projects/25501607)
+- [Lopez-Lira and Tang, ChatGPT and stock-return predictability](https://arxiv.org/abs/2304.07619)
+- [EDINET API catalogue](https://api-catalog.e-gov.go.jp/info/en/apicatalog/view/33) · [Companies House developer specs](https://developer-specs.company-information.service.gov.uk/)
+- [Finnhub](https://finnhub.io/docs/api/quote) · [NewsAPI terms](https://newsapi.org/terms) · [Event Registry](https://research.eventregistry.org/) · [Le Monde RSS terms example](https://www.lemonde.fr/en/rss/article/2022/06/23/the-rss-feeds-of-monde-fr_5987755_165.html)
+- Live feed probe, section 2: run 2026-10-10 from this machine.
+
+**Unverified in this revision:** EDINET/DART/Companies House/TDnet access details and the Guardian Open Platform terms come from a research pass that checked few sources; confirm each when its N4 task starts. Wire volume per day, model costs and the cited per-subscription Reuters prices are estimates until N0 and the owner's own check.
