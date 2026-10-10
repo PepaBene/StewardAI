@@ -1103,13 +1103,18 @@ def compute_look_through(
 # ---------------------------------------------------------------------------
 
 
-async def load_snapshots(pool: asyncpg.Pool, isins: list[str]) -> dict[str, SnapshotIn]:
-    """The latest stored snapshot of each fund, with its rows and breakdowns."""
+async def load_snapshots(
+    pool: asyncpg.Pool, isins: list[str], *, known_by: dt.datetime | None = None
+) -> dict[str, SnapshotIn]:
+    """The latest stored snapshot of each fund, with its rows and breakdowns. With `known_by`,
+    only snapshots fetched by then, so a past date sees the fund holdings known on that date."""
     metas = await pool.fetch(
         "select distinct on (fund_isin) id, fund_isin, source, as_of, fetched_at, fund_name,"
         " country_basis, currency_basis, warnings from public.etf_snapshot"
-        " where fund_isin = any($1::text[]) order by fund_isin, as_of desc, fetched_at desc",
+        " where fund_isin = any($1::text[]) and ($2::timestamptz is null or fetched_at <= $2)"
+        " order by fund_isin, as_of desc, fetched_at desc",
         isins,
+        known_by,
     )
     return await hydrate_snapshots(pool, metas)
 
@@ -1177,10 +1182,13 @@ async def hydrate_snapshots(
     }
 
 
-async def load_portfolio(pool: asyncpg.Pool) -> PortfolioIn | None:
+async def load_portfolio(pool: asyncpg.Pool, *, as_of: dt.date | None = None) -> PortfolioIn | None:
+    """The holdings of the latest daily snapshot, or of the latest one on or before `as_of`."""
     account = await pool.fetchrow(
         "select snapshot_date, base_currency, account_currency, cash_base"
-        " from public.account_snapshot order by snapshot_date desc limit 1"
+        " from public.account_snapshot where ($1::date is null or snapshot_date <= $1)"
+        " order by snapshot_date desc limit 1",
+        as_of,
     )
     if account is None:
         return None

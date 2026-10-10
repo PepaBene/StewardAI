@@ -221,6 +221,49 @@ function Review({ report }: { report: ReviewReportOut }) {
             </p>
           </section>
 
+          {body.holding_periods && body.holding_periods.length > 0 ? (
+            <section aria-labelledby="review-holding-heading" className={SECTION}>
+              <BlueprintCorners />
+              <h2 id="review-holding-heading" className="text-[22px] leading-tight font-semibold">
+                Holding periods
+              </h2>
+              <p className="text-sm text-text-muted">
+                Each open purchase lot, with the date it passes the holding-period test you set. Dates and your own thresholds, not tax advice.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <caption className="sr-only">Open lots and the date each passes the holding-period test</caption>
+                  <thead>
+                    <tr className="border-b border-border text-text-muted">
+                      <th scope="col" className="py-1.5 pr-3 text-left font-medium">Holding</th>
+                      <th scope="col" className="py-1.5 pr-3 text-right font-medium">Bought</th>
+                      <th scope="col" className="py-1.5 pr-3 text-right font-medium">Passes the test</th>
+                      <th scope="col" className="py-1.5 text-left font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {body.holding_periods.map((h) => (
+                      <tr key={`${h.ticker}-${h.bought_on}`} className="border-b border-border-soft">
+                        <th scope="row" className="py-1.5 pr-3 text-left font-normal">{h.ticker}</th>
+                        <td className="num py-1.5 pr-3 text-right">{formatDate(h.bought_on)}</td>
+                        <td className="num py-1.5 pr-3 text-right">{formatDate(h.passes_on)}</td>
+                        <td className="py-1.5">
+                          {h.passed ? "Passed" : `${h.months_remaining.toFixed(1)} months left`}
+                          {h.forfeits_exemption_warning ? <span className="ml-2 font-medium">Sell target reached: a full sale would give up the exemption</span> : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs">
+                <Link href="/performance/lots" className={LINK}>
+                  Lots and holding periods
+                </Link>
+              </p>
+            </section>
+          ) : null}
+
           <section aria-labelledby="review-kpis-heading" className={SECTION}>
             <BlueprintCorners />
             <h2 id="review-kpis-heading" className="text-[22px] leading-tight font-semibold">

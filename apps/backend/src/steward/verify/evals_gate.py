@@ -18,15 +18,18 @@ built from (the extraction effort, the event type descriptions), and the evaluat
 score. The check:
 
 - fingerprint unchanged: nothing the model sees changed; pass without an API call;
-- changed, ANTHROPIC_API_KEY set: run that component's live eval; fail below the target or
+- changed, GOOGLE_API_KEY set: run that component's live eval; fail below the target or
   more than one point below the recorded score (a regression);
 - changed, no key: fail, because a prompt, model or schema change must not merge unmeasured.
   Run `--write-baseline` with a key (it writes the baseline only if every changed component
   passes) and commit the file.
 
+The evals run on Gemini (`EVAL_MODEL`, default `gemini-3.8-flash`, override with the
+EVALS_MODEL environment variable), never on a Claude model: the app does not call Claude, and
+the routing client refuses to. The model is part of each fingerprint, so changing it re-measures.
+
 With no baseline file at all (a fresh repository), a run without a key warns and passes:
 no eval runs, so the model-facing code is unverified until a run with a key records one.
-Live runs cost roughly $2-3 (the golden set with Sonnet), a few cents for the other two.
 """
 
 import argparse
@@ -41,13 +44,22 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from steward.config.jobs import EarningsCheckSettings, NewsSettings
+from steward.config.jobs import EarningsCheckSettings
 from steward.config.verification import ClaimVerifierSettings
 
 SRC = Path(__file__).resolve().parents[1]
 BACKEND = SRC.parents[1]
 BASELINE = BACKEND / "evals" / "baseline.json"
 REGRESSION_TOLERANCE = 0.01
+KEY_NAME = "GOOGLE_API_KEY"
+
+
+def _eval_model() -> str:
+    """The model every live eval runs on: a Gemini model, whatever the app's job configs say."""
+    model = os.environ.get("EVALS_MODEL") or "gemini-3.8-flash"
+    if not model.startswith("gemini-"):
+        raise SystemExit(f"EVALS_MODEL must be a gemini-* model, not {model!r}")
+    return model
 
 
 @dataclass(frozen=True)
@@ -93,7 +105,7 @@ COMPONENTS: tuple[Component, ...] = (
         "earnings",
         (SRC / "earnings" / "extract.py", SRC / "earnings" / "schema.py"),
         (),  # the golden cases, listed at run time
-        lambda: EarningsCheckSettings().extraction_model,
+        _eval_model,
         0.98,
         lambda: f"effort={EarningsCheckSettings().effort}",
     ),
@@ -101,7 +113,7 @@ COMPONENTS: tuple[Component, ...] = (
         "classification",
         (SRC / "news" / "classify.py",),
         (BACKEND / "tests" / "news" / "news_classification.json",),
-        lambda: NewsSettings().classification_model,
+        _eval_model,
         0.85,
         _event_descriptions,
     ),
@@ -109,7 +121,7 @@ COMPONENTS: tuple[Component, ...] = (
         "claims",
         (SRC / "verify" / "claims.py",),
         (BACKEND / "tests" / "verify" / "injected_claims.json",),
-        lambda: ClaimVerifierSettings().model,
+        _eval_model,
         1.0,
     ),
 )
@@ -145,21 +157,21 @@ async def live_score(name: str) -> float:
 
         settings = EarningsCheckSettings()
         cases = [c for c in load_cases() if FULL_EARNINGS or c.id in GATE_EARNINGS_CASES]
-        extractor = ClaudeExtractor(client, settings.extraction_model, settings.effort)
+        extractor = ClaudeExtractor(client, _eval_model(), settings.effort)
         return float(summarise(await evaluate(cases, extractor))["accuracy"])
     if name == "classification":
         from steward.news.classify import ClaudeClassifier
         from steward.news.eval import evaluate as evaluate_news
         from steward.news.eval import load_set
 
-        classifier = ClaudeClassifier(client, NewsSettings().classification_model, llm=llm)
+        classifier = ClaudeClassifier(client, _eval_model(), llm=llm)
         return (await evaluate_news(classifier, load_set())).accuracy
     from steward.verify.claims import ClaudeClaimVerifier
     from steward.verify.eval import load_cases as load_claims
     from steward.verify.eval import score
 
     settings_c = ClaimVerifierSettings()
-    result = await score(load_claims(), ClaudeClaimVerifier(client, settings_c.model), settings_c)
+    result = await score(load_claims(), ClaudeClaimVerifier(client, _eval_model()), settings_c)
     # A verifier that flags faithful sentences is not passing, whatever it catches.
     return result.catch_rate if not result.faithful_flagged else 0.0
 
@@ -196,15 +208,15 @@ async def run_gate(
             if baseline is None:
                 lines.append(
                     f"::warning::{component.name}: NO EVALS RAN. There is no baseline and no "
-                    "ANTHROPIC_API_KEY, so the live eval was skipped and this component's "
-                    "prompt, model and schema are unverified. Set ANTHROPIC_API_KEY and run "
+                    f"{KEY_NAME}, so the live eval was skipped and this component's "
+                    f"prompt, model and schema are unverified. Set {KEY_NAME} and run "
                     "`--write-baseline` to measure them."
                 )
                 continue
             ok = False
             lines.append(
                 f"{component.name}: prompt, model, schema or eval set changed since the last "
-                "live run, and no ANTHROPIC_API_KEY is available to measure it. Run "
+                f"live run, and no {KEY_NAME} is available to measure it. Run "
                 "`uv run python -m steward.verify.evals_gate --write-baseline` with a key and "
                 "commit evals/baseline.json."
             )
@@ -253,11 +265,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     global FULL_EARNINGS
     FULL_EARNINGS = args.full
-    have_key = any(
-        os.environ.get(k) for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY")
-    )
+    have_key = bool(os.environ.get(KEY_NAME))
     if args.write_baseline and not have_key:
-        print("--write-baseline needs ANTHROPIC_API_KEY: it records live results")
+        print(f"--write-baseline needs {KEY_NAME}: it records live results")
         return 1
     result = asyncio.run(run_gate(load_baseline(), have_key))
     print("\n".join(result.lines))

@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type { Exposure, HoldingProfile, HoldingProfilesConfig } from "@/lib/api/client";
 
 import { fundamentalsFromProfile, fundamentalsToProfile, newFundamentals, type FundamentalsForm } from "./fundamentals-form";
@@ -26,7 +27,7 @@ export type ExposureForm = { key: string; kind: ExposureKind; name: string; shar
 /** The saved shape of an exposure row: provenance survives only an unedited AI row. */
 export function exposureToBody(e: ExposureForm): Exposure {
   const name = e.name.trim();
-  const share = e.share.trim() ? Number(e.share.trim().replace(",", ".")) : null;
+  const share = e.share.trim() ? Number(normaliseSeparators(e.share)) : null;
   const base = e.ai?.baseline;
   const unchanged = base !== undefined && base.kind === e.kind && base.name === name && base.share === e.share.trim();
   if (e.ai && unchanged) {
@@ -209,7 +210,7 @@ function manualFromBody(m: HoldingProfile["manual_fundamentals"]): ManualForm {
 
 /** "1 234,5" -> 1234.5; empty -> null. Anything unparsable is sent as-is so the backend names the field. */
 function decimal(text: string): number | null {
-  const t = text.trim().replace(/\s/g, "").replace(",", ".");
+  const t = normaliseSeparators(text.replace(/\s/g, ""));
   return t ? Number(t) : null;
 }
 

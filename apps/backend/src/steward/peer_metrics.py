@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
+from steward.analytics.ratio_set import nopat_roic
 from steward.sources.xbrl_concepts import DEBT_EXTRA, DEBT_PARTS, DEBT_TOTAL
 
 METRIC_NAMES = (
@@ -95,6 +96,14 @@ ALIASES: dict[str, dict[str, tuple[str, ...]]] = {
 }
 BASIS_TAXONOMY = {"US_GAAP": "us-gaap", "IFRS": "ifrs-full"}
 INSTANT_INPUTS = ("equity", "cash")
+# Non-controlling interest is read beside the inputs, not as one of them: it is optional (absent
+# means none) and does not decide whether a period is reconciled.
+NCI_NAMES = {"US_GAAP": ("minorityinterest",), "IFRS": ("noncontrollinginterests",)}
+# Equity elements that already include the non-controlling interest.
+EQUITY_WITH_NCI = {
+    "stockholdersequityincludingportionattributabletononcontrollinginterest",
+    "equity",
+}
 FLOW_INPUTS = (
     "revenue",
     "gross_profit",
@@ -114,8 +123,10 @@ FORMULAS = {
     ),
     "operating_margin": "operating income / revenue (revenue > 0)",
     "roic": (
-        "operating income * (1 - tax expense / pretax income) / (debt + equity - cash); "
-        "full-year periods only; pretax income > 0, tax rate within 0-100%, invested capital > 0"
+        "operating income * (1 - tax rate) / average invested capital now and a year earlier, "
+        "invested capital = equity + non-controlling interest + debt - cash; tax rate = tax "
+        "expense / pretax income capped to 0-50%; full-year periods only; pretax income > 0, "
+        "average invested capital > 0"
     ),
     "net_debt_to_equity": "(debt - cash) / equity (equity > 0)",
     "free_cash_flow_conversion": (
@@ -249,6 +260,23 @@ def _is_annual(days: int | None) -> bool:
     return days is not None and ANNUAL_DAYS[0] <= days <= ANNUAL_DAYS[1]
 
 
+def invested_capital(inputs: dict[str, Any]) -> Decimal | None:
+    """Equity + non-controlling interest + debt - cash from a period's `inputs`. The interest is
+    added only when the equity element excludes it; a period that files none has none."""
+
+    def get(key: str) -> Decimal | None:
+        item = inputs.get(key)
+        return item["value"] if item else None
+
+    equity, debt, cash = get("equity"), get("debt"), get("cash")
+    if equity is None or debt is None or cash is None:
+        return None
+    nci = Decimal(0)
+    if _local(inputs["equity"]["concept"]) not in EQUITY_WITH_NCI:
+        nci = get("noncontrolling_interest") or Decimal(0)
+    return equity + nci + debt - cash
+
+
 def _ratio(
     numerator: Decimal | None,
     denominator: Decimal | None,
@@ -331,25 +359,8 @@ def _build_period(
         metric="free_cash_flow_conversion",
     )
     days = _duration(start, end)
-    roic: Decimal | None = None
-    operating, tax, pretax = val("operating_income"), val("tax"), val("pretax")
-    if not _is_annual(days):
-        reasons["roic"] = "n/m: ROIC is computed for a full-year period only"
-    elif None in (operating, tax, pretax, debt, equity, cash):
-        reasons["roic"] = "missing operating income, tax, pretax income, debt, equity or cash"
-    else:
-        assert operating is not None and tax is not None and pretax is not None
-        assert debt is not None and equity is not None and cash is not None
-        capital = debt + equity - cash
-        if pretax <= 0:
-            reasons["roic"] = "n/m: non-positive pretax income"
-        elif capital <= 0:
-            reasons["roic"] = "n/m: non-positive invested capital"
-        elif not Decimal(0) <= tax / pretax <= Decimal(1):
-            reasons["roic"] = "n/m: tax rate outside 0-100%"
-        else:
-            roic = operating * (Decimal(1) - tax / pretax) / capital
-    metrics["roic"] = roic
+    metrics["roic"] = None  # set by `_attach_roic`, which needs the year-earlier period
+    nci = _pick(instants, NCI_NAMES[basis]) if instants else None
     states = {item.reconciled for item in picked.values() if item is not None}
     if not states:
         states = {None}
@@ -369,7 +380,12 @@ def _build_period(
             for key, item in picked.items()
             if item is not None
         }
-        | ({"debt": {"concept": "+".join(debt_elements), "value": debt}} if debt_elements else {}),
+        | ({"debt": {"concept": "+".join(debt_elements), "value": debt}} if debt_elements else {})
+        | (
+            {"noncontrolling_interest": {"concept": nci.concept, "value": nci.value}}
+            if nci is not None
+            else {}
+        ),
         "unreconciled_inputs": sorted(
             key for key, item in picked.items() if item is not None and item.reconciled is None
         ),
@@ -407,6 +423,40 @@ def _attach_growth(periods: list[dict[str, Any]]) -> None:
             current["not_meaningful"]["revenue_growth"] = "n/m: non-positive revenue"
             continue
         current["revenue_growth"] = revenue / base - Decimal(1)
+
+
+def prior_year(period: dict[str, Any], periods: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The full-year period of the same basis that ended about a year before `period`."""
+    return next(
+        (
+            p
+            for p in periods
+            if _is_annual(p["duration_days"])
+            and p["basis"] == period["basis"]
+            and 320 <= (period["period_end"] - p["period_end"]).days <= 410
+        ),
+        None,
+    )
+
+
+def _attach_roic(periods: list[dict[str, Any]]) -> None:
+    """ROIC by the one shared definition (`ratio_set.nopat_roic`), on full-year periods."""
+    for current in periods:
+        if not _is_annual(current["duration_days"]):
+            current["not_meaningful"]["roic"] = "n/m: ROIC is computed for a full-year period only"
+            continue
+        prior = prior_year(current, periods)
+        got = {k: v["value"] for k, v in current["inputs"].items()}
+        result = nopat_roic(
+            got.get("operating_income"),
+            got.get("pretax"),
+            got.get("tax"),
+            invested_capital(current["inputs"]),
+            invested_capital(prior["inputs"]) if prior else None,
+        )
+        current["roic"] = result.value
+        if result.value is None:
+            current["not_meaningful"]["roic"] = result.reason or "missing inputs"
 
 
 def financial_peer_metrics(
@@ -453,6 +503,7 @@ def financial_peer_metrics(
     out: dict[str, dict[str, object]] = {}
     for ticker, periods in by_ticker.items():
         _attach_growth(periods)
+        _attach_roic(periods)
         periods.sort(
             key=lambda p: (p["period_end"], p["duration_days"] or 0),
             reverse=True,

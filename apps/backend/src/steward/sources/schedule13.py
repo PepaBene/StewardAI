@@ -159,6 +159,8 @@ class Schedule13Filing:
     persons: list[ReportingPerson]
     # Item 4 (purpose of the transaction), 13D only; a 13G is passive by definition.
     intent_text: str | None
+    # Item 7 (material filed as exhibits), 13D only: (label, description) as the filing lists them.
+    exhibits: tuple[tuple[str, str | None], ...] = ()
 
     @property
     def stake_shares(self) -> Decimal | None:
@@ -224,6 +226,43 @@ def _intent(root: ET.Element) -> str | None:
     return flat or None
 
 
+# A label is a number ("99.1") or a single capital letter ("Exhibit A"); the letter is matched
+# case-sensitively so that "Exhibit a copy of" is not a label.
+_LABEL = r"(?:\d+(?:\.\d+)?|(?-i:[A-Z]))"
+_EXHIBIT = re.compile(rf"(?=\b(?:Exhibit|Ex\.)\s*{_LABEL}\b)", re.I)
+_DASHES = re.escape("-" + chr(0x2013) + chr(0x2014))  # hyphen, en dash, em dash
+_EXHIBIT_HEAD = re.compile(rf"^((?:Exhibit|Ex\.)\s*{_LABEL})\s*[:{_DASHES}.]?\s*(.*)$", re.I | re.S)
+# "incorporated by reference to Exhibit 99.1" mentions an exhibit; it does not list one.
+_CITED = re.compile(r"\b(?:to|in|see|and|of|with|by|under|from|as)\s*$", re.I)
+
+
+def parse_exhibits(text: str | None) -> tuple[tuple[str, str | None], ...]:
+    """Exhibit entries from Item 7 text: 'Exhibit 99.1 - Joint Filing Agreement' gives
+    ('Exhibit 99.1', 'Joint Filing Agreement'). Nothing is invented: text with no exhibit label
+    yields no rows, and a label with no description keeps a null description."""
+    if not text:
+        return ()
+    flat = " ".join(text.split())
+    starts = [m.start() for m in _EXHIBIT.finditer(flat) if not _CITED.search(flat[: m.start()])]
+    out: list[tuple[str, str | None]] = []
+    seen: set[str] = set()
+    for i, start in enumerate(starts):
+        stop = starts[i + 1] if i + 1 < len(starts) else len(flat)
+        m = _EXHIBIT_HEAD.match(flat[start:stop].strip())
+        if m and m.group(1).strip().lower() not in seen:
+            seen.add(m.group(1).strip().lower())
+            description = m.group(2).strip(" .;") or None
+            out.append((m.group(1).strip(), description))
+    return tuple(out)
+
+
+def _exhibits(root: ET.Element) -> tuple[tuple[str, str | None], ...]:
+    item7 = _find(root, ("item7",))
+    if item7 is None:
+        return ()
+    return parse_exhibits(" ".join(t.strip() for t in item7.itertext() if t.strip()))
+
+
 def parse_schedule13_xml(xml: bytes, form: str | None = None) -> Schedule13Filing:
     """Parse the structured XML of a Schedule 13D/G or amendment.
 
@@ -279,4 +318,5 @@ def parse_schedule13_xml(xml: bytes, form: str | None = None) -> Schedule13Filin
         filer_cik=filer_cik,
         persons=persons,
         intent_text=_intent(root) if schedule == "13D" else None,
+        exhibits=_exhibits(root) if schedule == "13D" else (),
     )

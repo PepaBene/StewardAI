@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type { ClaimTarget, VerificationConfig } from "@/lib/api/client";
 import type { FieldErrors } from "@/lib/api/validation-errors";
 
@@ -96,7 +97,7 @@ function text(value: number | null | undefined): string {
 }
 
 function numberOrText(value: string): number | string {
-  const trimmed = value.trim().replace(",", ".");
+  const trimmed = normaliseSeparators(value);
   const n = Number(trimmed);
   return trimmed !== "" && Number.isFinite(n) ? n : value.trim();
 }
@@ -192,7 +193,7 @@ const METRIC = /^[a-z][a-z0-9_]{0,63}$/;
 const MODEL = /^claude-[a-z0-9.-]{1,64}$/;
 
 function num(value: string): number | null {
-  const t = value.trim().replace(",", ".").replace(/\s*%$/, "");
+  const t = normaliseSeparators(value).replace(/\s*%$/, "");
   if (!/^[+-]?(\d+\.?\d*|\.\d+)$/.test(t)) return null;
   return Number(t);
 }

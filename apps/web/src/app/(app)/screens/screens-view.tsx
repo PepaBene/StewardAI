@@ -50,6 +50,7 @@ export function ScreensView() {
   const [drafts, setDrafts] = useState<FilterDraft[]>([{ id: 1, metric: "roic", op: "gte", value: "15" }]);
   const [missing, setMissing] = useState<MissingTreatment>("exclude");
   const [reconciledOnly, setReconciledOnly] = useState(false);
+  const [valuationGateOnly, setValuationGateOnly] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [run, setRun] = useState<Run>({ kind: "idle" });
 
@@ -63,7 +64,7 @@ export function ScreensView() {
   };
 
   const execute = async () => {
-    const { request, errors: found } = buildRequest({ universe, drafts, missing, sortBy: null, reconciledOnly });
+    const { request, errors: found } = buildRequest({ universe, drafts, missing, sortBy: null, reconciledOnly, valuationGateOnly });
     setErrors(found);
     if (!request) return;
     setRun({ kind: "running" });
@@ -207,6 +208,10 @@ export function ScreensView() {
           <input type="checkbox" checked={reconciledOnly} onChange={(e) => setReconciledOnly(e.target.checked)} />
           Use only facts that match the filed statement
         </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={valuationGateOnly} onChange={(e) => setValuationGateOnly(e.target.checked)} />
+          Keep only periods that passed the valuation checks
+        </label>
 
         {errors.length > 0 ? (
           <AlertMessage title="Fix these conditions to run the screen">
@@ -299,6 +304,10 @@ function Results({ run }: { run: Run }) {
                       {row.name ?? row.ticker}
                     </Link>
                     <span className="block font-mono text-xs text-text-muted">{row.ticker}</span>
+                    <span className="mt-0.5 flex gap-2 text-xs">
+                      <Link href={`/companies/${encodeURIComponent(row.ticker)}/financials`} className="text-text-muted hover:text-accent-ink hover:underline">Financials</Link>
+                      <Link href={`/companies/${encodeURIComponent(row.ticker)}/ratios`} className="text-text-muted hover:text-accent-ink hover:underline">Ratios</Link>
+                    </span>
                   </th>
                   <td className="num px-3 py-2 text-xs">
                     {formatDate(row.period_end)}

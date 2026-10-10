@@ -6,6 +6,7 @@ limits are review prompts: a position down past `position_loss_review` needs its
 re-checked, not selling.
 """
 
+import datetime as dt
 import logging
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -15,6 +16,7 @@ import asyncpg
 from steward.config.strategy import RiskLimits, StrategyConfig
 from steward.portfolio.breaches import Finding
 from steward.portfolio.snapshot import PositionRow
+from steward.settings import get_settings
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +39,13 @@ class Underlying:
 
 
 @dataclass(frozen=True)
+class Exposure:
+    dimension: str  # "sector" or "country"
+    name: str
+    weight: float  # share of total portfolio value, funds looked through
+
+
+@dataclass(frozen=True)
 class PairCorrelation:
     a: str
     b: str
@@ -44,14 +53,29 @@ class PairCorrelation:
     combined_weight: float  # share of the invested value
 
 
+@dataclass(frozen=True)
+class ValuationFlag:
+    ticker: str
+    scenario: str
+    what: str  # "terminal growth" or "explicit-year growth"
+    value: float
+
+
 @dataclass
 class RiskInputs:
     volatility: float | None = None
     beta: float | None = None
     drawdown: float | None = None
+    var_95: float | None = None
+    tracking_error: float | None = None
+    stress_loss: float | None = None  # positive loss, share of the portfolio
+    credit_spread_bp: float | None = None
+    credit_spread_date: dt.date | None = None
+    valuation_flags: list[ValuationFlag] = field(default_factory=list)
     correlations: list[PairCorrelation] = field(default_factory=list)
     positions: list[PositionLoss] = field(default_factory=list)
     underlyings: list[Underlying] = field(default_factory=list)
+    exposures: list[Exposure] = field(default_factory=list)
     # Measurements that could not be taken, by limit name (reported, never a breach).
     unavailable: dict[str, str] = field(default_factory=dict)
 
@@ -111,6 +135,74 @@ def evaluate_risk(inputs: RiskInputs, limits: RiskLimits) -> list[Finding]:
                 limits.max_drawdown,
             )
         )
+    for key, value, ceiling, what in (
+        ("var", inputs.var_95, limits.max_var_95, "one-day historical 95% value at risk"),
+        (
+            "tracking_error",
+            inputs.tracking_error,
+            limits.max_tracking_error,
+            "annualised tracking error against the benchmark",
+        ),
+        (
+            "stress",
+            inputs.stress_loss,
+            limits.max_stress_loss,
+            f"loss if equities fall {limits.stress_equity_fall:.0%}",
+        ),
+    ):
+        if ceiling is not None and value is not None and value > ceiling:
+            findings.append(
+                Finding(
+                    f"risk:{key}",
+                    "rule",
+                    None,
+                    severity,
+                    f"Risk limit: the {what} is {_pct(value)}; the limit is {_pct(ceiling)}. "
+                    "A review prompt, not an instruction to trade",
+                    value,
+                    ceiling,
+                )
+            )
+    if (
+        limits.credit_spread_alert_bp is not None
+        and inputs.credit_spread_bp is not None
+        and inputs.credit_spread_bp >= limits.credit_spread_alert_bp
+    ):
+        findings.append(
+            Finding(
+                "risk:credit_spread",
+                "rule",
+                None,
+                severity,
+                f"Credit signal: the US high-yield spread is {inputs.credit_spread_bp:.0f} bp"
+                f" ({inputs.credit_spread_date}); the alert level is "
+                f"{limits.credit_spread_alert_bp:.0f} bp. Widening spreads often come before "
+                "equity stress: check the holdings that rely on credit",
+                inputs.credit_spread_bp,
+                limits.credit_spread_alert_bp,
+            )
+        )
+    for flag in inputs.valuation_flags:
+        ceiling = (
+            limits.max_valuation_terminal_growth
+            if flag.what == "terminal growth"
+            else limits.max_valuation_growth
+        )
+        if ceiling is None:
+            continue
+        findings.append(
+            Finding(
+                f"risk:valuation:{flag.ticker}:{flag.scenario}:{flag.what.split()[0]}",
+                "rule",
+                flag.ticker,
+                severity,
+                f"Valuation assumption: scenario '{flag.scenario}' for {flag.ticker} uses "
+                f"{flag.what} of {_pct(flag.value)}; your ceiling is {_pct(ceiling or 0)}. "
+                "Re-check the assumption before relying on the fair value",
+                flag.value,
+                ceiling,
+            )
+        )
     if limits.max_pair_correlation is not None:
         for c in inputs.correlations:
             if (
@@ -166,6 +258,26 @@ def evaluate_risk(inputs: RiskInputs, limits: RiskLimits) -> list[Finding]:
                         limits.max_look_through_weight,
                     )
                 )
+    for dimension, ceiling in (
+        ("sector", limits.max_sector_weight),
+        ("country", limits.max_country_weight),
+    ):
+        if ceiling is None:
+            continue
+        for e in inputs.exposures:
+            if e.dimension == dimension and e.weight > ceiling:
+                findings.append(
+                    Finding(
+                        f"risk:{dimension}:{e.name}",
+                        "rule",
+                        None,
+                        severity,
+                        f"Risk limit: {e.name} is {_pct(e.weight)} of the portfolio counting "
+                        f"funds' holdings; the {dimension} limit is {_pct(ceiling)}",
+                        e.weight,
+                        ceiling,
+                    )
+                )
     return findings
 
 
@@ -206,13 +318,36 @@ async def gather_risk_inputs(
             log.warning("risk measurement failed: %s", exc)
             inputs.unavailable["volatility"] = inputs.unavailable["beta"] = str(exc)
             inputs.unavailable["drawdown"] = str(exc)
+    await _decision_inputs(pool, strategy, positions, inputs)
     if limits.max_pair_correlation is not None:
         try:
             inputs.correlations = await pair_correlations(pool, positions)
         except Exception as exc:
             log.warning("correlation failed: %s", exc)
             inputs.unavailable["correlation"] = str(exc)
-    if limits.max_look_through_weight is not None:
+    wants_xray = (
+        limits.max_look_through_weight is not None
+        or limits.max_sector_weight is not None
+        or limits.max_country_weight is not None
+    )
+    xray_done = False
+    owner = get_settings().owner_user_id
+    if wants_xray and owner:
+        try:
+            await _xray_inputs(pool, owner, limits, inputs)
+            xray_done = True
+        except Exception as exc:
+            log.warning("x-ray measurement failed: %s", exc)
+            inputs.unavailable["xray"] = str(exc)
+    if not xray_done:
+        # A configured limit that could not be measured is reported, never silently dropped.
+        why = inputs.unavailable.get("xray") or "no owner configured (OWNER_USER_ID)"
+        if limits.max_sector_weight is not None:
+            inputs.unavailable["sector"] = why
+        if limits.max_country_weight is not None:
+            inputs.unavailable["country"] = why
+    if limits.max_look_through_weight is not None and not xray_done:
+        # No owner configured or the X-Ray failed: the older look-through still answers overlap.
         try:
             report = await portfolio_look_through(pool)
             inputs.underlyings = [
@@ -223,6 +358,124 @@ async def gather_risk_inputs(
             log.warning("look-through failed: %s", exc)
             inputs.unavailable["overlap"] = str(exc)
     return inputs
+
+
+async def _decision_inputs(
+    pool: asyncpg.Pool,
+    strategy: StrategyConfig,
+    positions: list[PositionRow],
+    inputs: RiskInputs,
+) -> None:
+    """The Phase 6 limits: value at risk, tracking error, stress loss, the credit signal and
+    unusual valuation assumptions. Each is measured only when its limit is set, and a failed
+    measurement is noted, never raised."""
+    limits = strategy.risk
+    if limits.max_var_95 is not None or limits.max_tracking_error is not None:
+        try:
+            from steward.decision.risk_report import build_report
+            from steward.decision.series import load_bundle
+
+            report = build_report(await load_bundle(pool, RISK_WINDOW_DAYS))
+            if (got := report.stats.get("var_95")) is not None and got.value is not None:
+                inputs.var_95 = float(got.value)
+            elif limits.max_var_95 is not None:
+                inputs.unavailable["var"] = (
+                    got.warnings[0] if got and got.warnings else "no estimate"
+                )
+            if (got := report.stats.get("tracking_error")) is not None and got.value is not None:
+                inputs.tracking_error = float(got.value)
+            elif limits.max_tracking_error is not None:
+                inputs.unavailable["tracking_error"] = (
+                    got.warnings[0] if got and got.warnings else "no benchmark"
+                )
+        except Exception as exc:
+            log.warning("risk report failed: %s", exc)
+            inputs.unavailable["var"] = inputs.unavailable["tracking_error"] = str(exc)
+    if limits.max_stress_loss is not None and (owner := get_settings().owner_user_id):
+        try:
+            from steward.decision.service import run_shock
+            from steward.decision.shocks import ShockAssumptions, ShockSet
+
+            run = await run_shock(
+                pool, owner, ShockSet(equity_pct=-limits.stress_equity_fall), ShockAssumptions()
+            )
+            inputs.stress_loss = -run.result.pnl_pct
+        except Exception as exc:
+            log.warning("stress measurement failed: %s", exc)
+            inputs.unavailable["stress"] = str(exc)
+    if limits.credit_spread_alert_bp is not None:
+        row = await pool.fetchrow(
+            "select period, value from public.macro_series where series_id = 'us_hy_spread'"
+            " and value is not null order by period desc limit 1"
+        )
+        if row is None:
+            inputs.unavailable["credit_spread"] = (
+                "no us_hy_spread series is stored; run the macro job with a FRED key"
+            )
+        else:
+            # FRED publishes this spread in percent.
+            inputs.credit_spread_bp = float(row["value"]) * 100
+            inputs.credit_spread_date = row["period"]
+    if limits.max_valuation_terminal_growth is not None or limits.max_valuation_growth is not None:
+        held = sorted({p.ticker for p in positions if p.quantity > 0})
+        # Scenarios are the owner's own; with no owner configured there is no one to read for.
+        owner = get_settings().owner_user_id
+        rows = (
+            await pool.fetch(
+                "select distinct on (ticker, name) ticker, name, assumptions"
+                " from public.company_valuation_scenario"
+                " where ticker = any($1::text[]) and owner_id = $2::uuid"
+                " order by ticker, name, version desc",
+                held,
+                owner,
+            )
+            if owner
+            else []
+        )
+        if not owner:
+            inputs.unavailable["valuation"] = "no owner configured (OWNER_USER_ID)"
+        for r in rows:
+            body = r["assumptions"]
+            if isinstance(body, str):
+                import json
+
+                body = json.loads(body)
+            terminal = body.get("terminal_growth")
+            ceiling = limits.max_valuation_terminal_growth
+            if ceiling is not None and terminal is not None and float(terminal) > ceiling:
+                inputs.valuation_flags.append(
+                    ValuationFlag(r["ticker"], r["name"], "terminal growth", float(terminal))
+                )
+            growth = [float(g) for g in body.get("growth", [])]
+            ceiling = limits.max_valuation_growth
+            if ceiling is not None and growth and max(growth) > ceiling:
+                inputs.valuation_flags.append(
+                    ValuationFlag(r["ticker"], r["name"], "explicit-year growth", max(growth))
+                )
+
+
+async def _xray_inputs(
+    pool: asyncpg.Pool, owner_id: str, limits: RiskLimits, inputs: RiskInputs
+) -> None:
+    """Concentration from the X-Ray, the same figures the pages show: one company's weight is
+    summed over every fund that holds it, and a bucket with no real label is never a breach."""
+    from steward.xray import service as xray_service
+    from steward.xray.views import Dimension, XrayBucket, build_view
+
+    loaded = await xray_service.load(pool, owner_id)
+    ctx = xray_service.view_context(loaded)
+
+    def classified(dimension: Dimension) -> list[XrayBucket]:
+        return [b for b in build_view(dimension, ctx).buckets if b.kind == "classified"]
+
+    if limits.max_look_through_weight is not None:
+        inputs.underlyings = [
+            Underlying(b.label, b.weight, b.fund_weight > 0) for b in classified("issuer")
+        ]
+    if limits.max_sector_weight is not None:
+        inputs.exposures += [Exposure("sector", b.label, b.weight) for b in classified("sector")]
+    if limits.max_country_weight is not None:
+        inputs.exposures += [Exposure("country", b.label, b.weight) for b in classified("country")]
 
 
 async def pair_correlations(

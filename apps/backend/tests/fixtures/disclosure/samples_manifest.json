@@ -1,0 +1,3148 @@
+{
+ "version": 1,
+ "purpose": "P0.3 capture protocol: ten samples for each of ten disclosure types, each with manual ground truth. Slots are named `<category>-01` to `<category>-10` and are `pending_capture` unless `slots` says otherwise. A slot becomes `captured` only when the original bytes are archived (sha256) and a person has recorded the expected parsed fields. No slot is pre-filled with invented values.",
+ "captured": 0,
+ "slot_fields": [
+  "slot",
+  "status",
+  "issuer_key",
+  "source_url",
+  "sha256",
+  "published_at",
+  "known_at",
+  "expected",
+  "captured_by",
+  "captured_on"
+ ],
+ "status_values": [
+  "pending_capture",
+  "captured",
+  "captured_model_checked",
+  "rejected_unavailable"
+ ],
+ "categories": {
+  "13f_amendment": {
+   "expected_fields": [
+    "manager",
+    "period",
+    "amends_accession",
+    "holdings_replaced",
+    "shares_total"
+   ],
+   "channel": "sec"
+  },
+  "13dg_group": {
+   "expected_fields": [
+    "filer_group_members",
+    "class",
+    "shares",
+    "percent",
+    "voting_power",
+    "purpose",
+    "filing_time"
+   ],
+   "channel": "sec"
+  },
+  "form4_purchase_sale": {
+   "expected_fields": [
+    "insider",
+    "role",
+    "code",
+    "shares",
+    "price",
+    "post_holdings",
+    "plan_flag"
+   ],
+   "channel": "sec"
+  },
+  "form4_non_discretionary": {
+   "expected_fields": [
+    "insider",
+    "code",
+    "shares",
+    "footnote_reason",
+    "plan_flag"
+   ],
+   "channel": "sec"
+  },
+  "nport": {
+   "expected_fields": [
+    "fund",
+    "report_date",
+    "filing_date",
+    "holding_id",
+    "value",
+    "derivative_flag"
+   ],
+   "channel": "sec"
+  },
+  "8k_deal_exhibit": {
+   "expected_fields": [
+    "parties",
+    "announced_date",
+    "consideration",
+    "conditions",
+    "state"
+   ],
+   "channel": "sec"
+  },
+  "xbrl_note": {
+   "expected_fields": [
+    "concept",
+    "context",
+    "value",
+    "unit",
+    "scale",
+    "period"
+   ],
+   "channel": "sec"
+  },
+  "esef_block_note": {
+   "expected_fields": [
+    "issuer_lei",
+    "block_concept",
+    "text_offsets",
+    "extension_taxonomy"
+   ],
+   "channel": "esef"
+  },
+  "sedarplus_filing": {
+   "expected_fields": [
+    "issuer",
+    "document_id",
+    "form",
+    "filed_time",
+    "stable_url"
+   ],
+   "channel": "sedarplus"
+  },
+  "issuer_consensus_version": {
+   "expected_fields": [
+    "issuer",
+    "publisher",
+    "file_version",
+    "metric",
+    "period",
+    "mean",
+    "median",
+    "panel_size",
+    "basis"
+   ],
+   "channel": "issuer_ir"
+  },
+  "relationship_disclosure": {
+   "expected_fields": [
+    "reporter",
+    "counterparty_or_anonymous_label",
+    "direction",
+    "percentage",
+    "denominator",
+    "period",
+    "passage_offsets"
+   ],
+   "channel": "sec"
+  }
+ },
+ "samples_per_category": 10,
+ "adjudication": "Every `captured` slot is read by a person before it becomes ground truth. A `captured_model_checked` slot was checked against the original source by the model (2026-10-08) and still needs a person's read before it counts toward a release gate; disagreements are kept in `expected_notes`.",
+ "slots": {
+  "form4_purchase_sale": [
+   {
+    "slot": "form4_purchase_sale-01",
+    "status": "captured_model_checked",
+    "issuer_key": "NFLX_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1065280/000106528025000256/wk-form4_1748995666.xml",
+    "sha256": "c0f16a7c5c09f26564b27ab2baa11ec2f96111ca4c1992c8534b296b62bb70ac",
+    "published_at": "2025-06-03",
+    "known_at": "2025-06-03 23:59:59+00",
+    "expected": {
+     "row": "0001065280-25-000256:15",
+     "insider": "HASTINGS REED",
+     "code": "S",
+     "date": "2025-06-02",
+     "shares": 1946.0,
+     "price": 1215.3773,
+     "post_holdings": 7324.0,
+     "xml_owners": [
+      "HASTINGS REED"
+     ],
+     "xml_aff10b5One": "1"
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-02",
+    "status": "captured_model_checked",
+    "issuer_key": "FB_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000095010321005724/dp149574_4-zuckerberg0416.xml",
+    "sha256": "f01c83bcda058e6ed4213d31999dc8adc12ed8492a6dcfe7a42086674b3dc983",
+    "published_at": "2021-04-19",
+    "known_at": "2021-04-19 23:59:59+00",
+    "expected": {
+     "row": "0000950103-21-005724:3",
+     "insider": "Zuckerberg Mark",
+     "code": "S",
+     "date": "2021-04-16",
+     "shares": 1400.0,
+     "price": 306.9771,
+     "post_holdings": 1100.0,
+     "xml_owners": [
+      "Zuckerberg Mark"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-03",
+    "status": "captured_model_checked",
+    "issuer_key": "GOOGL_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000120919121039274/doc4.xml",
+    "sha256": "1500b2082414c58f15af70a6df75327739701b0dd963d70cf81f41885c01e92e",
+    "published_at": "2021-06-09",
+    "known_at": "2021-06-09 23:59:59+00",
+    "expected": {
+     "row": "0001209191-21-039274:5",
+     "insider": "Page Lawrence",
+     "code": "S",
+     "date": "2021-06-07",
+     "shares": 1100.0,
+     "price": 2387.2926,
+     "post_holdings": 9162.0,
+     "xml_owners": [
+      "Page Lawrence"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-04",
+    "status": "captured_model_checked",
+    "issuer_key": "FB_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000095010321003693/dp147498_4-zuckerberg2.xml",
+    "sha256": "4b3eca01d479de8e90f0e4e90a5bf55320ece6193735e7556ea946b03dbf8538",
+    "published_at": "2021-03-08",
+    "known_at": "2021-03-08 23:59:59+00",
+    "expected": {
+     "row": "0000950103-21-003693:2",
+     "insider": "Zuckerberg Mark",
+     "code": "S",
+     "date": "2021-03-04",
+     "shares": 270.0,
+     "price": 255.9391,
+     "post_holdings": 4330.0,
+     "xml_owners": [
+      "Zuckerberg Mark"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-05",
+    "status": "captured_model_checked",
+    "issuer_key": "FB_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000095010324012229/dp216661_4-zuckerberg0812.xml",
+    "sha256": "44d3fece0f30d254dc1abcade7deecb43328a444f38006600b72f24641cb345e",
+    "published_at": "2024-08-14",
+    "known_at": "2024-08-14 23:59:59+00",
+    "expected": {
+     "row": "0000950103-24-012229:4",
+     "insider": "Zuckerberg Mark",
+     "code": "S",
+     "date": "2024-08-12",
+     "shares": 4999.0,
+     "price": 515.1065,
+     "post_holdings": 628743.0,
+     "xml_owners": [
+      "Zuckerberg Mark"
+     ],
+     "xml_aff10b5One": "1"
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-06",
+    "status": "captured_model_checked",
+    "issuer_key": "AMD_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/2488/000000248819000128/wf-form4_156572890341539.xml",
+    "sha256": "af01d764c388238323eaaf975376b96c7ff5647554f48de28259e7637baa2228",
+    "published_at": "2019-08-13",
+    "known_at": "2019-08-13 23:59:59+00",
+    "expected": {
+     "row": "0000002488-19-000128:1",
+     "insider": "Su Lisa T",
+     "code": "S",
+     "date": "2019-08-12",
+     "shares": 429497.0,
+     "price": 33.53,
+     "post_holdings": 2802267.0,
+     "xml_owners": [
+      "Su Lisa T"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-07",
+    "status": "captured_model_checked",
+    "issuer_key": "GOOGL_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000120919121060519/doc4.xml",
+    "sha256": "3bea8c7167ab5972932c112f8c0667c93766f31c68240bbfe9f4cec7b232088c",
+    "published_at": "2021-10-15",
+    "known_at": "2021-10-15 23:59:59+00",
+    "expected": {
+     "row": "0001209191-21-060519:5",
+     "insider": "Brin Sergey",
+     "code": "S",
+     "date": "2021-10-13",
+     "shares": 900.0,
+     "price": 2738.3022,
+     "post_holdings": 11888.0,
+     "xml_owners": [
+      "Brin Sergey"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-08",
+    "status": "captured_model_checked",
+    "issuer_key": "AMD_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/2488/000000248820000168/wf-form4_160530290595176.xml",
+    "sha256": "dd9ae243cb07d1c9995c6f87f5b53a88f485b63c9b18895279caf26b80059406",
+    "published_at": "2020-11-13",
+    "known_at": "2020-11-13 23:59:59+00",
+    "expected": {
+     "row": "0000002488-20-000168:2",
+     "insider": "Su Lisa T",
+     "code": "S",
+     "date": "2020-11-10",
+     "shares": 64658.0,
+     "price": 79.07,
+     "post_holdings": 2722793.0,
+     "xml_owners": [
+      "Su Lisa T"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-09",
+    "status": "captured_model_checked",
+    "issuer_key": "GOOGL_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000120919121063755/doc4.xml",
+    "sha256": "9fac6a2b26141a55d378418e10db4357db501683aaeaad5e19e0f7c5f3f3f82d",
+    "published_at": "2021-11-09",
+    "known_at": "2021-11-09 23:59:59+00",
+    "expected": {
+     "row": "0001209191-21-063755:26",
+     "insider": "Brin Sergey",
+     "code": "S",
+     "date": "2021-11-08",
+     "shares": 200.0,
+     "price": 3008.55,
+     "post_holdings": 0.0,
+     "xml_owners": [
+      "Brin Sergey"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_purchase_sale-10",
+    "status": "captured_model_checked",
+    "issuer_key": "FB_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000095010320022110/dp140824_4-zuckerberg.xml",
+    "sha256": "2c4440bf5f8f8f0d1e25206aecc218d5f60328c0d3e55c11b77416a64d480bdb",
+    "published_at": "2020-11-12",
+    "known_at": "2020-11-12 23:59:59+00",
+    "expected": {
+     "row": "0000950103-20-022110:2",
+     "insider": "Zuckerberg Mark",
+     "code": "S",
+     "date": "2020-11-10",
+     "shares": 3000.0,
+     "price": 266.239,
+     "post_holdings": 24800.0,
+     "xml_owners": [
+      "Zuckerberg Mark"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   }
+  ],
+  "form4_non_discretionary": [
+   {
+    "slot": "form4_non_discretionary-01",
+    "status": "captured_model_checked",
+    "issuer_key": "UNH_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/731766/000073176624000360/wk-form4_1734643055.xml",
+    "sha256": "b517f1fa372997b7502b4f1f4289f732cc859e97511982bcdf6928766475a23a",
+    "published_at": "2024-12-19",
+    "known_at": "2024-12-19 23:59:59+00",
+    "expected": {
+     "row": "0000731766-24-000360:0",
+     "insider": "MONTGOMERY RICE VALERIE MD",
+     "code": "A",
+     "date": "2024-12-17",
+     "shares": 24.0,
+     "price": 0.0,
+     "post_holdings": 5866.0,
+     "xml_owners": [
+      "MONTGOMERY RICE VALERIE MD"
+     ],
+     "xml_aff10b5One": "0"
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-02",
+    "status": "captured_model_checked",
+    "issuer_key": "UNH_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/731766/000073176625000118/wk-form4_1743713628.xml",
+    "sha256": "74c6b86d4d9a5c1c5b41924a6c1e0c12e3d99de577313263be8b39c212d54c78",
+    "published_at": "2025-04-03",
+    "known_at": "2025-04-03 23:59:59+00",
+    "expected": {
+     "row": "0000731766-25-000118:0",
+     "insider": "Noseworthy John H",
+     "code": "A",
+     "date": "2025-04-01",
+     "shares": 180.0,
+     "price": 0.0,
+     "post_holdings": 5763.0,
+     "xml_owners": [
+      "Noseworthy John H"
+     ],
+     "xml_aff10b5One": "0"
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-03",
+    "status": "captured_model_checked",
+    "issuer_key": "KO_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/21344/000112760221006947/form4.xml",
+    "sha256": "3310a35b6edfe8315174943538f1bfbfe0e861063c2dd45a963c4e1f487d6d33",
+    "published_at": "2021-02-22",
+    "known_at": "2021-02-22 23:59:59+00",
+    "expected": {
+     "row": "0001127602-21-006947:0",
+     "insider": "LOVELESS KATHY",
+     "code": "A",
+     "date": "2021-02-18",
+     "shares": 717.0,
+     "price": 0.0,
+     "post_holdings": 12476.0,
+     "xml_owners": [
+      "LOVELESS KATHY"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-04",
+    "status": "captured_model_checked",
+    "issuer_key": "UBER_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1543151/000156218021001954/primarydocument.xml",
+    "sha256": "6e2d3547ac421315e0e48444b62f562996ae614bc806ab75196eddc645b3d31f",
+    "published_at": "2021-03-03",
+    "known_at": "2021-03-03 23:59:59+00",
+    "expected": {
+     "row": "0001562180-21-001954:0",
+     "insider": "Chai Nelson",
+     "code": "F",
+     "date": "2021-03-01",
+     "shares": 1756.0,
+     "price": 54.4,
+     "post_holdings": 177016.0,
+     "xml_owners": [
+      "Chai Nelson"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-05",
+    "status": "captured_model_checked",
+    "issuer_key": "FB_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000095010321007471/dp151257_4-cox.xml",
+    "sha256": "470b61d153155789806a3d40593763a289576e9ce4beb80d4db9c6f87baff39a",
+    "published_at": "2021-05-18",
+    "known_at": "2021-05-18 23:59:59+00",
+    "expected": {
+     "row": "0000950103-21-007471:2",
+     "insider": "Cox Christopher K",
+     "code": "M",
+     "date": "2021-05-15",
+     "shares": 17317.0,
+     "price": 0.0,
+     "post_holdings": 132323.0,
+     "xml_owners": [
+      "Cox Christopher K"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-06",
+    "status": "captured_model_checked",
+    "issuer_key": "FB_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000095010325002194/dp225056_4-newstead.xml",
+    "sha256": "4f51bd03a8e5a080a47d8780cb2e8f3d87c0e58c6849bd75a575319cace1c487",
+    "published_at": "2025-02-19",
+    "known_at": "2025-02-19 23:59:59+00",
+    "expected": {
+     "row": "0000950103-25-002194:3",
+     "insider": "Newstead Jennifer",
+     "code": "M",
+     "date": "2025-02-15",
+     "shares": 2679.0,
+     "price": 0.0,
+     "post_holdings": 45380.0,
+     "xml_owners": [
+      "Newstead Jennifer"
+     ],
+     "xml_aff10b5One": "1"
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-07",
+    "status": "captured_model_checked",
+    "issuer_key": "FB_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1326801/000112760219019063/form4.xml",
+    "sha256": "018bb3e2d70c06a1cb7ab2e7270eb7f88b4e256fb8fe691c1efae5c6b77e0db4",
+    "published_at": "2019-05-17",
+    "known_at": "2019-05-17 23:59:59+00",
+    "expected": {
+     "row": "0001127602-19-019063:0",
+     "insider": "HASTINGS REED",
+     "code": "M",
+     "date": "2019-05-15",
+     "shares": 1640.0,
+     "price": 0.0,
+     "post_holdings": 89245.0,
+     "xml_owners": [
+      "HASTINGS REED"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-08",
+    "status": "captured_model_checked",
+    "issuer_key": "ORCL_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1341439/000112760217024194/form4.xml",
+    "sha256": "92093512452534c7265d1311c85d7192b6f64ffb46336be2dc61f88aab5bff8b",
+    "published_at": "2017-07-26",
+    "known_at": "2017-07-26 23:59:59+00",
+    "expected": {
+     "row": "0001127602-17-024194:1",
+     "insider": "Daley Dorian",
+     "code": "F",
+     "date": "2017-07-24",
+     "shares": 6931.0,
+     "price": 50.8,
+     "post_holdings": 56753.0,
+     "xml_owners": [
+      "Daley Dorian"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-09",
+    "status": "captured_model_checked",
+    "issuer_key": "GOOGL_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000120919119039355/doc4.xml",
+    "sha256": "7be20d9d084f12cd6974bc1f6d9df9edf5da6159ccf1422a806a882af38a5286",
+    "published_at": "2019-06-27",
+    "known_at": "2019-06-27 23:59:59+00",
+    "expected": {
+     "row": "0001209191-19-039355:0",
+     "insider": "O'Toole Amie Thuener",
+     "code": "C",
+     "date": "2019-06-25",
+     "shares": 69.0,
+     "price": 0.0,
+     "post_holdings": 457.0,
+     "xml_owners": [
+      "O'Toole Amie Thuener"
+     ],
+     "xml_aff10b5One": null
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "form4_non_discretionary-10",
+    "status": "captured_model_checked",
+    "issuer_key": "NFLX_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1065280/000110465924016672/tm245893-1_4seq1.xml",
+    "sha256": "5042e1b1a92977eda0cf2ff946e3fdce3db69b929984c7381b7eb26d39c80097",
+    "published_at": "2024-02-12",
+    "known_at": "2024-02-12 23:59:59+00",
+    "expected": {
+     "row": "0001104659-24-016672:11",
+     "insider": "Hoag Jay C",
+     "code": "M",
+     "date": "2024-02-08",
+     "shares": 151.0,
+     "price": 269.58,
+     "post_holdings": 1336.0,
+     "xml_owners": [
+      "Hoag Jay C"
+     ],
+     "xml_aff10b5One": "0"
+    },
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08"
+   }
+  ],
+  "sedarplus_filing": [
+   {
+    "slot": "sedarplus_filing-01",
+    "status": "captured_model_checked",
+    "issuer_key": "000006073",
+    "source_url": null,
+    "sha256": "413fa3926703a607c0c9a2229fff41563df500f8a932b5e00c45c2bf7209ca18",
+    "published_at": "2026-10-08T07:21:37+00:00",
+    "known_at": "2026-10-08T07:21:37+00:00",
+    "expected": {
+     "issuer": "Nano One Materials Corp.",
+     "document_id": "000006073:20261008T072137Z:c045cb7a9635:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "News release - English.pdf",
+     "filed_time": "2026-10-08T07:21:37+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-02",
+    "status": "captured_model_checked",
+    "issuer_key": "000102279",
+    "source_url": null,
+    "sha256": "b14fec9a176b0d18b643a2244af3470d4def845f51a4715be337676e32d40fab",
+    "published_at": "2026-10-08T06:47:01+00:00",
+    "known_at": "2026-10-08T06:47:01+00:00",
+    "expected": {
+     "issuer": "Platform Advisor, LLC",
+     "document_id": "000102279:20261008T064701Z:3bf17d332e95:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Report of exempt distribution (45-106F1).pdf",
+     "filed_time": "2026-10-08T06:47:01+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-03",
+    "status": "captured_model_checked",
+    "issuer_key": "000102279",
+    "source_url": null,
+    "sha256": "9b9232f6b5b18ac92ee6f1b33a1b67771edb990be728b5c3011bc8ef5db77462",
+    "published_at": "2026-10-08T05:56:03+00:00",
+    "known_at": "2026-10-08T05:56:03+00:00",
+    "expected": {
+     "issuer": "Platform Advisor, LLC",
+     "document_id": "000102279:20261008T055603Z:bd7e6f351b9a:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Report of exempt distribution (45-106F1).pdf",
+     "filed_time": "2026-10-08T05:56:03+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-04",
+    "status": "captured_model_checked",
+    "issuer_key": "000102279",
+    "source_url": null,
+    "sha256": "aeeb77cbd1cc0c4700251af7d7790fc9b6138befeacd6318ec37765ec191b959",
+    "published_at": "2026-10-08T04:53:54+00:00",
+    "known_at": "2026-10-08T04:53:54+00:00",
+    "expected": {
+     "issuer": "Platform Advisor, LLC",
+     "document_id": "000102279:20261008T045354Z:c5c91e95682d:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Report of exempt distribution (45-106F1).pdf",
+     "filed_time": "2026-10-08T04:53:54+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-05",
+    "status": "captured_model_checked",
+    "issuer_key": "000021176",
+    "source_url": null,
+    "sha256": "bfcb529a69ffcdce19d4ed24cb0f804b3e2fa8136cd91e5ac47564ca9c5f6f5d",
+    "published_at": "2026-10-08T02:14:10+00:00",
+    "known_at": "2026-10-08T02:14:10+00:00",
+    "expected": {
+     "issuer": "North American Financial 15 Split Corp.",
+     "document_id": "000021176:20261008T021410Z:6d11af8a7bab:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Prospectus (non pricing) supplement (ATM) – English.pdf",
+     "filed_time": "2026-10-08T02:14:10+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-06",
+    "status": "captured_model_checked",
+    "issuer_key": "000020286",
+    "source_url": null,
+    "sha256": "f5b272a295e62e5009462a1c372c57caaf00456c98521119d00822f77c6cfa17",
+    "published_at": "2026-10-08T02:11:29+00:00",
+    "known_at": "2026-10-08T02:11:29+00:00",
+    "expected": {
+     "issuer": "Dividend 15 Split Corp.",
+     "document_id": "000020286:20261008T021129Z:2d490c282c3f:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Prospectus (non pricing) supplement (ATM) – English.pdf",
+     "filed_time": "2026-10-08T02:11:29+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-07",
+    "status": "captured_model_checked",
+    "issuer_key": "000020286",
+    "source_url": null,
+    "sha256": "3534c45daafeb4da4d83c9523b860736dd9491288e9b14e5c3f6cc01436959a7",
+    "published_at": "2026-10-08T02:11:29+00:00",
+    "known_at": "2026-10-08T02:11:29+00:00",
+    "expected": {
+     "issuer": "Dividend 15 Split Corp.",
+     "document_id": "000020286:20261008T021129Z:40b50c8d263e:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Other material contract(s).pdf",
+     "filed_time": "2026-10-08T02:11:29+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-08",
+    "status": "captured_model_checked",
+    "issuer_key": "000043146",
+    "source_url": null,
+    "sha256": "dcf2a1fbb61b6499a73223c0d9671e0deb40cf959df73cf8d0f9d7fe9362e9b6",
+    "published_at": "2026-10-08T02:03:21+00:00",
+    "known_at": "2026-10-08T02:03:21+00:00",
+    "expected": {
+     "issuer": "Scully Royalty Ltd.",
+     "document_id": "000043146:20261008T020321Z:77844a17caee:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Other.pdf",
+     "filed_time": "2026-10-08T02:03:21+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-09",
+    "status": "captured_model_checked",
+    "issuer_key": "000022832",
+    "source_url": null,
+    "sha256": "90dd78c7c1e99543db0e0c28e81d83876e2f8ce19d958f86ed52b4256bdac129",
+    "published_at": "2026-10-08T01:38:26+00:00",
+    "known_at": "2026-10-08T01:38:26+00:00",
+    "expected": {
+     "issuer": "Eagle Credit Card Trust",
+     "document_id": "000022832:20261008T013826Z:94b057a63d8e:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Pricing supplement (other than specified derivative) – English.pdf",
+     "filed_time": "2026-10-08T01:38:26+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "sedarplus_filing-10",
+    "status": "captured_model_checked",
+    "issuer_key": "000022832",
+    "source_url": null,
+    "sha256": "bc482743f4d8eccba96e51d29dc762b58abcc127788075e74134b1dc4b25f361",
+    "published_at": "2026-10-08T01:31:50+00:00",
+    "known_at": "2026-10-08T01:31:50+00:00",
+    "expected": {
+     "issuer": "Eagle Credit Card Trust",
+     "document_id": "000022832:20261008T013150Z:0bae39eb2667:0",
+     "id_basis": "derived: the page shows no document id and its links are session tokens",
+     "form": "Material change report - French.pdf",
+     "filed_time": "2026-10-08T01:31:50+00:00",
+     "stable_url": null,
+     "sha256_basis": "the extracted row as JSON; the page itself was not archived"
+    },
+    "captured_by": "claude-model (not a human) from a signed-in browser page the owner opened",
+    "captured_on": "2026-10-08"
+   }
+  ],
+  "nport": [
+   {
+    "slot": "nport-01",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-02",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-03",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-04",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-05",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-06",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-07",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-08",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-09",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "nport-10",
+    "status": "rejected_unavailable",
+    "reason": "no held fund has a US ISIN; the three held funds are IE/JE-domiciled and file no N-PORT",
+    "captured_on": "2026-10-08"
+   }
+  ],
+  "issuer_consensus_version": [
+   {
+    "slot": "issuer_consensus_version-01",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-02",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-03",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-04",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-05",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-06",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-07",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-08",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-09",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   },
+   {
+    "slot": "issuer_consensus_version-10",
+    "status": "rejected_unavailable",
+    "reason": "no issuer consensus source has an investor-relations URL registered",
+    "captured_on": "2026-10-08"
+   }
+  ],
+  "13f_amendment": [
+   {
+    "slot": "13f_amendment-01",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CIK2110329",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/2110329/000211032926000013/primary_doc.xml",
+    "sha256": "ffc29b08b52c669375c5cc4cf22a5979c8ecb4dfc29c4b2298a7d3cb2a5efae3",
+    "published_at": "2026-08-28",
+    "known_at": "2026-08-28 23:59:59+00",
+    "expected": {
+     "accession": "0002110329-26-000013",
+     "manager": "Cornerstone Financial Management LLC",
+     "period": "2025-12-31",
+     "amends_accession": "0002110329-26-000001",
+     "amendment_type": "RESTATEMENT",
+     "amendment_no": "1",
+     "holdings_replaced": true,
+     "shares_total": 1420446,
+     "shares_total_basis": "sum of sshPrnamt where sshPrnamtType=SH in the amendment's information table",
+     "info_table_rows": 1241,
+     "info_table_url": "https://www.sec.gov/Archives/edgar/data/2110329/000211032926000013/cornerstone13fq42025.xml",
+     "info_table_sha256": "39a1f1f54514124170d361fb046a1380e8c4ce513bc48a2cc602ea1a1c9de80a",
+     "amends_accession_basis": "same-period 13F-HR in EDGAR submissions JSON; the primary document does not name it"
+    },
+    "expected_notes": [
+     "app form13f_filing.reported_line_count and reported_total_value_usd are NULL; the cover page states tableEntryTotal=1241 and tableValueTotal=106497027"
+    ]
+   },
+   {
+    "slot": "13f_amendment-02",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CIK1297376",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1297376/000199937126018913/primary_doc.xml",
+    "sha256": "38b7df3919cf6d6bd44b8ff822bdd5b67ef4a7e93930ff9215c864ac5e8bc5a8",
+    "published_at": "2026-08-27",
+    "known_at": "2026-08-27 23:59:59+00",
+    "expected": {
+     "accession": "0001999371-26-018913",
+     "manager": "Advisors Asset Management, Inc.",
+     "period": "2021-09-30",
+     "amends_accession": "0000891092-21-007307",
+     "amendment_type": "RESTATEMENT",
+     "amendment_no": "1",
+     "holdings_replaced": true,
+     "shares_total": 138246733,
+     "shares_total_basis": "sum of sshPrnamt where sshPrnamtType=SH in the amendment's information table",
+     "info_table_rows": 1488,
+     "info_table_url": "https://www.sec.gov/Archives/edgar/data/1297376/000199937126018913/infotable.xml",
+     "info_table_sha256": "6dc6b012eb36e7e0e9c85359fbb8be34d71fe84ad12f2230d415db51c125be0b",
+     "amends_accession_basis": "same-period 13F-HR in EDGAR submissions JSON; the primary document does not name it; two 13F-HR/A exist for this period, the other is 0001999371-26-018771"
+    },
+    "expected_notes": [
+     "app form13f_filing.reported_line_count and reported_total_value_usd are NULL; the cover page states tableEntryTotal=1488 and tableValueTotal=6576592416"
+    ]
+   },
+   {
+    "slot": "13f_amendment-03",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CIK1339270",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1339270/000133927026000003/primary_doc.xml",
+    "sha256": "6f42b34af8ceae10b491be5dfca149911ddfbd2c6a04f87ef81244f3a6ce1402",
+    "published_at": "2026-07-29",
+    "known_at": "2026-07-29 23:59:59+00",
+    "expected": {
+     "accession": "0001339270-26-000003",
+     "manager": "SOL Capital Management CO",
+     "period": "2026-03-31",
+     "amends_accession": "0001339270-26-000002",
+     "amendment_type": "RESTATEMENT",
+     "amendment_no": "1",
+     "holdings_replaced": true,
+     "shares_total": 0,
+     "shares_total_basis": "sum of sshPrnamt where sshPrnamtType=SH in the amendment's information table",
+     "info_table_rows": 1,
+     "info_table_url": "https://www.sec.gov/Archives/edgar/data/1339270/000133927026000003/13F-HR_no_holdings.xml",
+     "info_table_sha256": "c06bc68894218105a499845cd6dd5b9de4c12ecc4844236f22e79f3899c40610",
+     "amends_accession_basis": "same-period 13F-HR in EDGAR submissions JSON; the primary document does not name it"
+    },
+    "expected_notes": [
+     "app form13f_filing.reported_line_count and reported_total_value_usd are NULL; the cover page states tableEntryTotal=0 and tableValueTotal=0"
+    ]
+   },
+   {
+    "slot": "13f_amendment-04",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CIK1442573",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1442573/000144257326000003/primary_doc.xml",
+    "sha256": "0a1f6a80cbba86fc1f5b80166fa334a0ac3c5c0a9d003bd037b113ee1ca2d5ac",
+    "published_at": "2026-07-30",
+    "known_at": "2026-07-30 23:59:59+00",
+    "expected": {
+     "accession": "0001442573-26-000003",
+     "manager": "HOURGLASS CAPITAL, LLC",
+     "period": "2026-06-30",
+     "amends_accession": "0001442573-26-000002",
+     "amendment_type": "RESTATEMENT",
+     "amendment_no": "1",
+     "holdings_replaced": true,
+     "shares_total": 7753045,
+     "shares_total_basis": "sum of sshPrnamt where sshPrnamtType=SH in the amendment's information table",
+     "info_table_rows": 127,
+     "info_table_url": "https://www.sec.gov/Archives/edgar/data/1442573/000144257326000003/q22026hourglass13famendment.xml",
+     "info_table_sha256": "a6ee3ed58749e9b13426204b24b4cd10cb45e424f249b55fd86214ab14d54f32",
+     "amends_accession_basis": "same-period 13F-HR in EDGAR submissions JSON; the primary document does not name it"
+    },
+    "expected_notes": [
+     "app form13f_filing.reported_line_count and reported_total_value_usd are NULL; the cover page states tableEntryTotal=127 and tableValueTotal=508360778"
+    ]
+   },
+   {
+    "slot": "13f_amendment-05",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CIK2143045",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/2143045/000175496026000787/primary_doc.xml",
+    "sha256": "0e41950f7f8ef588f548cb1efa27174ae27f5d8743ff8e924832c97ac17bb164",
+    "published_at": "2026-08-28",
+    "known_at": "2026-08-28 23:59:59+00",
+    "expected": {
+     "accession": "0001754960-26-000787",
+     "manager": "Pandowealth. LLC",
+     "period": "2026-03-31",
+     "amends_accession": "0001754960-26-000708",
+     "amendment_type": "RESTATEMENT",
+     "amendment_no": "1",
+     "holdings_replaced": true,
+     "shares_total": 5354791,
+     "shares_total_basis": "sum of sshPrnamt where sshPrnamtType=SH in the amendment's information table",
+     "info_table_rows": 19,
+     "info_table_url": "https://www.sec.gov/Archives/edgar/data/2143045/000175496026000787/InformationTableOutput.xml",
+     "info_table_sha256": "c0d42be68df46bf731630cd7cce1a7990947fc4160549c979a2106f70f1348dc",
+     "amends_accession_basis": "same-period 13F-HR in EDGAR submissions JSON; the primary document does not name it"
+    },
+    "expected_notes": [
+     "app form13f_filing.reported_line_count and reported_total_value_usd are NULL; the cover page states tableEntryTotal=19 and tableValueTotal=114579405"
+    ]
+   },
+   {
+    "slot": "13f_amendment-06",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CIK931588",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/931588/000162828026059287/primary_doc.xml",
+    "sha256": "f2afd5c2a478d81cfc332112cb5d4f0fbf7601302aa04b43418d89a576308588",
+    "published_at": "2026-08-28",
+    "known_at": "2026-08-28 23:59:59+00",
+    "expected": {
+     "accession": "0001628280-26-059287",
+     "manager": "Provida Pension Fund Administrator",
+     "period": "2026-03-31",
+     "amends_accession": "0001628280-26-035175",
+     "amendment_type": "NEW HOLDINGS",
+     "amendment_no": "1",
+     "holdings_replaced": false,
+     "shares_total": 50175091,
+     "shares_total_basis": "sum of sshPrnamt where sshPrnamtType=SH in the amendment's information table",
+     "info_table_rows": 60,
+     "info_table_url": "https://www.sec.gov/Archives/edgar/data/931588/000162828026059287/information_table.xml",
+     "info_table_sha256": "d3027ad85d9928cf07769f39ee0c8f4a114f0964fefe3b5bd6c14e534665e36f",
+     "amends_accession_basis": "same-period 13F-HR in EDGAR submissions JSON; the primary document does not name it"
+    },
+    "expected_notes": [
+     "app form13f_filing.reported_line_count and reported_total_value_usd are NULL; the cover page states tableEntryTotal=60 and tableValueTotal=5945731463"
+    ]
+   },
+   {
+    "slot": "13f_amendment-07",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CIK2088289",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/2088289/000208828926000005/primary_doc.xml",
+    "sha256": "adfda476d228a8288055ea0bcc93a387f7a5a81bb8afbee86d8b86b6798c0c11",
+    "published_at": "2026-07-28",
+    "known_at": "2026-07-28 23:59:59+00",
+    "expected": {
+     "accession": "0002088289-26-000005",
+     "manager": "Fundamenta Capital S.A.",
+     "period": "2025-12-31",
+     "amends_accession": "0002088289-26-000001",
+     "amendment_type": "RESTATEMENT",
+     "amendment_no": "1",
+     "holdings_replaced": true,
+     "shares_total": 2340688,
+     "shares_total_basis": "sum of sshPrnamt where sshPrnamtType=SH in the amendment's information table",
+     "info_table_rows": 5,
+     "info_table_url": "https://www.sec.gov/Archives/edgar/data/2088289/000208828926000005/fundamentaq425_13f.xml",
+     "info_table_sha256": "436f7976368da4aab166fae6cbbd4f03865b181e02e02e87e36b908855b39bdb",
+     "amends_accession_basis": "same-period 13F-HR in EDGAR submissions JSON; the primary document does not name it"
+    },
+    "expected_notes": [
+     "app form13f_filing.reported_line_count and reported_total_value_usd are NULL; the cover page states tableEntryTotal=5 and tableValueTotal=87266297"
+    ]
+   },
+   {
+    "slot": "13f_amendment-08",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CIK1652026",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1652026/000165202626000010/primary_doc.xml",
+    "sha256": "28a2e4125e5c8eaf5cbfeee80f928a9b7978fcccd2cb8982e4b3e0647bf1d7d7",
+    "published_at": "2026-07-29",
+    "known_at": "2026-07-29 23:59:59+00",
+    "expected": {
+     "accession": "0001652026-26-000010",
+     "manager": "Fund Resources Investment Holding Group Co Ltd",
+     "period": "2026-06-30",
+     "amends_accession": "0001652026-26-000009",
+     "amendment_type": "RESTATEMENT",
+     "amendment_no": "1",
+     "holdings_replaced": true,
+     "shares_total": 1750445,
+     "shares_total_basis": "sum of sshPrnamt where sshPrnamtType=SH in the amendment's information table",
+     "info_table_rows": 7,
+     "info_table_url": "https://www.sec.gov/Archives/edgar/data/1652026/000165202626000010/infortable.xml",
+     "info_table_sha256": "4525d6bcb94846f041565ed64ad10a2681edec883a1c2e39f7e45e3dc71b526b",
+     "amends_accession_basis": "same-period 13F-HR in EDGAR submissions JSON; the primary document does not name it"
+    },
+    "expected_notes": [
+     "app form13f_filing.reported_line_count and reported_total_value_usd are NULL; the cover page states tableEntryTotal=7 and tableValueTotal=817028574"
+    ]
+   },
+   {
+    "slot": "13f_amendment-09",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CIK2110329",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/2110329/000211032926000015/primary_doc.xml",
+    "sha256": "0002c6533d9eb424a3dc0afddf4569db925576917f737589015302f5956a92de",
+    "published_at": "2026-08-28",
+    "known_at": "2026-08-28 23:59:59+00",
+    "expected": {
+     "accession": "0002110329-26-000015",
+     "manager": "Cornerstone Financial Management LLC",
+     "period": "2026-06-30",
+     "amends_accession": "0002110329-26-000007",
+     "amendment_type": "RESTATEMENT",
+     "amendment_no": "1",
+     "holdings_replaced": true,
+     "shares_total": 1637952,
+     "shares_total_basis": "sum of sshPrnamt where sshPrnamtType=SH in the amendment's information table",
+     "info_table_rows": 1471,
+     "info_table_url": "https://www.sec.gov/Archives/edgar/data/2110329/000211032926000015/cornerstone13fq22026.xml",
+     "info_table_sha256": "ee2efecaad51c1c0ef49455cbcd628189361fd68b47fef053fc52f6bb0abe811",
+     "amends_accession_basis": "same-period 13F-HR in EDGAR submissions JSON; the primary document does not name it"
+    },
+    "expected_notes": [
+     "app form13f_filing.reported_line_count and reported_total_value_usd are NULL; the cover page states tableEntryTotal=1471 and tableValueTotal=124683667"
+    ]
+   },
+   {
+    "slot": "13f_amendment-10",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CIK1652027",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1652027/000165202726000017/primary_doc.xml",
+    "sha256": "7b7c9360725de9f43c67ebdc22a02a3f3e7c8d9f2066404bb328f11395b65e08",
+    "published_at": "2026-07-30",
+    "known_at": "2026-07-30 23:59:59+00",
+    "expected": {
+     "accession": "0001652027-26-000017",
+     "manager": "Funde Sino Life Insurance Co Ltd",
+     "period": "2026-06-30",
+     "amends_accession": "0001652027-26-000016",
+     "amendment_type": "RESTATEMENT",
+     "amendment_no": "1",
+     "holdings_replaced": true,
+     "shares_total": 963096,
+     "shares_total_basis": "sum of sshPrnamt where sshPrnamtType=SH in the amendment's information table",
+     "info_table_rows": 7,
+     "info_table_url": "https://www.sec.gov/Archives/edgar/data/1652027/000165202726000017/infortable.xml",
+     "info_table_sha256": "3f0d33b62f1642b2c75002aee5aeba00e7fb4a702c32fa7865172c4d54c07dd3",
+     "amends_accession_basis": "same-period 13F-HR in EDGAR submissions JSON; the primary document does not name it"
+    },
+    "expected_notes": [
+     "app form13f_filing.reported_line_count and reported_total_value_usd are NULL; the cover page states tableEntryTotal=7 and tableValueTotal=306754252"
+    ]
+   }
+  ],
+  "13dg_group": [
+   {
+    "slot": "13dg_group-01",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "UnitedHealth Group Inc",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/731766/000210011926001233/primary_doc.xml",
+    "sha256": "04381dec8c144316c6d82f61000f46f0295d38b61328e0500b0f83c9a00b55dc",
+    "published_at": "2026-04-30",
+    "known_at": "2026-04-30 23:59:59+00",
+    "expected": {
+     "accession": "0002100119-26-001233",
+     "form": "SCHEDULE 13G",
+     "filer_group_members": [
+      "Vanguard Capital Management"
+     ],
+     "class": "Common Stock",
+     "shares": 68122483.0,
+     "percent": 7.5,
+     "voting_power": {
+      "sole": 9251706.0,
+      "shared": 0.0,
+      "reporting_person": "Vanguard Capital Management"
+     },
+     "purpose": "none stated: Schedule 13G has no purpose item (filed under Rule 13d-1(b))",
+     "filing_time": "2026-04-30 14:32:42 (EDGAR index header, Eastern time)",
+     "members_detail": [
+      {
+       "name": "Vanguard Capital Management",
+       "sole_voting": "9251706",
+       "shared_voting": "0",
+       "sole_dispositive": "68122483",
+       "shared_dispositive": "0",
+       "aggregate_shares": "68122483",
+       "class_percent": "7.50",
+       "type": "IA"
+      }
+     ]
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "13dg_group-02",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "Celsius Holdings, Inc.",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1341766/000095017025018818/primary_doc.xml",
+    "sha256": "8e606c904f27c51d3595b187c9708e97f891b279375c1ea9853fa308dedc3cac",
+    "published_at": "2025-02-12",
+    "known_at": "2025-02-12 23:59:59+00",
+    "expected": {
+     "accession": "0000950170-25-018818",
+     "form": "SCHEDULE 13G/A",
+     "filer_group_members": [
+      "Chau Hoi Shuen Solina Holly",
+      "Grieg International Limited",
+      "Oscar Time Limited"
+     ],
+     "class": "Common Stock",
+     "shares": 23040969.0,
+     "percent": 9.8,
+     "voting_power": {
+      "sole": 23040969.0,
+      "shared": 0.0,
+      "reporting_person": "Chau Hoi Shuen Solina Holly"
+     },
+     "purpose": "none stated: Schedule 13G has no purpose item (filed under Rule 13d-1(c))",
+     "filing_time": "2025-02-12 16:05:02 (EDGAR index header, Eastern time)",
+     "members_detail": [
+      {
+       "name": "Chau Hoi Shuen Solina Holly",
+       "sole_voting": "23040969",
+       "shared_voting": "0",
+       "sole_dispositive": "23040969",
+       "shared_dispositive": "0",
+       "aggregate_shares": "23040969",
+       "class_percent": "9.80",
+       "type": "IN"
+      },
+      {
+       "name": "Grieg International Limited",
+       "sole_voting": "22333104",
+       "shared_voting": "0",
+       "sole_dispositive": "22333104",
+       "shared_dispositive": "0",
+       "aggregate_shares": "22333104",
+       "class_percent": "9.50",
+       "type": "CO"
+      },
+      {
+       "name": "Oscar Time Limited",
+       "sole_voting": "707865",
+       "shared_voting": "0",
+       "sole_dispositive": "707865",
+       "shared_dispositive": "0",
+       "aggregate_shares": "707865",
+       "class_percent": "0.30",
+       "type": "CO"
+      }
+     ]
+    },
+    "expected_notes": [
+     "3 reporting persons in the filing; the app stores one row keyed on the largest, group membership is not stored"
+    ]
+   },
+   {
+    "slot": "13dg_group-03",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "Celsius Holdings, Inc.",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1341766/000182912626001398/primary_doc.xml",
+    "sha256": "9da806b08cacf3b0119bbfdd222573fc662df293dad270677943b4ecd3aacaa9",
+    "published_at": "2026-02-17",
+    "known_at": "2026-02-17 23:59:59+00",
+    "expected": {
+     "accession": "0001829126-26-001398",
+     "form": "SCHEDULE 13G/A",
+     "filer_group_members": [
+      "William H. Milmoe",
+      "Deborah DeSantis",
+      "Dean DeSantis",
+      "CD Financial, LLC",
+      "GRAT 1, LLC",
+      "Carl DeSantis Retained Annuity Trust 2",
+      "Estate of Carl DeSantis"
+     ],
+     "class": "Common Stock",
+     "shares": 19577490.0,
+     "percent": 7.6,
+     "voting_power": {
+      "sole": 3559027.0,
+      "shared": 16018463.0,
+      "reporting_person": "Deborah DeSantis"
+     },
+     "purpose": "none stated: Schedule 13G has no purpose item (filed under Rule 13d-1(d))",
+     "filing_time": "2026-02-17 16:37:29 (EDGAR index header, Eastern time)",
+     "members_detail": [
+      {
+       "name": "William H. Milmoe",
+       "sole_voting": "211245.00",
+       "shared_voting": "15200463.00",
+       "sole_dispositive": "211245.00",
+       "shared_dispositive": "15200463.00",
+       "aggregate_shares": "15411708.00",
+       "class_percent": "6.0",
+       "type": "IN"
+      },
+      {
+       "name": "Deborah DeSantis",
+       "sole_voting": "3559027.00",
+       "shared_voting": "16018463.00",
+       "sole_dispositive": "3559027.00",
+       "shared_dispositive": "16018463.00",
+       "aggregate_shares": "19577490.00",
+       "class_percent": "7.6",
+       "type": "IN"
+      },
+      {
+       "name": "Dean DeSantis",
+       "sole_voting": "2131365.00",
+       "shared_voting": "17336530.00",
+       "sole_dispositive": "2131365.00",
+       "shared_dispositive": "17336530.00",
+       "aggregate_shares": "19467895.00",
+       "class_percent": "7.6",
+       "type": "IN"
+      },
+      {
+       "name": "CD Financial, LLC",
+       "sole_voting": "13882396.00",
+       "shared_voting": "0.00",
+       "sole_dispositive": "13882396.00",
+       "shared_dispositive": "0.00",
+       "aggregate_shares": "13882396.00",
+       "class_percent": "5.3",
+       "type": "OO"
+      },
+      {
+       "name": "GRAT 1, LLC",
+       "sole_voting": "0.00",
+       "shared_voting": "0.00",
+       "sole_dispositive": "0.00",
+       "shared_dispositive": "0.00",
+       "aggregate_shares": "0.00",
+       "class_percent": "0.0",
+       "type": "OO"
+      },
+      {
+       "name": "Carl DeSantis Retained Annuity Trust 2",
+       "sole_voting": "2136067.00",
+       "shared_voting": "0.00",
+       "sole_dispositive": "2136067.00",
+       "shared_dispositive": "0.00",
+       "aggregate_shares": "2136067.00",
+       "class_percent": "0.8",
+       "type": "OO"
+      },
+      {
+       "name": "Estate of Carl DeSantis",
+       "sole_voting": "1318067.00",
+       "shared_voting": "0.00",
+       "sole_dispositive": "1318067.00",
+       "shared_dispositive": "0.00",
+       "aggregate_shares": "1318067.00",
+       "class_percent": "0.5",
+       "type": "OO"
+      }
+     ]
+    },
+    "expected_notes": [
+     "7 reporting persons in the filing; the app stores one row keyed on the largest, group membership is not stored"
+    ]
+   },
+   {
+    "slot": "13dg_group-04",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "BOEING CO",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/12927/000031506626000359/primary_doc.xml",
+    "sha256": "c816c58efd8ff7bb4af2a02e54a51094fc9df5c11bb3e285f1d674875d656d12",
+    "published_at": "2026-02-05",
+    "known_at": "2026-02-05 23:59:59+00",
+    "expected": {
+     "accession": "0000315066-26-000359",
+     "form": "SCHEDULE 13G/A",
+     "filer_group_members": [
+      "FMR LLC",
+      "Abigail P. Johnson"
+     ],
+     "class": "COMMON STOCK",
+     "shares": 54979044.31,
+     "percent": 7.0,
+     "voting_power": {
+      "sole": 46852547.17,
+      "shared": 0.0,
+      "reporting_person": "FMR LLC"
+     },
+     "purpose": "none stated: Schedule 13G has no purpose item (filed under Rule 13d-1(b))",
+     "filing_time": "2026-02-05 13:16:32 (EDGAR index header, Eastern time)",
+     "members_detail": [
+      {
+       "name": "FMR LLC",
+       "sole_voting": "46852547.17",
+       "shared_voting": "0.00",
+       "sole_dispositive": "54979044.31",
+       "shared_dispositive": "0.00",
+       "aggregate_shares": "54979044.31",
+       "class_percent": "7.0",
+       "type": "HC"
+      },
+      {
+       "name": "Abigail P. Johnson",
+       "sole_voting": "0.00",
+       "shared_voting": "0.00",
+       "sole_dispositive": "54979044.31",
+       "shared_dispositive": "0.00",
+       "aggregate_shares": "54979044.31",
+       "class_percent": "7.0",
+       "type": "IN"
+      }
+     ]
+    },
+    "expected_notes": [
+     "2 reporting persons in the filing; the app stores one row keyed on the largest, group membership is not stored"
+    ]
+   },
+   {
+    "slot": "13dg_group-05",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "Netflix Inc",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1065280/000210011926000856/primary_doc.xml",
+    "sha256": "b38e585505a9ad69a94b71a564fa1419cc82e61f5d2cdd5930f7b6e30d99c80a",
+    "published_at": "2026-04-30",
+    "known_at": "2026-04-30 23:59:59+00",
+    "expected": {
+     "accession": "0002100119-26-000856",
+     "form": "SCHEDULE 13G",
+     "filer_group_members": [
+      "Vanguard Capital Management"
+     ],
+     "class": "Common Stock",
+     "shares": 316347733.0,
+     "percent": 7.49,
+     "voting_power": {
+      "sole": 41947081.0,
+      "shared": 0.0,
+      "reporting_person": "Vanguard Capital Management"
+     },
+     "purpose": "none stated: Schedule 13G has no purpose item (filed under Rule 13d-1(b))",
+     "filing_time": "2026-04-30 11:44:08 (EDGAR index header, Eastern time)",
+     "members_detail": [
+      {
+       "name": "Vanguard Capital Management",
+       "sole_voting": "41947081",
+       "shared_voting": "0",
+       "sole_dispositive": "316347733",
+       "shared_dispositive": "0",
+       "aggregate_shares": "316347733",
+       "class_percent": "7.49",
+       "type": "IA"
+      }
+     ]
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "13dg_group-06",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "Vertiv Holdings Co",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1674101/000210011926001190/primary_doc.xml",
+    "sha256": "b3374233f74408207d60fe50cfdf15d7fe2d92b6b8022eaca25d39a35f83f6b8",
+    "published_at": "2026-04-30",
+    "known_at": "2026-04-30 23:59:59+00",
+    "expected": {
+     "accession": "0002100119-26-001190",
+     "form": "SCHEDULE 13G",
+     "filer_group_members": [
+      "Vanguard Capital Management"
+     ],
+     "class": "Common Stock",
+     "shares": 28637577.0,
+     "percent": 7.48,
+     "voting_power": {
+      "sole": 3779258.0,
+      "shared": 0.0,
+      "reporting_person": "Vanguard Capital Management"
+     },
+     "purpose": "none stated: Schedule 13G has no purpose item (filed under Rule 13d-1(b))",
+     "filing_time": "2026-04-30 14:24:02 (EDGAR index header, Eastern time)",
+     "members_detail": [
+      {
+       "name": "Vanguard Capital Management",
+       "sole_voting": "3779258",
+       "shared_voting": "0",
+       "sole_dispositive": "28637577",
+       "shared_dispositive": "0",
+       "aggregate_shares": "28637577",
+       "class_percent": "7.48",
+       "type": "IA"
+      }
+     ]
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "13dg_group-07",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "Uber Technologies Inc",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1543151/000010290925000285/primary_doc.xml",
+    "sha256": "caee36a67a7c46ed7a4364a7e56a444dc6823ab8fce594217741357437a79e92",
+    "published_at": "2025-10-31",
+    "known_at": "2025-10-31 23:59:59+00",
+    "expected": {
+     "accession": "0000102909-25-000285",
+     "form": "SCHEDULE 13G/A",
+     "filer_group_members": [
+      "The Vanguard Group"
+     ],
+     "class": "Common Stock",
+     "shares": 190827921.0,
+     "percent": 9.15,
+     "voting_power": {
+      "sole": 0.0,
+      "shared": 12518813.0,
+      "reporting_person": "The Vanguard Group"
+     },
+     "purpose": "none stated: Schedule 13G has no purpose item (filed under Rule 13d-1(b))",
+     "filing_time": "2025-10-31 11:28:57 (EDGAR index header, Eastern time)",
+     "members_detail": [
+      {
+       "name": "The Vanguard Group",
+       "sole_voting": "0",
+       "shared_voting": "12518813",
+       "sole_dispositive": "170896655",
+       "shared_dispositive": "19931266",
+       "aggregate_shares": "190827921",
+       "class_percent": "9.15",
+       "type": "IA"
+      }
+     ]
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "13dg_group-08",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "Cisco Systems Inc",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/858877/000010290925000352/primary_doc.xml",
+    "sha256": "718d997e6d267dfaa920a5885bac8b432a3a53c7750d2873855056faed67c182",
+    "published_at": "2025-11-05",
+    "known_at": "2025-11-05 23:59:59+00",
+    "expected": {
+     "accession": "0000102909-25-000352",
+     "form": "SCHEDULE 13G/A",
+     "filer_group_members": [
+      "The Vanguard Group"
+     ],
+     "class": "Common Stock",
+     "shares": 396400218.0,
+     "percent": 10.02,
+     "voting_power": {
+      "sole": 0.0,
+      "shared": 23314334.0,
+      "reporting_person": "The Vanguard Group"
+     },
+     "purpose": "none stated: Schedule 13G has no purpose item (filed under Rule 13d-1(b))",
+     "filing_time": "2025-11-05 15:25:45 (EDGAR index header, Eastern time)",
+     "members_detail": [
+      {
+       "name": "The Vanguard Group",
+       "sole_voting": "0",
+       "shared_voting": "23314334",
+       "sole_dispositive": "357730079",
+       "shared_dispositive": "38670139",
+       "aggregate_shares": "396400218",
+       "class_percent": "10.02",
+       "type": "IA"
+      }
+     ]
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "13dg_group-09",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "Celsius Holdings Inc",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1341766/000010290926000037/primary_doc.xml",
+    "sha256": "41cd0e17d0c42de1aef4decd93a93ed87e3edb8f276211e19895f155fd9659cc",
+    "published_at": "2026-01-30",
+    "known_at": "2026-01-30 23:59:59+00",
+    "expected": {
+     "accession": "0000102909-26-000037",
+     "form": "SCHEDULE 13G/A",
+     "filer_group_members": [
+      "The Vanguard Group"
+     ],
+     "class": "Common Stock",
+     "shares": 18074995.0,
+     "percent": 7.01,
+     "voting_power": {
+      "sole": 0.0,
+      "shared": 1268236.0,
+      "reporting_person": "The Vanguard Group"
+     },
+     "purpose": "none stated: Schedule 13G has no purpose item (filed under Rule 13d-1(b))",
+     "filing_time": "2026-01-30 13:25:26 (EDGAR index header, Eastern time)",
+     "members_detail": [
+      {
+       "name": "The Vanguard Group",
+       "sole_voting": "0",
+       "shared_voting": "1268236",
+       "sole_dispositive": "0",
+       "shared_dispositive": "18074995",
+       "aggregate_shares": "18074995",
+       "class_percent": "7.01",
+       "type": "IA"
+      }
+     ]
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "13dg_group-10",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "Ciena Corp",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/936395/000010290926000972/primary_doc.xml",
+    "sha256": "72c2487a2a02bb249e9c998a91153c6bfdb6ec9ff0c332f256af99db60d8cbfd",
+    "published_at": "2026-03-26",
+    "known_at": "2026-03-26 23:59:59+00",
+    "expected": {
+     "accession": "0000102909-26-000972",
+     "form": "SCHEDULE 13G/A",
+     "filer_group_members": [
+      "The Vanguard Group"
+     ],
+     "class": "Common Stock",
+     "shares": 0.0,
+     "percent": 0.0,
+     "voting_power": {
+      "sole": 0.0,
+      "shared": 0.0,
+      "reporting_person": "The Vanguard Group"
+     },
+     "purpose": "none stated: Schedule 13G has no purpose item (filed under Rule 13d-1(b))",
+     "filing_time": "2026-03-26 17:15:48 (EDGAR index header, Eastern time)",
+     "members_detail": [
+      {
+       "name": "The Vanguard Group",
+       "sole_voting": "0",
+       "shared_voting": "0",
+       "sole_dispositive": "0",
+       "shared_dispositive": "0",
+       "aggregate_shares": "0",
+       "class_percent": "0",
+       "type": "IA"
+      }
+     ]
+    },
+    "expected_notes": []
+   }
+  ],
+  "8k_deal_exhibit": [
+   {
+    "slot": "8k_deal_exhibit-01",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "Quantinuum Inc.",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/2110105/000162828026060934/qnt-20260908.htm",
+    "sha256": "8cd5f032afe4ae56ab841a56755daae410129624c7f4abfa9a81dfe52ede75ee",
+    "published_at": "2026-09-08",
+    "known_at": "2026-09-09T00:46:55.000Z",
+    "expected": {
+     "accession": "0001628280-26-060934",
+     "items": "1.01,3.02,7.01,9.01",
+     "parties": [
+      "Quantinuum Inc.",
+      "Quantinuum LLC (Awardee)",
+      "Quantinuum Holdings, LLC",
+      "U.S. Department of Commerce"
+     ],
+     "announced_date": "2026-09-08 (Securities Issuance Agreement; Award Agreement 2026-09-04)",
+     "consideration": "Award of up to $100.0 million ($56.0m at award, then $32.0m and $12.0m on milestones); in exchange 2,369,528 Class A shares issued to the Department of Commerce",
+     "conditions": "later payments subject to project milestones; period of performance ends at the earlier of milestone completion and the fifth anniversary of the Award Date",
+     "state": "signed; shares issued 2026-09-08 (government award, not an acquisition)"
+    },
+    "expected_notes": [
+     "app deal_event table holds 0 rows: no deal from this filing is stored"
+    ]
+   },
+   {
+    "slot": "8k_deal_exhibit-02",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "Vertiv Holdings Co",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1674101/000119312526379306/d472406d8k.htm",
+    "sha256": "fc600cd335e906c40fef642b64d741f6ef1e65865705065f97d4d5a3318db5b0",
+    "published_at": "2026-09-02",
+    "known_at": "2026-09-02T14:42:34.000Z",
+    "expected": {
+     "accession": "0001193125-26-379306",
+     "items": "1.01,7.01,9.01",
+     "parties": [
+      "Vertiv Corporation (Buyer)",
+      "Vultra Merger Sub, Inc.",
+      "Utility Innovation Holdings, Inc. (Target)",
+      "Vertiv Holdings Co (parent)"
+     ],
+     "announced_date": "2026-09-01 (agreement date; filed 2026-09-02)",
+     "consideration": "about $1.45 billion upfront cash plus up to $1.15 billion contingent cash in 2 tranches tied to EBITDA targets",
+     "conditions": "customary closing conditions including expiry or termination of the HSR waiting period; expected to close Q4 2026",
+     "state": "signed, pending closing"
+    },
+    "expected_notes": [
+     "app deal_event table holds 0 rows: no deal from this filing is stored"
+    ]
+   },
+   {
+    "slot": "8k_deal_exhibit-03",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "BOEING CO",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/12927/000162828026059427/ba-20260824.htm",
+    "sha256": "6b47e43963833a9fc9cd5f9a47b9a1a68fbe54458b96714dc0890ef2a3ccae13",
+    "published_at": "2026-08-28",
+    "known_at": "2026-08-28T20:43:54.000Z",
+    "expected": {
+     "accession": "0001628280-26-059427",
+     "items": "1.01,2.03,9.01",
+     "parties": [
+      "The Boeing Company",
+      "Citibank, N.A. (administrative agent, joint lead arranger)",
+      "JPMorgan Chase Bank, N.A. (syndication agent, joint lead arranger)",
+      "syndicate of lenders"
+     ],
+     "announced_date": "2026-08-24",
+     "consideration": "no purchase consideration: $3.0 billion 364-day revolving credit agreement; commitment fee 0.125%-0.300% p.a.; SOFR loans at Term SOFR + 1.250%-1.700%",
+     "conditions": "covenants: consolidated debt not above 60% of total capital, liens and merger limits, liquidity of at least $5.0 billion; terminates 2027-08-23",
+     "state": "executed credit facility (not an M&A deal); replaces the prior $3.0bn 364-day facility"
+    },
+    "expected_notes": [
+     "app deal_event table holds 0 rows: no deal from this filing is stored"
+    ]
+   },
+   {
+    "slot": "8k_deal_exhibit-04",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "NETFLIX INC",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1065280/000119312525308651/d65144d8k.htm",
+    "sha256": "d7eda19ebe4ee748fae9532346239663e3f3265048d1fb70cbc0038f04412dd2",
+    "published_at": "2025-12-05",
+    "known_at": "2025-12-05T12:31:07.000Z",
+    "expected": {
+     "accession": "0001193125-25-308651",
+     "items": "1.01,7.01,9.01",
+     "parties": [
+      "Netflix, Inc.",
+      "Nightingale Sub, Inc.",
+      "Warner Bros. Discovery, Inc.",
+      "New Topco 25, Inc."
+     ],
+     "announced_date": "2025-12-04",
+     "consideration": "per WBD share $23.25 cash plus Netflix shares at an Exchange Ratio (0.0376 when the 15-day average Netflix price is at least $119.67; otherwise a formula built on $4.50 divided by that average); lower-price branch not read",
+     "conditions": "WBD Global Linear Networks business is separated and distributed to SpinCo before the Merger; other closing conditions not read",
+     "state": "signed, pending"
+    },
+    "expected_notes": [
+     "app deal_event table holds 0 rows: no deal from this filing is stored"
+    ]
+   },
+   {
+    "slot": "8k_deal_exhibit-05",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "NETFLIX INC",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1065280/000119312526015951/d37713d8k.htm",
+    "sha256": "636043bbf5f0d967ea47fd2d97db0bcf1c66e56aa784de2e7d6ef4e89fd7bfe0",
+    "published_at": "2026-01-20",
+    "known_at": "2026-01-20T12:00:24.000Z",
+    "expected": {
+     "accession": "0001193125-26-015951",
+     "items": "1.01,7.01,9.01",
+     "parties": [
+      "Netflix, Inc.",
+      "Nightingale Sub, Inc.",
+      "Warner Bros. Discovery, Inc.",
+      "New Topco 25, Inc."
+     ],
+     "announced_date": "2026-01-19",
+     "consideration": "$27.75 per WBD share, paid entirely in cash (replaces the earlier cash-and-stock mix)",
+     "conditions": "separation of WBD Global Linear Networks (SpinCo) first; Netflix pays WBD a $5.8 billion termination fee if antitrust or foreign-regulatory approvals fail; WBD termination fee $2.8 billion",
+     "state": "amended and restated, pending"
+    },
+    "expected_notes": [
+     "app deal_event table holds 0 rows: no deal from this filing is stored"
+    ]
+   },
+   {
+    "slot": "8k_deal_exhibit-06",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "Vertiv Holdings Co",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1674101/000167410125000031/vrt-20251204.htm",
+    "sha256": "4b3378c8c182b71785fbf0b7c6238b16501f3e8e2dfd5a4ef856bb876b95963b",
+    "published_at": "2025-12-05",
+    "known_at": "2025-12-05T16:29:52.000Z",
+    "expected": {
+     "accession": "0001674101-25-000031",
+     "items": "2.01,7.01,9.01",
+     "parties": [
+      "Vertiv Corporation (Buyer)",
+      "Vertiv Holdings Co",
+      "Purge Rite Intermediate, LLC (PurgeRite)",
+      "Purge Rite Holdings, LLC"
+     ],
+     "announced_date": "2025-10-31 (Securities Purchase Agreement); closed 2025-12-04",
+     "consideration": "about $1.0 billion upfront cash plus up to $250 million contingent cash on post-closing performance",
+     "conditions": "none stated (completion report); adjustments for working capital, indebtedness and expenses",
+     "state": "completed 2025-12-04"
+    },
+    "expected_notes": [
+     "app deal_event table holds 0 rows: no deal from this filing is stored"
+    ]
+   },
+   {
+    "slot": "8k_deal_exhibit-07",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "ADVANCED MICRO DEVICES INC",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/2488/000119312525250803/d917887d8k.htm",
+    "sha256": "a8b714643878bf42c3ea9036a68512badd980fa8ff7c5905d7bc29838e7e5f06",
+    "published_at": "2025-10-27",
+    "known_at": "2025-10-27T12:49:27.000Z",
+    "expected": {
+     "accession": "0001193125-25-250803",
+     "items": "2.01,7.01,9.01",
+     "parties": [
+      "Advanced Micro Devices, Inc.",
+      "AMD Design, LLC",
+      "ZT Group Int'l, Inc.",
+      "Sanmina Corporation"
+     ],
+     "announced_date": "2025-05-18 (Equity Purchase Agreement); completion announced 2025-10-27",
+     "consideration": "Sanmina issued 1,151,052 Sanmina shares and paid $2.4 billion cash to the Seller, plus up to $450 million contingent cash",
+     "conditions": "contingent consideration if certain conditions are met after closing; purchase price adjustments",
+     "state": "completed (closing announced 2025-10-27)"
+    },
+    "expected_notes": [
+     "app deal_event table holds 0 rows: no deal from this filing is stored"
+    ]
+   },
+   {
+    "slot": "8k_deal_exhibit-08",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "Alphabet Inc.",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000119312526257724/d83560d8k.htm",
+    "sha256": "1a5c2fd97876485fcbd88fdb008851cc5221bfcfce9ed02cb7d37231e5beb269",
+    "published_at": "2026-06-04",
+    "known_at": "2026-06-04T21:07:39.000Z",
+    "expected": {
+     "accession": "0001193125-26-257724",
+     "items": "1.01,7.01,8.01,9.01",
+     "parties": [
+      "Alphabet Inc.",
+      "Goldman Sachs & Co. LLC",
+      "J.P. Morgan Securities LLC",
+      "Morgan Stanley & Co. LLC"
+     ],
+     "announced_date": "2026-06-01",
+     "consideration": "no consideration to a counterparty: at-the-market program of up to $40 billion of Class A and Class C stock; Managers' commission up to 0.5% of gross proceeds",
+     "conditions": "Managers' obligations subject to customary conditions; Alphabet is not obliged to sell any shares",
+     "state": "executed equity distribution agreement (not an M&A deal)"
+    },
+    "expected_notes": [
+     "app deal_event table holds 0 rows: no deal from this filing is stored"
+    ]
+   },
+   {
+    "slot": "8k_deal_exhibit-09",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "ORACLE CORP",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1341439/000119312526037840/d23732d8k.htm",
+    "sha256": "d6659f0d644cea4a27ee37615d80a19bf1dac09bbc2e6da51d7e77c14c9ea38c",
+    "published_at": "2026-02-04",
+    "known_at": "2026-02-04T22:20:31.000Z",
+    "expected": {
+     "accession": "0001193125-26-037840",
+     "items": "1.01,8.01,9.01",
+     "parties": [
+      "Oracle Corporation",
+      "BofA Securities, Inc.",
+      "Citigroup Global Markets Inc.",
+      "Deutsche Bank Securities Inc.",
+      "Goldman Sachs & Co. LLC",
+      "J.P. Morgan Securities LLC",
+      "plus ten sales agents joined 2026-02-03"
+     ],
+     "announced_date": "2026-02-02",
+     "consideration": "no consideration to a counterparty: at-the-market program of up to $20.0 billion of common stock; commission rate not read",
+     "conditions": "sales on placement notices and subject to the agreement's terms",
+     "state": "executed equity distribution agreement (not an M&A deal)"
+    },
+    "expected_notes": [
+     "app deal_event table holds 0 rows: no deal from this filing is stored"
+    ]
+   },
+   {
+    "slot": "8k_deal_exhibit-10",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "Philip Morris International Inc.",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1413329/000110465925120310/tm2532876d1_8k.htm",
+    "sha256": "473071c5fe807d2ff7642f51854904d990b0588ce093615ab392b802159ac207",
+    "published_at": "2025-12-11",
+    "known_at": "2025-12-11T21:07:59.000Z",
+    "expected": {
+     "accession": "0001104659-25-120310",
+     "items": "1.01,1.02,2.03,9.01",
+     "parties": [
+      "Philip Morris International Inc.",
+      "Citibank Europe plc, UK Branch (facility agent)",
+      "Citibank, N.A. (swingline agent)",
+      "named lenders"
+     ],
+     "announced_date": "2025-12-11 (effective 2026-01-29)",
+     "consideration": "no purchase consideration: US$2.0 billion (or euro equivalent) senior unsecured revolving credit facility, expiring 2031-01-29",
+     "conditions": "termination of the existing facility is conditional on the effectiveness of the new Credit Agreement; customary events of default",
+     "state": "executed credit facility (not an M&A deal); replaces the facility expiring 2027-02-10"
+    },
+    "expected_notes": [
+     "app deal_event table holds 0 rows: no deal from this filing is stored"
+    ]
+   }
+  ],
+  "xbrl_note": [
+   {
+    "slot": "xbrl_note-01",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "AVGO_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1730168/000173016825000121/avgo-20251102.htm",
+    "sha256": "ec32016314ca075aabae35ec1fe765c1382fbc2d6d11f415f1679d7df3bacfa0",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "concept": "us-gaap:ConcentrationRiskPercentage1",
+     "context": {
+      "dimensions": [
+       [
+        "srt:MajorCustomersAxis",
+        "avgo:MajorCustomerOneMember"
+       ],
+       [
+        "us-gaap:ConcentrationRiskByBenchmarkAxis",
+        "us-gaap:SalesRevenueNetMember"
+       ],
+       [
+        "us-gaap:ConcentrationRiskByTypeAxis",
+        "us-gaap:CustomerConcentrationRiskMember"
+       ]
+      ]
+     },
+     "value": 0.32,
+     "unit": "pure",
+     "ix_unit_ref": "number",
+     "scale": -2,
+     "displayed_text": "32",
+     "period": {
+      "start": "2024-11-04",
+      "end": "2025-11-02"
+     },
+     "accession": "0001730168-25-000121",
+     "source_basis": "inline XBRL of the filing itself; SEC companyfacts omits dimensional facts, so it cannot serve as the independent source for notes"
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "xbrl_note-02",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "AVGO_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1730168/000173016825000121/avgo-20251102.htm",
+    "sha256": "ec32016314ca075aabae35ec1fe765c1382fbc2d6d11f415f1679d7df3bacfa0",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "concept": "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+     "context": {
+      "dimensions": [
+       [
+        "us-gaap:StatementBusinessSegmentsAxis",
+        "avgo:InfrastructureSoftwareMember"
+       ]
+      ]
+     },
+     "value": 27029000000.0,
+     "unit": "USD",
+     "ix_unit_ref": "usd",
+     "scale": 6,
+     "displayed_text": "27,029",
+     "period": {
+      "start": "2024-11-04",
+      "end": "2025-11-02"
+     },
+     "accession": "0001730168-25-000121",
+     "source_basis": "inline XBRL of the filing itself; SEC companyfacts omits dimensional facts, so it cannot serve as the independent source for notes"
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "xbrl_note-03",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "GOOGL_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000018/goog-20251231.htm",
+    "sha256": "f3238608dc0b6ee1c579ba3b282a3b6405136512cff16eebaa22e702e10497f4",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "concept": "us-gaap:ConcentrationRiskPercentage1",
+     "context": {
+      "dimensions": [
+       [
+        "srt:ProductOrServiceAxis",
+        "goog:OtherRevenueHedgingGainLossMember"
+       ],
+       [
+        "us-gaap:ConcentrationRiskByBenchmarkAxis",
+        "us-gaap:SalesRevenueNetMember"
+       ],
+       [
+        "us-gaap:ConcentrationRiskByTypeAxis",
+        "goog:RevenueByGeographicLocationAndTypeMember"
+       ]
+      ]
+     },
+     "value": 0.0,
+     "unit": "pure",
+     "ix_unit_ref": "number",
+     "scale": -2,
+     "displayed_text": "0",
+     "period": {
+      "start": "2025-01-01",
+      "end": "2025-12-31"
+     },
+     "accession": "0001652044-26-000018",
+     "source_basis": "inline XBRL of the filing itself; SEC companyfacts omits dimensional facts, so it cannot serve as the independent source for notes"
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "xbrl_note-04",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "GOOGL_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000018/goog-20251231.htm",
+    "sha256": "f3238608dc0b6ee1c579ba3b282a3b6405136512cff16eebaa22e702e10497f4",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "concept": "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+     "context": {
+      "dimensions": [
+       [
+        "us-gaap:StatementBusinessSegmentsAxis",
+        "goog:GoogleCloudMember"
+       ]
+      ]
+     },
+     "value": 33088000000.0,
+     "unit": "USD",
+     "ix_unit_ref": "usd",
+     "scale": 6,
+     "displayed_text": "33,088",
+     "period": {
+      "start": "2023-01-01",
+      "end": "2023-12-31"
+     },
+     "accession": "0001652044-26-000018",
+     "source_basis": "inline XBRL of the filing itself; SEC companyfacts omits dimensional facts, so it cannot serve as the independent source for notes"
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "xbrl_note-05",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CELH_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1341766/000134176626000024/celh-20251231.htm",
+    "sha256": "44b5b2952f671aa11e755a0f809a92208213d9d463235c380607208dfa550ac9",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "concept": "us-gaap:ConcentrationRiskPercentage1",
+     "context": {
+      "dimensions": [
+       [
+        "us-gaap:ConcentrationRiskByBenchmarkAxis",
+        "us-gaap:SalesRevenueNetMember"
+       ],
+       [
+        "us-gaap:ConcentrationRiskByTypeAxis",
+        "us-gaap:CustomerConcentrationRiskMember"
+       ]
+      ]
+     },
+     "value": 1.0,
+     "unit": "pure",
+     "ix_unit_ref": "number",
+     "scale": -2,
+     "displayed_text": "100.0",
+     "period": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+     },
+     "accession": "0001341766-26-000024",
+     "source_basis": "inline XBRL of the filing itself; SEC companyfacts omits dimensional facts, so it cannot serve as the independent source for notes"
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "xbrl_note-06",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CELH_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1341766/000134176626000024/celh-20251231.htm",
+    "sha256": "44b5b2952f671aa11e755a0f809a92208213d9d463235c380607208dfa550ac9",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "concept": "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+     "context": {
+      "dimensions": [
+       [
+        "us-gaap:StatementBusinessSegmentsAxis",
+        "celh:ReportableSegmentMember"
+       ]
+      ]
+     },
+     "value": 1318014000.0,
+     "unit": "USD",
+     "ix_unit_ref": "usd",
+     "scale": 3,
+     "displayed_text": "1,318,014",
+     "period": {
+      "start": "2023-01-01",
+      "end": "2023-12-31"
+     },
+     "accession": "0001341766-26-000024",
+     "source_basis": "inline XBRL of the filing itself; SEC companyfacts omits dimensional facts, so it cannot serve as the independent source for notes"
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "xbrl_note-07",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CIEN_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/936395/000162828025056698/cien-20251101.htm",
+    "sha256": "dd24f39c7860710d396906c8c11de93e6c9bfa8c5e0239f5c1209bca007bd1cf",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "concept": "us-gaap:ConcentrationRiskPercentage1",
+     "context": {
+      "dimensions": [
+       [
+        "srt:MajorCustomersAxis",
+        "cien:UnidentifiedCustomerTwoMember"
+       ],
+       [
+        "us-gaap:ConcentrationRiskByBenchmarkAxis",
+        "us-gaap:AccountsReceivableMember"
+       ],
+       [
+        "us-gaap:ConcentrationRiskByTypeAxis",
+        "us-gaap:CustomerConcentrationRiskMember"
+       ]
+      ]
+     },
+     "value": 0.12,
+     "unit": "pure",
+     "ix_unit_ref": "number",
+     "scale": -2,
+     "displayed_text": "12.0",
+     "period": {
+      "start": "2023-10-29",
+      "end": "2024-11-02"
+     },
+     "accession": "0001628280-25-056698",
+     "source_basis": "inline XBRL of the filing itself; SEC companyfacts omits dimensional facts, so it cannot serve as the independent source for notes"
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "xbrl_note-08",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CIEN_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/936395/000162828025056698/cien-20251101.htm",
+    "sha256": "dd24f39c7860710d396906c8c11de93e6c9bfa8c5e0239f5c1209bca007bd1cf",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "concept": "us-gaap:Revenues",
+     "context": {
+      "dimensions": [
+       [
+        "us-gaap:StatementBusinessSegmentsAxis",
+        "cien:NetworkingPlatformsSegmentMember"
+       ]
+      ]
+     },
+     "value": 3676377000.0,
+     "unit": "USD",
+     "ix_unit_ref": "usd",
+     "scale": 3,
+     "displayed_text": "3,676,377",
+     "period": {
+      "start": "2024-11-03",
+      "end": "2025-11-01"
+     },
+     "accession": "0001628280-25-056698",
+     "source_basis": "inline XBRL of the filing itself; SEC companyfacts omits dimensional facts, so it cannot serve as the independent source for notes"
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "xbrl_note-09",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "INTU_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/896878/000089687826000037/intu-20260731.htm",
+    "sha256": "7dd81c29e96ad898b2a67d98ab14649d7a0eed984d289c5a9712ded2c4d608f4",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "concept": "us-gaap:ConcentrationRiskPercentage1",
+     "context": {
+      "dimensions": [
+       [
+        "srt:StatementGeographicalAxis",
+        "us-gaap:NonUsMember"
+       ],
+       [
+        "us-gaap:ConcentrationRiskByBenchmarkAxis",
+        "us-gaap:SalesRevenueNetMember"
+       ],
+       [
+        "us-gaap:ConcentrationRiskByTypeAxis",
+        "us-gaap:GeographicConcentrationRiskMember"
+       ]
+      ]
+     },
+     "value": 0.08,
+     "unit": "pure",
+     "ix_unit_ref": "number",
+     "scale": -2,
+     "displayed_text": "8",
+     "period": {
+      "start": "2023-08-01",
+      "end": "2024-07-31"
+     },
+     "accession": "0000896878-26-000037",
+     "source_basis": "inline XBRL of the filing itself; SEC companyfacts omits dimensional facts, so it cannot serve as the independent source for notes"
+    },
+    "expected_notes": [
+     "DISAGREEMENT: app stores 0.08 for 2025-08-01..2026-07-31; the filing's only ConcentrationRiskPercentage1 fact with these dimensions is 8% for 2023-08-01..2024-07-31 (see expected)"
+    ]
+   },
+   {
+    "slot": "xbrl_note-10",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "INTU_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/896878/000089687826000037/intu-20260731.htm",
+    "sha256": "7dd81c29e96ad898b2a67d98ab14649d7a0eed984d289c5a9712ded2c4d608f4",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "concept": "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+     "context": {
+      "dimensions": [
+       [
+        "us-gaap:StatementBusinessSegmentsAxis",
+        "intu:ConsumerSegmentMember"
+       ]
+      ]
+     },
+     "value": 7754000000.0,
+     "unit": "USD",
+     "ix_unit_ref": "usd",
+     "scale": 6,
+     "displayed_text": "7,754",
+     "period": {
+      "start": "2024-08-01",
+      "end": "2025-07-31"
+     },
+     "accession": "0000896878-26-000037",
+     "source_basis": "inline XBRL of the filing itself; SEC companyfacts omits dimensional facts, so it cannot serve as the independent source for notes"
+    },
+    "expected_notes": []
+   }
+  ],
+  "esef_block_note": [
+   {
+    "slot": "esef_block_note-01",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "LEI:PY6ZZQWO2IZFZC3IOL08",
+    "source_url": "https://filings.xbrl.org/PY6ZZQWO2IZFZC3IOL08/2022-12-31/ESEF/SE/0/PY6ZZQWO2IZFZC3IOL08-2022-12-31-T01.json",
+    "sha256": "7505fa3d015f5e2138d648941e7a8bf9e4a8e8b284804e730314999053665b49",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "issuer_lei": "PY6ZZQWO2IZFZC3IOL08",
+     "block_concept": "ifrs-full:DisclosureOfFinancialInstrumentsExplanatory",
+     "fact_id": "f26217",
+     "text_offsets": [
+      0,
+      25790
+     ],
+     "text_offsets_basis": "whole fact value: start 0, end = length of the XHTML string in the xBRL-JSON",
+     "fiscal_period_end": "2022-12-31",
+     "extension_taxonomy": [
+      "azn"
+     ],
+     "extension_namespaces": {
+      "azn": "http://www.astrazeneca.com/20221231"
+     },
+     "text_block_facts_in_report": 9
+    },
+    "expected_notes": [
+     "no concept in any of the 14 stored reports ends with 'TextBlock'; IFRS names text blocks DisclosureOf*/DescriptionOf*Explanatory, so a TextBlock-suffix test finds 0 blocks",
+     "filing date was not retrieved; only the fiscal period end is recorded"
+    ]
+   },
+   {
+    "slot": "esef_block_note-02",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "LEI:724500Y6DUVHQD6OXN27",
+    "source_url": "https://filings.xbrl.org/724500Y6DUVHQD6OXN27/2023-12-31/ESEF/NL/0/asml-2023-12-31-en.json",
+    "sha256": "5180b81fd38eb0bc8fa57fb0cc9cea7309a3b1deeeba9e4118a8ef9ff837cf0b",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "issuer_lei": "724500Y6DUVHQD6OXN27",
+     "block_concept": "ifrs-full:DescriptionOfAccountingPolicyForPropertyPlantAndEquipmentExplanatory",
+     "fact_id": "f-628",
+     "text_offsets": [
+      0,
+      6645
+     ],
+     "text_offsets_basis": "whole fact value: start 0, end = length of the XHTML string in the xBRL-JSON",
+     "fiscal_period_end": "2023-12-31",
+     "extension_taxonomy": [
+      "asml"
+     ],
+     "extension_namespaces": {
+      "asml": "http://www.asml.com/20231231"
+     },
+     "text_block_facts_in_report": 60
+    },
+    "expected_notes": [
+     "no concept in any of the 14 stored reports ends with 'TextBlock'; IFRS names text blocks DisclosureOf*/DescriptionOf*Explanatory, so a TextBlock-suffix test finds 0 blocks",
+     "filing date was not retrieved; only the fiscal period end is recorded"
+    ]
+   },
+   {
+    "slot": "esef_block_note-03",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "LEI:724500Y6DUVHQD6OXN27",
+    "source_url": "https://filings.xbrl.org/724500Y6DUVHQD6OXN27/2024-12-31/ESEF/NL/0/asml-2024-12-31-en.json",
+    "sha256": "38ab2525075ab2d6c35c9504177b29d24cd78d1b0d105e6ac36fb6d6497a0d7a",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "issuer_lei": "724500Y6DUVHQD6OXN27",
+     "block_concept": "ifrs-full:DisclosureOfPropertyPlantAndEquipmentExplanatory",
+     "fact_id": "f-621",
+     "text_offsets": [
+      0,
+      137621
+     ],
+     "text_offsets_basis": "whole fact value: start 0, end = length of the XHTML string in the xBRL-JSON",
+     "fiscal_period_end": "2024-12-31",
+     "extension_taxonomy": [
+      "asml"
+     ],
+     "extension_namespaces": {
+      "asml": "http://www.asml.com/20241231"
+     },
+     "text_block_facts_in_report": 61
+    },
+    "expected_notes": [
+     "no concept in any of the 14 stored reports ends with 'TextBlock'; IFRS names text blocks DisclosureOf*/DescriptionOf*Explanatory, so a TextBlock-suffix test finds 0 blocks",
+     "filing date was not retrieved; only the fiscal period end is recorded"
+    ]
+   },
+   {
+    "slot": "esef_block_note-04",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "LEI:PY6ZZQWO2IZFZC3IOL08",
+    "source_url": "https://filings.xbrl.org/PY6ZZQWO2IZFZC3IOL08/2024-12-31/ESEF/SE/0/PY6ZZQWO2IZFZC3IOL08-2024-12-31-T01.json",
+    "sha256": "7d4d5dec756e6425f4823d8e0fb5769b3bab0581fa9008d8bd702f1e11d5534e",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "issuer_lei": "PY6ZZQWO2IZFZC3IOL08",
+     "block_concept": "ifrs-full:DisclosureOfFairValueOfFinancialInstrumentsExplanatory",
+     "fact_id": "TagsThatMustBeAppliedIfCorrespondingInformationIsPresentInAReport_Label_00576",
+     "text_offsets": [
+      0,
+      33473
+     ],
+     "text_offsets_basis": "whole fact value: start 0, end = length of the XHTML string in the xBRL-JSON",
+     "fiscal_period_end": "2024-12-31",
+     "extension_taxonomy": [
+      "azn"
+     ],
+     "extension_namespaces": {
+      "azn": "http://www.astrazeneca.com/20241231"
+     },
+     "text_block_facts_in_report": 150
+    },
+    "expected_notes": [
+     "no concept in any of the 14 stored reports ends with 'TextBlock'; IFRS names text blocks DisclosureOf*/DescriptionOf*Explanatory, so a TextBlock-suffix test finds 0 blocks",
+     "filing date was not retrieved; only the fiscal period end is recorded"
+    ]
+   },
+   {
+    "slot": "esef_block_note-05",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "LEI:PY6ZZQWO2IZFZC3IOL08",
+    "source_url": "https://filings.xbrl.org/PY6ZZQWO2IZFZC3IOL08/2022-12-31/ESEF/GB/0/PY6ZZQWO2IZFZC3IOL08-2022-12-31-T01.json",
+    "sha256": "58ce6be010d52e35e0cd93c305f923baf1d41e4b627441b3d080d99be54eaa4b",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "issuer_lei": "PY6ZZQWO2IZFZC3IOL08",
+     "block_concept": "ifrs-full:DisclosureOfFinancialInstrumentsAtFairValueThroughProfitOrLossExplanatory",
+     "fact_id": "f25990",
+     "text_offsets": [
+      0,
+      320858
+     ],
+     "text_offsets_basis": "whole fact value: start 0, end = length of the XHTML string in the xBRL-JSON",
+     "fiscal_period_end": "2022-12-31",
+     "extension_taxonomy": [
+      "azn"
+     ],
+     "extension_namespaces": {
+      "azn": "http://www.astrazeneca.com/20221231"
+     },
+     "text_block_facts_in_report": 9
+    },
+    "expected_notes": [
+     "no concept in any of the 14 stored reports ends with 'TextBlock'; IFRS names text blocks DisclosureOf*/DescriptionOf*Explanatory, so a TextBlock-suffix test finds 0 blocks",
+     "filing date was not retrieved; only the fiscal period end is recorded"
+    ]
+   },
+   {
+    "slot": "esef_block_note-06",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "LEI:724500Y6DUVHQD6OXN27",
+    "source_url": "https://filings.xbrl.org/724500Y6DUVHQD6OXN27/2025-12-31/ESEF/NL/0/asml-2025-12-31-1-en.json",
+    "sha256": "764526c6d9fbb9406d64c9983bb93caf5ad6e00da63f6bc002d9e536c7eb79aa",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "issuer_lei": "724500Y6DUVHQD6OXN27",
+     "block_concept": "ifrs-full:DescriptionOfAccountingPolicyToDetermineComponentsOfCashAndCashEquivalents",
+     "fact_id": "f-655",
+     "text_offsets": [
+      0,
+      2426
+     ],
+     "text_offsets_basis": "whole fact value: start 0, end = length of the XHTML string in the xBRL-JSON",
+     "fiscal_period_end": "2025-12-31",
+     "extension_taxonomy": [
+      "asml"
+     ],
+     "extension_namespaces": {
+      "asml": "http://www.asml.com/20251231"
+     },
+     "text_block_facts_in_report": 86
+    },
+    "expected_notes": [
+     "no concept in any of the 14 stored reports ends with 'TextBlock'; IFRS names text blocks DisclosureOf*/DescriptionOf*Explanatory, so a TextBlock-suffix test finds 0 blocks",
+     "filing date was not retrieved; only the fiscal period end is recorded"
+    ]
+   },
+   {
+    "slot": "esef_block_note-07",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "LEI:PY6ZZQWO2IZFZC3IOL08",
+    "source_url": "https://filings.xbrl.org/PY6ZZQWO2IZFZC3IOL08/2023-12-31/ESEF/GB/0/PY6ZZQWO2IZFZC3IOL08-2023-12-31-T01.json",
+    "sha256": "d3905a0f8dfcbc4cc03645938da03497a705a2997c57cc6bc5eccba9f1fe8b3a",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "issuer_lei": "PY6ZZQWO2IZFZC3IOL08",
+     "block_concept": "ifrs-full:DisclosureOfAuditorsRemunerationExplanatory",
+     "fact_id": "f48192",
+     "text_offsets": [
+      0,
+      8910
+     ],
+     "text_offsets_basis": "whole fact value: start 0, end = length of the XHTML string in the xBRL-JSON",
+     "fiscal_period_end": "2023-12-31",
+     "extension_taxonomy": [
+      "azn"
+     ],
+     "extension_namespaces": {
+      "azn": "http://www.astrazeneca.com/20231231"
+     },
+     "text_block_facts_in_report": 1
+    },
+    "expected_notes": [
+     "no concept in any of the 14 stored reports ends with 'TextBlock'; IFRS names text blocks DisclosureOf*/DescriptionOf*Explanatory, so a TextBlock-suffix test finds 0 blocks",
+     "filing date was not retrieved; only the fiscal period end is recorded"
+    ]
+   },
+   {
+    "slot": "esef_block_note-08",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "LEI:PY6ZZQWO2IZFZC3IOL08",
+    "source_url": "https://filings.xbrl.org/PY6ZZQWO2IZFZC3IOL08/2025-12-31/ESEF/GB/0/PY6ZZQWO2IZFZC3IOL08-2025-12-31-T01.json",
+    "sha256": "3c0c707542de03c43d61a92a0f01567074a001161241fb13c8a7246e46ac3e13",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "issuer_lei": "PY6ZZQWO2IZFZC3IOL08",
+     "block_concept": "ifrs-full:DisclosureOfDividendsExplanatory",
+     "fact_id": "TagsThatMustBeAppliedIfCorrespondingInformationIsPresentInAReport_Label_00564",
+     "text_offsets": [
+      0,
+      11761
+     ],
+     "text_offsets_basis": "whole fact value: start 0, end = length of the XHTML string in the xBRL-JSON",
+     "fiscal_period_end": "2025-12-31",
+     "extension_taxonomy": [
+      "azn"
+     ],
+     "extension_namespaces": {
+      "azn": "http://www.astrazeneca.com/20251231"
+     },
+     "text_block_facts_in_report": 145
+    },
+    "expected_notes": [
+     "no concept in any of the 14 stored reports ends with 'TextBlock'; IFRS names text blocks DisclosureOf*/DescriptionOf*Explanatory, so a TextBlock-suffix test finds 0 blocks",
+     "filing date was not retrieved; only the fiscal period end is recorded"
+    ]
+   },
+   {
+    "slot": "esef_block_note-09",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "LEI:724500Y6DUVHQD6OXN27",
+    "source_url": "https://filings.xbrl.org/724500Y6DUVHQD6OXN27/2022-12-31/ESEF/NL/0/asml-2022-12-31-en.json",
+    "sha256": "17969049b678be34a702684e7327aa279649cda373806a137218001d48146caf",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "issuer_lei": "724500Y6DUVHQD6OXN27",
+     "block_concept": "ifrs-full:DisclosureOfBusinessCombinationsExplanatory",
+     "fact_id": "id3VybDovL2RvY3MudjEvZG9jOmQ3ODIwYzAzOWZlZjQ1MmU5NzAyM2QzMGMwYjY5YjE4L3NlYzpkNzgyMGMwMzlmZWY0NTJlOTcwMjNkMzBjMGI2OWIxOF80MTkwL2ZyYWc6Nzk4OWQ1OTJjNTllNDE2OWFiMDhmZGFlN2Q3N2FiMzUvdGV4dHJlZ2lvbjo3OTg5ZDU5MmM1OWU0MTY5YWIwOGZkYWU3ZDc3YWIzNV8xNTUwMzExMzk1MjYxMDc_5b10525e-50a6-4d18-a634-ec45de422d1b",
+     "text_offsets": [
+      0,
+      10630
+     ],
+     "text_offsets_basis": "whole fact value: start 0, end = length of the XHTML string in the xBRL-JSON",
+     "fiscal_period_end": "2022-12-31",
+     "extension_taxonomy": [
+      "asml"
+     ],
+     "extension_namespaces": {
+      "asml": "http://www.asml.com/20221231"
+     },
+     "text_block_facts_in_report": 60
+    },
+    "expected_notes": [
+     "no concept in any of the 14 stored reports ends with 'TextBlock'; IFRS names text blocks DisclosureOf*/DescriptionOf*Explanatory, so a TextBlock-suffix test finds 0 blocks",
+     "filing date was not retrieved; only the fiscal period end is recorded"
+    ]
+   },
+   {
+    "slot": "esef_block_note-10",
+    "status": "rejected_unavailable",
+    "reason": "the 14 stored ESEF reports are only 11 distinct files (the GB and SE rows of AstraZeneca 2021, 2023 and 2024 carry identical bytes), and 2 of those 11 hold no text block; 9 distinct usable reports exist",
+    "captured_on": "2026-10-08"
+   }
+  ],
+  "relationship_disclosure": [
+   {
+    "slot": "relationship_disclosure-01",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "AAPL_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000020/aapl-20260627.htm",
+    "sha256": "906ef0a0bc771267e9f7b8748d5711bae79f74ebcf96ef37f12f29883987767d",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "relationship_id": 5,
+     "reporter": "AAPL_US_EQ",
+     "counterparty": "Customer One",
+     "counterparty_or_anonymous_label": "Customer One",
+     "relationship": "customer",
+     "direction": "issuer_sells_to",
+     "reported_share": 0.12,
+     "percentage": 0.12,
+     "denominator": "other",
+     "period": "FY2025",
+     "label": "true_relationship",
+     "label_source": "disclosure_adjudication dataset=relationship_claim item_ref=claim:5 sample_key=prod-20261008-model",
+     "passage": "XBRL fact us-gaap:ConcentrationRiskPercentage1: 12% for Customer One (Trade Accounts Receivable) over 2024-09-29 to 2025-09-27.",
+     "passage_check": {
+      "mode": "inline-xbrl fact (no prose passage)",
+      "passage_offset": null,
+      "ix_fact": {
+       "value": 0.12,
+       "period": [
+        "2024-09-29",
+        "2025-09-27"
+       ],
+       "dims": [
+        [
+         "srt:MajorCustomersAxis",
+         "aapl:CustomerOneMember"
+        ],
+        [
+         "us-gaap:ConcentrationRiskByBenchmarkAxis",
+         "us-gaap:TradeAccountsReceivableMember"
+        ],
+        [
+         "us-gaap:ConcentrationRiskByTypeAxis",
+         "us-gaap:CreditConcentrationRiskMember"
+        ]
+       ],
+       "displayed": "12"
+      }
+     },
+     "passage_offsets": null
+    },
+    "expected_notes": [
+     "passage is built from an XBRL fact; checked against the filing's inline XBRL, not prose",
+     "the fact is the prior-period comparative in this filing; the filing also carries a current-period value for the same customer that the app did not store"
+    ]
+   },
+   {
+    "slot": "relationship_disclosure-02",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CELH_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1341766/000134176626000050/celh-20260630.htm",
+    "sha256": "f78cf0620dfcb3aa8bcd7823b7cadf766210107dd12be9f8a6a0c66e428472a9",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "relationship_id": 13,
+     "reporter": "CELH_US_EQ",
+     "counterparty": "Pepsico Inc",
+     "counterparty_or_anonymous_label": "Pepsico Inc",
+     "relationship": "customer",
+     "direction": "issuer_sells_to",
+     "reported_share": 0.462,
+     "percentage": 0.462,
+     "denominator": "other",
+     "period": "FY2025",
+     "label": "true_relationship",
+     "label_source": "disclosure_adjudication dataset=relationship_claim item_ref=claim:13 sample_key=prod-20261008-model",
+     "passage": "XBRL fact us-gaap:ConcentrationRiskPercentage1: 46% for Pepsico Inc (Accounts Receivable) over 2025-01-01 to 2025-12-31.",
+     "passage_check": {
+      "mode": "inline-xbrl fact (no prose passage)",
+      "passage_offset": null,
+      "ix_fact": {
+       "value": 0.462,
+       "period": [
+        "2025-01-01",
+        "2025-12-31"
+       ],
+       "dims": [
+        [
+         "srt:MajorCustomersAxis",
+         "celh:PepsicoIncMember"
+        ],
+        [
+         "us-gaap:ConcentrationRiskByBenchmarkAxis",
+         "us-gaap:AccountsReceivableMember"
+        ],
+        [
+         "us-gaap:ConcentrationRiskByTypeAxis",
+         "us-gaap:CustomerConcentrationRiskMember"
+        ]
+       ],
+       "displayed": "46.2"
+      }
+     },
+     "passage_offsets": null
+    },
+    "expected_notes": [
+     "passage is built from an XBRL fact; checked against the filing's inline XBRL, not prose",
+     "the fact is the prior-period comparative in this filing; the filing also carries a current-period value for the same customer that the app did not store"
+    ]
+   },
+   {
+    "slot": "relationship_disclosure-03",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "AMD_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/2488/000000248826000018/amd-20251227.htm",
+    "sha256": "b4cb1e8128b0faa59453ae6967c3e4f2fa6e49f09790c4339359920465dd208c",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "relationship_id": 37,
+     "reporter": "AMD_US_EQ",
+     "counterparty": "Taiwan Semiconductor Manufacturing Company Limited (TSMC)",
+     "counterparty_or_anonymous_label": "Taiwan Semiconductor Manufacturing Company Limited (TSMC)",
+     "relationship": "supplier",
+     "direction": "issuer_buys_from",
+     "reported_share": null,
+     "percentage": null,
+     "denominator": null,
+     "period": "FY2025",
+     "label": "true_relationship",
+     "label_source": "disclosure_adjudication dataset=relationship_claim item_ref=claim:37 sample_key=prod-20261008-model",
+     "passage": "We rely on Taiwan Semiconductor Manufacturing Company Limited (TSMC) for the production of all wafers for microprocessor and GPU products at 7 nanometer (nm) or smaller nodes, and we rely primarily on GLOBALFOUNDRIES Inc. (GF) for wafers for microprocessor and GPU products manufactured at process nodes larger than 7 nm.",
+     "passage_check": {
+      "mode": "prose",
+      "passage_offset": 127696,
+      "basis": "character offset in the tag-stripped, whitespace-normalised text of the original HTML"
+     },
+     "passage_offsets": [
+      127696,
+      128017
+     ]
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "relationship_disclosure-04",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "AMD_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/2488/000000248826000018/amd-20251227.htm",
+    "sha256": "b4cb1e8128b0faa59453ae6967c3e4f2fa6e49f09790c4339359920465dd208c",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "relationship_id": 44,
+     "reporter": "AMD_US_EQ",
+     "counterparty": "Sony",
+     "counterparty_or_anonymous_label": "Sony",
+     "relationship": "customer",
+     "direction": "issuer_sells_to",
+     "reported_share": null,
+     "percentage": null,
+     "denominator": null,
+     "period": "FY2025",
+     "label": "true_relationship",
+     "label_source": "disclosure_adjudication dataset=relationship_claim item_ref=claim:44 sample_key=prod-20261008-model",
+     "passage": "AMD semi-custom SoC products power the Sony PlayStation® 5, the Microsoft® Xbox Series S™ and X™ game consoles, as well as the recently revealed Valve Steam Machine PC.",
+     "passage_check": {
+      "mode": "prose",
+      "passage_offset": 59221,
+      "basis": "character offset in the tag-stripped, whitespace-normalised text of the original HTML"
+     },
+     "passage_offsets": [
+      59221,
+      59389
+     ]
+    },
+    "expected_notes": [
+     "stored passage is not byte-identical to the filing text: the filing has a space before each registered mark (tag boundary) that the stored passage drops, so an exact substring search fails and the offset was found modulo that space"
+    ]
+   },
+   {
+    "slot": "relationship_disclosure-05",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CELH_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1341766/000134176626000024/celh-20251231.htm",
+    "sha256": "44b5b2952f671aa11e755a0f809a92208213d9d463235c380607208dfa550ac9",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "relationship_id": 54,
+     "reporter": "CELH_US_EQ",
+     "counterparty": "Pepsi",
+     "counterparty_or_anonymous_label": "Pepsi",
+     "relationship": "customer",
+     "direction": "issuer_sells_to",
+     "reported_share": 0.432,
+     "percentage": 0.432,
+     "denominator": "total_revenue",
+     "period": "FY2025",
+     "label": "true_relationship",
+     "label_source": "disclosure_adjudication dataset=relationship_claim item_ref=claim:54 sample_key=prod-20261008-model",
+     "passage": "In 2025, sales to Pepsi constituted 43.2% of our total revenue. As of December 31, 2025, receivables from Pepsi represented 46.2% of our total receivables.",
+     "passage_check": {
+      "mode": "prose",
+      "passage_offset": 69347,
+      "basis": "character offset in the tag-stripped, whitespace-normalised text of the original HTML"
+     },
+     "passage_offsets": [
+      69347,
+      69502
+     ]
+    },
+    "expected_notes": [
+     "passage holds two figures: 43.2% of revenue (stored) and 46.2% of receivables"
+    ]
+   },
+   {
+    "slot": "relationship_disclosure-06",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "CIEN_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/936395/000162828025056698/cien-20251101.htm",
+    "sha256": "dd24f39c7860710d396906c8c11de93e6c9bfa8c5e0239f5c1209bca007bd1cf",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "relationship_id": 58,
+     "reporter": "CIEN_US_EQ",
+     "counterparty": "AT&T",
+     "counterparty_or_anonymous_label": "AT&T",
+     "relationship": "customer",
+     "direction": "issuer_sells_to",
+     "reported_share": 0.105,
+     "percentage": 0.105,
+     "denominator": "total_revenue",
+     "period": "FY2025",
+     "label": "true_relationship",
+     "label_source": "disclosure_adjudication dataset=relationship_claim item_ref=claim:58 sample_key=prod-20261008-model",
+     "passage": "Sales to AT&T were $500.7 million, or 10.5% of total revenue, in fiscal 2025, and $475.3 million, or 11.8% of total revenue, in fiscal 2024.",
+     "passage_check": {
+      "mode": "prose",
+      "passage_offset": 173928,
+      "basis": "character offset in the tag-stripped, whitespace-normalised text of the original HTML"
+     },
+     "passage_offsets": [
+      173928,
+      174068
+     ]
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "relationship_disclosure-07",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "INTU_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/896878/000089687826000037/intu-20260731.htm",
+    "sha256": "7dd81c29e96ad898b2a67d98ab14649d7a0eed984d289c5a9712ded2c4d608f4",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "relationship_id": 61,
+     "reporter": "INTU_US_EQ",
+     "counterparty": "Amazon Web Services",
+     "counterparty_or_anonymous_label": "Amazon Web Services",
+     "relationship": "supplier",
+     "direction": "issuer_buys_from",
+     "reported_share": null,
+     "percentage": null,
+     "denominator": null,
+     "period": "FY2026",
+     "label": null,
+     "label_source": "no adjudication row stored for this claim",
+     "passage": "We use public cloud providers, such as Amazon Web Services and Google Cloud Platform, for most of our systems, networks, and databases used to operate these online offerings.",
+     "passage_check": {
+      "mode": "prose",
+      "passage_offset": 84077,
+      "basis": "character offset in the tag-stripped, whitespace-normalised text of the original HTML"
+     },
+     "passage_offsets": [
+      84077,
+      84251
+     ]
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "relationship_disclosure-08",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "KO_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/21344/000162828026010047/ko-20251231.htm",
+    "sha256": "b44db9ae27432d60fdf60bca73293add64e9f799b7f49cd7acb040ee33e4d079",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "relationship_id": 64,
+     "reporter": "KO_US_EQ",
+     "counterparty": "Cutrale Citrus Juices U.S.A., Inc.",
+     "counterparty_or_anonymous_label": "Cutrale Citrus Juices U.S.A., Inc.",
+     "relationship": "supplier",
+     "direction": "issuer_buys_from",
+     "reported_share": null,
+     "percentage": null,
+     "denominator": null,
+     "period": "FY2025",
+     "label": "true_relationship",
+     "label_source": "disclosure_adjudication dataset=relationship_claim item_ref=claim:64 sample_key=prod-20261008-model",
+     "passage": "We work closely with Cutrale Citrus Juices U.S.A., Inc., our primary supplier of orange juice from Florida and Brazil, to ensure an adequate supply of orange juice and orange juice concentrate that meets our Company’s standards.",
+     "passage_check": {
+      "mode": "prose",
+      "passage_offset": 102911,
+      "basis": "character offset in the tag-stripped, whitespace-normalised text of the original HTML"
+     },
+     "passage_offsets": [
+      102911,
+      103139
+     ]
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "relationship_disclosure-09",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "NVDA_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000021/nvda-20260125.htm",
+    "sha256": "da09753693ae094014dd7a13dcd2141978d1e2f187cf42c791670b9b99ad652c",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "relationship_id": 66,
+     "reporter": "NVDA_US_EQ",
+     "counterparty": "Taiwan Semiconductor Manufacturing Company Limited",
+     "counterparty_or_anonymous_label": "Taiwan Semiconductor Manufacturing Company Limited",
+     "relationship": "supplier",
+     "direction": "issuer_buys_from",
+     "reported_share": null,
+     "percentage": null,
+     "denominator": null,
+     "period": "FY2026",
+     "label": "true_relationship",
+     "label_source": "disclosure_adjudication dataset=relationship_claim item_ref=claim:66 sample_key=prod-20261008-model",
+     "passage": "We utilize foundries, such as Taiwan Semiconductor Manufacturing Company Limited, or TSMC, and Samsung Electronics Co., Ltd., or Samsung, to produce our semiconductor wafers.",
+     "passage_check": {
+      "mode": "prose",
+      "passage_offset": 57706,
+      "basis": "character offset in the tag-stripped, whitespace-normalised text of the original HTML"
+     },
+     "passage_offsets": [
+      57706,
+      57880
+     ]
+    },
+    "expected_notes": []
+   },
+   {
+    "slot": "relationship_disclosure-10",
+    "status": "captured_model_checked",
+    "captured_by": "claude-model (not a human)",
+    "captured_on": "2026-10-08",
+    "issuer_key": "NVDA_US_EQ",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000021/nvda-20260125.htm",
+    "sha256": "da09753693ae094014dd7a13dcd2141978d1e2f187cf42c791670b9b99ad652c",
+    "published_at": null,
+    "known_at": null,
+    "expected": {
+     "relationship_id": 71,
+     "reporter": "NVDA_US_EQ",
+     "counterparty": "Hon Hai Precision Industry Co., Ltd.",
+     "counterparty_or_anonymous_label": "Hon Hai Precision Industry Co., Ltd.",
+     "relationship": "supplier",
+     "direction": "issuer_buys_from",
+     "reported_share": null,
+     "percentage": null,
+     "denominator": null,
+     "period": "FY2026",
+     "label": "true_relationship",
+     "label_source": "disclosure_adjudication dataset=relationship_claim item_ref=claim:71 sample_key=prod-20261008-model",
+     "passage": "We engage with independent subcontractors and contract manufacturers such as Hon Hai Precision Industry Co., Ltd., Wistron Corporation, and Fabrinet to perform assembly, testing and packaging of our final products.",
+     "passage_check": {
+      "mode": "prose",
+      "passage_offset": 58015,
+      "basis": "character offset in the tag-stripped, whitespace-normalised text of the original HTML"
+     },
+     "passage_offsets": [
+      58015,
+      58229
+     ]
+    },
+    "expected_notes": []
+   }
+  ]
+ },
+ "captured_model_checked": 89
+}

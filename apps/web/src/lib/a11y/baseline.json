@@ -1,0 +1,89 @@
+{
+  "app/(app)/companies/[ticker]/assessment/assessment-view.tsx": {
+    "table-name": 1
+  },
+  "app/(app)/companies/[ticker]/evidence-views.tsx": {
+    "table-name": 5
+  },
+  "app/(app)/companies/[ticker]/financials/financials-view.tsx": {
+    "table-name": 1
+  },
+  "app/(app)/companies/[ticker]/peers/peers-view.tsx": {
+    "table-name": 2
+  },
+  "app/(app)/companies/[ticker]/ratios/ratios-view.tsx": {
+    "table-name": 1
+  },
+  "app/(app)/companies/[ticker]/report/report-view.tsx": {
+    "table-name": 1
+  },
+  "app/(app)/companies/[ticker]/segments/segments-view.tsx": {
+    "table-name": 2
+  },
+  "app/(app)/companies/[ticker]/valuation/valuation-view.tsx": {
+    "table-name": 1
+  },
+  "app/(app)/config/calendar/calendar-view.tsx": {
+    "table-name": 1
+  },
+  "app/(app)/discover/backtest/backtest-view.tsx": {
+    "table-name": 1
+  },
+  "app/(app)/funds/compare/compare-view.tsx": {
+    "table-name": 3
+  },
+  "app/(app)/funds/ledger-panel.tsx": {
+    "th-scope": 5
+  },
+  "app/(app)/funds/research/research-view.tsx": {
+    "table-name": 1
+  },
+  "app/(app)/funds/[isin]/fund-views.tsx": {
+    "table-name": 3
+  },
+  "app/(app)/funds/[isin]/performance-view.tsx": {
+    "table-name": 2
+  },
+  "app/(app)/holdings/[ticker]/holding-view.tsx": {
+    "table-name": 1
+  },
+  "app/(app)/investors/investors-view.tsx": {
+    "table-name": 1,
+    "th-scope": 1
+  },
+  "app/(app)/investors/[cik]/investor-view.tsx": {
+    "table-name": 1,
+    "th-scope": 2
+  },
+  "app/(app)/reports/[id]/digest-view.tsx": {
+    "table-name": 1
+  },
+  "app/(app)/review/review-parts.tsx": {
+    "table-name": 1
+  },
+  "app/(app)/reviews/[id]/monthly-review-view.tsx": {
+    "table-name": 2
+  },
+  "app/(app)/verification/signals-panel.tsx": {
+    "th-scope": 4
+  },
+  "components/charts/sparkline.tsx": {
+    "svg-name": 1
+  },
+  "components/portfolio/valuation-benchmark-panel.tsx": {
+    "th-scope": 10
+  },
+  "components/reference/identity-section.tsx": {
+    "table-name": 2
+  },
+  "components/reference/insider-trades-section.tsx": {
+    "table-name": 1,
+    "th-scope": 1
+  },
+  "components/reference/price-chart.tsx": {
+    "table-name": 1
+  },
+  "components/reference/price-risk-section.tsx": {
+    "table-name": 1
+  }
+}

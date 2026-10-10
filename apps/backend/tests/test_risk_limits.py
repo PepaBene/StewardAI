@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from steward.config.strategy import RiskLimits, StrategyConfig
 from steward.portfolio.risk import MIN_OBSERVATIONS, DailyReturn, beta
 from steward.portfolio.risk_limits import (
+    Exposure,
     PositionLoss,
     RiskInputs,
     Underlying,
@@ -17,6 +18,31 @@ from steward.portfolio.risk_limits import (
 LIMITS = RiskLimits(
     max_volatility=0.20, max_beta=1.2, position_loss_review=0.25, max_look_through_weight=0.10
 )
+
+
+async def test_stress_limit_measures_the_shocked_loss(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The stress limit runs the shock engine (an import error here once left it unavailable)."""
+    from types import SimpleNamespace
+
+    from steward.decision import service
+    from steward.portfolio import risk_limits
+
+    seen: dict[str, object] = {}
+
+    async def fake_run_shock(pool, owner, shocks, assumptions):  # type: ignore[no-untyped-def]
+        seen["equity_pct"] = shocks.equity_pct
+        return SimpleNamespace(result=SimpleNamespace(pnl_pct=-0.12))
+
+    monkeypatch.setattr(service, "run_shock", fake_run_shock)
+    monkeypatch.setattr(risk_limits, "get_settings", lambda: SimpleNamespace(owner_user_id="owner"))
+    strategy = StrategyConfig(
+        base_currency="CZK", risk=RiskLimits(max_stress_loss=0.2, stress_equity_fall=0.3)
+    )
+    inputs = RiskInputs()
+    await risk_limits._decision_inputs(None, strategy, [], inputs)  # type: ignore[arg-type]
+    assert "stress" not in inputs.unavailable
+    assert inputs.stress_loss == pytest.approx(0.12)
+    assert seen["equity_pct"] == pytest.approx(-0.3)
 
 
 def test_risk_limits_default_to_off() -> None:
@@ -38,6 +64,21 @@ def test_each_limit_breaches_only_past_its_threshold() -> None:
     )
     keys = sorted(f.key for f in evaluate_risk(inputs, LIMITS))
     assert keys == ["risk:beta", "risk:loss:A", "risk:overlap:NVIDIA", "risk:volatility"]
+
+
+def test_sector_and_country_ceilings_breach_only_past_the_limit() -> None:
+    limits = RiskLimits(max_sector_weight=0.30, max_country_weight=0.60)
+    inputs = RiskInputs(
+        exposures=[
+            Exposure("sector", "Technology", 0.34),
+            Exposure("sector", "Health Care", 0.30),
+            Exposure("country", "US", 0.62),
+            Exposure("country", "DE", 0.05),
+        ]
+    )
+    findings = evaluate_risk(inputs, limits)
+    assert sorted(f.key for f in findings) == ["risk:country:US", "risk:sector:Technology"]
+    assert evaluate_risk(inputs, RiskLimits()) == []
 
 
 def test_at_the_limit_is_not_a_breach() -> None:

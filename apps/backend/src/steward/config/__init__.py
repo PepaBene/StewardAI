@@ -13,6 +13,7 @@ from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfi
 from steward.config.jobs import JobSchedule, JobsConfig
 from steward.config.news_sources import NewsSourcesConfig
 from steward.config.notifications import NotificationsConfig
+from steward.config.performance import PerformanceSettings
 from steward.config.prompts import PromptsConfig
 from steward.config.research import ResearchProfile, ResearchProfilesConfig
 from steward.config.strategy import StrategyConfig
@@ -32,6 +33,7 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "budget": BudgetConfig,
     "research_profiles": ResearchProfilesConfig,
     "prompts": PromptsConfig,
+    "performance": PerformanceSettings,
 }
 
 __all__ = [

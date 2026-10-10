@@ -7,7 +7,17 @@ queue. Both look the handler up here.
 from typing import Literal
 
 from steward.approvals.ai import ai_approvals_handler
+from steward.changes.alerts import change_alerts_handler
 from steward.chat.assistant import chat_handler
+from steward.disclosure.jobs import (
+    disclosure_alerts_handler,
+    disclosure_deals_handler,
+    disclosure_esef_handler,
+    disclosure_estimates_handler,
+    disclosure_identifiers_handler,
+    disclosure_ingest_handler,
+    disclosure_sources_handler,
+)
 from steward.earnings.calendar import (
     earnings_calendar_full_handler,
     earnings_calendar_handler,
@@ -21,6 +31,7 @@ from steward.fundamentals.collect import sec_xbrl_handler
 from steward.fundamentals.fsds import sec_fsds_backfill_handler
 from steward.fundamentals.ir import ir_releases_handler
 from steward.fundamentals.ir_discovery import ir_discovery_handler
+from steward.fundresearch.issuer_sync import fund_issuer_facts_handler
 from steward.funds.drift import fund_characteristics_audit_handler
 from steward.graph.jobs import graph_review_handler
 from steward.jobs.runner import JobHandler
@@ -95,7 +106,9 @@ JobType = Literal[
     "nport_holdings",
     "fund_probes",
     "fund_characteristics_audit",
+    "fund_issuer_facts",
     "free_source_alerts",
+    "change_alerts",
     "shadow_snapshot",
     "shadow_report",
     "raw_retention",
@@ -116,6 +129,13 @@ JobType = Literal[
     "ir_discovery",
     "gap_research",
     "exposure_build",
+    "disclosure_sources",
+    "disclosure_ingest",
+    "disclosure_identifiers",
+    "disclosure_deals",
+    "disclosure_esef",
+    "disclosure_estimates",
+    "disclosure_alerts",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -150,7 +170,9 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "nport_holdings": nport_holdings_handler,
     "fund_probes": fund_probes_handler,
     "fund_characteristics_audit": fund_characteristics_audit_handler,
+    "fund_issuer_facts": fund_issuer_facts_handler,
     "free_source_alerts": free_source_alerts_handler,
+    "change_alerts": change_alerts_handler,
     "shadow_snapshot": shadow_snapshot_handler,
     "shadow_report": shadow_report_handler,
     "raw_retention": raw_retention_handler,
@@ -171,4 +193,11 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "ir_discovery": ir_discovery_handler,
     "gap_research": gap_research_handler,
     "exposure_build": exposure_build_handler,
+    "disclosure_sources": disclosure_sources_handler,
+    "disclosure_ingest": disclosure_ingest_handler,
+    "disclosure_identifiers": disclosure_identifiers_handler,
+    "disclosure_deals": disclosure_deals_handler,
+    "disclosure_esef": disclosure_esef_handler,
+    "disclosure_estimates": disclosure_estimates_handler,
+    "disclosure_alerts": disclosure_alerts_handler,
 }

@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type { components } from "@/lib/api/schema";
 import { isRecord, num, recs, str, titleCase, type Rec } from "@/lib/parse-untyped";
 import { URL_RE } from "@/lib/reference/form-utils";
@@ -279,7 +280,7 @@ export type ActionDraft = {
 export const emptyActionDraft = (symbol = ""): ActionDraft => ({ actionType: "cash_dividend", symbol, exDate: "", recordDate: "", paymentDate: "", ratio: "", cashAmount: "", currency: "", per: "listed_line", amountBasis: "as_declared", source: "", sourceUrl: "", evidenceId: "", status: "suggested" });
 
 const parseNum = (t: string): number | null | "invalid" => {
-  const s = t.trim().replace(",", ".");
+  const s = normaliseSeparators(t);
   if (s === "") return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : "invalid";

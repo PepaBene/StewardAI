@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type { JobsConfig, JobSchedule } from "@/lib/api/client";
 
 /*
@@ -173,6 +174,18 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Check the iShares and Vanguard fund valuation figures for parser drift.",
     cron: "30 7 * * *",
   },
+  fund_issuer_facts: {
+    label: "Fund issuer facts",
+    description:
+      "Read each held fund's replication, launch date, domicile, benchmark and published NAV from its issuer.",
+    cron: "15 8 * * 1-5",
+  },
+  change_alerts: {
+    label: "Deal and patent alerts",
+    description:
+      "An alert for a company-sourced deal story or a new patent family at a holding, once each.",
+    cron: "55 7 * * *",
+  },
   free_source_alerts: {
     label: "Free-source alerts",
     description:
@@ -297,6 +310,48 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
     description:
       "Builds each holding's revenue-by-country exposure from its latest annual SEC filing. Only single countries are mapped; your own exposure entries are never changed, and a row you delete is not rebuilt.",
     cron: "50 5 * * 2",
+  },
+  disclosure_sources: {
+    label: "Disclosure source tests",
+    description:
+      "Re-tests every disclosure source each day and stores what it answered. A source that stops answering is switched off; the SEC sources are switched on again when they pass.",
+    cron: "0 6 * * *",
+  },
+  disclosure_ingest: {
+    label: "Filing ingestion",
+    description:
+      "Fetches, stores and parses the newest annual and quarterly SEC filings of your holdings. Switch it on after the SEC sources pass their access test; a filing that fails is reported, not skipped silently.",
+    cron: "40 6 * * 1-5",
+  },
+  disclosure_identifiers: {
+    label: "Identifier suggestions",
+    description:
+      "Looks up missing LEIs and FIGIs and stores them as suggestions. Nothing is confirmed until you decide it.",
+    cron: "20 6 * * 6",
+  },
+  disclosure_deals: {
+    label: "Deal filings",
+    description:
+      "Reads recent 8-K, S-4, proxy and tender-offer filings of your holdings and stores the deals, their state and the terms they state. A filing that does not name two parties and a deal type is counted, never guessed.",
+    cron: "50 6 * * 1-5",
+  },
+  disclosure_esef: {
+    label: "European annual reports",
+    description:
+      "Checks filings.xbrl.org for new ESEF reports of holdings with a confirmed LEI and stores each with the date it was published. It reads no values; statements come through the statement pipeline.",
+    cron: "0 7 * * 1-5",
+  },
+  disclosure_estimates: {
+    label: "Consensus files",
+    description:
+      "Fetches each issuer consensus file you have enabled and stores a new version only when it changed. A file it cannot read is reported with the reason, never stored half-read.",
+    cron: "30 6 * * 1-5",
+  },
+  disclosure_alerts: {
+    label: "Disclosure alerts",
+    description:
+      "Scans verified filings for new insider trades, major-holder changes and relationship changes, and e-mails the new ones grouped by ticker when e-mail is configured.",
+    cron: "15 13 * * *",
   },
 };
 export const SCHEDULE_KEYS = Object.keys(SCHEDULES) as ScheduleKey[];
@@ -1154,7 +1209,7 @@ export function jobsToBody(form: JobsForm): JobsConfig {
       const v = values[field.key];
       if (field.kind === "bool") out[field.key] = Boolean(v);
       else if (field.kind === "int" || field.kind === "severity") out[field.key] = numberOrText(String(v));
-      else if (field.kind === "number") out[field.key] = numberOrText(String(v).replace(",", "."));
+      else if (field.kind === "number") out[field.key] = numberOrText(normaliseSeparators(String(v)));
       else if (field.kind === "lines") out[field.key] = list(String(v), /\n/);
       else if (field.kind === "symbol-lines") out[field.key] = parseSymbolLines(String(v));
       else if (field.kind === "codes") out[field.key] = list(String(v), /[\s,;]+/).map((c) => c.toUpperCase());

@@ -29,6 +29,7 @@ from steward.funds.aggregate import (
     aggregate_exposure,
     aggregate_portfolio,
     compute_fund_overlap,
+    is_shared,
 )
 from steward.funds.drift import Prior, classify_observation, record_observation
 from steward.lookthrough.collect import collect_fund
@@ -251,6 +252,19 @@ def test_adr_and_ordinary_merge_at_issuer_level_but_stay_traceable() -> None:
     assert tsm.weight == pytest.approx((100 + 140) / 900)
     assert tsm.direct_weight == pytest.approx(100 / 900)
     assert tsm.overlap_weight == pytest.approx(100 / 900) and tsm in report.overlap
+
+
+def test_two_directly_held_share_classes_of_one_issuer_are_not_shared() -> None:
+    report = aggregate_exposure(
+        portfolio(position("TSM_US_EQ", TSM_ADR, 100.0), position("TSM_TW_EQ", TSM_ORD, 100.0)),
+        SETTINGS,
+        {},
+        as_of=dt.date(2026, 9, 28),
+    )
+    tsm = next(i for i in report.issuers if "taiwan" in i.label.lower())
+    assert tsm.merged_securities == 2 and len(tsm.channels) == 2
+    assert tsm.overlap_weight == 0 and tsm not in report.overlap
+    assert not is_shared(tsm.channels)
 
 
 def test_unknown_fund_weight_is_its_own_bucket_and_never_redistributed() -> None:

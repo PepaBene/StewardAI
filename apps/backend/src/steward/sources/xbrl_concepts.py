@@ -209,6 +209,15 @@ _ENTRIES: tuple[tuple[str, Statement, str, tuple[str, ...]], ...] = (
     (
         "balance",
         "balance_sheet",
+        "retained_earnings",
+        (
+            "us-gaap:RetainedEarningsAccumulatedDeficit",
+            "ifrs-full:RetainedEarnings",
+        ),
+    ),
+    (
+        "balance",
+        "balance_sheet",
         "noncontrolling_interest",
         ("us-gaap:MinorityInterest", "ifrs-full:NoncontrollingInterests"),
     ),
@@ -491,6 +500,27 @@ _ENTRIES: tuple[tuple[str, Statement, str, tuple[str, ...]], ...] = (
     (
         "cash_flow",
         "cash_flow",
+        "acquisitions_paid",
+        (
+            "us-gaap:PaymentsToAcquireBusinessesNetOfCashAcquired",
+            "us-gaap:PaymentsToAcquireBusinessesGross",
+            "ifrs-full:CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities",
+        ),
+    ),
+    (
+        "cash_flow",
+        "cash_flow",
+        "divestiture_proceeds",
+        (
+            "us-gaap:ProceedsFromDivestitureOfBusinessesNetOfCashDivested",
+            "us-gaap:ProceedsFromDivestitureOfBusinesses",
+            "us-gaap:ProceedsFromSaleOfBusinessAssetsAndInterest",
+            "ifrs-full:CashFlowsFromLosingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities",
+        ),
+    ),
+    (
+        "cash_flow",
+        "cash_flow",
         "depreciation_amortization",
         (
             "us-gaap:DepreciationDepletionAndAmortization",
@@ -574,6 +604,40 @@ _ENTRIES: tuple[tuple[str, Statement, str, tuple[str, ...]], ...] = (
             "us-gaap:StockRepurchaseProgramAuthorizedAmount",
             "us-gaap:StockRepurchaseProgramRemainingAuthorizedRepurchaseAmount",
         ),
+    ),
+    # ------------------------------------------------------- related-party totals (no dims)
+    (
+        "related_party",
+        "note",
+        "related_party_transactions",
+        ("us-gaap:RelatedPartyTransactionAmountsOfTransaction",),
+    ),
+    (
+        "related_party",
+        "note",
+        "related_party_revenue",
+        ("us-gaap:RevenueFromRelatedParties",),
+    ),
+    (
+        "related_party",
+        "note",
+        "related_party_costs",
+        (
+            "us-gaap:CostsAndExpensesRelatedParty",
+            "us-gaap:RelatedPartyTransactionExpensesFromTransactionsWithRelatedParty",
+        ),
+    ),
+    (
+        "related_party",
+        "note",
+        "related_party_receivable",
+        ("us-gaap:DueFromRelatedParties", "us-gaap:AccountsReceivableRelatedParties"),
+    ),
+    (
+        "related_party",
+        "note",
+        "related_party_payable",
+        ("us-gaap:DueToRelatedParties", "us-gaap:AccountsPayableRelatedParties"),
     ),
     # ------------------------------------------------------------------------ pensions
     (
@@ -720,6 +784,16 @@ TEXT_BLOCK_TOPICS: tuple[str, ...] = (
     "propertyplant",
     "earningspershare",
     "fairvalue",
+)
+
+# Equity tags that already include the non-controlling interest. A filer that tags only these
+# has no parent-only equity, so the canonical `equity` must have the interest taken out before
+# it is added or subtracted again.
+EQUITY_INCLUDING_NCI: frozenset[str] = frozenset(
+    {
+        "us-gaap:StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+        "ifrs-full:Equity",
+    }
 )
 
 # Unit for monetary amounts: iso4217 code as the reader writes it, with an optional per-share

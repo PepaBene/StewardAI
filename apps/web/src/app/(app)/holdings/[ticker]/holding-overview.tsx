@@ -178,6 +178,9 @@ export function HoldingHeader({
                   Thesis · {THESIS_STATE_LABEL[row.state]}
                 </Link>
               ) : null}
+              <Link href={`/companies/${encodeURIComponent(detail.ticker)}`} className="px-2 py-[3px] font-semibold text-accent-ink hover:underline">
+                Company workbench
+              </Link>
             </div>
           </div>
         </div>

@@ -73,6 +73,18 @@ def test_profile_keeps_only_text_fields_sent_and_rejects_other_symbols() -> None
         fmp.parse_profile({"Error Message": "x"}, "AAPL")
 
 
+def test_estimate_selection_keeps_the_next_fiscal_year_though_fmp_answers_newest_first() -> None:
+    import datetime as dt
+
+    payload = [
+        {"symbol": "AAPL", "date": f"{y}-09-27", "epsAvg": 7 + y - 2026, "numAnalystsEps": 20}
+        for y in (2031, 2030, 2029, 2028, 2027, 2026, 2025, 2024, 2023, 2022)
+    ]
+    rows = fmp.select_estimates(fmp.parse_estimates(payload, "AAPL"), dt.date(2026, 10, 7))
+    assert sorted({r.fiscal_year for r in rows}) == [2026, 2027, 2028, 2029]
+    assert 2025 not in {r.fiscal_year for r in rows}  # ended more than the lookback ago
+
+
 def test_estimates_missing_figures_are_null_not_zero() -> None:
     rows = fmp.parse_estimates(ESTIMATES, "AAPL")
     eps = {r.fiscal_year: r for r in rows if r.metric == "earnings_per_share"}
@@ -133,11 +145,39 @@ async def test_fetch_error_envelope_on_http_200_is_an_error() -> None:
             await fmp._get(http, fmp.PROFILE_URL, {"symbol": "AAPL"}, "k")
 
 
-def test_fmp_endpoint_budget_never_exceeds_half_the_free_account_quota() -> None:
+def test_compensation_keeps_the_newest_years_and_never_invents_a_component() -> None:
+    payload = [
+        {
+            "symbol": "AAPL",
+            "nameAndPosition": "  Jane Doe   Chief Financial Officer ",
+            "year": year,
+            "salary": 1000000,
+            "stockAward": 5000000,
+            "total": 6500000,
+            "filingDate": f"{year + 1}-01-08",
+            "link": "https://www.sec.gov/Archives/x",
+        }
+        for year in (2023, 2024, 2025)
+    ] + [
+        {"symbol": "AAPL", "nameAndPosition": "", "year": 2025, "total": 1},  # no name: dropped
+        {"symbol": "AAPL", "nameAndPosition": "No Total", "year": 2025},  # no total: dropped
+        {"symbol": "MSFT", "nameAndPosition": "Other", "year": 2025, "total": 1},
+    ]
+    rows = fmp.latest_compensation(fmp.parse_compensation(payload, "AAPL"))
+    assert sorted({r.fiscal_year for r in rows}) == [2024, 2025]
+    one = rows[0]
+    assert one.name_and_position == "Jane Doe Chief Financial Officer"
+    assert set(one.components) == {"salary", "stock_award"}  # bonus was not sent: absent, not 0
+    assert one.total == Decimal(6500000) and one.source_url.startswith("https://www.sec.gov")
+    with pytest.raises(FreeSourceError):
+        fmp.parse_compensation({"unexpected": 1}, "AAPL")
+
+
+def test_fmp_endpoint_budget_never_exceeds_a_third_of_the_free_account_quota() -> None:
     providers = JobsConfig().providers
-    assert fmp.endpoint_budget(providers["fmp"]).daily == Decimal(125)
-    # two endpoints together stay inside the 250/day free key
-    assert 2 * fmp.ENDPOINT_DAILY_CAP <= providers["fmp"].daily_quota  # type: ignore[operator]
+    assert fmp.endpoint_budget(providers["fmp"]).daily == Decimal(83)
+    # three endpoints together stay inside the 250/day free key
+    assert 3 * fmp.ENDPOINT_DAILY_CAP <= providers["fmp"].daily_quota  # type: ignore[operator]
     low = providers["fmp"].model_copy(update={"daily_quota": 40})
     assert fmp.endpoint_budget(low).daily == Decimal(40)
 

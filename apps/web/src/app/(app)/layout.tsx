@@ -8,6 +8,7 @@ import { ChatPanel } from "@/components/chat/chat-panel";
 import { MarketStrip } from "@/components/market-strip";
 import { ColorModeToggle } from "@/components/color-mode-toggle";
 import { CommandPalette } from "@/components/command-palette";
+import { UsageBeacon } from "@/components/release/usage-beacon";
 import { SignOutButton } from "@/components/sign-out-button";
 import { SyncErrorBanner } from "@/components/sync/sync-error-banner";
 import { SyncIndicator } from "@/components/sync/sync-indicator";
@@ -40,6 +41,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <SyncStatusProvider>
+    <UsageBeacon />
     <div className="flex min-h-dvh flex-col">
       <a
         href="#main"

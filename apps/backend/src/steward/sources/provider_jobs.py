@@ -32,7 +32,11 @@ from steward.sources.base import Priority
 from steward.sources.companies_house import collect_companies_house
 from steward.sources.company_research import collect_epo_patents
 from steward.sources.edinet import collect_edinet_day
-from steward.sources.fmp import collect_fmp_company
+from steward.sources.fmp import (
+    COMPENSATION_REFRESH_DAYS,
+    collect_fmp_company,
+    collect_fmp_compensation,
+)
 from steward.sources.free_market import FreeSourceError
 from steward.sources.governor import QuotaExceeded
 from steward.sources.twelvedata import TwelveDataError, collect_corporate_actions
@@ -120,6 +124,18 @@ async def fmp_company_handler(ctx: JobContext) -> None:
             list(mapped),
         )
         seen = {r["ticker"]: r["seen"] for r in rows}
+        # A holding whose compensation was never checked is due whatever its profile's age, or a
+        # dataset added later would wait for every profile to go stale first.
+        compensation_checked = {
+            r["entity_key"]
+            for r in await ctx.pool.fetch(
+                "select entity_key from public.coverage_status"
+                " where provider='fmp' and dataset='executive_compensation'"
+                " and entity_key = any($1::text[])",
+                list(mapped),
+            )
+        }
+        seen = {t: s for t, s in seen.items() if t in compensation_checked}
         due = stalest_first(
             list(mapped),
             seen.get,
@@ -128,6 +144,7 @@ async def fmp_company_handler(ctx: JobContext) -> None:
             limit=FMP_HOLDINGS_PER_RUN,
         )
         results: dict[str, Any] = {}
+        compensation: dict[str, int] = {}
         async with httpx.AsyncClient(
             timeout=30, headers={"User-Agent": f"StewardAI/{__version__}"}
         ) as http:
@@ -151,7 +168,46 @@ async def fmp_company_handler(ctx: JobContext) -> None:
                         break
                 except httpx.HTTPError as exc:
                     results[ticker] = f"failed: {type(exc).__name__}"
+                # Proxy-statement pay changes once a year: refresh it monthly, not every run.
+                try:
+                    stale = await ctx.pool.fetchval(
+                        "select coalesce("
+                        "max(last_seen_at) < now() - make_interval(days => $2), true)"
+                        " from public.company_research_observation"
+                        " where provider='fmp' and dataset='executive_compensation' and ticker=$1",
+                        ticker,
+                        COMPENSATION_REFRESH_DAYS,
+                    )
+                    if stale:
+                        compensation[ticker] = await collect_fmp_compensation(
+                            ctx.pool,
+                            http,
+                            ticker=ticker,
+                            symbol=mapped[ticker],
+                            api_key=settings.fmp_api_key.get_secret_value(),
+                            provider_settings=provider,
+                        )
+                except (QuotaExceeded, RuntimeError) as exc:
+                    step.detail["compensation_stopped"] = f"{type(exc).__name__}: {exc}"[:200]
+                    unchecked = ("quota_exhausted", step.detail["compensation_stopped"])
+                except (FreeSourceError, httpx.HTTPError):
+                    compensation[ticker] = -1
+                    unchecked = ("temporarily_failed", "compensation request failed")
+                else:
+                    unchecked = ("access_unverified", "compensation not fetched: provider gated")
+                # A gated, over-quota or failed compensation call leaves no coverage row, and a
+                # ticker without one is treated as unchecked, so its profile would be re-fetched
+                # every run. Record the attempt without overwriting a real result; compensation
+                # itself is still retried because it is due while it has no observations.
+                await ctx.pool.execute(
+                    "insert into public.coverage_status (provider,dataset,entity_key,state,reason)"
+                    " values ('fmp','executive_compensation',$1,$2,$3)"
+                    " on conflict (provider,dataset,entity_key) do nothing",
+                    ticker,
+                    *unchecked,
+                )
         step.detail["refreshed"] = results
+        step.detail["compensation_rows"] = compensation
 
 
 # ------------------------------------------------------------------------- Alpha Vantage

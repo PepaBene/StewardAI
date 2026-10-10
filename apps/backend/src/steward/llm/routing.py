@@ -112,6 +112,14 @@ class _Messages:
     def __init__(self, owner: "RoutingClient") -> None:
         self._owner = owner
 
+    def __getattr__(self, name: str) -> Any:
+        # Everything but `parse` (the Message Batches API: `messages.batches`) is the
+        # Anthropic client's own.
+        anthropic_client = self._owner.anthropic
+        if name.startswith("_") or anthropic_client is None:
+            raise AttributeError(name)
+        return getattr(anthropic_client.messages, name)
+
     async def parse(self, **kwargs: Any) -> Any:
         cache = self._owner.cache
         schema = kwargs.get("output_format")

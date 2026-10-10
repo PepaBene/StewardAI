@@ -50,7 +50,9 @@ BudgetJobType = Literal[
     "nport_holdings",
     "fund_probes",
     "fund_characteristics_audit",
+    "fund_issuer_facts",
     "free_source_alerts",
+    "change_alerts",
     "shadow_snapshot",
     "shadow_report",
     "raw_retention",
@@ -71,6 +73,13 @@ BudgetJobType = Literal[
     "ir_discovery",
     "gap_research",
     "exposure_build",
+    "disclosure_sources",
+    "disclosure_ingest",
+    "disclosure_identifiers",
+    "disclosure_deals",
+    "disclosure_esef",
+    "disclosure_estimates",
+    "disclosure_alerts",
 ]
 
 AtCap = Literal["alert_only", "pause_noncritical", "downgrade_noncritical"]

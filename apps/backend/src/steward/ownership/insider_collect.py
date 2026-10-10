@@ -118,8 +118,12 @@ async def _upsert(
             record_key=filing.accession,
             quote=parsed.issuer_name,
         )
+        # Rows are updated in place, not deleted and re-inserted: the owner's classification
+        # overrides hang off (accession, row_index) and must survive a re-ingest.
         await conn.execute(
-            "delete from public.insider_transaction where accession = $1", filing.accession
+            "delete from public.insider_transaction where accession = $1 and row_index >= $2",
+            filing.accession,
+            len(parsed.rows),
         )
         await conn.executemany(
             """insert into public.insider_transaction
@@ -131,7 +135,31 @@ async def _upsert(
                 deemed_execution_date,equity_swap_involved,economic_class,
                 classification_basis,rule_10b5_1_plan,rule_10b5_1_basis,rule_10b5_1_adopted)
                values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-                       $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)""",
+                       $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
+               on conflict (accession,row_index) do update set
+                reporting_owner_cik=excluded.reporting_owner_cik, owner_name=excluded.owner_name,
+                officer_title=excluded.officer_title, is_director=excluded.is_director,
+                is_officer=excluded.is_officer, is_ten_percent_owner=excluded.is_ten_percent_owner,
+                security_title=excluded.security_title,
+                transaction_date=excluded.transaction_date,
+                transaction_code=excluded.transaction_code, shares=excluded.shares,
+                price_per_share=excluded.price_per_share,
+                acquired_disposed=excluded.acquired_disposed,
+                shares_owned_after=excluded.shares_owned_after,
+                direct_indirect=excluded.direct_indirect, derivative=excluded.derivative,
+                footnote_ids=excluded.footnote_ids, footnote_text=excluded.footnote_text,
+                exercise_price=excluded.exercise_price,
+                exercisable_date=excluded.exercisable_date,
+                expiration_date=excluded.expiration_date,
+                underlying_security_title=excluded.underlying_security_title,
+                underlying_shares=excluded.underlying_shares,
+                deemed_execution_date=excluded.deemed_execution_date,
+                equity_swap_involved=excluded.equity_swap_involved,
+                economic_class=excluded.economic_class,
+                classification_basis=excluded.classification_basis,
+                rule_10b5_1_plan=excluded.rule_10b5_1_plan,
+                rule_10b5_1_basis=excluded.rule_10b5_1_basis,
+                rule_10b5_1_adopted=excluded.rule_10b5_1_adopted""",
             [
                 (
                     filing.accession,
@@ -356,3 +384,9 @@ async def run_insider_filings(ctx: JobContext, edgar: EdgarClient) -> None:
 
 async def insider_trades_handler(ctx: JobContext) -> None:
     await collect_insiders(ctx)
+    # Alerts follow a collection that finished; a failed collection raised above and alerts nothing.
+    # The scan counts failures per ticker and never fails the job that stored the filings.
+    from steward.disclosure.alerts import scan_all
+
+    async with ctx.step("disclosure-alerts") as step:
+        step.detail.update(await scan_all(ctx.pool))

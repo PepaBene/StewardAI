@@ -1,3 +1,4 @@
+import { normaliseSeparators } from "@/lib/number-input";
 import type { components } from "@/lib/api/schema";
 
 type Schemas = components["schemas"];
@@ -49,6 +50,7 @@ export function buildRequest(input: {
   sortBy: MetricId | null;
   limit?: number;
   reconciledOnly?: boolean;
+  valuationGateOnly?: boolean;
 }): BuiltRequest {
   const errors: string[] = [];
   const seen = new Set<string>();
@@ -57,7 +59,7 @@ export function buildRequest(input: {
   for (const d of input.drafts) {
     const info = metricInfo(d.metric);
     const label = info?.label ?? d.metric;
-    const typed = d.value.trim().replace(",", ".");
+    const typed = normaliseSeparators(d.value);
     const n = typed === "" ? NaN : Number(typed);
     if (!Number.isFinite(n)) {
       errors.push(`${label}: enter a number.`);
@@ -82,6 +84,7 @@ export function buildRequest(input: {
       sort_by: input.sortBy,
       limit: input.limit ?? 100,
       reconciled_only: input.reconciledOnly ?? false,
+      valuation_gate_only: input.valuationGateOnly ?? false,
     },
     errors: [],
   };
