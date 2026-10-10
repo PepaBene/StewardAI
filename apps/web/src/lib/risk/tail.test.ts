@@ -6,6 +6,7 @@ const line = (over: Partial<TailLine>): TailLine => ({
   horizon_weeks: 4,
   level: 0.95,
   method: "historical",
+  independent_tail: 10,
   var: 0.05,
   es: 0.07,
   var_value: 50_000,

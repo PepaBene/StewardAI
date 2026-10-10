@@ -363,7 +363,7 @@ async def test_the_performance_rollbacks_remove_what_their_migrations_added(
 ) -> None:
     from pathlib import Path
 
-    rollback_dir = Path(__file__).resolve().parents[3] / "supabase" / "rollback"
+    rollback_dir = Path(__file__).resolve().parents[3] / "supabase" / "rollback"  # noqa: ASYNC240
     await api.put("/portfolio/performance/settings", json={"core_tickers": ["AAA_US_EQ"]})
     await api.put(
         "/portfolio/performance/settings",

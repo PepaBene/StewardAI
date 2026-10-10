@@ -622,7 +622,10 @@ _ENTRIES: tuple[tuple[str, Statement, str, tuple[str, ...]], ...] = (
         "related_party",
         "note",
         "related_party_costs",
-        ("us-gaap:CostsAndExpensesRelatedParty", "us-gaap:RelatedPartyTransactionExpensesFromTransactionsWithRelatedParty"),
+        (
+            "us-gaap:CostsAndExpensesRelatedParty",
+            "us-gaap:RelatedPartyTransactionExpensesFromTransactionsWithRelatedParty",
+        ),
     ),
     (
         "related_party",

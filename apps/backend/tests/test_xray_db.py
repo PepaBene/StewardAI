@@ -207,11 +207,15 @@ async def test_candidates_include_the_watchlist_and_search(api: httpx.AsyncClien
 async def test_a_past_date_shows_the_holdings_of_that_day(
     api: httpx.AsyncClient, backend_pool: asyncpg.Pool
 ) -> None:
-    snapshot_day = await backend_pool.fetchval("select max(snapshot_date) from public.account_snapshot")
+    snapshot_day = await backend_pool.fetchval(
+        "select max(snapshot_date) from public.account_snapshot"
+    )
     today = (await api.get("/portfolio/xray")).json()
     then = await api.get("/portfolio/xray", params={"as_of": snapshot_day.isoformat()})
     assert then.status_code == 200
-    assert then.json()["views"][0]["total_weight"] == pytest.approx(today["views"][0]["total_weight"])
+    assert then.json()["views"][0]["total_weight"] == pytest.approx(
+        today["views"][0]["total_weight"]
+    )
     assert any("Holdings as of" in n for n in then.json()["notes"])
     assert not any("Holdings as of" in n for n in today["notes"])
     before_any = await api.get("/portfolio/xray", params={"as_of": "2000-01-03"})

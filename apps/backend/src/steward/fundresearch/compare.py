@@ -162,7 +162,9 @@ def build_comparison(prepared: Sequence[Prepared]) -> FundComparison:
         funds.append(f)
     # Classes the issuer gave no shared portfolio id (or from different issuers) are still one
     # portfolio when their holdings are the same issuers at the same weights.
-    weights = {p.fund.isin: (_issuer_weights(p.rows)[0] if p.view.row_count else {}) for p in prepared}
+    weights = {
+        p.fund.isin: (_issuer_weights(p.rows)[0] if p.view.row_count else {}) for p in prepared
+    }
     for i, f in enumerate(funds):
         if f.duplicate_of is not None or not weights[f.isin]:
             continue
@@ -174,7 +176,9 @@ def build_comparison(prepared: Sequence[Prepared]) -> FundComparison:
             common = sum(
                 (min(w, weights[earlier.isin][k]) for k, w in weights[f.isin].items()), ZERO
             )
-            total = max(sum(weights[f.isin].values(), ZERO), sum(weights[earlier.isin].values(), ZERO))
+            total = max(
+                sum(weights[f.isin].values(), ZERO), sum(weights[earlier.isin].values(), ZERO)
+            )
             if total > 0 and common / total >= IDENTICAL_OVERLAP:
                 funds[i] = f.model_copy(
                     update={"duplicate_of": earlier.isin, "duplicate_basis": "identical_holdings"}
