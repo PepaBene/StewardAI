@@ -20,6 +20,7 @@ from steward.portfolio.breaches import Finding
 
 if TYPE_CHECKING:
     from steward.portfolio.exante import ExAnteRisk, LoadedBook
+    from steward.portfolio.tail import TailReport
 from steward.portfolio.snapshot import PositionRow
 from steward.settings import get_settings
 
@@ -98,6 +99,8 @@ class RiskInputs:
     beta: float | None = None
     drawdown: float | None = None
     var_95: float | None = None
+    es_95_month: float | None = None  # one-month 95 % Expected Shortfall, share of the book
+    drawdown_probability: float | None = None  # simulated chance of the max-drawdown fall
     tracking_error: float | None = None
     stress_loss: float | None = None  # positive loss, share of the portfolio
     credit_spread_bp: float | None = None
@@ -330,6 +333,19 @@ def evaluate_risk(inputs: RiskInputs, limits: RiskLimits) -> list[Finding]:
     for key, value, ceiling, what in (
         ("var", inputs.var_95, limits.max_var_95, "one-day historical 95% value at risk"),
         (
+            "es",
+            inputs.es_95_month,
+            limits.max_es_95_month,
+            "one-month 95% Expected Shortfall (average loss in the worst 5% of months)",
+        ),
+        (
+            "drawdown_probability",
+            inputs.drawdown_probability,
+            limits.max_drawdown_probability,
+            f"simulated chance of a {_pct(limits.max_drawdown or 0)} fall from a peak within "
+            f"{limits.drawdown_probability_years} years",
+        ),
+        (
             "tracking_error",
             inputs.tracking_error,
             limits.max_tracking_error,
@@ -553,6 +569,8 @@ async def gather_risk_inputs(
         or limits.min_effective_bets is not None
         or limits.tier_speculative_volatility is not None
         or limits.tier_core_max_volatility is not None
+        or limits.max_es_95_month is not None
+        or (limits.max_drawdown_probability is not None and limits.max_drawdown is not None)
     )
     if wants_book:
         # One load of the weekly base-currency return matrix serves the correlation limit and
@@ -565,6 +583,11 @@ async def gather_risk_inputs(
             from steward.portfolio.validation import validate_book
 
             inputs.model_check = validate_book(book, strategy).review_item
+            tail = _tail_inputs(book, strategy, inputs)
+            if tail.available:
+                from steward.portfolio.risk_snapshots import save_snapshot as save_tail
+
+                await save_tail(pool, "tail", tail, tail.as_of, tail.method_version)
             if risk_report.volatility_forecast is not None:
                 from steward.portfolio.risk_snapshots import save_snapshot
 
@@ -743,6 +766,34 @@ async def _xray_inputs(
         inputs.exposures += [Exposure("sector", b.label, b.weight) for b in classified("sector")]
     if limits.max_country_weight is not None:
         inputs.exposures += [Exposure("country", b.label, b.weight) for b in classified("country")]
+
+
+def _tail_inputs(
+    book: "LoadedBook", strategy: StrategyConfig, inputs: RiskInputs
+) -> "TailReport":
+    """The tail report of the loaded book, and the figures the limits need from it (Q2.4). A
+    limit that cannot be measured is noted as unavailable, never a breach. The caller saves the
+    report."""
+    from steward.portfolio.tail import tail_report
+
+    limits = strategy.risk
+    wants_dd = limits.max_drawdown_probability is not None and limits.max_drawdown is not None
+    report = tail_report(book, strategy)
+    if not report.available:
+        why = report.reason or "no estimate"
+        if limits.max_es_95_month is not None:
+            inputs.unavailable["es"] = why
+        if wants_dd:
+            inputs.unavailable["drawdown_probability"] = why
+        return report
+    inputs.es_95_month = report.es_95_month
+    if wants_dd:
+        horizon = next(
+            (d for d in report.drawdown if d.years == limits.drawdown_probability_years), None
+        )
+        if horizon is not None:
+            inputs.drawdown_probability = horizon.probability
+    return report
 
 
 def _book_inputs(book: "LoadedBook", strategy: StrategyConfig, inputs: RiskInputs) -> "ExAnteRisk":

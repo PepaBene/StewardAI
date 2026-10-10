@@ -57,6 +57,7 @@ from steward.settings import get_settings
 if TYPE_CHECKING:
     from steward.decision.ranking import RankingResponse
     from steward.portfolio.exante import ExAnteRisk
+    from steward.portfolio.tail import TailReport
     from steward.portfolio.validation import ModelValidation
 
 logger = logging.getLogger(__name__)
@@ -715,8 +716,8 @@ async def decision_scorecard_lines(pool: asyncpg.Pool, notes: list[str]) -> list
 
 def risk_section_lines(risk: "ExAnteRisk", validation: "ModelValidation | None") -> list[str]:
     """The model-based part of the review's risk section (pure): forecast against realised
-    volatility, the largest risk contributors, risk by tier against its budgets, the measures
-    that are not modelled yet and whether the model passed its own back-test."""
+    volatility, the largest risk contributors, risk by tier against its budgets and whether the
+    model passed its own back-test. The tail-loss lines come from `tail_lines`."""
     lines: list[str] = []
     if risk.volatility_forecast is not None:
         limit = risk.limits.max_volatility
@@ -750,10 +751,6 @@ def risk_section_lines(risk: "ExAnteRisk", validation: "ModelValidation | None")
         if risk.effective_bets is not None:
             lines.append(f"About {risk.effective_bets:.1f} independent bets.")
         lines += [w for w in risk.warnings if "understates" in w]
-    lines.append(
-        "Expected Shortfall and the probability of a drawdown are not modelled yet, so this "
-        "section has no tail-loss figure."
-    )
     if validation is not None and validation.available:
         lines.append(f"Model check: {validation.verdict}")
     elif validation is not None:
@@ -819,22 +816,51 @@ async def open_risk_limit_keys(pool: asyncpg.Pool) -> list[str]:
     return [r["key"] for r in rows]
 
 
+def tail_lines(report: "TailReport", max_drawdown: float | None) -> list[str]:
+    """The tail-loss lines of the risk section (pure): the bad-month loss and the chance of the
+    drawdown the strategy fears. A report that is not available says why, once."""
+    if not report.available:
+        return [f"No tail-loss figure this month: {report.reason or 'no estimate'}."]
+    lines: list[str] = []
+    if report.es_95_month is not None:
+        money = ""
+        month = next((x for x in report.lines if x.horizon_weeks == 4 and x.level == 0.95), None)
+        if month is not None and month.es_value is not None and report.es_95_month == month.es:
+            money = f" ({month.es_value:,.0f} {report.base_currency})"
+        lines.append(
+            f"In the worst one month in twenty the book has lost about {report.es_95_month:.1%} on "
+            f"average{money}, on weekly returns of today's holdings."
+        )
+    if report.drawdown:
+        longest = report.drawdown[-1]
+        limit = f" (the freeze is at {max_drawdown:.0%})" if max_drawdown is not None else ""
+        lines.append(
+            f"Simulated chance of a {longest.threshold:.0%} fall from a peak within "
+            f"{longest.years} years: {longest.probability:.0%}{limit}."
+        )
+    return lines
+
+
 async def risk_note_lines(
     pool: asyncpg.Pool, notes: list[str], due: list[str] | None = None
 ) -> list[str]:
     """Forecast risk, flagged factor tilts, the hardest past episode and a risk line for each
     thesis due for review. A part that cannot be computed is left out and noted; it never stops
     the review."""
-    from steward.portfolio.exante import ex_ante_risk
+    from steward.portfolio.exante import book_from_snapshot, ex_ante_risk
     from steward.portfolio.factors import factor_exposures
     from steward.portfolio.position_pack import position_risk_pack
     from steward.portfolio.replay import stress_replay
+    from steward.portfolio.tail import tail_report
     from steward.portfolio.validation import model_validation
 
     lines: list[str] = []
     try:
         risk = await ex_ante_risk(pool)
         lines += risk_section_lines(risk, await model_validation(pool))
+        book, strategy = await book_from_snapshot(pool)
+        if book is not None and strategy is not None:
+            lines += tail_lines(tail_report(book, strategy), strategy.risk.max_drawdown)
         for ticker in (due or [])[:MAX_PACKS]:
             pack = await position_risk_pack(pool, ticker)
             if pack.available and pack.summary:

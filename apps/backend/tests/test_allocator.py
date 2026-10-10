@@ -2,7 +2,12 @@
 
 import pytest
 
-from steward.config.strategy import CategoryTarget, PositionWeightRule, StrategyConfig
+from steward.config.strategy import (
+    CategoryTarget,
+    PositionWeightRule,
+    StrategyConfig,
+    TargetBand,
+)
 from steward.decision import allocator as al
 
 CAP = 0.10
@@ -64,6 +69,22 @@ def _run(
 
 # Total before the deposit: 300 + 90 + 120 + 390 (other) + 100 cash = 1000.
 HELD = {"ETF": 300.0, "A": 90.0, "B": 120.0, "OTHER": 390.0}
+
+
+def test_a_deposit_keeps_back_what_cash_needs_to_reach_the_lower_edge_of_its_band() -> None:
+    strategy = _strategy(core_target=0.6)
+    strategy.cash_target = TargetBand(target_weight=0.10, band=0.02)
+    # 900 invested + 20 cash + 100 deposit = 1020; the 8 % floor is 81.6, so 61.6 stays back.
+    assert al.cash_reserve(100.0, 20.0, {"ETF": 900.0}, strategy) == pytest.approx(61.6)
+    assert al.cash_reserve(100.0, 200.0, {"ETF": 900.0}, strategy) == 0.0
+    strategy.cash_target = None
+    assert al.cash_reserve(100.0, 20.0, {"ETF": 900.0}, strategy) == 0.0
+
+    strategy.cash_target = TargetBand(target_weight=0.10, band=0.02)
+    plan = _run(strategy, {"ETF": 900.0}, [_cand("ETF", 10.0, None, etf=True)], cash=20.0)
+    assert plan.spent <= 100.0 - 61.6 + 1e-9
+    assert plan.left_over >= 61.6 - 1e-9
+    assert any("stays in cash" in n for n in plan.notes)
 
 
 def test_the_core_gets_the_deposit_first_while_it_is_below_its_target_and_in_whole_shares() -> None:

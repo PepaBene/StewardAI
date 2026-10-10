@@ -33,6 +33,12 @@ class Fundamentals:
     is_stock: bool
     market_cap: float | None
     profitable: bool | None
+    # Annual loss years among the stored annual results (needs MIN_PROFIT_YEARS of them); None
+    # when there is not enough history to say.
+    loss_years: int | None = None
+
+
+MIN_PROFIT_YEARS = 3
 
 
 @dataclass(frozen=True)
@@ -69,6 +75,10 @@ def derive_tier(
             )
         if profitable is False:
             return make("speculative", "it is not profitable")
+        if facts is not None and facts.loss_years:
+            return make(
+                "growth", f"it made a loss in {facts.loss_years} of its stored annual results"
+            )
         if (
             cap is not None
             and cap > limits.tier_core_min_market_cap
@@ -144,6 +154,7 @@ async def load_fundamentals(pool: asyncpg.Pool, tickers: Sequence[str]) -> dict[
         figures = r["figures"]
         figures = json.loads(figures) if isinstance(figures, str) else figures
         per.setdefault(r["ticker"], {})[r["source"]] = figures or {}
+    losses = await _loss_years(pool, tickers)
     out: dict[str, Fundamentals] = {}
     for ticker, sources in per.items():
         av = sources.get("alphavantage", {})
@@ -159,8 +170,36 @@ async def load_fundamentals(pool: asyncpg.Pool, tickers: Sequence[str]) -> dict[
             if margin is not None
             else (net_income > 0 if net_income is not None else None)
         )
-        out[ticker] = Fundamentals(is_stock, cap, profitable)
+        out[ticker] = Fundamentals(is_stock, cap, profitable, losses.get(ticker))
     return out
+
+
+async def _loss_years(pool: asyncpg.Pool, tickers: Sequence[str]) -> dict[str, int]:
+    """Per ticker, the number of loss years among the latest five annual net results, for the
+    tickers that have at least MIN_PROFIT_YEARS of them. One value per year (the latest filed)."""
+    try:
+        rows = await pool.fetch(
+            "select ticker, period_end, value from (select distinct on (ticker, period_end)"
+            " ticker, period_end, value from public.financial_statement_fact"
+            " where ticker = any($1::text[]) and published"
+            " and concept in ('us-gaap:NetIncomeLoss', 'us-gaap:ProfitLoss',"
+            " 'ifrs-full:ProfitLoss')"
+            " and period_start is not null and period_end - period_start between 350 and 380"
+            " and (dimensions is null or dimensions = '{}'::jsonb)"
+            " order by ticker, period_end, known_at desc) t",
+            list(tickers),
+        )
+    except Exception as exc:  # the tier must not depend on this
+        log.warning("could not read annual results for the tiers: %s", exc)
+        return {}
+    per: dict[str, list[tuple[Any, float]]] = {}
+    for r in rows:
+        per.setdefault(r["ticker"], []).append((r["period_end"], float(r["value"])))
+    return {
+        t: sum(1 for _, v in sorted(vals)[-5:] if v < 0)
+        for t, vals in per.items()
+        if len(vals) >= MIN_PROFIT_YEARS
+    }
 
 
 async def save_tiers(pool: asyncpg.Pool, tiers: Mapping[str, DerivedTier]) -> None:

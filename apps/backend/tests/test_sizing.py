@@ -1,8 +1,49 @@
 """Sizing and concentration arithmetic (plan Q5.2, Q5.3, Q5.5), by hand-worked examples."""
 
+import datetime as dt
+from types import SimpleNamespace
+
 import pytest
 
+from steward.config.strategy import PretradeThresholds
+from steward.portfolio.sizing import conviction_confidence
 from steward.quant import sizing as sz
+
+
+def test_the_conviction_mapping_follows_the_strategy_settings() -> None:
+    assert [conviction_confidence(c) for c in (1, 3, 5)] == pytest.approx([0.2, 0.5, 0.8])
+    assert conviction_confidence(None) == pytest.approx(0.5)
+    assert conviction_confidence(5, 0.3, 0.7) == pytest.approx(0.7)
+    assert conviction_confidence(2, 0.3, 0.7) == pytest.approx(0.4)
+    with pytest.raises(ValueError, match="confidence_low"):
+        PretradeThresholds(confidence_low=0.9, confidence_high=0.4)
+    assert PretradeThresholds().equity_premium == pytest.approx(0.05)
+
+
+class _FakePool:
+    def __init__(self, rows: list[dict[str, object]]) -> None:
+        self.rows = rows
+
+    async def fetch(self, *_: object) -> list[dict[str, object]]:
+        return self.rows
+
+
+async def test_the_start_size_is_cut_to_fit_the_largest_move_on_a_report_date() -> None:
+    from steward.portfolio.sizing import _event_cap
+
+    days = [dt.date(2026, 1, 1) + dt.timedelta(days=i) for i in range(10)]
+    closes = [(d, 100.0) for d in days]
+    closes[5] = (days[5], 90.0)  # a 10 % fall over the report on day 4/5
+    closes[6:] = [(d, 90.0) for d in days[6:]]
+    pool = _FakePool([{"ticker": "AAA", "day": days[5]}])
+    book = SimpleNamespace(daily_closes={"AAA": closes})
+    cap = await _event_cap(pool, "AAA", 0.01, {}, book)  # type: ignore[arg-type]
+    assert cap is not None
+    move, weight = cap
+    assert move == pytest.approx(0.10) and weight == pytest.approx(0.10)  # 1 % / 10 %
+    assert await _event_cap(pool, "AAA", None, {}, book) is None  # type: ignore[arg-type]
+    no_dates = _FakePool([])
+    assert await _event_cap(no_dates, "AAA", 0.01, {}, book) is None  # type: ignore[arg-type]
 
 
 def test_the_equilibrium_return_is_the_risk_free_rate_plus_beta_times_the_premium() -> None:

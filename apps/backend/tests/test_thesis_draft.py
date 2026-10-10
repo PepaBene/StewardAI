@@ -33,6 +33,20 @@ def test_lines_without_a_real_fact_are_dropped_and_counted() -> None:
     assert "base-rate" in out.left_to_owner[0]
 
 
+def test_scenario_stories_keep_only_cited_facts_and_carry_no_numbers_of_their_own() -> None:
+    model = ModelDraft(
+        scenarios=draft.DraftScenarios(
+            bear=DraftLine(text="Margins fall.", facts=[2]),
+            base=DraftLine(text="Invented.", facts=[]),
+            bull=DraftLine(text="Segment doubles.", facts=[3, 99]),
+        )
+    )
+    out = draft.resolve(model, FACTS, None, "X")
+    assert set(out.scenarios) == {"bear", "bull"}
+    assert out.scenarios["bull"].facts == ["fact 3"] and out.dropped == 1
+    assert any("scenario prices" in x for x in out.left_to_owner)
+
+
 def test_a_short_pre_mortem_is_said_to_be_short() -> None:
     model = ModelDraft(pre_mortem=[DraftLine(text="only", facts=[1])])
     out = draft.resolve(model, FACTS, None, "X")

@@ -127,6 +127,16 @@ def test_the_pretrade_return_uses_the_scenarios_when_the_thesis_has_them() -> No
     assert expected_return(facts)[0] == pytest.approx(1.0)
 
 
+def test_pence_and_pounds_are_the_same_currency_with_the_price_scaled() -> None:
+    from steward.fx.convert import price_in_unit
+
+    assert price_in_unit(1250.0, "GBX", "GBP") == pytest.approx(12.5)
+    assert price_in_unit(12.5, "GBP", "GBX") == pytest.approx(1250.0)
+    assert price_in_unit(50.0, "USD", "USD") == pytest.approx(50.0)
+    assert price_in_unit(50.0, "USD", "EUR") is None
+    assert price_in_unit(50.0, None, "EUR") == pytest.approx(50.0)
+
+
 # ------------------------------------------------------------------------------ risk profile
 
 

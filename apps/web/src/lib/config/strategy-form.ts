@@ -76,6 +76,12 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
     auto_tiers: false,
     tier_speculative_market_cap: 2e9,
     tier_core_min_market_cap: 1e10,
+    max_es_95_month: null,
+    max_drawdown_probability: null,
+    drawdown_probability_years: 3,
+    max_stock_risk_share: 0.08,
+    thesis_volatility_multiple: 1.5,
+    drawdown_warnings: [0.1, 0.15],
   },
   hard_limit_severity: "severity_3",
   band_breach_severity: "severity_1",
@@ -200,6 +206,18 @@ export type StrategyForm = {
   risk_max_valuation_terminal_growth: string;
   risk_max_valuation_growth: string;
   risk_on_breach: OnBreach;
+  /** One stock's largest share of the portfolio's volatility, percent; blank switches it off. */
+  risk_max_stock_risk_share: string;
+  /** A held stock's recent volatility, as a multiple of its thesis band, that opens a review. */
+  risk_thesis_volatility_multiple: string;
+  /** One-month 95 % Expected Shortfall ceiling, percent; blank switches it off. */
+  risk_max_es_95_month: string;
+  /** Ceiling on the simulated chance of the max-drawdown fall, percent; blank switches it off. */
+  risk_max_drawdown_probability: string;
+  /** Horizon of that chance in years (1 to 3). */
+  risk_drawdown_probability_years: string;
+  /** Drawdown early-warning rungs as percents, separated by commas ("10, 15"); blank for none. */
+  risk_drawdown_warnings: string;
   /** Severity of a position above its hard limit. */
   hard_limit_severity: OnBreach;
   /** Severity of a weight outside its band (1: digest only; 2 or 3 also alert). */
@@ -221,7 +239,6 @@ const RISK_EXTRA_KEYS = [
   "tier_speculative_market_cap",
   "tier_core_min_market_cap",
   "stress_episodes",
-  "drawdown_warnings",
 ] as const;
 
 type RiskBody = NonNullable<StrategyConfig["risk"]>;
@@ -314,6 +331,22 @@ export function strategyFromBody(body: StrategyConfig | null): StrategyForm {
     risk_max_valuation_terminal_growth: fractionToPercent(b.risk?.max_valuation_terminal_growth),
     risk_max_valuation_growth: fractionToPercent(b.risk?.max_valuation_growth),
     risk_on_breach: b.risk?.on_breach ?? "severity_2",
+    // An absent value means the backend default; an explicit null means the owner switched it off.
+    risk_max_stock_risk_share: fractionToPercent(
+      b.risk?.max_stock_risk_share === undefined ? 0.08 : b.risk.max_stock_risk_share,
+    ),
+    risk_thesis_volatility_multiple:
+      b.risk?.thesis_volatility_multiple === undefined
+        ? "1.5"
+        : b.risk.thesis_volatility_multiple === null
+          ? ""
+          : String(b.risk.thesis_volatility_multiple),
+    risk_max_es_95_month: fractionToPercent(b.risk?.max_es_95_month),
+    risk_max_drawdown_probability: fractionToPercent(b.risk?.max_drawdown_probability),
+    risk_drawdown_probability_years: String(b.risk?.drawdown_probability_years ?? 3),
+    risk_drawdown_warnings: (b.risk?.drawdown_warnings ?? [0.1, 0.15])
+      .map((rung) => fractionToPercent(rung))
+      .join(", "),
     categories,
     classifications,
     cash_enabled: b.cash_target != null,
@@ -446,6 +479,16 @@ export function strategyToBody(form: StrategyForm): StrategyConfig {
       max_valuation_terminal_growth: optionalPercent(form.risk_max_valuation_terminal_growth) as number | null,
       max_valuation_growth: optionalPercent(form.risk_max_valuation_growth) as number | null,
       on_breach: form.risk_on_breach,
+      max_stock_risk_share: optionalPercent(form.risk_max_stock_risk_share) as number | null,
+      thesis_volatility_multiple: optionalNumber(form.risk_thesis_volatility_multiple) as number | null,
+      max_es_95_month: optionalPercent(form.risk_max_es_95_month) as number | null,
+      max_drawdown_probability: optionalPercent(form.risk_max_drawdown_probability) as number | null,
+      drawdown_probability_years: (Number(form.risk_drawdown_probability_years.trim()) ||
+        form.risk_drawdown_probability_years.trim()) as number,
+      drawdown_warnings: form.risk_drawdown_warnings
+        .split(/[,;\s]+/)
+        .filter((part) => part !== "")
+        .map((part) => percentToFraction(part)) as number[],
       auto_tiers: false,
       tier_speculative_market_cap: 2e9,
       tier_core_min_market_cap: 1e10,

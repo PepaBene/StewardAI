@@ -203,6 +203,7 @@ def allocate(
 ) -> AllocationPlan:
     """Split `amount` over the candidates by the order of principle 8c (pure)."""
     strategy_t = apply_tiers(strategy, tier_of)
+    reserve = cash_reserve(amount, cash_before, held, strategy_t)
     state = _State(values=dict(held), currency=dict(currency))
     for c in candidates:
         state.currency.setdefault(c.ticker, c.currency)
@@ -237,7 +238,7 @@ def allocate(
         if why and c.ticker not in set_aside:
             set_aside[c.ticker] = why
     for _ in range(MAX_STEPS):
-        remaining = amount - state.spent
+        remaining = amount - reserve - state.spent
         live = [c for c in candidates if c.ticker not in set_aside and c.price_base <= remaining]
         if not live:
             break
@@ -339,6 +340,11 @@ def allocate(
         strategy_t,
     )
     notes: list[str] = []
+    if reserve > 0:
+        notes.append(
+            f"{reserve:,.0f} {base_currency} of the deposit stays in cash: the cash target "
+            "(principle 2c) is below its lower band edge without it."
+        )
     if state.spent <= 0:
         notes.append(
             "Nothing could be bought: no candidate passes the thesis and return tests and fits "
@@ -358,6 +364,20 @@ def allocate(
         rule_findings_after=[f.detail for f in after_findings if f.key in before_rules],
         notes=notes,
     )
+
+
+def cash_reserve(
+    amount: float, cash_before: float, held: dict[str, float], strategy: StrategyConfig
+) -> float:
+    """How much of the deposit to leave in cash (principle 2c): what lifts cash back to the
+    lower edge of the strategy's cash band, measured on the book after the deposit. Zero when
+    the strategy sets no cash target, or cash is already at or above that edge."""
+    target = strategy.cash_target
+    if target is None:
+        return 0.0
+    total = sum(v for v in held.values() if v > 0) + max(cash_before, 0.0) + amount
+    floor = max(target.target_weight - target.band, 0.0) * total
+    return min(amount, max(0.0, floor - max(cash_before, 0.0)))
 
 
 def _stage_order(stage: Stage) -> int:

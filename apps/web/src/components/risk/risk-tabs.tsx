@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { href: "/risk", label: "Risk" },
   { href: "/risk/ex-ante", label: "Today’s risk" },
+  { href: "/risk/tail", label: "Bad months" },
   { href: "/risk/replay", label: "Past episodes" },
   { href: "/risk/factors", label: "Factors" },
   { href: "/risk/stress", label: "Stress test" },

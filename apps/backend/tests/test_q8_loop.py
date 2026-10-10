@@ -66,7 +66,8 @@ def test_a_ranked_row_carries_returns_risk_and_the_score() -> None:
         (row.returns.annualized - 0.035) / row.risk.volatility_1y  # type: ignore[operator]
     )
     assert row.improves_portfolio is True  # score well above 0.3 x correlation 1.0
-    assert "milder" in (row.bear_loss_vs_history or "") or "deep" in (row.bear_loss_vs_history or "")
+    history = row.bear_loss_vs_history or ""
+    assert "milder" in history or "deep" in history
 
 
 def test_a_thesis_without_scenarios_says_why_instead_of_showing_a_number() -> None:
@@ -124,7 +125,9 @@ def test_the_review_counts_the_bench_against_five_to_ten() -> None:
     ideas = [_row(_thesis(f"B{i}", **SCENARIOS)) for i in range(3)]
     lines = bench_lines(_ranking(ideas))
     assert lines[0] == "Bench: 3 ideas with a thesis, below the target of 5 to 10."
-    assert any("Best-ranked idea B0" in line and "above the return hurdle" in line for line in lines)
+    assert any(
+        "Best-ranked idea B0" in line and "above the return hurdle" in line for line in lines
+    )
     held = _row(_thesis("H", **SCENARIOS), held=True)
     assert "within" in bench_lines(_ranking([held, *ideas * 2]))[0]
 

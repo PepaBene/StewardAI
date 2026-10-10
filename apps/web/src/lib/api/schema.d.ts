@@ -788,6 +788,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/portfolio/risk/tail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio Risk Tail
+         * @description The bad-month numbers for today's weights, on weekly returns: Value at Risk and Expected
+         *     Shortfall at 95 and 99 % over one week and one month (historical, filtered-historical and
+         *     Cornish-Fisher), each position's part of the Expected Shortfall, the simulated chance of the
+         *     `max_drawdown` fall within 1, 2 and 3 years with drawdown and terminal-value quantiles, and
+         *     the downside statistics of the weekly record. `available` is false, with a `reason`, when
+         *     there is no book or too little history.
+         */
+        get: operations["get_portfolio_risk_tail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/portfolio/risk/snapshots": {
         parameters: {
             query?: never;
@@ -1687,6 +1712,27 @@ export interface paths {
          *     two stocks from the switch date and says whether the safety margin should be raised.
          */
         post: operations["add_switch_log"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/theses/switches/detected": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Detected Switches
+         * @description Sales followed within three days by a buy of another stock in your Trading212 history, not
+         *     yet in the log. Candidates only: confirm one with the log call below.
+         */
+        get: operations["detected_switches"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -13798,6 +13844,22 @@ export interface components {
             /** Inputs */
             inputs: string[];
         };
+        /** DetectedSwitch */
+        DetectedSwitch: {
+            /**
+             * Switched On
+             * Format: date
+             */
+            switched_on: string;
+            /** Sold Ticker */
+            sold_ticker: string;
+            /** Bought Ticker */
+            bought_ticker: string;
+            /** Sold Value Base */
+            sold_value_base: number;
+            /** Bought Value Base */
+            bought_value_base: number;
+        };
         /** DiffChange */
         DiffChange: {
             /**
@@ -14519,6 +14581,61 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** DownsideOut */
+        DownsideOut: {
+            /** Periods */
+            periods: number;
+            /** Annual Return */
+            annual_return: number;
+            /** Downside Deviation */
+            downside_deviation: number;
+            /** Sortino */
+            sortino: number | null;
+            /** Max Drawdown */
+            max_drawdown: number;
+            /** Calmar */
+            calmar: number | null;
+            /** Ulcer Index */
+            ulcer_index: number;
+            /** Skew */
+            skew: number;
+            /** Excess Kurtosis */
+            excess_kurtosis: number;
+        };
+        /** DrawdownOdds */
+        DrawdownOdds: {
+            /** Years */
+            years: number;
+            /** Probability */
+            probability: number;
+            /** Threshold */
+            threshold: number;
+            /** Drawdown P50 */
+            drawdown_p50: number;
+            /** Drawdown P95 */
+            drawdown_p95: number;
+            /** Conditional Drawdown At Risk */
+            conditional_drawdown_at_risk: number;
+            /** Terminal P05 */
+            terminal_p05: number;
+            /** Terminal P50 */
+            terminal_p50: number;
+            /** Terminal P95 */
+            terminal_p95: number;
+            /** Recovery Median Weeks */
+            recovery_median_weeks?: number | null;
+            /** Recovered Share */
+            recovered_share?: number | null;
+            /** Fan */
+            fan?: {
+                [key: string]: number[];
+            };
+            /**
+             * Fan Step Weeks
+             * @default 4
+             */
+            fan_step_weeks: number;
+        };
         /** DriftReport */
         DriftReport: {
             /**
@@ -14747,6 +14864,25 @@ export interface components {
             patent_candidates: number;
         } & {
             [key: string]: unknown;
+        };
+        /** EsContribution */
+        EsContribution: {
+            /** Ticker */
+            ticker: string;
+            /** Name */
+            name?: string | null;
+            /** Weight */
+            weight: number;
+            /**
+             * Es Share
+             * @description Share of the book's one-month 95 % Expected Shortfall.
+             */
+            es_share: number;
+            /**
+             * Part Of Es
+             * @description That figure as a part of the total (adds to 1).
+             */
+            part_of_es: number;
         };
         /** EscalationBody */
         EscalationBody: {
@@ -15692,6 +15828,13 @@ export interface components {
             coverage: components["schemas"]["steward__portfolio__exante__Coverage"] | null;
             /** Tier Checks */
             tier_checks: components["schemas"]["TierCheck"][];
+            /**
+             * Figure Basis
+             * @description The window and observation count behind each headline figure.
+             */
+            figure_basis?: {
+                [key: string]: components["schemas"]["FigureBasis"];
+            };
             limits: components["schemas"]["ExAnteLimits"];
             /** Warnings */
             warnings: string[];
@@ -16874,6 +17017,21 @@ export interface components {
             warnings?: string[];
             /** Input Hash */
             input_hash?: string | null;
+        };
+        /**
+         * FigureBasis
+         * @description What one figure rests on (rule 2): its window, how many weekly observations it used and
+         *     the model behind it.
+         */
+        FigureBasis: {
+            /** Window Start */
+            window_start: string | null;
+            /** Window End */
+            window_end: string | null;
+            /** Observations */
+            observations: number;
+            /** Method */
+            method: string;
         };
         /** FiledInput */
         FiledInput: {
@@ -25652,6 +25810,33 @@ export interface components {
              * @description Largest share of the portfolio's volatility one stock may account for. Unset: the share is shown but not judged, because the strategy states no number.
              */
             risk_contribution_cap?: number | null;
+            /**
+             * Score For Full Start
+             * @description Risk-adjusted score that earns the full tier starting cap; a lower score starts proportionally smaller. Unset: not applied.
+             */
+            score_for_full_start?: number | null;
+            /**
+             * Event Loss Budget
+             * @description Most of the portfolio one results day may cost; the starting size is cut to fit the stock's largest past move on a report date. Unset: not applied.
+             */
+            event_loss_budget?: number | null;
+            /**
+             * Equity Premium
+             * @description Yearly return above cash that the market is assumed to pay; the anchor the quarter-Kelly bound pulls a thesis return toward.
+             * @default 0.05
+             */
+            equity_premium: number;
+            /**
+             * Confidence Low
+             * @description Weight on the thesis return at conviction 1 (conviction 5 uses the high one).
+             * @default 0.2
+             */
+            confidence_low: number;
+            /**
+             * Confidence High
+             * @default 0.8
+             */
+            confidence_high: number;
         };
         /**
          * PretradeThresholds
@@ -25709,6 +25894,34 @@ export interface components {
              * @description Largest share of portfolio volatility one stock may account for (null: shown but not judged).
              */
             risk_contribution_cap?: number | null;
+            /**
+             * Score For Full Start
+             * @description The risk-adjusted score ((annualised thesis return - cash rate) / volatility) that earns the full tier starting cap. A stock scoring half of it starts at half the cap; a ceiling only, never above the tier cap. Null: not applied.
+             */
+            score_for_full_start?: number | null;
+            /**
+             * Event Loss Budget
+             * @description Most of the portfolio one results day may cost, as a fraction (0.01 = 1 %). The starting size is cut so that the stock's largest past move on a report date stays inside it. Null: not applied.
+             */
+            event_loss_budget?: number | null;
+            /**
+             * Equity Premium
+             * @description Yearly return above cash the market is assumed to pay; the anchor a thesis return is pulled toward in the quarter-Kelly bound.
+             * @default 0.05
+             */
+            equity_premium: number;
+            /**
+             * Confidence Low
+             * @description Weight on the thesis return at conviction 1.
+             * @default 0.2
+             */
+            confidence_low: number;
+            /**
+             * Confidence High
+             * @description Weight on the thesis return at conviction 5.
+             * @default 0.8
+             */
+            confidence_high: number;
         };
         /**
          * PriceBarOut
@@ -28506,6 +28719,22 @@ export interface components {
              */
             max_var_95?: number | null;
             /**
+             * Max Es 95 Month
+             * @description Ceiling on the portfolio's one-month 95 % Expected Shortfall (the average loss in the worst 5 % of months), as a share of the portfolio (0.10 = 10 %), from the larger of the historical and filtered-historical estimates on weekly returns.
+             */
+            max_es_95_month?: number | null;
+            /**
+             * Max Drawdown Probability
+             * @description Ceiling on the simulated chance that the portfolio falls by `max_drawdown` from a peak at some point within `drawdown_probability_years` (0.15 = 15 %). Needs `max_drawdown`.
+             */
+            max_drawdown_probability?: number | null;
+            /**
+             * Drawdown Probability Years
+             * @description Horizon of the drawdown probability, in years.
+             * @default 3
+             */
+            drawdown_probability_years: number;
+            /**
              * Max Tracking Error
              * @description Ceiling on the annualised tracking error against the configured benchmark (0.08 = 8 %), from the last year of daily returns.
              */
@@ -30383,7 +30612,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "ex_ante" | "replay" | "factors" | "shock";
+            kind: "ex_ante" | "replay" | "factors" | "shock" | "tail";
             /** Scope */
             scope: string;
             /**
@@ -31073,9 +31302,29 @@ export interface components {
              * @default none
              * @enum {string}
              */
-            binding: "tier_cap" | "risk_limits" | "none";
+            binding: "tier_cap" | "risk_limits" | "event_risk" | "score" | "none";
+            /**
+             * Score
+             * @description (annualised thesis return - cash rate) / volatility, the risk-adjusted score of Q8.4 on the sizing inputs.
+             */
+            score?: number | null;
+            /**
+             * Score Size
+             * @description The tier cap scaled by score / `pretrade.score_for_full_start`; a ceiling.
+             */
+            score_size?: number | null;
             /** Limits Reached */
             limits_reached?: string[];
+            /**
+             * Event Move
+             * @description Largest past move around a report date (a fraction).
+             */
+            event_move?: number | null;
+            /**
+             * Event Cap
+             * @description Weight at which that move costs `pretrade.event_loss_budget` of the book.
+             */
+            event_cap?: number | null;
             /** Base Currency */
             base_currency?: string | null;
             kelly?: components["schemas"]["KellyOut"] | null;
@@ -31906,6 +32155,85 @@ export interface components {
              */
             disclaimer: string;
         };
+        /** TailLine */
+        TailLine: {
+            /** Horizon Weeks */
+            horizon_weeks: number;
+            /** Level */
+            level: number;
+            /** Method */
+            method: string;
+            /**
+             * Var
+             * @description Loss exceeded on (1 - level) of periods, share of the book.
+             */
+            var: number;
+            /**
+             * Es
+             * @description Average loss on those periods.
+             */
+            es: number;
+            /** Var Value */
+            var_value?: number | null;
+            /** Es Value */
+            es_value?: number | null;
+        };
+        /** TailReport */
+        TailReport: {
+            /**
+             * Method Version
+             * @default tail-report-1
+             */
+            method_version: string;
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Base Currency */
+            base_currency?: string | null;
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Weeks
+             * @default 0
+             */
+            weeks: number;
+            /** Total Value */
+            total_value?: number | null;
+            /** Covered Share */
+            covered_share?: number | null;
+            /** Lines */
+            lines?: components["schemas"]["TailLine"][];
+            /** Contributions */
+            contributions?: components["schemas"]["EsContribution"][];
+            /** Drawdown */
+            drawdown?: components["schemas"]["DrawdownOdds"][];
+            downside?: components["schemas"]["DownsideOut"] | null;
+            /**
+             * Es 95 Month
+             * @description The larger of the historical and filtered-historical figures.
+             */
+            es_95_month?: number | null;
+            /**
+             * Block Weeks
+             * @default 8
+             */
+            block_weeks: number;
+            /**
+             * Seed
+             * @default 20261010
+             */
+            seed: number;
+            /**
+             * Paths
+             * @default 10000
+             */
+            paths: number;
+            /** Warnings */
+            warnings?: string[];
+            /** Not Modelled */
+            not_modelled?: string[];
+        };
         /** TargetBand */
         TargetBand: {
             /** Target Weight */
@@ -32259,6 +32587,13 @@ export interface components {
             ticker: string;
             /** Model */
             model: string | null;
+            /**
+             * Scenarios
+             * @description What would have to happen for the bear, base and bull case, with the facts each rests on. Prices and probabilities are the owner's.
+             */
+            scenarios?: {
+                [key: string]: components["schemas"]["ThesisDraftLine"];
+            };
             why_owned: components["schemas"]["ThesisDraftLine"] | null;
             /** Exit Conditions */
             exit_conditions: components["schemas"]["ThesisDraftLine"][];
@@ -35751,10 +36086,30 @@ export interface operations {
             };
         };
     };
+    get_portfolio_risk_tail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TailReport"];
+                };
+            };
+        };
+    };
     get_risk_snapshots: {
         parameters: {
             query?: {
-                kind?: ("ex_ante" | "replay" | "factors" | "shock") | null;
+                kind?: ("ex_ante" | "replay" | "factors" | "shock" | "tail") | null;
                 limit?: number;
             };
             header?: never;
@@ -36055,7 +36410,7 @@ export interface operations {
         parameters: {
             query: {
                 ticker: string;
-                premium?: number;
+                premium?: number | null;
             };
             header?: never;
             path?: never;
@@ -37213,6 +37568,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detected_switches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectedSwitch"][];
                 };
             };
         };

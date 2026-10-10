@@ -48,6 +48,13 @@ async def list_switch_log(pool: Pool, owner: Owner) -> list[switches.SwitchEntry
     return await switches.list_switches(pool, owner.user_id)
 
 
+@router.get("/switches/detected")
+async def detected_switches(pool: Pool, owner: Owner) -> list[switches.DetectedSwitch]:
+    """Sales followed within three days by a buy of another stock in your Trading212 history, not
+    yet in the log. Candidates only: confirm one with the log call below."""
+    return await switches.detect(pool, owner.user_id)
+
+
 @router.post("/switches/log", status_code=201)
 async def add_switch_log(body: switches.SwitchIn, pool: Pool, owner: Owner) -> switches.SwitchEntry:
     """Record a switch you made in Trading212 (stock sold, stock bought), with the prices of the

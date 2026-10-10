@@ -228,9 +228,13 @@ function SizeOutcome({ size }: { size: StartSize }) {
         </div>
       </dl>
       <p className="text-sm text-text-muted">
-        {size.binding === "risk_limits"
-          ? `The risk limits bind first${(size.limits_reached ?? []).length > 0 ? ` (${(size.limits_reached ?? []).join(", ")})` : ""}.`
-          : "Your tier cap binds first; the risk limits allow it."}
+        {size.binding === "score"
+          ? `The stock's risk-adjusted score (${size.score?.toFixed(2) ?? "—"}) binds first: it earns ${formatPercent(size.score_size)} of the portfolio, a share of the tier cap in proportion to that score.`
+          : size.binding === "event_risk"
+          ? `The stock's biggest move on a results day (${formatPercent(size.event_move)}) binds first: at ${formatPercent(size.event_cap)} of the portfolio it uses up your results-day loss budget.`
+          : size.binding === "risk_limits"
+            ? `The risk limits bind first${(size.limits_reached ?? []).length > 0 ? ` (${(size.limits_reached ?? []).join(", ")})` : ""}.`
+            : "Your tier cap binds first; the risk limits allow it."}
       </p>
       {k?.available ? (
         <p className="text-xs text-text-muted">

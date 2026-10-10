@@ -2,8 +2,8 @@
 
 What the position adds to the portfolio's risk, who it moves with, and what the past episodes
 would have done to it. Everything is read from the same models as the portfolio pages
-(`exante`, `replay`); nothing new is estimated here. Expected Shortfall is not modelled yet
-(plan Q2), and the pack says so instead of leaving a blank.
+(`exante`, `replay`, `tail`); nothing new is estimated here. The Expected Shortfall part is
+the position's share of the book's one-week 95 % loss; without one the pack says why.
 """
 
 import logging
@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from steward.portfolio import exante as ea
 from steward.portfolio.replay import StressReplay, stress_replay
+from steward.portfolio.tail import tail_report
 
 log = logging.getLogger(__name__)
 
@@ -66,8 +67,10 @@ def build_pack(
     report: ea.ExAnteRisk,
     correlations: list[tuple[str, str, float, int]],
     replay: StressReplay | None,
+    es_part: float | None = None,
 ) -> PositionRiskPack:
-    """The pack from reports already computed (pure)."""
+    """The pack from reports already computed (pure). `es_part` is the position's part of the
+    book's one-week 95 % Expected Shortfall (the parts add to 1), when it has been computed."""
     row = next((p for p in report.positions if p.ticker == ticker), None)
     if row is None:
         return PositionRiskPack(
@@ -108,6 +111,8 @@ def build_pack(
         total = row.weight + sum(m.weight for m in cluster)
         names = ", ".join(m.ticker for m in cluster[:3])
         parts.append(f"it moves with {names} (together {total:.1%} of the portfolio)")
+    if es_part is not None:
+        parts.append(f"{es_part:.0%} of the book's loss in its worst weeks")
     if stress:
         worst = stress[0]
         money = f"{worst.pnl:+,.0f} {report.base_currency or ''}".rstrip()
@@ -124,9 +129,14 @@ def build_pack(
         cluster=cluster,
         cluster_weight=(row.weight + sum(m.weight for m in cluster)) if cluster else None,
         stress=stress,
+        expected_shortfall_contribution=es_part,
         summary="; ".join(parts) + ("." if parts else ""),
         notes=[
-            "Expected Shortfall is not modelled yet, so there is no tail-loss contribution.",
+            *(
+                []
+                if es_part is not None
+                else ["No tail-loss contribution: the position has no weekly series in the book."]
+            ),
             *(
                 ["Part of the stress result is estimated through a proxy."]
                 if any(s.basis == "proxied" for s in stress)
@@ -151,7 +161,13 @@ async def position_risk_pack(pool: asyncpg.Pool, ticker: str) -> PositionRiskPac
         replay = await stress_replay(pool)
     except Exception:
         log.exception("replay for the position pack failed")
-    out = build_pack(ticker, report, correlations, replay)
+    es_part: float | None = None
+    try:
+        tail = tail_report(book, strategy)
+        es_part = next((c.part_of_es for c in tail.contributions if c.ticker == ticker), None)
+    except Exception:
+        log.exception("tail report for the position pack failed")
+    out = build_pack(ticker, report, correlations, replay, es_part)
     if replay is None:
         out.notes.append("The past-episode replay could not be computed.")
     return out

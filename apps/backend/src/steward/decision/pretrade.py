@@ -66,6 +66,34 @@ class PretradeRules(BaseModel):
         description="Largest share of the portfolio's volatility one stock may account for. "
         "Unset: the share is shown but not judged, because the strategy states no number.",
     )
+    score_for_full_start: float | None = Field(
+        default=None,
+        gt=0,
+        le=10,
+        description="Risk-adjusted score that earns the full tier starting cap; a lower score "
+        "starts proportionally smaller. Unset: not applied.",
+    )
+    event_loss_budget: float | None = Field(
+        default=None,
+        gt=0,
+        le=1,
+        description="Most of the portfolio one results day may cost; the starting size is cut "
+        "to fit the stock's largest past move on a report date. Unset: not applied.",
+    )
+    equity_premium: float = Field(
+        default=0.05,
+        ge=0,
+        le=0.2,
+        description="Yearly return above cash that the market is assumed to pay; the anchor "
+        "the quarter-Kelly bound pulls a thesis return toward.",
+    )
+    confidence_low: float = Field(
+        default=0.2,
+        ge=0,
+        le=1,
+        description="Weight on the thesis return at conviction 1 (conviction 5 uses the high one).",
+    )
+    confidence_high: float = Field(default=0.8, ge=0, le=1)
 
     def start_cap(self, tier: str | None) -> float | None:
         return {

@@ -308,6 +308,16 @@ class TierCheck(BaseModel):
     breached: bool
 
 
+class FigureBasis(BaseModel):
+    """What one figure rests on (rule 2): its window, how many weekly observations it used and
+    the model behind it."""
+
+    window_start: dt.date | None
+    window_end: dt.date | None
+    observations: int
+    method: str
+
+
 class ExAnteLimits(BaseModel):
     max_volatility: float | None
     tier_risk_budgets: dict[str, float] | None
@@ -355,6 +365,10 @@ class ExAnteRisk(BaseModel):
     by_currency: list[GroupRisk]
     coverage: Coverage | None
     tier_checks: list[TierCheck]
+    figure_basis: dict[str, FigureBasis] = Field(
+        default_factory=dict,
+        description="The window and observation count behind each headline figure.",
+    )
     limits: ExAnteLimits
     warnings: list[str]
     reason: str | None = Field(description="Why there is no forecast, when there is none.")
@@ -596,7 +610,28 @@ def _build_base(
             r.volatility, r.risk_share, r.marginal_risk = p.volatility, p.risk_share, p.marginal
     rows.sort(key=lambda r: -(r.risk_share if r.risk_share is not None else -1.0))
     labels = {dim: {p.ticker: _bucket(strategy, p, dim) for p in usable} for dim in _DIMENSIONS}
+    weeks = len(filled.dates)
+    ewma_weeks = min(weeks, EWMA_WEEKS)
+
+    def basis(observations: int, method: str) -> FigureBasis:
+        first = filled.dates[-observations] if observations <= weeks else filled.dates[0]
+        return FigureBasis(
+            window_start=first,
+            window_end=filled.dates[-1],
+            observations=observations,
+            method=method,
+        )
+
+    figure_basis = {
+        "volatility_ewma": basis(ewma_weeks, "ewma"),
+        "volatility_ledoit_wolf": basis(weeks, "ledoit_wolf"),
+        "volatility_forecast": basis(ewma_weeks if use_ewma else weeks, METHOD),
+        "risk_share": basis(ewma_weeks if use_ewma else weeks, METHOD),
+        "effective_bets": basis(ewma_weeks if use_ewma else weeks, METHOD),
+        "diversification_ratio": basis(ewma_weeks if use_ewma else weeks, METHOD),
+    }
     return ExAnteRisk(
+        figure_basis=figure_basis,
         as_of=filled.dates[-1],
         base_currency=book.base_currency,
         method_version=METHOD_VERSION,

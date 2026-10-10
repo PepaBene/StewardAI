@@ -266,6 +266,9 @@ def test_a_stock_is_tiered_by_volatility_size_and_profit() -> None:
     assert _tier(0.20, Fundamentals(True, 1e9, True)).tier == "speculative"  # small
     assert _tier(0.20, Fundamentals(True, 3e11, False)).tier == "speculative"  # loss-making
     assert _tier(0.20, Fundamentals(True, 3e11, None)).tier == "growth"  # profit unknown: not core
+    history = _tier(0.20, Fundamentals(True, 3e11, True, loss_years=1))
+    assert history.tier == "growth" and "loss in 1" in history.reason  # a loss year: not core
+    assert _tier(0.20, Fundamentals(True, 3e11, True, loss_years=0)).tier == "core"
 
 
 def test_a_fund_is_tiered_by_volatility_alone_and_none_without_prices() -> None:

@@ -142,6 +142,83 @@ async def list_switches(pool: asyncpg.Pool, owner_id: str, limit: int = 200) -> 
     return [_entry(r) for r in rows]
 
 
+WINDOW_DAYS = 3  # a buy this soon after a sale is read as bought with its proceeds
+MIN_SHARE, MAX_SHARE = 0.5, 1.15  # the buy as a share of the sale: much less or more is not it
+
+
+class Fill(BaseModel):
+    ticker: str
+    side: str
+    on: dt.date
+    amount: float  # absolute value in the account currency
+
+
+class DetectedSwitch(BaseModel):
+    switched_on: dt.date
+    sold_ticker: str
+    bought_ticker: str
+    sold_value_base: float
+    bought_value_base: float
+
+
+def pair_switches(fills: list[Fill], logged: set[tuple[str, str, dt.date]]) -> list[DetectedSwitch]:
+    """Pair each sale with the nearest later-or-same-day buy of a different stock that fits it
+    (within the window, and between MIN_SHARE and MAX_SHARE of the proceeds). Each buy is used
+    once, and a pair already in the switch log is left out."""
+    sells = sorted((f for f in fills if f.side == "SELL" and f.amount > 0), key=lambda f: f.on)
+    buys = [f for f in fills if f.side == "BUY" and f.amount > 0]
+    used: set[int] = set()
+    out: list[DetectedSwitch] = []
+    for sell in sells:
+        best: tuple[float, int] | None = None
+        for i, buy in enumerate(buys):
+            gap = (buy.on - sell.on).days
+            share = buy.amount / sell.amount
+            if i in used or buy.ticker == sell.ticker or not 0 <= gap <= WINDOW_DAYS:
+                continue
+            if not MIN_SHARE <= share <= MAX_SHARE:
+                continue
+            score = gap + abs(1.0 - share)
+            if best is None or score < best[0]:
+                best = (score, i)
+        if best is None:
+            continue
+        buy = buys[best[1]]
+        key = (sell.ticker, buy.ticker, buy.on)
+        used.add(best[1])
+        if key in logged:
+            continue
+        out.append(
+            DetectedSwitch(
+                switched_on=buy.on,
+                sold_ticker=sell.ticker,
+                bought_ticker=buy.ticker,
+                sold_value_base=sell.amount,
+                bought_value_base=buy.amount,
+            )
+        )
+    return out
+
+
+async def detect(pool: asyncpg.Pool, owner_id: str) -> list[DetectedSwitch]:
+    """Switches visible in the Trading212 transactions that are not in the switch log yet. They
+    are candidates: confirm one by posting it to the log."""
+    rows = await pool.fetch(
+        "select ticker, subtype, occurred_at::date as day, abs(amount) as amount"
+        " from public.\"transaction\" where type = 'order' and subtype in ('BUY', 'SELL')"
+        " and ticker is not null and amount is not null order by occurred_at"
+    )
+    fills = [
+        Fill(ticker=r["ticker"], side=r["subtype"], on=r["day"], amount=float(r["amount"]))
+        for r in rows
+    ]
+    logged = {
+        (e.sold_ticker, e.bought_ticker, e.switched_on)
+        for e in await list_switches(pool, owner_id, limit=1000)
+    }
+    return pair_switches(fills, logged)
+
+
 async def outcomes(pool: asyncpg.Pool, entries: list[SwitchEntry]) -> list[SwitchOutcome]:
     """Each switch against the stored closes that followed it: the price change of the stock
     bought and of the stock sold, from the switch date to the latest close."""

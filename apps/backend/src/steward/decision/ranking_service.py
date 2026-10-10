@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import time
 
 import asyncpg
 
@@ -18,6 +19,7 @@ from steward.decision import pretrade as pt
 from steward.decision import ranking as rk
 from steward.decision import service as svc
 from steward.earnings.check import local_today
+from steward.fx.convert import price_in_unit
 from steward.portfolio import exante as ea
 from steward.portfolio.risk import _risk_free, portfolio_risk
 from steward.reference.price_series import choose_series, holding_symbols
@@ -26,10 +28,30 @@ from steward.reference.read import load_series
 log = logging.getLogger(__name__)
 
 HISTORY_DAYS = 3 * 366
+SERIES_TTL_SECONDS = 120.0
+_Closes = dict[str, list[tuple[dt.date, float]]]
+_series_cache: dict[tuple[int, tuple[str, ...]], tuple[float, _Closes]] = {}
 
 
 async def _series(pool: asyncpg.Pool, tickers: list[str]) -> dict[str, list[tuple[dt.date, float]]]:
-    """The stored daily closes of each ticker (the series its readers use), last three years."""
+    """The stored daily closes of each ticker (the series its readers use), last three years.
+
+    Kept for two minutes, so the board, the switch scan and a chat question that follow one
+    another read the prices once. Closes change once a day; the copy is never edited."""
+    key = (id(pool), tuple(sorted(tickers)))
+    hit = _series_cache.get(key)
+    if hit is not None and time.monotonic() - hit[0] < SERIES_TTL_SECONDS:
+        return hit[1]
+    out = await _load_series(pool, tickers)
+    if len(_series_cache) > 32:
+        _series_cache.clear()
+    _series_cache[key] = (time.monotonic(), out)
+    return out
+
+
+async def _load_series(
+    pool: asyncpg.Pool, tickers: list[str]
+) -> dict[str, list[tuple[dt.date, float]]]:
     profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
     symbols = await holding_symbols(
         pool, tickers, profiles.body if profiles else HoldingProfilesConfig()
@@ -132,12 +154,13 @@ def _row(
     if price is None or price <= 0:
         row.reasons.append("no current price")
     elif sc is not None and target is not None:
-        if currency and target.currency != currency:
+        scaled = price_in_unit(price, currency, target.currency)
+        if scaled is None:
             row.reasons.append(
                 f"the scenarios are in {target.currency} but the price is in {currency}"
             )
         else:
-            row.returns = _figures(sc, price, target.catalyst_date, today, hurdle, gate)
+            row.returns = _figures(sc, scaled, target.catalyst_date, today, hurdle, gate)
     if row.returns is not None and row.risk is not None:
         row.bear_loss_vs_history = rk.bear_vs_history(row.returns.loss, row.risk.max_drawdown)
         vol = row.risk.volatility_1y

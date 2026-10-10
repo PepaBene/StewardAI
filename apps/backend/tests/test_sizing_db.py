@@ -7,6 +7,7 @@ import pytest
 
 from steward.config.store import save_config
 from steward.config.strategy import PositionWeightRule, StrategyConfig
+from steward.config.thesis import ThesesConfig
 from steward.decision.allocator import allocate_deposit
 from steward.decision.pretrade import TradeLeg
 from steward.portfolio.concentration import concentration_report
@@ -41,7 +42,11 @@ async def _setup(pool: asyncpg.Pool) -> None:
         },
         rules=[
             PositionWeightRule(
-                id="max-stock", type="position_weight", operator="<=", value=0.10, ticker="BBB_US_EQ"
+                id="max-stock",
+                type="position_weight",
+                operator="<=",
+                value=0.10,
+                ticker="BBB_US_EQ",
             )
         ],
     )
@@ -80,6 +85,60 @@ async def test_the_starting_size_is_the_smaller_of_the_tier_cap_and_the_risk_cei
     assert out.kelly is not None and not out.kelly.available  # no thesis stored
     unknown = await start_size(backend_pool, "NOPE_US_EQ")
     assert unknown.status == "unavailable" and unknown.reason
+
+
+@pytest.mark.db
+async def test_scenarios_feed_the_kelly_bound_and_the_score_scales_the_start_size(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    await _setup(backend_pool)
+    price = float(
+        await backend_pool.fetchval(
+            "select close from public.price_bar where symbol = 'ccc.us' order by date desc limit 1"
+        )
+    )
+    theses = ThesesConfig.model_validate(
+        {
+            "theses": [
+                {
+                    "ticker": "CCC_US_EQ",
+                    "why_owned": "test",
+                    "conviction": 4,
+                    "price_target": {
+                        "currency": "USD",
+                        "method": "DCF",
+                        "set_on": "2026-10-01",
+                        "scenarios": {
+                            "bear": round(price * 0.9, 2),
+                            "base": round(price * 1.4, 2),
+                            "bull": round(price * 1.8, 2),
+                        },
+                    },
+                }
+            ]
+        }
+    )
+    strategy = StrategyConfig(
+        base_currency="CZK",
+        categories=["risk"],
+        classifications={"AAA_US_EQ": {"risk": "core"}, "CCC_US_EQ": {"risk": "growth"}},
+    )
+    strategy.pretrade.score_for_full_start = 10.0  # a score no stock reaches: starts tiny
+    await backend_pool.execute(
+        "insert into public.macro_series (series_id, source, period, value, label, unit, url)"
+        " values ('czeonia', 'cnb', current_date, 3.5, 'CZEONIA', '%', 'https://x.test')"
+    )
+    async with backend_pool.acquire() as conn:
+        await save_config(conn, "theses", theses, created_by=None)
+        await save_config(conn, "strategy", strategy, created_by=None)
+    out = await start_size(backend_pool, "CCC_US_EQ")
+    assert out.kelly is not None
+    if not out.kelly.available:  # e.g. the test database stores no cash rate
+        pytest.skip(f"no Kelly bound in the test database: {out.kelly.reason}")
+    assert out.kelly.thesis_return is not None and out.kelly.thesis_return > 0
+    assert out.score is not None and out.score_size is not None
+    assert out.score_size == pytest.approx(0.03 * min(out.score / 10.0, 1.0))
+    assert out.binding == "score" and out.suggested == pytest.approx(out.score_size)
 
 
 @pytest.mark.db

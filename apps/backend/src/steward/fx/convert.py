@@ -56,6 +56,19 @@ def normalise_currency(code: str) -> tuple[str, Decimal]:
     return code.upper(), Decimal(1)
 
 
+def price_in_unit(price: float, quoted: str | None, target: str) -> float | None:
+    """The price in the unit `target` uses; GBX and GBP are one currency, 100 to 1.
+
+    None when they are different currencies. An unknown quote currency is taken as the target's."""
+    if not quoted:
+        return price
+    q_iso, q_factor = normalise_currency(quoted)
+    t_iso, t_factor = normalise_currency(target)
+    if q_iso != t_iso:
+        return None
+    return float(Decimal(str(price)) * q_factor / t_factor)
+
+
 @dataclass(frozen=True)
 class Conversion:
     rate: Decimal

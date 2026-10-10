@@ -167,11 +167,11 @@ Code: `steward/quant/{returns,proxy,covariance,decompose}.py`, `steward/portfoli
 
 **Outcome:** the probability of the outcome the strategy fears most.
 
-- [ ] `Q2.1` `quant/tail.py`: historical, filtered-historical and Cornish-Fisher VaR and ES at 95/99 %, 1-day and 1-month horizons, per portfolio with each position's ES contribution.
-- [ ] `Q2.2` `quant/bootstrap.py`: stationary block bootstrap of the current book over 1, 2 and 3 years (10 000 paths, fixed seed per run so a result is reproducible); outputs P(max drawdown ≥ 20 %), max-drawdown quantiles, terminal value quantiles, Conditional Drawdown at Risk, median time to recover a 20 % fall.
-- [ ] `Q2.3` Downside statistics on realized history: Sortino, Calmar, Ulcer index, downside deviation, skew and kurtosis — completes `M6.1`.
-- [ ] `Q2.4` Nightly worker job storing results with `method_version`; new limits from D5 evaluated after it.
-- [ ] `Q2.5` Frontend: drawdown fan chart over the horizon with the 20 % line, ES card, "what a 1-in-20 month looks like" in CZK.
+- [x] `Q2.1` `quant/tail.py`: historical, filtered-historical and Cornish-Fisher VaR and ES at 95/99 %, 1-week and 1-month horizons (weekly returns, not 1-day), per portfolio with each position's ES contribution (`portfolio/tail.py`, `GET /portfolio/risk/tail`).
+- [x] `Q2.2` `quant/bootstrap.py`: stationary block bootstrap of the current book over 1, 2 and 3 years (10 000 paths, fixed seed per run so a result is reproducible); outputs P(max drawdown ≥ 20 %), max-drawdown quantiles, terminal value quantiles, Conditional Drawdown at Risk, median time to recover a 20 % fall.
+- [x] `Q2.3` Downside statistics on realized history: Sortino, Calmar, Ulcer index, downside deviation, skew and kurtosis — completes `M6.1`. (`quant/downside.py`.)
+- [~] `Q2.4` New limits `risk.max_es_95_month` and `risk.max_drawdown_probability` (with `drawdown_probability_years`) are evaluated at every sync (findings `risk:es` and `risk:drawdown_probability`). Each sync saves the report as a `tail` snapshot with its `method_version` (G101 closed).
+- [~] `Q2.5` Frontend: the page Risk → "Bad months" has the one-month loss sentence in CZK, the loss table by method, the drawdown odds for 1, 2 and 3 years, who carries the tail and the downside statistics. Not built: the drawdown fan chart (G102).
 
 **Exit check:** on a synthetic normal i.i.d. series, bootstrap and closed-form VaR agree within sampling error; the drawdown probability is stable (± 1 pp) across seeds.
 
@@ -330,7 +330,7 @@ Method gaps:
 - G71. The factor alpha (Q6.3) is the intercept of the existing two-year regression on today's weights, not on the realised record; its t-statistic is Newey-West with 4 lags.
 - G72. Closed theses (Q6.5) are a `sell` after a `buy` or `add` in the journal; partial trims are ignored, the first buy opens the thesis, prices are the ones written in the entries, returns exclude dividends, and the tier is today's classification. "A risk finding came first" counts findings stored in `portfolio_breach`, which only goes back to when storing began. Hit rate and the trigger share are withheld below five theses.
 - G73. The monthly review (Q7.1) has no Expected Shortfall or drawdown probability (Q2 not built) and its stress line is the historical replay only. It recomputes the model check on each run. The tier budget line appears only for tiers with a budget or at least 5 % of risk.
-- G74. The position pack (Q7.2) is not yet on the thesis page; it is a route, a chat tool and monthly-review lines. The cluster threshold (weekly correlation 0.6) is a constant, and the ES contribution is empty.
+- G74 (closed: held cards on the thesis board have a "Risk of this holding" section that loads the pack when opened). Earlier note: the position pack (Q7.2) was not on the thesis page; it is a route, a chat tool and monthly-review lines. The cluster threshold (weekly correlation 0.6) is a constant, and the ES contribution is empty.
 - G75. The drawdown ladder (Q7.3): `risk.drawdown_warnings` (default 10 % and 15 %) has no field in the strategy editor; it is kept as loaded and changed through the import. The rungs apply only when `max_drawdown` is set. The drivers use today's weights from the weekly peak of the last 52 weeks, which approximates the real path and ignores trades since the peak. The note severity is fixed at 1.
 - G76. The glossary entries (Q7.4) were written, not reviewed with the owner (G27 stands).
 - G77. The existing drawdown test in `test_risk_limits.py` was changed: with the default rungs, a 20 % drawdown now also raises the 10 % and 15 % notes. Anyone reading the findings list for a book in drawdown will see three `risk:drawdown*` entries, and a strategy that sets `drawdown_warnings: []` gets the old behaviour.
@@ -383,6 +383,44 @@ Verified: unit tests for scenarios, expected return, annualisation, asymmetry, t
 - G98. The ranking and switch routes load the whole stored price history of every thesis and holding (three years) on each call, with no cache; the thesis board loads the ranking on every visit.
 - G99. Tests that pin a default (the per-stock risk-share ceiling, the volatility multiple) had to switch it off locally; any other test or fixture built on a small book will meet the same extra findings.
 - G100. Full backend runs on this machine need `--basetemp` pointed at a folder the user owns, because the default pytest temp folder is access-denied.
+
+### Gap closure (10 October 2026)
+
+**Closed in code**
+
+- G83: a price in GBX and a target in GBP (or the reverse) are one currency; the price is scaled (`fx.convert.price_in_unit`) in the ranking and in the Kelly bound. Different currencies still give "not comparable".
+- G92: the review page now shows "Portfolio risk" and "Bench" blocks from `risk_notes` and `bench_notes`.
+- G94: the rollbacks of the five quant migrations (`factor_return`, `risk_report_snapshot`, `risk_scenario`, `holding_risk_tier`, `switch_log`) were run against a real Postgres by `test_each_rollback_restores_the_schema_its_migration_changed` (every migration applied in order, each rollback checked against a catalog snapshot, then re-applied). Their notes now say so, and the documented-rollback test passes.
+- G98: the closes read for the ranking and the switch scan are kept for two minutes (`SERIES_TTL_SECONDS`), so the board, the scan and a chat question that follow one another read the prices once.
+- G44: `pretrade.equity_premium` (5 %), `pretrade.confidence_low` and `pretrade.confidence_high` (20 % and 80 %) are strategy settings. The `premium` query on the sizing route overrides the premium for one request.
+- G89, in part: the Kelly bound now uses a thesis's scenarios (probability-weighted value, annualised to the catalyst) when it has them, instead of reporting "no sell target". The risk-adjusted starting size is still not built.
+- G75: the strategy editor has fields for the drawdown rungs, the per-stock risk share and the volatility multiple on the thesis band.
+- Bug found on the way: saving the strategy from the editor dropped `max_stock_risk_share` and `thesis_volatility_multiple` back to the backend defaults, so an owner who had switched either off (null) would have had it switched on again. Both are now form fields and round-trip, with a test.
+
+- G95, G53, G65: the whole backend suite ran to completion (`--basetemp` set): 2731 passed, 754 skipped, 0 failed. The database-backed ones are among the skipped unless `STEWARD_TEST_DATABASE_URL` is set; the rollback proof above ran with it.
+
+**Second round (10 October 2026)**
+
+- Q2.1 to Q2.3 built, with the exit checks as tests (`tests/test_tail.py`: VaR and ES against the normal formulas on a large i.i.d. sample, the drawdown probability within 3 points across seeds and exactly reproducible per seed). Q2.4 and Q2.5 are partly built (above). This closes G43, G73 (the monthly review now carries the bad-month loss and the drawdown odds, and no longer says they are "not modelled") and the ES part of G74 (the thesis risk pack has the position's part of the book's loss in its worst weeks) and G81's ES gap at book level.
+- G54: the deposit allocator keeps back what cash needs to reach the lower edge of the cash band (`cash_reserve`), and says so in a note.
+- G56: `pretrade.event_loss_budget` (null = off) cuts the starting size so the stock's largest past move on a report date costs no more than the budget; the deposit page says when it binds.
+- G57: the starting size also holds the stock's own share of volatility to `risk.max_stock_risk_share` when no pre-trade cap is set.
+- Price history on the live database: `price_bar` now holds 83,793 daily rows, 48 symbols, to 9 October 2026, with 10 years for holdings. This settles G79 and the price part of G1 and G7. The 15 proxy and index symbols (`XLB`, `XLC`, `XLE`, `XLF`, `XLI`, `XLK`, `XLP`, `XLU`, `XLV`, `XLY`, `VGK`, `VT`, `VWO`, `^GSPC`, `^STOXX`) were stored as one bar a month, because Yahoo answers `range=max` with monthly bars. Fixed in code (`sources/yahoo.py` now asks for dated daily bars beyond ten years, tested). The stored monthly rows and their `price_backfill:yahoo:<symbol>` markers still have to be deleted before the next price run refetches them daily (G103).
+- `switch_log` applied to the live database (G80, in part: the routes and the board have still not been used against it).
+
+**Settled as intended, not changed**
+
+- G97: a scenarios-only thesis has no price level, so the sell and buy target alerts have nothing to compare with. Add a sell or buy target next to the scenarios to get the alert.
+- G96: a saved pre-trade result keeps the method version it was made with; recomputing history is not wanted.
+- G100: `--basetemp` is a property of this machine, not of the code.
+
+- G101 (closed). Q2 results are saved as `tail` snapshots (migration `20261026100000_tail_snapshot_kind`) at each sync and on opening the page, with their method version.
+- G102 (closed). The bad-months page has a fan chart (percentile paths of the bootstrap, `fan` on each `DrawdownOdds`, `risk/tail/fan-chart.tsx`); not yet looked at in a browser.
+- Third round (10 October 2026, with the owner's go-ahead): G103 closed on the live database (4,770 monthly rows and 15 `price_backfill` markers deleted, the price job re-run; daily bars of about 5,000 rows per symbol over 20 years are coming back). G91 built as a candidate list (`GET /theses/switches/detected`, sale and a buy of another stock within three days and 50 to 115 % of the proceeds; the live history holds only BUY orders, so it finds none today). G23 in part: a stock with a loss year among its latest five stored annual results (at least three needed) cannot be core; the live database holds too few annual results for this to act yet. G25: `figure_basis` on the ex-ante report gives the window, observation count and method of each headline figure. G90: the thesis draft now also writes bear/base/bull stories as events, each citing facts; prices and probabilities stay the owner's. G21: strategy saved as version 65 through the app's validation (new fields stored with defaults; `auto_tiers` is off, `max_es_95_month` and `max_drawdown_probability` are unset, so those limits do nothing until you set them). G3, G50, G80 browser checks are still not done.
+- G103 (closed, see above). The monthly rows of the 15 proxy and index symbols are still in `price_bar`, with their backfill markers in `sync_state`; they were not deleted because the delete was blocked and needs the owner's say-so. Until they go, the weekly proxy backfill and the long replays for those symbols rest on monthly bars.
+- G104. Q2 works on weekly returns of the book (the one-week and one-month horizon), the weights are today's, and positions left out of the model count as cash with no return, so the tail is understated by about their weight.
+
+**Still open** (need live data, a browser, a design decision or a separate phase): G80 (live run, migration `switch_log` not applied to the live database), G81, G82, G84, G85, G86, G87, G88, G90 (deep-research pre-fill), G91, G93, G99, and the Q5, Q6, Q7 items G43, G45, G46, G48 to G79 not named above. Q2 (Expected Shortfall and drawdown probability) is not started.
 
 ## Delivery order
 

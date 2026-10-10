@@ -2158,6 +2158,33 @@
         ]
       }
     },
+    "/portfolio/risk/tail": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio Risk Tail",
+        "description": "The bad-month numbers for today's weights, on weekly returns: Value at Risk and Expected\nShortfall at 95 and 99 % over one week and one month (historical, filtered-historical and\nCornish-Fisher), each position's part of the Expected Shortfall, the simulated chance of the\n`max_drawdown` fall within 1, 2 and 3 years with drawdown and terminal-value quantiles, and\nthe downside statistics of the weekly record. `available` is false, with a `reason`, when\nthere is no book or too little history.",
+        "operationId": "get_portfolio_risk_tail",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TailReport"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/portfolio/risk/snapshots": {
       "get": {
         "tags": [
@@ -2183,7 +2210,8 @@
                     "ex_ante",
                     "replay",
                     "factors",
-                    "shock"
+                    "shock",
+                    "tail"
                   ],
                   "type": "string"
                 },
@@ -2733,10 +2761,16 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "number",
-              "maximum": 0.15,
-              "minimum": 0,
-              "default": 0.05,
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 0.15,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Premium"
             }
           }
@@ -4823,6 +4857,37 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/theses/switches/detected": {
+      "get": {
+        "tags": [
+          "theses"
+        ],
+        "summary": "Detected Switches",
+        "description": "Sales followed within three days by a buy of another stock in your Trading212 history, not\nyet in the log. Candidates only: confirm one with the log call below.",
+        "operationId": "detected_switches",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DetectedSwitch"
+                  },
+                  "type": "array",
+                  "title": "Response Detected Switches"
                 }
               }
             }
@@ -42541,6 +42606,40 @@
         ],
         "title": "DerivedOut"
       },
+      "DetectedSwitch": {
+        "properties": {
+          "switched_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Switched On"
+          },
+          "sold_ticker": {
+            "type": "string",
+            "title": "Sold Ticker"
+          },
+          "bought_ticker": {
+            "type": "string",
+            "title": "Bought Ticker"
+          },
+          "sold_value_base": {
+            "type": "number",
+            "title": "Sold Value Base"
+          },
+          "bought_value_base": {
+            "type": "number",
+            "title": "Bought Value Base"
+          }
+        },
+        "type": "object",
+        "required": [
+          "switched_on",
+          "sold_ticker",
+          "bought_ticker",
+          "sold_value_base",
+          "bought_value_base"
+        ],
+        "title": "DetectedSwitch"
+      },
       "DiffChange": {
         "properties": {
           "path": {
@@ -44430,6 +44529,163 @@
         ],
         "title": "DomainTierInput"
       },
+      "DownsideOut": {
+        "properties": {
+          "periods": {
+            "type": "integer",
+            "title": "Periods"
+          },
+          "annual_return": {
+            "type": "number",
+            "title": "Annual Return"
+          },
+          "downside_deviation": {
+            "type": "number",
+            "title": "Downside Deviation"
+          },
+          "sortino": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sortino"
+          },
+          "max_drawdown": {
+            "type": "number",
+            "title": "Max Drawdown"
+          },
+          "calmar": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calmar"
+          },
+          "ulcer_index": {
+            "type": "number",
+            "title": "Ulcer Index"
+          },
+          "skew": {
+            "type": "number",
+            "title": "Skew"
+          },
+          "excess_kurtosis": {
+            "type": "number",
+            "title": "Excess Kurtosis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "periods",
+          "annual_return",
+          "downside_deviation",
+          "sortino",
+          "max_drawdown",
+          "calmar",
+          "ulcer_index",
+          "skew",
+          "excess_kurtosis"
+        ],
+        "title": "DownsideOut"
+      },
+      "DrawdownOdds": {
+        "properties": {
+          "years": {
+            "type": "integer",
+            "title": "Years"
+          },
+          "probability": {
+            "type": "number",
+            "title": "Probability"
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold"
+          },
+          "drawdown_p50": {
+            "type": "number",
+            "title": "Drawdown P50"
+          },
+          "drawdown_p95": {
+            "type": "number",
+            "title": "Drawdown P95"
+          },
+          "conditional_drawdown_at_risk": {
+            "type": "number",
+            "title": "Conditional Drawdown At Risk"
+          },
+          "terminal_p05": {
+            "type": "number",
+            "title": "Terminal P05"
+          },
+          "terminal_p50": {
+            "type": "number",
+            "title": "Terminal P50"
+          },
+          "terminal_p95": {
+            "type": "number",
+            "title": "Terminal P95"
+          },
+          "recovery_median_weeks": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery Median Weeks"
+          },
+          "recovered_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovered Share"
+          },
+          "fan": {
+            "additionalProperties": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Fan"
+          },
+          "fan_step_weeks": {
+            "type": "integer",
+            "title": "Fan Step Weeks",
+            "default": 4
+          }
+        },
+        "type": "object",
+        "required": [
+          "years",
+          "probability",
+          "threshold",
+          "drawdown_p50",
+          "drawdown_p95",
+          "conditional_drawdown_at_risk",
+          "terminal_p05",
+          "terminal_p50",
+          "terminal_p95"
+        ],
+        "title": "DrawdownOdds"
+      },
       "DriftReport": {
         "properties": {
           "weight_basis": {
@@ -44888,6 +45144,47 @@
           "patent_candidates"
         ],
         "title": "EpoRefreshResponse"
+      },
+      "EsContribution": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "es_share": {
+            "type": "number",
+            "title": "Es Share",
+            "description": "Share of the book's one-month 95 % Expected Shortfall."
+          },
+          "part_of_es": {
+            "type": "number",
+            "title": "Part Of Es",
+            "description": "That figure as a part of the total (adds to 1)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "weight",
+          "es_share",
+          "part_of_es"
+        ],
+        "title": "EsContribution"
       },
       "EscalationBody": {
         "properties": {
@@ -47745,6 +48042,14 @@
             },
             "type": "array",
             "title": "Tier Checks"
+          },
+          "figure_basis": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FigureBasis"
+            },
+            "type": "object",
+            "title": "Figure Basis",
+            "description": "The window and observation count behind each headline figure."
           },
           "limits": {
             "$ref": "#/components/schemas/ExAnteLimits"
@@ -50955,6 +51260,51 @@
           "method_version"
         ],
         "title": "Figure"
+      },
+      "FigureBasis": {
+        "properties": {
+          "window_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Start"
+          },
+          "window_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window End"
+          },
+          "observations": {
+            "type": "integer",
+            "title": "Observations"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          }
+        },
+        "type": "object",
+        "required": [
+          "window_start",
+          "window_end",
+          "observations",
+          "method"
+        ],
+        "title": "FigureBasis",
+        "description": "What one figure rests on (rule 2): its window, how many weekly observations it used and\nthe model behind it."
       },
       "FiledInput": {
         "properties": {
@@ -76544,6 +76894,57 @@
             ],
             "title": "Risk Contribution Cap",
             "description": "Largest share of the portfolio's volatility one stock may account for. Unset: the share is shown but not judged, because the strategy states no number."
+          },
+          "score_for_full_start": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score For Full Start",
+            "description": "Risk-adjusted score that earns the full tier starting cap; a lower score starts proportionally smaller. Unset: not applied."
+          },
+          "event_loss_budget": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Loss Budget",
+            "description": "Most of the portfolio one results day may cost; the starting size is cut to fit the stock's largest past move on a report date. Unset: not applied."
+          },
+          "equity_premium": {
+            "type": "number",
+            "maximum": 0.2,
+            "minimum": 0.0,
+            "title": "Equity Premium",
+            "description": "Yearly return above cash that the market is assumed to pay; the anchor the quarter-Kelly bound pulls a thesis return toward.",
+            "default": 0.05
+          },
+          "confidence_low": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence Low",
+            "description": "Weight on the thesis return at conviction 1 (conviction 5 uses the high one).",
+            "default": 0.2
+          },
+          "confidence_high": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence High",
+            "default": 0.8
           }
         },
         "type": "object",
@@ -76628,6 +77029,58 @@
             ],
             "title": "Risk Contribution Cap",
             "description": "Largest share of portfolio volatility one stock may account for (null: shown but not judged)."
+          },
+          "score_for_full_start": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score For Full Start",
+            "description": "The risk-adjusted score ((annualised thesis return - cash rate) / volatility) that earns the full tier starting cap. A stock scoring half of it starts at half the cap; a ceiling only, never above the tier cap. Null: not applied."
+          },
+          "event_loss_budget": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Loss Budget",
+            "description": "Most of the portfolio one results day may cost, as a fraction (0.01 = 1 %). The starting size is cut so that the stock's largest past move on a report date stays inside it. Null: not applied."
+          },
+          "equity_premium": {
+            "type": "number",
+            "maximum": 0.2,
+            "minimum": 0.0,
+            "title": "Equity Premium",
+            "description": "Yearly return above cash the market is assumed to pay; the anchor a thesis return is pulled toward in the quarter-Kelly bound.",
+            "default": 0.05
+          },
+          "confidence_low": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence Low",
+            "description": "Weight on the thesis return at conviction 1.",
+            "default": 0.2
+          },
+          "confidence_high": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence High",
+            "description": "Weight on the thesis return at conviction 5.",
+            "default": 0.8
           }
         },
         "additionalProperties": false,
@@ -84391,6 +84844,42 @@
             "title": "Max Var 95",
             "description": "Ceiling on the portfolio's one-day historical 95 % value at risk, as a share of the portfolio (0.03 = 3 %), from the last year of daily returns. A descriptive estimate of the sample, not a forecast."
           },
+          "max_es_95_month": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Es 95 Month",
+            "description": "Ceiling on the portfolio's one-month 95 % Expected Shortfall (the average loss in the worst 5 % of months), as a share of the portfolio (0.10 = 10 %), from the larger of the historical and filtered-historical estimates on weekly returns."
+          },
+          "max_drawdown_probability": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Probability",
+            "description": "Ceiling on the simulated chance that the portfolio falls by `max_drawdown` from a peak at some point within `drawdown_probability_years` (0.15 = 15 %). Needs `max_drawdown`."
+          },
+          "drawdown_probability_years": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Drawdown Probability Years",
+            "description": "Horizon of the drawdown probability, in years.",
+            "default": 3
+          },
           "max_tracking_error": {
             "anyOf": [
               {
@@ -89742,7 +90231,8 @@
               "ex_ante",
               "replay",
               "factors",
-              "shock"
+              "shock",
+              "tail"
             ],
             "title": "Kind"
           },
@@ -91749,10 +92239,36 @@
             "enum": [
               "tier_cap",
               "risk_limits",
+              "event_risk",
+              "score",
               "none"
             ],
             "title": "Binding",
             "default": "none"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score",
+            "description": "(annualised thesis return - cash rate) / volatility, the risk-adjusted score of Q8.4 on the sizing inputs."
+          },
+          "score_size": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Size",
+            "description": "The tier cap scaled by score / `pretrade.score_for_full_start`; a ceiling."
           },
           "limits_reached": {
             "items": {
@@ -91760,6 +92276,30 @@
             },
             "type": "array",
             "title": "Limits Reached"
+          },
+          "event_move": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Move",
+            "description": "Largest past move around a report date (a fraction)."
+          },
+          "event_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Cap",
+            "description": "Weight at which that move costs `pretrade.event_loss_budget` of the book."
           },
           "base_currency": {
             "anyOf": [
@@ -94099,6 +94639,214 @@
         ],
         "title": "SwitchResponse"
       },
+      "TailLine": {
+        "properties": {
+          "horizon_weeks": {
+            "type": "integer",
+            "title": "Horizon Weeks"
+          },
+          "level": {
+            "type": "number",
+            "title": "Level"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "var": {
+            "type": "number",
+            "title": "Var",
+            "description": "Loss exceeded on (1 - level) of periods, share of the book."
+          },
+          "es": {
+            "type": "number",
+            "title": "Es",
+            "description": "Average loss on those periods."
+          },
+          "var_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Var Value"
+          },
+          "es_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Es Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "horizon_weeks",
+          "level",
+          "method",
+          "var",
+          "es"
+        ],
+        "title": "TailLine"
+      },
+      "TailReport": {
+        "properties": {
+          "method_version": {
+            "type": "string",
+            "title": "Method Version",
+            "default": "tail-report-1"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "weeks": {
+            "type": "integer",
+            "title": "Weeks",
+            "default": 0
+          },
+          "total_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Value"
+          },
+          "covered_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Covered Share"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/TailLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/EsContribution"
+            },
+            "type": "array",
+            "title": "Contributions"
+          },
+          "drawdown": {
+            "items": {
+              "$ref": "#/components/schemas/DrawdownOdds"
+            },
+            "type": "array",
+            "title": "Drawdown"
+          },
+          "downside": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DownsideOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "es_95_month": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Es 95 Month",
+            "description": "The larger of the historical and filtered-historical figures."
+          },
+          "block_weeks": {
+            "type": "number",
+            "title": "Block Weeks",
+            "default": 8.0
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 20261010
+          },
+          "paths": {
+            "type": "integer",
+            "title": "Paths",
+            "default": 10000
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "not_modelled": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not Modelled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available"
+        ],
+        "title": "TailReport"
+      },
       "TargetBand": {
         "properties": {
           "target_weight": {
@@ -94984,6 +95732,14 @@
               }
             ],
             "title": "Model"
+          },
+          "scenarios": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ThesisDraftLine"
+            },
+            "type": "object",
+            "title": "Scenarios",
+            "description": "What would have to happen for the bear, base and bull case, with the facts each rests on. Prices and probabilities are the owner's."
           },
           "why_owned": {
             "anyOf": [

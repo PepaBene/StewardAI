@@ -36,6 +36,9 @@ checkable (a number crossing a level, a loss of a named customer or segment).
 - pre_mortem: exactly three likeliest reasons the stock loses 40%.
 - variant_perception: a belief that differs from what the price implies, and the evidence that \
 would show it is wrong. Use null when the facts do not support one.
+- scenarios: for bear, base and bull, one or two sentences on what would have to happen to the \
+business for that case to come true. Describe events, never prices, probabilities or returns: \
+the owner sets those.
 
 Every line names the fact numbers it rests on in `facts`. Use only the facts. Never add a \
 number, a name or an event that is not in them. If the facts are too thin for a line, leave it \
@@ -54,7 +57,14 @@ class DraftVariant(BaseModel):
     facts: list[int] = Field(default_factory=list)
 
 
+class DraftScenarios(BaseModel):
+    bear: DraftLine | None = None
+    base: DraftLine | None = None
+    bull: DraftLine | None = None
+
+
 class ModelDraft(BaseModel):
+    scenarios: DraftScenarios | None = None
     why_owned: DraftLine | None = None
     exit_conditions: list[DraftLine] = Field(default_factory=list)
     pre_mortem: list[DraftLine] = Field(default_factory=list)
@@ -75,6 +85,11 @@ class ThesisDraftVariant(BaseModel):
 class ThesisDraft(BaseModel):
     ticker: str
     model: str | None
+    scenarios: dict[str, ThesisDraftLine] = Field(
+        default_factory=dict,
+        description="What would have to happen for the bear, base and bull case, with the facts "
+        "each rests on. Prices and probabilities are the owner's.",
+    )
     why_owned: ThesisDraftLine | None
     exit_conditions: list[ThesisDraftLine]
     pre_mortem: list[ThesisDraftLine]
@@ -88,6 +103,7 @@ class ThesisDraft(BaseModel):
 LEFT_TO_OWNER = [
     "the base-rate check (no stored data supports it)",
     "conviction and the main reason for owning it",
+    "the scenario prices and probabilities (the draft describes events, not numbers)",
 ]
 
 
@@ -153,6 +169,15 @@ def resolve(model: ModelDraft, facts: list[str], model_id: str | None, ticker: s
             dropped += 1
     exits = lines(model.exit_conditions, 4)
     pre = lines(model.pre_mortem, 3)
+    scenarios: dict[str, ThesisDraftLine] = {}
+    if model.scenarios is not None:
+        for name in ("bear", "base", "bull"):
+            item = getattr(model.scenarios, name)
+            line = _resolve(item, facts)
+            if line is not None:
+                scenarios[name] = line
+            elif item is not None:
+                dropped += 1
     notes = []
     if len(pre) < 3:
         notes.append(
@@ -161,6 +186,7 @@ def resolve(model: ModelDraft, facts: list[str], model_id: str | None, ticker: s
     return ThesisDraft(
         ticker=ticker,
         model=model_id,
+        scenarios=scenarios,
         why_owned=why,
         exit_conditions=exits,
         pre_mortem=pre,

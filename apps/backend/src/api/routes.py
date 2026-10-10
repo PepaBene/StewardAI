@@ -47,7 +47,7 @@ from steward.earnings.review_stats import ReviewStats, review_stats
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 from steward.portfolio.concentration import ConcentrationReport, concentration_report
-from steward.portfolio.exante import ExAnteRisk, ex_ante_risk
+from steward.portfolio.exante import ExAnteRisk, book_from_snapshot, ex_ante_risk
 from steward.portfolio.factor_shock import (
     Scenario,
     ScenarioIn,
@@ -76,8 +76,14 @@ from steward.portfolio.read import (
 )
 from steward.portfolio.replay import StressReplay, stress_replay
 from steward.portfolio.risk import PortfolioRisk, portfolio_risk
-from steward.portfolio.risk_snapshots import SnapshotRow, get_snapshot, list_snapshots
+from steward.portfolio.risk_snapshots import (
+    SnapshotRow,
+    get_snapshot,
+    list_snapshots,
+    save_snapshot,
+)
 from steward.portfolio.sizing import StartSize, start_size
+from steward.portfolio.tail import TailReport, tail_report
 from steward.portfolio.transactions import (
     TransactionFilters,
     TransactionsPage,
@@ -165,11 +171,28 @@ async def get_portfolio_risk_ex_ante(pool: Pool, _owner: Owner) -> ExAnteRisk:
     return await ex_ante_risk(pool)
 
 
+@router.get("/portfolio/risk/tail", tags=["portfolio"])
+async def get_portfolio_risk_tail(pool: Pool, _owner: Owner) -> TailReport:
+    """The bad-month numbers for today's weights, on weekly returns: Value at Risk and Expected
+    Shortfall at 95 and 99 % over one week and one month (historical, filtered-historical and
+    Cornish-Fisher), each position's part of the Expected Shortfall, the simulated chance of the
+    `max_drawdown` fall within 1, 2 and 3 years with drawdown and terminal-value quantiles, and
+    the downside statistics of the weekly record. `available` is false, with a `reason`, when
+    there is no book or too little history."""
+    book, strategy = await book_from_snapshot(pool)
+    if book is None or strategy is None:
+        return TailReport(available=False, reason="no portfolio snapshot yet; run the sync")
+    report = tail_report(book, strategy)
+    if report.available:
+        await save_snapshot(pool, "tail", report, report.as_of, report.method_version)
+    return report
+
+
 @router.get("/portfolio/risk/snapshots", tags=["portfolio"])
 async def get_risk_snapshots(
     pool: Pool,
     _owner: Owner,
-    kind: Literal["ex_ante", "replay", "factors", "shock"] | None = None,
+    kind: Literal["ex_ante", "replay", "factors", "shock", "tail"] | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> list[SnapshotRow]:
     """Saved copies of the risk reports with their method version, newest first. A report is
@@ -280,7 +303,7 @@ async def get_start_size(
     pool: Pool,
     _owner: Owner,
     ticker: Annotated[str, Query(min_length=1, max_length=32)],
-    premium: Annotated[float, Query(ge=0, le=0.15)] = 0.05,
+    premium: Annotated[float | None, Query(ge=0, le=0.15)] = None,
 ) -> StartSize:
     """Risk-aware starting size for a stock: the smaller of the tier's starting cap (principle
     8b) and the largest weight that raises no new ex-ante limit breach, with the quarter-Kelly

@@ -27,6 +27,10 @@ from pydantic import BaseModel, Field
 from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig
+from steward.decision import expected_return as er
+from steward.decision import ranking as rk
+from steward.decision.ranking_service import _report_dates
+from steward.fx.convert import price_in_unit
 from steward.portfolio import exante as ea
 from steward.portfolio import trade_risk as tr
 from steward.portfolio.breaches import Finding
@@ -34,7 +38,6 @@ from steward.portfolio.risk import _risk_free
 from steward.quant import sizing as sz
 
 METHOD_VERSION = "sizing-1"
-EQUITY_PREMIUM = 0.05
 BETA_MIN_WEEKS = 40
 SEARCH_STEPS = 14
 
@@ -73,16 +76,34 @@ class StartSize(BaseModel):
     )
     suggested: float | None = Field(default=None, description="The smaller of the two.")
     suggested_value: float | None = None
-    binding: Literal["tier_cap", "risk_limits", "none"] = "none"
+    binding: Literal["tier_cap", "risk_limits", "event_risk", "score", "none"] = "none"
+    score: float | None = Field(
+        default=None,
+        description="(annualised thesis return - cash rate) / volatility, the risk-adjusted "
+        "score of Q8.4 on the sizing inputs.",
+    )
+    score_size: float | None = Field(
+        default=None,
+        description="The tier cap scaled by score / `pretrade.score_for_full_start`; a ceiling.",
+    )
     limits_reached: list[str] = Field(default_factory=list)
+    event_move: float | None = Field(
+        default=None, description="Largest past move around a report date (a fraction)."
+    )
+    event_cap: float | None = Field(
+        default=None,
+        description="Weight at which that move costs `pretrade.event_loss_budget` of the book.",
+    )
     base_currency: str | None = None
     kelly: KellyOut | None = None
     warnings: list[str] = Field(default_factory=list)
 
 
-def conviction_confidence(conviction: int | None) -> float:
-    """1 to 5 maps to 0.2 to 0.8; no conviction stored counts as the middle."""
-    return 0.5 if conviction is None else 0.2 + 0.15 * (min(max(conviction, 1), 5) - 1)
+def conviction_confidence(conviction: int | None, low: float = 0.2, high: float = 0.8) -> float:
+    """Conviction 1 to 5 runs from `low` to `high` (default 0.2 to 0.8); none stored is midway."""
+    if conviction is None:
+        return (low + high) / 2
+    return low + (high - low) * (min(max(conviction, 1), 5) - 1) / 4
 
 
 def weekly_beta(book: ea.LoadedBook, ticker: str) -> float | None:
@@ -103,7 +124,8 @@ def _bad(before: list[Finding], after: list[Finding]) -> list[str]:
     return [f.key for f in after if tr.change_of(fb.get(f.key), f) in ("new", "deeper")]
 
 
-async def start_size(pool: asyncpg.Pool, ticker: str, premium: float = EQUITY_PREMIUM) -> StartSize:
+async def start_size(pool: asyncpg.Pool, ticker: str, premium: float | None = None) -> StartSize:
+    """`premium` overrides the strategy's `pretrade.equity_premium` for this call."""
     book, strategy = await ea.book_from_snapshot(pool)
     if book is None or strategy is None:
         return StartSize(
@@ -154,7 +176,12 @@ async def start_size(pool: asyncpg.Pool, ticker: str, premium: float = EQUITY_PR
         return out
     total = book.total_value
     current = held[ticker].value_base if ticker in held else 0.0
-    contribution_cap = rules.risk_contribution_cap
+    # The pre-trade cap if set, else the strategy's per-stock risk share (principle 4e).
+    contribution_cap = (
+        rules.risk_contribution_cap
+        if rules.risk_contribution_cap is not None
+        else strategy.risk.max_stock_risk_share
+    )
     breached: list[str] = []
 
     def model(w: float) -> tuple[ea.ExAnteRisk, list[Finding]]:
@@ -180,13 +207,51 @@ async def start_size(pool: asyncpg.Pool, ticker: str, premium: float = EQUITY_PR
             breached = ["position_risk_share"]
     out.risk_ceiling = ceiling
     out.suggested = min(tier_cap, ceiling)
-    out.suggested_value = out.suggested * total
     out.binding = "risk_limits" if ceiling < tier_cap - 1e-9 else "tier_cap"
     out.limits_reached = breached
+    event = await _event_cap(pool, ticker, rules.event_loss_budget, new, book)
+    if event is not None:
+        out.event_move, out.event_cap = event
+        if out.event_cap < out.suggested:
+            out.suggested = out.event_cap
+            out.binding = "event_risk"
+            out.limits_reached = [*breached, "earnings_move"]
+    out.suggested_value = out.suggested * total
     final_report, _ = model(out.suggested)
     out.warnings = final_report.warnings
     out.kelly = await _kelly(pool, strategy, book, new, ticker, final_report, premium)
+    k = out.kelly
+    if k.available and k.thesis_return is not None and k.risk_free is not None and k.volatility:
+        out.score = (k.thesis_return - k.risk_free) / k.volatility
+        full = rules.score_for_full_start
+        if full is not None:
+            out.score_size = tier_cap * min(max(out.score / full, 0.0), 1.0)
+            if out.score_size < out.suggested:
+                out.suggested = out.score_size
+                out.suggested_value = out.suggested * total
+                out.binding = "score"
     return out
+
+
+async def _event_cap(
+    pool: asyncpg.Pool,
+    ticker: str,
+    budget: float | None,
+    new: dict[str, tuple[tr.NewSeries, list[tuple[dt.date, float]]]],
+    book: ea.LoadedBook,
+) -> tuple[float, float] | None:
+    """(largest past move on a report date, the weight at which that move costs the budget);
+    None when no budget is set or the stock has no past report inside its price history."""
+    if budget is None:
+        return None
+    closes = new[ticker][1] if ticker in new else book.daily_closes.get(ticker)
+    if not closes:
+        return None
+    dates = (await _report_dates(pool, [ticker])).get(ticker, [])
+    moves = rk.earnings_moves(closes, dates)
+    if moves is None or moves.largest_abs <= 0:
+        return None
+    return moves.largest_abs, budget / moves.largest_abs
 
 
 async def _kelly(
@@ -196,12 +261,14 @@ async def _kelly(
     new: dict[str, tuple[tr.NewSeries, list[tuple[dt.date, float]]]],
     ticker: str,
     report: ea.ExAnteRisk,
-    premium: float,
+    premium: float | None,
 ) -> KellyOut:
     theses = await load_active(pool, "theses", ThesesConfig)
     thesis = next((t for t in (theses.body.theses if theses else []) if t.ticker == ticker), None)
-    if thesis is None or thesis.price_target is None or thesis.price_target.sell_target is None:
-        return KellyOut(available=False, reason="no thesis with a sell target is stored")
+    target = thesis.price_target if thesis is not None else None
+    if target is None or (target.sell_target is None and target.scenarios is None):
+        return KellyOut(available=False, reason="no thesis with a sell target or scenarios")
+    assert thesis is not None
     closes = new[ticker][1] if ticker in new else book.daily_closes.get(ticker)
     currency = (
         new[ticker][0].currency
@@ -210,17 +277,28 @@ async def _kelly(
     )
     if not closes:
         return KellyOut(available=False, reason="no stored price to compare the target with")
-    target = thesis.price_target
-    if currency and target.currency != currency:
+    scaled = price_in_unit(closes[-1][1], currency, target.currency)
+    if scaled is None:
         return KellyOut(
             available=False,
             reason=f"the target is in {target.currency} but the price is in {currency}",
         )
-    price = closes[-1][1]
-    years = float(strategy.horizon_years or 3)
-    sell = target.sell_target
-    assert sell is not None
-    thesis_return = (sell / price) ** (1.0 / years) - 1.0
+    price = scaled
+    if target.scenarios is not None:
+        # The probability-weighted value, annualised to the catalyst (Q8.2), not one target.
+        thesis_return = er.expected_return(
+            target.scenarios,
+            price,
+            catalyst=target.catalyst_date,
+            today=dt.date.today(),
+            hurdle=None,
+            asymmetry_gate=None,
+        ).annualized
+    else:
+        years = float(strategy.horizon_years or 3)
+        sell = target.sell_target
+        assert sell is not None
+        thesis_return = (sell / price) ** (1.0 / years) - 1.0
     found = await _risk_free(pool, book.base_currency, dt.date.today() - dt.timedelta(days=30))
     rf = found[0].latest_rate if found is not None and found[0].latest_rate is not None else None
     if rf is None:
@@ -231,8 +309,13 @@ async def _kelly(
     vol = row.volatility if row is not None else None
     if vol is None or vol <= 0:
         return KellyOut(available=False, reason="no volatility estimate for this stock")
-    eq = sz.equilibrium_return(rf, beta if beta is not None else 1.0, premium)
-    confidence = conviction_confidence(thesis.conviction)
+    rules = strategy.pretrade
+    eq = sz.equilibrium_return(
+        rf, beta if beta is not None else 1.0, rules.equity_premium if premium is None else premium
+    )
+    confidence = conviction_confidence(
+        thesis.conviction, rules.confidence_low, rules.confidence_high
+    )
     blended = sz.shrink_expected_return(thesis_return, eq, confidence)
     k = sz.kelly_bound(blended, rf, vol)
     return KellyOut(

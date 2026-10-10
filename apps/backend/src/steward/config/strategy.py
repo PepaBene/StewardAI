@@ -127,6 +127,41 @@ class PretradeThresholds(ConfigModel):
         description="Largest share of portfolio volatility one stock may account for (null: "
         "shown but not judged).",
     )
+    score_for_full_start: float | None = Field(
+        default=None,
+        gt=0,
+        le=10,
+        description="The risk-adjusted score ((annualised thesis return - cash rate) / "
+        "volatility) that earns the full tier starting cap. A stock scoring half of it starts "
+        "at half the cap; a ceiling only, never above the tier cap. Null: not applied.",
+    )
+    event_loss_budget: float | None = Field(
+        default=None,
+        gt=0,
+        le=1,
+        description="Most of the portfolio one results day may cost, as a fraction (0.01 = 1 %). "
+        "The starting size is cut so that the stock's largest past move on a report date stays "
+        "inside it. Null: not applied.",
+    )
+    equity_premium: float = Field(
+        default=0.05,
+        ge=0,
+        le=0.2,
+        description="Yearly return above cash the market is assumed to pay; the anchor a thesis "
+        "return is pulled toward in the quarter-Kelly bound.",
+    )
+    confidence_low: float = Field(
+        default=0.2, ge=0, le=1, description="Weight on the thesis return at conviction 1."
+    )
+    confidence_high: float = Field(
+        default=0.8, ge=0, le=1, description="Weight on the thesis return at conviction 5."
+    )
+
+    @model_validator(mode="after")
+    def _confidence_ordered(self) -> Self:
+        if self.confidence_low > self.confidence_high:
+            raise ValueError("confidence_low must not exceed confidence_high")
+        return self
 
 
 class StressEpisodeConfig(ConfigModel):
@@ -214,6 +249,21 @@ class RiskLimits(ConfigModel):
         description="Ceiling on the portfolio's one-day historical 95 % value at risk, as a share "
         "of the portfolio (0.03 = 3 %), from the last year of daily returns. A descriptive "
         "estimate of the sample, not a forecast.",
+    )
+    max_es_95_month: Weight | None = Field(
+        default=None,
+        description="Ceiling on the portfolio's one-month 95 % Expected Shortfall (the average "
+        "loss in the worst 5 % of months), as a share of the portfolio (0.10 = 10 %), from the "
+        "larger of the historical and filtered-historical estimates on weekly returns.",
+    )
+    max_drawdown_probability: Weight | None = Field(
+        default=None,
+        description="Ceiling on the simulated chance that the portfolio falls by `max_drawdown` "
+        "from a peak at some point within `drawdown_probability_years` (0.15 = 15 %). Needs "
+        "`max_drawdown`.",
+    )
+    drawdown_probability_years: int = Field(
+        default=3, ge=1, le=3, description="Horizon of the drawdown probability, in years."
     )
     max_tracking_error: Weight | None = Field(
         default=None,

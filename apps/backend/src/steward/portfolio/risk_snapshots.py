@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 log = logging.getLogger(__name__)
 
-Kind = Literal["ex_ante", "replay", "factors", "shock"]
+Kind = Literal["ex_ante", "replay", "factors", "shock", "tail"]
 
 
 class SnapshotRow(BaseModel):
