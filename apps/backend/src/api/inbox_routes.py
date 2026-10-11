@@ -4,13 +4,15 @@ latency of each kind of work (agentic workflows and RAG plan, AG4 and AG5)."""
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import IdPath, Pool
-from steward.inbox import service
+from steward.config.jobs import JobsConfig
+from steward.config.store import load_active
+from steward.inbox import run, service, triggers
 from steward.inbox.route_stats import RouteStat, route_stats
-from steward.inbox.service import AgentNote, InboxItem, NoteIn, NotePatch
+from steward.inbox.service import AgentNote, InboxItem, NoteIn, NotePatch, NoteVersion
 
 router = APIRouter(tags=["inbox"])
 
@@ -20,6 +22,7 @@ NOT_FOUND = "No inbox item {}"
 class InboxList(BaseModel):
     items: list[InboxItem]
     unread: int
+    missed: int = 0
 
 
 class InboxFeedbackIn(BaseModel):
@@ -47,11 +50,77 @@ async def list_inbox(
     ticker: Annotated[str | None, Query(max_length=40)] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> InboxList:
-    """Items the event agents left, newest first. `unread` counts items still new."""
+    """Items the event agents left, newest first. `unread` counts items still new; `missed`
+    counts older events (up to 60 days) the scan never ran on."""
+    stored = await load_active(pool, "jobs", JobsConfig)
+    cfg = (stored.body if stored else JobsConfig()).inbox_settings
     return InboxList(
         items=await service.list_items(pool, item_status, ticker, limit),
         unread=await service.unread_count(pool),
+        missed=await triggers.missed_count(pool, cfg.lookback_days, cfg.min_severity),
     )
+
+
+class MissedEvent(BaseModel):
+    key: str
+    kind: str
+    ref: int
+    ticker: str | None
+    severity: int | None
+    headline: str
+    created_at: str
+
+
+class MissedRunIn(BaseModel):
+    keys: list[str] = Field(min_length=1, max_length=50)
+
+
+class MissedRunOut(BaseModel):
+    queued: list[str]
+    skipped: list[str]
+
+
+class NoteDecision(BaseModel):
+    item: InboxItem
+    note: AgentNote | None = None
+
+
+@router.get("/inbox/missed")
+async def list_missed(
+    pool: Pool,
+    _owner: Owner,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[MissedEvent]:
+    """Open events older than the scan window (up to 60 days) that no run has looked into."""
+    stored = await load_active(pool, "jobs", JobsConfig)
+    cfg = (stored.body if stored else JobsConfig()).inbox_settings
+    found = await triggers.missed(pool, cfg.lookback_days, cfg.min_severity, limit)
+    return [
+        MissedEvent(
+            key=t.key,
+            kind=t.kind,
+            ref=t.ref,
+            ticker=t.ticker,
+            severity=t.severity,
+            headline=t.headline,
+            created_at=t.created_at.isoformat(),
+        )
+        for t in found
+    ]
+
+
+@router.post("/inbox/missed/run", status_code=status.HTTP_202_ACCEPTED)
+async def run_missed(body: MissedRunIn, pool: Pool, owner: Owner) -> MissedRunOut:
+    """Queue an agent run for each chosen missed event. Only events still open are queued."""
+    stored = await load_active(pool, "jobs", JobsConfig)
+    cfg = (stored.body if stored else JobsConfig()).inbox_settings
+    open_now = {
+        t.key: t
+        for t in await triggers.missed(pool, cfg.lookback_days, cfg.min_severity, limit=100)
+    }
+    chosen = [open_now[k] for k in dict.fromkeys(body.keys) if k in open_now]
+    queued = await run.queue_runs(pool, chosen, "manual", requested_by=owner.user_id)
+    return MissedRunOut(queued=queued, skipped=[k for k in body.keys if k not in queued])
 
 
 @router.get("/inbox/{item_id}")
@@ -95,6 +164,32 @@ async def decline_inbox_action(item_id: IdPath, pool: Pool, _owner: Owner) -> In
         return await service.decline_action(pool, item_id)
     except service.ActionError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+
+@router.post("/inbox/{item_id}/note/accept")
+async def accept_suggested_note(item_id: IdPath, pool: Pool, _owner: Owner) -> NoteDecision:
+    """Keep the working note an agent run suggested; creates an ordinary agent note."""
+    return await _decide_note(pool, item_id, True)
+
+
+@router.post("/inbox/{item_id}/note/decline")
+async def decline_suggested_note(item_id: IdPath, pool: Pool, _owner: Owner) -> NoteDecision:
+    return await _decide_note(pool, item_id, False)
+
+
+async def _decide_note(pool: Pool, item_id: int, accept: bool) -> NoteDecision:
+    try:
+        item, note = await service.decide_suggested_note(pool, item_id, accept)
+    except service.ActionError as exc:
+        code = status.HTTP_409_CONFLICT if exc.conflict else status.HTTP_404_NOT_FOUND
+        raise HTTPException(code, str(exc)) from exc
+    return NoteDecision(item=item, note=note)
+
+
+@router.get("/agent-notes/{note_id}/history")
+async def agent_note_history(note_id: IdPath, pool: Pool, _owner: Owner) -> list[NoteVersion]:
+    """Every state a note has had, newest first; kept after the note is deleted."""
+    return await service.note_history(pool, note_id)
 
 
 @router.get("/agent-notes")

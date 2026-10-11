@@ -70,14 +70,14 @@ Sequencing note (updated 10 October 2026): the Morningstar, quant, public-disclo
 
 ## Known gaps after AG0–AG5 (11 October 2026)
 
-Nothing below is committed or run live. Each gap says what is missing and what closes it.
+AG0–AG5 are committed (`2b79847`); nothing below has been run live. Each gap says what is missing and what closes it. A second pass on 11 October 2026 closed what code alone can close; those items are marked **closed** and the rest need live keys, real data, the owner's reading, or a production project.
 
 **Verification**
 - Passed on 11 October 2026: a batch of 121 backend tests (inbox, catalog and capability-map doc, config schemas, jobs, agents, legacy envelope, chunking, retrieval eval, benchmark runner) plus rollback-file and retrieval-eval reruns (14), on a pgmq Postgres; the retrieval DB tests on plain Postgres and on pgvector (before the last lint-only edits, not rerun since); ruff clean on `src` and `tests`; mypy clean on `inbox`, `research`, `retrieval`, `chat`, `config`, `jobs` and `inbox_routes`; web `tsc` and the vitest files for config, nav, palette, inbox and the research report.
 - Not run: mypy on the rest of the backend; the full backend suite (only the batches above, in small groups because the machine ran out of memory once); the full web test suite and lint; the pgvector path after the last edits; every migration applied to a production-like Supabase project. A retrieval DB rerun and the whole suite should happen in CI before merging.
 - Tests that need the queue (inbox scan, job enqueue) skip or fail on Postgres without pgmq; they ran only on the pgmq container.
 - Fallout found late: the AG3 profile fields broke the web type check (profile form defaults, report fixture) and a pre-existing rollback-file test failed in the last commit; both are fixed, which shows that schema changes need `npm run gen:api` plus `tsc` every time. Nothing enforces that locally.
-- Nothing is committed; the work spans many modified and untracked files on the `morningstar` branch.
+- **Closed:** the web type check had failed on the committed `PROFILE_DEFAULTS.lenses` (a readonly tuple); fixed, and `tsc` is clean again.
 
 **AG0 / AG1**
 - No live, scored baseline run: cost per chat question and per research run (decision 4) is still unmeasured, so the monthly caps have no data behind them.
@@ -85,48 +85,55 @@ Nothing below is committed or run live. Each gap says what is missing and what c
 - The legacy-envelope wrapper reads figures from a fixed table per tool; a new field in one of those tools is not wrapped until the table is updated.
 
 **AG2**
-- `evals/retrieval_cases.json` is empty. Until cases are written against the real corpus and `python -m steward.retrieval.eval` shows hybrid recall above keyword recall, the vectors are unproven and `search_news` / `search_reports` stay.
-- Tested only with a fake embedder; the real `gemini-embedding-2` path, its cost line and the per-run cap are untested.
-- Filing indexing covers archived `evidence` documents only, not the disclosure register or filings fetched on the fly.
-- No cross-encoder rerank, and no citation-support check on retrieved passages (only recall@k is planned in the eval).
-- The migration was exercised on the test containers only (plain Postgres and pgvector), not on the production Supabase project; the HNSW build time on a large corpus is unknown.
+- **Closed (11 October 2026):** `document_index` ran three times on the production corpus: 4,208 passages (filing 2,601, news 938, disclosure 323, report 283, note 63), 3,717 child passages embedded with `gemini-embedding-2` (about 400K estimated tokens). `evals/retrieval_cases.json` holds 12 cases written against it (paraphrased queries, `must_contain` phrases copied from the passages). Result at k=5: keyword recall 0.58 / MRR 0.57; vector 0.83 / 0.84; hybrid 0.92 / 0.60; hybrid + LLM rerank 0.92 / 0.86; support@5 0.42 / 0.83 / 0.83 / 0.83. Hybrid beats keyword on recall, so the vectors stay. Twelve cases is small and one corpus snapshot: widen the set before dropping `search_news` / `search_reports`, which stay.
+- **Closed:** the eval first showed keyword recall 0.0: `websearch_to_tsquery` ANDs every word, so a question in plain words matched nothing. `keyword_ranking` now retries with the words OR-ed when the strict match is empty.
+- Open: hybrid MRR (0.60) is below vector-only (0.84); the rerank repairs it but is eval-only and not in `search_documents`. Whether to turn it on (one extra cheap-model call per search) is undecided.
+- Filing indexing covers archived `evidence` documents only; filings fetched on the fly are not stored, so they cannot be indexed until something archives them.
+- **Closed:** the disclosure register's prose is indexed as kind `disclosure`: the filing passage behind each non-rejected customer, supplier or award relationship, and the headline and detail of each disclosure alert of the last `disclosure_alert_days` (default 365). Its figures (trade sizes, holder percentages) stay with the data tools. Owner agent notes are indexed as kind `agent_note`, so `search_documents` can return them. Both can be turned off in `document_index_settings`. Needs migration `20261108100000` (below).
+- **Closed:** the eval has a support@k measure (`must_contain`) and an optional LLM rerank mode (`--rerank-model`). The rerank is not used by live search.
+- The index runs on plain `real[]` with a Python scan, because pgvector is not installed in the production project; the scan cost at 3,700 embedded passages was not measured, and the HNSW build time on a larger corpus is unknown.
 
 **AG3**
 - No live run: worker quality, cost within the profile's budget and "finds more correct evidence" are all unmeasured. `research/compare.py` measures evidence counts, claim-check results and cost, but not whether the extra evidence is correct; that needs the owner's reading.
 - Workers share one registry rather than keeping private copies, so a misbehaving worker's sources are visible to the others; findings are filtered by the code, but a source a worker added through a tool stays registered even if its finding is dropped.
 - The first worker runs alone for cache warmth; the effect on cost is assumed, not measured.
-- Worker step and search budgets are split evenly by lens (web searches go to the two web lenses in order), not adaptively; a lens that finishes early does not hand its budget on.
-- Without a provider key the `deep-agentic` profile silently runs as the fixed pipeline (noted only in the report's `engine` / empty `agents`).
-- Worker tool calls run with no owner, so owner-scoped tools (portfolio risk lens) return "unavailable"; the portfolio-risk lens is weak in research runs until an owner context is passed.
-- No prompt-injection test against worker tool results beyond the existing neutralisation of stored text.
+- **Closed:** a web worker now reserves its searches when it starts and hands back what it did not use, so a lens that finishes early leaves them to the ones still to run (step budgets are still split evenly).
+- **Closed:** without a provider key the `deep-agentic` profile still runs as the fixed pipeline, but the report now says so in its notes.
+- **Closed:** research workers now get the owner's user id (`chat/owner.py`, shared with the inbox), so the portfolio-risk lens can read holdings. Unverified against the production role (see AG4).
+- **Closed (partly):** `tests/test_agent_security.py` shows a worker cannot be steered into a tool outside its lens (the tool never runs), that findings echoing an instruction reach the writer neutralised, and that a finding cannot cite an unregistered id. There is still no adversarial run against a real model.
 
 **Web**
-- The research-profile editor does not show the engine, lens or worker fields (they round-trip unchanged), nor the `inbox_settings` and `document_index_settings` blocks; they are edited only as JSON in Config.
+- **Closed (partly):** the research-profile editor now shows the engine, worker model and effort, and the lenses (with checks and tests). Worker step, search and parallel limits still round-trip unchanged, and the `inbox_settings` and `document_index_settings` blocks are edited only as JSON in Config.
 - The Inbox page has helper tests and a clean type check but was never opened in a browser, so layout, focus order and the mobile view are unchecked.
 
 **AG4**
-- Never run live: whether the items are useful is the owner's reading of `python -m steward.inbox.replay` output on real events; the "10 past events" check has only been run with a fake agent.
-- Owner-scoped tools (`holding`, `position_risk`, `thesis_and_reports`, `strategy_rules`) need the owner's user id; the run reads it from `private.app_owner` and falls back to none if the backend role cannot read that table, in which case those tools return "no owner" and the agent has less to go on. Unverified against the production role.
-- Triggers are only escalation notes and thesis-breach alerts. Earnings checks, `monitor` results and risk-limit breaches do not start a run yet.
-- A trigger older than `lookback_days` or beyond `max_per_scan` is never picked up; there is no backlog view.
+- **Replayed live (11 October 2026):** `python -m steward.inbox.replay --limit 8` on real events wrote nothing; 7 of 8 items had a cited statement and 1 a proposed action (a research job on a risk-limit breach). Three portfolio breaches got sensible review-flag assessments, an NU escalation was marked unverified, and four VRT insider purchases were recognised as 2022 events. Whether the items are *useful* remains the owner's reading. Only 8 events were replayed (the plan says 10; fewer were available than the limit's mix suggested).
+- **Closed:** the replay showed old insider filings becoming triggers because the scan dated a disclosure by when it was ingested. Disclosure triggers (scan, missed list, replay) are now dated by `known_at`, the filing date, so a 2022 filing ingested today starts nothing and is outside the backlog window. Transaction date was not used: it exists only on insider trades and is at most a few days before the filing.
+- Open: for an event with no ticker (portfolio-level breach) a dropped action is logged as "None is not a holding or a thesis"; the wording is poor, the behaviour is right.
+- Owner-scoped tools (`holding`, `position_risk`, `thesis_and_reports`, `strategy_rules`) need the owner's user id; the run reads it from `private.app_owner`. In the live replay the agent did reason about holdings, so the production role could read it.
+- **Closed:** trigger kinds are now escalation, thesis-breach alert, disclosure alert, portfolio breach and thesis KPI verdict that is a breach (earnings results are verdicts). `monitor` results still have no trigger: nothing in the code records one as an event.
+- **Closed:** `GET /inbox/missed` lists events older than `lookback_days` (up to 60 days) with no run, and `POST /inbox/missed/run` queues them; the Inbox page has a panel for both.
 - A confirmed action runs with trigger `manual`; the job log does not say it came from the inbox except through `inbox_item.action_job_id`.
 - No push channel (WhatsApp was left for after the inbox proves useful; its feasibility check from the open items is still not done).
 - No test of the inbox page in a browser; only helper tests and the type check.
 
 **AG5**
-- `agent_note` is plain text per holding or general; there is no versioning, no way for the agent to suggest a note, and notes are not in the document index.
-- Feedback only exports candidate cases; nothing compares agent versions against them yet, and the benchmark runner does not read `inbox_feedback_cases.json`.
+- **Closed:** `agent_note_version` keeps every edit and deletion (history in the Inbox page), and the inbox agent can attach one suggested note to an item; only the owner's accept (`decide_suggested_note`) saves it. Notes are in the document index (owner's decision, 11 October 2026), so a search can return them next to evidence; they are tier 1 and labelled `agent_note`, and a deleted or deactivated note leaves the index on the next run.
+- **Closed:** `python -m steward.inbox.regress` replays each exported feedback case through the current agent (nothing is stored) and judges it: a liked item must keep a cited statement and the same kind of action, a rejected one must not repeat its statements or action. The chat benchmark runner is a different shape (question to tools) and still does not read the file. A pass is a floor; the owner reads the failures.
 - Route stats count a run as "unpriced" when a model step has no cost; those runs add nothing to the cost column, so it is a floor. Chat questions are one route (`chat`), not split by the tools they used.
 - Latency is job start to finish, not time to first token, and queue wait is not included.
 
 **Housekeeping**
-- Test containers (`steward-test-pgvector`, `steward-test-pg`, `steward-ci-pg`) and temp directories under `AppData\Local\Temp\claude\pt` are left running or in place.
+- **Closed (11 October 2026):** the containers started for these tests (`steward-test-pgvector`, `steward-ci-pg`) and the scratch directories are removed. `steward-test-pg` was already running before this work and was left alone.
+- Not built, by decision: splitting the `chat` route stats by tool; the WhatsApp feasibility check; the chat benchmark runner reading the feedback file.
+- On this Windows machine pytest can fail with `PermissionError` on its default temp folder (`Temp\pytest-of-pepab`); rerun with `--basetemp` pointing at a folder you own.
 
 **Cross-cutting**
 - No cost data exists for any new route (`document_index` embedding, research workers, `inbox_agent`), so none of the budget caps or `BudgetJobType` limits for them were set from evidence; they use defaults. Decision 4's "about 2× the median" cannot be applied until the AG0 baseline and a few live runs exist.
 - Security: untrusted text (news, filings, web pages, owner notes) reaches models in the workers, the inbox agent and `search_documents`. It is neutralised and tool access is read-only, but there is no adversarial test (prompt injection through a filing, a note or a story) for the new paths.
 - Model ids `gpt-6-luna` (workers, inbox agent) and `gemini-embedding-2` are taken from existing config; whether the account and the price tables support them in these roles was not checked, and an unpriced model makes cost a floor.
-- Migrations `20261106100000` and `20261107100000` have rollback files tested only on the local containers; neither has been applied to production, and the pgvector extension and HNSW index there are untested.
+- **Applied (11 October 2026):** all four migrations (`research_plan_draft`, `document_chunk`, `inbox_and_agent_note`, `index_disclosure_and_agent_notes`) are applied to the StewardAI Supabase project through the connector, with the owner's approval. Their rollback files were proven on local containers. The version numbers recorded by the connector are its own timestamps, not the file names, so a later `supabase db push` would see them as unrecorded; reconcile the history before using the CLI.
+- Adding a trigger kind or a passage kind needs a migration for the check constraints (`20261108100000` widens `document_chunk.kind` and `inbox_item.trigger_kind`); the next such change will too.
 - The plan's own later sections (Cost reduction C0–C8, decisions, open items) were not revisited; for example, whether WhatsApp is feasible (open item) and the C0 cost baseline are still open and now block honest AG3–AG5 sign-off.
 
 ## Cost reduction (target: 30–50% lower, quality gates unchanged)

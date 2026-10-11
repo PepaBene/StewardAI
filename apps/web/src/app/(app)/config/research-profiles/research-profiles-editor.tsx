@@ -1,15 +1,34 @@
 "use client";
 
-import { ArrowDownIcon, ArrowUpIcon, CopyIcon, FlaskConicalIcon, LoaderCircleIcon, PlusIcon, StarIcon, Trash2Icon } from "lucide-react";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  CopyIcon,
+  FlaskConicalIcon,
+  LoaderCircleIcon,
+  PlusIcon,
+  StarIcon,
+  Trash2Icon,
+} from "lucide-react";
 import Link from "next/link";
 import { useId, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { ConfigHeader } from "@/components/config/config-header";
-import { CheckboxField, CheckboxGroup, SelectField, TextAreaField, TextField } from "@/components/config/fields";
+import {
+  CheckboxField,
+  CheckboxGroup,
+  SelectField,
+  TextAreaField,
+  TextField,
+} from "@/components/config/fields";
 import { SaveBar } from "@/components/config/save-bar";
 import { Button } from "@/components/ui/button";
-import { getBrowserApiClient, type ResearchProfilesConfig, type ResearchSectionId } from "@/lib/api/client";
+import {
+  getBrowserApiClient,
+  type ResearchProfilesConfig,
+  type ResearchSectionId,
+} from "@/lib/api/client";
 import { errorsAt, type FieldErrors } from "@/lib/api/validation-errors";
 import { EFFORTS, MODEL_SUGGESTIONS } from "@/lib/config/jobs-form";
 import {
@@ -17,7 +36,9 @@ import {
   BOUNDS,
   duplicateProfile,
   duplicateTemplate,
+  ENGINES,
   LANGUAGES,
+  LENSES,
   MODES,
   moveInList,
   newProfile,
@@ -29,13 +50,23 @@ import {
   toggleInList,
   validateResearchProfiles,
   WEB_EMPHASES,
+  WORKER_EFFORTS,
   type ProfileForm,
   type ResearchProfilesForm,
   type TemplateForm,
 } from "@/lib/config/research-profiles-form";
 import { mergeErrors } from "@/lib/config/strategy-form";
-import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
-import { DEPTHS, RESEARCH_SECTIONS, sectionLabel, VALUATION_METHODS, WRITTEN_BY } from "@/lib/research/report";
+import {
+  configSaveQuery,
+  useConfigEditor,
+} from "@/lib/hooks/use-config-editor";
+import {
+  DEPTHS,
+  RESEARCH_SECTIONS,
+  sectionLabel,
+  VALUATION_METHODS,
+  WRITTEN_BY,
+} from "@/lib/research/report";
 import { cn } from "@/lib/utils";
 import { BlueprintCorners } from "@/components/ui/blueprint";
 
@@ -43,7 +74,10 @@ import { ReportTemplateCard } from "./report-template-card";
 
 const api = () => getBrowserApiClient();
 const EFFORT_OPTIONS = EFFORTS.map((e) => ({ value: e, label: e }));
-const VALUATION_OPTIONS = VALUATION_METHODS.map((m) => ({ value: m.id, label: m.label }));
+const VALUATION_OPTIONS = VALUATION_METHODS.map((m) => ({
+  value: m.id,
+  label: m.label,
+}));
 
 /**
  * Research profiles: the shapes a research run can take. Every field of every profile is
@@ -57,22 +91,45 @@ export function ResearchProfilesEditor() {
   const [baseline, setBaseline] = useState("");
   const editor = useConfigEditor<ResearchProfilesConfig>({
     load: () => api().GET("/config/research-profiles"),
-    save: (body, note, base) => api().PUT("/config/research-profiles", { body, params: { query: configSaveQuery(note, base) } }),
-    validate: (body) => api().POST("/config/research-profiles/validate", { body }),
+    save: (body, note, base) =>
+      api().PUT("/config/research-profiles", {
+        body,
+        params: { query: configSaveQuery(note, base) },
+      }),
+    validate: (body) =>
+      api().POST("/config/research-profiles/validate", { body }),
     onLoaded: (body) => {
       const loaded = researchProfilesFromBody(body);
       setForm(loaded);
       setBaseline(body ? JSON.stringify(researchProfilesToBody(loaded)) : "");
     },
   });
-  const body = useMemo(() => (form ? researchProfilesToBody(form) : null), [form]);
-  const clientErrors = useMemo(() => (form ? validateResearchProfiles(form) : {}), [form]);
-  const errors = useMemo(() => mergeErrors(clientErrors, editor.errors), [clientErrors, editor.errors]);
+  const body = useMemo(
+    () => (form ? researchProfilesToBody(form) : null),
+    [form],
+  );
+  const clientErrors = useMemo(
+    () => (form ? validateResearchProfiles(form) : {}),
+    [form],
+  );
+  const errors = useMemo(
+    () => mergeErrors(clientErrors, editor.errors),
+    [clientErrors, editor.errors],
+  );
   const blocked = Object.keys(clientErrors).length > 0;
   const dirty = body !== null && JSON.stringify(body) !== baseline;
 
   const setProfile = (key: string, change: Partial<ProfileForm>) =>
-    setForm((f) => (f ? { ...f, profiles: f.profiles.map((p) => (p.key === key ? { ...p, ...change } : p)) } : f));
+    setForm((f) =>
+      f
+        ? {
+            ...f,
+            profiles: f.profiles.map((p) =>
+              p.key === key ? { ...p, ...change } : p,
+            ),
+          }
+        : f,
+    );
   // Renaming a template's id keeps the profiles that use it pointing at it.
   const setTemplate = (key: string, change: Partial<TemplateForm>) =>
     setForm((f) => {
@@ -80,7 +137,9 @@ export function ResearchProfilesEditor() {
       const old = f.templates.find((t) => t.key === key);
       // A partial id that equals another template's id must not move profiles onto that
       // template (or, once typed past it, move that template's own profiles along).
-      const others = new Set(f.templates.filter((t) => t.key !== key).map((t) => t.id));
+      const others = new Set(
+        f.templates.filter((t) => t.key !== key).map((t) => t.id),
+      );
       const renamed =
         change.id !== undefined &&
         old &&
@@ -93,9 +152,15 @@ export function ResearchProfilesEditor() {
           : null;
       return {
         ...f,
-        templates: f.templates.map((t) => (t.key === key ? { ...t, ...change } : t)),
+        templates: f.templates.map((t) =>
+          t.key === key ? { ...t, ...change } : t,
+        ),
         profiles: renamed
-          ? f.profiles.map((p) => (p.template_id === renamed.from ? { ...p, template_id: renamed.to } : p))
+          ? f.profiles.map((p) =>
+              p.template_id === renamed.from
+                ? { ...p, template_id: renamed.to }
+                : p,
+            )
           : f.profiles,
       };
     });
@@ -110,13 +175,18 @@ export function ResearchProfilesEditor() {
     <div className="space-y-6">
       <ConfigHeader title="Research profiles" domain="research-profiles">
         <p>
-          The shapes a research run can take: which sections, in which order, how deep, which model and budget, which source
-          tiers, trusted and blocked domains, peers, valuation methods and language, whether it searches again for thin
-          sections, and which report template presents the result. A quick screen and a thorough workup are two profiles.
+          The shapes a research run can take: which sections, in which order,
+          how deep, which model and budget, which source tiers, trusted and
+          blocked domains, peers, valuation methods and language, whether it
+          searches again for thin sections, and which report template presents
+          the result. A quick screen and a thorough workup are two profiles.
           Used from the next run.
         </p>
         <p>
-          <Link href="/research" className="text-accent-ink underline-offset-4 hover:underline">
+          <Link
+            href="/research"
+            className="text-accent-ink underline-offset-4 hover:underline"
+          >
             Start research
           </Link>{" "}
           with any profile.
@@ -124,21 +194,35 @@ export function ResearchProfilesEditor() {
       </ConfigHeader>
 
       {editor.status.kind === "loading" ? (
-        <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
-          <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
+        <p
+          className="flex items-center gap-2 text-sm text-text-muted"
+          role="status"
+        >
+          <LoaderCircleIcon
+            aria-hidden="true"
+            className="size-4 animate-spin"
+          />
           Loading research profiles…
         </p>
       ) : null}
-      {editor.status.kind === "error" ? <AlertMessage title="Could not load the research profiles">{editor.status.message}</AlertMessage> : null}
+      {editor.status.kind === "error" ? (
+        <AlertMessage title="Could not load the research profiles">
+          {editor.status.message}
+        </AlertMessage>
+      ) : null}
       {editor.status.kind === "ready" && editor.status.version === null ? (
         <AlertMessage tone="info" title="Defaults in use">
-          Nothing saved yet: the profiles and report templates below are the backend&rsquo;s defaults.
+          Nothing saved yet: the profiles and report templates below are the
+          backend&rsquo;s defaults.
         </AlertMessage>
       ) : null}
 
       {form ? (
         <>
-          <section aria-labelledby="default-profile-heading" className="space-y-2 blueprint p-5">
+          <section
+            aria-labelledby="default-profile-heading"
+            className="space-y-2 blueprint p-5"
+          >
             <BlueprintCorners />
             <h2 id="default-profile-heading" className="font-medium">
               Default profile
@@ -150,17 +234,29 @@ export function ResearchProfilesEditor() {
               errors={errors}
               value={form.default_profile}
               options={[
-                ...form.profiles.map((p) => ({ value: p.id, label: `${p.name || "(no name)"} (${p.id || "no id"})` })),
+                ...form.profiles.map((p) => ({
+                  value: p.id,
+                  label: `${p.name || "(no name)"} (${p.id || "no id"})`,
+                })),
                 ...(form.profiles.some((p) => p.id === form.default_profile)
                   ? []
-                  : [{ value: form.default_profile, label: `${form.default_profile} (not a profile)` }]),
+                  : [
+                      {
+                        value: form.default_profile,
+                        label: `${form.default_profile} (not a profile)`,
+                      },
+                    ]),
               ]}
-              onChange={(v) => setForm((f) => (f ? { ...f, default_profile: v } : f))}
+              onChange={(v) =>
+                setForm((f) => (f ? { ...f, default_profile: v } : f))
+              }
             />
           </section>
 
           {errorsAt(errors, "profiles").length > 0 ? (
-            <AlertMessage title="Profiles">{errorsAt(errors, "profiles").join(" ")}</AlertMessage>
+            <AlertMessage title="Profiles">
+              {errorsAt(errors, "profiles").join(" ")}
+            </AlertMessage>
           ) : null}
 
           {form.profiles.map((p, i) => (
@@ -176,46 +272,90 @@ export function ResearchProfilesEditor() {
                 if (change.id !== undefined && p.id === form.default_profile) {
                   setForm((f) =>
                     f
-                      ? { ...f, default_profile: change.id!, profiles: f.profiles.map((x) => (x.key === p.key ? { ...x, ...change } : x)) }
+                      ? {
+                          ...f,
+                          default_profile: change.id!,
+                          profiles: f.profiles.map((x) =>
+                            x.key === p.key ? { ...x, ...change } : x,
+                          ),
+                        }
                       : f,
                   );
                 } else setProfile(p.key, change);
               }}
-              onMakeDefault={() => setForm((f) => (f ? { ...f, default_profile: p.id } : f))}
+              onMakeDefault={() =>
+                setForm((f) => (f ? { ...f, default_profile: p.id } : f))
+              }
               onDuplicate={() =>
                 setForm((f) => {
                   if (!f) return f;
-                  const copy = duplicateProfile(p, f.profiles.map((x) => x.id));
+                  const copy = duplicateProfile(
+                    p,
+                    f.profiles.map((x) => x.id),
+                  );
                   const at = f.profiles.findIndex((x) => x.key === p.key);
-                  return { ...f, profiles: [...f.profiles.slice(0, at + 1), copy, ...f.profiles.slice(at + 1)] };
+                  return {
+                    ...f,
+                    profiles: [
+                      ...f.profiles.slice(0, at + 1),
+                      copy,
+                      ...f.profiles.slice(at + 1),
+                    ],
+                  };
                 })
               }
               onRemove={
                 form.profiles.length > 1
-                  ? () => setForm((f) => (f ? { ...f, profiles: f.profiles.filter((x) => x.key !== p.key) } : f))
+                  ? () =>
+                      setForm((f) =>
+                        f
+                          ? {
+                              ...f,
+                              profiles: f.profiles.filter(
+                                (x) => x.key !== p.key,
+                              ),
+                            }
+                          : f,
+                      )
                   : undefined
               }
             />
           ))}
 
-          <Button variant="outline" size="sm" onClick={() => setForm((f) => (f ? { ...f, profiles: [...f.profiles, newProfile(ids)] } : f))}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setForm((f) =>
+                f ? { ...f, profiles: [...f.profiles, newProfile(ids)] } : f,
+              )
+            }
+          >
             <PlusIcon aria-hidden="true" />
             Add profile
           </Button>
 
           <section aria-labelledby="templates-heading" className="space-y-4">
             <div className="space-y-1">
-              <h2 id="templates-heading" className="text-[22px] leading-tight font-semibold">
+              <h2
+                id="templates-heading"
+                className="text-[22px] leading-tight font-semibold"
+              >
                 Report templates
               </h2>
               <p className="text-sm text-text-muted">
-                A profile decides how a run investigates; a template decides how the report is laid out: which sections appear,
-                in what order, under what title, and which are left out of the concise view. A template only arranges the
-                report. It cannot change a figure that code calculated or your strategy. Pick one per profile above.
+                A profile decides how a run investigates; a template decides how
+                the report is laid out: which sections appear, in what order,
+                under what title, and which are left out of the concise view. A
+                template only arranges the report. It cannot change a figure
+                that code calculated or your strategy. Pick one per profile
+                above.
               </p>
             </div>
             {errorsAt(errors, "templates").length > 0 ? (
-              <AlertMessage title="Templates">{errorsAt(errors, "templates").join(" ")}</AlertMessage>
+              <AlertMessage title="Templates">
+                {errorsAt(errors, "templates").join(" ")}
+              </AlertMessage>
             ) : null}
             {form.templates.map((t, i) => (
               <ReportTemplateCard
@@ -223,24 +363,64 @@ export function ResearchProfilesEditor() {
                 template={t}
                 index={i}
                 errors={errors}
-                usedBy={form.profiles.filter((p) => p.template_id.trim() !== "" && p.template_id === t.id).map((p) => p.name || p.id)}
+                usedBy={form.profiles
+                  .filter(
+                    (p) =>
+                      p.template_id.trim() !== "" && p.template_id === t.id,
+                  )
+                  .map((p) => p.name || p.id)}
                 onChange={(change) => setTemplate(t.key, change)}
                 onDuplicate={() =>
                   setForm((f) => {
                     if (!f) return f;
-                    const copy = duplicateTemplate(t, f.templates.map((x) => x.id));
+                    const copy = duplicateTemplate(
+                      t,
+                      f.templates.map((x) => x.id),
+                    );
                     const at = f.templates.findIndex((x) => x.key === t.key);
-                    return { ...f, templates: [...f.templates.slice(0, at + 1), copy, ...f.templates.slice(at + 1)] };
+                    return {
+                      ...f,
+                      templates: [
+                        ...f.templates.slice(0, at + 1),
+                        copy,
+                        ...f.templates.slice(at + 1),
+                      ],
+                    };
                   })
                 }
-                onRemove={() => setForm((f) => (f ? { ...f, templates: f.templates.filter((x) => x.key !== t.key) } : f))}
+                onRemove={() =>
+                  setForm((f) =>
+                    f
+                      ? {
+                          ...f,
+                          templates: f.templates.filter((x) => x.key !== t.key),
+                        }
+                      : f,
+                  )
+                }
               />
             ))}
-            {form.templates.length === 0 ? <p className="text-sm text-text-muted">No template yet. Profiles then use their own section list.</p> : null}
+            {form.templates.length === 0 ? (
+              <p className="text-sm text-text-muted">
+                No template yet. Profiles then use their own section list.
+              </p>
+            ) : null}
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setForm((f) => (f ? { ...f, templates: [...f.templates, newTemplate(f.templates.map((x) => x.id))] } : f))}
+              onClick={() =>
+                setForm((f) =>
+                  f
+                    ? {
+                        ...f,
+                        templates: [
+                          ...f.templates,
+                          newTemplate(f.templates.map((x) => x.id)),
+                        ],
+                      }
+                    : f,
+                )
+              }
             >
               <PlusIcon aria-hidden="true" />
               Add template
@@ -291,7 +471,10 @@ function ProfileCard({
   const label = p.name || p.id || `profile ${i + 1}`;
   const templateOptions = [
     { value: "", label: "None (the profile's own section list)" },
-    ...templates.map((t) => ({ value: t.id, label: `${t.name || "(no name)"} (${t.id || "no id"})` })),
+    ...templates.map((t) => ({
+      value: t.id,
+      label: `${t.name || "(no name)"} (${t.id || "no id"})`,
+    })),
     ...(p.template_id && !templates.some((t) => t.id === p.template_id)
       ? [{ value: p.template_id, label: `${p.template_id} (not a template)` }]
       : []),
@@ -300,9 +483,18 @@ function ProfileCard({
     <section aria-labelledby={headingId} className="space-y-4 blueprint p-5">
       <BlueprintCorners />
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h2 id={headingId} className="flex flex-wrap items-center gap-2 text-[22px] leading-tight font-semibold">
-          <FlaskConicalIcon aria-hidden="true" className="size-4 text-text-muted" />
-          {p.name || "(no name)"} <span className="font-mono text-sm font-normal text-text-muted">{p.id}</span>
+        <h2
+          id={headingId}
+          className="flex flex-wrap items-center gap-2 text-[22px] leading-tight font-semibold"
+        >
+          <FlaskConicalIcon
+            aria-hidden="true"
+            className="size-4 text-text-muted"
+          />
+          {p.name || "(no name)"}{" "}
+          <span className="font-mono text-sm font-normal text-text-muted">
+            {p.id}
+          </span>
           {isDefault ? (
             <span className="inline-flex items-center gap-1 rounded-sm border border-border px-1.5 py-0.5 text-xs font-medium">
               <StarIcon aria-hidden="true" className="size-3" />
@@ -312,24 +504,45 @@ function ProfileCard({
         </h2>
         <div className="flex flex-wrap gap-1">
           {!isDefault ? (
-            <Button variant="ghost" size="sm" onClick={onMakeDefault} aria-label={`Make ${label} the default profile`}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onMakeDefault}
+              aria-label={`Make ${label} the default profile`}
+            >
               <StarIcon aria-hidden="true" />
               Make default
             </Button>
           ) : null}
-          <Button variant="ghost" size="sm" onClick={onDuplicate} aria-label={`Duplicate ${label}`}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDuplicate}
+            aria-label={`Duplicate ${label}`}
+          >
             <CopyIcon aria-hidden="true" />
             Duplicate
           </Button>
           {onRemove ? (
-            <Button variant="ghost" size="sm" onClick={onRemove} aria-label={`Remove ${label}`} disabled={isDefault} title={isDefault ? "Make another profile the default first" : undefined}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onRemove}
+              aria-label={`Remove ${label}`}
+              disabled={isDefault}
+              title={
+                isDefault ? "Make another profile the default first" : undefined
+              }
+            >
               <Trash2Icon aria-hidden="true" />
               Remove
             </Button>
           ) : null}
         </div>
       </div>
-      {own.length > 0 ? <p className="text-xs text-text">{own.join(" ")}</p> : null}
+      {own.length > 0 ? (
+        <p className="text-xs text-text">{own.join(" ")}</p>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <TextField
@@ -342,9 +555,30 @@ function ProfileCard({
           onChange={(v) => onChange({ id: v })}
           hint="Lower-case words joined by dashes; used in the job and the report."
         />
-        <TextField label="Name" path={`${path}.name`} errors={errors} value={p.name} maxLength={BOUNDS.name.max} onChange={(v) => onChange({ name: v })} />
-        <SelectField label="Language" path={`${path}.language`} errors={errors} value={p.language} options={LANGUAGES} onChange={(v) => onChange({ language: v })} />
-        <SelectField label="Depth" path={`${path}.depth`} errors={errors} value={p.depth} options={DEPTHS} onChange={(v) => onChange({ depth: v })} />
+        <TextField
+          label="Name"
+          path={`${path}.name`}
+          errors={errors}
+          value={p.name}
+          maxLength={BOUNDS.name.max}
+          onChange={(v) => onChange({ name: v })}
+        />
+        <SelectField
+          label="Language"
+          path={`${path}.language`}
+          errors={errors}
+          value={p.language}
+          options={LANGUAGES}
+          onChange={(v) => onChange({ language: v })}
+        />
+        <SelectField
+          label="Depth"
+          path={`${path}.depth`}
+          errors={errors}
+          value={p.depth}
+          options={DEPTHS}
+          onChange={(v) => onChange({ depth: v })}
+        />
         <TextField
           label="Model"
           path={`${path}.model`}
@@ -359,7 +593,14 @@ function ProfileCard({
             <option key={m} value={m} />
           ))}
         </datalist>
-        <SelectField label="Effort" path={`${path}.effort`} errors={errors} value={p.effort} options={EFFORT_OPTIONS} onChange={(v) => onChange({ effort: v })} />
+        <SelectField
+          label="Effort"
+          path={`${path}.effort`}
+          errors={errors}
+          value={p.effort}
+          options={EFFORT_OPTIONS}
+          onChange={(v) => onChange({ effort: v })}
+        />
         <TextField
           label="Step cap per run"
           path={`${path}.max_steps`}
@@ -395,7 +636,12 @@ function ProfileCard({
         />
       </div>
 
-      <SectionPicker profile={p} path={`${path}.sections`} errors={errors} onChange={(sections) => onChange({ sections })} />
+      <SectionPicker
+        profile={p}
+        path={`${path}.sections`}
+        errors={errors}
+        onChange={(sections) => onChange({ sections })}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <CheckboxGroup
@@ -495,6 +741,80 @@ function ProfileCard({
       </fieldset>
 
       <fieldset className="space-y-3">
+        <legend className="text-sm font-medium">Research workers</legend>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <SelectField
+            label="Engine"
+            path={`${path}.engine`}
+            errors={errors}
+            value={p.engine}
+            options={ENGINES}
+            onChange={(v) => onChange({ engine: v })}
+            hint="Agentic: one cheap-model worker per lens reads the app's records and searches the web within this profile's step and search budget. The report is still written and checked section by section. Without an AI key the fixed pipeline runs."
+          />
+          {p.engine === "agentic" ? (
+            <>
+              <TextField
+                label="Worker model"
+                path={`${path}.worker_model`}
+                errors={errors}
+                value={p.worker_model}
+                list={listId}
+                spellCheck={false}
+                onChange={(v) => onChange({ worker_model: v })}
+              />
+              <SelectField
+                label="Worker effort"
+                path={`${path}.worker_effort`}
+                errors={errors}
+                value={p.worker_effort}
+                options={WORKER_EFFORTS}
+                onChange={(v) => onChange({ worker_effort: v })}
+              />
+              <TextField
+                label="Steps per worker"
+                path={`${path}.worker_max_steps`}
+                errors={errors}
+                value={p.worker_max_steps}
+                inputMode="numeric"
+                onChange={(v) => onChange({ worker_max_steps: v })}
+                hint={`At most this many model calls for one worker; steps a worker leaves unused go to the next. ${BOUNDS.worker_max_steps.min} to ${BOUNDS.worker_max_steps.max}.`}
+              />
+              <TextField
+                label="Web searches per worker"
+                path={`${path}.worker_max_searches`}
+                errors={errors}
+                value={p.worker_max_searches}
+                inputMode="numeric"
+                onChange={(v) => onChange({ worker_max_searches: v })}
+                hint={`Only the news and counter-case lenses search. All workers together stay inside this profile's searches. ${BOUNDS.worker_max_searches.min} to ${BOUNDS.worker_max_searches.max}.`}
+              />
+              <TextField
+                label="Workers at the same time"
+                path={`${path}.parallel_workers`}
+                errors={errors}
+                value={p.parallel_workers}
+                inputMode="numeric"
+                onChange={(v) => onChange({ parallel_workers: v })}
+                hint={`${BOUNDS.parallel_workers.min} to ${BOUNDS.parallel_workers.max}. The first worker always runs alone.`}
+              />
+            </>
+          ) : null}
+        </div>
+        {p.engine === "agentic" ? (
+          <CheckboxGroup
+            label="Lenses (one worker each)"
+            path={`${path}.lenses`}
+            errors={errors}
+            values={p.lenses}
+            options={LENSES}
+            onChange={(v) => onChange({ lenses: v })}
+            hint="Findings without a checkable source are dropped before the writer sees them."
+          />
+        ) : null}
+      </fieldset>
+
+      <fieldset className="space-y-3">
         <legend className="text-sm font-medium">Source policy</legend>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <TextAreaField
@@ -534,8 +854,12 @@ function ProfileCard({
           </div>
         </div>
         <fieldset className="space-y-1">
-          <legend className="text-sm font-medium">Days before a cited source counts as stale</legend>
-          <p className="text-xs text-text-muted">Leave blank to keep the built-in limit shown in each box.</p>
+          <legend className="text-sm font-medium">
+            Days before a cited source counts as stale
+          </legend>
+          <p className="text-xs text-text-muted">
+            Leave blank to keep the built-in limit shown in each box.
+          </p>
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {STALE_KINDS.map((k) => (
               <TextField
@@ -546,12 +870,16 @@ function ProfileCard({
                 value={p.stale_days[k.kind] ?? ""}
                 inputMode="numeric"
                 placeholder={String(k.builtin)}
-                onChange={(v) => onChange({ stale_days: { ...p.stale_days, [k.kind]: v } })}
+                onChange={(v) =>
+                  onChange({ stale_days: { ...p.stale_days, [k.kind]: v } })
+                }
               />
             ))}
           </div>
           {errorsAt(errors, `${path}.stale_days`).length > 0 ? (
-            <p className="text-xs text-text">{errorsAt(errors, `${path}.stale_days`).join(" ")}</p>
+            <p className="text-xs text-text">
+              {errorsAt(errors, `${path}.stale_days`).join(" ")}
+            </p>
           ) : null}
         </fieldset>
       </fieldset>
@@ -584,18 +912,33 @@ function SectionPicker({
   const selected = profile.sections;
   const unselected = RESEARCH_SECTIONS.filter((s) => !selected.includes(s.id));
   return (
-    <fieldset className="space-y-2" aria-describedby={messages.length > 0 ? `${id}-errors` : undefined}>
+    <fieldset
+      className="space-y-2"
+      aria-describedby={messages.length > 0 ? `${id}-errors` : undefined}
+    >
       <legend className="text-sm font-medium">Sections, in report order</legend>
       <ol className="space-y-1">
         {selected.map((sectionId, i) => {
           const info = RESEARCH_SECTIONS.find((s) => s.id === sectionId);
           return (
-            <li key={sectionId} className="flex flex-wrap items-center gap-2 rounded-md border border-border px-2 py-1 text-sm">
+            <li
+              key={sectionId}
+              className="flex flex-wrap items-center gap-2 rounded-md border border-border px-2 py-1 text-sm"
+            >
               <label className="inline-flex flex-1 items-center gap-2">
-                <input type="checkbox" checked onChange={() => onChange(toggleInList(selected, sectionId))} className="size-4 accent-accent" />
+                <input
+                  type="checkbox"
+                  checked
+                  onChange={() => onChange(toggleInList(selected, sectionId))}
+                  className="size-4 accent-accent"
+                />
                 <span className="num w-5 text-text-muted">{i + 1}.</span>
                 <span className="font-medium">{sectionLabel(sectionId)}</span>
-                {info ? <span className="text-xs text-text-muted">{WRITTEN_BY[info.writtenBy].label} · {info.description}</span> : null}
+                {info ? (
+                  <span className="text-xs text-text-muted">
+                    {WRITTEN_BY[info.writtenBy].label} · {info.description}
+                  </span>
+                ) : null}
               </label>
               <span className="flex gap-0.5">
                 <Button
@@ -623,15 +966,29 @@ function SectionPicker({
           );
         })}
       </ol>
-      {selected.length === 0 ? <p className="text-sm text-text-muted">No section picked.</p> : null}
+      {selected.length === 0 ? (
+        <p className="text-sm text-text-muted">No section picked.</p>
+      ) : null}
       {unselected.length > 0 ? (
         <div className="space-y-1">
-          <p className="text-xs text-text-muted">Not in this profile (tick to add at the end):</p>
+          <p className="text-xs text-text-muted">
+            Not in this profile (tick to add at the end):
+          </p>
           <ul className="flex flex-wrap gap-x-4 gap-y-1">
             {unselected.map((s) => (
               <li key={s.id}>
-                <label className={cn("inline-flex items-center gap-1.5 text-sm text-text-muted")} title={s.description}>
-                  <input type="checkbox" checked={false} onChange={() => onChange(toggleInList(selected, s.id))} className="size-4 accent-accent" />
+                <label
+                  className={cn(
+                    "inline-flex items-center gap-1.5 text-sm text-text-muted",
+                  )}
+                  title={s.description}
+                >
+                  <input
+                    type="checkbox"
+                    checked={false}
+                    onChange={() => onChange(toggleInList(selected, s.id))}
+                    className="size-4 accent-accent"
+                  />
                   {s.label}
                 </label>
               </li>

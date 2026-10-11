@@ -155,6 +155,36 @@ describe("research profiles form", () => {
   });
 });
 
+describe("research profiles form: research workers", () => {
+  it("round-trips the engine and worker fields and starts new profiles on the fixed engine", () => {
+    const form = researchProfilesFromBody(null);
+    const p = form.profiles[0]!;
+    expect(newProfile().engine).toBe("fixed");
+    p.engine = "agentic";
+    p.lenses = ["financials", "counter_case"];
+    p.worker_model = "gpt-6-luna";
+    p.worker_effort = "medium";
+    const back = researchProfilesFromBody(researchProfilesToBody(form)).profiles[0]!;
+    expect([back.engine, back.lenses, back.worker_model, back.worker_effort]).toEqual([
+      "agentic",
+      ["financials", "counter_case"],
+      "gpt-6-luna",
+      "medium",
+    ]);
+  });
+
+  it("asks for a lens and a worker model only when the engine is agentic", () => {
+    const form = researchProfilesFromBody(null);
+    const p = form.profiles[0]!;
+    p.lenses = [];
+    p.worker_model = "";
+    expect(validateResearchProfiles(form)).toEqual({});
+    p.engine = "agentic";
+    const errors = validateResearchProfiles(form);
+    expect(Object.keys(errors)).toEqual(["profiles.0.lenses", "profiles.0.worker_model"]);
+  });
+});
+
 describe("research profiles form: top holders", () => {
   it("defaults an old profile to 3 and checks the bounds", () => {
     const { top_holders: _dropped, ...old } = FULL.profiles![0] as Record<string, unknown>;

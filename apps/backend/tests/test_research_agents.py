@@ -87,16 +87,19 @@ def test_only_findings_with_a_checkable_citation_are_kept() -> None:
 
 
 class FakeWorker:
-    def __init__(self, fail: set[str] = frozenset()) -> None:  # type: ignore[assignment]
+    def __init__(self, fail: set[str] = frozenset(), spend: bool = False) -> None:  # type: ignore[assignment]
         self.fail = fail
+        self.spend = spend  # use every search it is given
         self.running = 0
         self.peak = 0
         self.order: list[str] = []
         self.searches: dict[str, int] = {}
+        self.steps: dict[str, int] = {}
 
     async def run(self, request: WorkerRequest) -> WorkerResult:
         self.order.append(request.lens)
         self.searches[request.lens] = request.max_searches
+        self.steps[request.lens] = request.max_steps
         self.running += 1
         self.peak = max(self.peak, self.running)
         await asyncio.sleep(0.01)
@@ -106,6 +109,8 @@ class FakeWorker:
         sid = request.registry.add("fact", f"f-{request.lens}", request.lens, snippet="x")
         usage = Usage(model="m")
         usage.input_tokens = 100
+        if self.spend:
+            usage.searches = request.max_searches
         return WorkerResult(
             LensDraft(findings=[Finding(text=f"{request.lens} finding.", source_ids=[sid])]),
             usage,
@@ -114,7 +119,13 @@ class FakeWorker:
         )
 
 
-async def drive(worker: FakeWorker, parallel: int = 2, total_searches: int = 10) -> Any:
+async def drive(
+    worker: FakeWorker,
+    parallel: int = 2,
+    total_searches: int = 10,
+    total_steps: int | None = None,
+    max_steps: int = 4,
+) -> Any:
     reg = Registry()
     request = make_request(reg)
     return await run_agents(
@@ -125,7 +136,8 @@ async def drive(worker: FakeWorker, parallel: int = 2, total_searches: int = 10)
         today="2026-10-11",
         model="m",
         effort="low",
-        max_steps=4,
+        max_steps=max_steps,
+        total_steps=total_steps,
         worker_searches=8,
         total_searches=total_searches,
         parallel=parallel,
@@ -152,7 +164,7 @@ async def test_workers_respect_the_parallel_cap_and_the_first_runs_alone() -> No
 
 
 async def test_searches_are_shared_out_of_the_total_and_only_to_web_lenses() -> None:
-    worker = FakeWorker()
+    worker = FakeWorker(spend=True)
     await drive(worker, total_searches=10)
     web = {lens: n for lens, n in worker.searches.items() if n}
     assert set(web) == agents.WEB_LENSES and sum(web.values()) <= 10
@@ -160,6 +172,21 @@ async def test_searches_are_shared_out_of_the_total_and_only_to_web_lenses() -> 
     none = FakeWorker()
     await drive(none, total_searches=0)
     assert not any(none.searches.values())
+
+
+async def test_a_worker_hands_back_the_searches_it_did_not_use() -> None:
+    worker = FakeWorker()  # uses none of what it is given
+    await drive(worker, parallel=1, total_searches=10)
+    assert worker.searches["news_web"] == 8 and worker.searches["counter_case"] == 8
+
+
+async def test_a_worker_hands_back_the_steps_it_did_not_use() -> None:
+    worker = FakeWorker()  # uses 2 of the steps it is given
+    await drive(worker, parallel=1, total_steps=20, max_steps=12)
+    shares = [worker.steps[lens] for lens in worker.order]
+    assert shares[0] == 4  # an even share of 20 over 5 lenses
+    assert shares[-1] > shares[0]  # what earlier lenses did not use went to the later ones
+    assert all(2 <= s <= 12 for s in shares)
 
 
 async def test_a_failing_worker_is_recorded_and_the_others_still_count() -> None:

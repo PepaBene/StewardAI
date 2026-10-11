@@ -253,7 +253,8 @@ async def test_only_a_confirmation_starts_a_job_and_only_once(backend_pool: asyn
         "select job_type, trigger, params from public.job where id = $1", confirmed.action_job_id
     )
     assert job["job_type"] == "earnings_check" and json.loads(job["params"]) == {
-        "ticker": "AAPL_US_EQ"
+        "ticker": "AAPL_US_EQ",
+        "inbox_item_id": item_id,
     }
     with pytest.raises(service.ActionError) as again:
         await service.confirm_action(backend_pool, item_id, OWNER)
@@ -279,6 +280,19 @@ async def test_only_a_confirmation_starts_a_job_and_only_once(backend_pool: asyn
         )
         == 1
     )
+
+
+@pytest.mark.db
+async def test_events_older_than_the_lookback_are_counted_as_missed(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    old = await add_escalation(backend_pool, "Old event")
+    await add_escalation(backend_pool, "Fresh event")
+    await backend_pool.execute(
+        "update public.report set created_at = now() - interval '20 days' where id = $1", old
+    )
+    assert await triggers.missed_count(backend_pool, 7, 2) == 1
+    assert [t.ref for t in await triggers.pending(backend_pool, 7, 10, 2)] != [old]
 
 
 @pytest.mark.db

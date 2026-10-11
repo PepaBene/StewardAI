@@ -110,18 +110,28 @@ def rrf(rankings: Sequence[Sequence[int]], k: int = RRF_K) -> dict[int, float]:
 
 
 async def keyword_ranking(pool: asyncpg.Pool, query: str, filters: Filters) -> list[int]:
-    """Passage ids best first by full-text rank (empty when the query has no searchable word)."""
+    """Passage ids best first by full-text rank (empty when the query has no searchable word).
+
+    A question in plain words rarely has every word in one passage, so when the strict (all
+    words) match finds nothing the terms are OR-ed and ts_rank_cd puts the passages with the
+    most of them first."""
     clause, params = filters.sql(3)
-    rows = await pool.fetch(
-        "with q as (select websearch_to_tsquery('english', $1::text) as tsq)"  # noqa: S608
-        " select c.id from public.document_chunk c, q"
-        f" where not c.is_parent and numnode(q.tsq) > 0 and c.search @@ q.tsq{clause}"
-        " order by ts_rank_cd(c.search, q.tsq) desc, c.id desc limit $2",
-        query,
-        CANDIDATES,
-        *params,
-    )
-    return [int(r["id"]) for r in rows]
+    for any_word in (False, True):
+        tsq = "websearch_to_tsquery('english', $1::text)"
+        if any_word:
+            tsq = f"to_tsquery('english', replace({tsq}::text, ' & ', ' | '))"
+        rows = await pool.fetch(
+            f"with q as (select {tsq} as tsq)"  # noqa: S608
+            " select c.id from public.document_chunk c, q"
+            f" where not c.is_parent and numnode(q.tsq) > 0 and c.search @@ q.tsq{clause}"
+            " order by ts_rank_cd(c.search, q.tsq) desc, c.id desc limit $2",
+            query,
+            CANDIDATES,
+            *params,
+        )
+        if rows:
+            return [int(r["id"]) for r in rows]
+    return []
 
 
 async def vector_ranking(

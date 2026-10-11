@@ -16,6 +16,7 @@ from typing import Any
 import asyncpg
 
 from steward.ai import AINotConfigured, Usage
+from steward.chat.owner import owner_of
 from steward.chat.tools import ChatTools
 from steward.config.jobs import InboxSettings, JobsConfig
 from steward.config.store import load_active
@@ -24,19 +25,10 @@ from steward.inbox import triggers
 from steward.inbox.agent import AgentRequest, AgentResult, InboxAgent, LLMInboxAgent
 from steward.inbox.triggers import Trigger
 from steward.jobs import queue
-from steward.jobs.runner import JobContext, JobFailed, create_job
+from steward.jobs.runner import JobContext, JobFailed, JobTrigger, create_job
 from steward.llm.client import create_llm
 from steward.research.sources import Registry
 from steward.settings import get_settings
-
-
-async def owner_of(pool: asyncpg.Pool) -> str | None:
-    """The single owner's user id, for the owner-scoped read tools; None if it cannot be read."""
-    try:
-        value = await pool.fetchval("select user_id::text from private.app_owner limit 1")
-    except asyncpg.PostgresError:
-        return None
-    return str(value) if value else None
 
 
 async def build_item(
@@ -69,6 +61,8 @@ async def build_item(
         "touches": [],
         "assessment": "",
         "nothing_to_do": False,
+        "suggested_note": None,
+        "note_status": None,
         "sources": [],
         "dropped_statements": 0,
         "action_dropped": None,
@@ -90,6 +84,8 @@ async def build_item(
             touches=result.draft.touches[:10],
             assessment=result.draft.assessment[:800],
             nothing_to_do=result.draft.nothing_to_do,
+            suggested_note=(result.draft.suggested_note or "").strip()[:500] or None,
+            note_status=("suggested" if (result.draft.suggested_note or "").strip() else None),
             dropped_statements=checked.dropped,
             action_dropped=checked.action_dropped,
             sources=[s.model_dump() for s in agent_mod.cited_sources(registry, checked.statements)],
@@ -140,6 +136,46 @@ async def _settings(ctx: JobContext) -> InboxSettings:
     return (stored.body if stored else JobsConfig()).inbox_settings
 
 
+async def queue_runs(
+    pool: asyncpg.Pool,
+    found: list[Trigger],
+    trigger: JobTrigger,
+    requested_by: str | None = None,
+) -> list[str]:
+    """Queue one `inbox_agent` job per trigger; the keys queued. A trigger that already has
+    an item or a run queued is skipped, so a repeated call cannot double-run an event."""
+    queued: list[str] = []
+    for t in found:
+        async with pool.acquire() as conn, conn.transaction():
+            # One transaction per trigger, serialised on its key, so two callers cannot both
+            # pass the check.
+            await conn.execute("select pg_advisory_xact_lock(hashtext($1))", t.key)
+            taken = await conn.fetchval(
+                "select exists (select 1 from public.inbox_item where trigger_key = $1)"
+                " or exists (select 1 from public.job where job_type = 'inbox_agent'"
+                " and status in ('queued', 'waiting', 'running')"
+                " and params ->> 'trigger_key' = $1)",
+                t.key,
+            )
+            if taken:
+                continue
+            job_id = await create_job(
+                conn,
+                "inbox_agent",
+                trigger,
+                requested_by=requested_by,
+                params={
+                    "trigger_key": t.key,
+                    "trigger_kind": t.kind,
+                    "trigger_ref": t.ref,
+                    "ticker": t.ticker,
+                },
+            )
+            await queue.enqueue(conn, job_id, "inbox_agent")
+        queued.append(t.key)
+    return queued
+
+
 async def inbox_scan_handler(ctx: JobContext) -> None:
     cfg = await _settings(ctx)
     async with ctx.step("scan") as step:
@@ -149,22 +185,7 @@ async def inbox_scan_handler(ctx: JobContext) -> None:
         found = await triggers.pending(
             ctx.pool, cfg.lookback_days, cfg.max_per_scan, cfg.min_severity
         )
-        queued = []
-        for t in found:
-            async with ctx.pool.acquire() as conn, conn.transaction():
-                job_id = await create_job(
-                    conn,
-                    "inbox_agent",
-                    "event",
-                    params={
-                        "trigger_key": t.key,
-                        "trigger_kind": t.kind,
-                        "trigger_ref": t.ref,
-                        "ticker": t.ticker,
-                    },
-                )
-                await queue.enqueue(conn, job_id, "inbox_agent")
-            queued.append(t.key)
+        queued = await queue_runs(ctx.pool, found, "event")
         step.detail.update(queued=queued, found=len(found))
 
 

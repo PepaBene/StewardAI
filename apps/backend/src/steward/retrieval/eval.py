@@ -14,7 +14,7 @@ set is written against the owner's real corpus; run it after the index job.
 import argparse
 import asyncio
 import json
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +22,7 @@ import httpx
 from pydantic import BaseModel, Field
 
 from steward.news.embeddings import Embedder
-from steward.retrieval.search import Filters, Mode, search
+from steward.retrieval.search import Filters, Hit, Mode, search
 
 CASES_PATH = Path(__file__).resolve().parents[3] / "evals" / "retrieval_cases.json"
 MODES: tuple[Mode, ...] = ("keyword", "vector", "hybrid")
@@ -39,6 +39,22 @@ class RetrievalCase(BaseModel):
     relevant: list[Relevant] = Field(min_length=1)
     ticker: str | None = None
     kinds: list[str] = Field(default_factory=list)
+    # Phrases the supporting passages must contain (case-insensitive). Support@k: every phrase
+    # appears in the top k passages of the labelled documents, i.e. the answer is retrievable,
+    # not just the right document.
+    must_contain: list[str] = Field(default_factory=list)
+
+
+def supported(
+    hits: Sequence[Hit], relevant: Sequence[Relevant], phrases: Sequence[str], k: int
+) -> bool | None:
+    """Whether the top-k passages of the labelled documents hold every phrase; None when the
+    case names no phrases."""
+    if not phrases:
+        return None
+    wanted = {(r.kind, r.ref) for r in relevant}
+    text = " ".join(h.text.lower() for h in hits[:k] if (h.kind, h.ref) in wanted)
+    return all(p.lower() in text for p in phrases)
 
 
 def load_cases(path: Path = CASES_PATH) -> list[RetrievalCase]:
@@ -71,28 +87,51 @@ def summarise(per_case: Sequence[dict[str, float]]) -> dict[str, float | None]:
     }
 
 
+Reranker = Callable[[str, list[Hit]], Awaitable[list[Hit]]]
+
+
 async def evaluate(
-    pool: Any, embedder: Embedder | None, cases: Sequence[RetrievalCase], k: int
+    pool: Any,
+    embedder: Embedder | None,
+    cases: Sequence[RetrievalCase],
+    k: int,
+    reranker: Reranker | None = None,
 ) -> dict[str, Any]:
-    """Every case under keyword, vector and hybrid search, with the summary per mode and the
-    cases where hybrid does worse than keywords alone."""
-    scores: dict[str, list[dict[str, float]]] = {m: [] for m in MODES}
+    """Every case under keyword, vector and hybrid search (and hybrid plus rerank when a
+    reranker is given), with the summary per mode, the support@k of the cases that name
+    phrases, and the cases where hybrid does worse than keywords alone."""
+    modes: list[str] = [*MODES, *(["hybrid+rerank"] if reranker else [])]
+    scores: dict[str, list[dict[str, float]]] = {m: [] for m in modes}
+    support: dict[str, list[bool]] = {m: [] for m in modes}
     worse: list[str] = []
     for case in cases:
         filters = Filters(tickers=(case.ticker,) if case.ticker else (), kinds=tuple(case.kinds))
         per_mode: dict[str, dict[str, float]] = {}
-        for mode in MODES:
-            if mode != "keyword" and embedder is None:
+        for mode in modes:
+            base: Mode = "hybrid" if mode == "hybrid+rerank" else mode  # type: ignore[assignment]
+            if base != "keyword" and embedder is None:
                 continue
-            result = await search(pool, embedder, case.query, filters=filters, limit=20, mode=mode)
-            per_mode[mode] = score_case([(h.kind, h.ref) for h in result.hits], case.relevant, k)
+            result = await search(pool, embedder, case.query, filters=filters, limit=20, mode=base)
+            hits = result.hits
+            if mode == "hybrid+rerank" and reranker is not None:
+                hits = await reranker(case.query, hits)
+            per_mode[mode] = score_case([(h.kind, h.ref) for h in hits], case.relevant, k)
             scores[mode].append(per_mode[mode])
+            if (ok := supported(hits, case.relevant, case.must_contain, k)) is not None:
+                support[mode].append(ok)
         if "hybrid" in per_mode and per_mode["hybrid"]["recall"] < per_mode["keyword"]["recall"]:
             worse.append(case.id)
     return {
         "k": k,
         "cases": len(cases),
-        "modes": {m: summarise(s) for m, s in scores.items() if s},
+        "modes": {
+            m: {
+                **summarise(s),
+                "support": round(sum(support[m]) / len(support[m]), 3) if support[m] else None,
+            }
+            for m, s in scores.items()
+            if s
+        },
         "hybrid_worse_than_keyword": worse,
     }
 
@@ -123,7 +162,17 @@ async def _main(args: argparse.Namespace) -> dict[str, Any]:
                 if settings.google_api_key
                 else None
             )
-            return await evaluate(pool, embedder, cases, args.k)
+            reranker: Reranker | None = None
+            if args.rerank_model:
+                from steward.llm.client import create_llm
+                from steward.retrieval.rerank import rerank
+
+                llm = create_llm(settings)
+
+                async def reranker(query: str, hits: list[Hit]) -> list[Hit]:
+                    return (await rerank(llm, args.rerank_model, query, hits))[0]
+
+            return await evaluate(pool, embedder, cases, args.k, reranker)
     finally:
         await pool.close()
 
@@ -133,6 +182,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--cases", default=str(CASES_PATH))
     parser.add_argument("--k", type=int, default=5)
     parser.add_argument("--out", help="write the result as JSON to this file")
+    parser.add_argument(
+        "--rerank-model", help="also score hybrid + a model rerank of the top 20, e.g. gpt-6-luna"
+    )
     args = parser.parse_args(argv)
     result = asyncio.run(_main(args))
     text = json.dumps(result, indent=2)

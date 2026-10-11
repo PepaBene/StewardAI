@@ -16,7 +16,7 @@ import asyncpg
 from steward.news.embeddings import Embedder, estimate_tokens
 from steward.retrieval import chunking
 
-Kind = Literal["filing", "report", "thesis", "note", "news"]
+Kind = Literal["filing", "report", "thesis", "note", "news", "disclosure", "agent_note"]
 KINDS: tuple[str, ...] = ("filing", "report", "thesis", "note", "news")
 # Longest text sent to the embedder for one passage (the model takes 8,192 tokens).
 EMBED_CHARS = 6000

@@ -140,8 +140,13 @@ async def confirm_action(pool: asyncpg.Pool, item_id: int, owner_id: str) -> Inb
         job_type = ACTION_JOB_TYPES.get(action.get("kind", ""))
         if job_type is None:
             raise ActionError(f"Unknown action kind {action.get('kind')!r}")
+        # The job carries the item it came from, so the job log shows it was an inbox action.
         job_id = await create_job(
-            conn, job_type, "manual", requested_by=owner_id, params=dict(action.get("params", {}))
+            conn,
+            job_type,
+            "manual",
+            requested_by=owner_id,
+            params={**dict(action.get("params", {})), "inbox_item_id": item_id},
         )
         await queue.enqueue(conn, job_id, job_type)
         await conn.execute(
@@ -212,14 +217,55 @@ async def list_notes(pool: asyncpg.Pool) -> list[AgentNote]:
     return [note_from(r) for r in rows]
 
 
-async def add_note(pool: asyncpg.Pool, body: NoteIn) -> AgentNote:
-    row = await pool.fetchrow(
-        "insert into public.agent_note (ticker, text, active) values ($1, $2, $3)"
-        " returning id, ticker, text, active, created_at, updated_at",
-        body.ticker or None,
-        body.text.strip(),
-        body.active,
+class NoteVersion(BaseModel):
+    id: int
+    note_id: int
+    ticker: str | None
+    text: str
+    active: bool
+    change: Literal["created", "edited", "deleted"]
+    changed_at: str
+
+
+async def _version(
+    conn: asyncpg.Connection | asyncpg.Pool,
+    note_id: int,
+    ticker: str | None,
+    text: str,
+    active: bool,
+    change: str,
+) -> None:
+    await conn.execute(
+        "insert into public.agent_note_version (note_id, ticker, text, active, change)"
+        " values ($1, $2, $3, $4, $5)",
+        note_id,
+        ticker,
+        text,
+        active,
+        change,
     )
+
+
+async def note_history(pool: asyncpg.Pool, note_id: int) -> list[NoteVersion]:
+    """Every state the note has had, newest first (kept after the note is deleted)."""
+    rows = await pool.fetch(
+        "select id, note_id, ticker, text, active, change, changed_at"
+        " from public.agent_note_version where note_id = $1 order by id desc",
+        note_id,
+    )
+    return [NoteVersion(**{**dict(r), "changed_at": r["changed_at"].isoformat()}) for r in rows]
+
+
+async def add_note(pool: asyncpg.Pool, body: NoteIn) -> AgentNote:
+    async with pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(
+            "insert into public.agent_note (ticker, text, active) values ($1, $2, $3)"
+            " returning id, ticker, text, active, created_at, updated_at",
+            body.ticker or None,
+            body.text.strip(),
+            body.active,
+        )
+        await _version(conn, row["id"], row["ticker"], row["text"], row["active"], "created")
     return note_from(row)
 
 
@@ -231,24 +277,73 @@ async def edit_note(pool: asyncpg.Pool, note_id: int, patch: NotePatch) -> Agent
             note_id,
         )
         return note_from(row) if row else None
-    row = await pool.fetchrow(
-        "update public.agent_note set"  # noqa: S608
-        " ticker = case when $2 then $3 else ticker end,"
-        " text = case when $4 then $5 else text end,"
-        " active = case when $6 then $7 else active end, updated_at = now()"
-        f" where id = $1 returning {NOTE_COLUMNS}",
-        note_id,
-        "ticker" in fields,
-        fields.get("ticker") or None,
-        "text" in fields,
-        (fields.get("text") or "").strip(),
-        "active" in fields,
-        fields.get("active", True),
-    )
+    async with pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(
+            "update public.agent_note set"  # noqa: S608
+            " ticker = case when $2 then $3 else ticker end,"
+            " text = case when $4 then $5 else text end,"
+            " active = case when $6 then $7 else active end, updated_at = now()"
+            f" where id = $1 returning {NOTE_COLUMNS}",
+            note_id,
+            "ticker" in fields,
+            fields.get("ticker") or None,
+            "text" in fields,
+            (fields.get("text") or "").strip(),
+            "active" in fields,
+            fields.get("active", True),
+        )
+        if row:
+            await _version(conn, row["id"], row["ticker"], row["text"], row["active"], "edited")
     return note_from(row) if row else None
 
 
 async def delete_note(pool: asyncpg.Pool, note_id: int) -> bool:
-    return bool(
-        await pool.fetchval("delete from public.agent_note where id = $1 returning id", note_id)
-    )
+    async with pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(
+            "delete from public.agent_note where id = $1 returning ticker, text, active", note_id
+        )
+        if row:
+            await _version(conn, note_id, row["ticker"], row["text"], row["active"], "deleted")
+    return row is not None
+
+
+async def decide_suggested_note(
+    pool: asyncpg.Pool, item_id: int, accept: bool
+) -> tuple[InboxItem, AgentNote | None]:
+    """The owner keeps or drops the note an agent run suggested. Keeping it creates an ordinary
+    agent note for the item's holding; only this call ever creates one from a run."""
+    async with pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(
+            "select ticker, body from public.inbox_item where id = $1 for update", item_id
+        )
+        if row is None:
+            raise ActionError(f"No inbox item {item_id}")
+        body = _json(row["body"])
+        if body.get("note_status") != "suggested" or not body.get("suggested_note"):
+            raise ActionError(f"Item {item_id} has no open note suggestion", conflict=True)
+        created: AgentNote | None = None
+        if accept:
+            note_row = await conn.fetchrow(
+                "insert into public.agent_note (ticker, text, active) values ($1, $2, true)"
+                " returning id, ticker, text, active, created_at, updated_at",
+                row["ticker"],
+                str(body["suggested_note"])[:2000],
+            )
+            await _version(
+                conn,
+                note_row["id"],
+                note_row["ticker"],
+                note_row["text"],
+                note_row["active"],
+                "created",
+            )
+            created = note_from(note_row)
+        body["note_status"] = "accepted" if accept else "declined"
+        await conn.execute(
+            "update public.inbox_item set body = $2::jsonb where id = $1",
+            item_id,
+            json.dumps(body, default=str),
+        )
+    item = await get_item(pool, item_id)
+    assert item is not None
+    return item, created

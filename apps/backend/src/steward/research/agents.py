@@ -350,6 +350,7 @@ async def run_agents(
     max_steps: int,
     worker_searches: int,
     total_searches: int,
+    total_steps: int | None = None,
     parallel: int,
     domains: tuple[str, ...],
     caller: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]],
@@ -364,16 +365,26 @@ async def run_agents(
     out = AgentRun()
     before = len(registry.sources)
     left = total_searches
+    steps_left = total_steps
+    unstarted = len(lenses)
     gate = asyncio.Semaphore(max(1, parallel))
     reserved: dict[Lens, int] = {}
-    for lens in lenses:
-        share = min(worker_searches, left) if lens in WEB_LENSES and domains else 0
-        reserved[lens] = share
-        left -= share
     results: dict[Lens, tuple[WorkerRecord, list[KeptFinding], list[str]]] = {}
 
     async def one(lens: Lens) -> None:
+        nonlocal left, steps_left, unstarted
         async with gate:
+            # With a step pool, a worker takes an even share of what is left (at most
+            # `max_steps`, at least 2) and hands back the steps it did not use.
+            share = max_steps
+            if steps_left is not None:
+                share = min(max_steps, max(2, steps_left // max(1, unstarted)))
+                steps_left -= share
+            unstarted -= 1
+            # A worker reserves its share when it starts and hands back what it did not use,
+            # so a lens that finishes early leaves its searches to the ones still to run.
+            reserved[lens] = min(worker_searches, left) if lens in WEB_LENSES and domains else 0
+            left -= reserved[lens]
             request = WorkerRequest(
                 lens=lens,
                 name=name,
@@ -381,7 +392,7 @@ async def run_agents(
                 today=today,
                 model=model,
                 effort=effort,
-                max_steps=max_steps,
+                max_steps=share,
                 max_searches=reserved[lens],
                 domains=domains,
                 caller=caller,
@@ -392,9 +403,15 @@ async def run_agents(
             try:
                 res = await worker.run(request)
             except Exception as exc:  # one worker must never fail the run
+                left += reserved[lens]
+                if steps_left is not None:
+                    steps_left += share
                 record.outcome, record.note = "failed", f"{type(exc).__name__}: {exc}"[:200]
                 results[lens] = (record, [], [])
                 return
+            left += max(0, reserved[lens] - res.usage.searches)
+            if steps_left is not None:
+                steps_left += max(0, share - res.steps)
             kept: list[KeptFinding] = []
             if res.draft is not None:
                 kept, record.dropped = keep_findings(lens, res.draft, request, res.titles)

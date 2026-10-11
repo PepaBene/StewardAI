@@ -81,6 +81,85 @@ async def note_docs(pool: asyncpg.Pool) -> list[SourceDoc]:
     ]
 
 
+async def agent_note_docs(pool: asyncpg.Pool) -> list[SourceDoc]:
+    """The owner's active working notes for the agent (per holding, or general)."""
+    rows = await pool.fetch(
+        "select id, ticker, text, updated_at from public.agent_note where active order by id"
+    )
+    return [
+        SourceDoc(
+            kind="agent_note",
+            ref=str(r["id"]),
+            title=f"Agent note{' on ' + r['ticker'] if r['ticker'] else ''}",
+            text=r["text"],
+            tickers=(r["ticker"],) if r["ticker"] else (),
+            as_of=r["updated_at"].date(),
+            tier=1,
+            structured=False,
+        )
+        for r in rows
+    ]
+
+
+def _detail_line(detail: object) -> str:
+    """A disclosure alert's detail as `key: value` pairs; nested values are left out."""
+    if not isinstance(detail, dict):
+        return ""
+    return "; ".join(
+        f"{k}: {v}" for k, v in detail.items() if isinstance(v, str | int | float) and str(v)
+    )
+
+
+async def disclosure_docs(pool: asyncpg.Pool, alert_days: int) -> list[SourceDoc]:
+    """The disclosure register's prose: the filing passage behind each customer, supplier or
+    award relationship that was not rejected, and the headline and detail of each disclosure
+    alert of the last `alert_days` (insider trades, major holders, relationship and deal
+    changes). The register's figures stay with the data tools; these are the words."""
+    rels = await pool.fetch(
+        "select id, ticker, relationship, counterparty_name, claim_label, fiscal_period,"
+        " passage, source_url, status, known_at from public.relationship_disclosure"
+        " where status <> 'rejected' order by id"
+    )
+    alerts = await pool.fetch(
+        "select id, kind, ticker, headline, detail, source_url, known_at"
+        " from public.disclosure_alert where created_at > now() - make_interval(days => $1)"
+        " order by id",
+        alert_days,
+    )
+    docs = [
+        SourceDoc(
+            kind="disclosure",
+            ref=f"relationship:{r['id']}",
+            title=(
+                f"{r['ticker']} {r['relationship']} disclosure"
+                f" ({r['counterparty_name'] or r['claim_label'] or 'unnamed'})"
+            ),
+            text=f"[{r['status']}] {r['passage']}",
+            tickers=(r["ticker"],),
+            as_of=r["known_at"].date(),
+            source_url=r["source_url"],
+            tier=1,
+            structured=False,
+        )
+        for r in rels
+    ]
+    docs += [
+        SourceDoc(
+            kind="disclosure",
+            ref=f"alert:{a['id']}",
+            title=f"{a['ticker']} disclosure alert: {a['kind']}",
+            text="\n".join(x for x in (a["headline"], _detail_line(a["detail"])) if x),
+            tickers=(a["ticker"],),
+            as_of=a["known_at"].date(),
+            source_url=a["source_url"],
+            tier=1,
+            structured=False,
+        )
+        for a in alerts
+    ]
+    return docs
+
+
 async def report_docs(pool: asyncpg.Pool, limit: int) -> list[SourceDoc]:
     """Reports not indexed yet (a report never changes once written), newest first."""
     rows = await pool.fetch(

@@ -3649,11 +3649,52 @@ export interface paths {
         };
         /**
          * List Inbox
-         * @description Items the event agents left, newest first. `unread` counts items still new.
+         * @description Items the event agents left, newest first. `unread` counts items still new; `missed`
+         *     counts older events (up to 60 days) the scan never ran on.
          */
         get: operations["list_inbox"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/missed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Missed
+         * @description Open events older than the scan window (up to 60 days) that no run has looked into.
+         */
+        get: operations["list_missed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/missed/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Missed
+         * @description Queue an agent run for each chosen missed event. Only events still open are queued.
+         */
+        post: operations["run_missed"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3732,6 +3773,63 @@ export interface paths {
         put?: never;
         /** Decline Inbox Action */
         post: operations["decline_inbox_action"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/{item_id}/note/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Suggested Note
+         * @description Keep the working note an agent run suggested; creates an ordinary agent note.
+         */
+        post: operations["accept_suggested_note"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/{item_id}/note/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline Suggested Note */
+        post: operations["decline_suggested_note"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent-notes/{note_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Agent Note History
+         * @description Every state a note has had, newest first; kept after the note is deleted.
+         */
+        get: operations["agent_note_history"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -15511,6 +15609,24 @@ export interface components {
              */
             reports_per_run: number;
             /**
+             * Index Disclosures
+             * @description Index the disclosure register's prose: relationship passages and alerts.
+             * @default true
+             */
+            index_disclosures: boolean;
+            /**
+             * Disclosure Alert Days
+             * @description Disclosure alerts of this many days are indexed.
+             * @default 365
+             */
+            disclosure_alert_days: number;
+            /**
+             * Index Agent Notes
+             * @description Index your working notes for the agent.
+             * @default true
+             */
+            index_agent_notes: boolean;
+            /**
              * News Per Run
              * @description News items indexed per run.
              * @default 600
@@ -21050,6 +21166,11 @@ export interface components {
             items: components["schemas"]["InboxItem"][];
             /** Unread */
             unread: number;
+            /**
+             * Missed
+             * @default 0
+             */
+            missed: number;
         };
         /**
          * InboxSettings
@@ -24379,6 +24500,35 @@ export interface components {
             /** Facts Mirrored */
             facts_mirrored: number;
         };
+        /** MissedEvent */
+        MissedEvent: {
+            /** Key */
+            key: string;
+            /** Kind */
+            kind: string;
+            /** Ref */
+            ref: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Severity */
+            severity: number | null;
+            /** Headline */
+            headline: string;
+            /** Created At */
+            created_at: string;
+        };
+        /** MissedRunIn */
+        MissedRunIn: {
+            /** Keys */
+            keys: string[];
+        };
+        /** MissedRunOut */
+        MissedRunOut: {
+            /** Queued */
+            queued: string[];
+            /** Skipped */
+            skipped: string[];
+        };
         /** MissingActions */
         MissingActions: {
             /**
@@ -25446,6 +25596,11 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** NoteDecision */
+        NoteDecision: {
+            item: components["schemas"]["InboxItem"];
+            note?: components["schemas"]["AgentNote"] | null;
+        };
         /** NoteExtractOut */
         NoteExtractOut: {
             /** Version Id */
@@ -25497,6 +25652,26 @@ export interface components {
             check?: ("supported" | "unsupported" | "unchecked") | null;
             /** Check Reason */
             check_reason?: string | null;
+        };
+        /** NoteVersion */
+        NoteVersion: {
+            /** Id */
+            id: number;
+            /** Note Id */
+            note_id: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Text */
+            text: string;
+            /** Active */
+            active: boolean;
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "created" | "edited" | "deleted";
+            /** Changed At */
+            changed_at: string;
         };
         /** NotificationRule */
         NotificationRule: {
@@ -31628,6 +31803,11 @@ export interface components {
             seconds_median: number | null;
             /** Seconds P95 */
             seconds_p95: number | null;
+            /**
+             * Queue Seconds Median
+             * @description Median wait between a job being created and starting.
+             */
+            queue_seconds_median?: number | null;
         };
         /** Row */
         Row: {
@@ -44476,6 +44656,70 @@ export interface operations {
             };
         };
     };
+    list_missed: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MissedEvent"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_missed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MissedRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MissedRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_inbox_item: {
         parameters: {
             query?: never;
@@ -44626,6 +44870,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InboxItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_suggested_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_suggested_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_note_history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteVersion"][];
                 };
             };
             /** @description Validation Error */

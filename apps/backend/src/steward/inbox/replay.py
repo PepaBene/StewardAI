@@ -16,11 +16,12 @@ from typing import Any
 
 import asyncpg
 
+from steward.chat.owner import owner_of
 from steward.config.jobs import InboxSettings, JobsConfig
 from steward.config.store import load_active
 from steward.inbox import triggers
 from steward.inbox.agent import InboxAgent
-from steward.inbox.run import build_item, owner_of
+from steward.inbox.run import build_item
 
 
 async def _counts(pool: asyncpg.Pool) -> tuple[int, int]:
@@ -34,7 +35,11 @@ async def recent_triggers(pool: asyncpg.Pool, limit: int) -> list[triggers.Trigg
     rows = await pool.fetch(
         "select 'escalation' as kind, id, created_at from public.report where type = 'escalation'"
         " and ticker is not null union all select 'alert', id, created_at from public.alert"
-        " where kind = 'thesis_breach' and ticker is not null order by created_at desc limit $1",
+        " where kind = 'thesis_breach' and ticker is not null"
+        " union all select 'disclosure', id, known_at from public.disclosure_alert"
+        " union all select 'breach', id, first_seen from public.portfolio_breach"
+        " union all select 'verdict', id, created_at from public.verdict where status = 'breach'"
+        " order by created_at desc limit $1",
         limit,
     )
     found = [await triggers.load(pool, r["kind"], r["id"]) for r in rows]

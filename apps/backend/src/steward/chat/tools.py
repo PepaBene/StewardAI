@@ -41,7 +41,7 @@ from steward.retrieval import search as retrieval_search
 from steward.retrieval.search import Filters
 
 ACTION_KINDS = ("earnings_check", "research", "portfolio_sync")
-DOCUMENT_KINDS = ("filing", "report", "thesis", "note", "news")
+DOCUMENT_KINDS = ("filing", "report", "thesis", "note", "news", "disclosure", "agent_note")
 DOCUMENT_SOURCE_KIND: dict[str, SourceKind] = {
     "filing": "observation",
     "note": "observation",
@@ -159,7 +159,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     "type": "array",
                     "items": {
                         "type": "string",
-                        "enum": ["filing", "report", "thesis", "note", "news"],
+                        "enum": list(DOCUMENT_KINDS),
                     },
                     "description": "Optional: limit to these kinds of document.",
                 },

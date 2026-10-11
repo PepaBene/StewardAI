@@ -10633,7 +10633,7 @@
           "inbox"
         ],
         "summary": "List Inbox",
-        "description": "Items the event agents left, newest first. `unread` counts items still new.",
+        "description": "Items the event agents left, newest first. `unread` counts items still new; `missed`\ncounts older events (up to 60 days) the scan never ran on.",
         "operationId": "list_inbox",
         "security": [
           {
@@ -10715,6 +10715,108 @@
             }
           }
         }
+      }
+    },
+    "/inbox/missed": {
+      "get": {
+        "tags": [
+          "inbox"
+        ],
+        "summary": "List Missed",
+        "description": "Open events older than the scan window (up to 60 days) that no run has looked into.",
+        "operationId": "list_missed",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MissedEvent"
+                  },
+                  "title": "Response List Missed"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbox/missed/run": {
+      "post": {
+        "tags": [
+          "inbox"
+        ],
+        "summary": "Run Missed",
+        "description": "Queue an agent run for each chosen missed event. Only events still open are queued.",
+        "operationId": "run_missed",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissedRunIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissedRunOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/inbox/{item_id}": {
@@ -10966,6 +11068,159 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InboxItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbox/{item_id}/note/accept": {
+      "post": {
+        "tags": [
+          "inbox"
+        ],
+        "summary": "Accept Suggested Note",
+        "description": "Keep the working note an agent run suggested; creates an ordinary agent note.",
+        "operationId": "accept_suggested_note",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteDecision"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbox/{item_id}/note/decline": {
+      "post": {
+        "tags": [
+          "inbox"
+        ],
+        "summary": "Decline Suggested Note",
+        "operationId": "decline_suggested_note",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteDecision"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-notes/{note_id}/history": {
+      "get": {
+        "tags": [
+          "inbox"
+        ],
+        "summary": "Agent Note History",
+        "description": "Every state a note has had, newest first; kept after the note is deleted.",
+        "operationId": "agent_note_history",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Note Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoteVersion"
+                  },
+                  "title": "Response Agent Note History"
                 }
               }
             }
@@ -47357,6 +47612,26 @@
             "description": "Reports indexed per run.",
             "default": 200
           },
+          "index_disclosures": {
+            "type": "boolean",
+            "title": "Index Disclosures",
+            "description": "Index the disclosure register's prose: relationship passages and alerts.",
+            "default": true
+          },
+          "disclosure_alert_days": {
+            "type": "integer",
+            "maximum": 1825.0,
+            "minimum": 7.0,
+            "title": "Disclosure Alert Days",
+            "description": "Disclosure alerts of this many days are indexed.",
+            "default": 365
+          },
+          "index_agent_notes": {
+            "type": "boolean",
+            "title": "Index Agent Notes",
+            "description": "Index your working notes for the agent.",
+            "default": true
+          },
           "news_per_run": {
             "type": "integer",
             "maximum": 5000.0,
@@ -63169,6 +63444,11 @@
           "unread": {
             "type": "integer",
             "title": "Unread"
+          },
+          "missed": {
+            "type": "integer",
+            "title": "Missed",
+            "default": 0
           }
         },
         "type": "object",
@@ -72747,6 +73027,105 @@
         ],
         "title": "MirrorOut"
       },
+      "MissedEvent": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "ref": {
+            "type": "integer",
+            "title": "Ref"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "kind",
+          "ref",
+          "ticker",
+          "severity",
+          "headline",
+          "created_at"
+        ],
+        "title": "MissedEvent"
+      },
+      "MissedRunIn": {
+        "properties": {
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Keys"
+          }
+        },
+        "type": "object",
+        "required": [
+          "keys"
+        ],
+        "title": "MissedRunIn"
+      },
+      "MissedRunOut": {
+        "properties": {
+          "queued": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Queued"
+          },
+          "skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queued",
+          "skipped"
+        ],
+        "title": "MissedRunOut"
+      },
       "MissingActions": {
         "properties": {
           "price_raw": {
@@ -75122,6 +75501,28 @@
         ],
         "title": "NotCovered"
       },
+      "NoteDecision": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/InboxItem"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentNote"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "item"
+        ],
+        "title": "NoteDecision"
+      },
       "NoteExtractOut": {
         "properties": {
           "version_id": {
@@ -75275,6 +75676,61 @@
           "text"
         ],
         "title": "NoteSentence"
+      },
+      "NoteVersion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "note_id": {
+            "type": "integer",
+            "title": "Note Id"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "change": {
+            "type": "string",
+            "enum": [
+              "created",
+              "edited",
+              "deleted"
+            ],
+            "title": "Change"
+          },
+          "changed_at": {
+            "type": "string",
+            "title": "Changed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "note_id",
+          "ticker",
+          "text",
+          "active",
+          "change",
+          "changed_at"
+        ],
+        "title": "NoteVersion"
       },
       "NotificationRule": {
         "properties": {
@@ -92415,6 +92871,18 @@
               }
             ],
             "title": "Seconds P95"
+          },
+          "queue_seconds_median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Seconds Median",
+            "description": "Median wait between a job being created and starting."
           }
         },
         "type": "object",

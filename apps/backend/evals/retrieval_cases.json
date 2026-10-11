@@ -1,5 +1,90 @@
 {
-  "description": "Retrieval evaluation set (agentic workflows and RAG plan, AG2). Each case is a question and the stored documents a good search must surface: {\"kind\": \"report\", \"ref\": \"<report id>\"}, {\"kind\": \"filing\", \"ref\": \"<evidence sha256>\"}, {\"kind\": \"thesis\", \"ref\": \"<ticker>\"}, {\"kind\": \"note\", \"ref\": \"<note id>\"}, {\"kind\": \"news\", \"ref\": \"<news item id>\"}. Write the cases against the real corpus after the first document_index run, including paraphrased queries that share no words with the passage, then run `python -m steward.retrieval.eval --k 5` and keep the embeddings only if hybrid recall beats keyword recall. See steward/retrieval/eval.py.",
-  "version": 1,
-  "cases": []
+  "description": "Retrieval evaluation set (agentic workflows and RAG plan, AG2). Each case is a question and the stored documents a good search must surface: {\"kind\": \"report\", \"ref\": \"<report id>\"}, {\"kind\": \"filing\", \"ref\": \"<evidence sha256>\"}, {\"kind\": \"thesis\", \"ref\": \"<ticker>\"}, {\"kind\": \"note\", \"ref\": \"<note id>\"}, {\"kind\": \"news\", \"ref\": \"<news item id>\"}, {\"kind\": \"disclosure\", \"ref\": \"alert:<id>\"}. Written against the real corpus after the first document_index run (2026-10-11); queries are paraphrased so they share few words with the passage. must_contain phrases were copied from the stored passage. Run `python -m steward.retrieval.eval --k 5` and keep the embeddings only if hybrid recall beats keyword recall. See steward/retrieval/eval.py.",
+  "version": 2,
+  "cases": [
+    {
+      "id": "asml-raised-outlook",
+      "query": "How much revenue did the chip equipment maker from the Netherlands say it expects for the full year after raising its outlook?",
+      "relevant": [{"kind": "filing", "ref": "0078667a21d8c74223732dc3f171f896610af8f82360a1ac8b716c5264878171"}],
+      "ticker": "ASML_US_EQ",
+      "must_contain": ["43 billion", "gross margin"]
+    },
+    {
+      "id": "meta-q2-ai-core-business",
+      "query": "Which social media company said artificial intelligence is speeding up its main advertising business in its June quarter report?",
+      "relevant": [{"kind": "filing", "ref": "171fa27ae6b174208884670afc2a0d43351e6357b4cfa4c1b0267b07b7b2d8c4"}],
+      "ticker": "FB_US_EQ",
+      "must_contain": ["AI is accelerating our core business"]
+    },
+    {
+      "id": "pmi-volume-guidance",
+      "query": "What does the tobacco company now expect for cigarette volumes this year compared with its earlier forecast?",
+      "relevant": [{"kind": "filing", "ref": "eacd84d30ad261589ca5b314869d128c12e0365000fe8b0fb89ffdb4e198badb"}],
+      "ticker": "PM_US_EQ",
+      "must_contain": ["decline of 2% to 3%"]
+    },
+    {
+      "id": "azn-pipeline-risk",
+      "query": "What are the risks of drug candidates being late or failing to reach the market?",
+      "relevant": [{"kind": "filing", "ref": "6083dd0cb938f85eda0a1b4f1cca6176068a6fffbf0b06e8e42e314cb884e5c0"}],
+      "ticker": "AZN_US_EQ",
+      "must_contain": ["Product pipeline risks"]
+    },
+    {
+      "id": "nvda-ai-labs",
+      "query": "Management's view that many new model developers are now buying compute in parallel",
+      "relevant": [{"kind": "filing", "ref": "1dea0c28492879d6d8aabf4af664d8c8a7aafa37267d69a86d6bef6f6b283065"}],
+      "ticker": "NVDA_US_EQ",
+      "must_contain": ["golden age"]
+    },
+    {
+      "id": "aapl-ecosystem-lock-in",
+      "query": "Why is it expensive for customers to move away from the iPhone maker's products?",
+      "relevant": [{"kind": "note", "ref": "1"}],
+      "kinds": ["note"],
+      "must_contain": ["leaving the ecosystem costly"]
+    },
+    {
+      "id": "azn-drug-pricing-patents",
+      "query": "Which risks come from losing exclusivity on medicines and government price controls in the US?",
+      "relevant": [{"kind": "note", "ref": "10"}],
+      "kinds": ["note"],
+      "must_contain": ["Patent expiries"]
+    },
+    {
+      "id": "boeing-duopoly",
+      "query": "What stops new competitors from building large passenger jets?",
+      "relevant": [{"kind": "note", "ref": "11"}],
+      "kinds": ["note"],
+      "must_contain": ["certification barriers"]
+    },
+    {
+      "id": "apple-insider-sale",
+      "query": "An Apple officer sold a very large block of stock on the market",
+      "relevant": [{"kind": "disclosure", "ref": "alert:1"}],
+      "kinds": ["disclosure"],
+      "must_contain": ["160,655 shares"]
+    },
+    {
+      "id": "uber-ceo-purchase",
+      "query": "The ride-hailing chief executive put almost nine million dollars of his own money into the stock",
+      "relevant": [{"kind": "disclosure", "ref": "alert:100"}],
+      "kinds": ["disclosure"],
+      "must_contain": ["200,000 shares"]
+    },
+    {
+      "id": "cz-jobless-rate",
+      "query": "Czech jobless rate rising from the previous month",
+      "relevant": [{"kind": "news", "ref": "1"}],
+      "kinds": ["news"],
+      "must_contain": ["3% for 2020-07"]
+    },
+    {
+      "id": "weekly-digest-breaches",
+      "query": "How many limit breaches did the weekly summary report for the portfolio?",
+      "relevant": [{"kind": "report", "ref": "10"}],
+      "kinds": ["report"],
+      "must_contain": ["2 portfolio breaches"]
+    }
+  ]
 }

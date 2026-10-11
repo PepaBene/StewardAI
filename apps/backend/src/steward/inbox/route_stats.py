@@ -21,6 +21,9 @@ class RouteStat(BaseModel):
     cost_p95_usd: float | None
     seconds_median: float | None
     seconds_p95: float | None
+    queue_seconds_median: float | None = Field(
+        default=None, description="Median wait between a job being created and starting."
+    )
 
 
 async def route_stats(pool: asyncpg.Pool, days: int, ai_only: bool = True) -> list[RouteStat]:
@@ -32,6 +35,7 @@ async def route_stats(pool: asyncpg.Pool, days: int, ai_only: bool = True) -> li
                                     then ':' || (j.params ->> 'profile') else '' end as route,
                  j.status,
                  extract(epoch from (j.finished_at - j.started_at)) as seconds,
+                 extract(epoch from (j.started_at - j.created_at)) as queue_seconds,
                  coalesce(sum(s.cost_usd), 0)::float8 as cost,
                  bool_or(s.model is not null) as used_model,
                  bool_or(s.model is not null and s.cost_usd is null) as unpriced
@@ -48,7 +52,8 @@ async def route_stats(pool: asyncpg.Pool, days: int, ai_only: bool = True) -> li
                (percentile_cont(0.5) within group (order by cost))::float8 as cost_median,
                (percentile_cont(0.95) within group (order by cost))::float8 as cost_p95,
                (percentile_cont(0.5) within group (order by seconds))::float8 as sec_median,
-               (percentile_cont(0.95) within group (order by seconds))::float8 as sec_p95
+               (percentile_cont(0.95) within group (order by seconds))::float8 as sec_p95,
+               (percentile_cont(0.5) within group (order by queue_seconds))::float8 as queue_median
           from runs
          where ($2::boolean is false or used_model)
          group by route order by sum(cost) desc, route
@@ -67,6 +72,7 @@ async def route_stats(pool: asyncpg.Pool, days: int, ai_only: bool = True) -> li
             cost_p95_usd=_round(r["cost_p95"], 4),
             seconds_median=_round(r["sec_median"], 1),
             seconds_p95=_round(r["sec_p95"], 1),
+            queue_seconds_median=_round(r["queue_median"], 1),
         )
         for r in rows
     ]

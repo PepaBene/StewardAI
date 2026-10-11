@@ -33,6 +33,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from steward.ai import AINotConfigured, Usage
+from steward.chat.owner import owner_of
 from steward.chat.tools import ChatTools
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.news_sources import NewsSourcesConfig
@@ -575,12 +576,13 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                     today=deps.now.date().isoformat(),
                     model=profile.worker_model,
                     effort=profile.worker_effort,
-                    max_steps=worker_steps,
+                    max_steps=profile.worker_max_steps,
+                    total_steps=step_room,
                     worker_searches=profile.worker_max_searches,
                     total_searches=first_searches,
                     parallel=profile.parallel_workers,
                     domains=domains,
-                    caller=ChatTools(pool, reg, None, None).call,
+                    caller=ChatTools(pool, reg, None, None, owner_id=await owner_of(pool)).call,
                     registry=reg,
                     tier_of=tier_of,
                     cost_of=lambda u: cost_of(u),
@@ -626,6 +628,10 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             agent_notes.append(
                 "Agentic engine skipped: the profile's step budget leaves too little for workers."
             )
+    if profile.engine == "agentic" and model_specs and deps.worker is None:
+        agent_notes.append(
+            "Agentic engine not used: no AI provider key is set, so the fixed pipeline ran."
+        )
     if agent_run is not None:
         per_section_searches = 0
     # The gathered material is identical for every section (the writer caches it); sources

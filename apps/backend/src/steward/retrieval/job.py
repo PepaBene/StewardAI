@@ -42,6 +42,18 @@ async def document_index_handler(ctx: JobContext) -> None:
         notes = await corpus.note_docs(ctx.pool)
         await add("note", notes)
         await index.prune(ctx.pool, "note", corpus.refs(notes))
+        if cfg.index_agent_notes:
+            agent_notes = await corpus.agent_note_docs(ctx.pool)
+            await add("agent_note", agent_notes)
+            await index.prune(ctx.pool, "agent_note", corpus.refs(agent_notes))
+        else:
+            await index.prune(ctx.pool, "agent_note", [])
+        if cfg.index_disclosures:
+            disclosures = await corpus.disclosure_docs(ctx.pool, cfg.disclosure_alert_days)
+            await add("disclosure", disclosures)
+            await index.prune(ctx.pool, "disclosure", corpus.refs(disclosures))
+        else:
+            await index.prune(ctx.pool, "disclosure", [])
         if cfg.reports_per_run:
             await add("report", await corpus.report_docs(ctx.pool, cfg.reports_per_run))
         if cfg.news_per_run:

@@ -278,6 +278,16 @@ class DocumentIndexSettings(ConfigModel):
         default=20, ge=0, le=200, description="Archived documents read and split per run."
     )
     reports_per_run: int = Field(default=200, ge=0, le=2000, description="Reports indexed per run.")
+    index_disclosures: bool = Field(
+        default=True,
+        description="Index the disclosure register's prose: relationship passages and alerts.",
+    )
+    disclosure_alert_days: int = Field(
+        default=365, ge=7, le=1825, description="Disclosure alerts of this many days are indexed."
+    )
+    index_agent_notes: bool = Field(
+        default=True, description="Index your working notes for the agent."
+    )
     news_per_run: int = Field(default=600, ge=0, le=5000, description="News items indexed per run.")
     news_days: int = Field(
         default=365,
