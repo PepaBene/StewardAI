@@ -5278,8 +5278,138 @@
           "research"
         ],
         "summary": "Get Research",
-        "description": "A research report: sections of cited sentences, computed valuation figures and the\nsource list every citation points into.",
+        "description": "A research report: sections of cited sentences, computed valuation figures and the\nsource list every citation points into. `view=concise` shows the same report with fewer\nsentences and without the sections a template marks detail-only.",
         "operationId": "get_research",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Report Id"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "concise",
+                "detailed"
+              ],
+              "type": "string",
+              "description": "concise: key sentences only; detailed: the whole stored report.",
+              "default": "detailed",
+              "title": "View"
+            },
+            "description": "concise: key sentences only; detailed: the whole stored report."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchReportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/research/{report_id}/export": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Export Research",
+        "description": "The report as Markdown, a rendering of the stored typed report in the chosen view.",
+        "operationId": "export_research",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Report Id"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "concise",
+                "detailed"
+              ],
+              "type": "string",
+              "description": "concise: key sentences only; detailed: the whole stored report.",
+              "default": "detailed",
+              "title": "View"
+            },
+            "description": "concise: key sentences only; detailed: the whole stored report."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/research/{report_id}/thesis-proposal/accept": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Accept Thesis Proposal",
+        "description": "Apply chosen fields of a report's thesis proposal. This saves a new `theses` config\nversion (the earlier one stays in the history). It is refused when the theses changed\nafter the report was made, so a stale proposal cannot overwrite newer edits.",
+        "operationId": "accept_thesis_proposal",
         "security": [
           {
             "HTTPBearer": []
@@ -5298,13 +5428,23 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThesisProposalAccept"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResearchReportOut"
+                  "$ref": "#/components/schemas/ThesisProposalApplied"
                 }
               }
             }
@@ -42029,6 +42169,38 @@
         ],
         "title": "CrossAxisOut"
       },
+      "CustomSection": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^custom-[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "task": {
+            "type": "string",
+            "maxLength": 400,
+            "minLength": 10,
+            "title": "Task",
+            "description": "What the section should answer, in plain words. No links or markup."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "task"
+        ],
+        "title": "CustomSection",
+        "description": "A section the owner defines: a title and the question it answers. Written by the model\nfrom the same sources, cited like any other. It has no code-written figures, so it cannot\nstand in for a trusted calculation."
+      },
       "DailyFallback": {
         "properties": {
           "date": {
@@ -45645,6 +45817,101 @@
           "value"
         ],
         "title": "DiscoverFilter"
+      },
+      "DiscoveredUrl": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "cited",
+              "found_not_cited",
+              "excluded"
+            ],
+            "title": "Status"
+          },
+          "section": {
+            "type": "string",
+            "title": "Section"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round",
+            "default": 0
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "page_age": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Age",
+            "description": "The provider's age, if it gave one."
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          },
+          "limitation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limitation",
+            "description": "Undated, likely paywalled, or why it was excluded."
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "title",
+          "host",
+          "status",
+          "section",
+          "retrieved_at"
+        ],
+        "title": "DiscoveredUrl",
+        "description": "One URL the search returned, kept whether or not a sentence cites it."
       },
       "DiscoveryResult": {
         "properties": {
@@ -53189,6 +53456,50 @@
         "type": "object",
         "title": "FetchPolicy",
         "description": "How far the article-text ladder (news/fulltext.py) may go for a source's items."
+      },
+      "FieldChange": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "why_owned",
+              "exit_conditions",
+              "pre_mortem"
+            ],
+            "title": "Field"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "add",
+              "change"
+            ],
+            "title": "Kind"
+          },
+          "before": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Before",
+            "description": "What the active thesis says now (empty if nothing)."
+          },
+          "after": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedLine"
+            },
+            "type": "array",
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "kind",
+          "before",
+          "after"
+        ],
+        "title": "FieldChange"
       },
       "Figure": {
         "properties": {
@@ -77971,6 +78282,58 @@
         "title": "PinnedSnapshotsResponse",
         "description": "`POST /funds/snapshots/pin`: the ids of the snapshots now protected from pruning."
       },
+      "PlanQuestion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section",
+            "description": "The report section it feeds; None for a mode-wide one."
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "internal_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Internal Tools",
+            "description": "Chat tool names that read the stored data."
+          },
+          "web_intent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web Intent",
+            "description": "What a web search should look for."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "section",
+          "question",
+          "internal_tools"
+        ],
+        "title": "PlanQuestion"
+      },
       "PlausibilityCheck": {
         "properties": {
           "date": {
@@ -81391,6 +81754,24 @@
         ],
         "title": "ProfileField"
       },
+      "PromptCopy": {
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sha256",
+          "text"
+        ],
+        "title": "PromptCopy"
+      },
       "PromptDefault": {
         "properties": {
           "key": {
@@ -81650,6 +82031,28 @@
           "kpis"
         ],
         "title": "ProposedAction"
+      },
+      "ProposedLine": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Ids",
+            "description": "Registry ids of the sources behind the line."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "evidence_ids"
+        ],
+        "title": "ProposedLine"
       },
       "ProposedRequest": {
         "properties": {
@@ -86317,6 +86720,63 @@
         ],
         "title": "ReportSummary"
       },
+      "ReportTemplate": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateSection"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Sections"
+          },
+          "custom_sections": {
+            "items": {
+              "$ref": "#/components/schemas/CustomSection"
+            },
+            "type": "array",
+            "maxItems": 6,
+            "title": "Custom Sections"
+          },
+          "default_view": {
+            "type": "string",
+            "enum": [
+              "concise",
+              "detailed"
+            ],
+            "title": "Default View",
+            "default": "detailed"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "sections"
+        ],
+        "title": "ReportTemplate",
+        "description": "How a report is presented (Phase 3): sections, order, titles, depth per section and the\ndefault view. It cannot change a code-written figure or the strategy; it only arranges."
+      },
       "ReportVersion": {
         "properties": {
           "version": {
@@ -86498,6 +86958,112 @@
             },
             "type": "array",
             "title": "Notes"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "default": "standard"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/RoundRecord"
+            },
+            "type": "array",
+            "title": "Rounds"
+          },
+          "stopped_because": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stopped Because"
+          },
+          "search_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SearchSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "discovered_urls": {
+            "items": {
+              "$ref": "#/components/schemas/DiscoveredUrl"
+            },
+            "type": "array",
+            "title": "Discovered Urls"
+          },
+          "view": {
+            "type": "string",
+            "title": "View",
+            "default": "detailed"
+          },
+          "default_view": {
+            "type": "string",
+            "title": "Default View",
+            "default": "detailed"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "authoring": {
+            "type": "string",
+            "title": "Authoring",
+            "default": "research_only"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thesis_proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thesis_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -86595,6 +87161,126 @@
         ],
         "title": "ResearchExcerpt"
       },
+      "ResearchPlan": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version",
+            "default": 1
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "horizon_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Days"
+          },
+          "web_emphasis": {
+            "type": "string",
+            "title": "Web Emphasis"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/PlanQuestion"
+            },
+            "type": "array",
+            "title": "Questions"
+          },
+          "internal_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Internal Tools"
+          },
+          "web_intents": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Web Intents"
+          },
+          "preferred_tiers": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Preferred Tiers"
+          },
+          "primary_required_for": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "facts"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Required For",
+            "description": "'facts' when tier 1 is allowed: figures and dates should come from it."
+          },
+          "counter_evidence_intent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counter Evidence Intent"
+          },
+          "stop": {
+            "$ref": "#/components/schemas/StopConditions"
+          },
+          "planned_sections": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Planned Sections"
+          },
+          "iterate": {
+            "type": "boolean",
+            "title": "Iterate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "ticker",
+          "question",
+          "horizon_days",
+          "web_emphasis",
+          "questions",
+          "internal_tools",
+          "web_intents",
+          "preferred_tiers",
+          "primary_required_for",
+          "counter_evidence_intent",
+          "stop",
+          "planned_sections",
+          "iterate"
+        ],
+        "title": "ResearchPlan"
+      },
       "ResearchProfile": {
         "properties": {
           "id": {
@@ -86613,11 +87299,16 @@
             "items": {
               "type": "string",
               "enum": [
+                "executive_summary",
                 "business",
                 "financial_trend",
                 "moat_risks",
                 "valuation",
+                "scenarios",
+                "catalysts",
+                "counter_case",
                 "strategy_fit",
+                "thesis_kpis",
                 "ownership",
                 "relationships",
                 "risk",
@@ -86726,6 +87417,120 @@
             "title": "Top Holders",
             "description": "Largest 13F holders named in the ownership section.",
             "default": 3
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "quick",
+              "standard",
+              "deep_thesis",
+              "earnings_update",
+              "portfolio_macro",
+              "custom"
+            ],
+            "title": "Mode",
+            "description": "The kind of run; it shapes the research plan (questions, tools, searches).",
+            "default": "standard"
+          },
+          "web_emphasis": {
+            "type": "string",
+            "enum": [
+              "internal",
+              "balanced",
+              "web"
+            ],
+            "title": "Web Emphasis",
+            "description": "internal: stored records first, a quarter of the search budget; balanced and web: the full budget.",
+            "default": "balanced"
+          },
+          "date_horizon_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 7.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Horizon Days",
+            "description": "Prefer evidence from this many days back; older sources are named as old."
+          },
+          "allow_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Allow Domains",
+            "description": "Domains the owner trusts, searched in addition to the tier lists. They are labelled as owner-trusted and never counted as proof."
+          },
+          "deny_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+            },
+            "type": "array",
+            "maxItems": 40,
+            "title": "Deny Domains",
+            "description": "Never searched, never cited."
+          },
+          "allow_forums": {
+            "type": "boolean",
+            "title": "Allow Forums",
+            "description": "Let search use forums and social media. Their sentences are labelled.",
+            "default": false
+          },
+          "iterate": {
+            "type": "boolean",
+            "title": "Iterate",
+            "description": "After the first pass, search again for sections left thin, corroborate single-source claims, and stop when the sections have enough or the budget is used.",
+            "default": false
+          },
+          "max_rounds": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Max Rounds",
+            "description": "Follow-up rounds when iterating.",
+            "default": 1
+          },
+          "min_sentences": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 1.0,
+            "title": "Min Sentences",
+            "description": "Cited sentences a section needs to count as answered.",
+            "default": 2
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40,
+                "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id",
+            "description": "A report template. It decides which sections appear, in what order, with what titles and in which view; the profile decides how the run investigates."
+          },
+          "authoring": {
+            "type": "string",
+            "enum": [
+              "research_only",
+              "draft_thesis",
+              "propose_update",
+              "review_thesis"
+            ],
+            "title": "Authoring",
+            "default": "research_only"
           }
         },
         "additionalProperties": false,
@@ -86759,6 +87564,15 @@
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
             "title": "Default Profile",
             "default": "standard"
+          },
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/ReportTemplate"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Templates",
+            "description": "Report templates a profile can name. Kept apart from the profiles: a profile is how to investigate, a template is how to present."
           }
         },
         "additionalProperties": false,
@@ -86930,6 +87744,18 @@
               }
             ],
             "title": "Note"
+          },
+          "detail_only": {
+            "type": "boolean",
+            "title": "Detail Only",
+            "description": "Left out of the concise view.",
+            "default": false
+          },
+          "custom": {
+            "type": "boolean",
+            "title": "Custom",
+            "description": "A section the owner defined.",
+            "default": false
           }
         },
         "type": "object",
@@ -89183,6 +90009,55 @@
         ],
         "title": "Role"
       },
+      "RoundRecord": {
+        "properties": {
+          "round": {
+            "type": "integer",
+            "title": "Round"
+          },
+          "sections": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "reasons": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Reasons"
+          },
+          "sentences_added": {
+            "type": "integer",
+            "title": "Sentences Added",
+            "default": 0
+          },
+          "sources_added": {
+            "type": "integer",
+            "title": "Sources Added",
+            "default": 0
+          },
+          "urls_found": {
+            "type": "integer",
+            "title": "Urls Found",
+            "default": 0
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "round",
+          "sections",
+          "reasons"
+        ],
+        "title": "RoundRecord"
+      },
       "Row": {
         "properties": {
           "label": {
@@ -89442,6 +90317,100 @@
           "severities"
         ],
         "title": "RuleMatch"
+      },
+      "RunSnapshot": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version",
+            "default": 1
+          },
+          "taken_at": {
+            "type": "string",
+            "title": "Taken At"
+          },
+          "profile": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Profile"
+          },
+          "template": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template"
+          },
+          "layout": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Layout"
+          },
+          "prompts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PromptCopy"
+            },
+            "type": "object",
+            "title": "Prompts"
+          },
+          "versions": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Versions",
+            "description": "Active config version id per domain when the run started."
+          },
+          "thesis": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thesis",
+            "description": "The ticker's thesis as it stood."
+          },
+          "plan_sha256": {
+            "type": "string",
+            "title": "Plan Sha256"
+          },
+          "digest": {
+            "type": "string",
+            "title": "Digest",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "taken_at",
+          "profile",
+          "template",
+          "layout",
+          "prompts",
+          "versions",
+          "thesis",
+          "plan_sha256"
+        ],
+        "title": "RunSnapshot"
       },
       "SaleImpact": {
         "properties": {
@@ -90854,6 +91823,44 @@
           "created_at"
         ],
         "title": "ScreenVersion"
+      },
+      "SearchSummary": {
+        "properties": {
+          "sources_after_first_pass": {
+            "type": "integer",
+            "title": "Sources After First Pass",
+            "default": 0
+          },
+          "sources_added_by_follow_up": {
+            "type": "integer",
+            "title": "Sources Added By Follow Up",
+            "default": 0
+          },
+          "urls_found": {
+            "type": "integer",
+            "title": "Urls Found",
+            "default": 0
+          },
+          "urls_cited": {
+            "type": "integer",
+            "title": "Urls Cited",
+            "default": 0
+          },
+          "urls_excluded": {
+            "type": "integer",
+            "title": "Urls Excluded",
+            "default": 0
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          }
+        },
+        "type": "object",
+        "title": "SearchSummary"
       },
       "Section": {
         "properties": {
@@ -94147,6 +95154,42 @@
               }
             ],
             "title": "As Of"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role",
+            "description": "For web sources: primary, quality_news, secondary, owner_trusted or forum."
+          },
+          "caveat": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caveat",
+            "description": "Why this source is weaker than it looks."
+          },
+          "retrieved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieved At",
+            "description": "When the search returned it."
           }
         },
         "type": "object",
@@ -96648,6 +97691,40 @@
         "type": "object",
         "title": "StockRequest"
       },
+      "StopConditions": {
+        "properties": {
+          "max_steps": {
+            "type": "integer",
+            "title": "Max Steps"
+          },
+          "max_searches": {
+            "type": "integer",
+            "title": "Max Searches"
+          },
+          "max_rounds": {
+            "type": "integer",
+            "title": "Max Rounds"
+          },
+          "min_sentences": {
+            "type": "integer",
+            "title": "Min Sentences",
+            "description": "Cited sentences a section needs to count as answered."
+          },
+          "rule": {
+            "type": "string",
+            "title": "Rule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "max_steps",
+          "max_searches",
+          "max_rounds",
+          "min_sentences",
+          "rule"
+        ],
+        "title": "StopConditions"
+      },
       "StoredSuggestionOut": {
         "properties": {
           "id": {
@@ -99146,6 +100223,58 @@
         ],
         "title": "TargetProgress"
       },
+      "TemplateSection": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "A built-in section id, or the id of one of the custom sections."
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "max_sentences": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 20.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Sentences"
+          },
+          "detail_only": {
+            "type": "boolean",
+            "title": "Detail Only",
+            "description": "Shown in the detailed view only; the concise view skips it.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "TemplateSection"
+      },
       "TestAlertRequest": {
         "properties": {
           "severity": {
@@ -100256,6 +101385,88 @@
         "title": "ThesisKPI",
         "description": "An absolute threshold the owner sets. v1 has no consensus-estimate comparisons."
       },
+      "ThesisKpiStatus": {
+        "properties": {
+          "kpi_id": {
+            "type": "string",
+            "title": "Kpi Id"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "rule": {
+            "type": "string",
+            "title": "Rule",
+            "description": "The configured condition, e.g. '>= 10 %'."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "breach",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "observed_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Value"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kpi_id",
+          "metric",
+          "rule",
+          "status",
+          "observed_value",
+          "period",
+          "as_of",
+          "rationale"
+        ],
+        "title": "ThesisKpiStatus"
+      },
       "ThesisOut": {
         "properties": {
           "links": {
@@ -100425,6 +101636,193 @@
         ],
         "title": "ThesisPriceTarget",
         "description": "The price levels the thesis's valuation sets, checked after each sync against the\nTrading212 price. Reaching the sell target asks for the research to be re-run: sell\nunless the new thesis raises the target. At or below the buy target the holding is a\ncandidate to add to. Scenarios alone are enough: they feed the expected return."
+      },
+      "ThesisProposal": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "research_only",
+              "draft_thesis",
+              "propose_update",
+              "review_thesis"
+            ],
+            "title": "Mode"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "base_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version Id",
+            "description": "The active `theses` version the proposal was made against."
+          },
+          "has_thesis": {
+            "type": "boolean",
+            "title": "Has Thesis"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/FieldChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "unchanged": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "why_owned",
+                "exit_conditions",
+                "pre_mortem"
+              ]
+            },
+            "type": "array",
+            "title": "Unchanged"
+          },
+          "left_to_owner": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Left To Owner"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "ticker",
+          "base_version_id",
+          "has_thesis",
+          "changes",
+          "unchanged",
+          "left_to_owner"
+        ],
+        "title": "ThesisProposal"
+      },
+      "ThesisProposalAccept": {
+        "properties": {
+          "fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "why_owned",
+                "exit_conditions",
+                "pre_mortem"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Fields",
+            "description": "The fields to apply."
+          }
+        },
+        "type": "object",
+        "required": [
+          "fields"
+        ],
+        "title": "ThesisProposalAccept"
+      },
+      "ThesisProposalApplied": {
+        "properties": {
+          "config_version_id": {
+            "type": "integer",
+            "title": "Config Version Id"
+          },
+          "applied": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "why_owned",
+                "exit_conditions",
+                "pre_mortem"
+              ]
+            },
+            "type": "array",
+            "title": "Applied"
+          }
+        },
+        "type": "object",
+        "required": [
+          "config_version_id",
+          "applied"
+        ],
+        "title": "ThesisProposalApplied"
+      },
+      "ThesisReview": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "base_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version Id"
+          },
+          "why_owned": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why Owned"
+          },
+          "kpis": {
+            "items": {
+              "$ref": "#/components/schemas/ThesisKpiStatus"
+            },
+            "type": "array",
+            "title": "Kpis"
+          },
+          "exit_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Exit Conditions"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "base_version_id",
+          "why_owned",
+          "kpis",
+          "exit_conditions"
+        ],
+        "title": "ThesisReview"
       },
       "ThesisScenarios": {
         "properties": {

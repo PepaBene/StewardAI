@@ -41,11 +41,26 @@ export const BOUNDS = {
 
 const ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
+/**
+ * The planning, source-policy, iteration and authoring fields every profile carries. This
+ * form does not edit them yet; they pass through `rest` unchanged on a save.
+ */
+export const PROFILE_DEFAULTS = {
+  mode: "standard",
+  web_emphasis: "balanced",
+  allow_forums: false,
+  iterate: false,
+  max_rounds: 1,
+  min_sentences: 2,
+  authoring: "research_only",
+} as const;
+
 /** The backend's defaults, for when nothing is saved yet (a 404). */
 export const DEFAULT_RESEARCH_PROFILES: ResearchProfilesConfig = {
   schema_version: 1,
   profiles: [
     {
+      ...PROFILE_DEFAULTS,
       id: "standard",
       name: "Standard workup",
       sections: [
@@ -72,6 +87,9 @@ export const DEFAULT_RESEARCH_PROFILES: ResearchProfilesConfig = {
       top_holders: 3,
     },
     {
+      ...PROFILE_DEFAULTS,
+      mode: "quick",
+      web_emphasis: "internal",
       id: "quick",
       name: "Quick screen",
       sections: ["business", "financial_trend", "valuation", "strategy_fit"],
@@ -86,8 +104,106 @@ export const DEFAULT_RESEARCH_PROFILES: ResearchProfilesConfig = {
       language: "en",
       top_holders: 3,
     },
+    {
+      ...PROFILE_DEFAULTS,
+      mode: "deep_thesis",
+      iterate: true,
+      max_rounds: 2,
+      authoring: "draft_thesis",
+      template_id: "thesis-memo",
+      id: "deep-thesis",
+      name: "Deep thesis workup",
+      sections: [
+        "executive_summary",
+        "business",
+        "financial_trend",
+        "moat_risks",
+        "valuation",
+        "scenarios",
+        "catalysts",
+        "counter_case",
+        "strategy_fit",
+        "thesis_kpis",
+        "open_questions",
+      ],
+      depth: "deep",
+      model: "gpt-6.1-sol",
+      effort: "high",
+      max_steps: 100,
+      max_searches: 60,
+      source_tiers: [1, 2],
+      include_peers: true,
+      valuation_methods: ["pe_ttm", "earnings_yield", "dividend_yield_ttm"],
+      language: "en",
+      top_holders: 3,
+    },
+    {
+      ...PROFILE_DEFAULTS,
+      mode: "earnings_update",
+      iterate: true,
+      authoring: "propose_update",
+      template_id: "update-note",
+      date_horizon_days: 120,
+      id: "earnings-update",
+      name: "Earnings and thesis update",
+      sections: [
+        "executive_summary",
+        "financial_trend",
+        "thesis_kpis",
+        "counter_case",
+        "strategy_fit",
+        "open_questions",
+      ],
+      depth: "standard",
+      model: "gpt-6.1-sol",
+      effort: "high",
+      max_steps: 40,
+      max_searches: 20,
+      source_tiers: [1, 2],
+      include_peers: true,
+      valuation_methods: ["pe_ttm", "earnings_yield", "dividend_yield_ttm"],
+      language: "en",
+      top_holders: 3,
+    },
   ],
   default_profile: "standard",
+  templates: [
+    {
+      schema_version: 1,
+      id: "thesis-memo",
+      name: "Thesis memo",
+      default_view: "concise",
+      custom_sections: [],
+      sections: [
+        { id: "executive_summary", enabled: true, detail_only: false },
+        { id: "business", enabled: true, detail_only: false },
+        { id: "financial_trend", enabled: true, detail_only: true },
+        { id: "valuation", enabled: true, detail_only: false },
+        { id: "scenarios", enabled: true, detail_only: false },
+        { id: "catalysts", enabled: true, detail_only: true },
+        { id: "moat_risks", enabled: true, detail_only: true },
+        { id: "counter_case", enabled: true, detail_only: false },
+        { id: "strategy_fit", enabled: true, detail_only: false },
+        { id: "thesis_kpis", enabled: true, detail_only: false },
+        { id: "open_questions", enabled: true, detail_only: false },
+      ],
+    },
+    {
+      schema_version: 1,
+      id: "update-note",
+      name: "Update note",
+      default_view: "concise",
+      custom_sections: [],
+      sections: [
+        { id: "executive_summary", enabled: true, detail_only: false },
+        { id: "financial_trend", enabled: true, detail_only: false },
+        { id: "thesis_kpis", enabled: true, detail_only: false },
+        { id: "counter_case", enabled: true, detail_only: false },
+        { id: "strategy_fit", enabled: true, detail_only: false },
+        { id: "open_questions", enabled: true, detail_only: false },
+      ],
+    },
+  ],
 };
 
 export type ProfileForm = {

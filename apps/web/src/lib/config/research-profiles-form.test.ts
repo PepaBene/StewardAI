@@ -8,6 +8,7 @@ import {
   duplicateProfile,
   moveInList,
   newProfile,
+  PROFILE_DEFAULTS,
   researchProfilesFromBody,
   researchProfilesToBody,
   toggleInList,
@@ -19,6 +20,7 @@ const FULL: ResearchProfilesConfig = {
   schema_version: 1,
   profiles: [
     {
+      ...PROFILE_DEFAULTS,
       id: "deep-dive",
       name: "Deep dive",
       sections: [...SECTION_IDS].reverse(),
@@ -34,6 +36,7 @@ const FULL: ResearchProfilesConfig = {
       top_holders: 10,
     },
     {
+      ...PROFILE_DEFAULTS,
       id: "screen",
       name: "Screen",
       sections: ["valuation"],
@@ -57,9 +60,14 @@ describe("research profiles form", () => {
     expect(researchProfilesToBody(researchProfilesFromBody(FULL))).toEqual(FULL);
   });
 
-  it("starts from the backend defaults (standard, quick) when nothing is saved", () => {
+  it("starts from the backend defaults when nothing is saved", () => {
     const form = researchProfilesFromBody(null);
-    expect(form.profiles.map((p) => p.id)).toEqual(["standard", "quick"]);
+    expect(form.profiles.map((p) => p.id)).toEqual([
+      "standard",
+      "quick",
+      "deep-thesis",
+      "earnings-update",
+    ]);
     expect(researchProfilesToBody(form)).toEqual(DEFAULT_RESEARCH_PROFILES);
   });
 

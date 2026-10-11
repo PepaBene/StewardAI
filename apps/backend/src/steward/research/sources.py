@@ -42,6 +42,12 @@ class Source(BaseModel):
     tier: int | None = None
     snippet: str | None = Field(default=None, description="The stored text it rests on.")
     as_of: str | None = None
+    role: str | None = Field(
+        default=None,
+        description="For web sources: primary, quality_news, secondary, owner_trusted or forum.",
+    )
+    caveat: str | None = Field(default=None, description="Why this source is weaker than it looks.")
+    retrieved_at: str | None = Field(default=None, description="When the search returned it.")
 
 
 class CitedSentence(BaseModel):

@@ -87,8 +87,10 @@ data-related ones:
 
 - **Retrieval over prose** (filings, reports, theses) is the agentic and RAG plan's AG2, not
   this plan. News already has embeddings.
-- **Web search** is the provider's own; discovered URLs are stored only when cited. Phase 2
-  stores every discovered URL and access time.
+- **Web search** is the provider's own. Research reports now keep every URL the provider
+  returned (`discovered_urls`: status cited, found-not-cited or excluded, with the reason and
+  access time). The provider exposes only the pages its answer cited, so this is not every page
+  it looked at.
 - **FX and intraday quotes** are read by the portfolio overview but have no research tool.
 - **Saved valuation scenarios** are written by the Company page but `valuation_scenarios`
   reads default assumptions only.
@@ -127,6 +129,10 @@ citable records it added and its result size. The step also records the model, t
 sources, the answer shape and token usage (`job_step.usage`), and the job records the config
 versions it ran under. Together these give the retrieval trace the benchmark scores.
 
-Not yet traced: web search queries and URLs (the provider runs them), per-step cost for the
-research report job beyond what `job_step.usage` already holds, and user feedback linked to a
-run. Phase 2 adds the first; the others follow with the claim ledger.
+The research report job records, on the report itself: the plan, the follow-up rounds, every
+URL found with its status, the search summary and a snapshot of the profile, template, prompts
+and config versions it ran under. Its `job_step` rows hold usage per section and follow-up.
+
+Not yet traced: the search queries the provider ran (the provider runs them), a per-call
+retrieval trace for the research job like chat's (it reads through `gather`), and user feedback
+linked to a run.

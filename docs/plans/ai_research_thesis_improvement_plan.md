@@ -20,8 +20,8 @@ The four data plans are implemented, which changes the starting point of every p
 |---|---|---|
 | 0 Baseline | Done for chat (2026-10-11) | Exists: claim-verifier eval set (`verify/eval.py`, `evals_gate.py`), news golden sets, and now the [capability map](ai_research_capability_map.md) generated from `chat/catalog.py` and tested against the real tool list; 41 labelled research/chat cases in `evals/research_cases.json` over ten categories with a trace scorer (`chat/benchmark.py`); a per-call trace (tool, arguments, ms, ok/error, sources added, bytes) on every chat answer step. Remains: a research-job trace of the same kind (web queries and URLs arrive with Phase 2), user feedback linked to a run, and a live runner that replays the cases against a model and records human review scores. |
 | 1 Typed data access | Done for chat (2026-10-11) | Exists: `data_context/` read models with `known_as_of` cutoffs; research `gather` sections from stored records; chat tools grew from 27 to 37 with `filing_evidence` (filed notes, 13D/G, 13F, N-PORT, insider, dependencies, deals, consensus), `fundamentals`, `valuation_scenarios`, `price_history`, `macro_series`, `strategy_rules`, `transactions` (paged), `risk_history`, `thesis_and_reports` and `data_freshness`; the shared figure envelope (`chat/envelope.py`: status ok/missing/not_applicable/stale/failed, unit, currency, period, `as_of`, `source_id`, reason) used by all of them; every result stamped with `tool` and `retrieved_at`; all lists capped with a stated `page`. Remains: move the earlier analytics tools' figures into the envelope, FX and intraday quote tools, reading saved valuation scenarios, and giving the research job the same tools (the research report still reads through `gather`). |
-| 2 Planning and web quality | Not started | Research is still a fixed chain with a gap finder (`research/gaps.py`) and source-tier-limited web search; there is no planner schema, no deep-mode query iteration, and no counter-evidence search step. Profiles already control sections, depth, tiers, peers, language and budgets. |
-| 3 Output and thesis authoring | Partial | Exists: configurable profile sections (code-written vs model-written split), a thesis first-draft generator (`thesis/draft.py`: facts-only prompt, lines that cite no fact are dropped, nothing saved until the owner edits), bear case, per-figure sources and server-side PDF (Morningstar plan). Remains: separate report templates from profiles, versioned template schemas, thesis *update* proposals as field-by-field diffs, immutable snapshots of template/profile/prompt/strategy versions per run. |
+| 2 Planning and web quality | Done in the backend (2026-10-11) | Exists: a plan schema built in code per run (`research/plan.py`: questions, stored-data tools, web intents, tiers, counter-evidence search, stop rule, planned sections), six research modes plus profile controls (horizon, web emphasis, allow and deny domains, forums off by default, iterate, rounds, minimum sentences), a source policy that labels each web source primary, quality news, secondary, owner-trusted or forum (`research/source_policy.py`), follow-up rounds that search again for thin sections and ask for a second source for single-source claims, a deliberate `counter_case` section, every URL the search returned kept with its status and limits, and the search provider read through one adapter (`research/web.py`). Remains: see "Gaps left after Phases 2 and 3". |
+| 3 Output and thesis authoring | Done in the backend (2026-10-11) | Exists: report templates kept apart from profiles (sections, order, titles, detail-only, owner-defined sections), a versioned template schema, concise and detailed views over the one stored report with a Markdown export, four authoring modes, thesis proposals as field-by-field diffs with the evidence behind each line, an accept route that saves a new `theses` version only if nothing changed since the report, and a tamper-evident snapshot of profile, template, prompts, versions and thesis in every report. Remains: see "Gaps left after Phases 2 and 3". |
 | 4 Claim grounding | Partial | Exists: sentence-level source IDs, claim verifier over every model sentence, "insufficient evidence" path, code-owned numbers. Remains: typed claim ledger (fact / calculation / interpretation / forecast), strategy-rule status per claim, confidence tied to evidence coverage. The news engine has its own claim checks (`news/claims.py`) that could share the ledger format. |
 | 5 Security and eval | Partial | Exists: read-only tool design, owner-confirmed `propose_job`, budget guard and routing, redaction. Remains: injected-article regression case, retention/deletion controls for traces, research-specific regression gates on prompt/model/tool changes. |
 
@@ -69,7 +69,55 @@ Phases 0 and 1 are built for chat only. Everything below is still open; later ph
 
 **Later phases (unchanged, not started)**
 
-Phase 2 planner, query iteration and counter-evidence search; Phase 3 report templates, thesis update diffs and immutable run snapshots; Phase 4 typed claim ledger and strategy-rule status per claim; Phase 5 injected-article regression case, retention and deletion, and regression gates. See the table above.
+Phase 4 typed claim ledger and strategy-rule status per claim; Phase 5 injected-article regression case, retention and deletion, and regression gates. See the table above.
+
+## Gaps left after Phases 2 and 3 (2026-10-11)
+
+Phases 2 and 3 are built in the backend only. The web app has no screen for the new profile fields, templates, view toggle, search coverage or thesis proposals; its API types were regenerated and nothing else was changed there.
+
+**Phase 2 (planning and web quality)**
+
+1. The research job still reads stored data through `gather`. The plan names the chat tools that would answer each question (`plan.internal_tools`, checked against the tool catalog), but the run does not call them. This is Phase 1 gap 2 and it now matters more: the plan says what to read, and the run reads something close to it.
+2. The plan is built in code from the profile and layout. No model breaks the question down, the owner cannot edit the plan before the run, and the plan is shown nowhere but the stored report.
+3. The routing client builds its search-result block from the pages the answer cited, so "found but not cited" holds only what the provider exposes. We cannot tell a page the model opened from a snippet it saw, and the provider gives no page age, so every URL carries the "undated" limit. `SearchHit.page_age` is read when a provider supplies it.
+4. A second source is asked for in the prompt. Code does not check that the second source is a different publisher from the first.
+5. Thin means fewer cited sentences than the profile's minimum, not "a plan question went unanswered". At most three sections are followed up per round.
+6. `date_horizon_days` is a prompt instruction. Code does not drop or flag sources by date, because search results carry none.
+7. Owner-trusted domains have no tier. The forum list is a fixed constant in `source_policy.py`, not configuration.
+8. `portfolio_macro` mode is still one ticker with a macro and exposure lens; there is no portfolio-wide run.
+9. The exit criterion (deep mode retrieves more unique, relevant evidence than one-shot search) is not measured. Each report records `sources_after_first_pass` and `sources_added_by_follow_up`, but comparing modes needs the live benchmark runner (Phase 0 gap 2).
+10. The new section prompts (`counter_case`, `thesis_kpis`, `scenarios`, `catalysts`, `executive_summary`) and the source-order paragraph are not evaluated against the benchmark.
+
+**Phase 3 (output and thesis authoring)**
+
+1. Custom output is a section builder only (title and a plain-words question, at most six, no links or markup). A validated JSON Schema format is not built.
+2. Export is Markdown. The server-side PDF of the company report is not wired to templates or views.
+3. The snapshot is tamper-evident (a digest over its content), kept inside the report body. The database does not stop an edit to the report row.
+4. Templates live in the `research_profiles` config document, not their own domain: a separate domain needs a migration of the `config_version` check. A template cannot set the language; the profile does.
+5. A proposal covers `why_owned`, `exit_conditions` and `pre_mortem`. It takes the report's own checked sentences verbatim, so the owner edits prose written as report text. KPI thresholds, scenario prices, probabilities, variant perception, conviction and base rate stay with the owner.
+6. The accept route applies whole fields. It keeps no record of fields the owner declined, and the report does not link to the version that accepted it (the version note names the report).
+7. `review_thesis` lists each KPI against its latest stored verdict. It does not run the earnings check or write a model assessment.
+8. The concise view uses fixed caps (3 model sentences, 4 code sentences per section).
+9. Not tested: a live model run, the web screens, and the claim verifier on follow-up sentences with a real provider.
+
+**Web app (not started beyond types)**
+
+1. No editor for the new profile fields (mode, web emphasis, horizon, allowed and denied domains, forums, iterate, rounds, minimum sentences, template, authoring). The profile form keeps them unchanged on save but cannot change them.
+2. No template editor (sections, order, titles, detail-only, owner-defined sections) and no way to pick a template per profile.
+3. The report page has no concise/detailed toggle, no search coverage panel (found, cited, excluded URLs and their limits), no plan display, no follow-up round summary and no snapshot view.
+4. No screen for a thesis proposal: no diff view, no per-field accept, no handling of the 409 "run the research again" answer. The accept route exists only in the API.
+5. The new source roles (owner-trusted, forum) and their caveats are not shown on source cards.
+6. The web copy of the default profiles and templates (`research-profiles-form.ts`) is hand-kept in step with the backend defaults. Nothing tests that they match.
+
+**Verification and process**
+
+1. The full backend suite has not been run on this change. The run was killed for low memory (Windows temp-folder permission error first). Run on their own and passing: the new unit and DB tests, one older research resume test, the API contract, writer, config and response-model tests. Other older tests that touch research profiles, reports or the writer (the rest of `test_phase5.py`, company report tests, and any that assert the default profile list) are not re-run.
+2. DB tests must run one process at a time: two processes against the same test Postgres collide on the shared role and fail with password or "tuple concurrently updated" errors.
+3. mypy reports four errors in `tests/test_phase1b.py` and `tests/test_phase5.py` that predate this work and were not fixed.
+4. The chat eval baseline (`evals/baseline.json`) and the earlier ChatTools tests are still outstanding from Phase 1; the new research prompts add to the same unevaluated surface.
+5. Existing stored research reports have none of the new fields. They load with defaults (no plan, no snapshot, no discovered URLs), so the new views and checks show nothing for them.
+6. Test fakes pass text through the code-side claim check, which removes a sentence containing a number no source has. Tests must keep fake sentences free of digits; this is easy to trip over.
+7. Nothing is committed or pushed yet.
 
 ## Current architecture and product intent
 

@@ -1872,11 +1872,54 @@ export interface paths {
         /**
          * Get Research
          * @description A research report: sections of cited sentences, computed valuation figures and the
-         *     source list every citation points into.
+         *     source list every citation points into. `view=concise` shows the same report with fewer
+         *     sentences and without the sections a template marks detail-only.
          */
         get: operations["get_research"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/research/{report_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Research
+         * @description The report as Markdown, a rendering of the stored typed report in the chosen view.
+         */
+        get: operations["export_research"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/research/{report_id}/thesis-proposal/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Thesis Proposal
+         * @description Apply chosen fields of a report's thesis proposal. This saves a new `theses` config
+         *     version (the earlier one stays in the history). It is refused when the theses changed
+         *     after the report was made, so a stale proposal cannot overwrite newer edits.
+         */
+        post: operations["accept_thesis_proposal"];
         delete?: never;
         options?: never;
         head?: never;
@@ -13675,6 +13718,23 @@ export interface components {
             /** Value */
             value: string;
         };
+        /**
+         * CustomSection
+         * @description A section the owner defines: a title and the question it answers. Written by the model
+         *     from the same sources, cited like any other. It has no code-written figures, so it cannot
+         *     stand in for a trusted calculation.
+         */
+        CustomSection: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Task
+             * @description What the section should answer, in plain words. No links or markup.
+             */
+            task: string;
+        };
         /** DailyFallback */
         DailyFallback: {
             /**
@@ -14909,6 +14969,46 @@ export interface components {
              * @description Pin the period rule; a mismatch is rejected.
              */
             period?: string | null;
+        };
+        /**
+         * DiscoveredUrl
+         * @description One URL the search returned, kept whether or not a sentence cites it.
+         */
+        DiscoveredUrl: {
+            /** Url */
+            url: string;
+            /** Title */
+            title: string;
+            /** Host */
+            host: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "cited" | "found_not_cited" | "excluded";
+            /** Section */
+            section: string;
+            /**
+             * Round
+             * @default 0
+             */
+            round: number;
+            /** Tier */
+            tier?: number | null;
+            /** Role */
+            role?: string | null;
+            /**
+             * Page Age
+             * @description The provider's age, if it gave one.
+             */
+            page_age?: string | null;
+            /** Retrieved At */
+            retrieved_at: string;
+            /**
+             * Limitation
+             * @description Undated, likely paywalled, or why it was excluded.
+             */
+            limitation?: string | null;
         };
         /** DiscoveryResult */
         DiscoveryResult: {
@@ -17652,6 +17752,26 @@ export interface components {
              * @enum {string}
              */
             display: "full" | "excerpt" | "link_only";
+        };
+        /** FieldChange */
+        FieldChange: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "why_owned" | "exit_conditions" | "pre_mortem";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "add" | "change";
+            /**
+             * Before
+             * @description What the active thesis says now (empty if nothing).
+             */
+            before: string[];
+            /** After */
+            after: components["schemas"]["ProposedLine"][];
         };
         /** Figure */
         Figure: {
@@ -26304,6 +26424,28 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** PlanQuestion */
+        PlanQuestion: {
+            /** Id */
+            id: string;
+            /**
+             * Section
+             * @description The report section it feeds; None for a mode-wide one.
+             */
+            section: string | null;
+            /** Question */
+            question: string;
+            /**
+             * Internal Tools
+             * @description Chat tool names that read the stored data.
+             */
+            internal_tools: string[];
+            /**
+             * Web Intent
+             * @description What a web search should look for.
+             */
+            web_intent?: string | null;
+        };
         /** PlausibilityCheck */
         PlausibilityCheck: {
             /**
@@ -27582,6 +27724,13 @@ export interface components {
              */
             reason?: string | null;
         };
+        /** PromptCopy */
+        PromptCopy: {
+            /** Sha256 */
+            sha256: string;
+            /** Text */
+            text: string;
+        };
         /** PromptDefault */
         PromptDefault: {
             /**
@@ -27656,6 +27805,16 @@ export interface components {
              * @description Thesis KPIs it rests on, as TICKER:kpi_id.
              */
             kpis: string[];
+        };
+        /** ProposedLine */
+        ProposedLine: {
+            /** Text */
+            text: string;
+            /**
+             * Evidence Ids
+             * @description Registry ids of the sources behind the line.
+             */
+            evidence_ids: string[];
         };
         /**
          * ProposedRequest
@@ -29272,6 +29431,33 @@ export interface components {
              */
             citation_count?: number | null;
         };
+        /**
+         * ReportTemplate
+         * @description How a report is presented (Phase 3): sections, order, titles, depth per section and the
+         *     default view. It cannot change a code-written figure or the strategy; it only arranges.
+         */
+        ReportTemplate: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Sections */
+            sections: components["schemas"]["TemplateSection"][];
+            /** Custom Sections */
+            custom_sections?: components["schemas"]["CustomSection"][];
+            /**
+             * Default View
+             * @default detailed
+             * @enum {string}
+             */
+            default_view: "concise" | "detailed";
+        };
         /** ReportVersion */
         ReportVersion: {
             /** Version */
@@ -29357,6 +29543,39 @@ export interface components {
             dropped_sentences: number;
             /** Notes */
             notes?: string[];
+            /**
+             * Mode
+             * @default standard
+             */
+            mode: string;
+            plan?: components["schemas"]["ResearchPlan"] | null;
+            /** Rounds */
+            rounds?: components["schemas"]["RoundRecord"][];
+            /** Stopped Because */
+            stopped_because?: string | null;
+            search_summary?: components["schemas"]["SearchSummary"] | null;
+            /** Discovered Urls */
+            discovered_urls?: components["schemas"]["DiscoveredUrl"][];
+            /**
+             * View
+             * @default detailed
+             */
+            view: string;
+            /**
+             * Default View
+             * @default detailed
+             */
+            default_view: string;
+            /** Template Id */
+            template_id?: string | null;
+            /**
+             * Authoring
+             * @default research_only
+             */
+            authoring: string;
+            snapshot?: components["schemas"]["RunSnapshot"] | null;
+            thesis_proposal?: components["schemas"]["ThesisProposal"] | null;
+            thesis_review?: components["schemas"]["ThesisReview"] | null;
         };
         /** ResearchContext */
         ResearchContext: {
@@ -29395,6 +29614,44 @@ export interface components {
             /** Older Than Latest Filing */
             older_than_latest_filing: boolean;
         };
+        /** ResearchPlan */
+        ResearchPlan: {
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+            /** Mode */
+            mode: string;
+            /** Ticker */
+            ticker: string;
+            /** Question */
+            question: string;
+            /** Horizon Days */
+            horizon_days: number | null;
+            /** Web Emphasis */
+            web_emphasis: string;
+            /** Questions */
+            questions: components["schemas"]["PlanQuestion"][];
+            /** Internal Tools */
+            internal_tools: string[];
+            /** Web Intents */
+            web_intents: string[];
+            /** Preferred Tiers */
+            preferred_tiers: number[];
+            /**
+             * Primary Required For
+             * @description 'facts' when tier 1 is allowed: figures and dates should come from it.
+             */
+            primary_required_for: "facts" | null;
+            /** Counter Evidence Intent */
+            counter_evidence_intent: string | null;
+            stop: components["schemas"]["StopConditions"];
+            /** Planned Sections */
+            planned_sections: string[];
+            /** Iterate */
+            iterate: boolean;
+        };
         /** ResearchProfile */
         ResearchProfile: {
             /** Id */
@@ -29402,7 +29659,7 @@ export interface components {
             /** Name */
             name: string;
             /** Sections */
-            sections: ("business" | "financial_trend" | "moat_risks" | "valuation" | "strategy_fit" | "ownership" | "relationships" | "risk" | "liquidity" | "open_questions")[];
+            sections: ("executive_summary" | "business" | "financial_trend" | "moat_risks" | "valuation" | "scenarios" | "catalysts" | "counter_case" | "strategy_fit" | "thesis_kpis" | "ownership" | "relationships" | "risk" | "liquidity" | "open_questions")[];
             /**
              * Depth
              * @description Sentences per model-written section: brief 3, standard 6, deep 12.
@@ -29460,6 +29717,70 @@ export interface components {
              * @default 3
              */
             top_holders: number;
+            /**
+             * Mode
+             * @description The kind of run; it shapes the research plan (questions, tools, searches).
+             * @default standard
+             * @enum {string}
+             */
+            mode: "quick" | "standard" | "deep_thesis" | "earnings_update" | "portfolio_macro" | "custom";
+            /**
+             * Web Emphasis
+             * @description internal: stored records first, a quarter of the search budget; balanced and web: the full budget.
+             * @default balanced
+             * @enum {string}
+             */
+            web_emphasis: "internal" | "balanced" | "web";
+            /**
+             * Date Horizon Days
+             * @description Prefer evidence from this many days back; older sources are named as old.
+             */
+            date_horizon_days?: number | null;
+            /**
+             * Allow Domains
+             * @description Domains the owner trusts, searched in addition to the tier lists. They are labelled as owner-trusted and never counted as proof.
+             */
+            allow_domains?: string[];
+            /**
+             * Deny Domains
+             * @description Never searched, never cited.
+             */
+            deny_domains?: string[];
+            /**
+             * Allow Forums
+             * @description Let search use forums and social media. Their sentences are labelled.
+             * @default false
+             */
+            allow_forums: boolean;
+            /**
+             * Iterate
+             * @description After the first pass, search again for sections left thin, corroborate single-source claims, and stop when the sections have enough or the budget is used.
+             * @default false
+             */
+            iterate: boolean;
+            /**
+             * Max Rounds
+             * @description Follow-up rounds when iterating.
+             * @default 1
+             */
+            max_rounds: number;
+            /**
+             * Min Sentences
+             * @description Cited sentences a section needs to count as answered.
+             * @default 2
+             */
+            min_sentences: number;
+            /**
+             * Template Id
+             * @description A report template. It decides which sections appear, in what order, with what titles and in which view; the profile decides how the run investigates.
+             */
+            template_id?: string | null;
+            /**
+             * Authoring
+             * @default research_only
+             * @enum {string}
+             */
+            authoring: "research_only" | "draft_thesis" | "propose_update" | "review_thesis";
         };
         /**
          * ResearchProfilesConfig
@@ -29479,6 +29800,11 @@ export interface components {
              * @default standard
              */
             default_profile: string;
+            /**
+             * Templates
+             * @description Report templates a profile can name. Kept apart from the profiles: a profile is how to investigate, a template is how to present.
+             */
+            templates?: components["schemas"]["ReportTemplate"][];
         };
         /** ResearchProfilesConfigVersion */
         ResearchProfilesConfigVersion: {
@@ -29545,6 +29871,18 @@ export interface components {
             sentences: components["schemas"]["CitedSentence"][];
             /** Note */
             note?: string | null;
+            /**
+             * Detail Only
+             * @description Left out of the concise view.
+             * @default false
+             */
+            detail_only: boolean;
+            /**
+             * Custom
+             * @description A section the owner defined.
+             * @default false
+             */
+            custom: boolean;
         };
         /** ResearchSummary */
         ResearchSummary: {
@@ -30365,6 +30703,37 @@ export interface components {
             /** Passage */
             passage: string | null;
         };
+        /** RoundRecord */
+        RoundRecord: {
+            /** Round */
+            round: number;
+            /** Sections */
+            sections: string[];
+            /** Reasons */
+            reasons: {
+                [key: string]: string;
+            };
+            /**
+             * Sentences Added
+             * @default 0
+             */
+            sentences_added: number;
+            /**
+             * Sources Added
+             * @default 0
+             */
+            sources_added: number;
+            /**
+             * Urls Found
+             * @default 0
+             */
+            urls_found: number;
+            /**
+             * Steps
+             * @default 0
+             */
+            steps: number;
+        };
         /** Row */
         Row: {
             /** Label */
@@ -30444,6 +30813,53 @@ export interface components {
              * @description Empty: any holding.
              */
             tickers?: string[];
+        };
+        /** RunSnapshot */
+        RunSnapshot: {
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+            /** Taken At */
+            taken_at: string;
+            /** Profile */
+            profile: {
+                [key: string]: unknown;
+            };
+            /** Template */
+            template: {
+                [key: string]: unknown;
+            } | null;
+            /** Layout */
+            layout: {
+                [key: string]: unknown;
+            }[];
+            /** Prompts */
+            prompts: {
+                [key: string]: components["schemas"]["PromptCopy"];
+            };
+            /**
+             * Versions
+             * @description Active config version id per domain when the run started.
+             */
+            versions: {
+                [key: string]: number | null;
+            };
+            /**
+             * Thesis
+             * @description The ticker's thesis as it stood.
+             */
+            thesis: {
+                [key: string]: unknown;
+            } | null;
+            /** Plan Sha256 */
+            plan_sha256: string;
+            /**
+             * Digest
+             * @default
+             */
+            digest: string;
         };
         /** SaleImpact */
         SaleImpact: {
@@ -30957,6 +31373,36 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** SearchSummary */
+        SearchSummary: {
+            /**
+             * Sources After First Pass
+             * @default 0
+             */
+            sources_after_first_pass: number;
+            /**
+             * Sources Added By Follow Up
+             * @default 0
+             */
+            sources_added_by_follow_up: number;
+            /**
+             * Urls Found
+             * @default 0
+             */
+            urls_found: number;
+            /**
+             * Urls Cited
+             * @default 0
+             */
+            urls_cited: number;
+            /**
+             * Urls Excluded
+             * @default 0
+             */
+            urls_excluded: number;
+            /** Limitations */
+            limitations?: string[];
         };
         /** Section */
         Section: {
@@ -32132,6 +32578,21 @@ export interface components {
             snippet?: string | null;
             /** As Of */
             as_of?: string | null;
+            /**
+             * Role
+             * @description For web sources: primary, quality_news, secondary, owner_trusted or forum.
+             */
+            role?: string | null;
+            /**
+             * Caveat
+             * @description Why this source is weaker than it looks.
+             */
+            caveat?: string | null;
+            /**
+             * Retrieved At
+             * @description When the search returned it.
+             */
+            retrieved_at?: string | null;
         };
         /** SourceAccess */
         SourceAccess: {
@@ -33016,6 +33477,22 @@ export interface components {
              * @description Apply the saved idea-pipeline rule on top of the filters.
              */
             preset?: "idea_pipeline" | null;
+        };
+        /** StopConditions */
+        StopConditions: {
+            /** Max Steps */
+            max_steps: number;
+            /** Max Searches */
+            max_searches: number;
+            /** Max Rounds */
+            max_rounds: number;
+            /**
+             * Min Sentences
+             * @description Cited sentences a section needs to count as answered.
+             */
+            min_sentences: number;
+            /** Rule */
+            rule: string;
         };
         /** StoredSuggestionOut */
         StoredSuggestionOut: {
@@ -33906,6 +34383,29 @@ export interface components {
             /** With Mismatch */
             with_mismatch: number;
         };
+        /** TemplateSection */
+        TemplateSection: {
+            /**
+             * Id
+             * @description A built-in section id, or the id of one of the custom sections.
+             */
+            id: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Title */
+            title?: string | null;
+            /** Max Sentences */
+            max_sentences?: number | null;
+            /**
+             * Detail Only
+             * @description Shown in the detailed view only; the concise view skips it.
+             * @default false
+             */
+            detail_only: boolean;
+        };
         /** TestAlertRequest */
         TestAlertRequest: {
             /**
@@ -34346,6 +34846,31 @@ export interface components {
              */
             description: string;
         };
+        /** ThesisKpiStatus */
+        ThesisKpiStatus: {
+            /** Kpi Id */
+            kpi_id: string;
+            /** Metric */
+            metric: string;
+            /**
+             * Rule
+             * @description The configured condition, e.g. '>= 10 %'.
+             */
+            rule: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "breach" | "unknown";
+            /** Observed Value */
+            observed_value: number | null;
+            /** Period */
+            period: string | null;
+            /** As Of */
+            as_of: string | null;
+            /** Rationale */
+            rationale: string | null;
+        };
         /** ThesisOut */
         ThesisOut: {
             /** Links */
@@ -34419,6 +34944,61 @@ export interface components {
              * @description Date of the valuation the targets come from.
              */
             set_on: string;
+        };
+        /** ThesisProposal */
+        ThesisProposal: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "research_only" | "draft_thesis" | "propose_update" | "review_thesis";
+            /** Ticker */
+            ticker: string;
+            /**
+             * Base Version Id
+             * @description The active `theses` version the proposal was made against.
+             */
+            base_version_id: number | null;
+            /** Has Thesis */
+            has_thesis: boolean;
+            /** Changes */
+            changes: components["schemas"]["FieldChange"][];
+            /** Unchanged */
+            unchanged: ("why_owned" | "exit_conditions" | "pre_mortem")[];
+            /** Left To Owner */
+            left_to_owner: string[];
+            /** Notes */
+            notes?: string[];
+        };
+        /** ThesisProposalAccept */
+        ThesisProposalAccept: {
+            /**
+             * Fields
+             * @description The fields to apply.
+             */
+            fields: ("why_owned" | "exit_conditions" | "pre_mortem")[];
+        };
+        /** ThesisProposalApplied */
+        ThesisProposalApplied: {
+            /** Config Version Id */
+            config_version_id: number;
+            /** Applied */
+            applied: ("why_owned" | "exit_conditions" | "pre_mortem")[];
+        };
+        /** ThesisReview */
+        ThesisReview: {
+            /** Ticker */
+            ticker: string;
+            /** Base Version Id */
+            base_version_id: number | null;
+            /** Why Owned */
+            why_owned: string | null;
+            /** Kpis */
+            kpis: components["schemas"]["ThesisKpiStatus"][];
+            /** Exit Conditions */
+            exit_conditions: string[];
+            /** Notes */
+            notes?: string[];
         };
         /**
          * ThesisScenarios
@@ -39639,7 +40219,10 @@ export interface operations {
     };
     get_research: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description concise: key sentences only; detailed: the whole stored report. */
+                view?: "concise" | "detailed";
+            };
             header?: never;
             path: {
                 report_id: number;
@@ -39655,6 +40238,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResearchReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_research: {
+        parameters: {
+            query?: {
+                /** @description concise: key sentences only; detailed: the whole stored report. */
+                view?: "concise" | "detailed";
+            };
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_thesis_proposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThesisProposalAccept"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThesisProposalApplied"];
                 };
             };
             /** @description Validation Error */

@@ -56,10 +56,14 @@ const BODY: ResearchBody = {
         { text: "Net income was USD 23.6 bn.", source_ids: ["S2", "S1"], written_by: "code" },
       ],
       note: null,
+      detail_only: false,
+      custom: false,
     },
     {
       id: "business",
       title: "Business",
+      detail_only: false,
+      custom: false,
       written_by: "model",
       sentences: [
         { text: "Services now make a quarter of revenue.", source_ids: ["S3"], written_by: "model", check: "supported" },
@@ -141,11 +145,16 @@ describe("source links", () => {
 
 describe("research labels and profiles", () => {
   it("labels sections, valuation methods and the writer", () => {
-    expect(SECTION_IDS).toHaveLength(10);
+    expect(SECTION_IDS).toHaveLength(15);
     expect(RESEARCH_SECTIONS.filter((s) => s.writtenBy === "model").map((s) => s.id)).toEqual([
+      "executive_summary",
       "business",
       "moat_risks",
+      "scenarios",
+      "catalysts",
+      "counter_case",
       "strategy_fit",
+      "thesis_kpis",
       "open_questions",
     ]);
     expect(sectionLabel("moat_risks")).toBe("Moat and risks");

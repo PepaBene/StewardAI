@@ -6,16 +6,19 @@ import json
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Path, Query, status
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import IdPath, Pool
 from api.routes import BaseVersionParam, NoteParam, _as_dict, _enqueue, _not_found, save_versioned
-from steward.config import ResearchProfilesConfig
+from steward.config import ResearchProfilesConfig, ThesesConfig
 from steward.config.store import load_active
 from steward.portfolio.read import JobSummary
-from steward.research.run import ResearchBody
+from steward.research.run import ResearchBody, render_md
+from steward.research.views import apply_view
 from steward.review.monthly import ReviewBody
+from steward.thesis.proposal import ProposalError, ProposalField, apply_changes, replace_thesis
 
 router = APIRouter()
 
@@ -88,10 +91,13 @@ class ResearchReportOut(BaseModel):
     body_md: str
 
 
-@router.get("/research/{report_id}", tags=["research"])
-async def get_research(report_id: IdPath, pool: Pool, _owner: Owner) -> ResearchReportOut:
-    """A research report: sections of cited sentences, computed valuation figures and the
-    source list every citation points into."""
+ViewParam = Annotated[
+    Literal["concise", "detailed"],
+    Query(description="concise: key sentences only; detailed: the whole stored report."),
+]
+
+
+async def _research_row(pool: Pool, report_id: int) -> Any:
     row = await pool.fetchrow(
         "select id, ticker, title, created_at, job_id, body, body_md from public.report"
         " where id = $1 and type = 'research'",
@@ -99,9 +105,79 @@ async def get_research(report_id: IdPath, pool: Pool, _owner: Owner) -> Research
     )
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"No research report {report_id}")
-    return ResearchReportOut(
-        **{**dict(row), "body": ResearchBody.model_validate(json.loads(row["body"]))}
+    return row
+
+
+@router.get("/research/{report_id}", tags=["research"])
+async def get_research(
+    report_id: IdPath, pool: Pool, _owner: Owner, view: ViewParam = "detailed"
+) -> ResearchReportOut:
+    """A research report: sections of cited sentences, computed valuation figures and the
+    source list every citation points into. `view=concise` shows the same report with fewer
+    sentences and without the sections a template marks detail-only."""
+    row = await _research_row(pool, report_id)
+    stored = ResearchBody.model_validate(json.loads(row["body"]))
+    body_md = row["body_md"] if view == "detailed" else render_md(stored, view)
+    return ResearchReportOut(**{**dict(row), "body": apply_view(stored, view), "body_md": body_md})
+
+
+@router.get("/research/{report_id}/export", tags=["research"])
+async def export_research(
+    report_id: IdPath, pool: Pool, _owner: Owner, view: ViewParam = "detailed"
+) -> PlainTextResponse:
+    """The report as Markdown, a rendering of the stored typed report in the chosen view."""
+    row = await _research_row(pool, report_id)
+    body = ResearchBody.model_validate(json.loads(row["body"]))
+    return PlainTextResponse(
+        render_md(body, view),
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="research-{report_id}-{view}.md"'},
     )
+
+
+class ThesisProposalAccept(BaseModel):
+    fields: list[ProposalField] = Field(min_length=1, description="The fields to apply.")
+
+
+class ThesisProposalApplied(BaseModel):
+    config_version_id: int
+    applied: list[ProposalField]
+
+
+@router.post("/research/{report_id}/thesis-proposal/accept", tags=["research"])
+async def accept_thesis_proposal(
+    report_id: IdPath, body: ThesisProposalAccept, pool: Pool, owner: Owner
+) -> ThesisProposalApplied:
+    """Apply chosen fields of a report's thesis proposal. This saves a new `theses` config
+    version (the earlier one stays in the history). It is refused when the theses changed
+    after the report was made, so a stale proposal cannot overwrite newer edits."""
+    row = await _research_row(pool, report_id)
+    report = ResearchBody.model_validate(json.loads(row["body"]))
+    proposal = report.thesis_proposal
+    if proposal is None or not proposal.changes:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This report proposes no thesis changes")
+    stored = await load_active(pool, "theses", ThesesConfig)
+    if (stored.id if stored else None) != proposal.base_version_id:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "The theses changed after this report was made; run the research again",
+        )
+    config = stored.body if stored else ThesesConfig()
+    current = next((t for t in config.theses if t.ticker == proposal.ticker), None)
+    try:
+        updated = apply_changes(current, proposal, list(body.fields))
+        new_config = replace_thesis(config, updated)
+    except (ProposalError, ValueError) as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    saved = await save_versioned(
+        pool,
+        "theses",
+        new_config,
+        created_by=owner.user_id,
+        note=f"Accepted {', '.join(body.fields)} from research report #{report_id}",
+        base_version_id=proposal.base_version_id,
+    )
+    return ThesisProposalApplied(config_version_id=saved.id, applied=list(body.fields))
 
 
 # ---------------------------------------------------------------------------
