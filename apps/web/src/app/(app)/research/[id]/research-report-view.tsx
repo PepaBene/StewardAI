@@ -55,6 +55,7 @@ import {
   WRITTEN_BY,
   writtenBy,
 } from "@/lib/research/report";
+import type { ReviewState } from "@/lib/research/ledger";
 import { normaliseView, originalSectionIndex, type ReportView } from "@/lib/research/view";
 import { salesRegionFigure } from "@/lib/reference/segments";
 import { sourceKindLabel, type CitationIndex } from "@/lib/sources/sources";
@@ -163,7 +164,9 @@ function useOptional<T>(key: string | null, load: () => Promise<{ data?: T }>): 
 function Report({ report: stored, onReload }: { report: ResearchReportOut; onReload: () => void }) {
   // One stored report, two views: the API serves the concise one on request.
   const [choice, setChoice] = useState<ReportView | null>(null);
-  const view = choice ?? normaliseView(stored.body.default_view);
+  // Claim reviews saved this session; kept here so they outlive the view switch.
+  const [reviews, setReviews] = useState<Record<string, ReviewState>>({});
+  const view =choice ?? normaliseView(stored.body.default_view);
   const concise = useOptional<ResearchReportOut>(
     view === "concise" ? `concise:${stored.id}:${stored.body.trace_purged_at ?? ""}` : null,
     () =>
@@ -368,7 +371,12 @@ function Report({ report: stored, onReload }: { report: ResearchReportOut; onRel
           </div>
 
           <ThesisProposalPanel reportId={report.id} proposal={body.thesis_proposal} review={body.thesis_review} sources={body.sources} />
-          <ClaimLedger reportId={report.id} body={body} />
+          <ClaimLedger
+            reportId={report.id}
+            body={body}
+            reviews={reviews}
+            onReview={(claimId, state) => setReviews((r) => ({ ...r, [claimId]: state }))}
+          />
           <SearchCoverage
             search_summary={body.search_summary}
             discovered_urls={body.discovered_urls}

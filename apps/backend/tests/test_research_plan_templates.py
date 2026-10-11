@@ -43,6 +43,7 @@ from steward.thesis.proposal import (
     apply_changes,
     build_proposal,
     replace_thesis,
+    stale_fields,
 )
 
 NOW = dt.datetime(2026, 10, 11, 9, 0, tzinfo=dt.UTC)
@@ -366,6 +367,83 @@ def test_follow_ups_target_thin_sections_but_not_ones_that_could_not_be_written(
     }
 
 
+def test_a_failed_section_is_retried_and_a_section_never_exceeds_its_cap() -> None:
+    specs = resolve_layout(profile(sections=["business", "moat_risks", "open_questions"]), None)
+    written: dict[str, dict[str, Any]] = {
+        "business": {"sentences": [], "note": "not written: the model returned nothing"},
+        "moat_risks": {
+            "sentences": [],
+            "note": "not written: the profile's step budget is used up",
+        },
+        "open_questions": {"sentences": []},
+    }
+    # a failed call is a gap a follow-up can fill; an exhausted budget is not
+    got = thin_sections(specs, written, 2)
+    assert set(got) == {"business", "open_questions"}
+    # the need never exceeds what a section may hold (brief depth holds 3)
+    assert "needs 3" in thin_sections(specs, written, 6, "brief")["business"]
+
+
+def test_the_profiles_domain_lists_match_hosts_with_or_without_www() -> None:
+    p = SourcePolicy.for_profile(
+        profile(deny_domains=["spam.example"], allow_domains=["research.example.org"]), tier_of
+    )
+    assert p.decide("www.spam.example").reason == "domain is denied"
+    both = SourcePolicy(tiers=(1,), tier_of=tier_of, deny=("spam.example",))
+    assert both.decide("spam.example").allowed is False
+
+
+def test_a_company_name_that_looks_like_a_site_is_not_a_foreign_site() -> None:
+    from steward.research.model_plan import foreign_hosts
+
+    assert foreign_hosts("Why does Amazon.com grow?", []) == ["amazon.com"]
+    assert foreign_hosts("Why does Amazon.com grow?", [], known={"amazon.com"}) == []
+    assert foreign_hosts("See evil.example", [], known={"amazon.com"}) == ["evil.example"]
+
+
+def test_clearing_a_review_goes_back_to_what_the_checks_said() -> None:
+    from steward.research.retention import set_claim_review
+
+    body = {
+        "ledger": {
+            "claims": [
+                {"id": "c1", "check": "unsupported", "written_by": "model", "review": "flagged"},
+                {"id": "c2", "check": "supported", "written_by": "model", "review": "x"},
+                {"id": "c3", "check": None, "written_by": "model", "review": "x"},
+            ]
+        }
+    }
+    for cid, expect in (("c1", "flagged"), ("c2", "machine_checked"), ("c3", "unreviewed")):
+        out = set_claim_review(set_claim_review(body, cid, "owner_confirmed"), cid, "unreviewed")
+        assert {c["id"]: c["review"] for c in out["ledger"]["claims"]}[cid] == expect
+
+
+def test_a_rule_limit_of_zero_has_no_warning_margin() -> None:
+    from steward.research.rules import _near
+
+    assert _near(0.0, "<=", 0.0) is False and _near(0.0, ">=", 0.0) is False
+    assert _near(0.095, "<=", 0.1) is True
+
+
+def test_a_run_id_cannot_leave_the_runs_directory() -> None:
+    from pathlib import Path
+
+    from steward.chat.benchmark_runner import run_path
+
+    assert run_path(Path("runs"), "20261011T1200-ab12cd").name == "20261011T1200-ab12cd.json"
+    for bad in ("../x", "a/b", "..", "", "a\\b"):
+        with pytest.raises(ValueError):
+            run_path(Path("runs"), bad)
+
+
+def test_cnn_subdomains_are_one_publisher() -> None:
+    from steward.research.source_policy import publisher_of
+
+    assert publisher_of("https://www.cnn.com/a") == publisher_of("https://edition.cnn.com:443/b")
+    assert publisher_of("https://news.bbc.co.uk/x") == "bbc.co.uk"
+    assert publisher_of(None) is None and publisher_of("/relative") is None
+
+
 def test_single_source_claims_pick_secondary_sources_only() -> None:
     reg = Registry()
     news = reg.add("news_item", 1, "N", tier=2)
@@ -512,10 +590,7 @@ def test_a_proposal_lists_each_field_with_its_evidence_and_never_applies_itself(
     by = {c.field: c for c in proposal.changes}
     assert set(by) == {"why_owned", "exit_conditions", "pre_mortem"}
     assert by["why_owned"].kind == "change" and by["why_owned"].before == ["Old reason."]
-    assert [x.text for x in by["why_owned"].after] == [
-        "Services fund buybacks.",
-        "Margins are stable.",
-    ]
+    assert [x.text for x in by["why_owned"].after] == ["Services fund buybacks."]
     assert by["exit_conditions"].after[0].evidence_ids == ["S1"]
     assert by["pre_mortem"].kind == "add" and by["pre_mortem"].before == []
     assert current.why_owned == "Old reason."  # building a proposal changed nothing
@@ -539,6 +614,33 @@ def test_an_identical_field_is_reported_unchanged_not_proposed() -> None:
     proposal = build_proposal("propose_update", "X", current, 1, sections)
     assert proposal is not None and proposal.changes == []
     assert proposal.unchanged == ["why_owned"]
+
+
+def test_a_field_stays_acceptable_after_another_field_of_the_same_report_was_saved() -> None:
+    current = ThesisConfig(ticker="X", why_owned="Old reason.", exit_conditions=["Old exit"])
+    proposal = build_proposal("propose_update", "X", current, 7, SECTIONS)
+    assert proposal is not None
+    assert stale_fields(current, proposal, ["why_owned", "exit_conditions"]) == []
+    # why_owned accepted first: exit_conditions is still what the proposal was made against
+    after_first = apply_changes(current, proposal, ["why_owned"])
+    assert stale_fields(after_first, proposal, ["exit_conditions"]) == []
+    # but a field the owner edited since is stale, and so is one already accepted
+    edited = after_first.model_copy(update={"exit_conditions": ["Edited by me"]})
+    assert stale_fields(edited, proposal, ["exit_conditions"]) == ["exit_conditions"]
+    assert stale_fields(after_first, proposal, ["why_owned"]) == ["why_owned"]
+
+
+def test_the_issuers_own_www_site_counts_as_tier_one() -> None:
+    from steward.config.news_sources import NewsSourcesConfig
+    from steward.research.run import search_domains
+
+    profiles = SimpleNamespace(
+        for_ticker=lambda _t: SimpleNamespace(allowed_domains=lambda: ["www.apple.com"])
+    )
+    domains, tier_of_ = search_domains(profiles, NewsSourcesConfig(), "AAPL", [1])  # type: ignore[arg-type]
+    assert "apple.com" in domains
+    # SourcePolicy.decide hands tier_of a host with `www.` already removed
+    assert tier_of_("apple.com") == 1 and tier_of_("ir.apple.com") == 1
 
 
 def proposal_for(current: ThesisConfig | None) -> ThesisProposal:

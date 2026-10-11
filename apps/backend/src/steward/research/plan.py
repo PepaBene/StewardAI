@@ -59,7 +59,7 @@ SECTION_PLANS: dict[str, tuple[str, list[str], str | None]] = {
     ),
     "counter_case": (
         "What is the strongest evidence against owning {name}?",
-        ["search_news", "filing_evidence", "event_paths"],
+        ["search_news", "filing_evidence"],  # event_paths is an owner tool: a run has no owner
         "Evidence against owning {name}: criticism, downgrades, short-seller reports, "
         "litigation, accounting questions, lost customers or contracts",
     ),

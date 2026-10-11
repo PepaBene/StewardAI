@@ -78,8 +78,17 @@ export function ResearchProfilesEditor() {
     setForm((f) => {
       if (!f) return f;
       const old = f.templates.find((t) => t.key === key);
+      // A partial id that equals another template's id must not move profiles onto that
+      // template (or, once typed past it, move that template's own profiles along).
+      const others = new Set(f.templates.filter((t) => t.key !== key).map((t) => t.id));
       const renamed =
-        change.id !== undefined && old && old.id !== "" && change.id !== "" && old.id !== change.id
+        change.id !== undefined &&
+        old &&
+        old.id !== "" &&
+        change.id !== "" &&
+        old.id !== change.id &&
+        !others.has(old.id) &&
+        !others.has(change.id)
           ? { from: old.id, to: change.id }
           : null;
       return {

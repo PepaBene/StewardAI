@@ -12,10 +12,12 @@ A denied domain is neither searched nor cited. Nothing here decides whether a cl
 that stays with the claim verifier.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Literal
+from urllib.parse import urlsplit
 
+from steward.config.news_sources import registrable_domain
 from steward.config.research import ResearchProfile
 
 Role = Literal["primary", "quality_news", "secondary", "owner_trusted", "forum"]
@@ -69,6 +71,13 @@ def normalise_host(host: str | None) -> str:
     return (host or "").lower().removeprefix("www.")
 
 
+def publisher_of(url: str | None) -> str | None:
+    """Who published a page: its registrable domain, so `www.cnn.com`, `edition.cnn.com` and
+    `cnn.com:443` are one publisher. None when the address has no host."""
+    host = normalise_host(urlsplit(url).hostname) if url else ""
+    return registrable_domain(host) if host else None
+
+
 @dataclass(frozen=True)
 class Decision:
     allowed: bool
@@ -93,23 +102,31 @@ class SourcePolicy:
         tier_of: Callable[[str | None], int | None],
         blocked: tuple[str, ...] = (),
     ) -> "SourcePolicy":
+        # `decide` compares bare hosts, so the configured lists must be bare too.
+        def bare(domains: Sequence[str]) -> tuple[str, ...]:
+            return tuple(dict.fromkeys(normalise_host(d) for d in domains))
+
         return cls(
             tiers=tuple(profile.source_tiers),
             tier_of=tier_of,
-            deny=tuple(dict.fromkeys([*profile.deny_domains, *blocked])),
-            trusted=tuple(profile.allow_domains),
+            deny=bare([*profile.deny_domains, *blocked]),
+            trusted=bare(profile.allow_domains),
             allow_forums=profile.allow_forums,
-            forum_hosts=tuple(dict.fromkeys([*FORUM_HOSTS, *profile.forum_domains])),
+            forum_hosts=bare([*FORUM_HOSTS, *profile.forum_domains]),
         )
 
     def search_domains(self, tiered: tuple[str, ...]) -> tuple[str, ...]:
         """The allow-list handed to the search provider: the tier lists minus denied domains,
         plus the owner's domains, plus forums when enabled."""
-        wanted = [d for d in tiered if not _matches(normalise_host(d), self.deny)]
-        wanted += [d for d in self.trusted if not _matches(d, self.deny)]
-        if self.allow_forums:
-            wanted += [d for d in self.forum_hosts if not _matches(d, self.deny)]
-        return tuple(dict.fromkeys(wanted))[:80]
+        trusted = [d for d in self.trusted if not _matches(d, self.deny)]
+        forums = (
+            [d for d in self.forum_hosts if not _matches(d, self.deny)] if self.allow_forums else []
+        )
+        # The provider takes at most 80 domains. The owner's own choices are never the ones cut:
+        # the tier lists give way first.
+        room = max(0, 80 - len(set(trusted)) - len(set(forums)))
+        tier_list = [d for d in tiered if not _matches(normalise_host(d), self.deny)]
+        return tuple(dict.fromkeys([*trusted, *tier_list[:room], *forums]))[:80]
 
     def decide(self, host: str | None) -> Decision:
         host = normalise_host(host)

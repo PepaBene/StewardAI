@@ -22,8 +22,10 @@ reach says so.
 """
 
 import datetime as dt
+import json
 import math
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -46,6 +48,7 @@ from steward.news.normalize import host_of
 from steward.research.gather import Gathered, Valuation, gather
 from steward.research.layout import SectionSpec, investigation_profile, resolve_layout
 from steward.research.ledger import ClaimLedger, SectionInput, build_ledger
+from steward.research.model_plan import SYSTEM as PLANNER_SYSTEM
 from steward.research.model_plan import (
     LLMResearchPlanner,
     PlannerResult,
@@ -64,7 +67,12 @@ from steward.research.read_tools import (
 )
 from steward.research.rules import load_compliance
 from steward.research.snapshot import RunSnapshot, take_snapshot
-from steward.research.source_policy import PRIORITY_TEXT, SourcePolicy
+from steward.research.source_policy import (
+    PRIORITY_TEXT,
+    SourcePolicy,
+    normalise_host,
+    publisher_of,
+)
 from steward.research.sources import CitedSentence, Registry, Source
 from steward.research.trace import (
     ModelCallTrace,
@@ -78,12 +86,13 @@ from steward.research.trace import (
 from steward.research.untrusted import flag_sources, neutralise, strip_outbound
 from steward.research.views import View, apply_view
 from steward.research.web import DiscoveredUrl, SearchHit, discovered, merge_discovered
-from steward.research.writer import SYSTEM as WRITER_SYSTEM
 from steward.research.writer import (
+    SECTION_TASKS,
     LLMResearchWriter,
     ResearchWriter,
     SectionRequest,
 )
+from steward.research.writer import SYSTEM as WRITER_SYSTEM
 from steward.settings import get_settings
 from steward.thesis.proposal import (
     ThesisProposal,
@@ -212,7 +221,8 @@ def material_text(g: Gathered, reg: Registry) -> str:
     lines += ["", "Already written from stored records (cite the same ids if you use them):"]
     for section in g.sections.values():
         for sentence in section.sentences:
-            lines.append(f"- {sentence.text} [{', '.join(sentence.source_ids)}]")
+            # Code sentences can embed a stored news headline: it is data, like a source title.
+            lines.append(f"- {neutralise(sentence.text)} [{', '.join(sentence.source_ids)}]")
     return "\n".join(lines)
 
 
@@ -228,7 +238,8 @@ def search_domains(
     profiles: HoldingProfilesConfig, registry: NewsSourcesConfig, ticker: str, tiers: list[int]
 ) -> tuple[tuple[str, ...], Any]:
     profile = profiles.for_ticker(ticker)
-    ir = profile.allowed_domains() if profile else []
+    # `decide` strips `www.` from each page host, so the issuer's own domains must be bare too.
+    ir = [normalise_host(d) for d in profile.allowed_domains()] if profile else []
     domains = [
         *(ir if 1 in tiers else []),
         *(d.domain for d in registry.domain_tiers if d.tier in tiers),
@@ -242,20 +253,40 @@ def search_domains(
     return tuple(dict.fromkeys(domains)), tier_of
 
 
+class _FailedCall(Exception):
+    """A model call that wrote nothing: its result must not become a checkpoint."""
+
+
+NO_KEY_NOTE = "not written: no AI provider key is set"
+NO_BUDGET_NOTE = "not written: the profile's step budget is used up"
+# Notes of a section no follow-up could fill; any other "not written" is a failed call.
+PERMANENT_NOTES = (NO_KEY_NOTE, NO_BUDGET_NOTE)
+
+
+def section_cap(spec: SectionSpec, depth: str) -> int:
+    """Most sentences a model section may hold, follow-ups included."""
+    return spec.max_sentences or SENTENCES_BY_DEPTH[depth]
+
+
 def thin_sections(
-    specs: list[SectionSpec], written: dict[str, dict[str, Any]], minimum: int
+    specs: list[SectionSpec],
+    written: dict[str, dict[str, Any]],
+    minimum: int,
+    depth: str = "deep",
 ) -> dict[str, str]:
     """Model sections with fewer cited sentences than the profile needs, and why. A section
     the run could not write at all (no provider key, budget used up) is not a gap a follow-up
-    could fill, so it is left out."""
+    could fill, so it is left out; one whose call failed is, and is tried again. The need never
+    exceeds what the section may hold."""
     out: dict[str, str] = {}
     for spec in specs:
         got = written.get(spec.id)
-        if got is None or str(got.get("note", "")).startswith("not written"):
+        if got is None or str(got.get("note", "")).startswith(PERMANENT_NOTES):
             continue
         n = len(got.get("sentences", []))
-        if n < minimum:
-            out[spec.id] = f"only {n} cited sentence(s); the profile needs {minimum}"
+        need = min(minimum, section_cap(spec, depth))
+        if n < need:
+            out[spec.id] = f"only {n} cited sentence(s); the profile needs {need}"
     return out
 
 
@@ -269,7 +300,7 @@ def single_source_claims(
         for s in written.get(spec.id, {}).get("sentences", []):
             found = [r for i in s.get("source_ids", []) if (r := reg.get(i)) is not None]
             # Two ids from one publisher are still one source.
-            publishers = {(host_of(r.url) if r.url else None) or r.id for r in found}
+            publishers = {publisher_of(r.url) or r.id for r in found}
             if len(publishers) == 1 and all(
                 r.kind in ("search", "news_item") and r.tier != 1 and r.role != "primary"
                 for r in found
@@ -290,8 +321,19 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         profiles_v = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
         sources_v = await load_active(pool, "news_sources", NewsSourcesConfig)
         verification_v = await load_active(pool, "verification", VerificationConfig)
-        for v in (research_v, theses_v, strategy_v, profiles_v, sources_v, verification_v):
-            await ctx.record_config_version(v.id if v else None)
+        versions = [v.id if v else None for v in (
+            research_v, theses_v, strategy_v, profiles_v, sources_v, verification_v
+        )]  # fmt: skip
+
+        async def first_versions() -> dict[str, Any]:
+            return {"ids": versions}
+
+        # The cached steps below were made under the versions of the first attempt. A resume
+        # under newer ones would mix two layouts, so it stops and the owner starts a new run.
+        if (await ctx.checkpoint("config_versions", first_versions))["ids"] != versions:
+            raise JobFailed("the configuration changed since this run started; start a new run")
+        for version_id in versions:
+            await ctx.record_config_version(version_id)
         research = research_v.body if research_v else ResearchProfilesConfig()
         profile = research.get(ctx.params.get("profile"))
         if profile is None:
@@ -449,7 +491,13 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             {"id": s.id, "title": s.title, "written_by": s.written_by, "custom": s.custom}
             for s in layout
         ],
-        prompts=deps.prompts,
+        prompts={
+            **deps.prompts,
+            # The other texts a report rests on, so the snapshot is the whole prompt set.
+            "research_planner": PLANNER_SYSTEM,
+            "section_tasks": json.dumps(SECTION_TASKS, sort_keys=True, ensure_ascii=False),
+            "source_priority": PRIORITY_TEXT,
+        },
         versions={
             "strategy": strategy_v.id if strategy_v else None,
             "theses": theses_v.id if theses_v else None,
@@ -495,7 +543,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
     ) -> dict[str, Any]:
         out: dict[str, Any] = {"sentences": [], "new_sources": [], "steps": 0, "searches": 0}
         if deps.writer is None:
-            out["note"] = "not written: no AI provider key is set"
+            out["note"] = NO_KEY_NOTE
             return out
         async with ctx.step(step_name) as step:
             offered = len(reg.sources)
@@ -645,6 +693,26 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         budget["steps"] += int(output.get("steps", 0))
         budget["searches"] += int(output.get("searches", 0))
 
+    async def checkpoint_written(
+        key: str, compute: Callable[[], Awaitable[dict[str, Any]]]
+    ) -> dict[str, Any]:
+        """`ctx.checkpoint`, except a failed model call is not stored: a resume or a follow-up
+        round tries it again instead of replaying the failure."""
+        failed: dict[str, Any] = {}
+
+        async def run() -> dict[str, Any]:
+            out = await compute()
+            note = str(out.get("note", ""))
+            if note.startswith("not written") and not note.startswith(PERMANENT_NOTES):
+                failed["out"] = out
+                raise _FailedCall
+            return out
+
+        try:
+            return dict(await ctx.checkpoint(key, run))
+        except _FailedCall:
+            return failed["out"]
+
     for index, spec in enumerate(model_specs):
 
         async def do_section(spec: SectionSpec = spec, index: int = index) -> dict[str, Any]:
@@ -655,7 +723,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                     "new_sources": [],
                     "steps": 0,
                     "searches": 0,
-                    "note": "not written: the profile's step budget is used up",
+                    "note": NO_BUDGET_NOTE,
                 }
             searches = max(
                 0,
@@ -678,7 +746,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                 step_name=f"section:{spec.id}",
             )
 
-        output = await ctx.checkpoint(f"section:{spec.id}", do_section)
+        output = await checkpoint_written(f"section:{spec.id}", do_section)
         absorb(output)
         written[spec.id] = output
 
@@ -686,11 +754,21 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
     rounds: list[RoundRecord] = []
     stopped: str | None = None
     first_pass_sources = len(reg.sources)
-    if profile.iterate and model_specs:
+    if profile.iterate and model_specs and deps.writer is None:
+        stopped = "no follow-up rounds: no AI provider key is set"
+    elif profile.iterate and model_specs:
         stopped = "round limit reached"
+        # A claim already sent for corroboration is not sent again, and a section targeted
+        # less often goes first, so later sections are not starved by the first three.
+        corroborated: set[str] = set()
+        attempts: dict[str, int] = {}
         for round_no in range(1, profile.max_rounds + 1):
-            thin = thin_sections(model_specs, written, profile.min_sentences)
-            single = single_source_claims(model_specs, written, reg)
+            thin = thin_sections(model_specs, written, profile.min_sentences, profile.depth)
+            single = {
+                section_id: fresh
+                for section_id, texts in single_source_claims(model_specs, written, reg).items()
+                if (fresh := [t for t in texts if t not in corroborated])
+            }
             targets: dict[str, str] = dict(thin)
             for section_id in single:
                 targets.setdefault(section_id, f"{len(single[section_id])} claim(s) on one source")
@@ -704,12 +782,18 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             record = RoundRecord(round=round_no, sections=[], reasons={})
             before_sources = len(reg.sources)
             urls_before = sum(len(w.get("discovered", [])) for w in written.values())
-            for spec in model_specs:
+            for spec in sorted(model_specs, key=lambda s: attempts.get(s.id, 0)):
                 if spec.id not in targets or len(record.sections) >= MAX_TARGETS_PER_ROUND:
+                    continue
+                # A section holds at most its cap, follow-ups included.
+                room = section_cap(spec, profile.depth) - len(written[spec.id]["sentences"])
+                if room < 1:
                     continue
                 steps_left = profile.max_steps - budget["steps"]
                 if steps_left < 1:
                     break
+                attempts[spec.id] = attempts.get(spec.id, 0) + 1
+                corroborated.update(single.get(spec.id, []))
                 searches = max(
                     0, min(FOLLOW_UP_SEARCHES, total_searches - budget["searches"], steps_left - 1)
                 )
@@ -726,25 +810,30 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                     searches: int = searches,
                     lines: list[str] = lines,
                     existing: str = existing,
+                    room: int = room,
                 ) -> dict[str, Any]:
                     return await write_section(
                         spec,
                         round_no=round_no,
                         searches=searches,
-                        max_sentences=FOLLOW_UP_SENTENCES,
+                        max_sentences=min(FOLLOW_UP_SENTENCES, room),
                         focus="\n".join(x for x in lines if x),
                         existing=existing,
                         step_name=f"follow_up:{round_no}:{spec.id}",
                     )
 
-                got = await ctx.checkpoint(f"follow_up:{round_no}:{spec.id}", do_follow_up)
+                got = await checkpoint_written(f"follow_up:{round_no}:{spec.id}", do_follow_up)
                 absorb(got)
                 record.sections.append(spec.id)
                 record.reasons[spec.id] = targets[spec.id]
                 record.sentences_added += len(got["sentences"])
                 record.steps += int(got.get("steps", 0))
                 base = written[spec.id]
-                base["sentences"] = [*base["sentences"], *got["sentences"]]
+                base["sentences"] = [*base["sentences"], *got["sentences"]][
+                    : section_cap(spec, profile.depth)
+                ]
+                if base["sentences"] and str(base.get("note", "")).startswith("not written"):
+                    del base["note"]  # a failed first call that the follow-up has now filled
                 base["discovered"] = [*base.get("discovered", []), *got.get("discovered", [])]
                 base["dropped"] = int(base.get("dropped", 0)) + int(got.get("dropped", 0))
                 base["links_removed"] = int(base.get("links_removed", 0)) + int(
@@ -760,7 +849,11 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             )
             rounds.append(record)
             if not record.sections:
-                stopped = "the step budget is used up"
+                stopped = (
+                    "the step budget is used up"
+                    if profile.max_steps - budget["steps"] < 1
+                    else "no section with a gap has room for more sentences"
+                )
                 break
 
     all_discovered: list[DiscoveredUrl] = []
@@ -933,7 +1026,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             gathered.valuation,
             deps.now,
             kpis=[
-                (k.kpi_id, k.rule, k.status, k.rationale)
+                (k.kpi_id, f"{k.metric} {k.rule}", k.status, k.rationale)
                 for k in (kpi_review.kpis if kpi_review else [])
             ],
             rules=[
@@ -1009,6 +1102,13 @@ def _count(items: list[str]) -> dict[str, int]:
     return counts
 
 
+def _md_line(text: str) -> str:
+    """Text safe to put on one Markdown line: a title or sentence from the web or a model may
+    contain newlines and a leading `#`, `>` or `-`, which would start a heading, quote or list."""
+    flat = " ".join(text.split())
+    return f"\\{flat}" if flat[:1] in ("#", ">", "-", "+", "|") else flat
+
+
 def render_md(body: ResearchBody, view: View | None = None) -> str:
     """Markdown for a view of the report; the detailed view when none is given. The stored
     `body_md` is the detailed one, so a template's `default_view` only steers readers."""
@@ -1033,7 +1133,7 @@ def render_md(body: ResearchBody, view: View | None = None) -> str:
             mark = " [not supported by its sources]" if s.check == "unsupported" else ""
             claim = by_position.get((section.id, i))
             tag = f" ({claim.type.replace('_', ' ')}, {claim.confidence})" if claim else ""
-            lines.append(f"{s.text} [{', '.join(s.source_ids)}]{tag}{mark}")
+            lines.append(f"{_md_line(s.text)} [{', '.join(s.source_ids)}]{tag}{mark}")
         if section.note:
             lines.append(f"_{section.note}_")
         lines.append("")
@@ -1045,7 +1145,10 @@ def render_md(body: ResearchBody, view: View | None = None) -> str:
         lines += ["## Proposed thesis changes (not applied)", ""]
         for change in shown.thesis_proposal.changes:
             lines.append(f"- {change.field} ({change.kind}):")
-            lines += [f"  - {line.text} [{', '.join(line.evidence_ids)}]" for line in change.after]
+            lines += [
+                f"  - {_md_line(line.text)} [{', '.join(line.evidence_ids)}]"
+                for line in change.after
+            ]
         lines.append("")
     if shown.view == "detailed" and shown.search_summary:
         cover = shown.search_summary
@@ -1065,7 +1168,7 @@ def render_md(body: ResearchBody, view: View | None = None) -> str:
         label = (
             f"tier {src.tier or '?'}" if src.role is None else f"{src.role}, tier {src.tier or '?'}"
         )
-        lines.append(f"- [{src.id}] {src.title} ({label}): {where}")
+        lines.append(f"- [{src.id}] {_md_line(src.title)} ({label}): {_md_line(where)}")
     return "\n".join(lines)
 
 

@@ -43,6 +43,8 @@ class RuleCompliance(BaseModel):
 
 
 def _near(value: float, operator: str, limit: float) -> bool:
+    if limit == 0:  # a margin of a fraction of zero is zero: nothing is "near" it
+        return False
     if operator in ("<", "<="):
         return value >= limit * (1 - WARN_MARGIN)
     if operator in (">", ">="):
@@ -70,7 +72,8 @@ def rule_compliance(
             unknown = "no drift report"
         if isinstance(rule, PositionWeightRule):
             suffix = ticker
-            if rule.ticker not in (None, ticker) or ticker in rule.exclude:
+            same = rule.ticker is None or rule.ticker.casefold() == ticker.casefold()
+            if not same or ticker.casefold() in {x.casefold() for x in rule.exclude}:
                 unknown = "does not apply to this ticker"
             elif unknown is None and ticker not in held:
                 unknown = "not held"

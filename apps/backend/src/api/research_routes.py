@@ -28,9 +28,11 @@ from steward.research.model_plan import (
     QuestionEdit,
     ResearchPlanner,
     apply_edits,
+    claim_draft,
     create_draft,
     get_draft,
     make_plan,
+    release_draft,
     save_draft,
 )
 from steward.research.plan import ResearchPlan, build_plan
@@ -39,7 +41,13 @@ from steward.research.run import ResearchBody, render_md
 from steward.research.views import apply_view
 from steward.review.monthly import ReviewBody
 from steward.settings import get_settings
-from steward.thesis.proposal import ProposalError, ProposalField, apply_changes, replace_thesis
+from steward.thesis.proposal import (
+    ProposalError,
+    ProposalField,
+    apply_changes,
+    replace_thesis,
+    stale_fields,
+)
 
 router = APIRouter()
 
@@ -61,6 +69,17 @@ class ResearchRequest(BaseModel):
     name: str | None = Field(default=None, max_length=120, description="Company name hint.")
 
 
+async def _canonical_ticker(pool: Pool, ticker: str) -> str:
+    """The instrument's own spelling of a ticker typed in another case (`aapl_us_eq`), so the
+    stored-data lookups find it. A ticker that is not an instrument is left as typed."""
+    found = await pool.fetchval(
+        "select t212_ticker from public.instrument where upper(t212_ticker) = upper($1)"
+        " order by t212_ticker = $1 desc limit 1",
+        ticker,
+    )
+    return str(found) if found else ticker
+
+
 @router.post("/jobs/research", tags=["research"], status_code=status.HTTP_202_ACCEPTED)
 async def run_research_now(body: ResearchRequest, pool: Pool, owner: Owner) -> JobSummary:
     """Queue a deep research run for a ticker under a research profile."""
@@ -69,7 +88,10 @@ async def run_research_now(body: ResearchRequest, pool: Pool, owner: Owner) -> J
     profile = profiles.get(body.profile)
     if profile is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No profile {body.profile!r}")
-    params: dict[str, Any] = {"ticker": body.ticker, "profile": profile.id}
+    params: dict[str, Any] = {
+        "ticker": await _canonical_ticker(pool, body.ticker),
+        "profile": profile.id,
+    }
     if body.name:
         params["name"] = body.name
     return await _enqueue(pool, "research", owner.user_id, params)
@@ -91,6 +113,7 @@ class PlanDraftRequest(BaseModel):
 class PlanDraftEdit(BaseModel):
     questions: list[QuestionEdit] | None = Field(
         default=None,
+        max_length=50,
         description="The whole question list in the order wanted; one left out is removed.",
     )
     approve: bool = Field(default=False, description="Approve the plan as it now stands.")
@@ -151,9 +174,11 @@ async def create_plan_draft(body: PlanDraftRequest, pool: Pool, _owner: Owner) -
     if profile is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No profile {body.profile!r}")
     layout = resolve_layout(profile, profiles.template_for(profile))
-    name = body.name or body.ticker
+    ticker = await _canonical_ticker(pool, body.ticker)
+    known = await pool.fetchval("select name from public.instrument where t212_ticker = $1", ticker)
+    name = body.name or known or ticker
     code_plan = build_plan(
-        profile, layout, ticker=body.ticker, name=name, today=dt.datetime.now(dt.UTC).date()
+        profile, layout, ticker=ticker, name=name, today=dt.datetime.now(dt.UTC).date()
     )
     use_model = body.planner == "model" or (
         body.planner == "profile" and profile.planning == "model"
@@ -171,7 +196,7 @@ async def create_plan_draft(body: PlanDraftRequest, pool: Pool, _owner: Owner) -
         else {}
     )
     draft = await create_draft(
-        pool, body.ticker, profile.id, body.name, plan, plan.fallback_reason, usage
+        pool, ticker, profile.id, body.name, plan, plan.fallback_reason, usage
     )
     return _draft_out(draft)
 
@@ -205,7 +230,15 @@ async def edit_plan_draft(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, {"problems": exc.problems}
             ) from exc
         edited = True
-    saved = await save_draft(pool, draft_id, plan, "approved" if body.approve else "draft", edited)
+    # An empty edit changes nothing, so it must not withdraw an approval.
+    new_status: Literal["draft", "approved"] = "approved" if body.approve else "draft"
+    if body.questions is None and not body.approve and draft.status == "approved":
+        new_status = "approved"
+    saved = await save_draft(pool, draft_id, plan, new_status, edited)
+    if saved is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "The draft was started or discarded meanwhile"
+        )
     return _draft_out(saved)
 
 
@@ -216,7 +249,8 @@ async def start_from_plan(draft_id: IdPath, pool: Pool, owner: Owner) -> JobSumm
     """Queue the research run for an approved draft. The run uses exactly this plan and stores
     it with the report, with whether the owner edited it."""
     draft = await _draft_or_404(pool, draft_id)
-    if draft.status != "approved":
+    # Claim the draft first: a double click must not queue two billed runs.
+    if not await claim_draft(pool, draft.id):
         raise HTTPException(status.HTTP_409_CONFLICT, "Approve the plan before starting the run")
     params: dict[str, Any] = {
         "ticker": draft.ticker,
@@ -225,13 +259,12 @@ async def start_from_plan(draft_id: IdPath, pool: Pool, owner: Owner) -> JobSumm
     }
     if draft.name:
         params["name"] = draft.name
-    job = await _enqueue(pool, "research", owner.user_id, params)
-    await pool.execute(
-        "update public.research_plan_draft set status = 'started', job_id = $2, updated_at = now()"
-        " where id = $1",
-        draft.id,
-        job.id,
-    )
+    try:
+        job = await _enqueue(pool, "research", owner.user_id, params)
+    except BaseException:
+        await release_draft(pool, draft.id, None)
+        raise
+    await release_draft(pool, draft.id, job.id)
     return job
 
 
@@ -317,7 +350,9 @@ async def export_research(
 
 
 class ThesisProposalAccept(BaseModel):
-    fields: list[ProposalField] = Field(min_length=1, description="The fields to apply.")
+    fields: list[ProposalField] = Field(
+        min_length=1, max_length=10, description="The fields to apply."
+    )
 
 
 class ThesisProposalApplied(BaseModel):
@@ -338,13 +373,17 @@ async def accept_thesis_proposal(
     if proposal is None or not proposal.changes:
         raise HTTPException(status.HTTP_409_CONFLICT, "This report proposes no thesis changes")
     stored = await load_active(pool, "theses", ThesesConfig)
-    if (stored.id if stored else None) != proposal.base_version_id:
+    config = stored.body if stored else ThesesConfig()
+    current = next((t for t in config.theses if t.ticker == proposal.ticker), None)
+    # Accepting one field saves a new version, so a later field of the same report sees a newer
+    # version. That is fine while the field it replaces is still what the proposal was made against.
+    if (stored.id if stored else None) != proposal.base_version_id and stale_fields(
+        current, proposal, list(body.fields)
+    ):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "The theses changed after this report was made; run the research again",
         )
-    config = stored.body if stored else ThesesConfig()
-    current = next((t for t in config.theses if t.ticker == proposal.ticker), None)
     try:
         updated = apply_changes(current, proposal, list(body.fields))
         new_config = replace_thesis(config, updated)
@@ -356,7 +395,7 @@ async def accept_thesis_proposal(
         new_config,
         created_by=owner.user_id,
         note=f"Accepted {', '.join(body.fields)} from research report #{report_id}",
-        base_version_id=proposal.base_version_id,
+        base_version_id=stored.id if stored else None,
     )
     return ThesisProposalApplied(config_version_id=saved.id, applied=list(body.fields))
 
@@ -414,14 +453,24 @@ async def review_claim(
 ) -> ClaimReviewed:
     """The owner confirms or rejects one claim of the report's ledger. The sentence is not
     changed; the review state is kept beside it."""
-    row = await _research_row(pool, report_id)
-    try:
-        updated = set_claim_review(json.loads(row["body"]), claim_id, body.state)
-    except LookupError as exc:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from None
-    await pool.execute(
-        "update public.report set body = $2::jsonb where id = $1", report_id, json.dumps(updated)
-    )
+    # Read and write under one row lock, so two reviews (or a review and a purge) at once
+    # each see the other's change instead of overwriting it.
+    async with pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(
+            "select body from public.report where id = $1 and type = 'research' for update",
+            report_id,
+        )
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"No research report {report_id}")
+        try:
+            updated = set_claim_review(json.loads(row["body"]), claim_id, body.state)
+        except LookupError as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from None
+        await conn.execute(
+            "update public.report set body = $2::jsonb where id = $1",
+            report_id,
+            json.dumps(updated),
+        )
     return ClaimReviewed(claim_id=claim_id, state=body.state)
 
 

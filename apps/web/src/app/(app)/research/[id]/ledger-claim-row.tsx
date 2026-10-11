@@ -17,8 +17,18 @@ import {
 import { Tag } from "./report-bits";
 
 /** One ledger claim: type, confidence with its reason, stale flag, review state and the confirm/reject buttons. */
-export function LedgerClaimRow({ reportId, claim }: { reportId: number; claim: LedgerClaim }) {
-  const [review, setReview] = useState<ReviewState>(claim.review);
+export function LedgerClaimRow({
+  reportId,
+  claim,
+  review,
+  onReview,
+}: {
+  reportId: number;
+  claim: LedgerClaim;
+  /** The saved review state, kept by the report so it survives switching views. */
+  review: ReviewState;
+  onReview: (claimId: string, state: ReviewState) => void;
+}) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +41,7 @@ export function LedgerClaimRow({ reportId, claim }: { reportId: number; claim: L
         params: { path: { report_id: reportId, claim_id: claim.id } },
         body: { state },
       });
-      if (response.ok) setReview(state);
+      if (response.ok) onReview(claim.id, state);
       else setError(`Review not saved (HTTP ${response.status}).`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

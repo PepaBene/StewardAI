@@ -22,10 +22,19 @@ from steward.research.sources import Source
 INSTRUCTION = re.compile(
     r"(ignore|disregard|forget|override)\b[^.\n]{0,40}\b(previous|prior|above|earlier|all|any|your)\b"
     r"[^.\n]{0,30}\b(instructions?|rules?|prompts?|guidelines?|policy|policies)\b"
-    r"|\b(you are now|act as|pretend to be|new instructions?|system prompt|developer message)\b"
-    r"|\b(send|post|upload|email|forward|exfiltrate|leak)\b[^.\n]{0,60}\b(portfolio|holdings?|"
-    r"strategy|thesis|api key|secret|password|credentials?|conversation|system prompt)\b"
-    r"|\b(call|invoke|run|use)\b[^.\n]{0,30}\b(tool|function|command)\b"
+    r"|\b(you are now|pretend to be|new instructions?|system prompt|developer message)\b"
+    r"|\bact as (?:if\b|an? (?:ai|assistant|agent|admin|system|unrestricted|different|new)\b"
+    r"|the (?:system|assistant|admin)\b)"
+    # An exfiltration verb is not part of a hyphenated word ("forward-looking", "post-merger")
+    # and needs a destination after the data ("... to ...", an address), as in real prose
+    # "we look forward to discussing our strategy" has none after "strategy".
+    r"|(?<![-\w])(?:send|post|upload|email|forward|exfiltrate|leak)(?![-\w])[^.\n]{0,60}"
+    r"\b(?:portfolio|holdings?|strategy|thesis|api key|secret|password|credentials?|"
+    r"conversation|system prompt)\b[^.\n]{0,60}(?:https?://|\S+@\S+|\bto\b|\bat\b)"
+    r"|\b(?:call|invoke)\b[^.\n]{0,30}\b(?:tool|function)\b"
+    r"|\b(?:run|use)\b\s+(?:the\s+|a\s+|this\s+)?(?:\w+\s+){0,2}(?:tool|function)\s+"
+    r"(?:named|called|[`\"'])"
+    r"|\b(?:run|execute)\b[^.\n]{0,20}\b(?:following|this|these)\b[^.\n]{0,15}\bcommands?\b"
     r"|\b(reveal|print|repeat|show)\b[^.\n]{0,30}\b(system prompt|instructions|api key)\b",
     re.I,
 )
@@ -33,7 +42,10 @@ MARKER = "[removed: instruction-like text in a source]"
 _SENTENCE = re.compile(r"(?<=[.!?])\s+|\n+")
 _MARKDOWN_IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 _MARKDOWN_LINK = re.compile(r"\[([^\]]*)\]\(([^)]*)\)")
-_URL = re.compile(r"https?://[^\s)\]>\"']+", re.I)
+# An address with a scheme, a scheme-relative one (`//host/p`) or a bare `www.host/p`.
+_URL = re.compile(r"(?:(?:https?:)?//|\bwww\.)[^\s)\]>\"']+", re.I)
+# Raw HTML (`<img src=...>`, `<a href=...>`) could load an address if a renderer allowed it.
+_HTML_TAG = re.compile(r"</?[a-z][^>]*>", re.I)
 CAVEAT = f"contains {INJECTION_CAVEAT}; treated as data, never followed"
 
 
@@ -71,7 +83,9 @@ def strip_outbound(text: str, allowed_urls: set[str]) -> tuple[str, int]:
 
     def link(m: re.Match[str]) -> str:
         nonlocal removed
-        if m.group(2) in allowed_urls:
+        # `[x](url "title")`: the address is the first word, optionally in angle brackets.
+        target = (m.group(2).split() or [""])[0].strip("<>")
+        if target in allowed_urls:
             return m.group(0)
         removed += 1
         return m.group(1)
@@ -84,6 +98,12 @@ def strip_outbound(text: str, allowed_urls: set[str]) -> tuple[str, int]:
         removed += 1
         return ""
 
+    def tag(_: re.Match[str]) -> str:
+        nonlocal removed
+        removed += 1
+        return ""
+
+    text = _HTML_TAG.sub(tag, text)
     text = _MARKDOWN_IMAGE.sub(image, text)
     text = _MARKDOWN_LINK.sub(link, text)
     text = _URL.sub(bare, text)

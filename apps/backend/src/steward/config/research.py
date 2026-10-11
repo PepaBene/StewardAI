@@ -194,6 +194,18 @@ class TemplateSection(ConfigModel):
         default=False, description="Shown in the detailed view only; the concise view skips it."
     )
 
+    @field_validator("title")
+    @classmethod
+    def _plain_title(cls, value: str | None) -> str | None:
+        return None if value is None else _plain(value)
+
+
+def _plain(value: str) -> str:
+    lowered = value.lower()
+    if any(mark in lowered for mark in ("http:", "https:", "www.", "<", ">", "```", "{{")):
+        raise ValueError("write plain words: no links, markup or template syntax")
+    return value
+
 
 class CustomSection(ConfigModel):
     """A section the owner defines: a title and the question it answers. Written by the model
@@ -211,10 +223,7 @@ class CustomSection(ConfigModel):
     @field_validator("task", "title")
     @classmethod
     def _plain_text(cls, value: str) -> str:
-        lowered = value.lower()
-        if any(mark in lowered for mark in ("http:", "https:", "www.", "<", ">", "```", "{{")):
-            raise ValueError("write plain words: no links, markup or template syntax")
-        return value
+        return _plain(value)
 
 
 class ReportTemplate(ConfigModel):

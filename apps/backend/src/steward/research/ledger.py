@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 
 from steward.research.gather import Valuation
 from steward.research.rules import RuleCompliance
+from steward.research.source_policy import publisher_of
 from steward.research.sources import CheckStatus, CitedSentence, Registry, Source
 from steward.verify.claims import missing_dates, missing_numbers
 
@@ -47,15 +48,28 @@ SECTION_TYPE: dict[str, ClaimType] = {
     "thesis_kpis": "strategy_assessment",
 }
 INTERPRETIVE_SECTIONS = {"executive_summary", "counter_case", "moat_risks"}
+# Each list has English and Czech words: `language: cs` is a supported profile setting.
 HEDGE = re.compile(
     r"\b(may|might|could|likely|unlikely|probably|suggests?|appears?|seems?|arguably|"
-    r"in our view|we think|should)\b",
+    r"in our view|we think|should|může|mohou|mohl[aoi]?|pravděpodobně|nepravděpodobně|"
+    r"zřejmě|patrně|nejspíše?|podle nás|domníváme se|měl[aoi]? by)\b",
     re.I,
 )
-FUTURE = re.compile(r"\b(will|expected to|is expected|forecast|guidance for|outlook)\b", re.I)
+FUTURE = re.compile(
+    r"\b(will|expected to|is expected|forecast|guidance for|outlook|bude|budou|"
+    r"očekává se|očekáváme|předpověď|prognóz\w*|výhled)\b",
+    re.I,
+)
+PAST = re.compile(
+    r"\b(was|were|rose|fell|reported|byl[aoi]?|vzrostl[aoy]?|klesl[aoy]?|"
+    r"uvedl[aoi]?|oznámil[aoi]?)\b",
+    re.I,
+)
 UNKNOWN = re.compile(
     r"\b(no (evidence|data|information)|not (disclosed|available|reported)|unclear|unknown|"
-    r"could not (find|verify)|cannot be (determined|verified))\b",
+    r"could not (find|verify)|cannot be (determined|verified)|"
+    r"žádné (důkazy|údaje|informace)|nezveřejněn\w*|není (k dispozici|jasné|známo)|"
+    r"neznámé|nepodařilo se (najít|ověřit)|nelze (určit|ověřit))\b",
     re.I,
 )
 # Records the app stores itself: code cites them, nobody has to trust a web page for them.
@@ -198,7 +212,7 @@ def claim_type(section_id: str, written_by: str, text: str) -> ClaimType:
         return "unknown"
     if written_by == "code":
         return "fact"
-    if FUTURE.search(text) and not re.search(r"\b(was|were|rose|fell|reported)\b", text, re.I):
+    if FUTURE.search(text) and not PAST.search(text):
         return "forecast"
     if HEDGE.search(text) or section_id in INTERPRETIVE_SECTIONS:
         return "interpretation"
@@ -257,7 +271,8 @@ def _rate(
     if written_by == "model" and check != "supported":
         return "low", "no claim check ran on it"
     strong = [s for s in sources if _strong(s)]
-    hosts = {s.url.split("/")[2] for s in sources if s.url and s.url.count("/") >= 2}
+    # A forum or blog thread is not an independent publisher, however many threads there are.
+    hosts = {p for s in sources if s.role != "forum" and (p := publisher_of(s.url))}
     if written_by == "code":
         return ("high", "built from a stored record") if strong else ("medium", "weak source")
     label: Confidence
@@ -355,9 +370,11 @@ def strategy_checks(
     out: list[StrategyCheck] = []
     judging = [c for c in claims if c.type == "strategy_assessment"]
     for kid, rule, status, evidence in kpis:
-        named = [
-            c.id for c in judging if _word_in(c.text, kid) or _word_in(c.text, rule.split()[0])
-        ]
+        # The rule reads "<metric> <operator> <threshold> <unit>": a report says the metric in
+        # words ("gross margin"), the config in a slug ("gross_margin").
+        metric = rule.split()[0]
+        names = {kid, metric, metric.replace("_", " ")}
+        named = [c.id for c in judging if any(_word_in(c.text, n) for n in names)]
         verdict: Verdict = {"pass": "supports", "breach": "challenges"}.get(status, "unknown")  # type: ignore[assignment]
         out.append(
             StrategyCheck(
@@ -561,7 +578,9 @@ def report_confidence(claims: list[Claim], checks: list[LedgerCheck]) -> tuple[C
             f"{len(errors)} check(s) failed: {', '.join(sorted({c.code for c in errors}))}",
         )
     share = sum(1 for c in claims if c.confidence == "high") / len(claims)
-    weak = sum(1 for c in claims if c.confidence == "low") / len(claims)
+    # Saying what is not known is honest, not weak: open questions do not count against it.
+    asserted = [c for c in claims if c.type != "unknown"]
+    weak = sum(1 for c in asserted if c.confidence == "low") / len(asserted) if asserted else 0.0
     warnings = {c.code for c in checks if c.severity == "warning"}
     if weak > 0.3:
         return "low", f"{weak:.0%} of claims are low confidence"

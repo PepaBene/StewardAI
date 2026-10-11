@@ -33,7 +33,7 @@ and `retrieved_at`. Tools added in phase 1 also report each figure in the shared
 | Per-holding theses, KPIs, verdicts and the reports written about them | `config_version`, `verdict`, `report` | `thesis_and_reports`, `holding`, `search_reports` | owner edits; verdicts on each earnings check | none |
 | Ex-ante risk, factor tilts, stress tests, past episodes and their history | `risk_report_snapshot`, `factor_return`, `risk_scenario` | `risk_forecast`, `stress_test`, `past_episodes`, `factor_tilts`, `model_check`, `position_risk`, `risk_whatif`, `risk_history`, `idea_factor_fit` | daily | none |
 | Sizing, deposits, rotation and switch effects | `switch_log` | `start_size`, `deposit_allocation`, `rotation_candidates`, `switch_effect` | computed on request | none |
-| Fund holdings, look-through and overlap | `etf_holding`, `fund_snapshot`, `nport_holding` | `fund_overlap`, `etf_breakdown`, `fund_nav` | per fund filing | none |
+| Fund holdings, look-through and overlap | `etf_holding`, `etf_snapshot`, `nport_holding` | `fund_overlap`, `etf_breakdown`, `fund_nav` | per fund filing | none |
 | When each dataset was last updated, and provider coverage | `coverage_status`, `sync_state` | `data_freshness`, `coverage_review` | live | none |
 | Open web through the model provider's search, limited to the allowed outlet tiers | — | — | live | Provider-side search; the URLs it returns are not stored unless cited. |
 | Proposed jobs the owner confirms | `chat_action` | `propose_job` | live | none |
@@ -67,7 +67,7 @@ and `retrieved_at`. Tools added in phase 1 also report each figure in the shared
 | `performance_explain` | transactions | `analytics_tools.performance_explain` | up to a year | owner | snapshot dates |
 | `decision_scorecard` | transactions | `analytics_tools.decision_scorecard` | last year | owner | journal ids |
 | `propose_job` | actions | `chat_action insert` | one proposal | owner | action id |
-| `filing_evidence` | filed_evidence | `data_context.evidence` | 10 items per call, as-of cutoff | global | source URL, passage and known-at per item |
+| `filing_evidence` | filed_evidence | `data_context.evidence` | 10 items by default, 25 at most, as-of cutoff | global | source URL, passage and known-at per item |
 | `fundamentals` | fundamentals | `company.ratios.build_ratios` | 80 ratios, or 300 points with periods | global | ratio group source with filed periods |
 | `valuation_scenarios` | valuation | `company.valuation.build_valuation` | 5 default scenarios | global | method version and price date |
 | `price_history` | prices | `company.service.load_market` | 120 points, 10 years, optional benchmark | global | last close date, thinning stated |
@@ -102,7 +102,9 @@ data-related ones:
   returned (`discovered_urls`: status cited, found-not-cited or excluded, with the reason and
   access time). The provider exposes only the pages its answer cited, so this is not every page
   it looked at.
-- **FX and intraday quotes** are read by the portfolio overview but have no research tool.
+- **FX and intraday quotes** are read by the `fx_rates` and `latest_quote` tools (fixings are
+  per source and never mixed across the EUR and CZK bases). The research run can call them
+  through its plan; the portfolio overview reads them separately.
 - **Saved valuation scenarios** are written by the Company page but `valuation_scenarios`
   reads default assumptions only.
 - **Tools written before phase 1** (`stress_test`, `risk_forecast`, ...) return their own
@@ -144,6 +146,7 @@ The research report job records, on the report itself: the plan, the follow-up r
 URL found with its status, the search summary and a snapshot of the profile, template, prompts
 and config versions it ran under. Its `job_step` rows hold usage per section and follow-up.
 
-Not yet traced: the search queries the provider ran (the provider runs them), a per-call
-retrieval trace for the research job like chat's (it reads through `gather`), and user feedback
-linked to a run.
+The research job also keeps a per-call trace on the report (`research/trace.py`: model calls,
+web queries and URLs, sources offered against cited, validation drops), and its stored-data
+tool calls are listed in `tool_calls`. Not yet traced: the search queries the provider ran
+(the provider runs them) and user feedback linked to a run.

@@ -15,13 +15,25 @@ import {
   strategyKindLabel,
   strategyStatusLabel,
   tally,
+  type ReviewState,
 } from "@/lib/research/ledger";
 
 import { LedgerClaimRow } from "./ledger-claim-row";
 import { NoteList, Panel, Tag } from "./report-bits";
 
 /** The claim ledger: report confidence, notices, strategy checks, balance, flagged sources and every typed claim. */
-export function ClaimLedger({ reportId, body }: { reportId: number; body: ResearchBody }) {
+export function ClaimLedger({
+  reportId,
+  body,
+  reviews,
+  onReview,
+}: {
+  reportId: number;
+  body: ResearchBody;
+  /** Review states the owner saved in this session, by claim id; they win over the loaded body. */
+  reviews: Record<string, ReviewState>;
+  onReview: (claimId: string, state: ReviewState) => void;
+}) {
   const { ledger } = body;
   const flagged = flaggedSourceWarnings(body.flagged_sources, body.sources);
   if (!ledger) {
@@ -151,7 +163,7 @@ export function ClaimLedger({ reportId, body }: { reportId: number; body: Resear
             </summary>
             <ul>
               {g.claims.map((c) => (
-                <LedgerClaimRow key={c.id} reportId={reportId} claim={c} />
+                <LedgerClaimRow key={c.id} reportId={reportId} claim={c} review={reviews[c.id] ?? c.review} onReview={onReview} />
               ))}
             </ul>
           </details>

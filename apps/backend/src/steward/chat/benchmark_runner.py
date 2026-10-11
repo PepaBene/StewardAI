@@ -18,6 +18,7 @@ import asyncio
 import datetime as dt
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -133,13 +134,20 @@ def datasets_touched(tools_called: Sequence[str]) -> list[str]:
 
 
 def _stages(
-    score: benchmark.Score, sentences: list[ChatSentence], shape: str | None, answered: bool
+    score: benchmark.Score,
+    sentences: list[ChatSentence],
+    shape: str | None,
+    answered: bool,
+    category: str = "",
 ) -> dict[str, StageResult]:
     cited = sum(1 for s in sentences if not s.no_source)
+    # For a question the data cannot answer, "not enough evidence" is the right answer and
+    # has nothing to cite.
+    honest_gap = category == "missing_data" and shape == "low_evidence"
     return {
         "retrieval": "fail" if score.failure == "retrieval" else "pass",
         "analysis": "fail" if any(s.unsupported for s in sentences) else "pass",
-        "citation": "pass" if cited else "fail",
+        "citation": "pass" if cited or honest_gap else "fail",
         "strategy": "unreviewed",
         "rendering": "fail" if not answered or shape is None else "pass",
     }
@@ -184,7 +192,9 @@ async def run_case(
     seconds = time.monotonic() - started
     trace = list(tools.trace)
     score = benchmark.score_trace(case, trace)
-    stages = _stages(score, sentences, shape, answered=bool(sentences) and error is None)
+    stages = _stages(
+        score, sentences, shape, answered=bool(sentences) and error is None, category=case.category
+    )
     called = [str(t.get("tool")) for t in trace]
     cost = (
         round((in_tok * usd_per_mtok[0] + out_tok * usd_per_mtok[1]) / 1_000_000, 6)
@@ -276,12 +286,19 @@ async def run_cases(
 # ------------------------------------------------------------------ storage
 
 
+def _safe_id(run_id: str) -> str:
+    """A run id is a file name: no separators or `..`, so it cannot leave the runs directory."""
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", run_id) or ".." in run_id:
+        raise ValueError(f"not a valid run id: {run_id!r}")
+    return run_id
+
+
 def run_path(directory: Path, run_id: str) -> Path:
-    return directory / f"{run_id}.json"
+    return directory / f"{_safe_id(run_id)}.json"
 
 
 def review_path(directory: Path, run_id: str) -> Path:
-    return directory / f"{run_id}.review.json"
+    return directory / f"{_safe_id(run_id)}.review.json"
 
 
 def save_run(run: RunRecord, directory: Path = RUNS_DIR) -> Path:
@@ -394,8 +411,14 @@ def compare_runs(a: RunRecord, b: RunRecord) -> dict[str, Any]:
         elif y.failure_stage and y.failure_stage != x.failure_stage and not x.passed:
             regressions.append(f"{cid}: failure moved {x.failure_stage} -> {y.failure_stage}")
     agg: dict[str, Any] = {}
+    common = ca.keys() & cb.keys()
+    # Totals over different case sets are not comparable (a 5-case run against a full run would
+    # read as 49 -> 5 passed), so the aggregates are rebuilt over the cases both runs have.
+    same_set = len(common) == len(ca) == len(cb)
+    agg_a = a.aggregate if same_set else aggregate([ca[c] for c in sorted(common)])
+    agg_b = b.aggregate if same_set else aggregate([cb[c] for c in sorted(common)])
     for key in (*_HIGHER_IS_BETTER, *_LOWER_IS_BETTER, "input_tokens", "output_tokens"):
-        va, vb = a.aggregate.get(key), b.aggregate.get(key)
+        va, vb = agg_a.get(key), agg_b.get(key)
         d = _delta(va, vb)
         agg[key] = {"a": va, "b": vb, "delta": d}
         if d is None or d == 0:
@@ -409,6 +432,7 @@ def compare_runs(a: RunRecord, b: RunRecord) -> dict[str, Any]:
         "b": b.run_id,
         "cases_only_in_a": sorted(ca.keys() - cb.keys()),
         "cases_only_in_b": sorted(cb.keys() - ca.keys()),
+        "aggregate_over": "all cases" if same_set else f"the {len(common)} cases in both runs",
         "per_case": per_case,
         "aggregate": agg,
         "regressions": regressions,
@@ -479,27 +503,58 @@ def append_case(
 # ------------------------------------------------------------------ CLI
 
 
+def _require_file(path: str | None) -> None:
+    if path and not Path(path).is_file():
+        raise SystemExit(f"cases file not found: {path}")
+
+
 def _select(
     cases: list[benchmark.Case], only: Sequence[str], category: str | None, limit: int | None
 ) -> list[benchmark.Case]:
     if only:
+        missing = sorted(set(only) - {c.id for c in cases})
+        if missing:
+            raise SystemExit(f"no such case id: {', '.join(missing)}")
         cases = [c for c in cases if c.id in set(only)]
     if category:
         cases = [c for c in cases if c.category == category]
-    return cases[:limit] if limit else cases
+    if limit is not None and limit < 1:
+        raise SystemExit("--limit must be at least 1")
+    if not cases:
+        raise SystemExit("no cases selected")
+    return cases[:limit] if limit is not None else cases
 
 
 async def _live_run(args: argparse.Namespace) -> RunRecord:
     """Builds the real client and tools (database, routing layer) and runs the cases."""
     from steward.ai import AINotConfigured
     from steward.chat.assistant import SYSTEM, LLMChatAssistant
-    from steward.chat.tools import ChatTools
+    from steward.chat.tools import ACTION_KINDS, ChatTools
     from steward.config.jobs import JobsConfig
     from steward.config.news_sources import NewsSourcesConfig
     from steward.config.store import load_active
     from steward.db import create_pool
     from steward.llm.client import create_llm
     from steward.settings import get_settings
+
+    class ReplayTools(ChatTools):
+        """A replay has no conversation to attach an action to, and must not write rows."""
+
+        async def _tool_propose_job(
+            self,
+            kind: str,
+            reason: str,
+            ticker: str | None = None,
+            profile: str | None = None,
+        ) -> dict[str, Any]:
+            if kind not in ACTION_KINDS:
+                return {"error": f"kind must be one of {', '.join(ACTION_KINDS)}"}
+            if kind in ("earnings_check", "research") and not ticker:
+                return {"error": f"{kind} needs a ticker"}
+            return {
+                "proposed_action": 0,
+                "status": "replay: recorded, nothing was stored or started",
+            }
 
     settings = get_settings()
     pool = await create_pool(settings)
@@ -517,6 +572,7 @@ async def _live_run(args: argparse.Namespace) -> RunRecord:
         owner = args.owner or await pool.fetchval(
             "select created_by::text from public.chat_conversation order by id limit 1"
         )
+        _require_file(args.cases)
         cases = _select(
             load_all_cases(Path(args.cases) if args.cases else EXTRA_CASES_PATH),
             args.only,
@@ -527,7 +583,7 @@ async def _live_run(args: argparse.Namespace) -> RunRecord:
         return await run_cases(
             cases,
             assistant,
-            lambda: ChatTools(pool, Registry(), None, None, owner_id=owner),
+            lambda: ReplayTools(pool, Registry(), None, None, owner_id=owner),
             model=args.model,
             usd_per_mtok=price,
         )

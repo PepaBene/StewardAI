@@ -15,6 +15,7 @@ the report says who wrote it and whether the owner edited it.
 import json
 import re
 import time
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
@@ -135,12 +136,15 @@ class LLMResearchPlanner:
 _HOST = re.compile(r"(?:https?://)?\b((?:[a-z0-9-]+\.)+[a-z]{2,})\b", re.IGNORECASE)
 
 
-def foreign_hosts(text: str, allow_domains: list[str]) -> list[str]:
+def foreign_hosts(text: str, allow_domains: list[str], known: Collection[str] = ()) -> list[str]:
     """Domain-like words in `text` that the profile does not allow (all of them, when it allows
-    none): a plan may only name a site the owner trusted."""
+    none): a plan may only name a site the owner trusted. `known` are words the code-built plan
+    already contains, such as a company name like "Amazon.com", which is not a site to visit."""
     bad = []
     for match in _HOST.finditer(text):
         host = match.group(1).lower().removeprefix("www.")
+        if host in known:
+            continue
         if not any(host == d or host.endswith("." + d) for d in allow_domains):
             bad.append(host)
     return bad
@@ -148,6 +152,11 @@ def foreign_hosts(text: str, allow_domains: list[str]) -> list[str]:
 
 def _known_tools(groups: list[str]) -> list[str]:
     return [t for t in tools_for(groups) if t in catalog.TOOLS]
+
+
+def _own_hosts(questions: list[PlanQuestion]) -> set[str]:
+    """Domain-like words the code-built questions contain themselves (a company name)."""
+    return {h for q in questions for h in foreign_hosts(f"{q.question} {q.web_intent or ''}", [])}
 
 
 def refresh(plan: ResearchPlan, questions: list[PlanQuestion]) -> ResearchPlan:
@@ -175,6 +184,7 @@ def _check_question(
     groups: list[str],
     searches: int,
     profile: ResearchProfile,
+    known: Collection[str] = (),
 ) -> list[str]:
     problems: list[str] = []
     if not MIN_TEXT <= len(text.strip()) <= MAX_TEXT:
@@ -186,7 +196,7 @@ def _check_question(
         problems.append("this profile does not search the web")
     if intent and len(intent) > MAX_INTENT:
         problems.append(f"the search intent is over {MAX_INTENT} characters")
-    named = foreign_hosts(f"{text} {intent or ''}", list(profile.allow_domains))
+    named = foreign_hosts(f"{text} {intent or ''}", list(profile.allow_domains), known)
     if named:
         problems.append(f"names a site the profile does not allow: {', '.join(sorted(set(named)))}")
     return problems
@@ -200,6 +210,7 @@ def validate_model_plan(
     trimmed or filled from the code plan."""
     notes: list[str] = []
     searches = base.stop.max_searches
+    known = _own_hosts(base.questions)
     per_section: dict[str, list[PlanQuestion]] = {}
     total = 0
     for item in out.questions:
@@ -218,7 +229,7 @@ def validate_model_plan(
             groups.remove(WEB_GROUP)
             intent = None
             notes.append(f"removed the web group from {item.section}: this profile does not search")
-        problems = _check_question(item.question, intent, groups, searches, profile)
+        problems = _check_question(item.question, intent, groups, searches, profile, known)
         if problems:
             notes.append(f"dropped a question for {item.section}: {problems[0]}")
             continue
@@ -257,10 +268,10 @@ class QuestionEdit(BaseModel):
     section: str | None = Field(
         default=None, description="A planned section id; the mode-wide question stays None."
     )
-    question: str
+    question: str = Field(max_length=2000)
     label: str | None = Field(default=None, max_length=80)
-    source_groups: list[str] = Field(default_factory=list)
-    web_intent: str | None = None
+    source_groups: list[str] = Field(default_factory=list, max_length=20)
+    web_intent: str | None = Field(default=None, max_length=1000)
 
 
 def apply_edits(
@@ -270,6 +281,7 @@ def apply_edits(
     `PlanProblem` listing every problem, so the owner sees them all at once."""
     problems: list[str] = []
     by_id = {q.id: q for q in plan.questions}
+    known = _own_hosts(plan.questions)
     searches = plan.stop.max_searches
     seen: set[str] = set()
     questions: list[PlanQuestion] = []
@@ -293,15 +305,22 @@ def apply_edits(
         groups = list(dict.fromkeys(e.source_groups))
         has_web = WEB_GROUP in groups
         intent = (e.web_intent or old.web_intent or e.question.strip())[:MAX_INTENT]
-        mine = _check_question(e.question, intent if has_web else None, groups, searches, profile)
+        mine = _check_question(
+            e.question, intent if has_web else None, groups, searches, profile, known
+        )
         problems += [f"{e.id}: {p}" for p in mine]
-        changed = groups != old.source_groups
+        # Keep the tools already planned for groups that stay on; add those of new groups only.
+        # (Recomputing from all groups would widen the plan after a reorder or a web toggle.)
+        added = [g for g in groups if g not in old.source_groups]
+        still_on = set(_known_tools(groups))
+        tools = [t for t in old.internal_tools if t in still_on]
+        tools += [t for t in _known_tools(added) if t not in tools]
         questions.append(
             PlanQuestion(
                 id=old.id,
                 section=old.section if old.section is None else e.section,
                 question=e.question.strip(),
-                internal_tools=_known_tools(groups) if changed else list(old.internal_tools),
+                internal_tools=tools,
                 web_intent=intent if has_web else None,
                 source_groups=groups,
                 label=(e.label or "").strip() or None,
@@ -427,13 +446,42 @@ async def get_draft(pool: asyncpg.Pool, draft_id: int) -> Draft | None:
 
 async def save_draft(
     pool: asyncpg.Pool, draft_id: int, plan: ResearchPlan, status: DraftStatus, edited: bool
-) -> Draft:
+) -> Draft | None:
+    """The saved draft, or None when it has meanwhile been started or discarded (a started
+    draft is final, so an edit racing a start must not reopen it)."""
     row = await pool.fetchrow(
         "update public.research_plan_draft set plan = $2::jsonb, status = $3, edited = $4,"
-        f" updated_at = now() where id = $1 returning {COLUMNS}",
+        " updated_at = now() where id = $1 and status in ('draft', 'approved')"
+        f" returning {COLUMNS}",
         draft_id,
         plan.model_dump_json(),
         status,
         edited,
     )
-    return _draft(row)
+    return _draft(row) if row else None
+
+
+async def claim_draft(pool: asyncpg.Pool, draft_id: int) -> bool:
+    """Mark an approved draft started, once: of two concurrent starts only one gets True."""
+    claimed = await pool.fetchval(
+        "update public.research_plan_draft set status = 'started', updated_at = now()"
+        " where id = $1 and status = 'approved' returning id",
+        draft_id,
+    )
+    return claimed is not None
+
+
+async def release_draft(pool: asyncpg.Pool, draft_id: int, job_id: int | None) -> None:
+    """After a claimed start: record the job, or (no job) put the draft back to approved."""
+    if job_id is None:
+        await pool.execute(
+            "update public.research_plan_draft set status = 'approved', updated_at = now()"
+            " where id = $1 and status = 'started' and job_id is null",
+            draft_id,
+        )
+    else:
+        await pool.execute(
+            "update public.research_plan_draft set job_id = $2, updated_at = now() where id = $1",
+            draft_id,
+            job_id,
+        )

@@ -88,13 +88,14 @@ def clamp_limit(limit: Any, default: int = DEFAULT_LIMIT, maximum: int = MAX_LIM
 
 
 def page(rows: Sequence[Any], limit: int, total: int | None = None) -> dict[str, Any]:
-    """The bounds of a returned list, so the model knows whether it saw everything."""
+    """The bounds of a returned list, so the model knows whether it saw everything. Without a
+    total, a list that filled its limit may have been cut, so it is reported as truncated."""
     shown = len(rows)
     known_total = total if total is not None else shown
     return {
         "returned": shown,
         "limit": limit,
-        "truncated": known_total > shown,
+        "truncated": known_total > shown or (total is None and shown >= limit),
         **({"total": known_total} if total is not None else {}),
     }
 
@@ -106,9 +107,12 @@ def neutralise_tree(value: Any) -> Any:
     if isinstance(value, str):
         return neutralise(value) if instruction_like(value) else value
     if isinstance(value, dict):
-        return {k: neutralise_tree(v) for k, v in value.items()}
+        # Keys can hold stored text too (a sector or country name grouped on).
+        return {neutralise_tree(k): neutralise_tree(v) for k, v in value.items()}
     if isinstance(value, list):
         return [neutralise_tree(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(neutralise_tree(v) for v in value)
     return value
 
 

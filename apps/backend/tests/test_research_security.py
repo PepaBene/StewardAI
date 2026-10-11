@@ -113,6 +113,11 @@ BENIGN = [
     "Management described the new rules on emissions as a tailwind.",
     "Analysts act on guidance within hours of the call.",
     "The strategy segment grew faster than hardware.",
+    "This forward-looking statement describes our strategy and is not a guarantee.",
+    "The post-merger integration strategy is on track.",
+    "Management will use the new tool to run the plant at full capacity.",
+    "Preferred shares may act as a hedge against rate moves.",
+    "We look forward to discussing our strategy with investors.",
 ]
 
 

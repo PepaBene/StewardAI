@@ -25,7 +25,8 @@ ProposalField = Literal["why_owned", "exit_conditions", "pre_mortem"]
 FIELDS: tuple[ProposalField, ...] = ("why_owned", "exit_conditions", "pre_mortem")
 # field -> (report sections it draws from in order of preference, most lines)
 SOURCES: dict[str, tuple[tuple[str, ...], int]] = {
-    "why_owned": (("executive_summary", "business"), 2),
+    # One line: the thesis keeps a single why-owned sentence, so one is all accept can apply.
+    "why_owned": (("executive_summary", "business"), 1),
     "exit_conditions": (("thesis_kpis",), 4),
     "pre_mortem": (("counter_case", "moat_risks"), 3),
 }
@@ -165,6 +166,14 @@ def apply_changes(
     if "why_owned" not in data:
         raise ProposalError("a new thesis needs the why-owned line accepted")
     return ThesisConfig.model_validate(data)
+
+
+def stale_fields(
+    current: ThesisConfig | None, proposal: ThesisProposal, accept: list[ProposalField]
+) -> list[ProposalField]:
+    """Accepted fields whose live value no longer equals what the proposal was made against."""
+    by_field = {c.field: c for c in proposal.changes}
+    return [f for f in accept if f in by_field and _current(current, f) != by_field[f].before]
 
 
 def replace_thesis(config: ThesesConfig, thesis: ThesisConfig) -> ThesesConfig:

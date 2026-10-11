@@ -166,6 +166,75 @@ def test_balance_names_what_a_planned_section_lacks() -> None:
     assert [c.severity for c in ledger.checks if c.code == "section_empty"] == ["warning"]
 
 
+def _web(reg: Registry, url: str, role: str = "secondary") -> str:
+    return reg.add("search", url, url, url=url, snippet="x", tier=3, role=role)  # type: ignore[arg-type]
+
+
+def test_variants_of_one_site_and_forum_threads_are_not_independent_publishers() -> None:
+    reg = Registry()
+    www, bare = _web(reg, "https://www.cnn.com/a"), _web(reg, "https://edition.cnn.com:443/b")
+    forum_a = _web(reg, "https://old.reddit.com/r/a", "forum")
+    forum_b = _web(reg, "https://news.ycombinator.com/item?id=1", "forum")
+    other = _web(reg, "https://ft.com/c")
+    ledger = build_ledger(
+        [
+            section(
+                "business",
+                "model",
+                sentence("Same publisher twice.", [www, bare]),
+                sentence("Two forum threads.", [forum_a, forum_b]),
+                sentence("Two real publishers.", [www, other]),
+            )
+        ],
+        reg,
+        [],
+        NOW,
+    )
+    got = [c.confidence for c in ledger.claims]
+    assert got == ["medium", "medium", "high"]
+
+
+def test_open_questions_do_not_make_an_honest_report_low() -> None:
+    reg = registry()
+    ledger = build_ledger(
+        [
+            section("business", "model", *[sentence("Revenue was 94.9 bn USD.", ["S1"])] * 6),
+            section(
+                "open_questions",
+                "model",
+                *[sentence("It is unclear what churn is.", ["S1"])] * 4,
+            ),
+        ],
+        reg,
+        [],
+        NOW,
+    )
+    assert ledger.confidence != "low"
+
+
+def test_czech_hedges_and_unknowns_are_typed_like_the_english_ones() -> None:
+    assert claim_type("business", "model", "Služby mohou zpomalit") == "interpretation"
+    assert claim_type("business", "model", "O odlivu zákazníků nejsou žádné údaje") == "unknown"
+    assert claim_type("business", "model", "Marže bude v příštím roce vyšší") == "forecast"
+    assert claim_type("business", "model", "Tržby vzrostly a výhled je silný") == "fact"
+
+
+def test_a_kpi_is_named_by_its_metric_in_words() -> None:
+    ledger = build_ledger(
+        [section("thesis_kpis", "model", sentence("Gross margin is on track.", ["S1"]))],
+        registry(),
+        [],
+        NOW,
+        kpis=[("k1", "gross_margin >= 10 pct", "pass", "12 %")],
+        rules=[],
+        kpi_version=1,
+        strategy_version=None,
+    )
+    [kpi] = ledger.strategy
+    assert kpi.named_by == ["c1"]
+    assert "kpi_unnamed" not in {c.code for c in ledger.checks}
+
+
 def test_strategy_checks_name_the_rule_its_condition_and_status() -> None:
     reg = registry()
     ledger = build_ledger(

@@ -39,14 +39,17 @@ def scrub_body(body: dict[str, Any], now: dt.datetime) -> dict[str, Any]:
 async def purge_report_trace(
     pool: asyncpg.Pool, report_id: int, now: dt.datetime
 ) -> dict[str, int]:
-    row = await pool.fetchrow(
-        "select id, job_id, body from public.report where id = $1 and type = 'research'", report_id
-    )
-    if row is None:
-        raise LookupError(f"No research report {report_id}")
-    body = json.loads(row["body"]) if isinstance(row["body"], str) else dict(row["body"])
-    cleared = len(body.get("discovered_urls", []))
     async with pool.acquire() as conn, conn.transaction():
+        # Locked until commit: a claim review racing this purge waits instead of losing a write.
+        row = await conn.fetchrow(
+            "select id, job_id, body from public.report where id = $1 and type = 'research'"
+            " for update",
+            report_id,
+        )
+        if row is None:
+            raise LookupError(f"No research report {report_id}")
+        body = json.loads(row["body"]) if isinstance(row["body"], str) else dict(row["body"])
+        cleared = len(body.get("discovered_urls", []))
         await conn.execute(
             "update public.report set body = $2::jsonb where id = $1",
             report_id,
@@ -140,9 +143,23 @@ def set_claim_review(body: dict[str, Any], claim_id: str, state: str) -> dict[st
     claims: list[dict[str, Any]] = ledger.get("claims", [])
     if not any(c.get("id") == claim_id for c in claims):
         raise LookupError(f"No claim {claim_id} in this report")
+
+    def reviewed(c: dict[str, Any]) -> dict[str, Any]:
+        if state != "unreviewed":
+            return {**c, "review": state}
+        # Clearing the owner's choice goes back to what the checks said, not to "unreviewed"
+        # (a claim the verifier flagged must stay flagged).
+        if c.get("check") == "unsupported":
+            back = "flagged"
+        elif c.get("written_by") == "code" or c.get("check") == "supported":
+            back = "machine_checked"
+        else:
+            back = "unreviewed"
+        return {**c, "review": back}
+
     out = dict(body)
     out["ledger"] = {
         **ledger,
-        "claims": [{**c, "review": state} if c.get("id") == claim_id else c for c in claims],
+        "claims": [reviewed(c) if c.get("id") == claim_id else c for c in claims],
     }
     return out

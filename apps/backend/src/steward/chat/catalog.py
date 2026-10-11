@@ -29,6 +29,7 @@ class ToolInfo:
     bounds: str  # row, date and size limits
     scope: str  # "owner" for the owner's own records, "global" for shared reference data
     provenance: str  # how a returned record is traced to its source
+    writes: bool = False  # True for a tool that stores anything; a research run never calls it
 
 
 DATASETS: tuple[Dataset, ...] = (
@@ -159,7 +160,7 @@ DATASETS: tuple[Dataset, ...] = (
     Dataset(
         "funds",
         "Fund holdings, look-through and overlap",
-        ("etf_holding", "fund_snapshot", "nport_holding"),
+        ("etf_holding", "etf_snapshot", "nport_holding"),
         ("fund_overlap", "etf_breakdown", "fund_nav"),
         "per fund filing",
     ),
@@ -214,8 +215,8 @@ TOOLS: dict[str, ToolInfo] = {
     "fund_overlap": ToolInfo(("funds",), "analytics_tools.fund_overlap", "one ticker", "owner", "fund snapshot"),
     "performance_explain": ToolInfo(("transactions",), "analytics_tools.performance_explain", "up to a year", "owner", "snapshot dates"),
     "decision_scorecard": ToolInfo(("transactions",), "analytics_tools.decision_scorecard", "last year", "owner", "journal ids"),
-    "propose_job": ToolInfo(("actions",), "chat_action insert", "one proposal", "owner", "action id"),
-    "filing_evidence": ToolInfo(("filed_evidence",), "data_context.evidence", "10 items per call, as-of cutoff", "global", "source URL, passage and known-at per item"),
+    "propose_job": ToolInfo(("actions",), "chat_action insert", "one proposal", "owner", "action id", writes=True),
+    "filing_evidence": ToolInfo(("filed_evidence",), "data_context.evidence", "10 items by default, 25 at most, as-of cutoff", "global", "source URL, passage and known-at per item"),
     "fundamentals": ToolInfo(("fundamentals",), "company.ratios.build_ratios", "80 ratios, or 300 points with periods", "global", "ratio group source with filed periods"),
     "valuation_scenarios": ToolInfo(("valuation",), "company.valuation.build_valuation", "5 default scenarios", "global", "method version and price date"),
     "price_history": ToolInfo(("prices",), "company.service.load_market", "120 points, 10 years, optional benchmark", "global", "last close date, thinning stated"),

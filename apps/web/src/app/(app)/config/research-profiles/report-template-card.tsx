@@ -141,7 +141,8 @@ function TemplateSections({
   const messages = [...errorsAt(errors, `${path}.sections`), ...errorsAt(errors, `${path}.custom_sections`)];
   const unused = unusedBuiltinSections(t);
   const customCount = t.custom_sections.length;
-  const atCustomLimit = customCount >= BOUNDS.custom_sections.max;
+  const atSectionLimit = t.sections.length >= BOUNDS.template_sections.max;
+  const atCustomLimit = customCount >= BOUNDS.custom_sections.max || atSectionLimit;
 
   return (
     <fieldset className="space-y-2" aria-describedby={messages.length > 0 ? `${id}-errors` : undefined}>
@@ -278,7 +279,13 @@ function TemplateSections({
             {unused.map((sid) => (
               <li key={sid}>
                 <label className="inline-flex items-center gap-1.5 text-sm text-text-muted">
-                  <input type="checkbox" checked={false} onChange={() => onApply(addBuiltinSection(t, sid))} className="size-4 accent-accent" />
+                  <input
+                    type="checkbox"
+                    checked={false}
+                    disabled={atSectionLimit}
+                    onChange={() => onApply(addBuiltinSection(t, sid))}
+                    className="size-4 accent-accent"
+                  />
                   {sectionLabel(sid)}
                 </label>
               </li>

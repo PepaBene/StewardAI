@@ -102,6 +102,7 @@ async def fx_rates(
             "rate": env.datum(
                 r["rate"],
                 unit="home_currency_per_unit",
+                currency=r["home_currency"],
                 source_id=sid,
                 as_of=r["rate_date"],
                 reason="units of home currency for one unit of the currency",
@@ -109,6 +110,11 @@ async def fx_rates(
         }
         for r in rows
     ]
+    # ECB fixings are against EUR and CNB's against CZK: never compare across sources, and
+    # take "the latest" per source rather than whichever sorts first.
+    newest_per_source: dict[str, asyncpg.Record] = {}
+    for r in rows:
+        newest_per_source.setdefault(r["source"], r)
     return {
         "currency": code,
         "source_id": sid,
@@ -121,6 +127,20 @@ async def fx_rates(
             source_id=sid,
             reason="latest stored fixing is old" if status == "stale" else None,
         ),
+        "latest_by_source": {
+            source: {
+                "home_currency": r["home_currency"],
+                "date": r["rate_date"].isoformat(),
+                "rate": env.datum(
+                    r["rate"],
+                    unit="home_currency_per_unit",
+                    currency=r["home_currency"],
+                    source_id=sid,
+                    as_of=r["rate_date"],
+                ),
+            }
+            for source, r in newest_per_source.items()
+        },
         "rates": out,
         "page": env.page(out, rows_n),
     }
@@ -151,7 +171,7 @@ async def latest_quote(pool: asyncpg.Pool, registry: Registry, ticker: str) -> d
         app_path=f"/holdings/{ticker}",
         tier=2,
         snippet=(
-            f"{ticker} {q['kind']} {q['price']:.6g} {q['currency']} "
+            f"{ticker} {q['kind']} {q['price']:.6g} {q['currency'] or '(currency not stored)'} "
             f"at {q['price_time']:%Y-%m-%d %H:%M} UTC"
         ),
         as_of=str(q["session_date"]),
@@ -271,13 +291,18 @@ async def statement_lines(
         return {"error": f"statement must be one of {', '.join(STATEMENTS)}"}
     rows_n = env.clamp_limit(limit, default=20, maximum=60)
     pattern = f"%{concept.strip()}%" if concept and concept.strip() else None
+    # Latest revision per line first (distinct on), then the newest periods across all
+    # concepts: the limit must cut by date, not by concept name.
     rows = await pool.fetch(
-        "select distinct on (statement, concept, period_end, fiscal_period)"
-        " statement, concept, label, period_end, fiscal_period, value, unit, currency,"
-        " source_url, form, known_at from public.financial_statement_fact"
+        "select * from (select distinct on (statement, concept, period_start, period_end,"
+        " fiscal_period, basis, unit)"
+        " statement, concept, label, period_start, period_end, fiscal_period, value, unit,"
+        " currency, source_url, form, known_at from public.financial_statement_fact"
         " where ticker = $1 and value is not null and dimensions = '{}'::jsonb"
         " and ($2::text is null or statement = $2) and ($3::text is null or concept ilike $3)"
-        " order by statement, concept, period_end desc, fiscal_period, revision desc limit $4",
+        " order by statement, concept, period_start, period_end desc, fiscal_period, basis, unit,"
+        " revision desc) latest"
+        " order by period_end desc, statement, concept, fiscal_period limit $4",
         ticker,
         statement,
         pattern,
@@ -307,7 +332,9 @@ async def statement_lines(
                     r["value"],
                     unit=r["unit"],
                     currency=r["currency"],
-                    period=f"{r['fiscal_period'] or ''} ending {r['period_end']}".strip(),
+                    period=(
+                        f"{r['fiscal_period'] or ''} {r['period_start'] or ''}..{r['period_end']}"
+                    ).strip(),
                     as_of=r["period_end"],
                     source_id=sid,
                 ),
@@ -367,12 +394,15 @@ async def segment_revenue(
     if kind is not None and kind not in SEGMENT_KINDS:
         return {"error": f"kind must be one of {', '.join(SEGMENT_KINDS)}"}
     rows_n = env.clamp_limit(limit, default=20, maximum=60)
+    # A 10-K restates prior years: keep one row per segment and period, from the newest filing.
     rows = await pool.fetch(
-        "select s.kind, s.axis, s.member, s.label, s.period_start, s.period_end, s.value,"
+        "select * from (select distinct on (s.kind, s.member, s.period_start, s.period_end)"
+        " s.kind, s.axis, s.member, s.label, s.period_start, s.period_end, s.value,"
         " s.unit, s.subtotal, f.form, f.accession, f.instance_url"
         " from public.segment_revenue s join public.xbrl_filing f on f.id = s.filing_id"
         " where f.ticker = $1 and ($2::text is null or s.kind = $2)"
-        " order by s.period_end desc, s.kind, s.value desc limit $3",
+        " order by s.kind, s.member, s.period_start, s.period_end, f.id desc) latest"
+        " order by period_end desc, kind, value desc limit $3",
         ticker,
         kind,
         rows_n,
@@ -432,7 +462,7 @@ async def corporate_actions(
         "select action_type, ex_date, record_date, payment_date, ratio, cash_amount, currency,"
         " source, source_url, status from public.corporate_action"
         " where symbol = any($1::text[]) and status <> 'rejected' and ex_date >= $2"
-        " order by ex_date desc limit $3",
+        " order by ex_date desc, action_type, id desc limit $3",
         list({_symbol(member), ticker}),
         _today() - dt.timedelta(days=span),
         rows_n,
@@ -531,7 +561,7 @@ async def etf_breakdown(
     top_n = env.clamp_limit(limit, default=10, maximum=25)
     top = await pool.fetch(
         "select name, ticker, isin, weight, sector, country from public.etf_holding"
-        " where snapshot_id = $1 order by weight desc limit $2",
+        " where snapshot_id = $1 order by weight desc, name, isin limit $2",
         snap["id"],
         top_n,
     )

@@ -680,8 +680,9 @@ class ChatTools:
             return {"error": f"unknown tool {name}"}
         try:
             result: dict[str, Any] = await handler(**args)
-        except TypeError as exc:
-            return {"error": f"bad arguments: {exc}"}
+        except (TypeError, AttributeError, ValueError) as exc:
+            # AttributeError: a number where text was expected (`.upper()` on an int).
+            return {"error": f"bad arguments: {str(exc)[:200]}"}
         except asyncpg.DataError as exc:
             # A model-chosen value the database cannot take (an id out of range) is a tool error
             # the model can correct, not a failure of the whole chat job.

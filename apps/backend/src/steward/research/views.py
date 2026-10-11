@@ -26,6 +26,13 @@ def apply_view(body: "ResearchBody", view: View) -> "ResearchBody":
         cap = CONCISE_MODEL_SENTENCES if section.written_by == "model" else CONCISE_CODE_SENTENCES
         sections.append(section.model_copy(update={"sentences": section.sentences[:cap]}))
     cited = {i for s in sections for sentence in s.sentences for i in sentence.source_ids}
+    # Other parts of the report point into the source list too: the thesis proposal's evidence
+    # (taken from every sentence, including detail-only sections) and the flagged sources.
+    if body.thesis_proposal:
+        cited |= {
+            i for c in body.thesis_proposal.changes for line in c.after for i in line.evidence_ids
+        }
+    cited |= set(body.flagged_sources)
     kept = {(s.id, i) for s in sections for i in range(len(s.sentences))}
     return body.model_copy(
         update={

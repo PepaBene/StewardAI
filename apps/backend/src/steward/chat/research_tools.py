@@ -273,6 +273,8 @@ async def fundamentals(
                     lines.append(f"{row.label} {point.value:.4g} ({point.label})")
                 entry["series"] = series
             rows.append(entry)
+        if not rows:
+            continue  # the budget ran out before this group: no empty source for the model to cite
         sid = registry.add(
             "observation",
             f"ratios:{ticker}:{group.id}:{view.input_hash[:12]}",
@@ -640,6 +642,21 @@ async def macro_series(
             "page": {"limit": rows_cap, "truncated": len(found) == rows_cap},
             "note": "Pass series_id to read the observations.",
         }
+    if geo is None:
+        # `distinct on (period)` below would mix countries or providers sharing one series id.
+        variants = await pool.fetch(
+            "select distinct source, geography from public.macro_observation"
+            " where series_id = $1 order by source, geography limit 10",
+            series_id,
+        )
+        if len(variants) > 1:
+            return {
+                "series_id": series_id,
+                "status": "ambiguous",
+                "reason": "this series id exists for several sources or geographies; "
+                "call again with `geography`",
+                "options": [{"source": v["source"], "geography": v["geography"]} for v in variants],
+            }
     rows = await pool.fetch(
         "select distinct on (period) series_id, source, geography, period, value, unit,"
         " unit_multiplier, frequency, vintage, revision, known_at, release_at, source_url"

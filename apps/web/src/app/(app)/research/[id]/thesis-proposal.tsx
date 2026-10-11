@@ -6,6 +6,7 @@ import { useState } from "react";
 import { AlertMessage } from "@/components/alert-message";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type ResearchBody } from "@/lib/api/client";
+import { apiErrorDetail } from "@/lib/evidence/review";
 import {
   acceptOutcome,
   diffLines,
@@ -44,7 +45,7 @@ export function ThesisProposalPanel({ reportId, proposal, review, sources }: Pro
         params: { path: { report_id: reportId } },
         body: { fields: [field] },
       });
-      const detail = error && typeof error === "object" && "detail" in error ? String(error.detail) : null;
+      const detail = apiErrorDetail(error) || null;
       const result = acceptOutcome(response.status, detail, data?.applied ?? [field]);
       setOutcome(result);
       if (result.kind === "applied") setApplied((a) => [...a, field]);

@@ -72,12 +72,9 @@ EVIDENCE_FOR = {
 
 
 def read_only_tools() -> frozenset[str]:
-    """Every catalog tool that only reads: all but those whose sole dataset is `actions`
-    (`propose_job` writes a proposal)."""
-    writes = {d.id for d in catalog.DATASETS if d.id == "actions"}
-    return frozenset(
-        name for name, info in catalog.TOOLS.items() if not set(info.datasets) <= writes
-    )
+    """Every catalog tool that only reads: all but those the catalog marks `writes`
+    (`propose_job` stores a proposal). A new write tool must be flagged there."""
+    return frozenset(name for name, info in catalog.TOOLS.items() if not info.writes)
 
 
 class PlannedCall(BaseModel):

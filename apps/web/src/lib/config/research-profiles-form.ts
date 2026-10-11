@@ -657,13 +657,13 @@ export function isCustomSectionId(id: string, t: TemplateForm): boolean {
 
 /** Add a built-in section at the end. */
 export function addBuiltinSection(t: TemplateForm, id: string): TemplateForm {
-  if (t.sections.some((s) => s.id === id)) return t;
+  if (t.sections.some((s) => s.id === id) || t.sections.length >= BOUNDS.template_sections.max) return t;
   return { ...t, sections: [...t.sections, newTemplateSection(id)] };
 }
 
 /** Add an owner-defined section at the end (the backend allows up to six); its id is made here. */
 export function addCustomSection(t: TemplateForm): TemplateForm {
-  if (t.custom_sections.length >= BOUNDS.custom_sections.max) return t;
+  if (t.custom_sections.length >= BOUNDS.custom_sections.max || t.sections.length >= BOUNDS.template_sections.max) return t;
   const id = uniqueId("custom-section", t.custom_sections.map((c) => c.id));
   return {
     ...t,
@@ -731,7 +731,7 @@ export function validateResearchProfiles(form: ResearchProfilesForm): FieldError
     if (!p.name.trim()) add(`profiles.${i}.name`, "Give the profile a name.");
     else if (p.name.trim().length > BOUNDS.name.max) add(`profiles.${i}.name`, `At most ${BOUNDS.name.max} characters.`);
     if (p.sections.length === 0) add(`profiles.${i}.sections`, "Pick at least one section.");
-    if (!/^(gpt|gemini)-/.test(p.model.trim())) add(`profiles.${i}.model`, "A gpt- or gemini- model id, e.g. gpt-6.1-sol.");
+    if (!/^(gpt|gemini)-[a-z0-9.-]{1,64}$/.test(p.model.trim())) add(`profiles.${i}.model`, "A gpt- or gemini- model id, e.g. gpt-6.1-sol.");
     const steps = intIn(p.max_steps, BOUNDS.max_steps.min, BOUNDS.max_steps.max);
     if (steps) add(`profiles.${i}.max_steps`, steps);
     const searches = intIn(p.max_searches, BOUNDS.max_searches.min, BOUNDS.max_searches.max);

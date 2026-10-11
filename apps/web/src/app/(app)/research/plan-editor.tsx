@@ -4,9 +4,11 @@ import { ArrowDownIcon, ArrowUpIcon, CheckIcon, LoaderCircleIcon, PlayIcon, Tras
 import { useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { useResearchProfiles } from "@/components/research/research-starter";
 import { Blueprint } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { apiErrorDetail } from "@/lib/evidence/review";
 import {
   authorLine,
   isDirty,
@@ -34,6 +36,9 @@ type Planner = "profile" | "model" | "code";
 export function PlanEditor({ initialTicker, onStarted }: { initialTicker: string; onStarted: () => void }) {
   const [ticker, setTicker] = useState(initialTicker);
   const [planner, setPlanner] = useState<Planner>("model");
+  const profiles = useResearchProfiles();
+  const [profile, setProfile] = useState<string | null>(null);
+  const chosenProfile = profile ?? profiles.defaultId;
   const [draft, setDraft] = useState<PlanDraft | null>(null);
   const [questions, setQuestions] = useState<DraftQuestion[]>([]);
   const [busy, setBusy] = useState<"draft" | "save" | "start" | null>(null);
@@ -56,10 +61,10 @@ export function PlanEditor({ initialTicker, onStarted }: { initialTicker: string
     setProblems([]);
     try {
       const { data, error, response } = await getBrowserApiClient().POST("/research/plans", {
-        body: { ticker: ticker.trim().toUpperCase(), planner },
+        body: { ticker: ticker.trim().toUpperCase(), profile: chosenProfile, planner },
       });
       if (data) show(data as unknown as PlanDraft);
-      else setMessage(`The plan could not be drafted (HTTP ${response.status}). ${JSON.stringify(error ?? "")}`.slice(0, 300));
+      else setMessage(`The plan could not be drafted (HTTP ${response.status}). ${apiErrorDetail(error)}`.trim().slice(0, 300));
     } catch (err) {
       setMessage(err instanceof Error ? err.message : String(err));
     } finally {
@@ -77,7 +82,8 @@ export function PlanEditor({ initialTicker, onStarted }: { initialTicker: string
     try {
       const { data, error, response } = await getBrowserApiClient().PATCH("/research/plans/{draft_id}", {
         params: { path: { draft_id: draft.id } },
-        body: { questions: toEdits(questions), approve },
+        // Unchanged questions are not sent, so approving alone does not mark the plan as edited.
+        body: { questions: dirty ? toEdits(questions) : undefined, approve },
       });
       if (data) {
         show(data as unknown as PlanDraft);
@@ -129,6 +135,21 @@ export function PlanEditor({ initialTicker, onStarted }: { initialTicker: string
             onChange={(e) => setTicker(e.target.value)}
             className="h-8 w-40 border border-border bg-surface px-2 font-mono text-sm text-text"
           />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-text-muted">
+          Profile
+          <select
+            value={chosenProfile}
+            onChange={(e) => setProfile(e.target.value)}
+            className="h-8 border border-border bg-surface px-2 text-sm text-text"
+          >
+            {profiles.options.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+                {p.id === profiles.defaultId ? " · default" : ""}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-text-muted">
           Written by
