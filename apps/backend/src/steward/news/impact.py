@@ -267,9 +267,7 @@ def apply_notes(
 
     chains = list(result.chains)
     by_index = {
-        n.path_index: n.text.strip()
-        for n in notes.paths
-        if n.text.strip() and not invented(n.text)
+        n.path_index: n.text.strip() for n in notes.paths if n.text.strip() and not invented(n.text)
     }
     second = [i for i, c in enumerate(chains) if c.relation == "second_order"]
     for idx, chain_pos in enumerate(second):

@@ -1801,7 +1801,7 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
                 items, notes, not_modified = [], [], True
             except (FetchError, httpx.HTTPError, ValueError) as exc:
                 items, notes, error = [], [], str(exc)[:500]
-            except Exception as exc:  # noqa: BLE001 - one bad source must not stop the ingest
+            except Exception as exc:
                 # A parser hitting an unexpected shape (AttributeError, TypeError, KeyError...)
                 # is that source's error, recorded like any other; the other sources still run.
                 logger.exception("news source %s failed", source.id)

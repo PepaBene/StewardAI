@@ -46,12 +46,12 @@ Status: `open`, `fixed`, `rejected` (false positive), `deferred` (reason given).
 | # | Where | Issue | Status |
 |---|---|---|---|
 | L1 | TDnet, HKEX | 20 pages / 3000 rows silently truncated; TDnet page 2+ errors swallowed. | fixed |
-| L2 | `normalize.canonical_url` | Strips `cid`, `ref`, `mod`; distinct articles can collapse. Also accepts non-http schemes. | partly fixed: non-http schemes rejected; cid/ref/mod stripping left (not safely changeable) |
+| L2 | `normalize.canonical_url` | Strips `cid`, `ref`, `mod`; distinct articles can collapse. Also accepts non-http schemes. | fixed: non-http schemes rejected; `cid`, `ref`, `mod` are stripped only when the value is not purely numeric |
 | L3 | NSM matching | Names under 4 chars (BP, BT) and "P.L.C." variants never match. | fixed |
 | L4 | `code_key` | Japanese alphanumeric stock codes collapse. | fixed |
 | L5 | `store_items` | Duplicate URL keeps first source's tier, not best. | fixed |
 | L6 | `store_items:951-1004` | Orphan `story_cluster` when item insert conflicts. | fixed |
-| L7 | simhash grouping | Cross-run grouping skips older late arrivals. | deferred: not addressed |
+| L7 | simhash grouping | Cross-run grouping skips older late arrivals. | fixed: any ungrouped item in the window can join an earlier copy, so a late older article groups with the newer copy from an earlier run |
 | L8 | `threads.py:205-209` | `record_update` reopens closed threads; concurrent runs can duplicate threads. | fixed |
 | L9 | `triage.py` | Items rejected by `check` stay untriaged and are re-sent for 48 h. | fixed |
 | L10 | brief/alert text | Feed-controlled text goes into notifications unescaped/unbounded. | fixed |
@@ -74,14 +74,14 @@ Status: `open`, `fixed`, `rejected` (false positive), `deferred` (reason given).
 | W6 | ops, disputed, news-view | Old data under changed filter, no loading state. | fixed |
 | W7 | `story-view.tsx:194,388` | `key={c.claim}` / `key={t}` collisions. | fixed |
 | W8 | `jobs-form.ts:1318` | `analysis_techniques` not lower-cased. | fixed |
-| W9 | storyDay/storyTime | Browser time zone, not market date. | deferred (display choice) |
-| W10 | citation spans | Plain text, not linked to the item. | deferred: needs backend route work |
+| W9 | storyDay/storyTime | Browser time zone, not market date. | not a defect: the price-reaction day is the owner local day by design; the backend uses a per-country close |
+| W10 | citation spans | Plain text, not linked to the item. | fixed: quoted spans link to the evidence item on the Story page |
 
 ## Tests that give false confidence
 
 | # | Where | Issue | Status |
 |---|---|---|---|
-| T1 | `test_news_n6_db.py:175-227` | Fake LLM returns empty framing/claims/notes; only extraction, novelty, thread rows asserted. No coverage of impact, framing, claims, thesis, market, themes saves. | deferred: needs a multi-outlet story fixture; golden sets cover the verification code |
+| T1 | `test_news_n6_db.py:175-227` | Fake LLM returns empty framing/claims/notes; only extraction, novelty, thread rows asserted. No coverage of impact, framing, claims, thesis, market, themes saves. | fixed: framing (quotes, invented-figure cause and conflict dropped) and claim check saves are asserted; impact notes are not (needs an exposure graph fixture) |
 | T2 | tests | No coverage of `resolve_quiet_stories`, `alert_brief`, `fetch_gdelt`, `write_theme_briefs`, `extract_batched`, sentiment job path. | fixed: tests added for alert_brief, fetch_gdelt, event_day_of, centroid, framing numbers, like_pattern, resolve_quiet_stories, theme narratives, sentiment job path, batched extraction |
 | T3 | `test_news_n3_db.py:157` | Lead is wire-only so zero alerts is trivial. | fixed |
 | T4 | `test_news_wire_db.py:136` | `health == "down" or backoff_until <= now` likely always true. | fixed |

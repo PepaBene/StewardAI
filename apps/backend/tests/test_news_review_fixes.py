@@ -69,7 +69,9 @@ class Story:
 def test_framing_free_text_with_invented_numbers_is_dropped() -> None:
     raw = FramingComparison(
         outlets=[
-            OutletFraming(item_id=1, headline_claim="Alpha agrees a 12bn deal", emphasised_cause="7 rounds"),
+            OutletFraming(
+                item_id=1, headline_claim="Alpha agrees a 12bn deal", emphasised_cause="7 rounds"
+            ),
             OutletFraming(item_id=2, headline_claim="Alpha deal confirmed"),
             OutletFraming(item_id=2, headline_claim="dup"),
         ],
@@ -177,3 +179,15 @@ async def test_fetch_gdelt_stops_at_the_first_failure_and_stores_nothing_for_it(
     )
     assert out["themes"] == [] and len(out["errors"]) == 1 and stored == []
     assert json.dumps(out)
+
+
+def test_canonical_url_keeps_numeric_article_ids_but_strips_word_tracking() -> None:
+    from steward.news.normalize import canonical_url
+
+    assert canonical_url("https://x.test/a?cid=1&utm_source=t") != canonical_url(
+        "https://x.test/a?cid=2&utm_source=t"
+    )
+    assert canonical_url("https://x.test/a?ref=rss") == canonical_url("https://x.test/a")
+    assert canonical_url("https://x.test/a?mod=twitter&id=7") == canonical_url(
+        "https://x.test/a?id=7"
+    )

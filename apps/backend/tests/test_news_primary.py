@@ -396,5 +396,7 @@ async def test_tdnet_error_on_a_later_page_is_reported() -> None:
         return httpx.Response(500)
 
     async with client(handler) as http:
-        result = await collect_tdnet(http, "tdnet", [holding("X_JP_EQ", "JP", "7603")], RULES, TODAY)
+        result = await collect_tdnet(
+            http, "tdnet", [holding("X_JP_EQ", "JP", "7603")], RULES, TODAY
+        )
     assert any("page 2" in e for e in result.errors)

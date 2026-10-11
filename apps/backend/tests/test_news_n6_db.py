@@ -3,6 +3,7 @@ idempotence, the briefs, and the read side the pages use."""
 
 import datetime as dt
 import json
+import re
 from collections.abc import AsyncIterator
 from types import SimpleNamespace
 from typing import Any
@@ -77,7 +78,49 @@ async def http(feeds: Feeds) -> AsyncIterator[httpx.AsyncClient]:
 class FakeAnalysisLLM:
     """Answers each schema from the request itself: the first item of the story, quoted."""
 
-    def __init__(self, bad_span: bool = False, budget_after: int | None = None) -> None:
+    def framing(self, request: Any) -> FramingComparison:
+        """Each outlet's headline claim and a quote, plus one cause that invents a figure."""
+        items = json.loads(request.messages[0].text.split("Items:\n", 1)[1])
+        assert len(items) >= 2
+        return FramingComparison.model_validate(
+            {
+                "outlets": [
+                    {
+                        "item_id": it["item_id"],
+                        "headline_claim": it["text"][:40],
+                        "emphasised_cause": "A $999 billion shock" if n == 0 else "Cheap financing",
+                        "quotes": [it["text"][:25], "a quote that is nowhere"],
+                    }
+                    for n, it in enumerate(items)
+                ],
+                "agreement": "conflict",
+                "conflicts": ["The outlets disagree on the price.", "It is worth $777 trillion."],
+            }
+        )
+
+    @staticmethod
+    def verdicts(request: Any) -> ClaimVerdicts:
+        """Claim 0 supported by the first primary document, quoting its first words."""
+        text = request.messages[0].text
+        match = re.search(r"\[item (\d+)\][^\n]*\n([^\n]+)", text)
+        assert match is not None
+        return ClaimVerdicts.model_validate(
+            {
+                "verdicts": [
+                    {
+                        "claim_index": 0,
+                        "verdict": "supported",
+                        "primary_item_id": int(match.group(1)),
+                        "quote": match.group(2)[:30],
+                    }
+                ]
+            }
+        )
+
+    def __init__(
+        self, bad_span: bool = False, budget_after: int | None = None, rich: bool = False
+    ) -> None:
+        self.rich = rich
         self.calls: list[str] = []
         self.batches: list[int] = []
         self.bad_span = bad_span
@@ -152,9 +195,13 @@ class FakeAnalysisLLM:
         elif request.schema is ImpactNotes:
             parsed = ImpactNotes()
         elif request.schema is FramingComparison:
-            parsed = FramingComparison(outlets=[], agreement="agree")
+            parsed = (
+                self.framing(request)
+                if self.rich
+                else FramingComparison(outlets=[], agreement="agree")
+            )
         elif request.schema is ClaimVerdicts:
-            parsed = ClaimVerdicts()
+            parsed = self.verdicts(request) if self.rich else ClaimVerdicts()
         else:
             raise AssertionError(name)
         return SimpleNamespace(
@@ -407,6 +454,49 @@ async def test_batched_extraction_sends_the_stories_as_one_batch(
 
     assert (await analysis_rows(backend_pool))["extraction"] == stories
     assert llm.batches == [stories]
+
+
+async def test_framing_and_claim_checks_are_saved_with_only_their_verified_parts(
+    backend_pool: asyncpg.Pool, feeds: Feeds, http: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await prepare(
+        backend_pool,
+        feeds,
+        http,
+        ["extraction", "framing", "claims"],
+        {"framing_min_outlets": 2},
+    )
+    monkeypatch.setattr(analysis_job, "make_llm", lambda: FakeAnalysisLLM(rich=True))
+
+    assert await analyse(backend_pool) == "succeeded"
+
+    rows = await analysis_rows(backend_pool)
+    assert rows.get("framing", 0) >= 1 and rows.get("claims", 0) >= 1
+
+    # Framing: only the story with two independent outlets (Reuters and CNBC) is compared.
+    deal = await backend_pool.fetchval(
+        "select id from story_cluster where headline like 'Microsoft to acquire%'"
+    )
+    framing = await latest_analysis(backend_pool, deal, "framing")
+    assert framing is not None and len(framing["outlets"]) == 2
+    for outlet in framing["outlets"]:
+        assert outlet["quotes"] and all("nowhere" not in q for q in outlet["quotes"])
+    # The cause that invents "$999 billion" is dropped, the plain one is kept.
+    causes = [o["emphasised_cause"] for o in framing["outlets"]]
+    assert causes.count(None) == 1 and "Cheap financing" in causes
+    # The conflict with an invented figure is dropped; the plain one is kept.
+    assert framing["conflicts"] == ["The outlets disagree on the price."]
+    assert framing["agreement"] == "conflict"
+
+    # Claims: checked against the story's primary document (Apple's own release, tier 1).
+    guidance = await backend_pool.fetchval(
+        "select id from story_cluster where headline like 'Apple cuts full-year guidance%'"
+    )
+    claims = await latest_analysis(backend_pool, guidance, "claims")
+    assert claims is not None and len(claims["claims"]) == 1
+    checked = claims["claims"][0]
+    assert checked["verdict"] == "supported"
+    assert checked["primary_url"] == "https://ir.apple.test/n/1" and checked["quote"]
 
 
 async def test_quiet_confirmed_stories_resolve_and_others_do_not(

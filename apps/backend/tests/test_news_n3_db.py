@@ -202,3 +202,45 @@ async def test_an_ai_search_lead_is_stored_at_tier_three_and_never_alerts(
         " where j.job_type = 'news_ai_search' and s.name = 'search'"
     )
     assert cost == 1
+
+
+async def test_a_late_older_copy_pulls_in_the_newer_copy_stored_in_an_earlier_run(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    from steward.news.dedupe import group_by_simhash
+
+    await backend_pool.execute(
+        "insert into public.source (id, name, tier, type) values ('wire-a', 'Wire A', 2, 'rss')"
+    )
+    published = dt.datetime(2026, 10, 10, 9, 0, tzinfo=dt.UTC)
+    since = published - dt.timedelta(days=1)
+    for job_type in ("news_ingest", "news_ingest"):
+        await backend_pool.execute(
+            "insert into public.job (job_type, trigger) values ($1, 'manual')", job_type
+        )
+    jobs = [r["id"] for r in await backend_pool.fetch("select id from public.job order by id")]
+
+    async def article(url: str, at: dt.datetime, job: int) -> int:
+        return int(
+            await backend_pool.fetchval(
+                "insert into public.news_article (url, source_id, tier, published_at, headline,"
+                " simhash, job_id) values ($1, 'wire-a', 2, $2, 'Same text', 12345, $3)"
+                " returning id",
+                url,
+                at,
+                job,
+            )
+        )
+
+    newer = await article("https://wire.test/new", published + dt.timedelta(hours=2), jobs[0])
+    # An earlier run grouped nothing: the newer copy was alone then.
+    assert await group_by_simhash(backend_pool, jobs[0], since) == 0
+    older = await article("https://wire.test/old", published, jobs[1])
+
+    assert await group_by_simhash(backend_pool, jobs[1], since) == 1
+
+    groups = {
+        r["id"]: r["group_id"]
+        for r in await backend_pool.fetch("select id, group_id from public.news_article")
+    }
+    assert groups[newer] == older and groups[older] == older

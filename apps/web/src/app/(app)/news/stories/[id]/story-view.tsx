@@ -156,7 +156,7 @@ export function StoryView({ id }: { id: number }) {
       >
         <ul className="m-0 list-none divide-y divide-border p-0">
           {evidence.items.map((item) => (
-            <li key={item.id} className="space-y-1 py-2 text-sm">
+            <li key={item.id} id={`item-${item.id}`} className="space-y-1 py-2 text-sm">
               <p className="flex flex-wrap items-center gap-x-2 text-xs text-text-muted">
                 <TierBadge tier={item.tier} />
                 <span>{item.outlet ?? "Unknown outlet"}</span>
@@ -204,12 +204,23 @@ export function StoryView({ id }: { id: number }) {
           Config, Jobs, News.
         </EmptyState>
       ) : null}
-      {analysis ? <AnalysisPanels analysis={analysis} /> : null}
+      {analysis ? <AnalysisPanels analysis={analysis} items={evidence.items} /> : null}
     </div>
   );
 }
 
-function AnalysisPanels({ analysis }: { analysis: StoryAnalysis }) {
+/** Which stored item a quoted span comes from: the outlet, linked to that item in the Evidence list. */
+function ItemRef({ id, items }: { id: number; items: StoryEvidence["items"] }) {
+  const item = items.find((i) => i.id === id);
+  if (!item) return <span>(item {id})</span>;
+  return (
+    <a href={`#item-${id}`} className="hover:text-accent-ink hover:underline">
+      ({item.outlet ?? `item ${id}`})
+    </a>
+  );
+}
+
+function AnalysisPanels({ analysis, items }: { analysis: StoryAnalysis; items: StoryEvidence["items"] }) {
   const { extraction, novelty, impact, thread, framing, claims, market, thesis, sentiment } = analysis;
   return (
     <>
@@ -228,7 +239,7 @@ function AnalysisPanels({ analysis }: { analysis: StoryAnalysis }) {
                   <NewsFeedback target="claim" targetId={`${analysis.story_id}:${i}`} label={`claim “${c.text}”`} />
                 </p>
                 <blockquote className="border-l-2 border-border pl-3 text-xs text-text-muted [overflow-wrap:anywhere]">
-                  &ldquo;{c.span}&rdquo; (item {c.item_id})
+                  &ldquo;{c.span}&rdquo; <ItemRef id={c.item_id} items={items} />
                 </blockquote>
               </li>
             ))}
@@ -309,7 +320,7 @@ function AnalysisPanels({ analysis }: { analysis: StoryAnalysis }) {
                   <span className="num text-xs text-text-muted">strength {a.strength.toFixed(2)}</span>
                 </p>
                 <blockquote className="border-l-2 border-border pl-3 text-xs text-text-muted [overflow-wrap:anywhere]">
-                  &ldquo;{a.span}&rdquo; (item {a.item_id})
+                  &ldquo;{a.span}&rdquo; <ItemRef id={a.item_id} items={items} />
                 </blockquote>
               </li>
             ))}
@@ -356,7 +367,7 @@ function AnalysisPanels({ analysis }: { analysis: StoryAnalysis }) {
           <ul className="m-0 list-none space-y-1 p-0 text-sm">
             {framing.outlets.map((o) => (
               <li key={o.item_id}>
-                <span className="text-text-muted">Item {o.item_id}:</span> {o.headline_claim}
+                <span className="text-text-muted"><ItemRef id={o.item_id} items={items} />:</span> {o.headline_claim}
                 {o.emphasised_cause ? <span className="text-text-muted"> (emphasises {o.emphasised_cause})</span> : null}
                 {o.omitted.length > 0 ? <span className="text-text-muted"> (leaves out {o.omitted.join("; ")})</span> : null}
               </li>

@@ -137,13 +137,15 @@ def test_a_translation_must_keep_every_number() -> None:
     assert numbers_in("5億円") == []
     assert (
         check_translation(
-            source("Umsatz 12bn"), TranslatedItem(index=0, headline_en="x 12 billion", summary_en=None)
+            source("Umsatz 12bn"),
+            TranslatedItem(index=0, headline_en="x 12 billion", summary_en=None),
         )
         is not None
     )
     assert (
         check_translation(
-            source("Umsatz 1.5bn"), TranslatedItem(index=0, headline_en="x 15 billion", summary_en=None)
+            source("Umsatz 1.5bn"),
+            TranslatedItem(index=0, headline_en="x 15 billion", summary_en=None),
         )
         is None
     )

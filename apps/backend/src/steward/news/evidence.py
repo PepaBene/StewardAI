@@ -91,7 +91,7 @@ _CORRECTION = re.compile(
     # colon or dash): "market correction" and "price correction" are ordinary news words.
     r"[(\[]\s*(?:correction|corrected)\b|"
     r"(?<!market )(?<!stock )(?<!price )(?<!bond )(?<!equity )"
-    r"\b(?:correction|corrected)\s*[:–—-]|"
+    r"\b(?:correction|corrected)\s*[:–—-]|"  # noqa: RUF001 - en and em dash are the point
     r"\b(retract(?:s|ed|ion)?|amended|restated|berichtigung|rectificatif)\b|訂正|更正|정정",
     re.IGNORECASE,
 )

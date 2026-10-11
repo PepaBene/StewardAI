@@ -46,7 +46,9 @@ async def group_by_simhash(pool: asyncpg.Pool, job_id: int, since: dt.datetime) 
         value = to_unsigned(r["simhash"])
         article_id = r["id"]
         group_of[article_id] = r["group_id"] or article_id
-        if r["job_id"] == job_id and r["group_id"] is None:
+        # Any ungrouped item in the window, not only this run's: a late-arriving older article
+        # is indexed before the newer copy stored in an earlier run, which must still join it.
+        if r["group_id"] is None:
             matches = index.matches(value)
             if matches:
                 # Nearest earlier item; join its group (the earliest member's id).

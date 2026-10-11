@@ -99,7 +99,9 @@ def _canonical_number(raw: str) -> str:
     parts = _SEPARATOR.split(raw)
     if len(parts) == 1:
         whole, frac = parts[0], ""
-    elif len(parts[-1]) == 3 and parts[0] not in {"0", "00"} and all(len(p) == 3 for p in parts[1:]):
+    elif (
+        len(parts[-1]) == 3 and parts[0] not in {"0", "00"} and all(len(p) == 3 for p in parts[1:])
+    ):
         whole, frac = "".join(parts), ""  # "1,500" and "1.500" are thousands groups
     else:
         whole, frac = "".join(parts[:-1]), parts[-1]
