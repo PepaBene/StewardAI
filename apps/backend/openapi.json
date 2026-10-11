@@ -78892,7 +78892,8 @@
                 "items": {
                   "$ref": "#/components/schemas/QuestionEdit"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 50
               },
               {
                 "type": "null"
@@ -83817,6 +83818,7 @@
           },
           "question": {
             "type": "string",
+            "maxLength": 2000,
             "title": "Question"
           },
           "label": {
@@ -83836,12 +83838,14 @@
               "type": "string"
             },
             "type": "array",
+            "maxItems": 20,
             "title": "Source Groups"
           },
           "web_intent": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 1000
               },
               {
                 "type": "null"
@@ -103000,6 +103004,7 @@
               ]
             },
             "type": "array",
+            "maxItems": 10,
             "minItems": 1,
             "title": "Fields",
             "description": "The fields to apply."

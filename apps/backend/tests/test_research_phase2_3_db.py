@@ -217,9 +217,9 @@ async def test_the_proposal_is_a_diff_and_accepting_it_saves_a_new_version(
     note = await backend_pool.fetchval("select note from config_version where id = $1", after.id)
     assert f"research report #{report_id}" in note
 
-    # the report was made against the old version: a second accept is stale and refused
+    # a field that has changed since the report was made is stale and refused
     stale = await api.post(
-        f"/research/{report_id}/thesis-proposal/accept", json={"fields": ["why_owned"]}
+        f"/research/{report_id}/thesis-proposal/accept", json={"fields": ["pre_mortem"]}
     )
     assert stale.status_code == 409 and "run the research again" in stale.json()["detail"]
 
