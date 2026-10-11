@@ -12,13 +12,33 @@ from pydantic import BaseModel, Field
 from api.auth import Owner
 from api.db import IdPath, Pool
 from api.routes import BaseVersionParam, NoteParam, _as_dict, _enqueue, _not_found, save_versioned
+from steward.ai import AINotConfigured
 from steward.config import ResearchProfilesConfig, ThesesConfig
+from steward.config.research import ResearchProfile
 from steward.config.store import load_active
+from steward.config.verification import VerificationConfig
+from steward.llm.client import create_llm
+from steward.llm.routing import routing_client
 from steward.portfolio.read import JobSummary
+from steward.research.layout import resolve_layout
+from steward.research.model_plan import (
+    Draft,
+    LLMResearchPlanner,
+    PlanProblem,
+    QuestionEdit,
+    ResearchPlanner,
+    apply_edits,
+    create_draft,
+    get_draft,
+    make_plan,
+    save_draft,
+)
+from steward.research.plan import ResearchPlan, build_plan
 from steward.research.retention import purge_old_traces, purge_report_trace, set_claim_review
 from steward.research.run import ResearchBody, render_md
 from steward.research.views import apply_view
 from steward.review.monthly import ReviewBody
+from steward.settings import get_settings
 from steward.thesis.proposal import ProposalError, ProposalField, apply_changes, replace_thesis
 
 router = APIRouter()
@@ -53,6 +73,166 @@ async def run_research_now(body: ResearchRequest, pool: Pool, owner: Owner) -> J
     if body.name:
         params["name"] = body.name
     return await _enqueue(pool, "research", owner.user_id, params)
+
+
+class PlanDraftRequest(BaseModel):
+    ticker: Annotated[str, Field(pattern=r"^[A-Za-z0-9._-]{1,32}$")]
+    profile: str | None = Field(
+        default=None, description="Research profile id; default if omitted."
+    )
+    name: str | None = Field(default=None, max_length=120, description="Company name hint.")
+    planner: Literal["profile", "model", "code"] = Field(
+        default="profile",
+        description="profile: the profile's `planning` setting; model: ask a model (falls back "
+        "to the code plan with the reason); code: the code-built plan.",
+    )
+
+
+class PlanDraftEdit(BaseModel):
+    questions: list[QuestionEdit] | None = Field(
+        default=None,
+        description="The whole question list in the order wanted; one left out is removed.",
+    )
+    approve: bool = Field(default=False, description="Approve the plan as it now stands.")
+
+
+class PlanDraftOut(BaseModel):
+    id: int
+    ticker: str
+    profile: str
+    name: str | None
+    status: Literal["draft", "approved", "started", "discarded"]
+    edited: bool
+    planner_note: str | None
+    plan: ResearchPlan
+    job_id: int | None
+
+
+def _draft_out(d: Draft) -> PlanDraftOut:
+    return PlanDraftOut(
+        id=d.id,
+        ticker=d.ticker,
+        profile=d.profile,
+        name=d.name,
+        status=d.status,  # type: ignore[arg-type]
+        edited=d.edited,
+        planner_note=d.planner_note,
+        plan=d.plan,
+        job_id=d.job_id,
+    )
+
+
+async def make_planner(pool: Pool, profile: ResearchProfile) -> ResearchPlanner | None:
+    """The model planner for a draft, or None when no provider key is set."""
+    try:
+        client = routing_client(create_llm(get_settings()))
+    except AINotConfigured:
+        return None
+    verification = await load_active(pool, "verification", VerificationConfig)
+    cheap = (verification.body if verification else VerificationConfig()).claim_verifier.model
+    return LLMResearchPlanner(client, profile.planner_model or cheap)
+
+
+async def _draft_or_404(pool: Pool, draft_id: int) -> Draft:
+    draft = await get_draft(pool, draft_id)
+    if draft is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No plan draft {draft_id}")
+    return draft
+
+
+@router.post("/research/plans", tags=["research"], status_code=status.HTTP_201_CREATED)
+async def create_plan_draft(body: PlanDraftRequest, pool: Pool, _owner: Owner) -> PlanDraftOut:
+    """Write a research plan for a ticker and profile without running it: by a model when the
+    profile (or `planner`) asks, else by code. The owner can edit and approve it, then start
+    the run from it."""
+    stored = await load_active(pool, "research_profiles", ResearchProfilesConfig)
+    profiles = stored.body if stored else ResearchProfilesConfig()
+    profile = profiles.get(body.profile)
+    if profile is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"No profile {body.profile!r}")
+    layout = resolve_layout(profile, profiles.template_for(profile))
+    name = body.name or body.ticker
+    code_plan = build_plan(
+        profile, layout, ticker=body.ticker, name=name, today=dt.datetime.now(dt.UTC).date()
+    )
+    use_model = body.planner == "model" or (
+        body.planner == "profile" and profile.planning == "model"
+    )
+    planner = await make_planner(pool, profile) if use_model else None
+    plan, result = await make_plan(code_plan, profile, planner, name=name, use_model=use_model)
+    usage: dict[str, Any] = (
+        {
+            "model": result.usage.model,
+            "input_tokens": result.usage.input_tokens,
+            "output_tokens": result.usage.output_tokens,
+            "ms": result.ms,
+        }
+        if result
+        else {}
+    )
+    draft = await create_draft(
+        pool, body.ticker, profile.id, body.name, plan, plan.fallback_reason, usage
+    )
+    return _draft_out(draft)
+
+
+@router.get("/research/plans/{draft_id}", tags=["research"])
+async def get_plan_draft(draft_id: IdPath, pool: Pool, _owner: Owner) -> PlanDraftOut:
+    return _draft_out(await _draft_or_404(pool, draft_id))
+
+
+@router.patch("/research/plans/{draft_id}", tags=["research"])
+async def edit_plan_draft(
+    draft_id: IdPath, body: PlanDraftEdit, pool: Pool, _owner: Owner
+) -> PlanDraftOut:
+    """Edit a draft (reorder, remove, relabel, reword, toggle source groups) under the same
+    checks as a model plan, and/or approve it. Any edit withdraws an earlier approval unless
+    `approve` is sent with it. A started draft is final."""
+    draft = await _draft_or_404(pool, draft_id)
+    if draft.status in ("started", "discarded"):
+        raise HTTPException(status.HTTP_409_CONFLICT, f"The draft is {draft.status}")
+    stored = await load_active(pool, "research_profiles", ResearchProfilesConfig)
+    profile = (stored.body if stored else ResearchProfilesConfig()).get(draft.profile)
+    if profile is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Profile {draft.profile!r} no longer exists")
+    plan = draft.plan
+    edited = draft.edited
+    if body.questions is not None:
+        try:
+            plan = apply_edits(plan, body.questions, profile)
+        except PlanProblem as exc:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, {"problems": exc.problems}
+            ) from exc
+        edited = True
+    saved = await save_draft(pool, draft_id, plan, "approved" if body.approve else "draft", edited)
+    return _draft_out(saved)
+
+
+@router.post(
+    "/research/plans/{draft_id}/start", tags=["research"], status_code=status.HTTP_202_ACCEPTED
+)
+async def start_from_plan(draft_id: IdPath, pool: Pool, owner: Owner) -> JobSummary:
+    """Queue the research run for an approved draft. The run uses exactly this plan and stores
+    it with the report, with whether the owner edited it."""
+    draft = await _draft_or_404(pool, draft_id)
+    if draft.status != "approved":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Approve the plan before starting the run")
+    params: dict[str, Any] = {
+        "ticker": draft.ticker,
+        "profile": draft.profile,
+        "plan_draft_id": draft.id,
+    }
+    if draft.name:
+        params["name"] = draft.name
+    job = await _enqueue(pool, "research", owner.user_id, params)
+    await pool.execute(
+        "update public.research_plan_draft set status = 'started', job_id = $2, updated_at = now()"
+        " where id = $1",
+        draft.id,
+        job.id,
+    )
+    return job
 
 
 class ResearchSummary(BaseModel):
@@ -199,6 +379,9 @@ class TracePurged(BaseModel):
     urls: int = Field(description="Discovered-URL records removed from the report.")
     checkpoints: int = Field(description="Step checkpoints deleted (the job cannot resume).")
     traces: int = Field(description="Tool traces removed from step details.")
+    report_traces: int = Field(
+        default=0, description="Per-call run traces removed from stored report bodies."
+    )
 
 
 class ClaimReview(BaseModel):

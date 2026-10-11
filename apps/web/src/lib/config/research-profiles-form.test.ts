@@ -393,6 +393,7 @@ describe("web default profiles and templates match the backend defaults", () => 
       max_rounds: 1,
       min_sentences: 2,
       authoring: "research_only",
+      planning: "code",
     });
     const pick = (p: ReturnType<typeof profile>) => ({
       mode: p.mode,

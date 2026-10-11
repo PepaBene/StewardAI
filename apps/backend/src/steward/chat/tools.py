@@ -17,8 +17,9 @@ from typing import Any
 import asyncpg
 import httpx
 
-from steward.chat import analytics_tools, research_tools
+from steward.chat import analytics_tools, data_tools, research_tools
 from steward.chat.analytics_tools import SELECTOR_KINDS
+from steward.chat.data_tool_defs import DATA_TOOL_DEFINITIONS
 from steward.chat.envelope import neutralise_tree, stamp
 from steward.chat.research_tools import EVIDENCE_SECTIONS, RISK_KINDS
 from steward.config.research import ResearchProfilesConfig
@@ -458,12 +459,14 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "covered company: margins, returns, growth, leverage, valuation multiples, with the "
         "latest value, its period and currency, its formula and the company's own five-year "
         "median. A ratio with no value says why. Pass `groups` (ids from an earlier call) to "
-        "narrow it.",
+        "narrow it. Pass `periods` (1-8) to get each ratio's last N values as a series "
+        "(fewer ratios are then returned).",
         "input_schema": {
             "type": "object",
             "properties": {
                 "ticker": {"type": "string"},
                 "groups": {"type": "array", "items": {"type": "string"}},
+                "periods": {"type": "integer", "description": "Series length, 1-8 (optional)."},
             },
             "required": ["ticker"],
             "additionalProperties": False,
@@ -486,10 +489,15 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "name": "price_history",
         "description": "Closing prices of one covered ticker over the last N days (default "
         "365, at most 3650), thinned to at most 120 points, with the change over the window, "
-        "high, low and deepest drawdown computed in code over every stored close.",
+        "high, low and deepest drawdown computed in code over every stored close. Pass "
+        "`benchmark` (another covered ticker) for the return against it over the same days.",
         "input_schema": {
             "type": "object",
-            "properties": {"ticker": {"type": "string"}, "days": {"type": "integer"}},
+            "properties": {
+                "ticker": {"type": "string"},
+                "days": {"type": "integer"},
+                "benchmark": {"type": "string", "description": "Covered ticker, optional."},
+            },
             "required": ["ticker"],
             "additionalProperties": False,
         },
@@ -569,6 +577,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "stale, and the provider coverage states. Check it before relying on recent data.",
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
+    *DATA_TOOL_DEFINITIONS,
     {
         "name": "propose_job",
         "description": "Propose starting a job: re-run a holding's earnings check, start a "
@@ -691,15 +700,67 @@ class ChatTools:
         )
 
     async def _tool_fundamentals(
-        self, ticker: str, groups: list[str] | None = None
+        self, ticker: str, groups: list[str] | None = None, periods: int | None = None
     ) -> dict[str, Any]:
-        return await research_tools.fundamentals(self.pool, self.registry, ticker, groups)
+        return await research_tools.fundamentals(self.pool, self.registry, ticker, groups, periods)
 
     async def _tool_valuation_scenarios(self, ticker: str) -> dict[str, Any]:
         return await research_tools.valuation_scenarios(self.pool, self.registry, ticker)
 
-    async def _tool_price_history(self, ticker: str, days: int = 365) -> dict[str, Any]:
-        return await research_tools.price_history(self.pool, self.registry, ticker, days)
+    async def _tool_price_history(
+        self, ticker: str, days: int = 365, benchmark: str | None = None
+    ) -> dict[str, Any]:
+        return await research_tools.price_history(self.pool, self.registry, ticker, days, benchmark)
+
+    async def _tool_fx_rates(
+        self, currency: str, days: int = 30, limit: int = 10
+    ) -> dict[str, Any]:
+        return await data_tools.fx_rates(self.pool, self.registry, currency, days, limit)
+
+    async def _tool_latest_quote(self, ticker: str) -> dict[str, Any]:
+        return await data_tools.latest_quote(self.pool, self.registry, ticker)
+
+    async def _tool_listing_liquidity(self, ticker: str) -> dict[str, Any]:
+        return await data_tools.listing_liquidity(self.pool, self.registry, ticker)
+
+    async def _tool_statement_lines(
+        self,
+        ticker: str,
+        statement: str | None = None,
+        concept: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        return await data_tools.statement_lines(
+            self.pool, self.registry, ticker, statement, concept, limit
+        )
+
+    async def _tool_share_counts(self, ticker: str) -> dict[str, Any]:
+        return await data_tools.share_counts(self.pool, self.registry, ticker)
+
+    async def _tool_segment_revenue(
+        self, ticker: str, kind: str | None = None, limit: int = 20
+    ) -> dict[str, Any]:
+        return await data_tools.segment_revenue(self.pool, self.registry, ticker, kind, limit)
+
+    async def _tool_corporate_actions(
+        self, ticker: str, days: int = 730, limit: int = 20
+    ) -> dict[str, Any]:
+        return await data_tools.corporate_actions(self.pool, self.registry, ticker, days, limit)
+
+    async def _tool_peers(self, ticker: str) -> dict[str, Any]:
+        return await data_tools.peers(self.pool, self.registry, ticker)
+
+    async def _tool_etf_breakdown(self, fund_isin: str, limit: int = 10) -> dict[str, Any]:
+        return await data_tools.etf_breakdown(self.pool, self.registry, fund_isin, limit)
+
+    async def _tool_fund_nav(self, fund_isin: str, limit: int = 8) -> dict[str, Any]:
+        owner = await self._owner()
+        if owner is None:
+            return {"error": "this conversation has no owner"}
+        return await data_tools.fund_nav(self.pool, self.registry, owner, fund_isin, limit)
+
+    async def _tool_coverage_review(self, limit: int = 25) -> dict[str, Any]:
+        return await data_tools.coverage_review(self.pool, limit)
 
     async def _tool_macro_series(
         self,

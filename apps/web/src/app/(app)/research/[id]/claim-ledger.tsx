@@ -4,6 +4,9 @@ import type { ResearchBody } from "@/lib/api/client";
 import {
   balanceLines,
   claimTypeLabel,
+  COMPLIANCE_LABELS,
+  complianceLine,
+  complianceOf,
   confidenceLabel,
   coverageNotices,
   flaggedSourceWarnings,
@@ -103,10 +106,26 @@ export function ClaimLedger({ reportId, body }: { reportId: number; body: Resear
                     </span>
                   </th>
                   <td className="py-1 pr-2">
-                    {strategyStatusLabel(s.status)}
-                    <span className="block text-text-muted">{s.formal ? "formal check" : "from the text"}</span>
+                    {complianceOf(s) ? COMPLIANCE_LABELS[complianceOf(s)!.status] : strategyStatusLabel(s.status)}
+                    <span className="block text-text-muted">
+                      {complianceOf(s) ? "rule engine check" : s.formal ? "formal check" : "from the text"}
+                    </span>
                   </td>
-                  <td className="py-1">{s.evidence ?? <span className="text-text-muted">none</span>}</td>
+                  <td className="py-1">
+                    {complianceOf(s) ? (
+                      <>
+                        {complianceLine(complianceOf(s)!)}
+                        {complianceOf(s)!.status !== "unknown" && complianceOf(s)!.status !== "pass" ? (
+                          <span className="block text-text-muted">{complianceOf(s)!.reason}</span>
+                        ) : null}
+                      </>
+                    ) : (
+                      (s.evidence ?? <span className="text-text-muted">none</span>)
+                    )}
+                    {(s.named_by?.length ?? 0) > 0 ? (
+                      <span className="block text-text-muted">Named in {s.named_by?.length} claim{s.named_by?.length === 1 ? "" : "s"} of the report (its reading, kept apart from the check)</span>
+                    ) : null}
+                  </td>
                 </tr>
               ))}
             </tbody>

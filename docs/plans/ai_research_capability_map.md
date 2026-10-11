@@ -22,19 +22,19 @@ and `retrieved_at`. Tools added in phase 1 also report each figure in the shared
 |---|---|---|---|---|
 | Portfolio positions, cash, allocation and drift | `account_snapshot`, `position_snapshot`, `instrument` | `portfolio_overview`, `holding`, `over_cap_positions`, `theme_exposure` | daily sync | none |
 | Orders, dividends and cash movements | `transaction`, `transaction_fee` | `transactions`, `decision_scorecard`, `performance_explain` | daily sync | none |
-| Daily closes, quotes and FX | `price_bar`, `market_quote`, `fx_rate` | `price_history` | daily; quotes intraday | FX rates and intraday quotes are not exposed as their own tool. |
-| Filed statements and the ratios computed from them | `financial_statement_fact`, `fundamentals`, `xbrl_filing` | `fundamentals`, `holding` | on each filing | Raw statement lines are not returned, only ratios and the holding's verified facts. |
+| Daily closes, quotes and FX | `price_bar`, `market_quote`, `fx_rate` | `price_history`, `fx_rates`, `latest_quote`, `listing_liquidity` | daily; quotes intraday | No total-return or adjusted series; benchmark comparison is price return only. |
+| Filed statements and the ratios computed from them | `financial_statement_fact`, `fundamentals`, `xbrl_filing` | `fundamentals`, `holding`, `statement_lines`, `share_counts`, `segment_revenue` | on each filing | Statement lines and segments come only from stored filings (SEC XBRL and parsed facts); other markets have no raw lines. |
 | Scenario DCF, reverse DCF and reference multiples | `company_valuation_scenario` | `valuation_scenarios`, `start_size`, `idea_factor_fit` | computed on request | Saved owner scenarios are not read back; the tool uses default assumptions. |
 | Filed notes, control stakes, 13F, N-PORT, insider activity, deals, dependencies, consensus | `fact`, `evidence`, `control_stake_filing`, `form13f_filing`, `nport_holding`, `insider_filing`, `deal_event`, `entity_relationship`, `estimate_value` | `filing_evidence`, `company_context`, `event_paths` | on each filing | none |
 | Stored news, wire articles, story clusters and threads | `news_item`, `news_article`, `story_cluster`, `story_thread`, `news_embedding` | `search_news`, `search_wire`, `get_story_thread` | continuous | none |
 | Macro and commodity series; country context | `macro_observation`, `macro_series` | `macro_series`, `country_context` | per series release | none |
-| Sector, country and industry context for a company | `issuer`, `security`, `listing` | `company_context`, `country_context` | on change | none |
+| Sector, country and industry context for a company | `issuer`, `security`, `listing` | `company_context`, `country_context`, `corporate_actions`, `peers` | on change | none |
 | The owner's strategy: goals, targets, hard limits, rules, risk limits | `config_version` | `strategy_rules`, `portfolio_overview` | owner edits | none |
 | Per-holding theses, KPIs, verdicts and the reports written about them | `config_version`, `verdict`, `report` | `thesis_and_reports`, `holding`, `search_reports` | owner edits; verdicts on each earnings check | none |
 | Ex-ante risk, factor tilts, stress tests, past episodes and their history | `risk_report_snapshot`, `factor_return`, `risk_scenario` | `risk_forecast`, `stress_test`, `past_episodes`, `factor_tilts`, `model_check`, `position_risk`, `risk_whatif`, `risk_history`, `idea_factor_fit` | daily | none |
 | Sizing, deposits, rotation and switch effects | `switch_log` | `start_size`, `deposit_allocation`, `rotation_candidates`, `switch_effect` | computed on request | none |
-| Fund holdings, look-through and overlap | `etf_holding`, `fund_snapshot`, `nport_holding` | `fund_overlap` | per fund filing | none |
-| When each dataset was last updated, and provider coverage | `coverage_status`, `sync_state` | `data_freshness` | live | none |
+| Fund holdings, look-through and overlap | `etf_holding`, `fund_snapshot`, `nport_holding` | `fund_overlap`, `etf_breakdown`, `fund_nav` | per fund filing | none |
+| When each dataset was last updated, and provider coverage | `coverage_status`, `sync_state` | `data_freshness`, `coverage_review` | live | none |
 | Open web through the model provider's search, limited to the allowed outlet tiers | — | — | live | Provider-side search; the URLs it returns are not stored unless cited. |
 | Proposed jobs the owner confirms | `chat_action` | `propose_job` | live | none |
 
@@ -68,9 +68,20 @@ and `retrieved_at`. Tools added in phase 1 also report each figure in the shared
 | `decision_scorecard` | transactions | `analytics_tools.decision_scorecard` | last year | owner | journal ids |
 | `propose_job` | actions | `chat_action insert` | one proposal | owner | action id |
 | `filing_evidence` | filed_evidence | `data_context.evidence` | 10 items per call, as-of cutoff | global | source URL, passage and known-at per item |
-| `fundamentals` | fundamentals | `company.ratios.build_ratios` | 80 ratios | global | ratio group source with filed periods |
+| `fundamentals` | fundamentals | `company.ratios.build_ratios` | 80 ratios, or 300 points with periods | global | ratio group source with filed periods |
 | `valuation_scenarios` | valuation | `company.valuation.build_valuation` | 5 default scenarios | global | method version and price date |
-| `price_history` | prices | `company.service.load_market` | 120 points, 10 years | global | last close date, thinning stated |
+| `price_history` | prices | `company.service.load_market` | 120 points, 10 years, optional benchmark | global | last close date, thinning stated |
+| `fx_rates` | prices | `SQL on fx_rate` | 60 fixings, 365 days | global | fixing date and source |
+| `latest_quote` | prices | `SQL on market_quote` | latest per provider | global | quote time and provider |
+| `listing_liquidity` | prices | `SQL on listing_liquidity, price_bar` | 30 daily bars | global | ISIN record and last bar date |
+| `statement_lines` | fundamentals | `SQL on financial_statement_fact` | 60 lines | global | filing URL per line |
+| `share_counts` | fundamentals | `SQL on shares_outstanding` | 8 records | global | method and as-of date |
+| `segment_revenue` | fundamentals | `SQL on segment_revenue, xbrl_filing` | 60 rows | global | filing instance URL |
+| `corporate_actions` | reference | `SQL on corporate_action` | 60 actions, 10 years | global | source URL per action |
+| `peers` | reference | `SQL on peer_set` | 25 peers | global | peer basis and status |
+| `etf_breakdown` | funds | `SQL on etf_snapshot, etf_holding` | 25 holdings, 10 groups | global | snapshot date |
+| `fund_nav` | funds | `SQL on fund_nav_point` | 30 points | owner | NAV source URL |
+| `coverage_review` | freshness | `SQL on coverage_status` | 60 rows | global | provider, dataset and checked time |
 | `macro_series` | macro | `SQL on macro_observation` | 60 periods | global | source URL and vintage |
 | `strategy_rules` | strategy | `config.store.load_active` | one version | owner | config version id |
 | `transactions` | transactions | `portfolio.transactions.list_transactions` | 50 per page, cursor | owner | scope and totals over all matches |

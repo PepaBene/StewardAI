@@ -31,6 +31,7 @@ def scrub_body(body: dict[str, Any], now: dt.datetime) -> dict[str, Any]:
     out["sources"] = [
         {**s, "snippet": None} if s.get("kind") == "search" else s for s in body.get("sources", [])
     ]
+    out.pop("trace", None)  # the per-call trace (model calls, queries, retrieval, validation)
     out["trace_purged_at"] = now.isoformat(timespec="seconds")
     return out
 
@@ -99,7 +100,19 @@ async def purge_old_traces(
                 cutoff,
             )
         )
-    return {"checkpoints": checkpoints, "traces": traces}
+        # the per-call trace kept in the report body goes on the same schedule
+        report_traces = int(
+            await conn.fetchval(
+                "with u as (update public.report r set body = (r.body - 'trace')"
+                " || jsonb_build_object('trace_purged_at', $2::text)"
+                " from public.job j where r.job_id = j.id and r.type = 'research'"
+                " and j.status = 'succeeded' and j.finished_at < $1 and r.body ? 'trace'"
+                " returning 1) select count(*) from u",
+                cutoff,
+                now.isoformat(timespec="seconds"),
+            )
+        )
+    return {"checkpoints": checkpoints, "traces": traces, "report_traces": report_traces}
 
 
 async def research_trace_retention_handler(ctx: JobContext) -> None:
@@ -113,7 +126,7 @@ async def research_trace_retention_handler(ctx: JobContext) -> None:
         raise JobFailed("trace_retention_days must be at least 1")
     async with ctx.step("purge") as step:
         counts = await purge_old_traces(ctx.pool, days, dt.datetime.now(dt.UTC))
-        step.detail.update(older_than_days=days, **counts)
+        step.detail.update(older_than_days=days, **counts)  # incl. report_traces
 
 
 REVIEW_STATES = ("owner_confirmed", "owner_rejected", "unreviewed")

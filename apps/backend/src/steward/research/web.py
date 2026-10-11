@@ -11,7 +11,7 @@ rests on text the model read; one that only appeared in results is recorded as f
 """
 
 import datetime as dt
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 from urllib.parse import urlparse
 
@@ -31,6 +31,7 @@ class SearchHit:
 class SearchOutcome:
     hits: list[SearchHit]
     errors: list[str]
+    queries: list[str] = field(default_factory=list)
 
 
 def web_search_tool(model: str, max_uses: int, domains: tuple[str, ...]) -> dict[str, Any]:
@@ -48,7 +49,15 @@ def web_search_tool(model: str, max_uses: int, domains: tuple[str, ...]) -> dict
 def normalise_results(content: list[Any]) -> SearchOutcome:
     hits: list[SearchHit] = []
     errors: list[str] = []
+    queries: list[str] = []
     for block in content:
+        if getattr(block, "type", None) == "server_tool_use":
+            # the provider's own record of a search the model asked for
+            asked = getattr(block, "input", None)
+            query = asked.get("query") if isinstance(asked, dict) else None
+            if query:
+                queries.append(str(query)[:200])
+            continue
         if getattr(block, "type", None) != "web_search_tool_result":
             continue
         results = getattr(block, "content", None)
@@ -67,7 +76,7 @@ def normalise_results(content: list[Any]) -> SearchOutcome:
         else:
             code = getattr(results, "error_code", None) or getattr(results, "type", None)
             errors.append(str(code or "search failed")[:80])
-    return SearchOutcome(hits, errors)
+    return SearchOutcome(hits, errors, queries)
 
 
 UrlStatus = Literal["cited", "found_not_cited", "excluded"]

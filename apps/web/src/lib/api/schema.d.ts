@@ -1845,6 +1845,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/research/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Plan Draft
+         * @description Write a research plan for a ticker and profile without running it: by a model when the
+         *     profile (or `planner`) asks, else by code. The owner can edit and approve it, then start
+         *     the run from it.
+         */
+        post: operations["create_plan_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/research/plans/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plan Draft */
+        get: operations["get_plan_draft"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit Plan Draft
+         * @description Edit a draft (reorder, remove, relabel, reword, toggle source groups) under the same
+         *     checks as a model plan, and/or approve it. Any edit withdraws an earlier approval unless
+         *     `approve` is sent with it. A started draft is final.
+         */
+        patch: operations["edit_plan_draft"];
+        trace?: never;
+    };
+    "/research/plans/{draft_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start From Plan
+         * @description Queue the research run for an approved draft. The run uses exactly this plan and stores
+         *     it with the report, with whether the owner edited it.
+         */
+        post: operations["start_from_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/research": {
         parameters: {
             query?: never;
@@ -23986,6 +24052,64 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** ModelCallTrace */
+        ModelCallTrace: {
+            /** Step */
+            step: string;
+            /** Section */
+            section?: string | null;
+            /**
+             * Round
+             * @default 0
+             */
+            round: number;
+            /** Model */
+            model: string;
+            /**
+             * Input Tokens
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Cache Read Tokens
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /**
+             * Searches
+             * @default 0
+             */
+            searches: number;
+            /**
+             * Cost Usd
+             * @description None when the model has no price.
+             */
+            cost_usd?: number | null;
+            /**
+             * Ms
+             * @default 0
+             */
+            ms: number;
+            /**
+             * Retries
+             * @description Re-asks the run made. The HTTP client's own retries are not visible here.
+             * @default 0
+             */
+            retries: number;
+            /**
+             * Outcome
+             * @default ok
+             * @enum {string}
+             */
+            outcome: "ok" | "failed" | "refused" | "schema_failure" | "skipped";
+            /** Note */
+            note?: string | null;
+        };
         /** ModelCost */
         ModelCost: {
             /** Model */
@@ -26547,6 +26671,65 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** PlanDraftEdit */
+        PlanDraftEdit: {
+            /**
+             * Questions
+             * @description The whole question list in the order wanted; one left out is removed.
+             */
+            questions?: components["schemas"]["QuestionEdit"][] | null;
+            /**
+             * Approve
+             * @description Approve the plan as it now stands.
+             * @default false
+             */
+            approve: boolean;
+        };
+        /** PlanDraftOut */
+        PlanDraftOut: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string;
+            /** Profile */
+            profile: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "approved" | "started" | "discarded";
+            /** Edited */
+            edited: boolean;
+            /** Planner Note */
+            planner_note: string | null;
+            plan: components["schemas"]["ResearchPlan"];
+            /** Job Id */
+            job_id: number | null;
+        };
+        /** PlanDraftRequest */
+        PlanDraftRequest: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Profile
+             * @description Research profile id; default if omitted.
+             */
+            profile?: string | null;
+            /**
+             * Name
+             * @description Company name hint.
+             */
+            name?: string | null;
+            /**
+             * Planner
+             * @description profile: the profile's `planning` setting; model: ask a model (falls back to the code plan with the reason); code: the code-built plan.
+             * @default profile
+             * @enum {string}
+             */
+            planner: "profile" | "model" | "code";
+        };
         /** PlanQuestion */
         PlanQuestion: {
             /** Id */
@@ -26568,6 +26751,10 @@ export interface components {
              * @description What a web search should look for.
              */
             web_intent?: string | null;
+            /** Source Groups */
+            source_groups?: string[];
+            /** Label */
+            label?: string | null;
         };
         /** PlausibilityCheck */
         PlausibilityCheck: {
@@ -28300,6 +28487,27 @@ export interface components {
              */
             unapplied_reports?: components["schemas"]["UnappliedReportOut"][];
         };
+        /** QuestionEdit */
+        QuestionEdit: {
+            /**
+             * Id
+             * @description The id of an existing question; order in the list is the order.
+             */
+            id: string;
+            /**
+             * Section
+             * @description A planned section id; the mode-wide question stays None.
+             */
+            section?: string | null;
+            /** Question */
+            question: string;
+            /** Label */
+            label?: string | null;
+            /** Source Groups */
+            source_groups?: string[];
+            /** Web Intent */
+            web_intent?: string | null;
+        };
         /** QueueContradiction */
         QueueContradiction: {
             /** Id */
@@ -29718,6 +29926,7 @@ export interface components {
             trace_purged_at?: string | null;
             /** Tool Calls */
             tool_calls?: components["schemas"]["ToolCallRecord"][];
+            trace?: components["schemas"]["ResearchTrace"] | null;
         };
         /** ResearchContext */
         ResearchContext: {
@@ -29793,6 +30002,26 @@ export interface components {
             planned_sections: string[];
             /** Iterate */
             iterate: boolean;
+            /**
+             * Authored By
+             * @default code
+             * @enum {string}
+             */
+            authored_by: "code" | "model";
+            /** Fallback Reason */
+            fallback_reason?: string | null;
+            /**
+             * Edited By Owner
+             * @default false
+             */
+            edited_by_owner: boolean;
+            /** Draft Id */
+            draft_id?: number | null;
+            /**
+             * Notes
+             * @description What validation trimmed.
+             */
+            notes?: string[];
         };
         /** ResearchProfile */
         ResearchProfile: {
@@ -29935,6 +30164,17 @@ export interface components {
              * @enum {string}
              */
             authoring: "research_only" | "draft_thesis" | "propose_update" | "review_thesis";
+            /**
+             * Planning
+             * @default code
+             * @enum {string}
+             */
+            planning: "code" | "model";
+            /**
+             * Planner Model
+             * @description The model that writes the plan; unset = the claim verifier's.
+             */
+            planner_model?: string | null;
         };
         /**
          * ResearchProfilesConfig
@@ -30070,6 +30310,29 @@ export interface components {
             /** Job Id */
             job_id: number | null;
         };
+        /** ResearchTrace */
+        ResearchTrace: {
+            /** Model Calls */
+            model_calls?: components["schemas"]["ModelCallTrace"][];
+            /** Web */
+            web?: components["schemas"]["WebTrace"][];
+            /** Retrieval */
+            retrieval?: components["schemas"]["RetrievalTrace"][];
+            /** Validation */
+            validation?: components["schemas"]["ValidationTrace"][];
+            /** Total Cost Usd */
+            total_cost_usd?: number | null;
+            /**
+             * Total Ms
+             * @default 0
+             */
+            total_ms: number;
+            /**
+             * Plan Source
+             * @description code, model or model fallback (with the reason).
+             */
+            plan_source?: string | null;
+        };
         /**
          * ResultCoverage
          * @description `numerator` of `denominator` inputs were usable. The denominator is always stated.
@@ -30109,6 +30372,28 @@ export interface components {
              * @description Extra why-it-passed lines, e.g. the idea-pipeline gate.
              */
             notes?: string[];
+        };
+        /** RetrievalTrace */
+        RetrievalTrace: {
+            /** Section */
+            section: string;
+            /**
+             * Sources Offered
+             * @description Sources in the registry when the section was asked.
+             */
+            sources_offered: number;
+            /**
+             * Sources Cited
+             * @description Distinct sources the kept sentences cite.
+             */
+            sources_cited: number;
+            /**
+             * Sources Uncited
+             * @default 0
+             */
+            sources_uncited: number;
+            /** Tools Planned */
+            tools_planned?: string[];
         };
         /** ReturnBasisCoverage */
         ReturnBasisCoverage: {
@@ -30959,6 +31244,36 @@ export interface components {
             caveats: string[];
             /** Input Hash */
             input_hash: string;
+        };
+        /** RuleCompliance */
+        RuleCompliance: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "breach" | "warn" | "unknown";
+            /** Measured */
+            measured?: number | null;
+            /** Limit */
+            limit?: number | null;
+            /** Operator */
+            operator?: string | null;
+            /**
+             * Unit
+             * @default weight
+             * @enum {string}
+             */
+            unit: "weight" | "count";
+            /** As Of */
+            as_of?: string | null;
+            /** Reason */
+            reason: string;
+            /**
+             * Scope
+             * @default ticker
+             * @enum {string}
+             */
+            scope: "ticker" | "portfolio";
         };
         /** RuleMatch */
         RuleMatch: {
@@ -33922,6 +34237,8 @@ export interface components {
              * @description True when the status comes from a stored check, not from the report's text.
              */
             formal: boolean;
+            /** @description For a strategy rule: the rule engine's check against the latest snapshot (status, measured value, limit, as-of date). Separate from the claims that name it. */
+            compliance?: components["schemas"]["RuleCompliance"] | null;
         };
         /**
          * StrategyConfig
@@ -35542,6 +35859,12 @@ export interface components {
              * @description Tool traces removed from step details.
              */
             traces: number;
+            /**
+             * Report Traces
+             * @description Per-call run traces removed from stored report bodies.
+             * @default 0
+             */
+            report_traces: number;
         };
         /** TrackedManager */
         TrackedManager: {
@@ -36090,6 +36413,47 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** ValidationTrace */
+        ValidationTrace: {
+            /** Step */
+            step: string;
+            /** Section */
+            section?: string | null;
+            /**
+             * Schema Failure
+             * @default false
+             */
+            schema_failure: boolean;
+            /**
+             * Retries
+             * @default 0
+             */
+            retries: number;
+            /**
+             * Sentences Returned
+             * @default 0
+             */
+            sentences_returned: number;
+            /**
+             * Dropped Uncited
+             * @description No checkable source id or allowed URL.
+             * @default 0
+             */
+            dropped_uncited: number;
+            /**
+             * Links Removed
+             * @default 0
+             */
+            links_removed: number;
+            /**
+             * Dropped By Check
+             * @description Removed after the claim check found them unsupported.
+             * @default 0
+             */
+            dropped_by_check: number;
+            /** Check Reasons */
+            check_reasons?: string[];
+        };
         /** Valuation */
         Valuation: {
             /** Method */
@@ -36546,6 +36910,50 @@ export interface components {
             status: "approved" | "rejected";
             /** Note */
             note?: string | null;
+        };
+        /** WebTrace */
+        WebTrace: {
+            /** Step */
+            step: string;
+            /** Section */
+            section?: string | null;
+            /**
+             * Round
+             * @default 0
+             */
+            round: number;
+            /**
+             * Queries
+             * @description As the provider reports them.
+             */
+            queries?: string[];
+            /**
+             * Urls Found
+             * @default 0
+             */
+            urls_found: number;
+            /**
+             * Urls Cited
+             * @default 0
+             */
+            urls_cited: number;
+            /**
+             * Urls Excluded
+             * @default 0
+             */
+            urls_excluded: number;
+            /**
+             * Found
+             * @description host + title of the first URLs found (no query string).
+             */
+            found?: string[];
+            /**
+             * Opened
+             * @description URLs a sentence cites. The provider does not say which pages the model read in full, so a cited page is the nearest evidence of one that was opened.
+             */
+            opened?: string[];
+            /** Errors */
+            errors?: string[];
         };
         /** WhatIfCase */
         WhatIfCase: {
@@ -40563,6 +40971,136 @@ export interface operations {
                 "application/json": components["schemas"]["ResearchRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_plan_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_plan_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_plan_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanDraftEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_from_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             202: {

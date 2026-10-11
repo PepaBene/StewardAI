@@ -116,6 +116,41 @@ MODE_QUESTIONS: dict[str, tuple[str, list[str], str | None]] = {
 
 COUNTER_INTENT = SECTION_PLANS["counter_case"][2] or ""
 
+# Source groups: what a model-written or owner-edited question may draw on. A group is a fixed
+# set of read-only catalog tools (or the web search the profile's source policy allows), so a
+# plan outside this table cannot add a tool or a domain.
+WEB_GROUP = "web"
+SOURCE_GROUPS: dict[str, tuple[str, ...]] = {
+    "portfolio": (
+        "holding",
+        "strategy_rules",
+        "over_cap_positions",
+        "portfolio_overview",
+        "position_risk",
+        "factor_tilts",
+        "risk_forecast",
+        "theme_exposure",
+        "event_paths",
+    ),
+    "thesis": ("thesis_and_reports",),
+    "financials": ("fundamentals", "valuation_scenarios", "price_history"),
+    "filings": ("filing_evidence", "company_context"),
+    "news": ("search_news",),
+    "macro": ("macro_series", "country_context"),
+    "freshness": ("data_freshness",),
+    WEB_GROUP: (),
+}
+
+
+def groups_for(tools: list[str], web_intent: str | None) -> list[str]:
+    """The source groups a code-built question already uses."""
+    found = [g for g, members in SOURCE_GROUPS.items() if set(members) & set(tools)]
+    return [*found, WEB_GROUP] if web_intent else found
+
+
+def tools_for(groups: list[str]) -> list[str]:
+    return list(dict.fromkeys(t for g in groups for t in SOURCE_GROUPS.get(g, ())))
+
 
 class PlanQuestion(BaseModel):
     id: str
@@ -125,6 +160,10 @@ class PlanQuestion(BaseModel):
     question: str
     internal_tools: list[str] = Field(description="Chat tool names that read the stored data.")
     web_intent: str | None = Field(default=None, description="What a web search should look for.")
+    # Model-written and owner-edited plans: the groups the question draws on (the tools above
+    # follow from them) and an owner's label. Plans built before these existed have neither.
+    source_groups: list[str] = Field(default_factory=list)
+    label: str | None = Field(default=None, max_length=80)
 
 
 class StopConditions(BaseModel):
@@ -153,6 +192,14 @@ class ResearchPlan(BaseModel):
     stop: StopConditions
     planned_sections: list[str]
     iterate: bool
+    # Phase 2 gap 2: who wrote the plan the run used. `authored_by` is code or model;
+    # `fallback_reason` says why a requested model plan was replaced by the code plan;
+    # `edited_by_owner` is true when the owner changed a draft before approving it.
+    authored_by: Literal["code", "model"] = "code"
+    fallback_reason: str | None = None
+    edited_by_owner: bool = False
+    draft_id: int | None = None
+    notes: list[str] = Field(default_factory=list, description="What validation trimmed.")
 
 
 def effective_searches(profile: ResearchProfile) -> int:
@@ -171,6 +218,20 @@ def build_plan(
     today: dt.date,
 ) -> ResearchPlan:
     questions: list[PlanQuestion] = []
+    plan = _build_plan(profile, layout, ticker=ticker, name=name, questions=questions)
+    for item in plan.questions:
+        item.source_groups = groups_for(item.internal_tools, item.web_intent)
+    return plan
+
+
+def _build_plan(
+    profile: ResearchProfile,
+    layout: list[SectionSpec],
+    *,
+    ticker: str,
+    name: str,
+    questions: list[PlanQuestion],
+) -> ResearchPlan:
     if profile.mode in MODE_QUESTIONS:
         q, tools, web = MODE_QUESTIONS[profile.mode]
         questions.append(

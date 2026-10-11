@@ -23,6 +23,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from steward.research.gather import Valuation
+from steward.research.rules import RuleCompliance
 from steward.research.sources import CheckStatus, CitedSentence, Registry, Source
 from steward.verify.claims import missing_dates, missing_numbers
 
@@ -118,6 +119,11 @@ class StrategyCheck(BaseModel):
     )
     formal: bool = Field(
         description="True when the status comes from a stored check, not from the report's text."
+    )
+    compliance: RuleCompliance | None = Field(
+        default=None,
+        description="For a strategy rule: the rule engine's check against the latest snapshot "
+        "(status, measured value, limit, as-of date). Separate from the claims that name it.",
     )
 
 
@@ -338,6 +344,7 @@ def strategy_checks(
     rules: Sequence[tuple[str, str]],
     kpi_version: int | None,
     strategy_version: int | None,
+    compliance: Mapping[str, RuleCompliance] | None = None,
 ) -> list[StrategyCheck]:
     """The thesis KPIs and strategy rules in force, each with the claims that name it.
 
@@ -360,10 +367,17 @@ def strategy_checks(
         )  # fmt: skip
     for rid, rule in rules:
         named = [c.id for c in judging if _word_in(c.text, rid)]
+        checked = (compliance or {}).get(rid)
+        verdict_rule: Verdict = "unknown"
+        if checked is not None and checked.status in ("pass", "warn"):
+            verdict_rule = "supports"
+        elif checked is not None and checked.status == "breach":
+            verdict_rule = "challenges"
         out.append(
             StrategyCheck(
                 kind="strategy_rule", id=rid, version=strategy_version, rule=rule,
-                status="unknown", evidence=None, named_by=named, formal=False,
+                status=verdict_rule, evidence=checked.reason if checked else None,
+                named_by=named, formal=verdict_rule != "unknown", compliance=checked,
             )
         )  # fmt: skip
     return out
@@ -570,11 +584,13 @@ def build_ledger(
     strategy_version: int | None = None,
     notes: list[str] | None = None,
     stale_days: Mapping[str, int] | None = None,
+    rule_compliance: Mapping[str, RuleCompliance] | None = None,
 ) -> ClaimLedger:
-    """`stale_days` overrides the built-in stale limit per source kind (the profile's setting)."""
+    """`stale_days` overrides the built-in stale limit per source kind (the profile's setting);
+    `rule_compliance` is the rule engine's check per rule id (see `research.rules`)."""
     limits = stale_limits(stale_days)
     claims = build_claims(sections, reg, now.date(), limits)
-    strategy = strategy_checks(claims, kpis, rules, kpi_version, strategy_version)
+    strategy = strategy_checks(claims, kpis, rules, kpi_version, strategy_version, rule_compliance)
     balance = _balance(claims, sections)
     checks = verify_ledger(claims, sections, reg, valuation, strategy, balance)
     confidence, why = report_confidence(claims, checks)

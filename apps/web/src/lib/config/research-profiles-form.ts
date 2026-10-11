@@ -112,6 +112,7 @@ export const PROFILE_DEFAULTS = {
   max_rounds: 1,
   min_sentences: 2,
   authoring: "research_only",
+  planning: "code",
 } as const;
 
 /** The backend's defaults, for when nothing is saved yet (a 404). */

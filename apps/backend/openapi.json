@@ -5201,6 +5201,210 @@
         ]
       }
     },
+    "/research/plans": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Create Plan Draft",
+        "description": "Write a research plan for a ticker and profile without running it: by a model when the\nprofile (or `planner`) asks, else by code. The owner can edit and approve it, then start\nthe run from it.",
+        "operationId": "create_plan_draft",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDraftOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/research/plans/{draft_id}": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Get Plan Draft",
+        "operationId": "get_plan_draft",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Draft Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDraftOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Edit Plan Draft",
+        "description": "Edit a draft (reorder, remove, relabel, reword, toggle source groups) under the same\nchecks as a model plan, and/or approve it. Any edit withdraws an earlier approval unless\n`approve` is sent with it. A started draft is final.",
+        "operationId": "edit_plan_draft",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Draft Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanDraftEdit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDraftOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/research/plans/{draft_id}/start": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Start From Plan",
+        "description": "Queue the research run for an approved draft. The run uses exactly this plan and stores\nit with the report, with whether the owner edited it.",
+        "operationId": "start_from_plan",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Draft Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/research": {
       "get": {
         "tags": [
@@ -71542,6 +71746,106 @@
         "type": "object",
         "title": "MissingActions"
       },
+      "ModelCallTrace": {
+        "properties": {
+          "step": {
+            "type": "string",
+            "title": "Step"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round",
+            "default": 0
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens",
+            "default": 0
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens",
+            "default": 0
+          },
+          "cache_read_tokens": {
+            "type": "integer",
+            "title": "Cache Read Tokens",
+            "default": 0
+          },
+          "searches": {
+            "type": "integer",
+            "title": "Searches",
+            "default": 0
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd",
+            "description": "None when the model has no price."
+          },
+          "ms": {
+            "type": "integer",
+            "title": "Ms",
+            "default": 0
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries",
+            "description": "Re-asks the run made. The HTTP client's own retries are not visible here.",
+            "default": 0
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "failed",
+              "refused",
+              "schema_failure",
+              "skipped"
+            ],
+            "title": "Outcome",
+            "default": "ok"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step",
+          "model"
+        ],
+        "title": "ModelCallTrace"
+      },
       "ModelCost": {
         "properties": {
           "model": {
@@ -78580,6 +78884,162 @@
         "title": "PinnedSnapshotsResponse",
         "description": "`POST /funds/snapshots/pin`: the ids of the snapshots now protected from pruning."
       },
+      "PlanDraftEdit": {
+        "properties": {
+          "questions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/QuestionEdit"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Questions",
+            "description": "The whole question list in the order wanted; one left out is removed."
+          },
+          "approve": {
+            "type": "boolean",
+            "title": "Approve",
+            "description": "Approve the plan as it now stands.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PlanDraftEdit"
+      },
+      "PlanDraftOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "approved",
+              "started",
+              "discarded"
+            ],
+            "title": "Status"
+          },
+          "edited": {
+            "type": "boolean",
+            "title": "Edited"
+          },
+          "planner_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planner Note"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/ResearchPlan"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "profile",
+          "name",
+          "status",
+          "edited",
+          "planner_note",
+          "plan",
+          "job_id"
+        ],
+        "title": "PlanDraftOut"
+      },
+      "PlanDraftRequest": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,32}$",
+            "title": "Ticker"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile",
+            "description": "Research profile id; default if omitted."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Company name hint."
+          },
+          "planner": {
+            "type": "string",
+            "enum": [
+              "profile",
+              "model",
+              "code"
+            ],
+            "title": "Planner",
+            "description": "profile: the profile's `planning` setting; model: ask a model (falls back to the code plan with the reason); code: the code-built plan.",
+            "default": "profile"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker"
+        ],
+        "title": "PlanDraftRequest"
+      },
       "PlanQuestion": {
         "properties": {
           "id": {
@@ -78621,6 +79081,25 @@
             ],
             "title": "Web Intent",
             "description": "What a web search should look for."
+          },
+          "source_groups": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Groups"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           }
         },
         "type": "object",
@@ -83317,6 +83796,67 @@
         ],
         "title": "QuarterOut"
       },
+      "QuestionEdit": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The id of an existing question; order in the list is the order."
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section",
+            "description": "A planned section id; the mode-wide question stays None."
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "source_groups": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Groups"
+          },
+          "web_intent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web Intent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "question"
+        ],
+        "title": "QuestionEdit"
+      },
       "QueueContradiction": {
         "properties": {
           "id": {
@@ -87405,6 +87945,16 @@
             },
             "type": "array",
             "title": "Tool Calls"
+          },
+          "trace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchTrace"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -87601,6 +88151,50 @@
           "iterate": {
             "type": "boolean",
             "title": "Iterate"
+          },
+          "authored_by": {
+            "type": "string",
+            "enum": [
+              "code",
+              "model"
+            ],
+            "title": "Authored By",
+            "default": "code"
+          },
+          "fallback_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Reason"
+          },
+          "edited_by_owner": {
+            "type": "boolean",
+            "title": "Edited By Owner",
+            "default": false
+          },
+          "draft_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Draft Id"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes",
+            "description": "What validation trimmed."
           }
         },
         "type": "object",
@@ -87893,6 +88487,33 @@
             ],
             "title": "Authoring",
             "default": "research_only"
+          },
+          "planning": {
+            "type": "string",
+            "enum": [
+              "code",
+              "model"
+            ],
+            "title": "Planning",
+            "default": "code"
+          },
+          "planner_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+                "examples": [
+                  "gpt-6.1-sol",
+                  "gpt-6-luna",
+                  "gemini-3.8-flash"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planner Model",
+            "description": "The model that writes the plan; unset = the claim verifier's."
           }
         },
         "additionalProperties": false,
@@ -88217,6 +88838,68 @@
         ],
         "title": "ResearchSummary"
       },
+      "ResearchTrace": {
+        "properties": {
+          "model_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ModelCallTrace"
+            },
+            "type": "array",
+            "title": "Model Calls"
+          },
+          "web": {
+            "items": {
+              "$ref": "#/components/schemas/WebTrace"
+            },
+            "type": "array",
+            "title": "Web"
+          },
+          "retrieval": {
+            "items": {
+              "$ref": "#/components/schemas/RetrievalTrace"
+            },
+            "type": "array",
+            "title": "Retrieval"
+          },
+          "validation": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationTrace"
+            },
+            "type": "array",
+            "title": "Validation"
+          },
+          "total_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost Usd"
+          },
+          "total_ms": {
+            "type": "integer",
+            "title": "Total Ms",
+            "default": 0
+          },
+          "plan_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Source",
+            "description": "code, model or model fallback (with the reason)."
+          }
+        },
+        "type": "object",
+        "title": "ResearchTrace"
+      },
       "ResultCoverage": {
         "properties": {
           "numerator": {
@@ -88329,6 +89012,43 @@
           "unknown"
         ],
         "title": "ResultRow"
+      },
+      "RetrievalTrace": {
+        "properties": {
+          "section": {
+            "type": "string",
+            "title": "Section"
+          },
+          "sources_offered": {
+            "type": "integer",
+            "title": "Sources Offered",
+            "description": "Sources in the registry when the section was asked."
+          },
+          "sources_cited": {
+            "type": "integer",
+            "title": "Sources Cited",
+            "description": "Distinct sources the kept sentences cite."
+          },
+          "sources_uncited": {
+            "type": "integer",
+            "title": "Sources Uncited",
+            "default": 0
+          },
+          "tools_planned": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tools Planned"
+          }
+        },
+        "type": "object",
+        "required": [
+          "section",
+          "sources_offered",
+          "sources_cited"
+        ],
+        "title": "RetrievalTrace"
       },
       "ReturnBasisCoverage": {
         "properties": {
@@ -90624,6 +91344,92 @@
           "input_hash"
         ],
         "title": "Rubric"
+      },
+      "RuleCompliance": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "breach",
+              "warn",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "measured": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measured"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "operator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "weight",
+              "count"
+            ],
+            "title": "Unit",
+            "default": "weight"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "ticker",
+              "portfolio"
+            ],
+            "title": "Scope",
+            "default": "ticker"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "reason"
+        ],
+        "title": "RuleCompliance"
       },
       "RuleMatch": {
         "properties": {
@@ -98879,6 +99685,17 @@
             "type": "boolean",
             "title": "Formal",
             "description": "True when the status comes from a stored check, not from the report's text."
+          },
+          "compliance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleCompliance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For a strategy rule: the rule engine's check against the latest snapshot (status, measured value, limit, as-of date). Separate from the claims that name it."
           }
         },
         "type": "object",
@@ -103072,6 +103889,12 @@
             "type": "integer",
             "title": "Traces",
             "description": "Tool traces removed from step details."
+          },
+          "report_traces": {
+            "type": "integer",
+            "title": "Report Traces",
+            "description": "Per-call run traces removed from stored report bodies.",
+            "default": 0
           }
         },
         "type": "object",
@@ -104630,6 +105453,69 @@
         ],
         "title": "ValidationError"
       },
+      "ValidationTrace": {
+        "properties": {
+          "step": {
+            "type": "string",
+            "title": "Step"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "schema_failure": {
+            "type": "boolean",
+            "title": "Schema Failure",
+            "default": false
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries",
+            "default": 0
+          },
+          "sentences_returned": {
+            "type": "integer",
+            "title": "Sentences Returned",
+            "default": 0
+          },
+          "dropped_uncited": {
+            "type": "integer",
+            "title": "Dropped Uncited",
+            "description": "No checkable source id or allowed URL.",
+            "default": 0
+          },
+          "links_removed": {
+            "type": "integer",
+            "title": "Links Removed",
+            "default": 0
+          },
+          "dropped_by_check": {
+            "type": "integer",
+            "title": "Dropped By Check",
+            "description": "Removed after the claim check found them unsupported.",
+            "default": 0
+          },
+          "check_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Check Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step"
+        ],
+        "title": "ValidationTrace"
+      },
       "Valuation": {
         "properties": {
           "method": {
@@ -105923,6 +106809,81 @@
           "status"
         ],
         "title": "WebFactDecision"
+      },
+      "WebTrace": {
+        "properties": {
+          "step": {
+            "type": "string",
+            "title": "Step"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round",
+            "default": 0
+          },
+          "queries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Queries",
+            "description": "As the provider reports them."
+          },
+          "urls_found": {
+            "type": "integer",
+            "title": "Urls Found",
+            "default": 0
+          },
+          "urls_cited": {
+            "type": "integer",
+            "title": "Urls Cited",
+            "default": 0
+          },
+          "urls_excluded": {
+            "type": "integer",
+            "title": "Urls Excluded",
+            "default": 0
+          },
+          "found": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Found",
+            "description": "host + title of the first URLs found (no query string)."
+          },
+          "opened": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Opened",
+            "description": "URLs a sentence cites. The provider does not say which pages the model read in full, so a cited page is the nearest evidence of one that was opened."
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step"
+        ],
+        "title": "WebTrace"
       },
       "WhatIfCase": {
         "properties": {

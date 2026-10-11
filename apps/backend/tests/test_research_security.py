@@ -78,7 +78,14 @@ def test_research_modules_write_only_the_report_and_its_working_records() -> Non
     for path in (SRC / "research").glob("*.py"):
         text = path.read_text(encoding="utf-8")
         assert not forbidden.search(text), path.name
-        if path.name not in ("run.py", "retention.py", "domains.py", "web_facts.py"):
+        if path.name == "model_plan.py":
+            # the owner's plan drafts: the one table the plan editor writes, nothing else
+            assert not re.findall(
+                r"(insert\s+into|update|delete\s+from)\s+(?!public\.research_plan_draft)\w",
+                text,
+                re.I,
+            )
+        elif path.name not in ("run.py", "retention.py", "domains.py", "web_facts.py"):
             assert not sql_writes(path), f"{path.name} writes to the database"
 
 

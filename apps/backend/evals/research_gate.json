@@ -1,7 +1,7 @@
 {
   "description": "Fingerprint the research regression suite last passed at; see steward/research/gate.py.",
-  "recorded_at": "2026-10-11T12:54:45+00:00",
-  "fingerprint": "181eb1a595809c798e4f079421ac632a0bc4edd8f8dca15978b54bb38fa24794",
+  "recorded_at": "2026-10-11T13:34:42+00:00",
+  "fingerprint": "5d399d135b96b1a4ab0eac7250e7b332309e05d01e5683b7d132a01e26a4d9aa",
   "suite": {
     "injection": 1.0,
     "outbound": 1.0,

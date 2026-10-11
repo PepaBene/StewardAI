@@ -161,6 +161,13 @@ class ResearchProfile(ConfigModel):
         "what titles and in which view; the profile decides how the run investigates.",
     )
     authoring: Authoring = "research_only"
+    # `authoring` says what a run does with its findings (a thesis proposal or review); this says
+    # who writes the research plan: code (always the same for the same inputs) or a cheap model
+    # call, validated in code, with the code plan as the fallback.
+    planning: Literal["code", "model"] = "code"
+    planner_model: ModelId | None = Field(
+        default=None, description="The model that writes the plan; unset = the claim verifier's."
+    )
 
     @model_validator(mode="after")
     def _unique_sections(self) -> Self:

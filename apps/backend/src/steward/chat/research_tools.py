@@ -179,12 +179,22 @@ def _ratio_rows(view: ratios.RatiosView, wanted: set[str]) -> tuple[list[ratios.
     return groups, sum(len(g.ratios) for g in groups)
 
 
+MAX_SERIES_PERIODS = 8
+MAX_SERIES_POINTS = 300
+
+
 async def fundamentals(
-    pool: asyncpg.Pool, registry: Registry, ticker: str, groups: list[str] | None
+    pool: asyncpg.Pool,
+    registry: Registry,
+    ticker: str,
+    groups: list[str] | None,
+    periods: Any = None,
 ) -> dict[str, Any]:
     """The latest value of each financial ratio, from the filed statements, with its formula,
     period and the company's own five-year median. Without `groups` the group list is
-    returned together with every ratio's latest value."""
+    returned together with every ratio's latest value. With `periods` (1-8) each ratio also
+    carries its last N values as a series; the ratio count is then reduced so the whole
+    answer stays within 300 series points."""
     company = await service.load_company(pool, ticker)
     if company is None:
         return {"error": f"{ticker} is not in the covered universe"}
@@ -204,7 +214,9 @@ async def fundamentals(
         }
     chosen, total = _ratio_rows(view, wanted)
     out_groups: list[dict[str, Any]] = []
-    budget = MAX_RATIOS
+    n_periods = env.clamp_limit(periods, default=1, maximum=MAX_SERIES_PERIODS) if periods else 0
+    max_ratios = min(MAX_RATIOS, MAX_SERIES_POINTS // n_periods) if n_periods else MAX_RATIOS
+    budget = max_ratios
     for group in chosen:
         rows: list[dict[str, Any]] = []
         lines: list[str] = []
@@ -230,22 +242,44 @@ async def fundamentals(
                     as_of=view.as_of,
                 )
                 lines.append(f"{row.label} {latest.value:.4g} ({latest.label})")
-            rows.append(
-                {
-                    "id": row.id,
-                    "label": row.label,
-                    "formula": row.formula,
-                    "latest": figure,
-                    "own_median_5y": env.plain(row.own_median_5y),
-                }
-            )
+            entry: dict[str, Any] = {
+                "id": row.id,
+                "label": row.label,
+                "formula": row.formula,
+                "latest": figure,
+                "own_median_5y": env.plain(row.own_median_5y),
+            }
+            if n_periods:
+                series: list[dict[str, Any]] = []
+                for point in row.points[-n_periods:]:
+                    if point.value is None:
+                        series.append(
+                            env.absent(
+                                "missing",
+                                point.reason or "no value for this period",
+                                unit=row.unit,
+                                period=point.label,
+                            )
+                        )
+                        continue
+                    series.append(
+                        env.datum(
+                            point.value,
+                            unit=row.unit,
+                            currency=view.statement_currency if money else None,
+                            period=point.label,
+                        )
+                    )
+                    lines.append(f"{row.label} {point.value:.4g} ({point.label})")
+                entry["series"] = series
+            rows.append(entry)
         sid = registry.add(
             "observation",
             f"ratios:{ticker}:{group.id}:{view.input_hash[:12]}",
             f"{ticker} {group.label} ratios",
             app_path=f"/companies/{ticker}",
             tier=1,
-            snippet="; ".join(lines)[:1500] or None,
+            snippet="; ".join(lines)[:3000] or None,
             as_of=str(view.as_of) if view.as_of else None,
         )
         out_groups.append({"id": group.id, "label": group.label, "source_id": sid, "ratios": rows})
@@ -259,7 +293,11 @@ async def fundamentals(
         if view.price is not None
         else env.absent("missing", "no price stored for this ticker", unit="price"),
         "groups": out_groups,
-        "page": {"ratios_returned": MAX_RATIOS - budget, "ratios_available": total},
+        "page": {
+            "ratios_returned": max_ratios - budget,
+            "ratios_available": total,
+            **({"periods": n_periods} if n_periods else {}),
+        },
         "warnings": view.warnings[:8],
         "method_version": view.method_version,
         "note": "Ratios are computed in code from filed statements; a ratio without a value "
@@ -394,11 +432,54 @@ def max_drawdown(closes: list[tuple[dt.date, Decimal]]) -> float | None:
     return float(worst)
 
 
+MAX_RELATIVE_POINTS = 24
+
+
+def relative_performance(
+    closes: list[tuple[dt.date, Decimal]], bench: list[tuple[dt.date, Decimal]]
+) -> dict[str, Any] | None:
+    """The ticker against a benchmark over the days both have a close: each return, their
+    difference in percentage points of return, and at most 24 points of the two series
+    indexed to 100 at the first common day. None when fewer than two common days exist."""
+    bench_by_day = dict(bench)
+    common = [(d, c, bench_by_day[d]) for d, c in closes if d in bench_by_day]
+    if len(common) < 2 or not common[0][1] or not common[0][2]:
+        return None
+    first, last = common[0], common[-1]
+    own = float(last[1] / first[1] - 1)
+    other = float(last[2] / first[2] - 1)
+    step = max(1, -(-len(common) // MAX_RELATIVE_POINTS))
+    picked = common[::step]
+    if picked[-1][0] != last[0]:
+        picked.append(last)
+    return {
+        "from": first[0],
+        "to": last[0],
+        "common_days": len(common),
+        "own_return": own,
+        "benchmark_return": other,
+        "excess_return": own - other,
+        "series": [
+            [
+                d.isoformat(),
+                round(float(c / first[1]) * 100, 2),
+                round(float(b / first[2]) * 100, 2),
+            ]
+            for d, c, b in picked
+        ],
+    }
+
+
 async def price_history(
-    pool: asyncpg.Pool, registry: Registry, ticker: str, days: Any
+    pool: asyncpg.Pool,
+    registry: Registry,
+    ticker: str,
+    days: Any,
+    benchmark: str | None = None,
 ) -> dict[str, Any]:
     """Closing prices over the last `days` days (thinned to at most 120 points), with the
-    return, high, low and deepest drawdown computed in code over every stored close."""
+    return, high, low and deepest drawdown computed in code over every stored close. With
+    `benchmark` (another covered ticker) it also reports the relative performance."""
     span = env.clamp_limit(days, default=365, maximum=MAX_PRICE_DAYS)
     got = await service.load_market(pool, ticker)
     if got is None:
@@ -436,10 +517,14 @@ async def price_history(
         snippet=snippet,
         as_of=str(last[0]),
     )
+    relative: dict[str, Any] | None = None
+    if benchmark:
+        relative = await _relative_block(pool, registry, ticker, benchmark, closes, since)
     return {
         "ticker": ticker,
         "source_id": sid,
         "currency": market.currency,
+        **({"relative_to_benchmark": relative} if relative is not None else {}),
         "last_close": env.datum(
             last[1],
             status=status,
@@ -463,6 +548,51 @@ async def price_history(
         "page": env.page(points, MAX_PRICE_POINTS, len(closes)),
         "note": "Closes are in major currency units; return and drawdown are computed over "
         "every stored close in the window, not just the points shown.",
+    }
+
+
+async def _relative_block(
+    pool: asyncpg.Pool,
+    registry: Registry,
+    ticker: str,
+    benchmark: str,
+    closes: list[tuple[dt.date, Decimal]],
+    since: dt.date,
+) -> dict[str, Any]:
+    got = await service.load_market(pool, benchmark)
+    if got is None:
+        return {"benchmark": benchmark, **env.absent("missing", "benchmark is not covered")}
+    bench = [(d, c) for d, c in got[1].closes if d >= since]
+    rel = relative_performance(closes, bench)
+    if rel is None:
+        return {
+            "benchmark": benchmark,
+            **env.absent("missing", "fewer than two days with a close for both"),
+        }
+    sid = registry.add(
+        "price",
+        f"relative:{ticker}:{benchmark}:{rel['from']}:{rel['to']}",
+        f"{ticker} against {benchmark}, {rel['from']} to {rel['to']}",
+        app_path=f"/holdings/{ticker}",
+        tier=2,
+        snippet=(
+            f"{ticker} {rel['own_return'] * 100:+.1f}% and {benchmark} "
+            f"{rel['benchmark_return'] * 100:+.1f}% from {rel['from']} to {rel['to']}; "
+            f"difference {rel['excess_return'] * 100:+.1f} points"
+        ),
+        as_of=str(rel["to"]),
+    )
+    return {
+        "benchmark": benchmark,
+        "benchmark_currency": got[1].currency,
+        "window": {"from": rel["from"].isoformat(), "to": rel["to"].isoformat()},
+        "common_days": rel["common_days"],
+        "own_return": env.datum(rel["own_return"], unit="fraction", source_id=sid),
+        "benchmark_return": env.datum(rel["benchmark_return"], unit="fraction", source_id=sid),
+        "excess_return": env.datum(rel["excess_return"], unit="fraction", source_id=sid),
+        "indexed_series": {"columns": ["date", "own", "benchmark"], "rows": rel["series"]},
+        "note": "Price returns in each instrument's own currency, indexed to 100 at the first "
+        "common day; dividends and currency effects are not included.",
     }
 
 

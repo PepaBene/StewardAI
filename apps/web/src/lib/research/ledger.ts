@@ -95,6 +95,43 @@ export function strategyStatusLabel(status: string): string {
   return STRATEGY_STATUS_LABELS[status as keyof typeof STRATEGY_STATUS_LABELS] ?? status;
 }
 
+/** The rule engine's check of a strategy rule against the latest snapshot (formal compliance). */
+export type RuleCompliance = {
+  status: "pass" | "breach" | "warn" | "unknown";
+  measured?: number | null;
+  limit?: number | null;
+  operator?: string | null;
+  unit?: "weight" | "count";
+  as_of?: string | null;
+  reason: string;
+  scope?: "ticker" | "portfolio";
+};
+
+export const COMPLIANCE_LABELS: Record<RuleCompliance["status"], string> = {
+  pass: "Pass",
+  breach: "Breach",
+  warn: "Warning: close to the limit",
+  unknown: "Not checked",
+};
+
+/** The compliance of a strategy check, or null for a thesis KPI and for reports stored before it existed. */
+export function complianceOf(check: unknown): RuleCompliance | null {
+  return (check as { compliance?: RuleCompliance | null } | null | undefined)?.compliance ?? null;
+}
+
+function formatMeasure(value: number, unit: RuleCompliance["unit"]): string {
+  return unit === "count" ? String(Math.round(value)) : `${(value * 100).toFixed(2)} %`;
+}
+
+/** "Measured 8.38 % against <= 9.00 % as of 2026-10-10", or the reason it was not checked. */
+export function complianceLine(c: RuleCompliance): string {
+  if (c.status === "unknown" || c.measured === null || c.measured === undefined) return c.reason;
+  const unit = c.unit ?? "weight";
+  const limit = c.limit === null || c.limit === undefined ? "" : ` against ${c.operator ?? ""} ${formatMeasure(c.limit, unit)}`.replace("  ", " ");
+  const date = c.as_of ? ` as of ${c.as_of}` : "";
+  return `Measured ${formatMeasure(c.measured, unit)}${limit}${date}${c.scope === "portfolio" ? " (whole portfolio)" : ""}`;
+}
+
 export function strategyKindLabel(kind: string): string {
   return kind === "thesis_kpi" ? "Thesis KPI" : kind === "strategy_rule" ? "Strategy rule" : kind.replaceAll("_", " ");
 }

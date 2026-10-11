@@ -23,12 +23,13 @@ reach says so.
 
 import datetime as dt
 import math
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from steward.ai import AINotConfigured
+from steward.ai import AINotConfigured, Usage
 from steward.chat.tools import ChatTools
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.news_sources import NewsSourcesConfig
@@ -45,6 +46,14 @@ from steward.news.normalize import host_of
 from steward.research.gather import Gathered, Valuation, gather
 from steward.research.layout import SectionSpec, investigation_profile, resolve_layout
 from steward.research.ledger import ClaimLedger, SectionInput, build_ledger
+from steward.research.model_plan import (
+    LLMResearchPlanner,
+    PlannerResult,
+    ResearchPlanner,
+    get_draft,
+    make_plan,
+    same_layout,
+)
 from steward.research.plan import ResearchPlan, build_plan, effective_searches, focus_for
 from steward.research.read_tools import (
     ReadToolRun,
@@ -53,9 +62,19 @@ from steward.research.read_tools import (
     evidence_for,
     run_read_tools,
 )
+from steward.research.rules import load_compliance
 from steward.research.snapshot import RunSnapshot, take_snapshot
 from steward.research.source_policy import PRIORITY_TEXT, SourcePolicy
 from steward.research.sources import CitedSentence, Registry, Source
+from steward.research.trace import (
+    ModelCallTrace,
+    ResearchTrace,
+    RetrievalTrace,
+    ValidationTrace,
+    clip,
+    finish,
+    web_trace,
+)
 from steward.research.untrusted import flag_sources, neutralise, strip_outbound
 from steward.research.views import View, apply_view
 from steward.research.web import DiscoveredUrl, SearchHit, discovered, merge_discovered
@@ -165,6 +184,9 @@ class ResearchBody(BaseModel):
     # The plan's stored-data tools as the run called them (the same tools chat uses), one
     # compact record per call, so research and chat can be compared. Older reports have none.
     tool_calls: list[ToolCallRecord] = Field(default_factory=list)
+    # Per-call trace of the run (model calls, searches, retrieval, output validation): metadata
+    # only, removed by the purge and the retention job. Older reports have none.
+    trace: ResearchTrace | None = None
 
 
 @dataclass
@@ -174,6 +196,7 @@ class ResearchDeps:
     now: dt.datetime
     app_url: str | None = None
     prompts: dict[str, str] = field(default_factory=dict)  # the system texts, for the snapshot
+    planner: ResearchPlanner | None = None  # the model planning step; None = code plan
 
 
 def _source_line(s: Source) -> str:
@@ -306,15 +329,95 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
     gathered = Gathered.model_validate(await ctx.checkpoint("gather", do_gather))
     reg = Registry.load(gathered.sources)
     flagged = flag_sources(reg.sources)
-    plan = build_plan(profile, layout, ticker=ticker, name=gathered.name, today=deps.now.date())
-    async with ctx.step("plan") as step:
-        step.detail.update(
-            mode=plan.mode,
-            questions=len(plan.questions),
-            tools=len(plan.internal_tools),
-            counter_search=bool(plan.counter_evidence_intent),
-            iterate=plan.iterate,
+    code_plan = build_plan(
+        profile, layout, ticker=ticker, name=gathered.name, today=deps.now.date()
+    )
+    prices = await ctx.price_table()
+    trace_parts: list[dict[str, Any]] = []
+
+    def cost_of(usage: Usage) -> float | None:
+        cost = prices.cost(
+            usage.model,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            cache_write_tokens=usage.cache_write_tokens,
+            cache_read_tokens=usage.cache_read_tokens,
+            searches=usage.searches,
         )
+        return float(cost) if cost is not None else None
+
+    async def do_plan() -> dict[str, Any]:
+        async with ctx.step("plan") as step:
+            draft_id = ctx.params.get("plan_draft_id")
+            result: PlannerResult | None = None
+            if draft_id is not None:
+                draft = await get_draft(pool, int(draft_id))
+                if (
+                    draft is None
+                    or draft.ticker != ticker
+                    or draft.status
+                    not in (
+                        "approved",
+                        "started",
+                    )
+                ):
+                    reason = "the approved plan draft was not found; the code-built plan is used"
+                    chosen = code_plan.model_copy(update={"fallback_reason": reason})
+                elif not same_layout(draft.plan, code_plan.planned_sections):
+                    reason = "the profile or template changed after the draft; code plan used"
+                    chosen = code_plan.model_copy(update={"fallback_reason": reason})
+                else:
+                    chosen = draft.plan.model_copy(
+                        update={
+                            "draft_id": draft.id,
+                            "edited_by_owner": draft.edited or draft.plan.edited_by_owner,
+                        }
+                    )
+            else:
+                chosen, result = await make_plan(
+                    code_plan,
+                    profile,
+                    deps.planner,
+                    name=gathered.name,
+                    use_model=profile.planning == "model",
+                )
+            part: dict[str, Any] | None = None
+            if result is not None:
+                step.usage = result.usage.step_usage()
+                outcome = (
+                    "ok"
+                    if chosen.authored_by == "model"
+                    else ("schema_failure" if result.schema_failure else "failed")
+                )
+                part = {
+                    "model": ModelCallTrace(
+                        step="plan",
+                        model=result.usage.model,
+                        input_tokens=result.usage.input_tokens,
+                        output_tokens=result.usage.output_tokens,
+                        cache_read_tokens=result.usage.cache_read_tokens,
+                        cost_usd=cost_of(result.usage),
+                        ms=result.ms,
+                        outcome=outcome,  # type: ignore[arg-type]
+                        note=clip(chosen.fallback_reason or "", 160) or None,
+                    ).model_dump()
+                }
+            step.detail.update(
+                mode=chosen.mode,
+                questions=len(chosen.questions),
+                tools=len(chosen.internal_tools),
+                counter_search=bool(chosen.counter_evidence_intent),
+                iterate=chosen.iterate,
+                authored_by=chosen.authored_by,
+                edited_by_owner=chosen.edited_by_owner,
+                fallback=chosen.fallback_reason,
+            )
+            return {"plan": chosen.model_dump(mode="json"), "trace": part}
+
+    planned = await ctx.checkpoint("plan", do_plan)
+    plan = ResearchPlan.model_validate(planned["plan"])
+    if planned.get("trace"):
+        trace_parts.append(planned["trace"])
 
     async def do_read_tools() -> dict[str, Any]:
         async with ctx.step("read_tools") as step:
@@ -395,6 +498,8 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             out["note"] = "not written: no AI provider key is set"
             return out
         async with ctx.step(step_name) as step:
+            offered = len(reg.sources)
+            started = time.monotonic()
             result = await deps.writer.write(
                 SectionRequest(
                     section=spec.id,
@@ -419,18 +524,50 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                     ),
                 )
             )
+            ms = round((time.monotonic() - started) * 1000)
             step.usage = result.usage.step_usage()
             out["steps"] = 1 + result.usage.searches
             out["searches"] = result.usage.searches
             hits = result.hits or [SearchHit(u, t) for u, t in result.titles.items()]
             if result.search_errors:
                 out["search_errors"] = result.search_errors
+            call_outcome = (
+                "ok"
+                if result.draft is not None
+                else (
+                    "schema_failure"
+                    if result.schema_failure
+                    else ("refused" if "declined" in (result.note or "") else "failed")
+                )
+            )
+            part: dict[str, Any] = {
+                "offered": offered,
+                "model": ModelCallTrace(
+                    step=step_name,
+                    section=spec.id,
+                    round=round_no,
+                    model=result.usage.model,
+                    input_tokens=result.usage.input_tokens,
+                    output_tokens=result.usage.output_tokens,
+                    cache_read_tokens=result.usage.cache_read_tokens,
+                    searches=result.usage.searches,
+                    cost_usd=cost_of(result.usage),
+                    ms=ms,
+                    outcome=call_outcome,  # type: ignore[arg-type]
+                    note=clip(result.note or "", 160) or None,
+                ).model_dump(),
+            }
+            out["trace"] = part
             if result.draft is None:
                 out["note"] = f"not written: {result.note}"
-                out["discovered"] = [
-                    discovered(h, policy, spec.id, round_no, set(), deps.now).model_dump()
-                    for h in hits
-                ]
+                found = [discovered(h, policy, spec.id, round_no, set(), deps.now) for h in hits]
+                out["discovered"] = [d.model_dump() for d in found]
+                part["web"] = web_trace(
+                    step_name, spec.id, round_no, result.queries, found, result.search_errors
+                ).model_dump()
+                part["validation"] = ValidationTrace(
+                    step=step_name, section=spec.id, schema_failure=result.schema_failure
+                ).model_dump()
                 return out
             known = reg.ids()
             dropped = 0
@@ -473,10 +610,18 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                     ).model_dump()
                 )
             out["dropped"] = dropped
-            out["discovered"] = [
-                discovered(h, policy, spec.id, round_no, cited_urls, deps.now).model_dump()
-                for h in hits
-            ]
+            found = [discovered(h, policy, spec.id, round_no, cited_urls, deps.now) for h in hits]
+            out["discovered"] = [d.model_dump() for d in found]
+            part["web"] = web_trace(
+                step_name, spec.id, round_no, result.queries, found, result.search_errors
+            ).model_dump()
+            part["validation"] = ValidationTrace(
+                step=step_name,
+                section=spec.id,
+                sentences_returned=len(result.draft.sentences[:max_sentences]),
+                dropped_uncited=dropped,
+                links_removed=int(out.get("links_removed", 0)),
+            ).model_dump()
             step.detail.update(
                 sentences=len(out["sentences"]),
                 dropped=dropped,
@@ -487,6 +632,8 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         return out
 
     def absorb(output: dict[str, Any]) -> None:
+        if output.get("trace"):
+            trace_parts.append(output["trace"])
         for src in output.get("new_sources", []):
             source = Source.model_validate(src)
             reg.add(
@@ -669,11 +816,14 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             }
 
     checked = await ctx.checkpoint("claims", do_claims)
+    check_drops: dict[str, list[str]] = {}
     for n, (written_in, i, _sentence) in enumerate(model_sentences):
         status = checked["results"].get(str(n))
         stored_sentence = written[written_in]["sentences"][i]
         if status:
             stored_sentence["check"], stored_sentence["check_reason"] = status
+            if status[0] == "unsupported" and claim_settings.mode == "strip":
+                check_drops.setdefault(written_in, []).append(str(status[1] or "unsupported"))
 
     async with ctx.step("store") as step:
         existing_report = await pool.fetchval(
@@ -742,6 +892,33 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                 f"{len(flagged)} source(s) contained instruction-like text; it was treated as "
                 "data and their claims are marked low confidence."
             )
+        compliance = await load_compliance(pool, strategy, ticker)
+        trace = finish(trace_parts, check_drops)
+        offered = {
+            p["model"]["section"]: int(p["offered"])
+            for p in trace_parts
+            if "offered" in p and p["model"].get("round") == 0
+        }
+        for s in sections:
+            if s.id not in offered:
+                continue
+            cited_ids = {i for x in s.sentences for i in x.source_ids}
+            trace.retrieval.append(
+                RetrievalTrace(
+                    section=s.id,
+                    sources_offered=offered[s.id],
+                    sources_cited=len(cited_ids),
+                    sources_uncited=max(0, offered[s.id] - len(cited_ids)),
+                    tools_planned=list(
+                        dict.fromkeys(
+                            t for q in plan.questions if q.section == s.id for t in q.internal_tools
+                        )
+                    ),
+                )
+            )
+        trace.plan_source = plan.authored_by + (
+            f" (fallback: {plan.fallback_reason})" if plan.fallback_reason else ""
+        )
         ledger = build_ledger(
             [
                 SectionInput(
@@ -767,6 +944,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             kpi_version=theses_v.id if theses_v else None,
             strategy_version=strategy_v.id if strategy_v else None,
             notes=[n for n in notes if "Sections written" not in n],
+            rule_compliance=compliance,
         )
         body = ResearchBody(
             ticker=ticker,
@@ -805,6 +983,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             flagged_sources=flagged,
             links_removed=links_removed,
             tool_calls=tool_run.records,
+            trace=trace,
         )
         report_id: int = await pool.fetchval(
             "insert into public.report (type, ticker, title, body, body_md, profile,"
@@ -900,6 +1079,7 @@ async def research_handler(ctx: JobContext) -> None:
     )
     writer: ResearchWriter | None
     verifier: ClaimVerifier | None
+    planner: ResearchPlanner | None = None
     writer_system = prompts.text("research_writer", WRITER_SYSTEM)
     verifier_system = prompts.text("claim_verifier", VERIFIER_SYSTEM)
     try:
@@ -907,6 +1087,9 @@ async def research_handler(ctx: JobContext) -> None:
     except AINotConfigured:
         writer = verifier = None
     else:
+        cheap = (verification.body if verification else VerificationConfig()).claim_verifier.model
+        if profile and profile.planning == "model":
+            planner = LLMResearchPlanner(client, profile.planner_model or cheap)
         writer = (
             LLMResearchWriter(client, profile.model, profile.effort, writer_system)
             if profile
@@ -929,5 +1112,6 @@ async def research_handler(ctx: JobContext) -> None:
             now=dt.datetime.now(dt.UTC),
             app_url=settings.app_url,
             prompts={"research_writer": writer_system, "claim_verifier": verifier_system},
+            planner=planner,
         ),
     )

@@ -12,6 +12,8 @@ import { ResearchStarter } from "@/components/research/research-starter";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type ResearchSummary } from "@/lib/api/client";
+
+import { PlanEditor } from "./plan-editor";
 import { formatDateTime } from "@/lib/format";
 import { jobHref } from "@/lib/jobs/job-detail";
 import { normaliseTicker, researchForTicker, researchHref } from "@/lib/research/report";
@@ -72,6 +74,8 @@ export function ResearchListView() {
         <PanelHeading kicker="Start a run" title={<span id="new-research-heading">New research</span>} />
         <ResearchStarter initialTicker={ticker ?? ""} onFinished={() => setReloadKey((k) => k + 1)} />
       </Blueprint>
+
+      <PlanEditor initialTicker={ticker ?? ""} onStarted={() => setReloadKey((k) => k + 1)} />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[22px] leading-tight font-semibold">

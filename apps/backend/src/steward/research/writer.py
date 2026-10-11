@@ -161,6 +161,10 @@ class SectionResult:
     # fills `titles` still works: the run derives hits from it.
     hits: list[SearchHit] = field(default_factory=list)
     search_errors: list[str] = field(default_factory=list)
+    # The queries the provider reports the model issued (empty when it does not say), and
+    # whether the answer failed the section schema (see steward.research.trace).
+    queries: list[str] = field(default_factory=list)
+    schema_failure: bool = False
 
 
 class ResearchWriter(Protocol):
@@ -239,7 +243,13 @@ class LLMResearchWriter:
                 **effort_kwargs(self._model, self._effort, 16000),
             )
         except LLMError as exc:
-            return SectionResult(None, usage, titles, f"the call failed: {exc}"[:300])
+            return SectionResult(
+                None,
+                usage,
+                titles,
+                f"the call failed: {exc}"[:300],
+                schema_failure="does not match the schema" in str(exc),
+            )
         usage.add(response.usage)
         outcome = normalise_results(response.content)
         titles |= {h.url: h.title for h in outcome.hits}
@@ -255,4 +265,6 @@ class LLMResearchWriter:
             None if draft else "no parseable section",
             outcome.hits,
             outcome.errors,
+            outcome.queries,
+            draft is None,
         )

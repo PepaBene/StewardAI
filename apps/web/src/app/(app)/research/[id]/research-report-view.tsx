@@ -63,6 +63,7 @@ import { cn } from "@/lib/utils";
 import { ClaimLedger } from "./claim-ledger";
 import { KpiThresholdFigure } from "./kpi-figure";
 import { PlanPanel, ToolCalls } from "./plan-panel";
+import { TracePanel } from "./trace-panel";
 import { RunSnapshot } from "./run-snapshot";
 import { SalesRegionFigureView } from "./sales-region-figure";
 import { SearchCoverage } from "./search-coverage";
@@ -376,6 +377,7 @@ function Report({ report: stored, onReload }: { report: ResearchReportOut; onRel
           />
           <PlanPanel plan={body.plan} />
           <ToolCalls calls={body.tool_calls} />
+          <TracePanel body={body} />
         </article>
 
         <aside className="flex min-w-0 flex-col gap-5" aria-label="Report details">
