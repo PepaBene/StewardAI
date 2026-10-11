@@ -51,6 +51,7 @@ const FULL: JobsConfig = {
   shadow_snapshot: { enabled: true, cron: "56 13 * * mon", timezone: "UTC" },
   shadow_report: { enabled: false, cron: "3 14 * * mon", timezone: "UTC" },
   raw_retention: { enabled: true, cron: "10 5 * * mon", timezone: "UTC" },
+  research_trace_retention: { enabled: true, cron: "40 4 * * *", timezone: "UTC" },
   zero_cost_gate: { enabled: false, cron: "17 6 * * mon", timezone: "UTC" },
   returns_refresh: { enabled: true, cron: "24 7 * * mon", timezone: "UTC" },
   exchange_probes: { enabled: false, cron: "31 8 * * mon", timezone: "UTC" },

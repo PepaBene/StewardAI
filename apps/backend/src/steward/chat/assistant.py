@@ -36,6 +36,7 @@ from steward.llm.types import (
 )
 from steward.news.normalize import host_of
 from steward.research.sources import Registry, Source
+from steward.research.untrusted import flag_sources, strip_outbound
 from steward.settings import get_settings
 from steward.verify.claims import Claim, check_claims
 
@@ -58,6 +59,12 @@ not give buy, sell or price-target advice; you may lay out what the sources say 
 against and which thesis KPIs or exit conditions are involved. Do not answer from \
 general knowledge about a company: if the tools return nothing, say what you looked at. \
 Propose a job only when the question needs it, and say what you proposed and why.
+
+Tool figures come with a status. "missing", "not_applicable" and "failed" mean there is no \
+value: say so and why, never write a zero or an estimate in its place. "stale" means the \
+value is the latest known but old: give its as_of date. Name the period, currency and unit \
+that come with a figure. A list marked truncated is not everything: say it is partial or \
+ask for the next page. Check data_freshness before stating that something is recent.
 
 The owner's strategy is core-satellite: a global ETF core, plus individual stocks, each \
 backed by a written thesis (why owned, KPIs, exit conditions, valuation scenarios, \
@@ -366,6 +373,10 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
                 settings.source_tiers,
             )
             await mark_unsupported_figures(sentences, registry)
+            flag_sources(registry.sources)
+            allowed = {s.url for s in registry.sources if s.url}
+            for sentence in sentences:
+                sentence.text, _ = strip_outbound(sentence.text, allowed)
         answer = ChatAnswer(
             sentences=sentences,
             sources=registry.sources,
@@ -409,6 +420,10 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
             unsourced=sum(1 for s in sentences if s.no_source),
             tools=tools.used,
             actions=tools.actions,
+            model=result.usage.model,
+            trace=tools.trace,
+            sources=len(registry.sources),
+            shape=answer.shape,
         )
     return reply
 

@@ -10,14 +10,18 @@ or cancels in the chat panel. Only a confirmed action creates a job (trigger `ch
 
 import datetime as dt
 import json
+import time
 from collections.abc import Sequence
 from typing import Any
 
 import asyncpg
 import httpx
 
-from steward.chat import analytics_tools
+from steward.chat import analytics_tools, data_tools, research_tools
 from steward.chat.analytics_tools import SELECTOR_KINDS
+from steward.chat.data_tool_defs import DATA_TOOL_DEFINITIONS
+from steward.chat.envelope import neutralise_tree, stamp
+from steward.chat.research_tools import EVIDENCE_SECTIONS, RISK_KINDS
 from steward.config.research import ResearchProfilesConfig
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
@@ -430,6 +434,151 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
+        "name": "filing_evidence",
+        "description": "Stored filed evidence for one ticker, one section at a time: "
+        "filed_notes, control_stakes (13D/G), institutional (13F), fund_positions (N-PORT), "
+        "insider (classified Form 4 activity), dependencies (confirmed customers/suppliers), "
+        "deals, or consensus (analyst vintages). Starts with a coverage state saying whether "
+        "the section is covered; each item carries its source URL, passage and known-at date. "
+        "The channels are never added together. `as_of` hides records learned after that day.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string", "description": "e.g. AAPL_US_EQ"},
+                "section": {"type": "string", "enum": list(EVIDENCE_SECTIONS)},
+                "as_of": {"type": "string", "description": "ISO date, optional."},
+                "limit": {"type": "integer", "description": "Items per list, 1-25 (default 10)."},
+            },
+            "required": ["ticker", "section"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "fundamentals",
+        "description": "Financial ratios computed in code from the filed statements of one "
+        "covered company: margins, returns, growth, leverage, valuation multiples, with the "
+        "latest value, its period and currency, its formula and the company's own five-year "
+        "median. A ratio with no value says why. Pass `groups` (ids from an earlier call) to "
+        "narrow it. Pass `periods` (1-8) to get each ratio's last N values as a series "
+        "(fewer ratios are then returned).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string"},
+                "groups": {"type": "array", "items": {"type": "string"}},
+                "periods": {"type": "integer", "description": "Series length, 1-8 (optional)."},
+            },
+            "required": ["ticker"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "valuation_scenarios",
+        "description": "The app's scenario DCF for one covered company under default "
+        "assumptions built from its own filed growth: value per share per scenario, the range, "
+        "the price, the discount-rate build and the filed inputs. The assumptions are "
+        "placeholders, not forecasts; there is no single target value.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"ticker": {"type": "string"}},
+            "required": ["ticker"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "price_history",
+        "description": "Closing prices of one covered ticker over the last N days (default "
+        "365, at most 3650), thinned to at most 120 points, with the change over the window, "
+        "high, low and deepest drawdown computed in code over every stored close. Pass "
+        "`benchmark` (another covered ticker) for the return against it over the same days.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string"},
+                "days": {"type": "integer"},
+                "benchmark": {"type": "string", "description": "Covered ticker, optional."},
+            },
+            "required": ["ticker"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "macro_series",
+        "description": "Stored macro and commodity series. Without series_id: the series "
+        "matching `query` (and `geography`, an ISO code) with their latest period. With "
+        "series_id: its most recent periods, newest vintage of each, with unit and source URL.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "series_id": {"type": "string"},
+                "query": {"type": "string"},
+                "geography": {"type": "string"},
+                "limit": {"type": "integer", "description": "1-60 (default 12)."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "strategy_rules",
+        "description": "The owner's active strategy with its version: goals, horizon, target "
+        "weights with bands and hard limits, category targets, rules (id, operator, value), "
+        "risk limits and pre-trade thresholds. Use it to judge fit against a named rule.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "transactions",
+        "description": "The owner's orders, dividends and cash movements over the last N days "
+        "(default 90), newest first, optionally for one ticker or one kind (order, dividend, "
+        "cash). Totals cover every match; pass the returned next_cursor for the next page.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string"},
+                "days": {"type": "integer"},
+                "kind": {"type": "string", "enum": ["order", "dividend", "cash"]},
+                "limit": {"type": "integer", "description": "1-50 (default 25)."},
+                "cursor": {"type": "string"},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "risk_history",
+        "description": "Stored risk reports of one kind (ex_ante, replay, factors, shock), "
+        "newest first, each with its as-of date, method version and headline numbers: how "
+        "the portfolio's risk figures moved. Compare only equal method versions.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "kind": {"type": "string", "enum": list(RISK_KINDS)},
+                "scope": {"type": "string"},
+                "limit": {"type": "integer", "description": "1-30 (default 8)."},
+            },
+            "required": ["kind"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "thesis_and_reports",
+        "description": "One holding's written thesis (why owned, KPIs, exit conditions, "
+        "review date), the latest verdict of each KPI with its observed value, and its last "
+        "two research or review reports, in one call.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"ticker": {"type": "string"}},
+            "required": ["ticker"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "data_freshness",
+        "description": "When each research dataset (portfolio snapshot, news, macro, "
+        "fundamentals, prices, FX, insider filings, transactions) was last updated, which are "
+        "stale, and the provider coverage states. Check it before relying on recent data.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    *DATA_TOOL_DEFINITIONS,
+    {
         "name": "propose_job",
         "description": "Propose starting a job: re-run a holding's earnings check, start a "
         "research report, or run the portfolio sync. Nothing starts until the owner "
@@ -447,6 +596,19 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
 ]
+
+
+def trace_args(args: dict[str, Any]) -> dict[str, Any]:
+    """A call's arguments as kept in the trace: long strings and lists clipped."""
+    out: dict[str, Any] = {}
+    for key, value in args.items():
+        if isinstance(value, str):
+            out[key] = value[:200]
+        elif isinstance(value, list):
+            out[key] = value[:10]
+        else:
+            out[key] = value
+    return out
 
 
 SEMANTIC_MIN_COSINE = 0.6
@@ -474,34 +636,175 @@ class ChatTools:
         self,
         pool: asyncpg.Pool,
         registry: Registry,
-        conversation_id: int,
+        conversation_id: int | None,
         message_id: int | None,
         embedder: Embedder | None = None,
+        *,
+        owner_id: str | None = None,
     ) -> None:
+        # Outside chat (the research run) there is no conversation: `conversation_id` is None,
+        # and owner-scoped tools use `owner_id` if given, else report that they have no owner.
         self.pool = pool
         self.registry = registry
         self.conversation_id = conversation_id
         self.message_id = message_id
+        self.owner_id = owner_id
         self.embedder = embedder
         self.used: list[str] = []
         self.actions: list[int] = []
+        # One entry per call, for the job's step detail: what was asked, how long it took,
+        # whether it returned data or an error, and how many citable records it added.
+        self.trace: list[dict[str, Any]] = []
 
     async def call(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         self.used.append(name)
+        started = time.monotonic()
+        known = len(self.registry.sources)
+        result = await self._dispatch(name, args)
+        self.trace.append(
+            {
+                "tool": name,
+                "args": trace_args(args),
+                "ms": round((time.monotonic() - started) * 1000),
+                "ok": "error" not in result,
+                **({"error": str(result["error"])[:200]} if "error" in result else {}),
+                "sources_added": len(self.registry.sources) - known,
+                "bytes": len(json.dumps(result, default=str)),
+            }
+        )
+        return stamp(neutralise_tree(result), name, dt.datetime.now(dt.UTC))
+
+    async def _dispatch(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         handler = getattr(self, f"_tool_{name}", None)
         if handler is None:
             return {"error": f"unknown tool {name}"}
         try:
             result: dict[str, Any] = await handler(**args)
-        except TypeError as exc:
-            return {"error": f"bad arguments: {exc}"}
+        except (TypeError, AttributeError, ValueError) as exc:
+            # AttributeError: a number where text was expected (`.upper()` on an int).
+            return {"error": f"bad arguments: {str(exc)[:200]}"}
         except asyncpg.DataError as exc:
             # A model-chosen value the database cannot take (an id out of range) is a tool error
             # the model can correct, not a failure of the whole chat job.
             return {"error": f"bad arguments: {str(exc)[:200]}"}
         return result
 
+    async def _tool_filing_evidence(
+        self,
+        ticker: str,
+        section: str,
+        as_of: str | None = None,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        return await research_tools.filing_evidence(
+            self.pool, self.registry, ticker, section, as_of, limit
+        )
+
+    async def _tool_fundamentals(
+        self, ticker: str, groups: list[str] | None = None, periods: int | None = None
+    ) -> dict[str, Any]:
+        return await research_tools.fundamentals(self.pool, self.registry, ticker, groups, periods)
+
+    async def _tool_valuation_scenarios(self, ticker: str) -> dict[str, Any]:
+        return await research_tools.valuation_scenarios(self.pool, self.registry, ticker)
+
+    async def _tool_price_history(
+        self, ticker: str, days: int = 365, benchmark: str | None = None
+    ) -> dict[str, Any]:
+        return await research_tools.price_history(self.pool, self.registry, ticker, days, benchmark)
+
+    async def _tool_fx_rates(
+        self, currency: str, days: int = 30, limit: int = 10
+    ) -> dict[str, Any]:
+        return await data_tools.fx_rates(self.pool, self.registry, currency, days, limit)
+
+    async def _tool_latest_quote(self, ticker: str) -> dict[str, Any]:
+        return await data_tools.latest_quote(self.pool, self.registry, ticker)
+
+    async def _tool_listing_liquidity(self, ticker: str) -> dict[str, Any]:
+        return await data_tools.listing_liquidity(self.pool, self.registry, ticker)
+
+    async def _tool_statement_lines(
+        self,
+        ticker: str,
+        statement: str | None = None,
+        concept: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        return await data_tools.statement_lines(
+            self.pool, self.registry, ticker, statement, concept, limit
+        )
+
+    async def _tool_share_counts(self, ticker: str) -> dict[str, Any]:
+        return await data_tools.share_counts(self.pool, self.registry, ticker)
+
+    async def _tool_segment_revenue(
+        self, ticker: str, kind: str | None = None, limit: int = 20
+    ) -> dict[str, Any]:
+        return await data_tools.segment_revenue(self.pool, self.registry, ticker, kind, limit)
+
+    async def _tool_corporate_actions(
+        self, ticker: str, days: int = 730, limit: int = 20
+    ) -> dict[str, Any]:
+        return await data_tools.corporate_actions(self.pool, self.registry, ticker, days, limit)
+
+    async def _tool_peers(self, ticker: str) -> dict[str, Any]:
+        return await data_tools.peers(self.pool, self.registry, ticker)
+
+    async def _tool_etf_breakdown(self, fund_isin: str, limit: int = 10) -> dict[str, Any]:
+        return await data_tools.etf_breakdown(self.pool, self.registry, fund_isin, limit)
+
+    async def _tool_fund_nav(self, fund_isin: str, limit: int = 8) -> dict[str, Any]:
+        owner = await self._owner()
+        if owner is None:
+            return {"error": "this conversation has no owner"}
+        return await data_tools.fund_nav(self.pool, self.registry, owner, fund_isin, limit)
+
+    async def _tool_coverage_review(self, limit: int = 25) -> dict[str, Any]:
+        return await data_tools.coverage_review(self.pool, limit)
+
+    async def _tool_macro_series(
+        self,
+        series_id: str | None = None,
+        query: str | None = None,
+        geography: str | None = None,
+        limit: int = 12,
+    ) -> dict[str, Any]:
+        return await research_tools.macro_series(
+            self.pool, self.registry, series_id, query, geography, limit
+        )
+
+    async def _tool_strategy_rules(self) -> dict[str, Any]:
+        return await research_tools.strategy_rules(self.pool, self.registry)
+
+    async def _tool_transactions(
+        self,
+        ticker: str | None = None,
+        days: int = 90,
+        kind: str | None = None,
+        limit: int = 25,
+        cursor: str | None = None,
+    ) -> dict[str, Any]:
+        return await research_tools.transactions(
+            self.pool, self.registry, ticker, days, kind, limit, cursor
+        )
+
+    async def _tool_risk_history(
+        self, kind: str, scope: str | None = None, limit: int = 8
+    ) -> dict[str, Any]:
+        return await research_tools.risk_history(self.pool, self.registry, kind, scope, limit)
+
+    async def _tool_thesis_and_reports(self, ticker: str) -> dict[str, Any]:
+        return await research_tools.thesis_and_reports(self.pool, self.registry, ticker)
+
+    async def _tool_data_freshness(self) -> dict[str, Any]:
+        return await research_tools.data_freshness(self.pool)
+
     async def _owner(self) -> str | None:
+        if self.owner_id is not None:
+            return self.owner_id
+        if self.conversation_id is None:
+            return None
         return await analytics_tools.conversation_owner(self.pool, self.conversation_id)
 
     async def _tool_stress_test(self) -> dict[str, Any]:

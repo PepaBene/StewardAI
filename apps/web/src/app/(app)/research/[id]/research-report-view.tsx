@@ -55,12 +55,22 @@ import {
   WRITTEN_BY,
   writtenBy,
 } from "@/lib/research/report";
+import type { ReviewState } from "@/lib/research/ledger";
+import { normaliseView, originalSectionIndex, type ReportView } from "@/lib/research/view";
 import { salesRegionFigure } from "@/lib/reference/segments";
 import { sourceKindLabel, type CitationIndex } from "@/lib/sources/sources";
 import { cn } from "@/lib/utils";
 
+import { ClaimLedger } from "./claim-ledger";
 import { KpiThresholdFigure } from "./kpi-figure";
+import { PlanPanel, ToolCalls } from "./plan-panel";
+import { TracePanel } from "./trace-panel";
+import { RunSnapshot } from "./run-snapshot";
 import { SalesRegionFigureView } from "./sales-region-figure";
+import { SearchCoverage } from "./search-coverage";
+import { SourceRoleNote } from "./source-role-note";
+import { ThesisProposalPanel } from "./thesis-proposal";
+import { ViewToggle } from "./view-toggle";
 
 const LINK = "text-accent-ink underline-offset-4 hover:underline";
 
@@ -108,7 +118,7 @@ export function ResearchReportView({ id }: { id: number }) {
     );
   }
   const report = state.kind === "ok" ? state.data : state.previous!;
-  return <Report report={report} />;
+  return <Report report={report} onReload={reload} />;
 }
 
 /** "Computed" (code) or "Model-written", as a word with an icon. */
@@ -151,8 +161,23 @@ function useOptional<T>(key: string | null, load: () => Promise<{ data?: T }>): 
   return got && got.key === key ? got.data : null;
 }
 
-function Report({ report }: { report: ResearchReportOut }) {
+function Report({ report: stored, onReload }: { report: ResearchReportOut; onReload: () => void }) {
+  // One stored report, two views: the API serves the concise one on request.
+  const [choice, setChoice] = useState<ReportView | null>(null);
+  // Claim reviews saved this session; kept here so they outlive the view switch.
+  const [reviews, setReviews] = useState<Record<string, ReviewState>>({});
+  const view =choice ?? normaliseView(stored.body.default_view);
+  const concise = useOptional<ResearchReportOut>(
+    view === "concise" ? `concise:${stored.id}:${stored.body.trace_purged_at ?? ""}` : null,
+    () =>
+      getBrowserApiClient().GET("/research/{report_id}", {
+        params: { path: { report_id: stored.id }, query: { view: "concise" } },
+      }),
+  );
+  const report = view === "concise" && concise ? concise : stored;
+  const viewPending = view === "concise" && report === stored;
   const { body } = report;
+  const flaggedIds = body.flagged_sources;
   const index = useMemo(() => researchIndex(body), [body]);
   const job = useOptional<JobDetail>(report.job_id === null ? null : `job:${report.job_id}`, () =>
     getBrowserApiClient().GET("/jobs/{job_id}", { params: { path: { job_id: report.job_id! } } }),
@@ -231,7 +256,8 @@ function Report({ report }: { report: ResearchReportOut }) {
           </p>
         </div>
         <div className="flex flex-col items-end gap-1.5" data-print-hide>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            <ViewToggle view={view} onChange={setChoice} />
             <Button variant="outline" onClick={() => window.print()}>
               <DownloadIcon aria-hidden="true" />
               PDF
@@ -257,12 +283,18 @@ function Report({ report }: { report: ResearchReportOut }) {
                     key={i}
                     reportId={report.id}
                     sentence={sentence}
-                    path={researchSentencePath(body.sections.indexOf(conclusion), i)}
+                    path={researchSentencePath(originalSectionIndex(stored.body.sections, conclusion.id, body.sections.indexOf(conclusion)), i)}
                     index={index}
                   />
                 ))}
               </p>
             </section>
+          ) : null}
+
+          {viewPending ? (
+            <p role="status" className="text-xs text-text-muted">
+              Loading the concise view; the whole report is shown meanwhile.
+            </p>
           ) : null}
 
           {(body.notes ?? []).length > 0 ? (
@@ -312,7 +344,7 @@ function Report({ report }: { report: ResearchReportOut }) {
                     reportId={report.id}
                     sentence={sentence}
                     sectionWriter={writtenBy(section.written_by)}
-                    path={researchSentencePath(s, i)}
+                    path={researchSentencePath(originalSectionIndex(stored.body.sections, section.id, s), i)}
                     index={index}
                   />
                 ))}
@@ -337,13 +369,31 @@ function Report({ report }: { report: ResearchReportOut }) {
             </p>
             <ClaimsSummaryLine claims={body.claims} />
           </div>
+
+          <ThesisProposalPanel reportId={report.id} proposal={body.thesis_proposal} review={body.thesis_review} sources={body.sources} />
+          <ClaimLedger
+            reportId={report.id}
+            body={body}
+            reviews={reviews}
+            onReview={(claimId, state) => setReviews((r) => ({ ...r, [claimId]: state }))}
+          />
+          <SearchCoverage
+            search_summary={body.search_summary}
+            discovered_urls={body.discovered_urls}
+            rounds={body.rounds}
+            stopped_because={body.stopped_because}
+          />
+          <PlanPanel plan={body.plan} />
+          <ToolCalls calls={body.tool_calls} />
+          <TracePanel body={body} />
         </article>
 
         <aside className="flex min-w-0 flex-col gap-5" aria-label="Report details">
           <ClaimsTile report={report} />
           <KeyFigures figures={figures} loaded={holding !== null} />
-          <SourcesPanel index={index} />
+          <SourcesPanel index={index} flaggedIds={flaggedIds} />
           <RunDetails report={report} job={job} />
+          <RunSnapshot reportId={report.id} body={body} onPurged={onReload} />
         </aside>
       </div>
     </div>
@@ -443,7 +493,7 @@ function KeyFigures({ figures, loaded }: { figures: ReturnType<typeof keyFigures
 }
 
 /** Every source, numbered as the citations are, with its kind, tier, date, snippet and links. */
-function SourcesPanel({ index }: { index: CitationIndex }) {
+function SourcesPanel({ index, flaggedIds }: { index: CitationIndex; flaggedIds: readonly string[] | undefined }) {
   return (
     <Blueprint className="flex flex-col gap-2.5 px-5 py-[18px]" aria-labelledby="sources-heading">
       <h2 id="sources-heading" className="kicker font-sans">
@@ -474,6 +524,7 @@ function SourcesPanel({ index }: { index: CitationIndex }) {
                 <span>· {citedBy === 0 ? "not cited in the text" : `cited ${citedBy}×`}</span>
               </p>
               {s.snippet ? <p className="line-clamp-2 text-xs text-text-muted" title={s.snippet}>{s.snippet}</p> : null}
+              <SourceRoleNote source={s} flaggedIds={flaggedIds} />
               <SourceLinksLine source={s} />
             </div>
           </li>

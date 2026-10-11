@@ -36,11 +36,16 @@ export function holdingHref(ticker: string): string {
 
 /** Every section a profile can ask for, in the backend's order, and who writes it. */
 export const RESEARCH_SECTIONS: readonly { id: ResearchSectionId; label: string; writtenBy: "code" | "model"; description: string }[] = [
+  { id: "executive_summary", label: "Executive summary", writtenBy: "model", description: "The conclusion first: how strong the case is and what is still open." },
   { id: "business", label: "Business", writtenBy: "model", description: "What the company does and how it earns money." },
   { id: "financial_trend", label: "Financial trend", writtenBy: "code", description: "Verified figures over the last periods, from stored facts." },
   { id: "moat_risks", label: "Moat and risks", writtenBy: "model", description: "What protects the business and what threatens it." },
   { id: "valuation", label: "Valuation", writtenBy: "code", description: "The valuation methods below, computed from stored figures and prices." },
+  { id: "scenarios", label: "Bull, base and bear cases", writtenBy: "model", description: "What would have to happen for each case; prices stay with the valuation." },
+  { id: "catalysts", label: "Catalysts", writtenBy: "model", description: "Events that could move the case, with dates when the sources give them." },
+  { id: "counter_case", label: "The case against", writtenBy: "model", description: "Searched for on purpose: the strongest evidence against owning it." },
   { id: "strategy_fit", label: "Strategy fit", writtenBy: "model", description: "How it fits the strategy's targets, bands and rules." },
+  { id: "thesis_kpis", label: "Thesis KPIs and exit conditions", writtenBy: "model", description: "What proves the case, what would end it, and where each stands." },
   { id: "ownership", label: "Ownership", writtenBy: "code", description: "Institutional holders from SEC Form 13F (US listings)." },
   { id: "relationships", label: "Relationships", writtenBy: "code", description: "Group structure, competitors, suppliers and customers." },
   { id: "risk", label: "Risk", writtenBy: "code", description: "Volatility, drawdown, beta and correlations from price history." },

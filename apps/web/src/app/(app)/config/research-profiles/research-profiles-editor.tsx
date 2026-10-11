@@ -6,25 +6,32 @@ import { useId, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { ConfigHeader } from "@/components/config/config-header";
-import { CheckboxField, CheckboxGroup, SelectField, TextField } from "@/components/config/fields";
+import { CheckboxField, CheckboxGroup, SelectField, TextAreaField, TextField } from "@/components/config/fields";
 import { SaveBar } from "@/components/config/save-bar";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type ResearchProfilesConfig, type ResearchSectionId } from "@/lib/api/client";
 import { errorsAt, type FieldErrors } from "@/lib/api/validation-errors";
 import { EFFORTS, MODEL_SUGGESTIONS } from "@/lib/config/jobs-form";
 import {
+  AUTHORING_MODES,
   BOUNDS,
   duplicateProfile,
+  duplicateTemplate,
   LANGUAGES,
+  MODES,
   moveInList,
   newProfile,
+  newTemplate,
   researchProfilesFromBody,
   researchProfilesToBody,
+  STALE_KINDS,
   TIER_OPTIONS,
   toggleInList,
   validateResearchProfiles,
+  WEB_EMPHASES,
   type ProfileForm,
   type ResearchProfilesForm,
+  type TemplateForm,
 } from "@/lib/config/research-profiles-form";
 import { mergeErrors } from "@/lib/config/strategy-form";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
@@ -32,13 +39,17 @@ import { DEPTHS, RESEARCH_SECTIONS, sectionLabel, VALUATION_METHODS, WRITTEN_BY 
 import { cn } from "@/lib/utils";
 import { BlueprintCorners } from "@/components/ui/blueprint";
 
+import { ReportTemplateCard } from "./report-template-card";
+
 const api = () => getBrowserApiClient();
 const EFFORT_OPTIONS = EFFORTS.map((e) => ({ value: e, label: e }));
 const VALUATION_OPTIONS = VALUATION_METHODS.map((m) => ({ value: m.id, label: m.label }));
 
 /**
  * Research profiles: the shapes a research run can take. Every field of every profile is
- * editable; profiles can be added, duplicated and removed, and one is the default. Checked
+ * editable (planning, source policy, iteration, authoring mode and report template too);
+ * profiles can be added, duplicated and removed, and one is the default. Report templates
+ * (sections, order, titles, owner-defined sections) are edited below the profiles. Checked
  * here against the backend's bounds before Save, and validated again by the backend.
  */
 export function ResearchProfilesEditor() {
@@ -62,6 +73,32 @@ export function ResearchProfilesEditor() {
 
   const setProfile = (key: string, change: Partial<ProfileForm>) =>
     setForm((f) => (f ? { ...f, profiles: f.profiles.map((p) => (p.key === key ? { ...p, ...change } : p)) } : f));
+  // Renaming a template's id keeps the profiles that use it pointing at it.
+  const setTemplate = (key: string, change: Partial<TemplateForm>) =>
+    setForm((f) => {
+      if (!f) return f;
+      const old = f.templates.find((t) => t.key === key);
+      // A partial id that equals another template's id must not move profiles onto that
+      // template (or, once typed past it, move that template's own profiles along).
+      const others = new Set(f.templates.filter((t) => t.key !== key).map((t) => t.id));
+      const renamed =
+        change.id !== undefined &&
+        old &&
+        old.id !== "" &&
+        change.id !== "" &&
+        old.id !== change.id &&
+        !others.has(old.id) &&
+        !others.has(change.id)
+          ? { from: old.id, to: change.id }
+          : null;
+      return {
+        ...f,
+        templates: f.templates.map((t) => (t.key === key ? { ...t, ...change } : t)),
+        profiles: renamed
+          ? f.profiles.map((p) => (p.template_id === renamed.from ? { ...p, template_id: renamed.to } : p))
+          : f.profiles,
+      };
+    });
   const ids = form?.profiles.map((p) => p.id) ?? [];
 
   async function save(note: string | null) {
@@ -74,8 +111,9 @@ export function ResearchProfilesEditor() {
       <ConfigHeader title="Research profiles" domain="research-profiles">
         <p>
           The shapes a research run can take: which sections, in which order, how deep, which model and budget, which source
-          tiers, peers, valuation methods and language. A quick screen and a thorough workup are two profiles. Used from the
-          next run.
+          tiers, trusted and blocked domains, peers, valuation methods and language, whether it searches again for thin
+          sections, and which report template presents the result. A quick screen and a thorough workup are two profiles.
+          Used from the next run.
         </p>
         <p>
           <Link href="/research" className="text-accent-ink underline-offset-4 hover:underline">
@@ -94,7 +132,7 @@ export function ResearchProfilesEditor() {
       {editor.status.kind === "error" ? <AlertMessage title="Could not load the research profiles">{editor.status.message}</AlertMessage> : null}
       {editor.status.kind === "ready" && editor.status.version === null ? (
         <AlertMessage tone="info" title="Defaults in use">
-          Nothing saved yet: the two profiles below (standard, quick) are the backend&rsquo;s defaults.
+          Nothing saved yet: the profiles and report templates below are the backend&rsquo;s defaults.
         </AlertMessage>
       ) : null}
 
@@ -132,6 +170,7 @@ export function ResearchProfilesEditor() {
               index={i}
               errors={errors}
               isDefault={p.id === form.default_profile}
+              templates={form.templates}
               onChange={(change) => {
                 // Renaming the default profile's id keeps it the default.
                 if (change.id !== undefined && p.id === form.default_profile) {
@@ -164,6 +203,50 @@ export function ResearchProfilesEditor() {
             Add profile
           </Button>
 
+          <section aria-labelledby="templates-heading" className="space-y-4">
+            <div className="space-y-1">
+              <h2 id="templates-heading" className="text-[22px] leading-tight font-semibold">
+                Report templates
+              </h2>
+              <p className="text-sm text-text-muted">
+                A profile decides how a run investigates; a template decides how the report is laid out: which sections appear,
+                in what order, under what title, and which are left out of the concise view. A template only arranges the
+                report. It cannot change a figure that code calculated or your strategy. Pick one per profile above.
+              </p>
+            </div>
+            {errorsAt(errors, "templates").length > 0 ? (
+              <AlertMessage title="Templates">{errorsAt(errors, "templates").join(" ")}</AlertMessage>
+            ) : null}
+            {form.templates.map((t, i) => (
+              <ReportTemplateCard
+                key={t.key}
+                template={t}
+                index={i}
+                errors={errors}
+                usedBy={form.profiles.filter((p) => p.template_id.trim() !== "" && p.template_id === t.id).map((p) => p.name || p.id)}
+                onChange={(change) => setTemplate(t.key, change)}
+                onDuplicate={() =>
+                  setForm((f) => {
+                    if (!f) return f;
+                    const copy = duplicateTemplate(t, f.templates.map((x) => x.id));
+                    const at = f.templates.findIndex((x) => x.key === t.key);
+                    return { ...f, templates: [...f.templates.slice(0, at + 1), copy, ...f.templates.slice(at + 1)] };
+                  })
+                }
+                onRemove={() => setForm((f) => (f ? { ...f, templates: f.templates.filter((x) => x.key !== t.key) } : f))}
+              />
+            ))}
+            {form.templates.length === 0 ? <p className="text-sm text-text-muted">No template yet. Profiles then use their own section list.</p> : null}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setForm((f) => (f ? { ...f, templates: [...f.templates, newTemplate(f.templates.map((x) => x.id))] } : f))}
+            >
+              <PlusIcon aria-hidden="true" />
+              Add template
+            </Button>
+          </section>
+
           <SaveBar
             dirty={dirty}
             savedVersionId={editor.version?.id ?? null}
@@ -185,6 +268,7 @@ function ProfileCard({
   index: i,
   errors,
   isDefault,
+  templates,
   onChange,
   onMakeDefault,
   onDuplicate,
@@ -194,6 +278,7 @@ function ProfileCard({
   index: number;
   errors: FieldErrors;
   isDefault: boolean;
+  templates: readonly TemplateForm[];
   onChange: (change: Partial<ProfileForm>) => void;
   onMakeDefault: () => void;
   onDuplicate: () => void;
@@ -204,6 +289,13 @@ function ProfileCard({
   const path = `profiles.${i}`;
   const own = errorsAt(errors, path);
   const label = p.name || p.id || `profile ${i + 1}`;
+  const templateOptions = [
+    { value: "", label: "None (the profile's own section list)" },
+    ...templates.map((t) => ({ value: t.id, label: `${t.name || "(no name)"} (${t.id || "no id"})` })),
+    ...(p.template_id && !templates.some((t) => t.id === p.template_id)
+      ? [{ value: p.template_id, label: `${p.template_id} (not a template)` }]
+      : []),
+  ];
   return (
     <section aria-labelledby={headingId} className="space-y-4 blueprint p-5">
       <BlueprintCorners />
@@ -324,6 +416,145 @@ function ProfileCard({
           hint="None: the valuation section states only the price."
         />
       </div>
+
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-medium">Planning and report</legend>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <SelectField
+            label="Mode"
+            path={`${path}.mode`}
+            errors={errors}
+            value={p.mode}
+            options={MODES}
+            onChange={(v) => onChange({ mode: v })}
+            hint="The kind of run; it shapes the research plan (questions, tools, searches)."
+          />
+          <SelectField
+            label="Web emphasis"
+            path={`${path}.web_emphasis`}
+            errors={errors}
+            value={p.web_emphasis}
+            options={WEB_EMPHASES}
+            onChange={(v) => onChange({ web_emphasis: v })}
+          />
+          <TextField
+            label="Date horizon (days)"
+            path={`${path}.date_horizon_days`}
+            errors={errors}
+            value={p.date_horizon_days}
+            inputMode="numeric"
+            placeholder="No horizon"
+            onChange={(v) => onChange({ date_horizon_days: v })}
+            hint={`Prefer evidence from this many days back; older sources are named as old. Blank, or ${BOUNDS.date_horizon_days.min} to ${BOUNDS.date_horizon_days.max}.`}
+          />
+          <SelectField
+            label="Report template"
+            path={`${path}.template_id`}
+            errors={errors}
+            value={p.template_id}
+            options={templateOptions}
+            onChange={(v) => onChange({ template_id: v })}
+            hint="Decides which sections appear, in what order, under what titles. Edited under Report templates."
+          />
+          <SelectField
+            label="Authoring mode"
+            path={`${path}.authoring`}
+            errors={errors}
+            value={p.authoring}
+            options={AUTHORING_MODES}
+            onChange={(v) => onChange({ authoring: v })}
+            hint="None of these changes your active thesis; you accept a proposal field by field."
+          />
+          <TextField
+            label="Cited sentences for a section to count as answered"
+            path={`${path}.min_sentences`}
+            errors={errors}
+            value={p.min_sentences}
+            inputMode="numeric"
+            onChange={(v) => onChange({ min_sentences: v })}
+            hint={`${BOUNDS.min_sentences.min} to ${BOUNDS.min_sentences.max}.`}
+          />
+        </div>
+        <div className="grid items-start gap-3 sm:grid-cols-2">
+          <CheckboxField
+            label="Search again for thin sections"
+            checked={p.iterate}
+            onChange={(v) => onChange({ iterate: v })}
+            hint="After the first pass, search for sections left thin, corroborate single-source claims, and stop when the sections have enough or the budget is used."
+          />
+          <TextField
+            label="Follow-up rounds"
+            path={`${path}.max_rounds`}
+            errors={errors}
+            value={p.max_rounds}
+            inputMode="numeric"
+            onChange={(v) => onChange({ max_rounds: v })}
+            hint={`Used only when searching again. ${BOUNDS.max_rounds.min} to ${BOUNDS.max_rounds.max}.`}
+          />
+        </div>
+      </fieldset>
+
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-medium">Source policy</legend>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <TextAreaField
+            label="Trusted domains"
+            path={`${path}.allow_domains`}
+            errors={errors}
+            value={p.allow_domains}
+            rows={4}
+            onChange={(v) => onChange({ allow_domains: v })}
+            hint={`One per line, e.g. example.com. Searched in addition to the tier lists, labelled owner-trusted, never counted as proof. Up to ${BOUNDS.allow_domains.max}.`}
+          />
+          <TextAreaField
+            label="Blocked domains"
+            path={`${path}.deny_domains`}
+            errors={errors}
+            value={p.deny_domains}
+            rows={4}
+            onChange={(v) => onChange({ deny_domains: v })}
+            hint={`One per line. Never searched, never cited. Up to ${BOUNDS.deny_domains.max}.`}
+          />
+          <div className="space-y-3">
+            <CheckboxField
+              label="Allow forums and social media"
+              checked={p.allow_forums}
+              onChange={(v) => onChange({ allow_forums: v })}
+              hint="Their sentences are labelled as forum."
+            />
+            <TextAreaField
+              label="Extra forum domains"
+              path={`${path}.forum_domains`}
+              errors={errors}
+              value={p.forum_domains}
+              rows={3}
+              onChange={(v) => onChange({ forum_domains: v })}
+              hint={`One per line, added to the built-in list; searched only when forums are allowed. Up to ${BOUNDS.forum_domains.max}.`}
+            />
+          </div>
+        </div>
+        <fieldset className="space-y-1">
+          <legend className="text-sm font-medium">Days before a cited source counts as stale</legend>
+          <p className="text-xs text-text-muted">Leave blank to keep the built-in limit shown in each box.</p>
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {STALE_KINDS.map((k) => (
+              <TextField
+                key={k.kind}
+                label={k.label}
+                path={`${path}.stale_days.${k.kind}`}
+                errors={errors}
+                value={p.stale_days[k.kind] ?? ""}
+                inputMode="numeric"
+                placeholder={String(k.builtin)}
+                onChange={(v) => onChange({ stale_days: { ...p.stale_days, [k.kind]: v } })}
+              />
+            ))}
+          </div>
+          {errorsAt(errors, `${path}.stale_days`).length > 0 ? (
+            <p className="text-xs text-text">{errorsAt(errors, `${path}.stale_days`).join(" ")}</p>
+          ) : null}
+        </fieldset>
+      </fieldset>
     </section>
   );
 }

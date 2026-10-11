@@ -22,8 +22,16 @@ from steward.ai import Usage
 from steward.config.jobs import effort_kwargs
 from steward.llm.routing import RoutingClient
 from steward.llm.types import LLMError
+from steward.research.web import SearchHit, normalise_results, web_search_tool
+
+__all__ = ["web_search_tool"]  # kept importable from here
 
 SECTION_TITLES = {
+    "executive_summary": "Executive summary",
+    "scenarios": "Bull, base and bear cases",
+    "catalysts": "Catalysts",
+    "counter_case": "The case against",
+    "thesis_kpis": "Thesis KPIs and exit conditions",
     "business": "Business",
     "financial_trend": "Financial trend",
     "moat_risks": "Moat and risks",
@@ -37,6 +45,21 @@ SECTION_TITLES = {
 }
 
 SECTION_TASKS = {
+    "executive_summary": "The conclusion first, in plain words: what the evidence says about "
+    "the case for owning this company, how strong it is, and what is still open. If the "
+    "evidence is mixed or too thin, say that rather than leaning one way.",
+    "scenarios": "What would have to happen for the bear, base and bull case to come true. "
+    "Describe events and the evidence for each, never prices, probabilities or returns: the "
+    "valuation and the owner's scenarios are computed elsewhere.",
+    "catalysts": "The events that could move the case, with the date they should land when "
+    "the sources give one (results, regulatory decisions, product or contract milestones).",
+    "counter_case": "The strongest case against owning it: search deliberately for "
+    "disconfirming evidence, criticism, short-seller or analyst downgrades, litigation, "
+    "competitor wins and accounting questions. Give each point its source, and say plainly "
+    "when you looked and found nothing.",
+    "thesis_kpis": "The checkable conditions that prove the case and the ones that would end "
+    "it: for each, the metric, the level and where the sources show it now. Name the "
+    "owner's thesis KPIs if there are any.",
     "business": "What the company does, how it makes money, its main segments and markets.",
     "moat_risks": "Its competitive advantages and the main risks to them, against peers "
     "where given.",
@@ -113,6 +136,19 @@ class SectionRequest:
     # Sources earlier sections found by web search: after the cached material, since they
     # grow from section to section.
     added_material: str = ""
+    # Phase 2 and 3 additions, all after the cached material. `title` and `task` override the
+    # built-in text (a custom section); `focus` is the plan's questions for the section;
+    # `policy` the source order; `existing` the section's sentences so far (a follow-up must
+    # not repeat them); `horizon_days` how far back evidence should reach.
+    title: str | None = None
+    task: str | None = None
+    focus: str = ""
+    policy: str = ""
+    existing: str = ""
+    horizon_days: int | None = None
+    # What the plan's stored-data tools returned for this section (see research.read_tools):
+    # after the cached material, before the task.
+    tool_evidence: str = ""
 
 
 @dataclass
@@ -121,37 +157,22 @@ class SectionResult:
     usage: Usage
     titles: dict[str, str] = field(default_factory=dict)
     note: str | None = None
+    # What the search returned, normalised (see steward.research.web). A writer that only
+    # fills `titles` still works: the run derives hits from it.
+    hits: list[SearchHit] = field(default_factory=list)
+    search_errors: list[str] = field(default_factory=list)
+    # The queries the provider reports the model issued (empty when it does not say), and
+    # whether the answer failed the section schema (see steward.research.trace).
+    queries: list[str] = field(default_factory=list)
+    schema_failure: bool = False
 
 
 class ResearchWriter(Protocol):
     async def write(self, request: SectionRequest) -> SectionResult: ...
 
 
-def web_search_tool(model: str, max_uses: int, domains: tuple[str, ...]) -> dict[str, Any]:
-    """The web search tool a call site passes to `client.messages.parse`; the routing client
-    turns it into the provider's own search. `model` is accepted so a call site need not know
-    which models search differently."""
-    del model
-    return {
-        "type": "web_search",
-        "name": "web_search",
-        "max_uses": max_uses,
-        "allowed_domains": list(domains),
-    }
-
-
 def result_titles(content: list[Any]) -> dict[str, str]:
-    titles: dict[str, str] = {}
-    for block in content:
-        if getattr(block, "type", None) != "web_search_tool_result":
-            continue
-        results = getattr(block, "content", None)
-        if isinstance(results, list):
-            for r in results:
-                url = getattr(r, "url", None)
-                if url:
-                    titles[url] = str(getattr(r, "title", "") or url)[:300]
-    return titles
+    return {h.url: h.title for h in normalise_results(content).hits}
 
 
 def section_prompt(request: SectionRequest) -> str:
@@ -163,11 +184,30 @@ def section_prompt(request: SectionRequest) -> str:
         else ""
     )
     added = f"{request.added_material}\n\n" if request.added_material else ""
+    if request.tool_evidence:
+        added += f"{request.tool_evidence}\n\n"
+    title = request.title or SECTION_TITLES[request.section]
+    task = request.task or SECTION_TASKS[request.section]
+    extra = ""
+    if request.focus:
+        extra += f"\nQuestions to answer:\n{request.focus}"
+    if request.horizon_days:
+        extra += (
+            f"\nPrefer evidence from the last {request.horizon_days} days; say when a source "
+            "is older than that."
+        )
+    if request.policy:
+        extra += f"\n{request.policy}"
+    if request.existing:
+        extra += (
+            "\nThis section already says the following. Add only what is new, a second "
+            f"source for a claim, or a contradiction; do not repeat it:\n{request.existing}"
+        )
     return (
         f"{added}Today is {request.today.isoformat()}.\n"
         f"Company: {request.name} ({request.ticker}).\n"
-        f"Section: {SECTION_TITLES[request.section]}. Task: {SECTION_TASKS[request.section]}"
-        f"{peers}\nWrite at most {request.max_sentences} sentences, in {language}."
+        f"Section: {title}. Task: {task}"
+        f"{peers}{extra}\nWrite at most {request.max_sentences} sentences, in {language}."
     )
 
 
@@ -203,10 +243,28 @@ class LLMResearchWriter:
                 **effort_kwargs(self._model, self._effort, 16000),
             )
         except LLMError as exc:
-            return SectionResult(None, usage, titles, f"the call failed: {exc}"[:300])
+            return SectionResult(
+                None,
+                usage,
+                titles,
+                f"the call failed: {exc}"[:300],
+                schema_failure="does not match the schema" in str(exc),
+            )
         usage.add(response.usage)
-        titles |= result_titles(response.content)
+        outcome = normalise_results(response.content)
+        titles |= {h.url: h.title for h in outcome.hits}
         if response.stop_reason == "refusal":
-            return SectionResult(None, usage, titles, "the model declined this section")
+            return SectionResult(
+                None, usage, titles, "the model declined this section", outcome.hits, outcome.errors
+            )
         draft = response.parsed_output
-        return SectionResult(draft, usage, titles, None if draft else "no parseable section")
+        return SectionResult(
+            draft,
+            usage,
+            titles,
+            None if draft else "no parseable section",
+            outcome.hits,
+            outcome.errors,
+            outcome.queries,
+            draft is None,
+        )

@@ -1845,6 +1845,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/research/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Plan Draft
+         * @description Write a research plan for a ticker and profile without running it: by a model when the
+         *     profile (or `planner`) asks, else by code. The owner can edit and approve it, then start
+         *     the run from it.
+         */
+        post: operations["create_plan_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/research/plans/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plan Draft */
+        get: operations["get_plan_draft"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit Plan Draft
+         * @description Edit a draft (reorder, remove, relabel, reword, toggle source groups) under the same
+         *     checks as a model plan, and/or approve it. Any edit withdraws an earlier approval unless
+         *     `approve` is sent with it. A started draft is final.
+         */
+        patch: operations["edit_plan_draft"];
+        trace?: never;
+    };
+    "/research/plans/{draft_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start From Plan
+         * @description Queue the research run for an approved draft. The run uses exactly this plan and stores
+         *     it with the report, with whether the owner edited it.
+         */
+        post: operations["start_from_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/research": {
         parameters: {
             query?: never;
@@ -1872,11 +1938,116 @@ export interface paths {
         /**
          * Get Research
          * @description A research report: sections of cited sentences, computed valuation figures and the
-         *     source list every citation points into.
+         *     source list every citation points into. `view=concise` shows the same report with fewer
+         *     sentences and without the sections a template marks detail-only.
          */
         get: operations["get_research"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/research/{report_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Research
+         * @description The report as Markdown, a rendering of the stored typed report in the chosen view.
+         */
+        get: operations["export_research"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/research/{report_id}/thesis-proposal/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Thesis Proposal
+         * @description Apply chosen fields of a report's thesis proposal. This saves a new `theses` config
+         *     version (the earlier one stays in the history). It is refused when the theses changed
+         *     after the report was made, so a stale proposal cannot overwrite newer edits.
+         */
+        post: operations["accept_thesis_proposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/research/{report_id}/trace/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Purge Research Trace
+         * @description Delete the working records of a research run: the URL list, web snippets, the resume
+         *     checkpoints and the tool trace. The report's sentences, sources and claim ledger stay.
+         */
+        post: operations["purge_research_trace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/research/{report_id}/claims/{claim_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Claim
+         * @description The owner confirms or rejects one claim of the report's ledger. The sentence is not
+         *     changed; the review state is kept beside it.
+         */
+        post: operations["review_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/maintenance/purge-traces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Purge Traces
+         * @description Delete the checkpoints and tool traces of succeeded jobs finished more than N days ago.
+         */
+        post: operations["purge_traces"];
         delete?: never;
         options?: never;
         head?: never;
@@ -10508,6 +10679,21 @@ export interface components {
             /** Caveats */
             caveats: string[];
         };
+        /** Balance */
+        Balance: {
+            /** Has Support */
+            has_support: boolean;
+            /** Has Challenge */
+            has_challenge: boolean;
+            /** Has Unknowns */
+            has_unknowns: boolean;
+            /** Has Scenarios */
+            has_scenarios: boolean;
+            /** Missing */
+            missing: string[];
+            /** Not Requested */
+            not_requested: string[];
+        };
         /** BaseTotals */
         BaseTotals: {
             /** Base Currency */
@@ -11147,7 +11333,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -11869,6 +12055,13 @@ export interface components {
              * @description Outlet tiers web search may use and an answer may cite (News sources config).
              */
             source_tiers?: (1 | 2 | 3)[];
+            /**
+             * Freshness Days
+             * @description Days after which the data_freshness tool calls a dataset stale: portfolio_snapshot, news, macro, fundamentals, price_bars, fx, insider_filings, transactions. A dataset left out uses its built-in limit.
+             */
+            freshness_days?: {
+                [key: string]: number;
+            };
         };
         /** CheckOut */
         CheckOut: {
@@ -11951,52 +12144,6 @@ export interface components {
             /** Check Reason */
             check_reason?: string | null;
         };
-        /** Claim */
-        Claim: {
-            /**
-             * Claim Id
-             * @description Stable id built from the record's natural key (series, geography, period; never a row id, which changes when the same value is fetched again); cite it, never the number.
-             */
-            claim_id: string;
-            /**
-             * Domain
-             * @enum {string}
-             */
-            domain: "macro" | "trade" | "financial" | "forward" | "company_research" | "business_network" | "patents";
-            /** Subject */
-            subject: string;
-            /** Metric */
-            metric: string;
-            /** Label */
-            label: string;
-            /** Value */
-            value: number | string | null;
-            /** Text Value */
-            text_value?: string | null;
-            /** Unit */
-            unit: string | null;
-            /** Currency */
-            currency?: string | null;
-            /** Period */
-            period: string | null;
-            /**
-             * Known As Of
-             * Format: date
-             * @description Date the record became known to the app.
-             */
-            known_as_of: string;
-            /** Source */
-            source: string;
-            /**
-             * Provenance
-             * @enum {string}
-             */
-            provenance: "primary" | "vendor" | "owner" | "community" | "unclassified";
-            /** Source Url */
-            source_url: string | null;
-            /** Note */
-            note?: string | null;
-        };
         /**
          * ClaimCheckSummary
          * @description What the claim verifier did to a report, stored with it.
@@ -12030,6 +12177,54 @@ export interface components {
             removed: number;
             /** Note */
             note?: string | null;
+        };
+        /** ClaimLedger */
+        ClaimLedger: {
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+            /** Claims */
+            claims: components["schemas"]["steward__research__ledger__Claim"][];
+            /** By Type */
+            by_type: {
+                [key: string]: number;
+            };
+            /** By Confidence */
+            by_confidence: {
+                [key: string]: number;
+            };
+            /** Checks */
+            checks: components["schemas"]["LedgerCheck"][];
+            /** Strategy */
+            strategy: components["schemas"]["StrategyCheck"][];
+            balance: components["schemas"]["Balance"];
+            coverage: components["schemas"]["steward__research__ledger__Coverage"];
+            /**
+             * Confidence
+             * @description The report as a whole, from its claims and checks.
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /** Confidence Why */
+            confidence_why: string;
+        };
+        /** ClaimReview */
+        ClaimReview: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "owner_confirmed" | "owner_rejected" | "unreviewed";
+        };
+        /** ClaimReviewed */
+        ClaimReviewed: {
+            /** Claim Id */
+            claim_id: string;
+            /** State */
+            state: string;
         };
         /** ClaimRow */
         ClaimRow: {
@@ -13675,6 +13870,23 @@ export interface components {
             /** Value */
             value: string;
         };
+        /**
+         * CustomSection
+         * @description A section the owner defines: a title and the question it answers. Written by the model
+         *     from the same sources, cited like any other. It has no code-written figures, so it cannot
+         *     stand in for a trusted calculation.
+         */
+        CustomSection: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Task
+             * @description What the section should answer, in plain words. No links or markup.
+             */
+            task: string;
+        };
         /** DailyFallback */
         DailyFallback: {
             /**
@@ -14909,6 +15121,46 @@ export interface components {
              * @description Pin the period rule; a mismatch is rejected.
              */
             period?: string | null;
+        };
+        /**
+         * DiscoveredUrl
+         * @description One URL the search returned, kept whether or not a sentence cites it.
+         */
+        DiscoveredUrl: {
+            /** Url */
+            url: string;
+            /** Title */
+            title: string;
+            /** Host */
+            host: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "cited" | "found_not_cited" | "excluded";
+            /** Section */
+            section: string;
+            /**
+             * Round
+             * @default 0
+             */
+            round: number;
+            /** Tier */
+            tier?: number | null;
+            /** Role */
+            role?: string | null;
+            /**
+             * Page Age
+             * @description The provider's age, if it gave one.
+             */
+            page_age?: string | null;
+            /** Retrieved At */
+            retrieved_at: string;
+            /**
+             * Limitation
+             * @description Undated, likely paywalled, or why it was excluded.
+             */
+            limitation?: string | null;
         };
         /** DiscoveryResult */
         DiscoveryResult: {
@@ -16350,6 +16602,26 @@ export interface components {
              */
             context: string | null;
         };
+        /** EvidenceRef */
+        EvidenceRef: {
+            /** Source Id */
+            source_id: string;
+            /** Kind */
+            kind: string;
+            /** Role */
+            role?: string | null;
+            /** Tier */
+            tier?: number | null;
+            /** As Of */
+            as_of?: string | null;
+            /** Retrieved At */
+            retrieved_at?: string | null;
+            /**
+             * Exists
+             * @default true
+             */
+            exists: boolean;
+        };
         /** EvidenceSpan */
         EvidenceSpan: {
             /** Evidence Id */
@@ -17652,6 +17924,26 @@ export interface components {
              * @enum {string}
              */
             display: "full" | "excerpt" | "link_only";
+        };
+        /** FieldChange */
+        FieldChange: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "why_owned" | "exit_conditions" | "pre_mortem";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "add" | "change";
+            /**
+             * Before
+             * @description What the active thesis says now (empty if nothing).
+             */
+            before: string[];
+            /** After */
+            after: components["schemas"]["ProposedLine"][];
         };
         /** Figure */
         Figure: {
@@ -21852,6 +22144,8 @@ export interface components {
             shadow_report?: components["schemas"]["JobSchedule"];
             /** @description Blanks old raw payloads (normalized data stays) and deletes fetch-audit rows past the horizon. Default: daily 03:15. */
             raw_retention?: components["schemas"]["JobSchedule"];
+            /** @description Deletes the checkpoints and tool traces of research and chat jobs that succeeded more than `research.trace_retention_days` ago (reports stay). Default: daily 03:40. */
+            research_trace_retention?: components["schemas"]["JobSchedule"];
             /** @description Audits the access ledger and the budgets collectors pass to the governor against the free quotas; reads only. Default: daily 03:20. */
             zero_cost_gate?: components["schemas"]["JobSchedule"];
             /** @description Compute and store price and total returns for held securities. Default: weekdays 23:45. */
@@ -21931,6 +22225,7 @@ export interface components {
             prices?: components["schemas"]["PriceSettings"];
             calendar?: components["schemas"]["CalendarSettings"];
             chat?: components["schemas"]["ChatSettings"];
+            research?: components["schemas"]["ResearchRetentionSettings"];
             review?: components["schemas"]["ReviewSettings"];
             ownership?: components["schemas"]["OwnershipSettings"];
             valuation?: components["schemas"]["ValuationSettings"];
@@ -22259,6 +22554,20 @@ export interface components {
             error: string | null;
             /** Fallback */
             fallback: string | null;
+        };
+        /** LedgerCheck */
+        LedgerCheck: {
+            /** Code */
+            code: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "error" | "warning" | "info";
+            /** Message */
+            message: string;
+            /** Claims */
+            claims?: string[];
         };
         /** LedgerEntryInput */
         LedgerEntryInput: {
@@ -23742,6 +24051,64 @@ export interface components {
             total_return: string[];
         } & {
             [key: string]: unknown;
+        };
+        /** ModelCallTrace */
+        ModelCallTrace: {
+            /** Step */
+            step: string;
+            /** Section */
+            section?: string | null;
+            /**
+             * Round
+             * @default 0
+             */
+            round: number;
+            /** Model */
+            model: string;
+            /**
+             * Input Tokens
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Cache Read Tokens
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /**
+             * Searches
+             * @default 0
+             */
+            searches: number;
+            /**
+             * Cost Usd
+             * @description None when the model has no price.
+             */
+            cost_usd?: number | null;
+            /**
+             * Ms
+             * @default 0
+             */
+            ms: number;
+            /**
+             * Retries
+             * @description Re-asks the run made. The HTTP client's own retries are not visible here.
+             * @default 0
+             */
+            retries: number;
+            /**
+             * Outcome
+             * @default ok
+             * @enum {string}
+             */
+            outcome: "ok" | "failed" | "refused" | "schema_failure" | "skipped";
+            /** Note */
+            note?: string | null;
         };
         /** ModelCost */
         ModelCost: {
@@ -26304,6 +26671,91 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** PlanDraftEdit */
+        PlanDraftEdit: {
+            /**
+             * Questions
+             * @description The whole question list in the order wanted; one left out is removed.
+             */
+            questions?: components["schemas"]["QuestionEdit"][] | null;
+            /**
+             * Approve
+             * @description Approve the plan as it now stands.
+             * @default false
+             */
+            approve: boolean;
+        };
+        /** PlanDraftOut */
+        PlanDraftOut: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string;
+            /** Profile */
+            profile: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "approved" | "started" | "discarded";
+            /** Edited */
+            edited: boolean;
+            /** Planner Note */
+            planner_note: string | null;
+            plan: components["schemas"]["ResearchPlan"];
+            /** Job Id */
+            job_id: number | null;
+        };
+        /** PlanDraftRequest */
+        PlanDraftRequest: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Profile
+             * @description Research profile id; default if omitted.
+             */
+            profile?: string | null;
+            /**
+             * Name
+             * @description Company name hint.
+             */
+            name?: string | null;
+            /**
+             * Planner
+             * @description profile: the profile's `planning` setting; model: ask a model (falls back to the code plan with the reason); code: the code-built plan.
+             * @default profile
+             * @enum {string}
+             */
+            planner: "profile" | "model" | "code";
+        };
+        /** PlanQuestion */
+        PlanQuestion: {
+            /** Id */
+            id: string;
+            /**
+             * Section
+             * @description The report section it feeds; None for a mode-wide one.
+             */
+            section: string | null;
+            /** Question */
+            question: string;
+            /**
+             * Internal Tools
+             * @description Chat tool names that read the stored data.
+             */
+            internal_tools: string[];
+            /**
+             * Web Intent
+             * @description What a web search should look for.
+             */
+            web_intent?: string | null;
+            /** Source Groups */
+            source_groups?: string[];
+            /** Label */
+            label?: string | null;
+        };
         /** PlausibilityCheck */
         PlausibilityCheck: {
             /**
@@ -27582,6 +28034,13 @@ export interface components {
              */
             reason?: string | null;
         };
+        /** PromptCopy */
+        PromptCopy: {
+            /** Sha256 */
+            sha256: string;
+            /** Text */
+            text: string;
+        };
         /** PromptDefault */
         PromptDefault: {
             /**
@@ -27656,6 +28115,16 @@ export interface components {
              * @description Thesis KPIs it rests on, as TICKER:kpi_id.
              */
             kpis: string[];
+        };
+        /** ProposedLine */
+        ProposedLine: {
+            /** Text */
+            text: string;
+            /**
+             * Evidence Ids
+             * @description Registry ids of the sources behind the line.
+             */
+            evidence_ids: string[];
         };
         /**
          * ProposedRequest
@@ -28017,6 +28486,27 @@ export interface components {
              * @description Reports with only an amendment of no stated type: not read, not counted.
              */
             unapplied_reports?: components["schemas"]["UnappliedReportOut"][];
+        };
+        /** QuestionEdit */
+        QuestionEdit: {
+            /**
+             * Id
+             * @description The id of an existing question; order in the list is the order.
+             */
+            id: string;
+            /**
+             * Section
+             * @description A planned section id; the mode-wide question stays None.
+             */
+            section?: string | null;
+            /** Question */
+            question: string;
+            /** Label */
+            label?: string | null;
+            /** Source Groups */
+            source_groups?: string[];
+            /** Web Intent */
+            web_intent?: string | null;
         };
         /** QueueContradiction */
         QueueContradiction: {
@@ -29272,6 +29762,33 @@ export interface components {
              */
             citation_count?: number | null;
         };
+        /**
+         * ReportTemplate
+         * @description How a report is presented (Phase 3): sections, order, titles, depth per section and the
+         *     default view. It cannot change a code-written figure or the strategy; it only arranges.
+         */
+        ReportTemplate: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Sections */
+            sections: components["schemas"]["TemplateSection"][];
+            /** Custom Sections */
+            custom_sections?: components["schemas"]["CustomSection"][];
+            /**
+             * Default View
+             * @default detailed
+             * @enum {string}
+             */
+            default_view: "concise" | "detailed";
+        };
         /** ReportVersion */
         ReportVersion: {
             /** Version */
@@ -29357,6 +29874,59 @@ export interface components {
             dropped_sentences: number;
             /** Notes */
             notes?: string[];
+            /**
+             * Mode
+             * @default standard
+             */
+            mode: string;
+            plan?: components["schemas"]["ResearchPlan"] | null;
+            /** Rounds */
+            rounds?: components["schemas"]["RoundRecord"][];
+            /** Stopped Because */
+            stopped_because?: string | null;
+            search_summary?: components["schemas"]["SearchSummary"] | null;
+            /** Discovered Urls */
+            discovered_urls?: components["schemas"]["DiscoveredUrl"][];
+            /**
+             * View
+             * @default detailed
+             */
+            view: string;
+            /**
+             * Default View
+             * @default detailed
+             */
+            default_view: string;
+            /** Template Id */
+            template_id?: string | null;
+            /**
+             * Authoring
+             * @default research_only
+             */
+            authoring: string;
+            snapshot?: components["schemas"]["RunSnapshot"] | null;
+            thesis_proposal?: components["schemas"]["ThesisProposal"] | null;
+            thesis_review?: components["schemas"]["ThesisReview"] | null;
+            ledger?: components["schemas"]["ClaimLedger"] | null;
+            /**
+             * Flagged Sources
+             * @description Sources with instruction-like text, treated as data.
+             */
+            flagged_sources?: string[];
+            /**
+             * Links Removed
+             * @description Links or images in model text that were not report sources.
+             * @default 0
+             */
+            links_removed: number;
+            /**
+             * Trace Purged At
+             * @description When the owner deleted the run's working records.
+             */
+            trace_purged_at?: string | null;
+            /** Tool Calls */
+            tool_calls?: components["schemas"]["ToolCallRecord"][];
+            trace?: components["schemas"]["ResearchTrace"] | null;
         };
         /** ResearchContext */
         ResearchContext: {
@@ -29373,7 +29943,7 @@ export interface components {
              */
             as_of: string;
             /** Claims */
-            claims: components["schemas"]["Claim"][];
+            claims: components["schemas"]["steward__data_context__research__Claim"][];
             /** Gaps */
             gaps: components["schemas"]["ContextGap"][];
             /**
@@ -29395,6 +29965,64 @@ export interface components {
             /** Older Than Latest Filing */
             older_than_latest_filing: boolean;
         };
+        /** ResearchPlan */
+        ResearchPlan: {
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+            /** Mode */
+            mode: string;
+            /** Ticker */
+            ticker: string;
+            /** Question */
+            question: string;
+            /** Horizon Days */
+            horizon_days: number | null;
+            /** Web Emphasis */
+            web_emphasis: string;
+            /** Questions */
+            questions: components["schemas"]["PlanQuestion"][];
+            /** Internal Tools */
+            internal_tools: string[];
+            /** Web Intents */
+            web_intents: string[];
+            /** Preferred Tiers */
+            preferred_tiers: number[];
+            /**
+             * Primary Required For
+             * @description 'facts' when tier 1 is allowed: figures and dates should come from it.
+             */
+            primary_required_for: "facts" | null;
+            /** Counter Evidence Intent */
+            counter_evidence_intent: string | null;
+            stop: components["schemas"]["StopConditions"];
+            /** Planned Sections */
+            planned_sections: string[];
+            /** Iterate */
+            iterate: boolean;
+            /**
+             * Authored By
+             * @default code
+             * @enum {string}
+             */
+            authored_by: "code" | "model";
+            /** Fallback Reason */
+            fallback_reason?: string | null;
+            /**
+             * Edited By Owner
+             * @default false
+             */
+            edited_by_owner: boolean;
+            /** Draft Id */
+            draft_id?: number | null;
+            /**
+             * Notes
+             * @description What validation trimmed.
+             */
+            notes?: string[];
+        };
         /** ResearchProfile */
         ResearchProfile: {
             /** Id */
@@ -29402,7 +30030,7 @@ export interface components {
             /** Name */
             name: string;
             /** Sections */
-            sections: ("business" | "financial_trend" | "moat_risks" | "valuation" | "strategy_fit" | "ownership" | "relationships" | "risk" | "liquidity" | "open_questions")[];
+            sections: ("executive_summary" | "business" | "financial_trend" | "moat_risks" | "valuation" | "scenarios" | "catalysts" | "counter_case" | "strategy_fit" | "thesis_kpis" | "ownership" | "relationships" | "risk" | "liquidity" | "open_questions")[];
             /**
              * Depth
              * @description Sentences per model-written section: brief 3, standard 6, deep 12.
@@ -29460,6 +30088,93 @@ export interface components {
              * @default 3
              */
             top_holders: number;
+            /**
+             * Mode
+             * @description The kind of run; it shapes the research plan (questions, tools, searches).
+             * @default standard
+             * @enum {string}
+             */
+            mode: "quick" | "standard" | "deep_thesis" | "earnings_update" | "portfolio_macro" | "custom";
+            /**
+             * Web Emphasis
+             * @description internal: stored records first, a quarter of the search budget; balanced and web: the full budget.
+             * @default balanced
+             * @enum {string}
+             */
+            web_emphasis: "internal" | "balanced" | "web";
+            /**
+             * Date Horizon Days
+             * @description Prefer evidence from this many days back; older sources are named as old.
+             */
+            date_horizon_days?: number | null;
+            /**
+             * Allow Domains
+             * @description Domains the owner trusts, searched in addition to the tier lists. They are labelled as owner-trusted and never counted as proof.
+             */
+            allow_domains?: string[];
+            /**
+             * Deny Domains
+             * @description Never searched, never cited.
+             */
+            deny_domains?: string[];
+            /**
+             * Allow Forums
+             * @description Let search use forums and social media. Their sentences are labelled.
+             * @default false
+             */
+            allow_forums: boolean;
+            /**
+             * Forum Domains
+             * @description Extra hosts treated as forums or social media, added to the built-in list. Labelled as forum and searched only when forums are allowed.
+             */
+            forum_domains?: string[];
+            /**
+             * Stale Days
+             * @description Days after which a cited source of a kind counts as stale, overriding the built-in limit. Kinds: price, news_item, search, observation, default; `default` covers any other kind. Empty = built-in limits.
+             */
+            stale_days?: {
+                [key: string]: number;
+            };
+            /**
+             * Iterate
+             * @description After the first pass, search again for sections left thin, corroborate single-source claims, and stop when the sections have enough or the budget is used.
+             * @default false
+             */
+            iterate: boolean;
+            /**
+             * Max Rounds
+             * @description Follow-up rounds when iterating.
+             * @default 1
+             */
+            max_rounds: number;
+            /**
+             * Min Sentences
+             * @description Cited sentences a section needs to count as answered.
+             * @default 2
+             */
+            min_sentences: number;
+            /**
+             * Template Id
+             * @description A report template. It decides which sections appear, in what order, with what titles and in which view; the profile decides how the run investigates.
+             */
+            template_id?: string | null;
+            /**
+             * Authoring
+             * @default research_only
+             * @enum {string}
+             */
+            authoring: "research_only" | "draft_thesis" | "propose_update" | "review_thesis";
+            /**
+             * Planning
+             * @default code
+             * @enum {string}
+             */
+            planning: "code" | "model";
+            /**
+             * Planner Model
+             * @description The model that writes the plan; unset = the claim verifier's.
+             */
+            planner_model?: string | null;
         };
         /**
          * ResearchProfilesConfig
@@ -29479,6 +30194,11 @@ export interface components {
              * @default standard
              */
             default_profile: string;
+            /**
+             * Templates
+             * @description Report templates a profile can name. Kept apart from the profiles: a profile is how to investigate, a template is how to present.
+             */
+            templates?: components["schemas"]["ReportTemplate"][];
         };
         /** ResearchProfilesConfigVersion */
         ResearchProfilesConfigVersion: {
@@ -29530,6 +30250,18 @@ export interface components {
              */
             name?: string | null;
         };
+        /**
+         * ResearchRetentionSettings
+         * @description What the research_trace_retention job keeps.
+         */
+        ResearchRetentionSettings: {
+            /**
+             * Trace Retention Days
+             * @description Checkpoints and tool traces of succeeded research and chat jobs older than this are deleted. Reports, their sources and claim ledgers stay.
+             * @default 30
+             */
+            trace_retention_days: number;
+        };
         /** ResearchSection */
         ResearchSection: {
             /** Id */
@@ -29545,6 +30277,18 @@ export interface components {
             sentences: components["schemas"]["CitedSentence"][];
             /** Note */
             note?: string | null;
+            /**
+             * Detail Only
+             * @description Left out of the concise view.
+             * @default false
+             */
+            detail_only: boolean;
+            /**
+             * Custom
+             * @description A section the owner defined.
+             * @default false
+             */
+            custom: boolean;
         };
         /** ResearchSummary */
         ResearchSummary: {
@@ -29565,6 +30309,29 @@ export interface components {
             created_at: string;
             /** Job Id */
             job_id: number | null;
+        };
+        /** ResearchTrace */
+        ResearchTrace: {
+            /** Model Calls */
+            model_calls?: components["schemas"]["ModelCallTrace"][];
+            /** Web */
+            web?: components["schemas"]["WebTrace"][];
+            /** Retrieval */
+            retrieval?: components["schemas"]["RetrievalTrace"][];
+            /** Validation */
+            validation?: components["schemas"]["ValidationTrace"][];
+            /** Total Cost Usd */
+            total_cost_usd?: number | null;
+            /**
+             * Total Ms
+             * @default 0
+             */
+            total_ms: number;
+            /**
+             * Plan Source
+             * @description code, model or model fallback (with the reason).
+             */
+            plan_source?: string | null;
         };
         /**
          * ResultCoverage
@@ -29605,6 +30372,28 @@ export interface components {
              * @description Extra why-it-passed lines, e.g. the idea-pipeline gate.
              */
             notes?: string[];
+        };
+        /** RetrievalTrace */
+        RetrievalTrace: {
+            /** Section */
+            section: string;
+            /**
+             * Sources Offered
+             * @description Sources in the registry when the section was asked.
+             */
+            sources_offered: number;
+            /**
+             * Sources Cited
+             * @description Distinct sources the kept sentences cite.
+             */
+            sources_cited: number;
+            /**
+             * Sources Uncited
+             * @default 0
+             */
+            sources_uncited: number;
+            /** Tools Planned */
+            tools_planned?: string[];
         };
         /** ReturnBasisCoverage */
         ReturnBasisCoverage: {
@@ -30365,6 +31154,37 @@ export interface components {
             /** Passage */
             passage: string | null;
         };
+        /** RoundRecord */
+        RoundRecord: {
+            /** Round */
+            round: number;
+            /** Sections */
+            sections: string[];
+            /** Reasons */
+            reasons: {
+                [key: string]: string;
+            };
+            /**
+             * Sentences Added
+             * @default 0
+             */
+            sentences_added: number;
+            /**
+             * Sources Added
+             * @default 0
+             */
+            sources_added: number;
+            /**
+             * Urls Found
+             * @default 0
+             */
+            urls_found: number;
+            /**
+             * Steps
+             * @default 0
+             */
+            steps: number;
+        };
         /** Row */
         Row: {
             /** Label */
@@ -30425,6 +31245,36 @@ export interface components {
             /** Input Hash */
             input_hash: string;
         };
+        /** RuleCompliance */
+        RuleCompliance: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "breach" | "warn" | "unknown";
+            /** Measured */
+            measured?: number | null;
+            /** Limit */
+            limit?: number | null;
+            /** Operator */
+            operator?: string | null;
+            /**
+             * Unit
+             * @default weight
+             * @enum {string}
+             */
+            unit: "weight" | "count";
+            /** As Of */
+            as_of?: string | null;
+            /** Reason */
+            reason: string;
+            /**
+             * Scope
+             * @default ticker
+             * @enum {string}
+             */
+            scope: "ticker" | "portfolio";
+        };
         /** RuleMatch */
         RuleMatch: {
             /**
@@ -30444,6 +31294,53 @@ export interface components {
              * @description Empty: any holding.
              */
             tickers?: string[];
+        };
+        /** RunSnapshot */
+        RunSnapshot: {
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+            /** Taken At */
+            taken_at: string;
+            /** Profile */
+            profile: {
+                [key: string]: unknown;
+            };
+            /** Template */
+            template: {
+                [key: string]: unknown;
+            } | null;
+            /** Layout */
+            layout: {
+                [key: string]: unknown;
+            }[];
+            /** Prompts */
+            prompts: {
+                [key: string]: components["schemas"]["PromptCopy"];
+            };
+            /**
+             * Versions
+             * @description Active config version id per domain when the run started.
+             */
+            versions: {
+                [key: string]: number | null;
+            };
+            /**
+             * Thesis
+             * @description The ticker's thesis as it stood.
+             */
+            thesis: {
+                [key: string]: unknown;
+            } | null;
+            /** Plan Sha256 */
+            plan_sha256: string;
+            /**
+             * Digest
+             * @default
+             */
+            digest: string;
         };
         /** SaleImpact */
         SaleImpact: {
@@ -30957,6 +31854,36 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** SearchSummary */
+        SearchSummary: {
+            /**
+             * Sources After First Pass
+             * @default 0
+             */
+            sources_after_first_pass: number;
+            /**
+             * Sources Added By Follow Up
+             * @default 0
+             */
+            sources_added_by_follow_up: number;
+            /**
+             * Urls Found
+             * @default 0
+             */
+            urls_found: number;
+            /**
+             * Urls Cited
+             * @default 0
+             */
+            urls_cited: number;
+            /**
+             * Urls Excluded
+             * @default 0
+             */
+            urls_excluded: number;
+            /** Limitations */
+            limitations?: string[];
         };
         /** Section */
         Section: {
@@ -32132,6 +33059,21 @@ export interface components {
             snippet?: string | null;
             /** As Of */
             as_of?: string | null;
+            /**
+             * Role
+             * @description For web sources: primary, quality_news, secondary, owner_trusted or forum.
+             */
+            role?: string | null;
+            /**
+             * Caveat
+             * @description Why this source is weaker than it looks.
+             */
+            caveat?: string | null;
+            /**
+             * Retrieved At
+             * @description When the search returned it.
+             */
+            retrieved_at?: string | null;
         };
         /** SourceAccess */
         SourceAccess: {
@@ -33017,6 +33959,22 @@ export interface components {
              */
             preset?: "idea_pipeline" | null;
         };
+        /** StopConditions */
+        StopConditions: {
+            /** Max Steps */
+            max_steps: number;
+            /** Max Searches */
+            max_searches: number;
+            /** Max Rounds */
+            max_rounds: number;
+            /**
+             * Min Sentences
+             * @description Cited sentences a section needs to count as answered.
+             */
+            min_sentences: number;
+            /** Rule */
+            rule: string;
+        };
         /** StoredSuggestionOut */
         StoredSuggestionOut: {
             /** Id */
@@ -33239,6 +34197,48 @@ export interface components {
             resolution: "confirmed" | "false";
             /** Note */
             note?: string | null;
+        };
+        /**
+         * StrategyCheck
+         * @description One configured rule or thesis KPI, the condition it states, and where the report stands.
+         */
+        StrategyCheck: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "thesis_kpi" | "strategy_rule";
+            /** Id */
+            id: string;
+            /**
+             * Version
+             * @description The config version the rule comes from.
+             */
+            version: number | null;
+            /**
+             * Rule
+             * @description The condition as configured, e.g. 'gross_margin >= 10 %'.
+             */
+            rule: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "supports" | "challenges" | "mixed" | "unknown";
+            /** Evidence */
+            evidence?: string | null;
+            /**
+             * Named By
+             * @description Claims in the report that name it.
+             */
+            named_by?: string[];
+            /**
+             * Formal
+             * @description True when the status comes from a stored check, not from the report's text.
+             */
+            formal: boolean;
+            /** @description For a strategy rule: the rule engine's check against the latest snapshot (status, measured value, limit, as-of date). Separate from the claims that name it. */
+            compliance?: components["schemas"]["RuleCompliance"] | null;
         };
         /**
          * StrategyConfig
@@ -33906,6 +34906,29 @@ export interface components {
             /** With Mismatch */
             with_mismatch: number;
         };
+        /** TemplateSection */
+        TemplateSection: {
+            /**
+             * Id
+             * @description A built-in section id, or the id of one of the custom sections.
+             */
+            id: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Title */
+            title?: string | null;
+            /** Max Sentences */
+            max_sentences?: number | null;
+            /**
+             * Detail Only
+             * @description Shown in the detailed view only; the concise view skips it.
+             * @default false
+             */
+            detail_only: boolean;
+        };
         /** TestAlertRequest */
         TestAlertRequest: {
             /**
@@ -34346,6 +35369,31 @@ export interface components {
              */
             description: string;
         };
+        /** ThesisKpiStatus */
+        ThesisKpiStatus: {
+            /** Kpi Id */
+            kpi_id: string;
+            /** Metric */
+            metric: string;
+            /**
+             * Rule
+             * @description The configured condition, e.g. '>= 10 %'.
+             */
+            rule: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "breach" | "unknown";
+            /** Observed Value */
+            observed_value: number | null;
+            /** Period */
+            period: string | null;
+            /** As Of */
+            as_of: string | null;
+            /** Rationale */
+            rationale: string | null;
+        };
         /** ThesisOut */
         ThesisOut: {
             /** Links */
@@ -34419,6 +35467,61 @@ export interface components {
              * @description Date of the valuation the targets come from.
              */
             set_on: string;
+        };
+        /** ThesisProposal */
+        ThesisProposal: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "research_only" | "draft_thesis" | "propose_update" | "review_thesis";
+            /** Ticker */
+            ticker: string;
+            /**
+             * Base Version Id
+             * @description The active `theses` version the proposal was made against.
+             */
+            base_version_id: number | null;
+            /** Has Thesis */
+            has_thesis: boolean;
+            /** Changes */
+            changes: components["schemas"]["FieldChange"][];
+            /** Unchanged */
+            unchanged: ("why_owned" | "exit_conditions" | "pre_mortem")[];
+            /** Left To Owner */
+            left_to_owner: string[];
+            /** Notes */
+            notes?: string[];
+        };
+        /** ThesisProposalAccept */
+        ThesisProposalAccept: {
+            /**
+             * Fields
+             * @description The fields to apply.
+             */
+            fields: ("why_owned" | "exit_conditions" | "pre_mortem")[];
+        };
+        /** ThesisProposalApplied */
+        ThesisProposalApplied: {
+            /** Config Version Id */
+            config_version_id: number;
+            /** Applied */
+            applied: ("why_owned" | "exit_conditions" | "pre_mortem")[];
+        };
+        /** ThesisReview */
+        ThesisReview: {
+            /** Ticker */
+            ticker: string;
+            /** Base Version Id */
+            base_version_id: number | null;
+            /** Why Owned */
+            why_owned: string | null;
+            /** Kpis */
+            kpis: components["schemas"]["ThesisKpiStatus"][];
+            /** Exit Conditions */
+            exit_conditions: string[];
+            /** Notes */
+            notes?: string[];
         };
         /**
          * ThesisScenarios
@@ -34637,6 +35740,58 @@ export interface components {
             /** Fees */
             fees: number;
         };
+        /** ToolCallRecord */
+        ToolCallRecord: {
+            /** Tool */
+            tool: string;
+            /** Args */
+            args?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "missing" | "failed" | "skipped";
+            /**
+             * Ok
+             * @default false
+             */
+            ok: boolean;
+            /** Error */
+            error?: string | null;
+            /**
+             * Ms
+             * @default 0
+             */
+            ms: number;
+            /**
+             * Sources Added
+             * @default 0
+             */
+            sources_added: number;
+            /**
+             * Bytes
+             * @default 0
+             */
+            bytes: number;
+            /**
+             * Figures
+             * @description Figures in the result by status (ok, stale, ...).
+             */
+            figures?: {
+                [key: string]: number;
+            };
+            /**
+             * As Of
+             * @description The newest as-of date among figures.
+             */
+            as_of?: string | null;
+            /** Sections */
+            sections?: string[];
+            /** Note */
+            note?: string | null;
+        };
         /** TopHolder */
         TopHolder: {
             /** Cik */
@@ -34686,6 +35841,30 @@ export interface components {
              * @description Sum of `amount` over the filtered rows.
              */
             amount: number;
+        };
+        /** TracePurged */
+        TracePurged: {
+            /**
+             * Urls
+             * @description Discovered-URL records removed from the report.
+             */
+            urls: number;
+            /**
+             * Checkpoints
+             * @description Step checkpoints deleted (the job cannot resume).
+             */
+            checkpoints: number;
+            /**
+             * Traces
+             * @description Tool traces removed from step details.
+             */
+            traces: number;
+            /**
+             * Report Traces
+             * @description Per-call run traces removed from stored report bodies.
+             * @default 0
+             */
+            report_traces: number;
         };
         /** TrackedManager */
         TrackedManager: {
@@ -35234,6 +36413,47 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** ValidationTrace */
+        ValidationTrace: {
+            /** Step */
+            step: string;
+            /** Section */
+            section?: string | null;
+            /**
+             * Schema Failure
+             * @default false
+             */
+            schema_failure: boolean;
+            /**
+             * Retries
+             * @default 0
+             */
+            retries: number;
+            /**
+             * Sentences Returned
+             * @default 0
+             */
+            sentences_returned: number;
+            /**
+             * Dropped Uncited
+             * @description No checkable source id or allowed URL.
+             * @default 0
+             */
+            dropped_uncited: number;
+            /**
+             * Links Removed
+             * @default 0
+             */
+            links_removed: number;
+            /**
+             * Dropped By Check
+             * @description Removed after the claim check found them unsupported.
+             * @default 0
+             */
+            dropped_by_check: number;
+            /** Check Reasons */
+            check_reasons?: string[];
+        };
         /** Valuation */
         Valuation: {
             /** Method */
@@ -35690,6 +36910,50 @@ export interface components {
             status: "approved" | "rejected";
             /** Note */
             note?: string | null;
+        };
+        /** WebTrace */
+        WebTrace: {
+            /** Step */
+            step: string;
+            /** Section */
+            section?: string | null;
+            /**
+             * Round
+             * @default 0
+             */
+            round: number;
+            /**
+             * Queries
+             * @description As the provider reports them.
+             */
+            queries?: string[];
+            /**
+             * Urls Found
+             * @default 0
+             */
+            urls_found: number;
+            /**
+             * Urls Cited
+             * @default 0
+             */
+            urls_cited: number;
+            /**
+             * Urls Excluded
+             * @default 0
+             */
+            urls_excluded: number;
+            /**
+             * Found
+             * @description host + title of the first URLs found (no query string).
+             */
+            found?: string[];
+            /**
+             * Opened
+             * @description URLs a sentence cites. The provider does not say which pages the model read in full, so a cited page is the nearest evidence of one that was opened.
+             */
+            opened?: string[];
+            /** Errors */
+            errors?: string[];
         };
         /** WhatIfCase */
         WhatIfCase: {
@@ -36697,6 +37961,52 @@ export interface components {
             /** Reason */
             reason: string | null;
         };
+        /** Claim */
+        steward__data_context__research__Claim: {
+            /**
+             * Claim Id
+             * @description Stable id built from the record's natural key (series, geography, period; never a row id, which changes when the same value is fetched again); cite it, never the number.
+             */
+            claim_id: string;
+            /**
+             * Domain
+             * @enum {string}
+             */
+            domain: "macro" | "trade" | "financial" | "forward" | "company_research" | "business_network" | "patents";
+            /** Subject */
+            subject: string;
+            /** Metric */
+            metric: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Text Value */
+            text_value?: string | null;
+            /** Unit */
+            unit: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Period */
+            period: string | null;
+            /**
+             * Known As Of
+             * Format: date
+             * @description Date the record became known to the app.
+             */
+            known_as_of: string;
+            /** Source */
+            source: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "primary" | "vendor" | "owner" | "community" | "unclassified";
+            /** Source Url */
+            source_url: string | null;
+            /** Note */
+            note?: string | null;
+        };
         /** Check */
         steward__discovery__engine__Check: {
             /** Metric */
@@ -36795,6 +38105,83 @@ export interface components {
             issues: number;
             /** Note */
             note?: string | null;
+        };
+        /** Claim */
+        steward__research__ledger__Claim: {
+            /**
+             * Id
+             * @description c1, c2, ... in report order.
+             */
+            id: string;
+            /** Section Id */
+            section_id: string;
+            /**
+             * Index
+             * @description Position of the sentence in its section.
+             */
+            index: number;
+            /** Text */
+            text: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "fact" | "calculation" | "interpretation" | "strategy_assessment" | "forecast" | "unknown";
+            /**
+             * Written By
+             * @enum {string}
+             */
+            written_by: "code" | "model";
+            /** Evidence */
+            evidence: components["schemas"]["EvidenceRef"][];
+            /** Check */
+            check?: ("supported" | "unsupported" | "unchecked") | null;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /**
+             * Why
+             * @description What the confidence label rests on.
+             */
+            why: string;
+            /**
+             * Period
+             * @description The newest date among its sources.
+             */
+            period?: string | null;
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+            /**
+             * Review
+             * @default unreviewed
+             * @enum {string}
+             */
+            review: "unreviewed" | "machine_checked" | "flagged" | "owner_confirmed" | "owner_rejected";
+            /**
+             * Rule
+             * @description For a strategy assessment: the rule or KPI it names.
+             */
+            rule?: string | null;
+        };
+        /** Coverage */
+        steward__research__ledger__Coverage: {
+            /** As Of */
+            as_of: string;
+            /** Data From */
+            data_from?: string | null;
+            /** Data To */
+            data_to?: string | null;
+            /** Stale Sources */
+            stale_sources?: string[];
+            /** Undated Sources */
+            undated_sources?: string[];
+            /** Notices */
+            notices?: string[];
         };
     };
     responses: never;
@@ -39605,6 +40992,136 @@ export interface operations {
             };
         };
     };
+    create_plan_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_plan_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_plan_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanDraftEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_from_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_research: {
         parameters: {
             query?: {
@@ -39639,7 +41156,10 @@ export interface operations {
     };
     get_research: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description concise: key sentences only; detailed: the whole stored report. */
+                view?: "concise" | "detailed";
+            };
             header?: never;
             path: {
                 report_id: number;
@@ -39655,6 +41175,173 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResearchReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_research: {
+        parameters: {
+            query?: {
+                /** @description concise: key sentences only; detailed: the whole stored report. */
+                view?: "concise" | "detailed";
+            };
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_thesis_proposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThesisProposalAccept"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThesisProposalApplied"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_research_trace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TracePurged"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_claim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+                claim_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimReview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimReviewed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_traces: {
+        parameters: {
+            query?: {
+                older_than_days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TracePurged"];
                 };
             };
             /** @description Validation Error */

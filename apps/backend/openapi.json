@@ -5201,6 +5201,210 @@
         ]
       }
     },
+    "/research/plans": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Create Plan Draft",
+        "description": "Write a research plan for a ticker and profile without running it: by a model when the\nprofile (or `planner`) asks, else by code. The owner can edit and approve it, then start\nthe run from it.",
+        "operationId": "create_plan_draft",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDraftOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/research/plans/{draft_id}": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Get Plan Draft",
+        "operationId": "get_plan_draft",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Draft Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDraftOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Edit Plan Draft",
+        "description": "Edit a draft (reorder, remove, relabel, reword, toggle source groups) under the same\nchecks as a model plan, and/or approve it. Any edit withdraws an earlier approval unless\n`approve` is sent with it. A started draft is final.",
+        "operationId": "edit_plan_draft",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Draft Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanDraftEdit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanDraftOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/research/plans/{draft_id}/start": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Start From Plan",
+        "description": "Queue the research run for an approved draft. The run uses exactly this plan and stores\nit with the report, with whether the owner edited it.",
+        "operationId": "start_from_plan",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Draft Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/research": {
       "get": {
         "tags": [
@@ -5278,8 +5482,198 @@
           "research"
         ],
         "summary": "Get Research",
-        "description": "A research report: sections of cited sentences, computed valuation figures and the\nsource list every citation points into.",
+        "description": "A research report: sections of cited sentences, computed valuation figures and the\nsource list every citation points into. `view=concise` shows the same report with fewer\nsentences and without the sections a template marks detail-only.",
         "operationId": "get_research",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Report Id"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "concise",
+                "detailed"
+              ],
+              "type": "string",
+              "description": "concise: key sentences only; detailed: the whole stored report.",
+              "default": "detailed",
+              "title": "View"
+            },
+            "description": "concise: key sentences only; detailed: the whole stored report."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchReportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/research/{report_id}/export": {
+      "get": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Export Research",
+        "description": "The report as Markdown, a rendering of the stored typed report in the chosen view.",
+        "operationId": "export_research",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Report Id"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "concise",
+                "detailed"
+              ],
+              "type": "string",
+              "description": "concise: key sentences only; detailed: the whole stored report.",
+              "default": "detailed",
+              "title": "View"
+            },
+            "description": "concise: key sentences only; detailed: the whole stored report."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/research/{report_id}/thesis-proposal/accept": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Accept Thesis Proposal",
+        "description": "Apply chosen fields of a report's thesis proposal. This saves a new `theses` config\nversion (the earlier one stays in the history). It is refused when the theses changed\nafter the report was made, so a stale proposal cannot overwrite newer edits.",
+        "operationId": "accept_thesis_proposal",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Report Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThesisProposalAccept"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThesisProposalApplied"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/research/{report_id}/trace/purge": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Purge Research Trace",
+        "description": "Delete the working records of a research run: the URL list, web snippets, the resume\ncheckpoints and the tool trace. The report's sentences, sources and claim ledger stay.",
+        "operationId": "purge_research_trace",
         "security": [
           {
             "HTTPBearer": []
@@ -5304,7 +5698,128 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResearchReportOut"
+                  "$ref": "#/components/schemas/TracePurged"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/research/{report_id}/claims/{claim_id}/review": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Review Claim",
+        "description": "The owner confirms or rejects one claim of the report's ledger. The sentence is not\nchanged; the review state is kept beside it.",
+        "operationId": "review_claim",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Report Id"
+            }
+          },
+          {
+            "name": "claim_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^c[0-9]{1,6}$",
+              "title": "Claim Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimReviewed"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/maintenance/purge-traces": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Purge Traces",
+        "description": "Delete the checkpoints and tool traces of succeeded jobs finished more than N days ago.",
+        "operationId": "purge_traces",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "older_than_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3650,
+              "minimum": 1,
+              "default": 30,
+              "title": "Older Than Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TracePurged"
                 }
               }
             }
@@ -32748,6 +33263,50 @@
         ],
         "title": "BacktestResponse"
       },
+      "Balance": {
+        "properties": {
+          "has_support": {
+            "type": "boolean",
+            "title": "Has Support"
+          },
+          "has_challenge": {
+            "type": "boolean",
+            "title": "Has Challenge"
+          },
+          "has_unknowns": {
+            "type": "boolean",
+            "title": "Has Unknowns"
+          },
+          "has_scenarios": {
+            "type": "boolean",
+            "title": "Has Scenarios"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing"
+          },
+          "not_requested": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not Requested"
+          }
+        },
+        "type": "object",
+        "required": [
+          "has_support",
+          "has_challenge",
+          "has_unknowns",
+          "has_scenarios",
+          "missing",
+          "not_requested"
+        ],
+        "title": "Balance"
+      },
       "BaseTotals": {
         "properties": {
           "base_currency": {
@@ -34577,6 +35136,7 @@
                 "shadow_snapshot",
                 "shadow_report",
                 "raw_retention",
+                "research_trace_retention",
                 "zero_cost_gate",
                 "returns_refresh",
                 "exchange_probes",
@@ -34655,6 +35215,7 @@
                 "shadow_snapshot",
                 "shadow_report",
                 "raw_retention",
+                "research_trace_retention",
                 "zero_cost_gate",
                 "returns_refresh",
                 "exchange_probes",
@@ -34746,6 +35307,7 @@
                 "shadow_snapshot",
                 "shadow_report",
                 "raw_retention",
+                "research_trace_retention",
                 "zero_cost_gate",
                 "returns_refresh",
                 "exchange_probes",
@@ -36604,6 +37166,16 @@
             "minItems": 1,
             "title": "Source Tiers",
             "description": "Outlet tiers web search may use and an answer may cite (News sources config)."
+          },
+          "freshness_days": {
+            "additionalProperties": {
+              "type": "integer",
+              "maximum": 3650.0,
+              "minimum": 1.0
+            },
+            "type": "object",
+            "title": "Freshness Days",
+            "description": "Days after which the data_freshness tool calls a dataset stale: portfolio_snapshot, news, macro, fundamentals, price_bars, fx, insider_filings, transactions. A dataset left out uses its built-in limit."
           }
         },
         "additionalProperties": false,
@@ -36861,159 +37433,6 @@
         ],
         "title": "CitedSentence"
       },
-      "Claim": {
-        "properties": {
-          "claim_id": {
-            "type": "string",
-            "title": "Claim Id",
-            "description": "Stable id built from the record's natural key (series, geography, period; never a row id, which changes when the same value is fetched again); cite it, never the number."
-          },
-          "domain": {
-            "type": "string",
-            "enum": [
-              "macro",
-              "trade",
-              "financial",
-              "forward",
-              "company_research",
-              "business_network",
-              "patents"
-            ],
-            "title": "Domain"
-          },
-          "subject": {
-            "type": "string",
-            "title": "Subject"
-          },
-          "metric": {
-            "type": "string",
-            "title": "Metric"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Value"
-          },
-          "text_value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Text Value"
-          },
-          "unit": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Unit"
-          },
-          "currency": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Currency"
-          },
-          "period": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Period"
-          },
-          "known_as_of": {
-            "type": "string",
-            "format": "date",
-            "title": "Known As Of",
-            "description": "Date the record became known to the app."
-          },
-          "source": {
-            "type": "string",
-            "title": "Source"
-          },
-          "provenance": {
-            "type": "string",
-            "enum": [
-              "primary",
-              "vendor",
-              "owner",
-              "community",
-              "unclassified"
-            ],
-            "title": "Provenance"
-          },
-          "source_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Url"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          }
-        },
-        "type": "object",
-        "required": [
-          "claim_id",
-          "domain",
-          "subject",
-          "metric",
-          "label",
-          "value",
-          "unit",
-          "period",
-          "known_as_of",
-          "source",
-          "provenance",
-          "source_url"
-        ],
-        "title": "Claim"
-      },
       "ClaimCheckSummary": {
         "properties": {
           "mode": {
@@ -37063,6 +37482,120 @@
         ],
         "title": "ClaimCheckSummary",
         "description": "What the claim verifier did to a report, stored with it."
+      },
+      "ClaimLedger": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Version",
+            "default": 1
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/steward__research__ledger__Claim"
+            },
+            "type": "array",
+            "title": "Claims"
+          },
+          "by_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Type"
+          },
+          "by_confidence": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Confidence"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/LedgerCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "strategy": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyCheck"
+            },
+            "type": "array",
+            "title": "Strategy"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Balance"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/steward__research__ledger__Coverage"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence",
+            "description": "The report as a whole, from its claims and checks."
+          },
+          "confidence_why": {
+            "type": "string",
+            "title": "Confidence Why"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claims",
+          "by_type",
+          "by_confidence",
+          "checks",
+          "strategy",
+          "balance",
+          "coverage",
+          "confidence",
+          "confidence_why"
+        ],
+        "title": "ClaimLedger"
+      },
+      "ClaimReview": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "owner_confirmed",
+              "owner_rejected",
+              "unreviewed"
+            ],
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "ClaimReview"
+      },
+      "ClaimReviewed": {
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "title": "Claim Id"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim_id",
+          "state"
+        ],
+        "title": "ClaimReviewed"
       },
       "ClaimRow": {
         "properties": {
@@ -42029,6 +42562,38 @@
         ],
         "title": "CrossAxisOut"
       },
+      "CustomSection": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^custom-[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "task": {
+            "type": "string",
+            "maxLength": 400,
+            "minLength": 10,
+            "title": "Task",
+            "description": "What the section should answer, in plain words. No links or markup."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "task"
+        ],
+        "title": "CustomSection",
+        "description": "A section the owner defines: a title and the question it answers. Written by the model\nfrom the same sources, cited like any other. It has no code-written figures, so it cannot\nstand in for a trusted calculation."
+      },
       "DailyFallback": {
         "properties": {
           "date": {
@@ -45645,6 +46210,101 @@
           "value"
         ],
         "title": "DiscoverFilter"
+      },
+      "DiscoveredUrl": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "cited",
+              "found_not_cited",
+              "excluded"
+            ],
+            "title": "Status"
+          },
+          "section": {
+            "type": "string",
+            "title": "Section"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round",
+            "default": 0
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "page_age": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Age",
+            "description": "The provider's age, if it gave one."
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          },
+          "limitation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limitation",
+            "description": "Undated, likely paywalled, or why it was excluded."
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "title",
+          "host",
+          "status",
+          "section",
+          "retrieved_at"
+        ],
+        "title": "DiscoveredUrl",
+        "description": "One URL the search returned, kept whether or not a sentence cites it."
       },
       "DiscoveryResult": {
         "properties": {
@@ -49607,6 +50267,73 @@
         ],
         "title": "EvidenceLink"
       },
+      "EvidenceRef": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "retrieved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieved At"
+          },
+          "exists": {
+            "type": "boolean",
+            "title": "Exists",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "kind"
+        ],
+        "title": "EvidenceRef"
+      },
       "EvidenceSpan": {
         "properties": {
           "evidence_id": {
@@ -53189,6 +53916,50 @@
         "type": "object",
         "title": "FetchPolicy",
         "description": "How far the article-text ladder (news/fulltext.py) may go for a source's items."
+      },
+      "FieldChange": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "why_owned",
+              "exit_conditions",
+              "pre_mortem"
+            ],
+            "title": "Field"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "add",
+              "change"
+            ],
+            "title": "Kind"
+          },
+          "before": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Before",
+            "description": "What the active thesis says now (empty if nothing)."
+          },
+          "after": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedLine"
+            },
+            "type": "array",
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "kind",
+          "before",
+          "after"
+        ],
+        "title": "FieldChange"
       },
       "Figure": {
         "properties": {
@@ -65477,6 +66248,10 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Blanks old raw payloads (normalized data stays) and deletes fetch-audit rows past the horizon. Default: daily 03:15."
           },
+          "research_trace_retention": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Deletes the checkpoints and tool traces of research and chat jobs that succeeded more than `research.trace_retention_days` ago (reports stay). Default: daily 03:40."
+          },
           "zero_cost_gate": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Audits the access ledger and the budgets collectors pass to the governor against the free quotas; reads only. Default: daily 03:20."
@@ -65649,6 +66424,9 @@
           },
           "chat": {
             "$ref": "#/components/schemas/ChatSettings"
+          },
+          "research": {
+            "$ref": "#/components/schemas/ResearchRetentionSettings"
           },
           "review": {
             "$ref": "#/components/schemas/ReviewSettings"
@@ -66724,6 +67502,41 @@
           "fallback"
         ],
         "title": "LastAttempt"
+      },
+      "LedgerCheck": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "error",
+              "warning",
+              "info"
+            ],
+            "title": "Severity"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "claims": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Claims"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ],
+        "title": "LedgerCheck"
       },
       "LedgerEntryInput": {
         "properties": {
@@ -70932,6 +71745,106 @@
         "additionalProperties": true,
         "type": "object",
         "title": "MissingActions"
+      },
+      "ModelCallTrace": {
+        "properties": {
+          "step": {
+            "type": "string",
+            "title": "Step"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round",
+            "default": 0
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens",
+            "default": 0
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens",
+            "default": 0
+          },
+          "cache_read_tokens": {
+            "type": "integer",
+            "title": "Cache Read Tokens",
+            "default": 0
+          },
+          "searches": {
+            "type": "integer",
+            "title": "Searches",
+            "default": 0
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd",
+            "description": "None when the model has no price."
+          },
+          "ms": {
+            "type": "integer",
+            "title": "Ms",
+            "default": 0
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries",
+            "description": "Re-asks the run made. The HTTP client's own retries are not visible here.",
+            "default": 0
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "failed",
+              "refused",
+              "schema_failure",
+              "skipped"
+            ],
+            "title": "Outcome",
+            "default": "ok"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step",
+          "model"
+        ],
+        "title": "ModelCallTrace"
       },
       "ModelCost": {
         "properties": {
@@ -77971,6 +78884,234 @@
         "title": "PinnedSnapshotsResponse",
         "description": "`POST /funds/snapshots/pin`: the ids of the snapshots now protected from pruning."
       },
+      "PlanDraftEdit": {
+        "properties": {
+          "questions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/QuestionEdit"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Questions",
+            "description": "The whole question list in the order wanted; one left out is removed."
+          },
+          "approve": {
+            "type": "boolean",
+            "title": "Approve",
+            "description": "Approve the plan as it now stands.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PlanDraftEdit"
+      },
+      "PlanDraftOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "approved",
+              "started",
+              "discarded"
+            ],
+            "title": "Status"
+          },
+          "edited": {
+            "type": "boolean",
+            "title": "Edited"
+          },
+          "planner_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planner Note"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/ResearchPlan"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "profile",
+          "name",
+          "status",
+          "edited",
+          "planner_note",
+          "plan",
+          "job_id"
+        ],
+        "title": "PlanDraftOut"
+      },
+      "PlanDraftRequest": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,32}$",
+            "title": "Ticker"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile",
+            "description": "Research profile id; default if omitted."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Company name hint."
+          },
+          "planner": {
+            "type": "string",
+            "enum": [
+              "profile",
+              "model",
+              "code"
+            ],
+            "title": "Planner",
+            "description": "profile: the profile's `planning` setting; model: ask a model (falls back to the code plan with the reason); code: the code-built plan.",
+            "default": "profile"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker"
+        ],
+        "title": "PlanDraftRequest"
+      },
+      "PlanQuestion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section",
+            "description": "The report section it feeds; None for a mode-wide one."
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "internal_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Internal Tools",
+            "description": "Chat tool names that read the stored data."
+          },
+          "web_intent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web Intent",
+            "description": "What a web search should look for."
+          },
+          "source_groups": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Groups"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "section",
+          "question",
+          "internal_tools"
+        ],
+        "title": "PlanQuestion"
+      },
       "PlausibilityCheck": {
         "properties": {
           "date": {
@@ -81391,6 +82532,24 @@
         ],
         "title": "ProfileField"
       },
+      "PromptCopy": {
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sha256",
+          "text"
+        ],
+        "title": "PromptCopy"
+      },
       "PromptDefault": {
         "properties": {
           "key": {
@@ -81650,6 +82809,28 @@
           "kpis"
         ],
         "title": "ProposedAction"
+      },
+      "ProposedLine": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Ids",
+            "description": "Registry ids of the sources behind the line."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "evidence_ids"
+        ],
+        "title": "ProposedLine"
       },
       "ProposedRequest": {
         "properties": {
@@ -82615,6 +83796,70 @@
           "reports"
         ],
         "title": "QuarterOut"
+      },
+      "QuestionEdit": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The id of an existing question; order in the list is the order."
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section",
+            "description": "A planned section id; the mode-wide question stays None."
+          },
+          "question": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Question"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "source_groups": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Source Groups"
+          },
+          "web_intent": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web Intent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "question"
+        ],
+        "title": "QuestionEdit"
       },
       "QueueContradiction": {
         "properties": {
@@ -86317,6 +87562,63 @@
         ],
         "title": "ReportSummary"
       },
+      "ReportTemplate": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 40,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateSection"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Sections"
+          },
+          "custom_sections": {
+            "items": {
+              "$ref": "#/components/schemas/CustomSection"
+            },
+            "type": "array",
+            "maxItems": 6,
+            "title": "Custom Sections"
+          },
+          "default_view": {
+            "type": "string",
+            "enum": [
+              "concise",
+              "detailed"
+            ],
+            "title": "Default View",
+            "default": "detailed"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "sections"
+        ],
+        "title": "ReportTemplate",
+        "description": "How a report is presented (Phase 3): sections, order, titles, depth per section and the\ndefault view. It cannot change a code-written figure or the strategy; it only arranges."
+      },
       "ReportVersion": {
         "properties": {
           "version": {
@@ -86498,6 +87800,165 @@
             },
             "type": "array",
             "title": "Notes"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "default": "standard"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/RoundRecord"
+            },
+            "type": "array",
+            "title": "Rounds"
+          },
+          "stopped_because": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stopped Because"
+          },
+          "search_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SearchSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "discovered_urls": {
+            "items": {
+              "$ref": "#/components/schemas/DiscoveredUrl"
+            },
+            "type": "array",
+            "title": "Discovered Urls"
+          },
+          "view": {
+            "type": "string",
+            "title": "View",
+            "default": "detailed"
+          },
+          "default_view": {
+            "type": "string",
+            "title": "Default View",
+            "default": "detailed"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "authoring": {
+            "type": "string",
+            "title": "Authoring",
+            "default": "research_only"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thesis_proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thesis_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ledger": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClaimLedger"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flagged_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flagged Sources",
+            "description": "Sources with instruction-like text, treated as data."
+          },
+          "links_removed": {
+            "type": "integer",
+            "title": "Links Removed",
+            "description": "Links or images in model text that were not report sources.",
+            "default": 0
+          },
+          "trace_purged_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Purged At",
+            "description": "When the owner deleted the run's working records."
+          },
+          "tool_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCallRecord"
+            },
+            "type": "array",
+            "title": "Tool Calls"
+          },
+          "trace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchTrace"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -86539,7 +88000,7 @@
           },
           "claims": {
             "items": {
-              "$ref": "#/components/schemas/Claim"
+              "$ref": "#/components/schemas/steward__data_context__research__Claim"
             },
             "type": "array",
             "title": "Claims"
@@ -86595,6 +88056,170 @@
         ],
         "title": "ResearchExcerpt"
       },
+      "ResearchPlan": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version",
+            "default": 1
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "horizon_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Days"
+          },
+          "web_emphasis": {
+            "type": "string",
+            "title": "Web Emphasis"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/PlanQuestion"
+            },
+            "type": "array",
+            "title": "Questions"
+          },
+          "internal_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Internal Tools"
+          },
+          "web_intents": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Web Intents"
+          },
+          "preferred_tiers": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Preferred Tiers"
+          },
+          "primary_required_for": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "facts"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Required For",
+            "description": "'facts' when tier 1 is allowed: figures and dates should come from it."
+          },
+          "counter_evidence_intent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counter Evidence Intent"
+          },
+          "stop": {
+            "$ref": "#/components/schemas/StopConditions"
+          },
+          "planned_sections": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Planned Sections"
+          },
+          "iterate": {
+            "type": "boolean",
+            "title": "Iterate"
+          },
+          "authored_by": {
+            "type": "string",
+            "enum": [
+              "code",
+              "model"
+            ],
+            "title": "Authored By",
+            "default": "code"
+          },
+          "fallback_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Reason"
+          },
+          "edited_by_owner": {
+            "type": "boolean",
+            "title": "Edited By Owner",
+            "default": false
+          },
+          "draft_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Draft Id"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes",
+            "description": "What validation trimmed."
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "ticker",
+          "question",
+          "horizon_days",
+          "web_emphasis",
+          "questions",
+          "internal_tools",
+          "web_intents",
+          "preferred_tiers",
+          "primary_required_for",
+          "counter_evidence_intent",
+          "stop",
+          "planned_sections",
+          "iterate"
+        ],
+        "title": "ResearchPlan"
+      },
       "ResearchProfile": {
         "properties": {
           "id": {
@@ -86613,11 +88238,16 @@
             "items": {
               "type": "string",
               "enum": [
+                "executive_summary",
                 "business",
                 "financial_trend",
                 "moat_risks",
                 "valuation",
+                "scenarios",
+                "catalysts",
+                "counter_case",
                 "strategy_fit",
+                "thesis_kpis",
                 "ownership",
                 "relationships",
                 "risk",
@@ -86726,6 +88356,168 @@
             "title": "Top Holders",
             "description": "Largest 13F holders named in the ownership section.",
             "default": 3
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "quick",
+              "standard",
+              "deep_thesis",
+              "earnings_update",
+              "portfolio_macro",
+              "custom"
+            ],
+            "title": "Mode",
+            "description": "The kind of run; it shapes the research plan (questions, tools, searches).",
+            "default": "standard"
+          },
+          "web_emphasis": {
+            "type": "string",
+            "enum": [
+              "internal",
+              "balanced",
+              "web"
+            ],
+            "title": "Web Emphasis",
+            "description": "internal: stored records first, a quarter of the search budget; balanced and web: the full budget.",
+            "default": "balanced"
+          },
+          "date_horizon_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 7.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Horizon Days",
+            "description": "Prefer evidence from this many days back; older sources are named as old."
+          },
+          "allow_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Allow Domains",
+            "description": "Domains the owner trusts, searched in addition to the tier lists. They are labelled as owner-trusted and never counted as proof."
+          },
+          "deny_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+            },
+            "type": "array",
+            "maxItems": 40,
+            "title": "Deny Domains",
+            "description": "Never searched, never cited."
+          },
+          "allow_forums": {
+            "type": "boolean",
+            "title": "Allow Forums",
+            "description": "Let search use forums and social media. Their sentences are labelled.",
+            "default": false
+          },
+          "forum_domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 100,
+              "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+            },
+            "type": "array",
+            "maxItems": 40,
+            "title": "Forum Domains",
+            "description": "Extra hosts treated as forums or social media, added to the built-in list. Labelled as forum and searched only when forums are allowed."
+          },
+          "stale_days": {
+            "additionalProperties": {
+              "type": "integer",
+              "maximum": 3650.0,
+              "minimum": 1.0
+            },
+            "type": "object",
+            "title": "Stale Days",
+            "description": "Days after which a cited source of a kind counts as stale, overriding the built-in limit. Kinds: price, news_item, search, observation, default; `default` covers any other kind. Empty = built-in limits."
+          },
+          "iterate": {
+            "type": "boolean",
+            "title": "Iterate",
+            "description": "After the first pass, search again for sections left thin, corroborate single-source claims, and stop when the sections have enough or the budget is used.",
+            "default": false
+          },
+          "max_rounds": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Max Rounds",
+            "description": "Follow-up rounds when iterating.",
+            "default": 1
+          },
+          "min_sentences": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 1.0,
+            "title": "Min Sentences",
+            "description": "Cited sentences a section needs to count as answered.",
+            "default": 2
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40,
+                "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id",
+            "description": "A report template. It decides which sections appear, in what order, with what titles and in which view; the profile decides how the run investigates."
+          },
+          "authoring": {
+            "type": "string",
+            "enum": [
+              "research_only",
+              "draft_thesis",
+              "propose_update",
+              "review_thesis"
+            ],
+            "title": "Authoring",
+            "default": "research_only"
+          },
+          "planning": {
+            "type": "string",
+            "enum": [
+              "code",
+              "model"
+            ],
+            "title": "Planning",
+            "default": "code"
+          },
+          "planner_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+                "examples": [
+                  "gpt-6.1-sol",
+                  "gpt-6-luna",
+                  "gemini-3.8-flash"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planner Model",
+            "description": "The model that writes the plan; unset = the claim verifier's."
           }
         },
         "additionalProperties": false,
@@ -86759,6 +88551,15 @@
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
             "title": "Default Profile",
             "default": "standard"
+          },
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/ReportTemplate"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Templates",
+            "description": "Report templates a profile can name. Kept apart from the profiles: a profile is how to investigate, a template is how to present."
           }
         },
         "additionalProperties": false,
@@ -86898,6 +88699,22 @@
         ],
         "title": "ResearchRequest"
       },
+      "ResearchRetentionSettings": {
+        "properties": {
+          "trace_retention_days": {
+            "type": "integer",
+            "maximum": 3650.0,
+            "minimum": 1.0,
+            "title": "Trace Retention Days",
+            "description": "Checkpoints and tool traces of succeeded research and chat jobs older than this are deleted. Reports, their sources and claim ledgers stay.",
+            "default": 30
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ResearchRetentionSettings",
+        "description": "What the research_trace_retention job keeps."
+      },
       "ResearchSection": {
         "properties": {
           "id": {
@@ -86930,6 +88747,18 @@
               }
             ],
             "title": "Note"
+          },
+          "detail_only": {
+            "type": "boolean",
+            "title": "Detail Only",
+            "description": "Left out of the concise view.",
+            "default": false
+          },
+          "custom": {
+            "type": "boolean",
+            "title": "Custom",
+            "description": "A section the owner defined.",
+            "default": false
           }
         },
         "type": "object",
@@ -87012,6 +88841,68 @@
           "job_id"
         ],
         "title": "ResearchSummary"
+      },
+      "ResearchTrace": {
+        "properties": {
+          "model_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ModelCallTrace"
+            },
+            "type": "array",
+            "title": "Model Calls"
+          },
+          "web": {
+            "items": {
+              "$ref": "#/components/schemas/WebTrace"
+            },
+            "type": "array",
+            "title": "Web"
+          },
+          "retrieval": {
+            "items": {
+              "$ref": "#/components/schemas/RetrievalTrace"
+            },
+            "type": "array",
+            "title": "Retrieval"
+          },
+          "validation": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationTrace"
+            },
+            "type": "array",
+            "title": "Validation"
+          },
+          "total_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost Usd"
+          },
+          "total_ms": {
+            "type": "integer",
+            "title": "Total Ms",
+            "default": 0
+          },
+          "plan_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Source",
+            "description": "code, model or model fallback (with the reason)."
+          }
+        },
+        "type": "object",
+        "title": "ResearchTrace"
       },
       "ResultCoverage": {
         "properties": {
@@ -87125,6 +89016,43 @@
           "unknown"
         ],
         "title": "ResultRow"
+      },
+      "RetrievalTrace": {
+        "properties": {
+          "section": {
+            "type": "string",
+            "title": "Section"
+          },
+          "sources_offered": {
+            "type": "integer",
+            "title": "Sources Offered",
+            "description": "Sources in the registry when the section was asked."
+          },
+          "sources_cited": {
+            "type": "integer",
+            "title": "Sources Cited",
+            "description": "Distinct sources the kept sentences cite."
+          },
+          "sources_uncited": {
+            "type": "integer",
+            "title": "Sources Uncited",
+            "default": 0
+          },
+          "tools_planned": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tools Planned"
+          }
+        },
+        "type": "object",
+        "required": [
+          "section",
+          "sources_offered",
+          "sources_cited"
+        ],
+        "title": "RetrievalTrace"
       },
       "ReturnBasisCoverage": {
         "properties": {
@@ -89183,6 +91111,55 @@
         ],
         "title": "Role"
       },
+      "RoundRecord": {
+        "properties": {
+          "round": {
+            "type": "integer",
+            "title": "Round"
+          },
+          "sections": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "reasons": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Reasons"
+          },
+          "sentences_added": {
+            "type": "integer",
+            "title": "Sentences Added",
+            "default": 0
+          },
+          "sources_added": {
+            "type": "integer",
+            "title": "Sources Added",
+            "default": 0
+          },
+          "urls_found": {
+            "type": "integer",
+            "title": "Urls Found",
+            "default": 0
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "round",
+          "sections",
+          "reasons"
+        ],
+        "title": "RoundRecord"
+      },
       "Row": {
         "properties": {
           "label": {
@@ -89372,6 +91349,92 @@
         ],
         "title": "Rubric"
       },
+      "RuleCompliance": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "breach",
+              "warn",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "measured": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measured"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "operator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "weight",
+              "count"
+            ],
+            "title": "Unit",
+            "default": "weight"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "ticker",
+              "portfolio"
+            ],
+            "title": "Scope",
+            "default": "ticker"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "reason"
+        ],
+        "title": "RuleCompliance"
+      },
       "RuleMatch": {
         "properties": {
           "severities": {
@@ -89442,6 +91505,100 @@
           "severities"
         ],
         "title": "RuleMatch"
+      },
+      "RunSnapshot": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version",
+            "default": 1
+          },
+          "taken_at": {
+            "type": "string",
+            "title": "Taken At"
+          },
+          "profile": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Profile"
+          },
+          "template": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template"
+          },
+          "layout": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Layout"
+          },
+          "prompts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PromptCopy"
+            },
+            "type": "object",
+            "title": "Prompts"
+          },
+          "versions": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Versions",
+            "description": "Active config version id per domain when the run started."
+          },
+          "thesis": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thesis",
+            "description": "The ticker's thesis as it stood."
+          },
+          "plan_sha256": {
+            "type": "string",
+            "title": "Plan Sha256"
+          },
+          "digest": {
+            "type": "string",
+            "title": "Digest",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "taken_at",
+          "profile",
+          "template",
+          "layout",
+          "prompts",
+          "versions",
+          "thesis",
+          "plan_sha256"
+        ],
+        "title": "RunSnapshot"
       },
       "SaleImpact": {
         "properties": {
@@ -90854,6 +93011,44 @@
           "created_at"
         ],
         "title": "ScreenVersion"
+      },
+      "SearchSummary": {
+        "properties": {
+          "sources_after_first_pass": {
+            "type": "integer",
+            "title": "Sources After First Pass",
+            "default": 0
+          },
+          "sources_added_by_follow_up": {
+            "type": "integer",
+            "title": "Sources Added By Follow Up",
+            "default": 0
+          },
+          "urls_found": {
+            "type": "integer",
+            "title": "Urls Found",
+            "default": 0
+          },
+          "urls_cited": {
+            "type": "integer",
+            "title": "Urls Cited",
+            "default": 0
+          },
+          "urls_excluded": {
+            "type": "integer",
+            "title": "Urls Excluded",
+            "default": 0
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          }
+        },
+        "type": "object",
+        "title": "SearchSummary"
       },
       "Section": {
         "properties": {
@@ -94147,6 +96342,42 @@
               }
             ],
             "title": "As Of"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role",
+            "description": "For web sources: primary, quality_news, secondary, owner_trusted or forum."
+          },
+          "caveat": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caveat",
+            "description": "Why this source is weaker than it looks."
+          },
+          "retrieved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieved At",
+            "description": "When the search returned it."
           }
         },
         "type": "object",
@@ -96648,6 +98879,40 @@
         "type": "object",
         "title": "StockRequest"
       },
+      "StopConditions": {
+        "properties": {
+          "max_steps": {
+            "type": "integer",
+            "title": "Max Steps"
+          },
+          "max_searches": {
+            "type": "integer",
+            "title": "Max Searches"
+          },
+          "max_rounds": {
+            "type": "integer",
+            "title": "Max Rounds"
+          },
+          "min_sentences": {
+            "type": "integer",
+            "title": "Min Sentences",
+            "description": "Cited sentences a section needs to count as answered."
+          },
+          "rule": {
+            "type": "string",
+            "title": "Rule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "max_steps",
+          "max_searches",
+          "max_rounds",
+          "min_sentences",
+          "rule"
+        ],
+        "title": "StopConditions"
+      },
       "StoredSuggestionOut": {
         "properties": {
           "id": {
@@ -97359,6 +99624,95 @@
           "resolution"
         ],
         "title": "StoryResolution"
+      },
+      "StrategyCheck": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "thesis_kpi",
+              "strategy_rule"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "The config version the rule comes from."
+          },
+          "rule": {
+            "type": "string",
+            "title": "Rule",
+            "description": "The condition as configured, e.g. 'gross_margin >= 10 %'."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "challenges",
+              "mixed",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence"
+          },
+          "named_by": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Named By",
+            "description": "Claims in the report that name it."
+          },
+          "formal": {
+            "type": "boolean",
+            "title": "Formal",
+            "description": "True when the status comes from a stored check, not from the report's text."
+          },
+          "compliance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleCompliance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For a strategy rule: the rule engine's check against the latest snapshot (status, measured value, limit, as-of date). Separate from the claims that name it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "version",
+          "rule",
+          "status",
+          "formal"
+        ],
+        "title": "StrategyCheck",
+        "description": "One configured rule or thesis KPI, the condition it states, and where the report stands."
       },
       "StrategyConfig": {
         "properties": {
@@ -99146,6 +101500,58 @@
         ],
         "title": "TargetProgress"
       },
+      "TemplateSection": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "A built-in section id, or the id of one of the custom sections."
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "max_sentences": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 20.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Sentences"
+          },
+          "detail_only": {
+            "type": "boolean",
+            "title": "Detail Only",
+            "description": "Shown in the detailed view only; the concise view skips it.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "TemplateSection"
+      },
       "TestAlertRequest": {
         "properties": {
           "severity": {
@@ -100256,6 +102662,88 @@
         "title": "ThesisKPI",
         "description": "An absolute threshold the owner sets. v1 has no consensus-estimate comparisons."
       },
+      "ThesisKpiStatus": {
+        "properties": {
+          "kpi_id": {
+            "type": "string",
+            "title": "Kpi Id"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "rule": {
+            "type": "string",
+            "title": "Rule",
+            "description": "The configured condition, e.g. '>= 10 %'."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "breach",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "observed_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Value"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kpi_id",
+          "metric",
+          "rule",
+          "status",
+          "observed_value",
+          "period",
+          "as_of",
+          "rationale"
+        ],
+        "title": "ThesisKpiStatus"
+      },
       "ThesisOut": {
         "properties": {
           "links": {
@@ -100425,6 +102913,194 @@
         ],
         "title": "ThesisPriceTarget",
         "description": "The price levels the thesis's valuation sets, checked after each sync against the\nTrading212 price. Reaching the sell target asks for the research to be re-run: sell\nunless the new thesis raises the target. At or below the buy target the holding is a\ncandidate to add to. Scenarios alone are enough: they feed the expected return."
+      },
+      "ThesisProposal": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "research_only",
+              "draft_thesis",
+              "propose_update",
+              "review_thesis"
+            ],
+            "title": "Mode"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "base_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version Id",
+            "description": "The active `theses` version the proposal was made against."
+          },
+          "has_thesis": {
+            "type": "boolean",
+            "title": "Has Thesis"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/FieldChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "unchanged": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "why_owned",
+                "exit_conditions",
+                "pre_mortem"
+              ]
+            },
+            "type": "array",
+            "title": "Unchanged"
+          },
+          "left_to_owner": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Left To Owner"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "ticker",
+          "base_version_id",
+          "has_thesis",
+          "changes",
+          "unchanged",
+          "left_to_owner"
+        ],
+        "title": "ThesisProposal"
+      },
+      "ThesisProposalAccept": {
+        "properties": {
+          "fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "why_owned",
+                "exit_conditions",
+                "pre_mortem"
+              ]
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Fields",
+            "description": "The fields to apply."
+          }
+        },
+        "type": "object",
+        "required": [
+          "fields"
+        ],
+        "title": "ThesisProposalAccept"
+      },
+      "ThesisProposalApplied": {
+        "properties": {
+          "config_version_id": {
+            "type": "integer",
+            "title": "Config Version Id"
+          },
+          "applied": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "why_owned",
+                "exit_conditions",
+                "pre_mortem"
+              ]
+            },
+            "type": "array",
+            "title": "Applied"
+          }
+        },
+        "type": "object",
+        "required": [
+          "config_version_id",
+          "applied"
+        ],
+        "title": "ThesisProposalApplied"
+      },
+      "ThesisReview": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "base_version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version Id"
+          },
+          "why_owned": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why Owned"
+          },
+          "kpis": {
+            "items": {
+              "$ref": "#/components/schemas/ThesisKpiStatus"
+            },
+            "type": "array",
+            "title": "Kpis"
+          },
+          "exit_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Exit Conditions"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "base_version_id",
+          "why_owned",
+          "kpis",
+          "exit_conditions"
+        ],
+        "title": "ThesisReview"
       },
       "ThesisScenarios": {
         "properties": {
@@ -100950,6 +103626,105 @@
         ],
         "title": "TimelineMonth"
       },
+      "ToolCallRecord": {
+        "properties": {
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "args": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Args"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "stale",
+              "missing",
+              "failed",
+              "skipped"
+            ],
+            "title": "Status"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": false
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "ms": {
+            "type": "integer",
+            "title": "Ms",
+            "default": 0
+          },
+          "sources_added": {
+            "type": "integer",
+            "title": "Sources Added",
+            "default": 0
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes",
+            "default": 0
+          },
+          "figures": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Figures",
+            "description": "Figures in the result by status (ok, stale, ...)."
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "The newest as-of date among figures."
+          },
+          "sections": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool",
+          "status"
+        ],
+        "title": "ToolCallRecord"
+      },
       "TopHolder": {
         "properties": {
           "cik": {
@@ -101102,6 +103877,38 @@
           "amount"
         ],
         "title": "TotalByCurrency"
+      },
+      "TracePurged": {
+        "properties": {
+          "urls": {
+            "type": "integer",
+            "title": "Urls",
+            "description": "Discovered-URL records removed from the report."
+          },
+          "checkpoints": {
+            "type": "integer",
+            "title": "Checkpoints",
+            "description": "Step checkpoints deleted (the job cannot resume)."
+          },
+          "traces": {
+            "type": "integer",
+            "title": "Traces",
+            "description": "Tool traces removed from step details."
+          },
+          "report_traces": {
+            "type": "integer",
+            "title": "Report Traces",
+            "description": "Per-call run traces removed from stored report bodies.",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "urls",
+          "checkpoints",
+          "traces"
+        ],
+        "title": "TracePurged"
       },
       "TrackedManager": {
         "properties": {
@@ -102651,6 +105458,69 @@
         ],
         "title": "ValidationError"
       },
+      "ValidationTrace": {
+        "properties": {
+          "step": {
+            "type": "string",
+            "title": "Step"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "schema_failure": {
+            "type": "boolean",
+            "title": "Schema Failure",
+            "default": false
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries",
+            "default": 0
+          },
+          "sentences_returned": {
+            "type": "integer",
+            "title": "Sentences Returned",
+            "default": 0
+          },
+          "dropped_uncited": {
+            "type": "integer",
+            "title": "Dropped Uncited",
+            "description": "No checkable source id or allowed URL.",
+            "default": 0
+          },
+          "links_removed": {
+            "type": "integer",
+            "title": "Links Removed",
+            "default": 0
+          },
+          "dropped_by_check": {
+            "type": "integer",
+            "title": "Dropped By Check",
+            "description": "Removed after the claim check found them unsupported.",
+            "default": 0
+          },
+          "check_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Check Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step"
+        ],
+        "title": "ValidationTrace"
+      },
       "Valuation": {
         "properties": {
           "method": {
@@ -103944,6 +106814,81 @@
           "status"
         ],
         "title": "WebFactDecision"
+      },
+      "WebTrace": {
+        "properties": {
+          "step": {
+            "type": "string",
+            "title": "Step"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round",
+            "default": 0
+          },
+          "queries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Queries",
+            "description": "As the provider reports them."
+          },
+          "urls_found": {
+            "type": "integer",
+            "title": "Urls Found",
+            "default": 0
+          },
+          "urls_cited": {
+            "type": "integer",
+            "title": "Urls Cited",
+            "default": 0
+          },
+          "urls_excluded": {
+            "type": "integer",
+            "title": "Urls Excluded",
+            "default": 0
+          },
+          "found": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Found",
+            "description": "host + title of the first URLs found (no query string)."
+          },
+          "opened": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Opened",
+            "description": "URLs a sentence cites. The provider does not say which pages the model read in full, so a cited page is the nearest evidence of one that was opened."
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step"
+        ],
+        "title": "WebTrace"
       },
       "WhatIfCase": {
         "properties": {
@@ -107049,6 +109994,159 @@
         ],
         "title": "CoverageEntry"
       },
+      "steward__data_context__research__Claim": {
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "title": "Claim Id",
+            "description": "Stable id built from the record's natural key (series, geography, period; never a row id, which changes when the same value is fetched again); cite it, never the number."
+          },
+          "domain": {
+            "type": "string",
+            "enum": [
+              "macro",
+              "trade",
+              "financial",
+              "forward",
+              "company_research",
+              "business_network",
+              "patents"
+            ],
+            "title": "Domain"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "text_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "known_as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "Known As Of",
+            "description": "Date the record became known to the app."
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "vendor",
+              "owner",
+              "community",
+              "unclassified"
+            ],
+            "title": "Provenance"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim_id",
+          "domain",
+          "subject",
+          "metric",
+          "label",
+          "value",
+          "unit",
+          "period",
+          "known_as_of",
+          "source",
+          "provenance",
+          "source_url"
+        ],
+        "title": "Claim"
+      },
       "steward__discovery__engine__Check": {
         "properties": {
           "metric": {
@@ -107340,6 +110438,195 @@
           "denominator"
         ],
         "title": "Check"
+      },
+      "steward__research__ledger__Claim": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "c1, c2, ... in report order."
+          },
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          },
+          "index": {
+            "type": "integer",
+            "title": "Index",
+            "description": "Position of the sentence in its section."
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "calculation",
+              "interpretation",
+              "strategy_assessment",
+              "forecast",
+              "unknown"
+            ],
+            "title": "Type"
+          },
+          "written_by": {
+            "type": "string",
+            "enum": [
+              "code",
+              "model"
+            ],
+            "title": "Written By"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceRef"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "check": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "supported",
+                  "unsupported",
+                  "unchecked"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence"
+          },
+          "why": {
+            "type": "string",
+            "title": "Why",
+            "description": "What the confidence label rests on."
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period",
+            "description": "The newest date among its sources."
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "default": false
+          },
+          "review": {
+            "type": "string",
+            "enum": [
+              "unreviewed",
+              "machine_checked",
+              "flagged",
+              "owner_confirmed",
+              "owner_rejected"
+            ],
+            "title": "Review",
+            "default": "unreviewed"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule",
+            "description": "For a strategy assessment: the rule or KPI it names."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "section_id",
+          "index",
+          "text",
+          "type",
+          "written_by",
+          "evidence",
+          "confidence",
+          "why"
+        ],
+        "title": "Claim"
+      },
+      "steward__research__ledger__Coverage": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          },
+          "data_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data From"
+          },
+          "data_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data To"
+          },
+          "stale_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stale Sources"
+          },
+          "undated_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Undated Sources"
+          },
+          "notices": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of"
+        ],
+        "title": "Coverage"
       }
     },
     "securitySchemes": {

@@ -264,6 +264,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "public_data_collect",
         "raw_retention",
         "reference_data",
+        "research_trace_retention",
         "returns_refresh",
         "sec_xbrl",
         "source_audit",

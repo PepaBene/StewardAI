@@ -56,6 +56,7 @@ BudgetJobType = Literal[
     "shadow_snapshot",
     "shadow_report",
     "raw_retention",
+    "research_trace_retention",
     "zero_cost_gate",
     "returns_refresh",
     "exchange_probes",
