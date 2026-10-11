@@ -60,7 +60,7 @@ def test_value_question_is_answered_with_a_source_that_holds_every_figure() -> N
     tools = _Tools(OVERVIEW)
     inner = _Inner()
     result = asyncio.run(
-        RuleChatAssistant(inner, "claude-sonnet-5").answer(  # type: ignore[arg-type]
+        RuleChatAssistant(inner, "gpt-6.1-sol").answer(  # type: ignore[arg-type]
             [],
             "What is my portfolio worth?",
             tools,

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from steward.config.jobs import JobsConfig
 from steward.news.digest import DigestBody
 from steward.news.escalation import EscalationBody
+from steward.news.evidence import Lifecycle
 from steward.news.normalize import host_of
 from steward.portfolio.read import JobStatus, JobSummary
 
@@ -22,6 +23,11 @@ class ItemLink(BaseModel):
     ticker: str
     via: str
     term: str
+    confidence: float | None = Field(
+        default=None,
+        description="How sure the link is: 1 for the source or an identifier, lower for a "
+        "name, lowest for a competitor, supplier, customer or topic. Null before N5.",
+    )
 
 
 class StoryOut(BaseModel):
@@ -31,6 +37,9 @@ class StoryOut(BaseModel):
     severity: int | None
     status: StoryStatus
     confidence: Confidence
+    lifecycle: Lifecycle = Field(
+        default="reported", description="Where the story is: reported to resolved."
+    )
     status_reason: str | None
     rumour: bool
     recycled: bool
@@ -128,6 +137,7 @@ def _story(row: asyncpg.Record) -> StoryOut:
         severity=row["c_severity"],
         status=row["c_status"],
         confidence=row["c_confidence"],
+        lifecycle=row["c_lifecycle"],
         status_reason=row["c_status_reason"],
         rumour=row["c_rumour"],
         recycled=row["c_recycled"],
@@ -146,6 +156,7 @@ FEED_SELECT = (
     " i.relevant, i.sentiment_score, i.sentiment_relevance, i.cluster_id,"
     " c.ticker as c_ticker, c.event_type as c_event_type,"
     " c.severity as c_severity, c.status as c_status, c.confidence as c_confidence,"
+    " c.lifecycle as c_lifecycle,"
     " c.status_reason as c_status_reason, c.rumour as c_rumour, c.recycled as c_recycled,"
     " c.best_tier as c_best_tier, c.source_count as c_source_count,"
     " c.first_seen as c_first_seen, c.last_seen as c_last_seen,"
@@ -465,6 +476,138 @@ async def resolve_story(
         note,
     )
     return updated is not None
+
+
+# ---------------------------------------------------------------------------
+# Evidence behind a story: why it is linked, confirmed, disputed or corrected
+# ---------------------------------------------------------------------------
+
+
+class EvidenceItem(BaseModel):
+    id: int
+    url: str
+    headline: str
+    outlet: str | None
+    tier: int
+    kind: str | None = Field(description="Provenance kind; null on items stored before N5.")
+    independence_key: str | None = Field(
+        description="Items sharing a key are one source (a wire and its republishers)."
+    )
+    is_correction: bool
+    published_at: dt.datetime
+    links: list[ItemLink] = Field(description="Why the item is tied to each holding.")
+
+
+class LifecycleStep(BaseModel):
+    at: dt.datetime
+    from_state: str | None
+    to_state: Lifecycle
+    reason: str
+    evidence: list[dict[str, Any]] = Field(description="The items and results behind it.")
+
+
+class StoryEvidence(BaseModel):
+    id: int
+    headline: str
+    lifecycle: Lifecycle
+    lifecycle_reason: str | None
+    status: StoryStatus
+    confidence: Confidence
+    status_reason: str | None
+    closed_at: dt.datetime | None = Field(description="When the owner closed (resolved) it.")
+    independent_sources: int = Field(description="Independence groups among the items.")
+    primary_evidence: int = Field(description="Items that are primary evidence.")
+    items: list[EvidenceItem]
+    history: list[LifecycleStep] = Field(description="Every lifecycle change, oldest first.")
+
+
+async def story_evidence(pool: asyncpg.Pool, story_id: int) -> StoryEvidence | None:
+    story = await pool.fetchrow(
+        "select id, headline, lifecycle, lifecycle_reason, status, confidence, status_reason,"
+        " lifecycle_closed_at from public.story_cluster where id = $1",
+        story_id,
+    )
+    if story is None:
+        return None
+    rows = await pool.fetch(
+        "select id, url, headline, outlet, tier, evidence_kind, independence_key, is_correction,"
+        " published_at, links from public.news_item where cluster_id = $1"
+        " order by tier, published_at, id",
+        story_id,
+    )
+    events = await pool.fetch(
+        "select at, from_state, to_state, reason, evidence from public.story_lifecycle_event"
+        " where cluster_id = $1 order by at, id",
+        story_id,
+    )
+    from steward.news.evidence import PRIMARY_KINDS
+
+    return StoryEvidence(
+        id=story["id"],
+        headline=story["headline"],
+        lifecycle=story["lifecycle"],
+        lifecycle_reason=story["lifecycle_reason"],
+        status=story["status"],
+        confidence=story["confidence"],
+        status_reason=story["status_reason"],
+        closed_at=story["lifecycle_closed_at"],
+        independent_sources=len({r["independence_key"] or r["outlet"] or r["url"] for r in rows}),
+        primary_evidence=sum(1 for r in rows if r["evidence_kind"] in PRIMARY_KINDS),
+        items=[
+            EvidenceItem(
+                id=r["id"],
+                url=r["url"],
+                headline=r["headline"],
+                outlet=r["outlet"],
+                tier=r["tier"],
+                kind=r["evidence_kind"],
+                independence_key=r["independence_key"],
+                is_correction=r["is_correction"],
+                published_at=r["published_at"],
+                links=[ItemLink(**link) for link in _json(r["links"])],
+            )
+            for r in rows
+        ],
+        history=[
+            LifecycleStep(
+                at=e["at"],
+                from_state=e["from_state"],
+                to_state=e["to_state"],
+                reason=e["reason"],
+                evidence=_json(e["evidence"]),
+            )
+            for e in events
+        ],
+    )
+
+
+async def set_story_closed(pool: asyncpg.Pool, story_id: int, closed: bool) -> bool:
+    """The owner closes a story (lifecycle `resolved`) or reopens it. Closing sets the state
+    now and records the step; reopening clears the closing time and the story's next
+    assessment recomputes the state from its evidence."""
+    async with pool.acquire() as conn, conn.transaction():
+        before = await conn.fetchrow(
+            "select lifecycle from public.story_cluster where id = $1 for update", story_id
+        )
+        if before is None:
+            return False
+        await conn.execute(
+            "update public.story_cluster set lifecycle_closed_at ="
+            " case when $2 then coalesce(lifecycle_closed_at, now()) end,"
+            " lifecycle = case when $2 then 'resolved' else lifecycle end,"
+            " lifecycle_reason = case when $2 then 'closed by the owner' else lifecycle_reason"
+            " end, lifecycle_at = now() where id = $1",
+            story_id,
+            closed,
+        )
+        if closed and before["lifecycle"] != "resolved":
+            await conn.execute(
+                "insert into public.story_lifecycle_event (cluster_id, from_state, to_state,"
+                " reason) values ($1, $2, 'resolved', 'closed by the owner')",
+                story_id,
+                before["lifecycle"],
+            )
+    return True
 
 
 # ---------------------------------------------------------------------------

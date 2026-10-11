@@ -32,7 +32,7 @@ describe("budget form", () => {
     form.monthlyCap = "0";
     form.warnPercent = "120";
     form.atCap = "downgrade_noncritical";
-    form.downgradeModel = "claude-unpriced-1";
+    form.downgradeModel = "gpt-unpriced-1";
     form.prices = [...form.prices, { ...form.prices[0], key: "dup" }];
     form.jobCaps = [
       { ...newJobCapRow(), jobType: "research", cap: "1" },

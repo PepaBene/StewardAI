@@ -1,4 +1,4 @@
-"""Research step 2 (model): one Claude call per model-written section.
+"""Research step 2 (model): one model call per model-written section.
 
 Each call gets the section's task, the gathered sources (id, kind, tier, title, stored
 text), the code sections already written, and, when the profile allows it, web search on
@@ -6,23 +6,22 @@ outlets of the allowed tiers. It returns sentences that each cite source ids or 
 result URLs; the code keeps only citations it can check (a registry id, or a URL that was
 among the search results and whose outlet has an allowed tier).
 
-Every section of a report gets the same gathered material, so it is sent first, as its own
-block with a cache breakpoint after it: section 1 writes the cache and sections 2..N (and
-any pause_turn continuation) read it at a tenth of the input price. Anything that differs per
-section (the date, the task, sources earlier sections found by search) comes after it, so
-the cached prefix stays byte-identical.
+Every section of a report gets the same gathered material, so it is sent first: the
+providers cache a repeated prefix, so sections 2..N read it at a lower input price.
+Anything that differs per section (the date, the task, sources earlier sections found by
+search) comes after it, so the cached prefix stays byte-identical.
 """
 
 import datetime as dt
 from dataclasses import dataclass, field
-from typing import Any, Protocol, cast
+from typing import Any, Protocol
 
-import anthropic
-from anthropic.types import MessageParam
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
 from steward.config.jobs import effort_kwargs
+from steward.llm.routing import RoutingClient
+from steward.llm.types import LLMError
 
 SECTION_TITLES = {
     "business": "Business",
@@ -129,9 +128,12 @@ class ResearchWriter(Protocol):
 
 
 def web_search_tool(model: str, max_uses: int, domains: tuple[str, ...]) -> dict[str, Any]:
-    kind = "web_search_20250305" if model.startswith("claude-haiku-4") else "web_search_20260209"
+    """The web search tool a call site passes to `client.messages.parse`; the routing client
+    turns it into the provider's own search. `model` is accepted so a call site need not know
+    which models search differently."""
+    del model
     return {
-        "type": kind,
+        "type": "web_search",
         "name": "web_search",
         "max_uses": max_uses,
         "allowed_domains": list(domains),
@@ -169,17 +171,15 @@ def section_prompt(request: SectionRequest) -> str:
     )
 
 
-def section_content(request: SectionRequest) -> list[dict[str, Any]]:
-    """The user message: the shared material with a cache breakpoint, then the section."""
-    return [
-        {"type": "text", "text": request.material, "cache_control": {"type": "ephemeral"}},
-        {"type": "text", "text": section_prompt(request)},
-    ]
+def section_content(request: SectionRequest) -> str:
+    """The user message: the shared material first, then the section. Every section of a
+    report gets the same material, so it comes first and the prefix stays byte-identical."""
+    return f"{request.material}\n\n{section_prompt(request)}"
 
 
-class ClaudeResearchWriter:
+class LLMResearchWriter:
     def __init__(
-        self, client: anthropic.AsyncAnthropic, model: str, effort: str, system: str = SYSTEM
+        self, client: RoutingClient, model: str, effort: str, system: str = SYSTEM
     ) -> None:
         self._client = client
         self._model = model
@@ -191,34 +191,21 @@ class ClaudeResearchWriter:
         tools: list[Any] = []
         if request.max_searches > 0 and request.domains:
             tools = [web_search_tool(self._model, request.max_searches, request.domains)]
-        messages: list[dict[str, Any]] = [{"role": "user", "content": section_content(request)}]
         titles: dict[str, str] = {}
-        response = None
-        for _ in range(4):  # pause_turn continuations of the server-side search loop
-            try:
-                response = await self._client.messages.parse(
-                    model=self._model,
-                    system=[
-                        {
-                            "type": "text",
-                            "text": self._system,
-                            "cache_control": {"type": "ephemeral"},
-                        }
-                    ],
-                    messages=cast(list[MessageParam], messages),
-                    tools=cast(Any, tools if tools else anthropic.omit),
-                    **effort_kwargs(self._model, self._effort, 16000),
-                    output_format=SectionDraft,
-                )
-            except anthropic.APIError as exc:
-                return SectionResult(None, usage, titles, f"the call failed: {exc}"[:300])
-            usage.add(response.usage)
-            titles |= result_titles(response.content)
-            if response.stop_reason != "pause_turn":
-                break
-            messages.append({"role": "assistant", "content": response.content})
-        if response is None:
-            return SectionResult(None, usage, titles, "no response")
+        extra: dict[str, Any] = {"tools": tools} if tools else {}
+        try:
+            response = await self._client.messages.parse(
+                model=self._model,
+                system=self._system,
+                messages=[{"role": "user", "content": section_content(request)}],
+                output_format=SectionDraft,
+                **extra,
+                **effort_kwargs(self._model, self._effort, 16000),
+            )
+        except LLMError as exc:
+            return SectionResult(None, usage, titles, f"the call failed: {exc}"[:300])
+        usage.add(response.usage)
+        titles |= result_titles(response.content)
         if response.stop_reason == "refusal":
             return SectionResult(None, usage, titles, "the model declined this section")
         draft = response.parsed_output

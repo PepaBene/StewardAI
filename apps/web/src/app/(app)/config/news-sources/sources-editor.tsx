@@ -133,6 +133,15 @@ export function SourcesEditor() {
                 hint='One "domain tier" per line, e.g. "reuters.com 2". Subdomains included. Every holding profile&apos;s IR domains count as tier 1.'
               />
               <div className="space-y-3">
+                <TextAreaField
+                  label="Portfolio watch topics"
+                  path="portfolio_topics"
+                  errors={editor.errors}
+                  value={form.portfolio_topics}
+                  onChange={(v) => set({ portfolio_topics: v })}
+                  rows={6}
+                  hint='One topic per line: "id | label | kind | keyword, keyword" (kinds: macro, regulation, rates, currency, sector, supply_chain, other). Start a line with "off " to disable it. Wire items that mention a keyword are tagged with the topic; a tag never links a holding or alerts.'
+                />
                 <TextAreaField label="Blocked outlets" path="blocked_domains" errors={editor.errors} value={form.blocked_domains} onChange={(v) => set({ blocked_domains: v })} rows={3} hint="One domain per line; their items are dropped." />
                 <TextAreaField
                   label="Allowed outlets for aggregators (optional)"

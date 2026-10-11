@@ -29,7 +29,7 @@ def request(**kw: Any) -> Request:
 
 
 def test_provider_follows_the_model_prefix() -> None:
-    assert provider_of("claude-haiku-4-5") == "anthropic"
+    assert provider_of("gpt-6-luna") == "openai"
     assert provider_of("gpt-6.1-sol") == "openai"
     assert provider_of("gemini-3.8-flash") == "google"
     with pytest.raises(ValueError):
@@ -362,10 +362,10 @@ def test_per_model_prices_override_the_global_cache_and_search_prices() -> None:
     prices = PriceTable(BudgetConfig())
     sol = prices.prices_for("gpt-6.1-sol")
     flash = prices.prices_for("gemini-3.8-flash")
-    claude = prices.prices_for("claude-sonnet-5")
-    assert sol and flash and claude
+    priced = prices.prices_for("gpt-6.1-sol")
+    assert sol and flash and priced
     assert (sol["cache_read_multiplier"], sol["cache_write_multiplier"]) == (0.05, 1)
-    assert flash["web_search_per_1000"] == 14 and claude["cache_write_multiplier"] == 1.25
+    assert flash["web_search_per_1000"] == 14 and priced["cache_write_multiplier"] == 1
 
 
 async def test_complete_posts_to_the_provider_and_retries_a_rate_limit() -> None:

@@ -110,12 +110,15 @@ class AnnouncementRule(ConfigModel):
     """Maps a regulatory announcement's type (the RNS headline or the EQS category) to an
     event type. First match wins; `classify` leaves the item to the classifier."""
 
-    service: Literal["rns", "eqs", "any"] = "any"
+    service: Literal[
+        "rns", "eqs", "tdnet", "hkex", "cninfo", "dart", "gazette", "fca_nsm", "filings", "any"
+    ] = "any"
     pattern: str = Field(
         min_length=1,
         max_length=200,
         description="Case-insensitive regular expression matched against the announcement "
-        "type (RNS: the headline, e.g. 'Final Results'; EQS: the category, e.g. 'Ad-hoc').",
+        "type (RNS: the headline, e.g. 'Final Results'; EQS: the category, e.g. 'Ad-hoc'; "
+        "TDnet, CNINFO, DART and HKEX: the title in the filing's own language).",
     )
     event_type: EventType | Literal["classify"]
 
@@ -149,6 +152,67 @@ def _default_announcement_rules() -> list[AnnouncementRule]:
         ("eqs", r"voting rights", "other"),
         ("eqs", r"financial reports?|half-?year report|quarterly (report|statement)|"
          r"annual report", "earnings_release"),
+        # Tokyo (TDnet): titles are Japanese. Forecast revisions come before results.
+        ("tdnet", r"業績予想の修正|配当予想の修正|業績予想.{0,6}修正|下方修正|上方修正",
+         "guidance_change"),
+        ("tdnet", r"決算短信|四半期報告|有価証券報告|決算概要|決算補足", "earnings_release"),
+        ("tdnet", r"自己株式|配当|株主還元|株式分割|新株予約権|公募|第三者割当",
+         "capital_allocation"),
+        ("tdnet", r"合併|買収|株式取得|公開買付|子会社化|株式交換|事業譲渡|吸収分割",
+         "m_and_a"),
+        ("tdnet", r"代表取締役|役員の異動|役員人事|人事異動", "management_change"),
+        # Hong Kong (HKEXnews): English titles plus the exchange's category text.
+        ("hkex", r"profit warning|positive profit alert|profit alert", "guidance_change"),
+        ("hkex", r"(annual|interim|final|quarterly|third quarter|first quarter) results|"
+         r"results announcement", "earnings_release"),
+        ("hkex", r"connected transaction|discloseable transaction|acquisition|disposal|"
+         r"takeover|general offer|merger|privatisation", "m_and_a"),
+        ("hkex", r"repurchase|buy-?back|dividend|placing|rights issue|open offer|"
+         r"subscription of new shares|share scheme", "capital_allocation"),
+        ("hkex", r"change of director|appointment|resignation|retirement|change in "
+         r"(chairman|chief)", "management_change"),
+        ("hkex", r"dealings? by|director.?s? interest|disclosure of interests",
+         "insider_transaction"),
+        # Shanghai and Shenzhen (CNINFO): Chinese titles.
+        ("cninfo", r"业绩预告|业绩快报|盈利预警|业绩预增|业绩预减|业绩修正", "guidance_change"),
+        ("cninfo", r"年度报告|半年度报告|季度报告|年报|中报|一季报|三季报|财务报告",
+         "earnings_release"),
+        ("cninfo", r"收购|重组|并购|要约|吸收合并|资产出售|资产购买", "m_and_a"),
+        ("cninfo", r"回购|分红|利润分配|权益分派|增发|配股|可转债|定向增发",
+         "capital_allocation"),
+        ("cninfo", r"董事|监事|高级管理人员|辞职|聘任|总经理", "management_change"),
+        ("cninfo", r"增持|减持|权益变动|持股", "insider_transaction"),
+        ("cninfo", r"立案|处罚|诉讼|仲裁|问询函|监管函", "regulatory_legal"),
+        # Korea (DART): report names are Korean. Insider reports come before the generic ones.
+        ("dart", r"임원.{0,3}주요주주|특정증권등소유상황", "insider_transaction"),
+        ("dart", r"영업\(잠정\)실적|매출액또는손익구조|분기보고서|반기보고서|사업보고서",
+         "earnings_release"),
+        ("dart", r"합병|인수|양수도|영업양수|타법인주식", "m_and_a"),
+        ("dart", r"자기주식|배당|유상증자|무상증자|전환사채|신주인수권", "capital_allocation"),
+        ("dart", r"대표이사|임원.{0,3}변경|최대주주변경", "management_change"),
+        # The Gazette (UK): insolvency and corporate-status notices.
+        ("gazette", r"winding.?up|liquidat|administrat|receiver|insolven|strike.?off|"
+         r"dissol", "entity_status"),
+        # FCA National Storage Mechanism (UK): the title plus the NSM's own type and category.
+        ("fca_nsm", r"director/pdmr|pdmr shareholding|directors?.? dealings?|"
+         r"holding\(s\) in company|major shareholding", "insider_transaction"),
+        ("fca_nsm", r"results|financial report|trading (update|statement)|interim|annual report",
+         "earnings_release"),
+        ("fca_nsm", r"acquisition|disposal|merger|takeover|offer for|rule 2\.7|scheme of arr",
+         "m_and_a"),
+        ("fca_nsm", r"buy ?back|dividend|share repurchase|issue of (equity|shares)|total voting",
+         "capital_allocation"),
+        ("fca_nsm", r"director.{0,20}(appointment|resignation|change)|board change|"
+         r"change of (chair|ceo|cfo)", "management_change"),
+        # EDINET and Companies House filings stored by the disclosure jobs.
+        ("filings", r"臨時報告書", "classify"),
+        ("filings", r"有価証券報告書|四半期報告書|半期報告書|決算", "earnings_release"),
+        ("filings", r"大量保有報告書|変更報告書", "insider_transaction"),
+        ("filings", r"accounts|annual report", "earnings_release"),
+        ("filings", r"appointment of|termination of appointment|change of (director|secretary)",
+         "management_change"),
+        ("filings", r"allotment|statement of capital|capital|resolution|memorandum",
+         "capital_allocation"),
         ("any", r".", "classify"),
     ]  # fmt: skip
     return [
@@ -259,6 +323,22 @@ class FreeSourceAlertsConfig(ConfigModel):
         default_factory=lambda: ["acquirer", "acquired", "executive", "customer", "supplier"],
         description="Confirmed company-graph edges of these types alert.",
     )
+
+
+def with_default_services(rules: "EventRulesConfig") -> "EventRulesConfig":
+    """The rules with the default announcement rules of any service the saved list has none
+    for, placed before the catch-all. A config saved before a service existed (TDnet, HKEX,
+    DART, the Gazette...) would otherwise send all its filings to the classifier. Services the
+    owner already has rules for are left exactly as saved; the stored version is not changed."""
+    have = {r.service for r in rules.announcement_types}
+    missing = [
+        r for r in _default_announcement_rules() if r.service not in have and r.service != "any"
+    ]
+    if not missing:
+        return rules
+    kept = list(rules.announcement_types)
+    at = next((i for i, r in enumerate(kept) if r.service == "any"), len(kept))
+    return rules.model_copy(update={"announcement_types": [*kept[:at], *missing, *kept[at:]]})
 
 
 class EventRulesConfig(ConfigModel):

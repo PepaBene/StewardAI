@@ -13,12 +13,12 @@ import re
 from decimal import ROUND_DOWN, Decimal
 from typing import Any
 
-import anthropic
 import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
 from steward.config.jobs import effort_kwargs
+from steward.llm.routing import RoutingClient
 
 HS_REVISION = "HS2022"
 TOLERANCE = Decimal("1.005")
@@ -100,7 +100,7 @@ async def product_lines(
 
 
 async def ask_hs(
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     model: str,
     effort: str | None,
     company: str,

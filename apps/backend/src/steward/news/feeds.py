@@ -52,6 +52,10 @@ class RawItem:
     event_type: str | None = None
     sentiment_score: float | None = None
     sentiment_relevance: float | None = None
+    # ISO country of the outlet when the collector knows it (else the source's region).
+    region: str | None = None
+    # Article text the feed itself carried (`content:encoded`): rung 1 of the fetch ladder.
+    content: str | None = None
 
 
 @dataclass(frozen=True)
@@ -68,6 +72,9 @@ class HoldingFeedInfo:
     regulatory_urls: tuple[str, ...] = ()
     topics: tuple[str, ...] = ()
     alpha_symbol: str | None = None
+    # Exchange stock codes (Tokyo 7203, Hong Kong 0700, Shenzhen 002475, Seoul 005930): the
+    # key the exchange disclosure sources match on.
+    listing_codes: tuple[str, ...] = ()
 
 
 async def collect_alpha_vantage_news(
@@ -227,6 +234,9 @@ def parse_feed(
         source = entry.get("source") or {}
         outlet_url = source.get("href") if isinstance(source, dict) else None
         outlet_name = source.get("title") if isinstance(source, dict) else None
+        body = " ".join(
+            str(c.get("value") or "") for c in entry.get("content") or [] if isinstance(c, dict)
+        )
         items.append(
             RawItem(
                 source_id=source_id,
@@ -238,6 +248,7 @@ def parse_feed(
                 outlet_host=host_of(outlet_url) or host_of(link),
                 outlet_name=outlet_name,
                 tickers=tickers,
+                content=clean_text(body, 200_000) if len(body) > 600 else None,
             )
         )
     return items
@@ -248,6 +259,26 @@ async def collect_rss(
 ) -> list[RawItem]:
     document = await fetch_document(http, url, max_bytes=MAX_FEED_BYTES, headers=default_headers())
     return parse_feed(document.data, source_id, tickers=tickers, feed_url=url)
+
+
+async def collect_rss_conditional(
+    http: httpx.AsyncClient,
+    source_id: str,
+    url: str,
+    tickers: tuple[str, ...],
+    etag: str | None,
+    last_modified: str | None,
+) -> tuple[list[RawItem], str | None, str | None]:
+    """Like `collect_rss`, but a conditional GET: raises `NotModified` when the feed has not
+    changed since the stored validators. Returns the items and the new validators."""
+    headers = default_headers()
+    if etag:
+        headers["If-None-Match"] = etag
+    if last_modified:
+        headers["If-Modified-Since"] = last_modified
+    document = await fetch_document(http, url, max_bytes=MAX_FEED_BYTES, headers=headers)
+    items = parse_feed(document.data, source_id, tickers=tickers, feed_url=url)
+    return items, document.etag, document.last_modified
 
 
 # ---------------------------------------------------------------------------
@@ -559,7 +590,9 @@ async def collect_google_news(
         if url is None:
             continue
         try:
-            items = await collect_rss(http, source_id, url, (holding.ticker,))
+            # No direct ticker: a name query hit is linked only when the linker matches the
+            # holding's name in the text, not at confidence 1.0 by the query alone.
+            items = await collect_rss(http, source_id, url, ())
         except FetchError as exc:
             result.errors.append(f"{holding.ticker}: {exc}")
             continue

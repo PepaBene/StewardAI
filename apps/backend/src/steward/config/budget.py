@@ -71,6 +71,10 @@ BudgetJobType = Literal[
     "twelve_data_corporate_actions",
     "ai_approvals",
     "ir_discovery",
+    "news_ai_search",
+    "news_triage",
+    "news_analysis",
+    "news_brief",
     "gap_research",
     "exposure_build",
     "factor_returns",
@@ -89,6 +93,12 @@ AtCap = Literal["alert_only", "pause_noncritical", "downgrade_noncritical"]
 # theses, judging a severe news event, and answering the owner's own chat questions are
 # what the app is for and are time-critical; digests, research and reviews can wait.
 DEFAULT_CRITICAL_JOB_TYPES: list[BudgetJobType] = ["earnings_check", "event_escalation", "chat"]
+DEFAULT_MONTHLY_CAPS_USD: dict[BudgetJobType, float] = {
+    "news_analysis": 4.0,
+    "news_brief": 1.5,
+    "news_ai_search": 2.5,
+    "news_triage": 1.0,
+}
 
 
 class ModelPrice(ConfigModel):
@@ -109,18 +119,11 @@ class ModelPrice(ConfigModel):
 
 
 def _default_prices() -> list[ModelPrice]:
-    table = {
-        "claude-fable-5-1": (10, 50),
-        "claude-opus-4-8": (5, 25),
-        "claude-haiku-4-5": (1, 5),
-        "claude-sonnet-5": (2, 10),
-        "claude-sonnet-4-6": (3, 15),
-        "claude-opus-5": (5, 25),
-        "claude-opus-5-5": (4, 20),
-    }
-    prices = [
-        ModelPrice(model=m, input_per_mtok=i, output_per_mtok=o) for m, (i, o) in table.items()
-    ]
+    prices: list[ModelPrice] = []
+    # Embedding model: input only. PROVISIONAL list price (the plan flags it unverified; the
+    # embedding API reports no usage, so tokens are estimated). Check against the provider's
+    # price page and correct here; the news embedding cost is ~$1/month at this rate.
+    prices.append(ModelPrice(model="gemini-embedding-2", input_per_mtok=0.15, output_per_mtok=0))
     # OpenAI and Google list prices of 2026-10-06 (docs/plans/multi_provider_model_routing_plan.md).
     # Cached input is read at 5 % (sol) or 10 % (luna, flash) of input with no write premium.
     # Gemini 3.x prices double on 2027-01-01: re-price flash then.
@@ -189,7 +192,7 @@ class BudgetConfig(ConfigModel):
         " AI request; or run their requests on `downgrade_model`.",
     )
     downgrade_model: ModelId = Field(
-        default="claude-haiku-4-5",
+        default="gpt-6-luna",
         description="The model non-critical requests use at the cap (`downgrade_noncritical`).",
     )
     critical_job_types: list[BudgetJobType] = Field(
@@ -206,6 +209,14 @@ class BudgetConfig(ConfigModel):
         description="Most AI spend of one run of a job type not in `per_job_cap_usd`."
         " Null: no cap.",
     )
+    per_job_monthly_cap_usd: dict[BudgetJobType, float] = Field(
+        # The $10 news envelope (news plan section 8a): the new news stages degrade at their own
+        # ceiling and never stop ingestion. Ingestion itself has no monthly cap here.
+        default_factory=lambda: dict(DEFAULT_MONTHLY_CAPS_USD),
+        description="Most AI spend of one job type per calendar month (Europe/Prague), in USD,"
+        " so one stage cannot use the whole monthly budget. A run over it fails before its next"
+        " request, whatever its criticality.",
+    )
 
     @model_validator(mode="after")
     def _one_price_per_model(self) -> Self:
@@ -214,6 +225,13 @@ class BudgetConfig(ConfigModel):
         for job_type, cap in self.per_job_cap_usd.items():
             if cap <= 0:
                 raise ValueError(f"per_job_cap_usd[{job_type}] must be greater than 0")
+        for job_type, cap in self.per_job_monthly_cap_usd.items():
+            if cap <= 0:
+                raise ValueError(f"per_job_monthly_cap_usd[{job_type}] must be greater than 0")
+        if "news_ingest" in {str(k) for k in self.per_job_monthly_cap_usd}:
+            # A monthly cap raises BudgetExceeded and stops the run; the news plan says a capped
+            # stage degrades and never stops ingestion, so ingestion cannot have one.
+            raise ValueError("per_job_monthly_cap_usd cannot cap news_ingest: it must not stop")
         if self.at_cap == "downgrade_noncritical" and not any(
             p.model == self.downgrade_model for p in self.prices
         ):
@@ -226,3 +244,7 @@ class BudgetConfig(ConfigModel):
         """The spend cap of one run of `job_type` (None: none)."""
         caps = {str(k): v for k, v in self.per_job_cap_usd.items()}
         return caps.get(job_type, self.default_job_cap_usd)
+
+    def job_monthly_cap(self, job_type: str) -> float | None:
+        """The spend cap of one job type per month (None: none)."""
+        return {str(k): v for k, v in self.per_job_monthly_cap_usd.items()}.get(job_type)

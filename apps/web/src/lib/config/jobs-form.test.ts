@@ -66,6 +66,10 @@ const FULL: JobsConfig = {
   twelve_data_corporate_actions: { enabled: false, cron: "50 10 * * 6", timezone: "UTC" },
   ai_approvals: { enabled: true, cron: "10 7 * * *", timezone: "UTC" },
   ir_discovery: { enabled: true, cron: "30 7 * * 1", timezone: "UTC" },
+  news_ai_search: { enabled: false, cron: "20 6 * * *", timezone: "UTC" },
+  news_triage: { enabled: false, cron: "10 * * * *", timezone: "UTC" },
+  news_analysis: { enabled: true, cron: "25 */3 * * *", timezone: "UTC" },
+  news_brief: { enabled: false, cron: "30 6 * * *", timezone: "UTC" },
   gap_research: { enabled: true, cron: "0 8 * * 3", timezone: "UTC" },
   exposure_build: { enabled: true, cron: "50 5 * * 2", timezone: "UTC" },
   factor_returns: { enabled: true, cron: "30 5 * * 1", timezone: "UTC" },
@@ -78,8 +82,8 @@ const FULL: JobsConfig = {
   disclosure_alerts: { enabled: true, cron: "15 13 * * *", timezone: "UTC" },
   change_alerts: { enabled: true, cron: "55 7 * * *", timezone: "Europe/Prague" },
   earnings_check: {
-    extraction_model: "claude-opus-5-5",
-    locate_model: "claude-sonnet-5",
+    extraction_model: "gpt-6.1-sol",
+    locate_model: "gpt-6.1-sol",
     effort: "xhigh",
     locate_effort: "medium",
     max_steps: 12,
@@ -89,27 +93,71 @@ const FULL: JobsConfig = {
     xbrl_for_filings: true,
     kpi_history_periods: 12,
   },
-  earnings_calendar_settings: { model: "claude-haiku-4-5", effort: null, lookahead_days: 90, refresh_within_days: 21, use_batch: true, batch_wait_minutes: 60 },
-  ai_approval: { model: "claude-sonnet-5", effort: null, listings: true, peers: true, refresh_peers: true, peer_refresh_days: 30, peer_refresh_per_run: 8, min_confidence: 0.8, max_confirmed_peers: 8, max_calls_per_run: 40, use_sic: true, rules_first: true, use_batch: true, batch_wait_minutes: 60 },
-  exposure_build_settings: { model: "claude-sonnet-5", effort: null, filings_per_run: 6, extract_inputs: true, extract_dependencies: true, map_products: true },
-  gap_research_settings: { model: "claude-sonnet-5", effort: null, slots: ["next_report_date"], max_searches: 3, slots_per_run: 8, use_batch: true, batch_wait_minutes: 60, browser_fallback: false, cooldown_days: 30, min_confidence: 0.8, t1_domains: ["sec.gov"], t2_domains: ["reuters.com"], t3_domains: ["wikipedia.org"], denied_domains: ["reddit.com"] },
-  ir_discovery_settings: { model: "claude-sonnet-5", effort: null, max_searches: 4, holdings_per_run: 6, use_batch: true, batch_wait_minutes: 60, probe_first: true, browser_fallback: false, cooldown_days: 30, min_confidence: 0.8, denied_domains: ["wikipedia.org"], robots_exempt_domains: [] },
+  earnings_calendar_settings: { model: "gpt-6-luna", effort: null, lookahead_days: 90, refresh_within_days: 21, use_batch: true, batch_wait_minutes: 60 },
+  ai_approval: { model: "gpt-6.1-sol", effort: null, listings: true, peers: true, refresh_peers: true, peer_refresh_days: 30, peer_refresh_per_run: 8, min_confidence: 0.8, max_confirmed_peers: 8, max_calls_per_run: 40, use_sic: true, rules_first: true, use_batch: true, batch_wait_minutes: 60 },
+  exposure_build_settings: { model: "gpt-6.1-sol", effort: null, filings_per_run: 6, extract_inputs: true, extract_dependencies: true, map_products: true },
+  gap_research_settings: { model: "gpt-6.1-sol", effort: null, slots: ["next_report_date"], max_searches: 3, slots_per_run: 8, use_batch: true, batch_wait_minutes: 60, browser_fallback: false, cooldown_days: 30, min_confidence: 0.8, t1_domains: ["sec.gov"], t2_domains: ["reuters.com"], t3_domains: ["wikipedia.org"], denied_domains: ["reddit.com"] },
+  ir_discovery_settings: { model: "gpt-6.1-sol", effort: null, max_searches: 4, holdings_per_run: 6, use_batch: true, batch_wait_minutes: 60, probe_first: true, browser_fallback: false, cooldown_days: 30, min_confidence: 0.8, denied_domains: ["wikipedia.org"], robots_exempt_domains: [] },
   news: {
-    classification_model: "claude-haiku-4-5",
+    classification_model: "gpt-6-luna",
     classification_effort: null,
     classification_batch_size: 25,
     classification_use_batch: true,
     classification_batch_wait_minutes: 30,
-    corroboration_model: "claude-sonnet-5",
+    corroboration_model: "gpt-6.1-sol",
     corroboration_effort: "low",
     corroboration_max_searches: 5,
     corroboration_rounds: 0,
     recheck_hours: 72,
     max_items_per_run: 1000,
     edgar_fts_max_hits: 500,
+    translation_model: "gpt-6-luna",
+    translation_effort: null,
+    translation_per_run: 300,
+    search_lead_model: "gpt-6-luna",
+    search_lead_effort: null,
+    ai_search_max_searches: 3,
+    ai_search_max_holdings: 10,
+    ai_search_thin_below: 3,
+    ai_search_days: 3,
+    analysis_techniques: ["novelty", "thread", "market", "themes"],
+    extraction_model: "gpt-6-luna",
+    extraction_effort: null,
+    analysis_model: "gemini-3.8-flash",
+    analysis_effort: null,
+    brief_model: "gemini-3.8-flash",
+    brief_effort: null,
+    analysis_per_run: 25,
+    analysis_min_severity: 1,
+    framing_min_outlets: 3,
+    novelty_window_days: 30,
+    novelty_repeat_similarity: 0.88,
+    novelty_update_similarity: 0.72,
+    thread_window_days: 21,
+    brief_max_lines: 12,
+    brief_alert: false,
+    gdelt_themes: false,
+    gdelt_max_themes: 6,
+    theme_narratives: true,
+    triage_model: "gpt-6-luna",
+    triage_effort: null,
+    triage_per_run: 200,
+    triage_fulltext_relevance: 2,
+    batch_extraction: false,
+    sector_benchmarks: {},
+    auto_resolve_days: 14,
+    sentiment_weight: 0.25,
+    indirect_alert_min_severity: 2,
+    embedding_model: "gemini-embedding-2",
+    embedding_dimensions: 768,
+    embedding_per_run: 600,
+    embedding_duplicate_threshold: 0.9,
+    duplicate_window_hours: 36,
+    fulltext_per_run: 40,
+    fulltext_browser_fallback: false,
   },
   digest: {
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: "high",
     use_batch: true,
     batch_wait_minutes: 30,
@@ -120,7 +168,7 @@ const FULL: JobsConfig = {
   },
   escalation: {
     enabled: false,
-    model: "claude-opus-5-5",
+    model: "gpt-6.1-sol",
     effort: "max",
     max_steps: 9,
     max_searches: 0,
@@ -164,9 +212,9 @@ const FULL: JobsConfig = {
       { mic: "XETR", date: "2026-12-24", name: "Christmas Eve" },
     ],
   },
-  chat: { model: "claude-haiku-4-5", effort: null, max_steps: 9, max_searches: 0, history_messages: 20, source_tiers: [1, 2, 3], rules_first: true },
+  chat: { model: "gpt-6-luna", effort: null, max_steps: 9, max_searches: 0, history_messages: 20, source_tiers: [1, 2, 3], rules_first: true },
   review: {
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: "max",
     max_steps: 5,
     use_batch: true,
@@ -332,11 +380,11 @@ describe("jobs form: phase 5 schedules and settings", () => {
     expect(form.settings.review.values.effort).toBe("max");
     expect(form.settings.ownership.values.enabled).toBe(false);
     form.settings.review.values.liquidity_days = "0,5";
-    form.settings.chat.values.model = " claude-sonnet-5 ";
+    form.settings.chat.values.model = " gpt-6.1-sol ";
     form.settings.ownership.values.index_url = " https://example.test/13f ";
     const body = jobsToBody(form);
     expect(body.review!.liquidity_days).toBe(0.5);
-    expect(body.chat!.model).toBe("claude-sonnet-5");
+    expect(body.chat!.model).toBe("gpt-6.1-sol");
     expect(body.ownership!.index_url).toBe("https://example.test/13f");
   });
 
@@ -461,6 +509,12 @@ describe("jobs form: optional effort, tiers and the other preferences", () => {
     expect(form.settings.chat.values.source_tiers).toBe("1, 2, 3");
     form.settings.escalation.values.source_tiers = "2, 1";
     expect(jobsToBody(form).escalation!.source_tiers).toEqual([1, 2]);
+  });
+
+  it("lower-cases analysis technique names so a capital cannot switch one off", () => {
+    const form = jobsFromBody(FULL);
+    form.settings.news.values.analysis_techniques = "Novelty, THREAD;Extraction  market";
+    expect(jobsToBody(form).news!.analysis_techniques).toEqual(["novelty", "thread", "extraction", "market"]);
   });
 
   it("keeps a saved body without the new fields on today's defaults", () => {

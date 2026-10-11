@@ -12,6 +12,7 @@ import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { FreshnessText } from "@/components/freshness/as-of-label";
 import { NewsSummary, type Loaded } from "@/components/news/news-summary";
+import { NewsTabs } from "@/components/news/news-tabs";
 import { TierBadge } from "@/components/news/severity-badge";
 import { SeverityBlocks } from "@/components/news/severity-timeline";
 import { PageHeader } from "@/components/page-header";
@@ -46,7 +47,7 @@ import {
 } from "@/lib/news/feed-filters";
 import { CONFIDENCES, eventLabel, SEVERITY, STATUS_LABELS, TIERS } from "@/lib/news/labels";
 import { priceReaction, storyDay, type ClosePoint } from "@/lib/news/price-reaction";
-import { activePreset, PRESETS, presetFilters, sourceBars, storyTime } from "@/lib/news/stats";
+import { activePreset, healthSummary, PRESETS, presetFilters, sourceBars, storyTime } from "@/lib/news/stats";
 import { appendUnique } from "@/lib/portfolio/transactions";
 import { hostOf, isExternalUrl } from "@/lib/sources/sources";
 import { cn } from "@/lib/utils";
@@ -151,6 +152,9 @@ export function NewsView() {
 
   useEffect(() => {
     const mine = ++sequence.current;
+    // A changed filter or a reload must not show the old page under the new filter.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoad({ kind: "loading" });
     fetchFeed(filters, null)
       .then((feed) => {
         if (mine === sequence.current) {
@@ -209,6 +213,13 @@ export function NewsView() {
   }
 
   const groups = load.kind === "ok" ? groupByStory(load.items) : [];
+  // An empty feed is only "no news yet" when the sources are known to be healthy.
+  const sourcesNote =
+    health.kind === "error"
+      ? `Source health could not be checked (${health.message}), so an empty feed may mean the sources are failing.`
+      : health.kind === "ok" && healthSummary(health.data).failing.length > 0
+        ? `${healthSummary(health.data).failing.length} of ${healthSummary(health.data).enabled} enabled sources are unhealthy, so an empty feed may mean they are failing. See the feed health above.`
+        : null;
   const preset = activePreset(filters);
   const disputed = stats.kind === "ok" ? stats.data.disputed_count : null;
 
@@ -245,6 +256,7 @@ export function NewsView() {
           </nav>
         }
       />
+      <NewsTabs active="feed" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         {load.kind === "ok" ? <IngestFreshness job={load.lastIngest} nextDueAt={load.nextIngestDueAt} /> : <span />}
@@ -281,10 +293,10 @@ export function NewsView() {
       ) : null}
       {load.kind === "error" ? <AlertMessage title="Could not load the news">{load.message}</AlertMessage> : null}
       {load.kind === "ok" && groups.length === 0 ? (
-        <EmptyState title={isFiltered(filters) ? "Nothing matches these filters" : "No news yet"}>
+        <EmptyState title={isFiltered(filters) ? "Nothing matches these filters" : sourcesNote ? "No news, and the sources may be failing" : "No news yet"}>
           {isFiltered(filters)
             ? "Clear a filter to see more."
-            : "The news check runs every two hours from 06:00 to 22:00. Add feeds under Config / News sources."}
+            : sourcesNote ?? "The news check runs every two hours from 06:00 to 22:00. Add feeds under Config / News sources."}
         </EmptyState>
       ) : null}
 

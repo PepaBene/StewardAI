@@ -31,7 +31,7 @@ const body: EscalationBody = {
     { url: "https://reuters.com/b", outlet: "reuters.com", tier: 2, headline: null, kind: "search" },
   ],
   dropped_sentences: 0,
-  writer: "claude-sonnet-5",
+  writer: "gpt-6.1-sol",
   price_move: null,
 };
 
@@ -50,11 +50,11 @@ describe("escalations", () => {
   });
 
   it("says who assessed the note, or why nobody did", () => {
-    expect(escalationStatus(body)).toEqual({ kind: "assessed", label: "Assessed by claude-sonnet-5" });
-    expect(escalationStatus({ writer: null, thesis_link: "not assessed: no Anthropic API key", rationale: "" })).toEqual({
+    expect(escalationStatus(body)).toEqual({ kind: "assessed", label: "Assessed by gpt-6.1-sol" });
+    expect(escalationStatus({ writer: null, thesis_link: "not assessed: no OpenAI or Google API key", rationale: "" })).toEqual({
       kind: "not_assessed",
       label: "Not assessed",
-      reason: "no Anthropic API key",
+      reason: "no OpenAI or Google API key",
     });
   });
 

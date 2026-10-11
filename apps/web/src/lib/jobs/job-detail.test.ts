@@ -45,9 +45,9 @@ describe("job detail", () => {
   });
 
   it("lists the models once, and finds the error to show", () => {
-    expect(modelsUsed([{ model: "claude-haiku-4-5" }, { model: null }, { model: "claude-haiku-4-5" }, { model: "claude-sonnet-5" }])).toEqual([
-      "claude-haiku-4-5",
-      "claude-sonnet-5",
+    expect(modelsUsed([{ model: "gpt-6-luna" }, { model: null }, { model: "gpt-6-luna" }, { model: "gpt-6.1-sol" }])).toEqual([
+      "gpt-6-luna",
+      "gpt-6.1-sol",
     ]);
     const steps = [
       { step_index: 0, name: "fetch", status: "succeeded" as const, started_at: "", finished_at: null, error: null, detail: null, model: null, cost_usd: null },

@@ -8,7 +8,7 @@ checkpointed chain of steps under a research profile.
 
 Each completed step's output is a `job_checkpoint`. If the worker is killed mid-run, the
 queue redelivers the job and the run resumes: completed steps are read back, not redone
-(and not paid for again). The profile's step budget (Claude calls plus searches) is spread
+(and not paid for again). The profile's step budget (model calls plus searches) is spread
 over the model sections; a section the budget does not reach says so.
 """
 
@@ -19,7 +19,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from steward.ai import AINotConfigured, create_client
+from steward.ai import AINotConfigured
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.news_sources import NewsSourcesConfig
 from steward.config.prompts import load_prompts
@@ -36,7 +36,7 @@ from steward.research.gather import Gathered, Valuation, gather
 from steward.research.sources import CitedSentence, Registry, Source
 from steward.research.writer import (
     SECTION_TITLES,
-    ClaudeResearchWriter,
+    LLMResearchWriter,
     ResearchWriter,
     SectionRequest,
 )
@@ -47,7 +47,7 @@ from steward.verify.claims import (
     Claim,
     ClaimCheckSummary,
     ClaimVerifier,
-    ClaudeClaimVerifier,
+    LLMClaimVerifier,
     check_claims,
 )
 
@@ -194,7 +194,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             left = profile.max_steps - budget["steps"]
             out: dict[str, Any] = {"sentences": [], "new_sources": [], "steps": 0, "searches": 0}
             if deps.writer is None:
-                out["note"] = "not written: ANTHROPIC_API_KEY is not set"
+                out["note"] = "not written: no AI provider key is set"
                 return out
             if left < 1:
                 out["note"] = "not written: the profile's step budget is used up"
@@ -419,13 +419,12 @@ async def research_handler(ctx: JobContext) -> None:
     writer: ResearchWriter | None
     verifier: ClaimVerifier | None
     try:
-        anthropic_client = create_client(settings)
-        client = routing_client(anthropic_client, create_llm(settings, anthropic_client))
+        client = routing_client(create_llm(settings))
     except AINotConfigured:
         writer = verifier = None
     else:
         writer = (
-            ClaudeResearchWriter(
+            LLMResearchWriter(
                 client,
                 profile.model,
                 profile.effort,
@@ -437,7 +436,7 @@ async def research_handler(ctx: JobContext) -> None:
         claim_settings = (
             verification.body if verification else VerificationConfig()
         ).claim_verifier
-        verifier = ClaudeClaimVerifier(
+        verifier = LLMClaimVerifier(
             client,
             claim_settings.model,
             prompts.text("claim_verifier", VERIFIER_SYSTEM),

@@ -16,7 +16,7 @@ describe("parseWebFacts", () => {
           host: "investors.example.com",
           retrieved_at: "2026-10-06T10:00:00Z",
           status: "approved",
-          decided_by: "ai:claude-sonnet-5",
+          decided_by: "ai:gpt-6.1-sol",
           confidence: "0.91",
           reasons: "T1 source",
         },

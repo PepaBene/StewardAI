@@ -197,7 +197,7 @@ def test_jobs_config_saved_before_phase_2_still_loads() -> None:
     from steward.config import JobsConfig
 
     old = JobsConfig.model_validate({"schema_version": 1, "portfolio_sync": {"cron": "0 23 * * *"}})
-    assert old.earnings_check.extraction_model == "claude-sonnet-5"
+    assert old.earnings_check.extraction_model == "gpt-6.1-sol"
     assert old.earnings_check.check_days_after_report == [1, 2, 4]
     with pytest.raises(ValidationError):
         JobsConfig.model_validate({"earnings_check": {"extraction_model": "llama-4"}})

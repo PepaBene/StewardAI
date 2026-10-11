@@ -1,0 +1,130 @@
+{
+  "model": "gpt-6-luna",
+  "recorded": "2026-10-10",
+  "pooled": [
+    149,
+    150
+  ],
+  "segments": {
+    "event:analyst_rating": [
+      8,
+      8
+    ],
+    "event:capital_allocation": [
+      8,
+      8
+    ],
+    "event:central_bank": [
+      11,
+      11
+    ],
+    "event:credit_rating": [
+      5,
+      5
+    ],
+    "event:dividend_cut": [
+      4,
+      4
+    ],
+    "event:earnings_release": [
+      9,
+      10
+    ],
+    "event:guidance_change": [
+      8,
+      8
+    ],
+    "event:index_change": [
+      5,
+      5
+    ],
+    "event:insider_transaction": [
+      6,
+      6
+    ],
+    "event:m_and_a": [
+      13,
+      13
+    ],
+    "event:macro_surprise": [
+      9,
+      9
+    ],
+    "event:management_change": [
+      7,
+      7
+    ],
+    "event:other": [
+      26,
+      26
+    ],
+    "event:product_business": [
+      12,
+      12
+    ],
+    "event:regulatory_legal": [
+      10,
+      10
+    ],
+    "event:sector_competitor": [
+      8,
+      8
+    ],
+    "language:de": [
+      16,
+      16
+    ],
+    "language:en": [
+      101,
+      102
+    ],
+    "language:ja": [
+      16,
+      16
+    ],
+    "language:zh": [
+      16,
+      16
+    ],
+    "region:CA": [
+      11,
+      11
+    ],
+    "region:CN": [
+      9,
+      9
+    ],
+    "region:DE": [
+      16,
+      16
+    ],
+    "region:GB": [
+      11,
+      11
+    ],
+    "region:HK": [
+      9,
+      9
+    ],
+    "region:IN": [
+      4,
+      4
+    ],
+    "region:JP": [
+      17,
+      17
+    ],
+    "region:KR": [
+      4,
+      4
+    ],
+    "region:SG": [
+      3,
+      3
+    ],
+    "region:US": [
+      65,
+      66
+    ]
+  }
+}

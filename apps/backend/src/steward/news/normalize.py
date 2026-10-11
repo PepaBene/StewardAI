@@ -15,17 +15,31 @@ from steward.documents.text import html_to_text
 
 _TRACKING_PARAMS = re.compile(
     r"^(utm_[a-z_]+|fbclid|gclid|dclid|msclkid|mc_cid|mc_eid|ocid|cmpid|taid|guccounter|"
-    r"guce_referrer|guce_referrer_sig|smid|mod|ref|ref_src|feedtype|rss|cid|__twitter_impression|"
+    r"guce_referrer|guce_referrer_sig|smid|ref_src|feedtype|rss|__twitter_impression|"
     r"yptr|ncid|soc_src|soc_trk)$",
     re.IGNORECASE,
 )
+# Tracking on most sites (`?ref=rss`, `?mod=twitter`), but an article id on some (`?cid=12345`).
+# A purely numeric value is kept so two distinct articles are not merged into one.
+_AMBIGUOUS_PARAMS = re.compile(r"^(mod|ref|cid)$", re.IGNORECASE)
+
+
+def _is_tracking(key: str, value: str) -> bool:
+    if _TRACKING_PARAMS.match(key):
+        return True
+    return bool(_AMBIGUOUS_PARAMS.match(key)) and not value.isdigit()
 
 
 def canonical_url(url: str) -> str:
+    """The dedupe form of a URL. Raises ValueError for a URL that cannot be an article link
+    (unparseable, a bad port, or a scheme other than http/https such as javascript: or ftp:).
+    Callers skip such items with a drop reason rather than letting one feed item stop a run."""
     parts = urlsplit(url.strip())
     scheme = parts.scheme.lower() or "https"
+    if scheme not in ("http", "https"):
+        raise ValueError(f"unsupported URL scheme: {scheme!r}")
     host = (parts.hostname or "").lower()
-    port = parts.port
+    port = parts.port  # raises ValueError on a non-numeric or out-of-range port
     netloc = (
         host
         if port is None or (scheme, port) in (("http", 80), ("https", 443))
@@ -36,7 +50,7 @@ def canonical_url(url: str) -> str:
         path = path.rstrip("/")
     query = sorted(
         (k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
-        if not _TRACKING_PARAMS.match(k)
+        if not _is_tracking(k, v)
     )  # fmt: skip
     return urlunsplit((scheme, netloc, path, urlencode(query), ""))
 

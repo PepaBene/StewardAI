@@ -55,6 +55,9 @@ const PRIMARY_PAGES = [
   { href: "/", label: "Overview", keywords: "portfolio value allocation drift alerts" },
   { href: "/holdings", label: "Holdings", keywords: "positions ticker thesis verdicts news evidence" },
   { href: "/news", label: "News", keywords: "feed severity confidence source tier" },
+  { href: "/news/wire", label: "News wire", keywords: "headlines all sources language region translation" },
+  { href: "/news/brief", label: "News brief", keywords: "morning weekly brief overnight themes" },
+  { href: "/news/stories", label: "News stories", keywords: "threads timeline developing situation what changed" },
   { href: "/screens", label: "Screens", keywords: "screener filter margin roic growth leverage cash conversion find issuers" },
   { href: "/discover", label: "Discover", keywords: "screener screen stocks funds filters backtest universe saved screens providers" },
   { href: "/funds/research", label: "Fund research", keywords: "etf fund compare saved comparison holdings style performance bond checklist nav premium benchmark" },
@@ -81,7 +84,7 @@ export const CONFIG_PAGES = [
   { href: "/config/notifications", label: "Notifications", keywords: "alerts telegram email quiet hours channels weekends holidays monitoring system alerts replay preview" },
   { href: "/config/verification", label: "Verification", keywords: "sanity bounds tolerance corroboration trust penalty reward demote claim verifier strip mark numeric check" },
   { href: "/config/research-profiles", label: "Research profiles", keywords: "research sections depth model effort searches tiers peers valuation language quick standard" },
-  { href: "/config/prompts", label: "Prompts", keywords: "system prompts ai instructions tone override customize reset default evals claude" },
+  { href: "/config/prompts", label: "Prompts", keywords: "system prompts ai instructions tone override customize reset default evals" },
 ] as const;
 
 /** Pages that are not a section or a config editor. */

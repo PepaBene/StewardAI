@@ -1,10 +1,9 @@
 """`LLM.complete`: one call that any provider answers, under the Budget config's caps.
 
-Anthropic requests go through `BudgetedAnthropic`, which guards and records them itself. For
-OpenAI and Google this module does the same, so every provider is capped, counted per step
-(`record_response`, so a failed or killed step keeps its cost) and priced from the Budget price
-table. At the monthly cap a request may be sent to `downgrade_model`, which can belong to
-another provider: the provider is chosen after the guard has had its say.
+Every provider is capped, counted per step (`record_response`, so a failed or killed step
+keeps its cost) and priced from the Budget price table. At the monthly cap a request may be
+sent to `downgrade_model`, which can belong to another provider: the provider is chosen after
+the guard has had its say.
 """
 
 import asyncio
@@ -14,21 +13,20 @@ import logging
 from collections.abc import Sequence
 from typing import Any, cast
 
-import anthropic
 import httpx
 
 from steward import budget_guard
-from steward.config.jobs import reasoning_kwargs
+from steward.costs import DEFAULT_PRICES
 from steward.jobs.runner import current_job, current_step, record_response
 from steward.llm import wire
 from steward.llm.types import (
+    AINotConfigured,
     Citation,
     Completion,
     LLMError,
     Message,
     Provider,
     Request,
-    StopReason,
     normalized_usage,
     provider_of,
 )
@@ -44,7 +42,6 @@ OPENAI_FILES = "https://api.openai.com/v1/files"
 OPENAI_BATCHES = "https://api.openai.com/v1/batches"
 RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504}
 DEADLINE_MARGIN = 30.0
-MAX_PAUSES = 4
 # Search calls a batch request makes directly (Gemini batch mode does not ground) at once.
 DIRECT_SEARCH_CONCURRENCY = 4
 
@@ -55,106 +52,32 @@ class LLM:
     def __init__(
         self,
         *,
-        anthropic_client: anthropic.AsyncAnthropic | None = None,
         openai_key: str | None = None,
         google_key: str | None = None,
         http: httpx.AsyncClient | None = None,
         retries: int = 2,
     ) -> None:
-        self._anthropic = anthropic_client
-        self._keys: dict[Provider, str | None] = {
-            "anthropic": None,
-            "openai": openai_key,
-            "google": google_key,
-        }
+        self._keys: dict[Provider, str | None] = {"openai": openai_key, "google": google_key}
         self._http = http or httpx.AsyncClient()
         self._retries = retries
 
     def configured(self, model: str) -> bool:
-        provider = provider_of(model)
-        if provider == "anthropic":
-            return self._anthropic is not None
-        return self._keys[provider] is not None
+        return self._keys[provider_of(model)] is not None
 
     async def complete(self, req: Request) -> Completion:
         ctx = current_job.get()
-        if ctx is not None and provider_of(req.model) != "anthropic":
+        if ctx is not None:
             model = await budget_guard.before_request(ctx, req.model, can_switch_provider=True)
             if model != req.model:
                 req = _downgraded(req, model)
         provider = provider_of(req.model)
-        if provider == "anthropic":
-            # BudgetedAnthropic has already guarded and recorded this request.
-            return await self._anthropic_complete(req)
         done = await (self._openai if provider == "openai" else self._google)(req)
         if ctx is not None:
             budget_guard.after_response(ctx, done.model, done.usage)
+        else:
+            _log_unrecorded(done)
         await record_response(done.model, done.usage)
         return done
-
-    # ------------------------------------------------------------------ Anthropic
-
-    async def _anthropic_complete(self, req: Request) -> Completion:
-        if self._anthropic is None:
-            raise LLMError("ANTHROPIC_API_KEY is not set", provider="anthropic")
-        if req.tools or any(m.role == "tool" for m in req.messages):
-            # Claude's tool loop (tool_use blocks) is kept by its call sites, not translated.
-            raise LLMError(
-                "app tools are not supported through LLM for Claude", provider="anthropic"
-            )
-        system: list[dict[str, Any]] = [{"type": "text", "text": req.system}]
-        if req.cache_system:
-            system[0]["cache_control"] = {"type": "ephemeral"}
-        messages: list[dict[str, Any]] = [{"role": m.role, "content": m.text} for m in req.messages]
-        kwargs: dict[str, Any] = reasoning_kwargs(req.model, req.effort, req.max_tokens)
-        if req.search is not None:
-            kind = (
-                "web_search_20250305"
-                if req.model.startswith("claude-haiku-4")
-                else "web_search_20260209"
-            )
-            tool: dict[str, Any] = {
-                "type": kind,
-                "name": "web_search",
-                "max_uses": req.search.max_uses,
-            }
-            if req.search.allowed_domains:
-                tool["allowed_domains"] = list(req.search.allowed_domains)
-            kwargs["tools"] = [tool]
-        totals = normalized_usage()
-        for _ in range(MAX_PAUSES + 1):
-            try:
-                response = await self._anthropic.messages.parse(
-                    model=req.model,
-                    system=cast(Any, system),
-                    messages=cast(Any, messages),
-                    output_format=req.schema,
-                    timeout=req.timeout,
-                    **kwargs,
-                )
-            except anthropic.APIError as exc:
-                raise LLMError(f"anthropic call failed: {exc}", provider="anthropic") from exc
-            _accumulate(totals, response.usage)
-            if response.stop_reason != "pause_turn":
-                break
-            messages.append({"role": "assistant", "content": response.content})
-        stops: dict[str, StopReason] = {
-            "end_turn": "end",
-            "stop_sequence": "end",
-            "max_tokens": "max_tokens",
-            "refusal": "refusal",
-        }
-        stop = stops.get(str(response.stop_reason), "other")
-        text = "".join(getattr(b, "text", "") for b in response.content if b.type == "text")
-        return Completion(
-            model=req.model,
-            provider="anthropic",
-            text=text,
-            parsed=getattr(response, "parsed_output", None),
-            stop_reason=stop,
-            usage=totals,
-            citations=_anthropic_citations(response.content),
-        )
 
     # ------------------------------------------------------------------ OpenAI, Google
 
@@ -367,7 +290,7 @@ class LLM:
         none: list[Completion | None] = [None] * len(requests)
         model = requests[0].model
         provider = provider_of(model)
-        if provider == "anthropic" or any(r.model != model for r in requests):
+        if any(r.model != model for r in requests):
             return none
         ctx = current_job.get()
         if ctx is not None:
@@ -581,25 +504,36 @@ def _accumulate(total: Any, usage: Any) -> None:
         total.server_tool_use.web_search_requests += getattr(server, "web_search_requests", 0) or 0
 
 
-def _anthropic_citations(content: Any) -> list[Citation]:
-    out: list[Citation] = []
-    for block in content:
-        for c in getattr(block, "citations", None) or []:
-            url = getattr(c, "url", None)
-            if url:
-                out.append(Citation(url, getattr(c, "title", "") or ""))
-    return out
+def _log_unrecorded(done: Completion) -> None:
+    """A request made outside a job (an eval or script run) has no `job_step` to hold its
+    cost, so log it: the app's spend figures do not include these."""
+    usage = done.usage
+    cost = DEFAULT_PRICES.cost(
+        done.model,
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        cache_write_tokens=usage.cache_creation_input_tokens,
+        cache_read_tokens=usage.cache_read_input_tokens,
+        searches=usage.server_tool_use.web_search_requests,
+    )
+    logger.info(
+        "AI request outside a job, not counted in the app's spend: model=%s in=%d out=%d cost=%s",
+        done.model,
+        usage.input_tokens,
+        usage.output_tokens,
+        f"~${cost}" if cost is not None else "unknown (no price)",
+    )
 
 
-def create_llm(settings: Settings, anthropic_client: anthropic.AsyncAnthropic | None) -> LLM:
-    """The multi-provider client: Anthropic through the budgeted client the app already makes
-    (None when its key is unset), OpenAI and Google from their keys."""
+def create_llm(settings: Settings) -> LLM:
+    """The multi-provider client from the OpenAI and Google keys. Raises `AINotConfigured`
+    when neither is set."""
 
     def secret(value: Any) -> str | None:
         return value.get_secret_value() if value is not None else None
 
-    return LLM(
-        anthropic_client=anthropic_client,
-        openai_key=secret(settings.openai_api_key),
-        google_key=secret(settings.google_api_key),
-    )
+    openai_key = secret(settings.openai_api_key)
+    google_key = secret(settings.google_api_key)
+    if openai_key is None and google_key is None:
+        raise AINotConfigured("neither OPENAI_API_KEY nor GOOGLE_API_KEY is set")
+    return LLM(openai_key=openai_key, google_key=google_key)

@@ -49,9 +49,7 @@ class ModelCost(BaseModel):
     model: str
     steps: int
     cost_usd: float
-    provider: str = Field(
-        default="unknown", description="anthropic, openai or google, from the model id."
-    )
+    provider: str = Field(default="unknown", description="openai or google, from the model id.")
 
 
 class CostSummary(BaseModel):

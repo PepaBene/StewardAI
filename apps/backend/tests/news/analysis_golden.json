@@ -1,0 +1,30 @@
+{
+  "note": "Hand-written cases for the techniques that run in code: span verification, thread claim diffs and novelty. They gate a change to those functions; the model techniques have no golden set yet.",
+  "spans": [
+    {"id": "exact", "span": "cut its full-year guidance to 4.1 billion euros", "texts": ["The company cut its full-year guidance to 4.1 billion euros on Tuesday."], "ok": true},
+    {"id": "case_and_space", "span": "Cut its  FULL-YEAR guidance", "texts": ["it cut its full-year guidance"], "ok": true},
+    {"id": "curly_quotes", "span": "said “no comment” twice", "texts": ["A spokesman said \"no comment\" twice."], "ok": true},
+    {"id": "too_short", "span": "no comment", "texts": ["A spokesman said \"no comment\" twice."], "ok": false},
+    {"id": "second_text", "span": "plant in Ohio", "texts": ["Unrelated.", "It will close its plant in Ohio."], "ok": true},
+    {"id": "paraphrase", "span": "lowered its yearly outlook", "texts": ["The company cut its full-year guidance."], "ok": false},
+    {"id": "wrong_number", "span": "guidance to 4.2 billion euros", "texts": ["cut its full-year guidance to 4.1 billion euros"], "ok": false},
+    {"id": "empty", "span": "", "texts": ["anything"], "ok": false}
+  ],
+  "diffs": [
+    {"id": "same_claim", "prior": ["Acme will close its plant in Ohio in March"], "now": ["Acme will close its plant in Ohio in March"], "new": 0, "changed": 0},
+    {"id": "number_changes", "prior": ["Acme cut its full-year guidance to 4.1 billion euros"], "now": ["Acme cut its full-year guidance to 3.8 billion euros"], "new": 0, "changed": 1},
+    {"id": "brand_new", "prior": ["Acme will close its plant in Ohio"], "now": ["The chief executive resigned effective immediately"], "new": 1, "changed": 0},
+    {"id": "no_prior", "prior": [], "now": ["Acme announced a share buyback of 2 billion dollars"], "new": 1, "changed": 0},
+    {"id": "mixed", "prior": ["Acme cut its guidance to 4.1 billion euros"], "now": ["Acme cut its guidance to 3.9 billion euros", "Regulators opened an inquiry into Acme"], "new": 1, "changed": 1},
+    {"id": "correction", "prior": ["Acme cut its guidance to 4.1 billion euros"], "now": [], "corrections": ["Acme cut its guidance to 4.1 billion euros"], "new": 0, "changed": 0, "retracted": 1}
+  ],
+  "novelty": [
+    {"id": "first_story", "own": [1, 0], "earlier": {}, "recycled": false, "age_days": 0, "expect": "new"},
+    {"id": "same_event_again", "own": [1, 0], "earlier": {"7": [0.999, 0.04]}, "recycled": false, "age_days": 0, "expect": "repeat"},
+    {"id": "related_development", "own": [1, 0], "earlier": {"7": [0.8, 0.6]}, "recycled": false, "age_days": 0, "expect": "update"},
+    {"id": "unrelated", "own": [1, 0], "earlier": {"7": [0, 1]}, "recycled": false, "age_days": 0, "expect": "new"},
+    {"id": "flagged_recycled", "own": [1, 0], "earlier": {}, "recycled": true, "age_days": 0, "expect": "recycled"},
+    {"id": "event_long_ago", "own": [1, 0], "earlier": {}, "recycled": false, "age_days": 400, "expect": "recycled"},
+    {"id": "no_embedding", "own": [], "earlier": {"7": [1, 0]}, "recycled": false, "age_days": 0, "expect": "new"}
+  ]
+}

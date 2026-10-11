@@ -12,7 +12,6 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-import anthropic
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
@@ -28,6 +27,7 @@ from steward.exposures.filing_text import (
     verified,
     word_in_quote,
 )
+from steward.llm.routing import RoutingClient
 
 MAX_FINDINGS = 25
 
@@ -95,7 +95,7 @@ def inputs_prompt(filing: FilingText, sections: dict[str, str]) -> str:
 
 
 async def extract_inputs(
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     model: str,
     effort: str | None,
     filing: FilingText,

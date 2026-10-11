@@ -1,6 +1,6 @@
 """Gap research: facts the structured sources left empty, found on reliable web pages.
 
-Web search is the last resort. For each empty, fillable slot that is off its cooldown, a Claude
+Web search is the last resort. For each empty, fillable slot that is off its cooldown, a model
 web search proposes candidates (value, URL, verbatim quote). Then, in this order:
 
 1. Mechanical checks, which can only block: the URL was returned by the search; its domain has
@@ -8,7 +8,7 @@ web search proposes candidates (value, URL, verbatim quote). Then, in this order
    established press tier 2, reference sites tier 3, anything unlisted or denied is rejected);
    the page loads over https and is not an error or bot-check page; the quote is present in
    the fetched text; the value is the one the quote prints (date, count or text).
-2. A second Claude call, without search, judges what is left (right entity, does the quote
+2. A second model call, without search, judges what is left (right entity, does the quote
    support the value for this company and period). Page text is untrusted data.
 3. Auto-approval needs the checks, the AI, a confidence at or above `min_confidence` and a
    tier that suffices: tier 1; tier 2 alone only for slots that allow it (dates), otherwise a
@@ -32,14 +32,13 @@ from decimal import Decimal
 from typing import Any, Literal, cast
 from urllib.parse import urlsplit
 
-import anthropic
 import asyncpg
 import httpx
 import pydantic
 from pydantic import BaseModel, Field
 
 from steward import __version__
-from steward.ai import AINotConfigured, Usage, create_client
+from steward.ai import AINotConfigured, Usage
 from steward.budget_guard import BudgetExceeded
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.jobs import GapResearchSettings, JobsConfig, effort_kwargs
@@ -52,8 +51,8 @@ from steward.fundamentals.ir_discovery import host_denied, is_blocked_page, regi
 from steward.jobs.runner import JobContext, JobFailed
 from steward.llm.cache import ResultCache
 from steward.llm.client import create_llm
-from steward.llm.routing import batch_collector, routing_client
-from steward.llm.types import provider_of
+from steward.llm.routing import RoutingClient, batch_collector, routing_client
+from steward.llm.types import LLMError
 from steward.research.domains import (
     DOMAIN_SYSTEM,
     domain_key,
@@ -324,7 +323,7 @@ async def load_page_text(fetcher: PoliteFetcher, url: str) -> tuple[str | None, 
 
 
 async def search_candidates(
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     cfg: GapResearchSettings,
     slot: Slot,
     company: str,
@@ -333,9 +332,7 @@ async def search_candidates(
     system: str = SEARCH_SYSTEM,
 ) -> tuple[Candidates | None, set[str]]:
     tool = {
-        "type": "web_search_20250305"
-        if cfg.model.startswith("claude-haiku-4")
-        else "web_search_20260209",
+        "type": "web_search_20260209",
         "name": "web_search",
         "max_uses": cfg.max_searches,
         "blocked_domains": list(cfg.denied_domains),
@@ -345,28 +342,20 @@ async def search_candidates(
         f"<fact>{slot.ask}</fact>\n\nToday is {dt.date.today().isoformat()}. "
         "Find this fact and return your candidates."
     )
-    messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
-    seen: set[str] = set()
-    response = None
-    for _ in range(3):  # pause_turn continuations
-        response = await client.messages.parse(
-            model=cfg.model,
-            system=system,
-            messages=cast(Any, messages),
-            tools=cast(Any, [tool]),
-            output_format=Candidates,
-            **effort_kwargs(cfg.model, cfg.effort, 8000),
-        )
-        usage.add(response.usage)
-        seen |= _result_urls(response.content)
-        if response.stop_reason != "pause_turn":
-            break
-        messages.append({"role": "assistant", "content": response.content})
-    return (response.parsed_output if response else None), seen
+    response = await client.messages.parse(
+        model=cfg.model,
+        system=system,
+        messages=cast(Any, [{"role": "user", "content": prompt}]),
+        tools=cast(Any, [tool]),
+        output_format=Candidates,
+        **effort_kwargs(cfg.model, cfg.effort, 8000),
+    )
+    usage.add(response.usage)
+    return response.parsed_output, _result_urls(response.content)
 
 
 async def judge_candidate(
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     cfg: GapResearchSettings,
     slot: Slot,
     company: str,
@@ -392,7 +381,8 @@ async def judge_candidate(
         **effort_kwargs(cfg.model, cfg.effort, 2000),
     )
     usage.add(response.usage)
-    return response.parsed_output
+    verdict: FactVerdict | None = response.parsed_output
+    return verdict
 
 
 # ---------------------------------------------------------------------------------- decision
@@ -522,7 +512,7 @@ async def promote(pool: asyncpg.Pool, ids: list[int], reason: str, model: str) -
 
 async def research_slot(
     ctx: JobContext,
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     fetcher: PoliteFetcher,
     cfg: GapResearchSettings,
     profiles: HoldingProfilesConfig,
@@ -690,11 +680,8 @@ async def gap_research_handler(ctx: JobContext) -> None:
         (g for g in gaps if (last.get(g) or never) < cutoff), key=lambda g: last.get(g) or never
     )[: cfg.slots_per_run]
     try:
-        anthropic_client = create_client(settings)
-        llm = create_llm(settings, anthropic_client)
-        client = routing_client(
-            anthropic_client, llm, ResultCache(ctx.pool, "gap_research", search_ttl_days=3)
-        )
+        llm = create_llm(settings)
+        client = routing_client(llm, ResultCache(ctx.pool, "gap_research", search_ttl_days=3))
     except AINotConfigured as exc:
         raise JobFailed(str(exc)) from exc
     usage = Usage(model=cfg.model)
@@ -730,16 +717,12 @@ async def gap_research_handler(ctx: JobContext) -> None:
                         prompts,
                         learned,
                     )
-                except (anthropic.APIError, pydantic.ValidationError, ValueError) as exc:
+                except (LLMError, pydantic.ValidationError, ValueError) as exc:
                     return "error", {"error": str(exc)[:200]}
 
-            # With `use_batch` and an OpenAI or Google model the slots run side by side and each
+            # With `use_batch` the slots run side by side and each
             # round of calls (all the searches, then all the judgements) is one provider batch.
-            if (
-                cfg.use_batch
-                and provider_of(cfg.model) != "anthropic"
-                and llm.configured(cfg.model)
-            ):
+            if cfg.use_batch and llm.configured(cfg.model):
                 with batch_collector(client, llm, cfg.batch_wait_minutes) as collector:
                     ran = await collector.run([research(t, k) for t, k in due])
                 step.detail["batch_rounds"] = collector.rounds

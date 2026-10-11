@@ -119,6 +119,17 @@ async def test_each_rollback_restores_the_schema_its_migration_changed(
             async with conn.transaction():
                 await conn.execute(sql)
             applied = await catalog_snapshot(conn)
+            data_only = (
+                "nothing to undo"
+                in rollback_notes(rollback_path(ROLLBACK_DIR, migration)).casefold()
+            )
+            if data_only:
+                # A data-only migration (config versions): the schema must not move either way.
+                assert diff_snapshots(before, applied) == [], migration.name
+                async with conn.transaction():
+                    await conn.execute(rollback_path(ROLLBACK_DIR, migration).read_text())
+                proven.append(migration.name)
+                continue
             assert diff_snapshots(before, applied), f"{migration.name} changed nothing"
             async with conn.transaction():
                 await conn.execute(rollback_path(ROLLBACK_DIR, migration).read_text())

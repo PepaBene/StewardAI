@@ -1,21 +1,21 @@
 {
   "description": "Live eval results per model-facing component; see steward/verify/evals_gate.py. Written by --write-baseline, only when every changed component passed.",
-  "recorded_at": "2026-10-06T07:52:14+00:00",
+  "recorded_at": "2026-10-10T20:19:08+00:00",
   "components": {
     "claims": {
-      "fingerprint": "63383e925b93de8f0b6c651a8a7a57cc036ca56346145095d919f46796764434",
+      "fingerprint": "da9c13560841ba5120b11a656f73042ca979686be9647e3ad73020f87ed5c7df",
       "score": 1.0,
-      "model": "claude-haiku-4-5"
+      "model": "gemini-3.8-flash"
     },
     "classification": {
-      "fingerprint": "2c627bda9f9e920ffb45689e538e4c9e52c52a1f2370e41f9a89c938070d1528",
-      "score": 0.97,
-      "model": "claude-haiku-4-5"
+      "fingerprint": "adf106068f75a2846d5244233f193fbb4632c95896fd81c900e4511433ea4a27",
+      "score": 0.99,
+      "model": "gemini-3.8-flash"
     },
     "earnings": {
-      "fingerprint": "3dff6c29696c7aa51cd8249d88b675deaed48db1e31c36c4c2cf8bd24cf153e8",
+      "fingerprint": "f657605cc8d1c86ebc9c7934c025fc7033609557ed736a4e91d80db79a470b34",
       "score": 1.0,
-      "model": "claude-sonnet-5"
+      "model": "gemini-3.8-flash"
     }
   }
 }

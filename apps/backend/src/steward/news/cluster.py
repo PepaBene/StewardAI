@@ -13,6 +13,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from steward.news.normalize import headline_tokens
+from steward.news.simhash import distance, near_duplicate
 
 JACCARD = 0.6
 CONTAINMENT = 0.85
@@ -73,6 +74,22 @@ def same_story(a: Fingerprint, b: Fingerprint) -> bool:
 class ClusterMember:
     cluster_id: int
     fingerprint: Fingerprint
+    # Unsigned 64-bit SimHash of the item's text, when it has one (see news/simhash.py).
+    simhash: int | None = None
+
+
+def simhash_cluster(simhash: int | None, members: Iterable[ClusterMember]) -> int | None:
+    """The cluster of the nearest member whose text is a near-identical copy of this one's,
+    for copies the token fingerprint misses (CJK text, which has no spaces to tokenise)."""
+    if simhash is None:
+        return None
+    best: tuple[int, int] | None = None
+    for member in members:
+        if member.simhash is not None and near_duplicate(simhash, member.simhash):
+            d = distance(simhash, member.simhash)
+            if best is None or d < best[0]:
+                best = (d, member.cluster_id)
+    return best[1] if best else None
 
 
 def best_cluster(item: Fingerprint, members: Iterable[ClusterMember]) -> int | None:

@@ -275,7 +275,7 @@ function ProfileCard({
           value={p.max_steps}
           inputMode="numeric"
           onChange={(v) => onChange({ max_steps: v })}
-          hint={`Claude calls plus web searches. ${BOUNDS.max_steps.min} to ${BOUNDS.max_steps.max}.`}
+          hint={`Model calls plus web searches. ${BOUNDS.max_steps.min} to ${BOUNDS.max_steps.max}.`}
         />
         <TextField
           label="Web searches per run"

@@ -1,0 +1,2835 @@
+{
+  "description": "Synthetic (fictional) September-October 2026 multilingual news items for 12 invented-portfolio holdings, each labelled with the expected event type, affected ticker, rumour flag and relevance. All events and counterparties are invented; stratified by region and language with hard negatives, rumours and macro items, used to benchmark the LLM event classifier.",
+  "holdings": [
+    {
+      "ticker": "AAPL_US_EQ",
+      "name": "Apple",
+      "relations": [
+        "iPhone",
+        "Tim Cook",
+        "App Store",
+        "Foxconn"
+      ]
+    },
+    {
+      "ticker": "7203_JP_EQ",
+      "name": "Toyota Motor",
+      "relations": [
+        "トヨタ",
+        "Lexus",
+        "Denso",
+        "Honda"
+      ]
+    },
+    {
+      "ticker": "0700_HK_EQ",
+      "name": "Tencent Holdings",
+      "relations": [
+        "腾讯",
+        "WeChat",
+        "ByteDance"
+      ]
+    },
+    {
+      "ticker": "9988_HK_EQ",
+      "name": "Alibaba Group",
+      "relations": [
+        "阿里巴巴",
+        "Alibaba Cloud",
+        "Taobao"
+      ]
+    },
+    {
+      "ticker": "SAPd_EQ",
+      "name": "SAP",
+      "relations": [
+        "S/4HANA",
+        "Oracle",
+        "Walldorf"
+      ]
+    },
+    {
+      "ticker": "SIEd_EQ",
+      "name": "Siemens",
+      "relations": [
+        "Siemens Healthineers",
+        "ABB",
+        "Munich"
+      ]
+    },
+    {
+      "ticker": "SHOP_CA_EQ",
+      "name": "Shopify",
+      "relations": [
+        "Tobi Lutke",
+        "e-commerce merchants",
+        "Ottawa"
+      ]
+    },
+    {
+      "ticker": "RY_CA_EQ",
+      "name": "Royal Bank of Canada",
+      "relations": [
+        "RBC",
+        "Toronto-Dominion",
+        "OSFI"
+      ]
+    },
+    {
+      "ticker": "AZN_GB_EQ",
+      "name": "AstraZeneca",
+      "relations": [
+        "GSK",
+        "oncology",
+        "Cambridge"
+      ]
+    },
+    {
+      "ticker": "005930_KR_EQ",
+      "name": "Samsung Electronics",
+      "relations": [
+        "Galaxy",
+        "SK Hynix",
+        "HBM"
+      ]
+    },
+    {
+      "ticker": "D05_SG_EQ",
+      "name": "DBS Group",
+      "relations": [
+        "OCBC",
+        "UOB",
+        "Singapore banks"
+      ]
+    },
+    {
+      "ticker": "INFY_IN_EQ",
+      "name": "Infosys",
+      "relations": [
+        "TCS",
+        "Wipro",
+        "Bengaluru"
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "bm-001",
+      "headline": "トヨタ、今期の営業利益見通しを2兆8000億円に上方修正",
+      "summary": "トヨタ自動車は2027年3月期の連結営業利益予想を従来の2兆5000億円から2兆8000億円に引き上げた。北米でのハイブリッド車の販売好調と円安が寄与するとしている。",
+      "outlet": "nikkei.com",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-01T03:10:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "guidance_change",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-002",
+      "headline": "トヨタ、ブレーキ部品の不具合で国内外約42万台をリコール",
+      "summary": "トヨタ自動車は、ブレーキ制御部品の不具合のおそれがあるとして、国内外で約42万台のリコールを国土交通省に届け出た。対象は2025年から2026年に生産されたSUVなど。",
+      "outlet": "asahi.com",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-01T09:44:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-003",
+      "headline": "トヨタ、車載半導体の新興ミライ電装の買収を検討か　関係者が明らかに",
+      "summary": "複数の関係者によると、トヨタ自動車は車載半導体設計のミライ電装の買収を検討している。トヨタは「現時点で決定した事実はない」とコメントしている。",
+      "outlet": "nikkei.com",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-01T15:25:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-004",
+      "headline": "日銀、政策金利を据え置き　追加利上げは慎重に判断",
+      "summary": "日本銀行は金融政策決定会合で政策金利を0.75%程度に据え置いた。植田総裁は会見で、賃金と物価の動向を見極める姿勢を示した。",
+      "outlet": "jp.reuters.com",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-01T21:06:00Z",
+      "candidates": [
+        "7203_JP_EQ",
+        "005930_KR_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-005",
+      "headline": "9月の全国消費者物価、市場予想を上回る3.4%上昇",
+      "summary": "総務省が発表した9月の全国消費者物価指数は前年同月比3.4%上昇し、民間予測の3.1%を上回った。生鮮食品を除く指数も約2年ぶりの高い伸びとなった。",
+      "outlet": "nikkei.com",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-02T03:40:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "macro_surprise",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-006",
+      "headline": "トヨタ、最大5000億円の自社株買いを発表",
+      "summary": "トヨタ自動車は取締役会で、発行済み株式の1.5%に相当する上限5000億円の自己株式取得を決議したと発表した。取得期間は10月から来年3月まで。",
+      "outlet": "nikkan.co.jp",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-02T09:21:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "capital_allocation",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-007",
+      "headline": "トヨタ、来年4月に財務担当副社長が社長に昇格へ",
+      "summary": "トヨタ自動車は、現社長が会長に就き、後任に財務担当の副社長を充てる人事を発表した。世代交代を進め、電動化投資の加速を図る。",
+      "outlet": "asahi.com",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-02T15:02:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "management_change",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-008",
+      "headline": "ムーディーズ、トヨタの格付け見通しを「ポジティブ」に変更",
+      "summary": "格付け会社ムーディーズは、トヨタ自動車の長期格付けを据え置いたうえで、見通しを「安定的」から「ポジティブ」に引き上げた。財務体質の改善を評価した。",
+      "outlet": "jp.reuters.com",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-02T21:36:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "credit_rating",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-009",
+      "headline": "トヨタ、4〜9月期の純利益が過去最高　北米が牽引",
+      "summary": "トヨタ自動車が発表した2026年4〜9月期の連結決算は、純利益が前年同期比12%増の2兆3000億円となり、中間期として過去最高を更新した。",
+      "outlet": "nikkei.com",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-03T03:17:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-010",
+      "headline": "ホンダ、米国でのEV生産を2年延期　工場の転換を見直し",
+      "summary": "ホンダは米国オハイオ州で計画していたEVの専用ラインの稼働を2028年に延期すると発表した。トヨタなど競合の電動化戦略にも影響が及ぶとの見方がある。",
+      "outlet": "nikkan.co.jp",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-03T08:58:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-011",
+      "headline": "野村証券、トヨタの目標株価を3800円に引き上げ",
+      "summary": "野村証券はトヨタ自動車の投資判断を「買い」に維持し、目標株価を3500円から3800円に引き上げた。ハイブリッド車の収益性改善を理由に挙げた。",
+      "outlet": "nikkei.com",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-03T15:32:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "analyst_rating",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-012",
+      "headline": "豊田市の秋祭り、3年ぶりに山車巡行が復活",
+      "summary": "愛知県豊田市で開かれる秋祭りで、3年ぶりに山車の巡行が行われる。市は観光客の増加を見込んでいる。",
+      "outlet": "asahi.com",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-03T21:13:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-013",
+      "headline": "コラム：トヨタ神話はいつまで続くのか",
+      "summary": "筆者は、日本の製造業の強さを象徴してきたトヨタの経営手法を論じる。事実関係の新しい報道はなく、持論の展開が中心である。",
+      "outlet": "nikkei.com",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-04T02:54:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-014",
+      "headline": "JPX日経400、定期入れ替えで電装部品大手を採用",
+      "summary": "日本取引所グループなどは、JPX日経インデックス400の定期入れ替えを発表した。トヨタ関連の部品メーカー1社が新規採用され、2社が除外される。",
+      "outlet": "jp.reuters.com",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-04T08:35:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "index_change",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-015",
+      "headline": "トヨタ役員、保有株の一部を売却　大量保有報告書で判明",
+      "summary": "関東財務局に提出された報告書によると、トヨタ自動車の常務役員が9月に保有株式約3万株を売却した。売却額は約1億円とみられる。",
+      "outlet": "nikkan.co.jp",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-04T15:09:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "insider_transaction",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-016",
+      "headline": "公取委、トヨタの下請け取引を調査へとの観測　部品値下げ要請で",
+      "summary": "関係者の話として、公正取引委員会がトヨタ自動車の一部部品メーカーへの値下げ要請を調べる方針だと伝わった。トヨタは「調査の通知は受けていない」としている。",
+      "outlet": "nikkei.com",
+      "region": "JP",
+      "language": "ja",
+      "published_at": "2026-09-04T20:50:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-017",
+      "headline": "腾讯第三季度营收同比增长14%，游戏与广告业务超预期",
+      "summary": "腾讯控股公布第三季度业绩，营收同比增长14%至1900亿元，净利润增长18%。国际游戏收入与视频号广告收入均好于分析师预期。",
+      "outlet": "caixin.com",
+      "region": "CN",
+      "language": "zh",
+      "published_at": "2026-09-05T02:31:00Z",
+      "candidates": [
+        "0700_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "0700_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-018",
+      "headline": "阿里巴巴宣布新增200亿美元股份回购计划",
+      "summary": "阿里巴巴集团董事会批准新一轮股份回购授权，规模最高200亿美元，为期三年。公司表示将以自有现金支付。",
+      "outlet": "hk01.com",
+      "region": "HK",
+      "language": "zh",
+      "published_at": "2026-09-05T09:05:00Z",
+      "candidates": [
+        "9988_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "capital_allocation",
+        "affected_ticker": "9988_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-019",
+      "headline": "市场监管总局对阿里巴巴旗下平台启动反垄断调查",
+      "summary": "国家市场监督管理总局发布公告，称对阿里巴巴旗下一家电商平台涉嫌滥用市场支配地位立案调查。阿里巴巴表示将配合调查。",
+      "outlet": "yicai.com",
+      "region": "CN",
+      "language": "zh",
+      "published_at": "2026-09-05T14:46:00Z",
+      "candidates": [
+        "9988_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "9988_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-020",
+      "headline": "腾讯多款自研游戏获批版号，含两款重点新作",
+      "summary": "国家新闻出版署公布9月网络游戏审批名单，腾讯多款自研游戏获批，其中包括两款备受期待的新作，预计年内上线。",
+      "outlet": "caixin.com",
+      "region": "CN",
+      "language": "zh",
+      "published_at": "2026-09-05T20:27:00Z",
+      "candidates": [
+        "0700_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "0700_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-021",
+      "headline": "消息人士：阿里巴巴拟收购东南亚物流企业，谈判仍在早期",
+      "summary": "据知情人士透露，阿里巴巴正与一家东南亚物流公司洽谈收购事宜，交易仍处于早期阶段，尚未达成最终协议。阿里巴巴未予置评。",
+      "outlet": "mingpao.com",
+      "region": "HK",
+      "language": "zh",
+      "published_at": "2026-09-06T03:01:00Z",
+      "candidates": [
+        "9988_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "9988_HK_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-022",
+      "headline": "腾讯首席战略官宣布离职，将于年底卸任",
+      "summary": "腾讯控股公告称，首席战略官因个人原因辞去职务，将于12月31日生效，其职责由一名高级副总裁接任。",
+      "outlet": "yicai.com",
+      "region": "CN",
+      "language": "zh",
+      "published_at": "2026-09-06T08:42:00Z",
+      "candidates": [
+        "0700_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "management_change",
+        "affected_ticker": "0700_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-023",
+      "headline": "恒指公司公布季度检讨结果，三只新股纳入恒生指数",
+      "summary": "恒生指数公司公布第三季度检讨结果，三只股票将纳入恒生指数，两只被剔除，变动于12月第一个交易日生效。",
+      "outlet": "hk01.com",
+      "region": "HK",
+      "language": "zh",
+      "published_at": "2026-09-06T14:23:00Z",
+      "candidates": [
+        "0700_HK_EQ",
+        "9988_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "index_change",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-024",
+      "headline": "中国央行宣布下调存款准备金率0.5个百分点",
+      "summary": "中国人民银行宣布自下月起下调金融机构存款准备金率0.5个百分点，释放长期资金约1万亿元，并维持政策利率不变。",
+      "outlet": "caixin.com",
+      "region": "CN",
+      "language": "zh",
+      "published_at": "2026-09-06T20:04:00Z",
+      "candidates": [
+        "0700_HK_EQ",
+        "9988_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-025",
+      "headline": "9月制造业PMI降至48.9，低于市场预期",
+      "summary": "国家统计局公布，9月制造业采购经理指数为48.9，低于市场预期的50.1和前值49.6，新订单指数明显回落。",
+      "outlet": "yicai.com",
+      "region": "CN",
+      "language": "zh",
+      "published_at": "2026-09-07T02:38:00Z",
+      "candidates": [
+        "0700_HK_EQ",
+        "9988_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "macro_surprise",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-026",
+      "headline": "高盛上调腾讯目标价至720港元，维持买入评级",
+      "summary": "高盛发表研究报告，将腾讯目标价由650港元上调至720港元，理由是游戏业务利润率改善及人工智能投入见效。",
+      "outlet": "mingpao.com",
+      "region": "HK",
+      "language": "zh",
+      "published_at": "2026-09-07T08:19:00Z",
+      "candidates": [
+        "0700_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "analyst_rating",
+        "affected_ticker": "0700_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-027",
+      "headline": "字节跳动推出新一代对话式应用，直接挑战微信生态",
+      "summary": "字节跳动发布新版超级应用，整合即时通讯、支付和小程序功能。分析人士认为这将加剧与微信的竞争。",
+      "outlet": "caixin.com",
+      "region": "CN",
+      "language": "zh",
+      "published_at": "2026-09-07T14:00:00Z",
+      "candidates": [
+        "0700_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "0700_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-028",
+      "headline": "阿里巴巴下调本财年云业务收入增长指引",
+      "summary": "阿里巴巴表示，因大型客户项目延期，将本财年阿里云收入增速指引从20%下调至15%左右，并重申整体盈利目标不变。",
+      "outlet": "hk01.com",
+      "region": "HK",
+      "language": "zh",
+      "published_at": "2026-09-07T20:34:00Z",
+      "candidates": [
+        "9988_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "guidance_change",
+        "affected_ticker": "9988_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-029",
+      "headline": "周末手游推荐：十款适合假日的轻松游戏",
+      "summary": "本文列出十款适合假期游玩的手机游戏，包括腾讯代理的几款休闲作品，内容为玩家推荐，不涉及公司业务消息。",
+      "outlet": "mingpao.com",
+      "region": "HK",
+      "language": "zh",
+      "published_at": "2026-09-08T02:15:00Z",
+      "candidates": [
+        "0700_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-030",
+      "headline": "阿里山秋季旅游旺季来临，火车观日出一票难求",
+      "summary": "台湾阿里山进入秋季旅游旺季，森林小火车观日出班次热门，游客人数较去年增长一成。",
+      "outlet": "yicai.com",
+      "region": "CN",
+      "language": "zh",
+      "published_at": "2026-09-08T07:56:00Z",
+      "candidates": [
+        "9988_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-031",
+      "headline": "腾讯宣布下调中期股息，称需保留现金用于云与芯片投资",
+      "summary": "腾讯控股宣布中期股息每股1.2港元，较去年的2.4港元减半，管理层称将保留更多现金用于人工智能基础设施投入。",
+      "outlet": "hk01.com",
+      "region": "HK",
+      "language": "zh",
+      "published_at": "2026-09-08T14:30:00Z",
+      "candidates": [
+        "0700_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "dividend_cut",
+        "affected_ticker": "0700_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-032",
+      "headline": "腾讯主席增持公司股份，涉资约2亿港元",
+      "summary": "根据联交所权益披露，腾讯执行董事于9月下旬在公开市场买入约50万股公司股份，涉资约2亿港元。",
+      "outlet": "stheadline.com",
+      "region": "HK",
+      "language": "zh",
+      "published_at": "2026-09-08T20:11:00Z",
+      "candidates": [
+        "0700_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "insider_transaction",
+        "affected_ticker": "0700_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-033",
+      "headline": "Siemens hebt Jahresprognose an: Automatisierung und Bahntechnik treiben das Geschäft",
+      "summary": "Siemens erwartet für das Geschäftsjahr nun ein Umsatzwachstum von 7 bis 9 Prozent, zuvor waren es 5 bis 7 Prozent. Vorstandschef nannte starke Nachfrage in der Fabrikautomatisierung.",
+      "outlet": "handelsblatt.com",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-09T01:52:00Z",
+      "candidates": [
+        "SIEd_EQ"
+      ],
+      "expected": {
+        "event_type": "guidance_change",
+        "affected_ticker": "SIEd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-034",
+      "headline": "SAP steigert Cloud-Umsatz im dritten Quartal um 26 Prozent",
+      "summary": "SAP hat im dritten Quartal den Umsatz mit Cloud-Software um 26 Prozent auf 5,6 Milliarden Euro gesteigert und damit die Erwartungen der Analysten übertroffen.",
+      "outlet": "faz.net",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-09T07:33:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-035",
+      "headline": "Siemens übernimmt Brandtner Automation für 2,3 Milliarden Euro",
+      "summary": "Siemens kauft den Industriesoftware-Anbieter Brandtner Automation aus Stuttgart. Der Kaufpreis beträgt 2,3 Milliarden Euro, der Abschluss wird für das erste Halbjahr 2027 erwartet.",
+      "outlet": "handelsblatt.com",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-09T14:07:00Z",
+      "candidates": [
+        "SIEd_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "SIEd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-036",
+      "headline": "SAP prüft laut Insidern Zukauf eines KI-Start-ups für Milliardensumme",
+      "summary": "Wie mehrere Insider berichten, lotet SAP eine Übernahme des Berliner KI-Unternehmens Lernwerk aus. Ein Abschluss sei noch ungewiss, SAP wollte sich nicht äußern.",
+      "outlet": "wiwo.de",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-09T19:48:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-037",
+      "headline": "Siemens-Finanzvorstand verlässt Konzern zum Jahresende",
+      "summary": "Der Finanzvorstand von Siemens scheidet auf eigenen Wunsch zum 31. Dezember aus. Der Aufsichtsrat hat die interne Nachfolgerin bereits benannt.",
+      "outlet": "faz.net",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-10T01:29:00Z",
+      "candidates": [
+        "SIEd_EQ"
+      ],
+      "expected": {
+        "event_type": "management_change",
+        "affected_ticker": "SIEd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-038",
+      "headline": "EU-Kommission eröffnet Kartellverfahren gegen SAP wegen Lizenzbedingungen",
+      "summary": "Die EU-Kommission prüft, ob SAP Kunden durch Lizenzbedingungen an seine Cloud-Produkte bindet. Bei einem Verstoß drohen Bußgelder von bis zu zehn Prozent des Jahresumsatzes.",
+      "outlet": "handelsblatt.com",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-10T08:03:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-039",
+      "headline": "SAP startet Aktienrückkauf über fünf Milliarden Euro",
+      "summary": "SAP hat ein neues Aktienrückkaufprogramm mit einem Volumen von bis zu fünf Milliarden Euro beschlossen. Das Programm soll bis Ende 2027 laufen.",
+      "outlet": "boerse.de",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-10T13:44:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "capital_allocation",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-040",
+      "headline": "EZB lässt Leitzins unverändert und hält sich weitere Schritte offen",
+      "summary": "Der EZB-Rat hat den Einlagensatz bei 2,0 Prozent belassen. Präsidentin Lagarde sagte, die Entscheidungen blieben von der Datenlage abhängig.",
+      "outlet": "handelsblatt.com",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-10T19:25:00Z",
+      "candidates": [
+        "SAPd_EQ",
+        "SIEd_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-041",
+      "headline": "Ifo-Geschäftsklima bricht im September überraschend ein",
+      "summary": "Der Ifo-Geschäftsklimaindex ist im September auf 84,1 Punkte gefallen, Volkswirte hatten 87,5 erwartet. Besonders die Industrie bewertet ihre Lage deutlich schlechter.",
+      "outlet": "faz.net",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-11T01:59:00Z",
+      "candidates": [
+        "SAPd_EQ",
+        "SIEd_EQ"
+      ],
+      "expected": {
+        "event_type": "macro_surprise",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-042",
+      "headline": "Dax-Revision: Siemens Energy steigt auf, zwei Werte müssen gehen",
+      "summary": "Die Deutsche Börse hat die Zusammensetzung von Dax und MDax überprüft. Aus dem Dax scheiden zwei Titel aus, Siemens und SAP bleiben unverändert gewichtet.",
+      "outlet": "boerse.de",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-11T07:40:00Z",
+      "candidates": [
+        "SIEd_EQ",
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "index_change",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-043",
+      "headline": "Deutsche Bank hebt Kursziel für SAP auf 290 Euro",
+      "summary": "Die Deutsche Bank hat ihr Kursziel für SAP von 260 auf 290 Euro angehoben und die Kaufempfehlung bekräftigt. Die Cloud-Dynamik sei intakt, schrieb der Analyst.",
+      "outlet": "wiwo.de",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-11T13:21:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "analyst_rating",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-044",
+      "headline": "Siemens gewinnt Großauftrag für Hochgeschwindigkeitszüge in Saudi-Arabien",
+      "summary": "Siemens Mobility liefert 40 Hochgeschwindigkeitszüge samt Wartung an einen saudischen Betreiber. Der Auftragswert liegt bei rund 3 Milliarden Euro.",
+      "outlet": "handelsblatt.com",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-11T19:02:00Z",
+      "candidates": [
+        "SIEd_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "SIEd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-045",
+      "headline": "ABB meldet Rückgang bei Bestellungen in der Antriebstechnik",
+      "summary": "Der Siemens-Konkurrent ABB verbuchte im dritten Quartal weniger Bestellungen in der Antriebstechnik. Der Konzern verwies auf zurückhaltende Investitionen der Industriekunden in Europa.",
+      "outlet": "faz.net",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-12T01:36:00Z",
+      "candidates": [
+        "SIEd_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "SIEd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-046",
+      "headline": "Siemensstraße in Karlsruhe wegen Rohrbruchs für Tage gesperrt",
+      "summary": "Nach einem Rohrbruch bleibt die Siemensstraße in Karlsruhe bis Freitag gesperrt. Die Stadtwerke rechnen mit Umleitungen im Berufsverkehr.",
+      "outlet": "faz.net",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-12T07:17:00Z",
+      "candidates": [
+        "SIEd_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-047",
+      "headline": "SAP Arena: Adler Mannheim startet mit Heimsieg in die Saison",
+      "summary": "Die Adler Mannheim haben ihr erstes Heimspiel der Eishockeysaison in der SAP Arena vor ausverkauftem Haus gewonnen.",
+      "outlet": "wiwo.de",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-12T12:58:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-048",
+      "headline": "SAP-Vorstand kauft Aktien für 1,2 Millionen Euro",
+      "summary": "Laut einer Pflichtmitteilung zu Directors' Dealings hat ein SAP-Vorstandsmitglied Anfang Oktober Aktien im Wert von rund 1,2 Millionen Euro erworben.",
+      "outlet": "boerse.de",
+      "region": "DE",
+      "language": "de",
+      "published_at": "2026-09-12T19:32:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "insider_transaction",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-049",
+      "headline": "Bank of England holds rates at 3.75% but signals cuts could resume",
+      "summary": "The Bank of England kept Bank Rate at 3.75% in a 6-3 vote. Governor Bailey said policymakers would look through some of the recent rise in energy prices.",
+      "outlet": "bbc.co.uk",
+      "region": "GB",
+      "language": "en",
+      "published_at": "2026-09-13T01:13:00Z",
+      "candidates": [
+        "AZN_GB_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-050",
+      "headline": "UK inflation unexpectedly accelerates to 3.9% in September",
+      "summary": "Consumer price inflation rose to 3.9%, above the 3.5% forecast by economists polled, the Office for National Statistics said, driven by food and airfares.",
+      "outlet": "ft.com",
+      "region": "GB",
+      "language": "en",
+      "published_at": "2026-09-13T06:54:00Z",
+      "candidates": [
+        "AZN_GB_EQ"
+      ],
+      "expected": {
+        "event_type": "macro_surprise",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-051",
+      "headline": "AstraZeneca wins 10-year NHS contract for respiratory therapies",
+      "summary": "AstraZeneca has been awarded a 10-year NHS England supply deal for its asthma and COPD inhalers worth an estimated 4 billion pounds.",
+      "outlet": "theguardian.com",
+      "region": "GB",
+      "language": "en",
+      "published_at": "2026-09-13T13:28:00Z",
+      "candidates": [
+        "AZN_GB_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "AZN_GB_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-052",
+      "headline": "AstraZeneca raises full-year earnings guidance after strong oncology sales",
+      "summary": "AstraZeneca now expects core earnings per share to grow by a high-teens percentage this year, up from low-double digits, on stronger cancer drug sales.",
+      "outlet": "thetimes.co.uk",
+      "region": "GB",
+      "language": "en",
+      "published_at": "2026-09-13T19:09:00Z",
+      "candidates": [
+        "AZN_GB_EQ"
+      ],
+      "expected": {
+        "event_type": "guidance_change",
+        "affected_ticker": "AZN_GB_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-053",
+      "headline": "AstraZeneca in talks to buy US biotech Corvane for $6bn, sources say",
+      "summary": "AstraZeneca is in advanced discussions to acquire Boston-based Corvane Therapeutics, according to people familiar with the matter. No agreement has been reached.",
+      "outlet": "ft.com",
+      "region": "GB",
+      "language": "en",
+      "published_at": "2026-09-14T00:50:00Z",
+      "candidates": [
+        "AZN_GB_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "AZN_GB_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-054",
+      "headline": "Barclays raises AstraZeneca price target ahead of trial readouts",
+      "summary": "Barclays lifted its price target on AstraZeneca to 14,200p from 12,800p, citing an upcoming run of late-stage data readouts.",
+      "outlet": "telegraph.co.uk",
+      "region": "GB",
+      "language": "en",
+      "published_at": "2026-09-14T06:31:00Z",
+      "candidates": [
+        "AZN_GB_EQ"
+      ],
+      "expected": {
+        "event_type": "analyst_rating",
+        "affected_ticker": "AZN_GB_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-055",
+      "headline": "AstraZeneca finance chief to step down next spring",
+      "summary": "AstraZeneca said its chief financial officer will retire in April 2027 after eight years in the role. A search for a successor has begun.",
+      "outlet": "thetimes.co.uk",
+      "region": "GB",
+      "language": "en",
+      "published_at": "2026-09-14T13:05:00Z",
+      "candidates": [
+        "AZN_GB_EQ"
+      ],
+      "expected": {
+        "event_type": "management_change",
+        "affected_ticker": "AZN_GB_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-056",
+      "headline": "Competition watchdog fines AstraZeneca 85m pounds over inhaler pricing",
+      "summary": "The Competition and Markets Authority fined AstraZeneca 85 million pounds after finding it had hindered cheaper generic inhalers. The company said it would appeal.",
+      "outlet": "independent.co.uk",
+      "region": "GB",
+      "language": "en",
+      "published_at": "2026-09-14T18:46:00Z",
+      "candidates": [
+        "AZN_GB_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "AZN_GB_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-057",
+      "headline": "GSK halts late-stage lung cancer trial after disappointing interim data",
+      "summary": "GSK said an independent committee recommended stopping a phase three lung cancer trial, a setback for a class of drugs that AstraZeneca also develops.",
+      "outlet": "theguardian.com",
+      "region": "GB",
+      "language": "en",
+      "published_at": "2026-09-15T00:27:00Z",
+      "candidates": [
+        "AZN_GB_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "AZN_GB_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-058",
+      "headline": "Opinion: Britain's drug pricing row is a battle of egos, not economics",
+      "summary": "A columnist argues that the dispute between ministers and pharmaceutical firms is driven by politics. The piece adds no new facts on any company.",
+      "outlet": "telegraph.co.uk",
+      "region": "GB",
+      "language": "en",
+      "published_at": "2026-09-15T07:01:00Z",
+      "candidates": [
+        "AZN_GB_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-059",
+      "headline": "Autumn bake: five apple crumble recipes to try this weekend",
+      "summary": "Food writers share their favourite twists on the classic apple crumble, from oat toppings to spiced custard.",
+      "outlet": "bbc.co.uk",
+      "region": "GB",
+      "language": "en",
+      "published_at": "2026-09-15T12:42:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-060",
+      "headline": "Shopify posts third-quarter revenue growth of 29%, beating forecasts",
+      "summary": "Shopify reported third-quarter revenue of $3.1 billion US, up 29% from a year earlier, and net income above analysts' estimates on strong payments volume.",
+      "outlet": "theglobeandmail.com",
+      "region": "CA",
+      "language": "en",
+      "published_at": "2026-09-15T18:23:00Z",
+      "candidates": [
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "SHOP_CA_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-061",
+      "headline": "Shopify cuts fourth-quarter outlook, citing tariff uncertainty for merchants",
+      "summary": "Shopify said it expects fourth-quarter revenue growth in the low 20s percent, below consensus, as cross-border tariff changes weigh on merchant sales.",
+      "outlet": "financialpost.com",
+      "region": "CA",
+      "language": "en",
+      "published_at": "2026-09-16T00:57:00Z",
+      "candidates": [
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "guidance_change",
+        "affected_ticker": "SHOP_CA_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-062",
+      "headline": "RBC raises quarterly dividend by 6% and approves new share buyback",
+      "summary": "Royal Bank of Canada lifted its quarterly dividend to $1.65 per share and received approval to repurchase up to 30 million shares.",
+      "outlet": "theglobeandmail.com",
+      "region": "CA",
+      "language": "en",
+      "published_at": "2026-09-16T06:38:00Z",
+      "candidates": [
+        "RY_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "capital_allocation",
+        "affected_ticker": "RY_CA_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-063",
+      "headline": "DBRS downgrades Royal Bank of Canada's subordinated debt on rising loan losses",
+      "summary": "DBRS Morningstar cut the rating on RBC's subordinated notes by one notch, citing higher provisions for commercial real estate loans.",
+      "outlet": "bnnbloomberg.ca",
+      "region": "CA",
+      "language": "en",
+      "published_at": "2026-09-16T12:19:00Z",
+      "candidates": [
+        "RY_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "credit_rating",
+        "affected_ticker": "RY_CA_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-064",
+      "headline": "Bank of Canada cuts key rate to 2.5% as economy slows",
+      "summary": "The Bank of Canada reduced its overnight rate by a quarter point to 2.5% and said weaker hiring and trade uncertainty justified more support.",
+      "outlet": "cbc.ca",
+      "region": "CA",
+      "language": "en",
+      "published_at": "2026-09-16T18:53:00Z",
+      "candidates": [
+        "RY_CA_EQ",
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-065",
+      "headline": "Canada loses 38,000 jobs in September, against forecasts of a gain",
+      "summary": "Statistics Canada said employment fell by 38,000 last month and the unemployment rate rose to 7.2%, a surprise to economists who expected modest growth.",
+      "outlet": "financialpost.com",
+      "region": "CA",
+      "language": "en",
+      "published_at": "2026-09-17T00:34:00Z",
+      "candidates": [
+        "RY_CA_EQ",
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "macro_surprise",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-066",
+      "headline": "Shopify exploring acquisition of logistics software firm, people familiar say",
+      "summary": "Shopify has held early talks about buying a warehouse software company in a deal that could be valued near $1.5 billion, people familiar with the matter said.",
+      "outlet": "bnnbloomberg.ca",
+      "region": "CA",
+      "language": "en",
+      "published_at": "2026-09-17T06:15:00Z",
+      "candidates": [
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "SHOP_CA_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-067",
+      "headline": "OSFI orders RBC to strengthen anti-money-laundering controls",
+      "summary": "Canada's banking regulator directed Royal Bank of Canada to fix deficiencies in its anti-money-laundering monitoring, and imposed a higher capital add-on.",
+      "outlet": "theglobeandmail.com",
+      "region": "CA",
+      "language": "en",
+      "published_at": "2026-09-17T11:56:00Z",
+      "candidates": [
+        "RY_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "RY_CA_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-068",
+      "headline": "Shopify president sells $24-million of shares under trading plan",
+      "summary": "A filing shows Shopify's president sold about 200,000 Class A shares in late September under a pre-arranged trading plan.",
+      "outlet": "financialpost.com",
+      "region": "CA",
+      "language": "en",
+      "published_at": "2026-09-17T18:30:00Z",
+      "candidates": [
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "insider_transaction",
+        "affected_ticker": "SHOP_CA_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-069",
+      "headline": "Shopify launches AI storefront builder for small merchants",
+      "summary": "Shopify unveiled an AI assistant that builds and updates online stores from a text prompt, available to all merchants from next month.",
+      "outlet": "bnnbloomberg.ca",
+      "region": "CA",
+      "language": "en",
+      "published_at": "2026-09-18T00:11:00Z",
+      "candidates": [
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "SHOP_CA_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-070",
+      "headline": "Royal Bank Road bridge in Victoria to close for repairs through November",
+      "summary": "The City of Victoria says the Royal Bank Road bridge will close for structural repairs, with detours posted for drivers and cyclists.",
+      "outlet": "cbc.ca",
+      "region": "CA",
+      "language": "en",
+      "published_at": "2026-09-18T05:52:00Z",
+      "candidates": [
+        "RY_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-071",
+      "headline": "DBS third-quarter net profit rises 9% on fee income",
+      "summary": "DBS Group reported third-quarter net profit of S$3.0 billion, up 9%, as wealth management and treasury fees offset a narrower net interest margin.",
+      "outlet": "straitstimes.com",
+      "region": "SG",
+      "language": "en",
+      "published_at": "2026-09-18T12:26:00Z",
+      "candidates": [
+        "D05_SG_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "D05_SG_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-072",
+      "headline": "DBS trims interim dividend as it builds buffers for regional credit risks",
+      "summary": "DBS cut its quarterly dividend to 60 Singapore cents from 66 cents and said it would keep more capital against property exposures in the region.",
+      "outlet": "businesstimes.com.sg",
+      "region": "SG",
+      "language": "en",
+      "published_at": "2026-09-18T18:07:00Z",
+      "candidates": [
+        "D05_SG_EQ"
+      ],
+      "expected": {
+        "event_type": "dividend_cut",
+        "affected_ticker": "D05_SG_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-073",
+      "headline": "MAS keeps Singapore dollar policy band unchanged",
+      "summary": "The Monetary Authority of Singapore left the slope, width and centre of its exchange-rate band unchanged, saying inflation would stay moderate.",
+      "outlet": "straitstimes.com",
+      "region": "SG",
+      "language": "en",
+      "published_at": "2026-09-18T23:48:00Z",
+      "candidates": [
+        "D05_SG_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-074",
+      "headline": "Infosys cuts FY27 revenue growth guidance to 1-3%",
+      "summary": "Infosys lowered its constant-currency revenue growth forecast for the fiscal year to 1% to 3%, from 3% to 5%, as clients delay discretionary projects.",
+      "outlet": "economictimes.indiatimes.com",
+      "region": "IN",
+      "language": "en",
+      "published_at": "2026-09-19T06:22:00Z",
+      "candidates": [
+        "INFY_IN_EQ"
+      ],
+      "expected": {
+        "event_type": "guidance_change",
+        "affected_ticker": "INFY_IN_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-075",
+      "headline": "Infosys to acquire Singapore data analytics firm Orbyte for $420 million",
+      "summary": "Infosys signed a definitive agreement to buy Orbyte Analytics for about $420 million in cash. The deal is expected to close within six months.",
+      "outlet": "livemint.com",
+      "region": "IN",
+      "language": "en",
+      "published_at": "2026-09-19T12:03:00Z",
+      "candidates": [
+        "INFY_IN_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "INFY_IN_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-076",
+      "headline": "RBI cuts repo rate by 25 basis points to 5.25%",
+      "summary": "The Reserve Bank of India's monetary policy committee lowered the repo rate to 5.25% and shifted its stance to accommodative.",
+      "outlet": "livemint.com",
+      "region": "IN",
+      "language": "en",
+      "published_at": "2026-09-19T17:44:00Z",
+      "candidates": [
+        "INFY_IN_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-077",
+      "headline": "India retail inflation unexpectedly jumps to 5.6% in September",
+      "summary": "Retail inflation rose to 5.6% in September, above the 4.9% forecast in a Reuters poll, as vegetable prices spiked.",
+      "outlet": "economictimes.indiatimes.com",
+      "region": "IN",
+      "language": "en",
+      "published_at": "2026-09-19T23:25:00Z",
+      "candidates": [
+        "INFY_IN_EQ"
+      ],
+      "expected": {
+        "event_type": "macro_surprise",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-078",
+      "headline": "Samsung wins Nvidia qualification for next-generation HBM4 memory",
+      "summary": "Samsung Electronics said its 12-layer HBM4 chips have passed qualification tests at a major AI chip customer, with mass shipments starting in the fourth quarter.",
+      "outlet": "koreaherald.com",
+      "region": "KR",
+      "language": "en",
+      "published_at": "2026-09-20T05:59:00Z",
+      "candidates": [
+        "005930_KR_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "005930_KR_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-079",
+      "headline": "Samsung suspends special dividend after chip investment plan upsized",
+      "summary": "Samsung Electronics said it will not pay a special dividend this year after raising its capital spending plan for new fabs in Texas and Pyeongtaek.",
+      "outlet": "koreatimes.co.kr",
+      "region": "KR",
+      "language": "en",
+      "published_at": "2026-09-20T11:40:00Z",
+      "candidates": [
+        "005930_KR_EQ"
+      ],
+      "expected": {
+        "event_type": "dividend_cut",
+        "affected_ticker": "005930_KR_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-080",
+      "headline": "Samsung reportedly eyes acquisition of European robotics firm, sources say",
+      "summary": "Samsung Electronics is said to be weighing an offer for a Swedish industrial robotics company, according to industry sources. Samsung said nothing had been decided.",
+      "outlet": "koreaherald.com",
+      "region": "KR",
+      "language": "en",
+      "published_at": "2026-09-20T17:21:00Z",
+      "candidates": [
+        "005930_KR_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "005930_KR_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-081",
+      "headline": "Bank of Korea holds base rate at 2.50%, flags household debt risks",
+      "summary": "The Bank of Korea kept its base rate at 2.50% for a third straight meeting, saying rising household debt limited room for further easing.",
+      "outlet": "koreatimes.co.kr",
+      "region": "KR",
+      "language": "en",
+      "published_at": "2026-09-20T23:55:00Z",
+      "candidates": [
+        "005930_KR_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-082",
+      "headline": "China's market regulator opens probe into Alibaba's cross-border trade platform",
+      "summary": "China's State Administration for Market Regulation said it had opened an investigation into a cross-border e-commerce platform of Alibaba over alleged unfair seller terms.",
+      "outlet": "scmp.com",
+      "region": "HK",
+      "language": "en",
+      "published_at": "2026-09-21T05:36:00Z",
+      "candidates": [
+        "9988_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "9988_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-083",
+      "headline": "Tencent's quarterly profit tops estimates on gaming rebound",
+      "summary": "Tencent reported adjusted net profit of 62 billion yuan for the third quarter, 17% above a year ago, as domestic games and advertising beat forecasts.",
+      "outlet": "caixinglobal.com",
+      "region": "CN",
+      "language": "en",
+      "published_at": "2026-09-21T11:17:00Z",
+      "candidates": [
+        "0700_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "0700_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-084",
+      "headline": "Infosys hands out lower final dividend as margins come under pressure",
+      "summary": "Infosys announced a final dividend of 18 rupees per share, down from 22 rupees a year earlier, citing wage costs and a slower deal pipeline.",
+      "outlet": "asia.nikkei.com",
+      "region": "JP",
+      "language": "en",
+      "published_at": "2026-09-21T17:51:00Z",
+      "candidates": [
+        "INFY_IN_EQ"
+      ],
+      "expected": {
+        "event_type": "dividend_cut",
+        "affected_ticker": "INFY_IN_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-085",
+      "headline": "Apple lowers holiday-quarter revenue forecast on constrained iPhone supply",
+      "summary": "Apple said holiday-quarter revenue would be 3% to 5% below its earlier range because a camera module shortage is limiting iPhone shipments.",
+      "outlet": "wsj.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-21T23:32:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "guidance_change",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-086",
+      "headline": "Apple lifts December-quarter outlook as iPhone 18 demand surprises",
+      "summary": "Apple raised its December-quarter revenue guidance by about $4 billion, saying pre-orders for the new iPhone had outpaced supply.",
+      "outlet": "cnbc.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-22T05:13:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "guidance_change",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-087",
+      "headline": "Apple reports record services revenue as fiscal fourth quarter tops estimates",
+      "summary": "Apple posted fiscal fourth-quarter revenue of $104 billion, with services reaching $30 billion, both above analyst forecasts.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-22T10:54:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-088",
+      "headline": "Apple to buy audio technology startup Pinecrest for about $1.2 billion",
+      "summary": "Apple agreed to acquire Pinecrest Audio, a maker of spatial audio software, in a cash deal expected to close in early 2027.",
+      "outlet": "cnbc.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-22T17:28:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-089",
+      "headline": "Apple weighs purchase of mapping startup Harbor Maps, people familiar say",
+      "summary": "Apple has held talks to acquire Harbor Maps, according to people familiar with the discussions, who cautioned that a deal might not materialize.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-22T23:09:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-090",
+      "headline": "Apple names new chief financial officer as long-time CFO retires",
+      "summary": "Apple said its finance chief will retire at the end of the year and named a senior finance vice president as successor.",
+      "outlet": "wsj.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-23T04:50:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "management_change",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-091",
+      "headline": "Judge orders Apple to allow outside payment links in App Store",
+      "summary": "A federal judge ruled that Apple must let developers link to outside payment options without a commission, in a decision the company said it would appeal.",
+      "outlet": "nytimes.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-23T11:24:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-092",
+      "headline": "European Commission fines Apple 900 million euros under digital markets law",
+      "summary": "The European Commission fined Apple 900 million euros for steering rules that limit app developers from reaching customers outside the App Store.",
+      "outlet": "reuters.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-23T17:05:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-093",
+      "headline": "Apple authorizes $110 billion share repurchase program",
+      "summary": "Apple's board approved a new buyback authorization of up to $110 billion and raised its quarterly dividend by 4%.",
+      "outlet": "cnbc.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-23T22:46:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "capital_allocation",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-094",
+      "headline": "Apple sells $5 billion of bonds in first offering this year",
+      "summary": "Apple priced a five-part bond offering of $5 billion, with proceeds earmarked for general corporate purposes, a regulatory filing showed.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-24T05:20:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "capital_allocation",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-095",
+      "headline": "Fitch upgrades Apple to AAA citing cash generation",
+      "summary": "Fitch Ratings raised Apple's long-term issuer rating one notch to AAA, pointing to sustained free cash flow and a conservative balance sheet.",
+      "outlet": "reuters.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-24T11:01:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "credit_rating",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-096",
+      "headline": "S&P downgrades Toyota Motor Credit on rising leverage at finance arm",
+      "summary": "S&P Global cut the rating on Toyota Motor Credit Corp by one notch to A, saying the finance arm's leverage had risen as it funded higher vehicle lending.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-24T16:42:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "credit_rating",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-097",
+      "headline": "Moody's upgrades SAP to A1 as cloud margins improve",
+      "summary": "Moody's raised SAP's senior unsecured rating to A1 from A2, citing steady margin gains and strong cash flow from its cloud business.",
+      "outlet": "reuters.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-24T22:23:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "credit_rating",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-098",
+      "headline": "Fed holds rates steady, flags uncertainty over tariff impact",
+      "summary": "The Federal Reserve kept its benchmark rate at 3.75% to 4.00%, with Chair Powell's successor noting tariff-driven price pressures on goods.",
+      "outlet": "wsj.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-25T04:57:00Z",
+      "candidates": [
+        "AAPL_US_EQ",
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-099",
+      "headline": "Fed officials split on pace of cuts, minutes show",
+      "summary": "Minutes of the September meeting showed several policymakers favoured a pause until early next year, while others wanted a December cut.",
+      "outlet": "cnbc.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-25T10:38:00Z",
+      "candidates": [
+        "AAPL_US_EQ",
+        "RY_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-100",
+      "headline": "US consumer prices rise 0.5% in September, hotter than expected",
+      "summary": "The consumer price index climbed 0.5% in September versus the 0.3% forecast, the Labor Department said, led by shelter and used cars.",
+      "outlet": "cnbc.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-25T16:19:00Z",
+      "candidates": [
+        "AAPL_US_EQ",
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "macro_surprise",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-101",
+      "headline": "US employers add just 22,000 jobs in September, far below forecasts",
+      "summary": "Nonfarm payrolls rose by 22,000, well short of the 130,000 forecast, and the August figure was revised down by 41,000.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-25T22:53:00Z",
+      "candidates": [
+        "AAPL_US_EQ",
+        "RY_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "macro_surprise",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-102",
+      "headline": "US third-quarter GDP growth tracks at 0.8%, well below estimates",
+      "summary": "The Commerce Department's advance estimate showed output growing 0.8% annualised, a sharp slowdown from the prior quarter and below the 2.1% consensus.",
+      "outlet": "wsj.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-26T04:34:00Z",
+      "candidates": [
+        "AAPL_US_EQ",
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "macro_surprise",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-103",
+      "headline": "Apple director sells $14 million of stock, filing shows",
+      "summary": "A Form 4 filing showed an Apple board member sold 70,000 shares on October 2 at an average price of about $200.",
+      "outlet": "sec.gov",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-26T10:15:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "insider_transaction",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-104",
+      "headline": "Apple chief operating officer exercises options and sells shares",
+      "summary": "Under a Form 4 filing, Apple's chief operating officer exercised options for 120,000 shares and sold roughly half of them to cover taxes.",
+      "outlet": "marketwatch.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-26T16:49:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "insider_transaction",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-105",
+      "headline": "Apple recalls 1.1 million USB-C wall chargers over overheating risk",
+      "summary": "Apple and the Consumer Product Safety Commission announced a recall of chargers sold between 2024 and 2026 after reports of overheating.",
+      "outlet": "cnbc.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-26T22:30:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-106",
+      "headline": "iCloud outage leaves users unable to sync for over six hours",
+      "summary": "Apple said a fault in a storage system caused a widespread iCloud outage on Tuesday, affecting backups, photos and Messages.",
+      "outlet": "theverge.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-27T04:11:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-107",
+      "headline": "Toyota to build $9 billion battery plant in North Carolina expansion",
+      "summary": "Toyota will add a second battery factory in North Carolina, creating 3,000 jobs, with production of hybrid packs starting in 2029.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-27T09:52:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-108",
+      "headline": "Alibaba Cloud lands multiyear AI infrastructure deal with Gulf telecom group",
+      "summary": "Alibaba Cloud signed a multiyear agreement to supply data-centre capacity and AI services to a Gulf telecom operator, valued at about $1.5 billion.",
+      "outlet": "reuters.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-27T16:26:00Z",
+      "candidates": [
+        "9988_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "9988_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-109",
+      "headline": "Fire at Taiwanese display plant threatens iPhone supply, analysts warn",
+      "summary": "A fire at a Taiwan display supplier halted production lines that provide screens for Apple's iPhone, and analysts said it could affect November shipments.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-27T22:07:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-110",
+      "headline": "Vertex Mobile unveils flagship phone with built-in satellite messaging",
+      "summary": "Rival handset maker Vertex Mobile launched a flagship phone with satellite messaging at a lower price than Apple's iPhone, raising competitive pressure.",
+      "outlet": "cnbc.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-28T03:48:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-111",
+      "headline": "Taiwan Chipworks warns of softer fourth-quarter orders from smartphone makers",
+      "summary": "The foundry said orders from smartphone customers would be weaker in the fourth quarter, a signal for suppliers such as Apple and Samsung.",
+      "outlet": "reuters.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-28T10:22:00Z",
+      "candidates": [
+        "AAPL_US_EQ",
+        "005930_KR_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-112",
+      "headline": "Oracle cloud outage disrupts business software customers for a day",
+      "summary": "A rival cloud provider, Oracle, suffered an outage that disrupted enterprise applications, with competitors such as SAP seeing customers ask about migrations.",
+      "outlet": "cnbc.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-28T16:03:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "sector_competitor",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-113",
+      "headline": "MSCI adds Infosys to its India Index with higher weighting after review",
+      "summary": "MSCI's quarterly review will raise Infosys's weight in its India benchmark, which analysts estimate will draw about $400 million of inflows.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-28T21:44:00Z",
+      "candidates": [
+        "INFY_IN_EQ"
+      ],
+      "expected": {
+        "event_type": "index_change",
+        "affected_ticker": "INFY_IN_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-114",
+      "headline": "S&P Dow Jones Indices adds Shopify to Canada index family rebalance",
+      "summary": "S&P Dow Jones Indices announced Shopify will join a Canadian large-cap sustainability index as part of its quarterly rebalance.",
+      "outlet": "reuters.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-29T04:18:00Z",
+      "candidates": [
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "index_change",
+        "affected_ticker": "SHOP_CA_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-115",
+      "headline": "Morgan Stanley upgrades Apple to overweight on upgrade cycle",
+      "summary": "Morgan Stanley raised Apple to overweight from equal-weight and set a $245 price target, expecting a multi-year iPhone upgrade cycle.",
+      "outlet": "cnbc.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-29T09:59:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "analyst_rating",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-116",
+      "headline": "Goldman Sachs cuts Shopify price target on valuation",
+      "summary": "Goldman Sachs lowered its Shopify price target to $140 from $165 while keeping a neutral rating, citing a rich valuation.",
+      "outlet": "marketwatch.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-29T15:40:00Z",
+      "candidates": [
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "analyst_rating",
+        "affected_ticker": "SHOP_CA_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-117",
+      "headline": "Jefferies initiates Alibaba at buy with $190 target",
+      "summary": "Jefferies began coverage of Alibaba with a buy rating and a $190 price target, pointing to cloud growth and buybacks.",
+      "outlet": "barrons.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-29T22:14:00Z",
+      "candidates": [
+        "9988_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "analyst_rating",
+        "affected_ticker": "9988_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-118",
+      "headline": "Samsung Electronics flags 40% jump in third-quarter operating profit",
+      "summary": "Samsung Electronics said preliminary third-quarter operating profit was about 14 trillion won, up 40% from a year ago, helped by memory prices.",
+      "outlet": "reuters.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-30T03:55:00Z",
+      "candidates": [
+        "005930_KR_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "005930_KR_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-119",
+      "headline": "Siemens quarterly profit rises 11% as order book hits record",
+      "summary": "Siemens reported fourth-quarter net income of 2.4 billion euros and an order backlog of 120 billion euros.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-30T09:36:00Z",
+      "candidates": [
+        "SIEd_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "SIEd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-120",
+      "headline": "Toyota prices $2 billion green bond to fund battery investments",
+      "summary": "Toyota Motor Credit priced a $2 billion green bond to finance its battery and hybrid investments, according to a bookrunner.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-30T15:17:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "capital_allocation",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-121",
+      "headline": "Alibaba launches $3 billion convertible bond offering",
+      "summary": "Alibaba Group is selling $3 billion in convertible notes due 2031, with proceeds for cloud capacity and share repurchases.",
+      "outlet": "reuters.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-09-30T21:51:00Z",
+      "candidates": [
+        "9988_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "capital_allocation",
+        "affected_ticker": "9988_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-122",
+      "headline": "Samsung names new head of its chip division after leadership reshuffle",
+      "summary": "Samsung Electronics replaced the head of its semiconductor business in a year-end reshuffle, naming a veteran memory executive.",
+      "outlet": "reuters.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-01T03:32:00Z",
+      "candidates": [
+        "005930_KR_EQ"
+      ],
+      "expected": {
+        "event_type": "management_change",
+        "affected_ticker": "005930_KR_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-123",
+      "headline": "Alibaba chairman to hand day-to-day role to cloud chief",
+      "summary": "Alibaba announced its chairman will step back from day-to-day duties and be succeeded as CEO by the head of Alibaba Cloud from January.",
+      "outlet": "ft.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-01T09:13:00Z",
+      "candidates": [
+        "9988_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "management_change",
+        "affected_ticker": "9988_HK_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-124",
+      "headline": "FTC opens inquiry into Shopify's payment fees for merchants",
+      "summary": "The Federal Trade Commission has opened an investigation into Shopify Payments' fee practices, the company disclosed in a securities filing.",
+      "outlet": "wsj.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-01T15:47:00Z",
+      "candidates": [
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "SHOP_CA_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-125",
+      "headline": "Toyota reportedly considering sale of its Brazilian plant, sources say",
+      "summary": "Toyota is reportedly exploring options for its Sorocaba plant in Brazil, including a sale, according to two sources familiar with the matter.",
+      "outlet": "reuters.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-01T21:28:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "7203_JP_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-126",
+      "headline": "Tencent said to weigh sale of stake in European game studio",
+      "summary": "Tencent is weighing a sale of its minority stake in a European studio, people with knowledge of the matter said, though no decision has been made.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-02T03:09:00Z",
+      "candidates": [
+        "0700_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "0700_HK_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-127",
+      "headline": "Siemens reportedly exploring sale of building-technology unit for 10 billion euros",
+      "summary": "Siemens is said to be speaking with advisers about selling a building-technology business, with private-equity firms showing interest, sources said.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-02T09:43:00Z",
+      "candidates": [
+        "SIEd_EQ"
+      ],
+      "expected": {
+        "event_type": "m_and_a",
+        "affected_ticker": "SIEd_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-128",
+      "headline": "Apple may delay foldable iPhone to 2028, supply chain sources say",
+      "summary": "Apple is reportedly pushing back its foldable iPhone launch by a year because of screen-yield problems, sources in the supply chain say.",
+      "outlet": "9to5mac.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-02T15:24:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-129",
+      "headline": "Dow, S&P 500 slip as investors await bank earnings",
+      "summary": "US stocks edged lower on Monday as investors waited for big-bank earnings, with Apple and Tesla among the biggest drags on the index.",
+      "outlet": "cnbc.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-02T21:05:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-130",
+      "headline": "Stocks to watch: Apple, Shopify and Toyota in focus this week",
+      "summary": "A rundown of company news and earnings dates for the week ahead, including Apple, Shopify and Toyota.",
+      "outlet": "marketwatch.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-03T02:46:00Z",
+      "candidates": [
+        "AAPL_US_EQ",
+        "SHOP_CA_EQ",
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-131",
+      "headline": "Apple orchard opens pick-your-own season with record crowds",
+      "summary": "A family-run apple orchard in upstate New York opened its pick-your-own season, drawing record weekend crowds.",
+      "outlet": "nytimes.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-03T09:20:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-132",
+      "headline": "Opinion: Why Apple's design philosophy is a lesson for every founder",
+      "summary": "A columnist reflects on product design and what start-ups can learn from Apple. The essay reports no company news.",
+      "outlet": "washingtonpost.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-03T15:01:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-133",
+      "headline": "Five years ago: how Apple's 2021 privacy overhaul reshaped advertising",
+      "summary": "A retrospective revisits a privacy change Apple introduced in 2021 and its effect on the ad market. No new development is reported.",
+      "outlet": "wsj.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-03T20:42:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-134",
+      "headline": "Tencent Tower in Shenzhen named among world's tallest office buildings",
+      "summary": "A feature on the Shenzhen skyline notes the Tencent headquarters building among the tallest offices, with photos and visitor tips.",
+      "outlet": "cnbc.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-04T03:16:00Z",
+      "candidates": [
+        "0700_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-135",
+      "headline": "Toyota Tundra wins truck of the year from outdoor magazine",
+      "summary": "A magazine's annual truck award went to the Toyota Tundra for towing capacity and ride quality, in a consumer review roundup.",
+      "outlet": "latimes.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-04T08:57:00Z",
+      "candidates": [
+        "7203_JP_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-136",
+      "headline": "Shopping app tips: how to find the best Black Friday deals early",
+      "summary": "Consumer tips for finding early Black Friday discounts, with a mention that many small retailers use Shopify storefronts.",
+      "outlet": "foxnews.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-04T14:38:00Z",
+      "candidates": [
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-137",
+      "headline": "Siemens Energy-powered wind farm opens in Texas panhandle",
+      "summary": "A new wind farm using turbines from a different company, Siemens Gamesa's former rival, has begun operating in Texas. The article concerns local jobs and landowners.",
+      "outlet": "apnews.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-04T21:12:00Z",
+      "candidates": [
+        "SIEd_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-138",
+      "headline": "Ali Baba pantomime opens in Birmingham theatre",
+      "summary": "A family pantomime of Ali Baba and the Forty Thieves opened at a Birmingham theatre to warm reviews.",
+      "outlet": "cnn.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-05T02:53:00Z",
+      "candidates": [
+        "9988_HK_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-139",
+      "headline": "Wheat futures climb as dry weather threatens Kansas winter crop",
+      "summary": "Wheat futures rose on concerns that dry weather will cut Kansas yields, with traders also watching Black Sea exports.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-05T08:34:00Z",
+      "candidates": [
+        "005930_KR_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-140",
+      "headline": "Royal Bank of Scotland-themed pub quiz raises funds for local hospice",
+      "summary": "A pub in Ohio raised money for a hospice at a quiz night themed around British banking history.",
+      "outlet": "usatoday.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-05T14:15:00Z",
+      "candidates": [
+        "RY_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-141",
+      "headline": "Samsung washer-dryer review: is the premium price worth it?",
+      "summary": "A product review compares laundry appliances for noise, cycle times and energy use. It carries no corporate news.",
+      "outlet": "foxbusiness.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-05T20:49:00Z",
+      "candidates": [
+        "005930_KR_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-142",
+      "headline": "DBS Marine Ltd diving club hosts reef cleanup in Florida Keys",
+      "summary": "A small dive club called DBS Marine organised a volunteer reef cleanup, unrelated to any bank.",
+      "outlet": "nypost.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-06T02:30:00Z",
+      "candidates": [
+        "D05_SG_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-143",
+      "headline": "Infosys Foundation sponsors rural school library in Karnataka",
+      "summary": "A community feature on a library opening, with a passing mention of a charitable foundation. It contains no business information.",
+      "outlet": "nbcnews.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-06T08:11:00Z",
+      "candidates": [
+        "INFY_IN_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-144",
+      "headline": "Justice Department reportedly preparing new antitrust complaint against Apple, sources say",
+      "summary": "The Justice Department is said to be drafting an additional antitrust complaint over Apple's smartwatch ecosystem, according to two sources. Apple declined to comment.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-06T14:45:00Z",
+      "candidates": [
+        "AAPL_US_EQ"
+      ],
+      "expected": {
+        "event_type": "regulatory_legal",
+        "affected_ticker": "AAPL_US_EQ",
+        "rumour": true,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-145",
+      "headline": "SAP unveils AI agent suite for finance teams at Orlando customer briefing",
+      "summary": "SAP launched a suite of AI agents that automate invoice matching and month-end close, generally available to S/4HANA Cloud customers from November.",
+      "outlet": "cnbc.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-06T20:26:00Z",
+      "candidates": [
+        "SAPd_EQ"
+      ],
+      "expected": {
+        "event_type": "product_business",
+        "affected_ticker": "SAPd_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-146",
+      "headline": "Royal Bank of Canada earnings preview: analysts expect higher loan-loss provisions",
+      "summary": "RBC is due to report in December; analysts surveyed by Bloomberg expect a profit of C$4.2 billion, with provisions rising.",
+      "outlet": "bloomberg.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-07T02:07:00Z",
+      "candidates": [
+        "RY_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "earnings_release",
+        "affected_ticker": "RY_CA_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-147",
+      "headline": "Citigroup upgrades Infosys to buy on deal-win momentum",
+      "summary": "Citigroup raised Infosys to buy from neutral and lifted its price target to 1,900 rupees, citing large-deal wins in banking and insurance.",
+      "outlet": "reuters.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-07T08:41:00Z",
+      "candidates": [
+        "INFY_IN_EQ"
+      ],
+      "expected": {
+        "event_type": "analyst_rating",
+        "affected_ticker": "INFY_IN_EQ",
+        "rumour": false,
+        "relevant": true
+      }
+    },
+    {
+      "id": "bm-148",
+      "headline": "Senate hearing on drug prices lists AstraZeneca among a dozen manufacturers",
+      "summary": "A Senate committee hearing on drug pricing named a dozen manufacturers in a background memo. The hearing produced no company-specific action.",
+      "outlet": "politico.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-07T14:22:00Z",
+      "candidates": [
+        "AZN_GB_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-149",
+      "headline": "Remember when Shopify laid off 20% of staff? A look back at 2023",
+      "summary": "A feature revisits the 2023 workforce cut at Shopify and what it meant for the tech sector at the time. No new developments are reported.",
+      "outlet": "forbes.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-07T20:03:00Z",
+      "candidates": [
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "other",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": false
+      }
+    },
+    {
+      "id": "bm-150",
+      "headline": "Fed Governor says labor market weakness could justify faster rate cuts",
+      "summary": "A Federal Reserve governor said in a speech that deterioration in hiring could warrant faster cuts, a shift in the policy debate.",
+      "outlet": "wsj.com",
+      "region": "US",
+      "language": "en",
+      "published_at": "2026-10-08T01:44:00Z",
+      "candidates": [
+        "AAPL_US_EQ",
+        "SHOP_CA_EQ"
+      ],
+      "expected": {
+        "event_type": "central_bank",
+        "affected_ticker": null,
+        "rumour": false,
+        "relevant": true
+      }
+    }
+  ]
+}

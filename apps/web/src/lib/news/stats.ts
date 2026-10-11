@@ -108,6 +108,35 @@ export function healthSummary(health: Pick<SourcesHealth, "sources" | "window_ho
   };
 }
 
+const RUNG_NAMES: Record<string, string> = { "1": "feed text", "2": "page fetch", "3": "browser", "4": "official API" };
+
+/** "12 feed text, 3 page fetch" for the texts a source stored in a week; "none" when there are none. */
+export function fetchMethods(byRung: Record<string, number> | undefined): string {
+  const parts = Object.entries(byRung ?? {})
+    .filter(([, n]) => n > 0)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([rung, n]) => `${n} ${RUNG_NAMES[rung] ?? `rung ${rung}`}`);
+  return parts.length > 0 ? parts.join(", ") : "none";
+}
+
+function minutes(value: number): string {
+  if (value < 90) return `${value} min`;
+  const hours = value / 60;
+  return hours < 48 ? `${hours.toFixed(1)} h` : `${(hours / 24).toFixed(1)} d`;
+}
+
+/** "5 min (95%: 40 min)": how long after publication the app first saw an article; "no data" when unknown. */
+export function delayLabel(p50: number | null | undefined, p95: number | null | undefined): string {
+  if (p50 === null || p50 === undefined) return "no data";
+  return p95 === null || p95 === undefined ? minutes(p50) : `${minutes(p50)} (95%: ${minutes(p95)})`;
+}
+
+/** The feed's average answer time: "820 ms" or "1.4 s"; "no data" when unknown. */
+export function responseTimeLabel(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined) return "no data";
+  return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
+}
+
 // ---------------------------------------------------------------------------
 // Story rows
 // ---------------------------------------------------------------------------

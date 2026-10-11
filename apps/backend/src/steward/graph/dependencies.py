@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Literal
 
-import anthropic
 import asyncpg
 from pydantic import BaseModel, Field
 
@@ -31,6 +30,7 @@ from steward.exposures.filing_text import (
 from steward.graph.decisions import GraphDecisionError, decide_disclosure
 from steward.graph.keys import normalize_object_key
 from steward.graph.relationships import detect_contradictions, upsert_disclosure
+from steward.llm.routing import RoutingClient
 
 ORIGIN = "ai_extraction"
 MIN_CONFIDENCE = 0.8
@@ -176,7 +176,7 @@ def findings_prompt(filing: FilingText, sections: dict[str, str]) -> str:
 
 
 async def extract_dependencies(
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     model: str,
     effort: str | None,
     filing: FilingText,
@@ -200,7 +200,7 @@ async def extract_dependencies(
 
 
 async def judge_dependencies(
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     model: str,
     effort: str | None,
     filing: FilingText,

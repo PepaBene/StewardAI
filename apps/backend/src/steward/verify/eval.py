@@ -9,8 +9,8 @@ everything would pass the first test and fail this one.
 
 Without --live only the numeric check runs: it must catch every numeric case and flag no
 faithful sentence; semantic cases are reported as not checked. The live run calls the
-Claude API (about $0.01 with Haiku 4.5) and needs ANTHROPIC_API_KEY. Exit status 1 when a
-target is missed.
+model API (about $0.01 with gpt-6-luna) and needs OPENAI_API_KEY or GOOGLE_API_KEY. Exit
+status 1 when a target is missed.
 """
 
 import argparse
@@ -25,7 +25,7 @@ from typing import Any
 from steward.config.verification import ClaimVerifierSettings
 from steward.llm.routing import create_routing_client
 from steward.settings import get_settings
-from steward.verify.claims import Claim, ClaimVerifier, ClaudeClaimVerifier, check_claims
+from steward.verify.claims import Claim, ClaimVerifier, LLMClaimVerifier, check_claims
 
 SET_PATH = Path(__file__).resolve().parents[3] / "tests" / "verify" / "injected_claims.json"
 TODAY = dt.date(2026, 9, 26)
@@ -114,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
     cases = load_cases()
     settings = ClaimVerifierSettings(model=args.model)
     verifier = (
-        ClaudeClaimVerifier(create_routing_client(get_settings())[0], args.model)
+        LLMClaimVerifier(create_routing_client(get_settings())[0], args.model)
         if args.live
         else None
     )

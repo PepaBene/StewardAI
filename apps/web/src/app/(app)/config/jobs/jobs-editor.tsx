@@ -95,7 +95,7 @@ export function JobsEditor() {
       <ConfigHeader title="Jobs" domain="jobs">
         <p>
           When each scheduled job runs, whether it runs at all, and the models and caps of the jobs
-          that call Claude. Times are read in each schedule&rsquo;s time zone.
+          that call a model. Times are read in each schedule&rsquo;s time zone.
         </p>
       </ConfigHeader>
       <AlertMessage tone="info" title="No restart needed">

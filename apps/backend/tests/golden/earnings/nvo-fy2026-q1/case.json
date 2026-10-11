@@ -215,6 +215,6 @@
     }
   ],
   "absent_metrics": [],
-  "labelled_by": "claude (AI-read from the document; owner has not hand-checked)",
+  "labelled_by": "AI model (AI-read from the document; owner has not hand-checked)",
   "notes": "Substitute for ASML (see README). IFRS, DKK million. Adjusted operating profit (340B provision reversal excluded) from 'Adjusted sales and Adjusted operating profit as reported and at CER'; adjusted diluted EPS from 'Adjusted net profit and Adjusted diluted EPS'. Q1 2026 reported figures include a DKK 26.8 billion 340B rebate provision reversal. Non-US filer: no XBRL crosscheck (crosscheck is null)."
 }

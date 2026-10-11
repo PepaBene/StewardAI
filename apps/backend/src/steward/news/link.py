@@ -1,10 +1,10 @@
 """Linking items to holdings through each holding's news profile.
 
 A holding is matched by its company name and aliases, its ticker written as a ticker
-("$AAPL", "(NASDAQ: AAPL)"), or its ISIN. Named competitors, suppliers and customers and the
-watch topics link an item to the holding too, with the relation recorded, so news about a key
-supplier reaches the owner even when the holding is not mentioned. Items that match nothing
-are dropped.
+("$AAPL", "(NASDAQ: AAPL)"), or its ISIN. Named executives and brands link too. Named
+competitors, suppliers and customers, the top constituents of a held fund, and the watch topics
+link an item to the holding with the relation recorded, so news about a key supplier reaches
+the owner even when the holding is not mentioned. Items that match nothing are dropped.
 """
 
 import re
@@ -32,14 +32,48 @@ def short_name(name: str) -> str:
     return re.sub(r"^the\s+", "", text, flags=re.IGNORECASE)
 
 
+# How sure a link of each kind is, and which kinds reach the holding only indirectly.
+LINK_CONFIDENCE: dict[str, float] = {
+    "source": 1.0,
+    "isin": 1.0,
+    "ticker": 0.95,
+    "name": 0.85,
+    "alias": 0.75,
+    # A named executive or a product brand is about the company itself, but a name alone
+    # is weaker evidence than the company's own.
+    "executive": 0.7,
+    "brand": 0.7,
+    "supplier": 0.6,
+    "customer": 0.6,
+    # A top constituent of a held fund: the fund is reached through it, not named.
+    "constituent": 0.5,
+    "competitor": 0.5,
+    "topic": 0.4,
+}
+INDIRECT_VIA: frozenset[str] = frozenset(
+    {"competitor", "supplier", "customer", "constituent", "topic"}
+)
+
+
 @dataclass(frozen=True)
 class Link:
     ticker: str
     via: str  # name, alias, ticker, isin, source, competitor, supplier, customer, topic
     term: str
 
-    def as_json(self) -> dict[str, str]:
-        return {"ticker": self.ticker, "via": self.via, "term": self.term}
+    @property
+    def confidence(self) -> float:
+        """How sure the link is: by identifier or the source itself, by name, or only through
+        a competitor, supplier, customer or topic."""
+        return LINK_CONFIDENCE.get(self.via, 0.5)
+
+    def as_json(self) -> dict[str, str | float]:
+        return {
+            "ticker": self.ticker,
+            "via": self.via,
+            "term": self.term,
+            "confidence": self.confidence,
+        }
 
 
 @dataclass
@@ -78,6 +112,8 @@ def holding_terms(
     if profile:
         terms.aliases = list(profile.aliases)
         terms.relations = [
+            *(("executive", e) for e in profile.executives),
+            *(("brand", b) for b in profile.brands),
             *(("competitor", c) for c in profile.competitors),
             *(("supplier", s) for s in profile.suppliers),
             *(("customer", c) for c in profile.customers),
@@ -86,12 +122,19 @@ def holding_terms(
     return terms
 
 
+_CJK = re.compile(r"[぀-ヿ㐀-䶿一-鿿가-힯]")
+
+
 def _name_pattern(term: str) -> re.Pattern[str]:
     """Whole-word match. Short or all-caps names (SAP, ASML) must match their case exactly
     so ordinary words do not. A single-word name (Target, Apple, Shell) is often an ordinary
     word too, so it matches as written or in capitals ("TARGET"), never "price target".
     Longer multi-word names match case-insensitively."""
     escaped = re.escape(term).replace(r"\ ", r"\s+")
+    if _CJK.search(term):
+        # CJK text has no spaces: a name is followed by a particle or more text ("トヨタは"),
+        # which the word-boundary test below would refuse.
+        return re.compile(escaped)
     if len(term) <= 4 or term.isupper():
         return re.compile(rf"(?<![\w&]){escaped}(?![\w&])")
     if not re.search(r"\s", term.strip()):
@@ -100,7 +143,7 @@ def _name_pattern(term: str) -> re.Pattern[str]:
     return re.compile(rf"(?<![\w&]){escaped}(?![\w&])", re.IGNORECASE)
 
 
-def _topic_pattern(topic: str) -> re.Pattern[str]:
+def topic_pattern(topic: str) -> re.Pattern[str]:
     """Whole-word match for a watch topic: "AI" must not match "said". A short all-caps topic
     (AI, EV) matches its case exactly; any other topic matches case-insensitively."""
     escaped = re.escape(topic).replace(r"\ ", r"\s+")
@@ -111,7 +154,9 @@ def _topic_pattern(topic: str) -> re.Pattern[str]:
 def _symbol_pattern(symbol: str) -> re.Pattern[str]:
     s = re.escape(symbol)
     exchanges = r"(?:NASDAQ|NYSE|Nasdaq|NYSE\s+American|XETRA|Xetra|ETR|FRA|CPH|LSE|AMS|EPA|SWX)"
-    return re.compile(rf"(\${s}\b|\(\s*{s}\s*\)|{exchanges}\s*:\s*{s}\b)")
+    # "$700 million" and "$700.50" are prices, not the cashtag $700.
+    price = r"(?![.,]\d)(?!\s*(?i:million|billion|trillion|thousand|mn|bn|m|b|k)\b)"
+    return re.compile(rf"(\${s}\b{price}|\(\s*{s}\s*\)|{exchanges}\s*:\s*{s}\b)")
 
 
 class Linker:
@@ -131,7 +176,7 @@ class Linker:
             for via, term in h.relations:
                 self._patterns.append((h.ticker, via, term, _name_pattern(term)))
             for topic in h.topics:
-                self._patterns.append((h.ticker, "topic", topic, _topic_pattern(topic)))
+                self._patterns.append((h.ticker, "topic", topic, topic_pattern(topic)))
 
     @property
     def tickers(self) -> list[str]:
@@ -151,9 +196,12 @@ class Linker:
             "alias",
             "ticker",
             "isin",
+            "executive",
+            "brand",
             "competitor",
             "supplier",
             "customer",
+            "constituent",
             "topic",
         ]
         for ticker, via, term, pattern in self._patterns:

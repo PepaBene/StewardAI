@@ -10,9 +10,11 @@ or cancels in the chat panel. Only a confirmed action creates a job (trigger `ch
 
 import datetime as dt
 import json
+from collections.abc import Sequence
 from typing import Any
 
 import asyncpg
+import httpx
 
 from steward.chat import analytics_tools
 from steward.chat.analytics_tools import SELECTOR_KINDS
@@ -27,6 +29,8 @@ from steward.data_context.research import (
     country_context,
 )
 from steward.earnings.read import holding_detail
+from steward.news.embeddings import Embedder, EmbeddingError, GeminiEmbedder, cosine
+from steward.news.read_analysis import like_pattern
 from steward.portfolio.read import portfolio_overview
 from steward.research.sources import Registry
 
@@ -74,6 +78,40 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 },
                 "days": {"type": "integer", "minimum": 1, "maximum": 365},
             },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "search_wire",
+        "description": "The news wire: every stored headline from every source, in any language "
+        "(English translations are searched too), linked to a holding or not. Use it for "
+        "questions about coverage ('what is the Japanese press saying about yen intervention', "
+        "'who reported the Siemens Energy guidance cut first'). Each item has its outlet, "
+        "region, tier and publication time; filters narrow by region (country code), language "
+        "and holding. Oldest-first ordering finds who reported first.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Words that must appear."},
+                "region": {"type": "string", "description": "Outlet country code, e.g. JP."},
+                "language": {"type": "string", "description": "Language code, e.g. ja."},
+                "ticker": {"type": "string"},
+                "days": {"type": "integer", "minimum": 1, "maximum": 90},
+                "oldest_first": {"type": "boolean"},
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "get_story_thread",
+        "description": "A developing situation as a timeline: each story in the thread with "
+        "what it added (new facts, changed facts, corrections, what is still unknown). Give a "
+        "story id from search_news or search_wire.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"story_id": {"type": "integer"}},
+            "required": ["story_id"],
             "additionalProperties": False,
         },
     },
@@ -411,6 +449,26 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
 ]
 
 
+SEMANTIC_MIN_COSINE = 0.6
+SEMANTIC_CANDIDATES = 4000
+SEMANTIC_ENOUGH = 8
+MAX_ID = 2**63 - 1  # the largest bigint id the database holds
+
+
+class QueryEmbedder:
+    """Embeds one search query, opening its own HTTP client for the call (a chat question
+    embeds at most a few queries, so a shared client is not worth the lifetime handling)."""
+
+    def __init__(self, api_key: str, model: str, dimensions: int) -> None:
+        self._key = api_key
+        self.model = model
+        self.dimensions = dimensions
+
+    async def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        async with httpx.AsyncClient(timeout=30.0) as http:
+            return await GeminiEmbedder(http, self._key, self.model, self.dimensions).embed(texts)
+
+
 class ChatTools:
     def __init__(
         self,
@@ -418,11 +476,13 @@ class ChatTools:
         registry: Registry,
         conversation_id: int,
         message_id: int | None,
+        embedder: Embedder | None = None,
     ) -> None:
         self.pool = pool
         self.registry = registry
         self.conversation_id = conversation_id
         self.message_id = message_id
+        self.embedder = embedder
         self.used: list[str] = []
         self.actions: list[int] = []
 
@@ -435,6 +495,10 @@ class ChatTools:
             result: dict[str, Any] = await handler(**args)
         except TypeError as exc:
             return {"error": f"bad arguments: {exc}"}
+        except asyncpg.DataError as exc:
+            # A model-chosen value the database cannot take (an id out of range) is a tool error
+            # the model can correct, not a failure of the whole chat job.
+            return {"error": f"bad arguments: {str(exc)[:200]}"}
         return result
 
     async def _owner(self) -> str | None:
@@ -629,8 +693,8 @@ class ChatTools:
             " from q, public.news_item i left join public.story_cluster c on c.id = i.cluster_id"
             " where ($1::text is null or $1 = any(i.tickers)) and i.published_at >= $3"
             " and ($2::text is null or case when coalesce(numnode(q.tsq), 0) > 0"
-            " then i.search @@ q.tsq else i.headline ilike '%' || $2::text || '%'"
-            " or i.summary ilike '%' || $2::text || '%' end)"
+            " then i.search @@ q.tsq else i.headline ilike $4 escape '\\'"
+            " or i.summary ilike $4 escape '\\' end)"
             " order by score desc, i.published_at desc limit 15)"
             " select hits.*, case when hits.fts then ts_headline('english',"
             " coalesce(hits.summary, hits.headline), q.tsq,"
@@ -639,6 +703,7 @@ class ChatTools:
             ticker,
             query or None,
             dt.datetime.now(dt.UTC) - dt.timedelta(days=max(1, min(365, days))),
+            like_pattern(query) if query else None,
         )
         items = []
         for r in rows:
@@ -665,6 +730,198 @@ class ChatTools:
                 }
             )
         return {"items": items}
+
+    async def _tool_search_wire(
+        self,
+        query: str,
+        region: str | None = None,
+        language: str | None = None,
+        ticker: str | None = None,
+        days: int = 14,
+        oldest_first: bool = False,
+    ) -> dict[str, Any]:
+        query = query.strip()
+        if not query:
+            return {"error": "query must not be empty"}
+        since = dt.datetime.now(dt.UTC) - dt.timedelta(days=max(1, min(90, days)))
+        # The words match through the full-text index and the English title through a bounded
+        # date range, as two index-friendly queries combined: one OR across both would scan the
+        # whole table. `%` and `_` in the query are literal, not wildcards.
+        rows = await self.pool.fetch(
+            "select a.id, a.url, a.headline, a.title_en, a.summary, a.outlet, a.outlet_name,"
+            " a.region, a.language, a.tier, a.published_at, a.linked, i.cluster_id as story_id"
+            " from public.news_article a left join public.news_item i on i.id = a.news_item_id"
+            " where a.published_at >= $1 and ($2::text is null or a.region = upper($2))"
+            " and ($3::text is null or a.language = lower($3))"
+            " and ($4::text is null or $4 = any(i.tickers))"
+            " and a.id in (select m.id from public.news_article m where m.published_at >= $1"
+            "  and m.search @@ websearch_to_tsquery('simple', $5)"
+            "  union select t.id from public.news_article t where t.published_at >= $1"
+            "  and coalesce(t.title_en, '') ilike $7 escape '\\')"
+            " order by case when $6 then extract(epoch from a.published_at)"
+            " else -extract(epoch from a.published_at) end limit 15",
+            since,
+            region,
+            language,
+            ticker,
+            query,
+            oldest_first,
+            like_pattern(query),
+        )
+        items = []
+        for r in rows:
+            sid = self.registry.add(
+                "news_item",
+                f"wire:{r['id']}",
+                r["title_en"] or r["headline"],
+                url=r["url"],
+                tier=r["tier"],
+                snippet=(r["summary"] or "")[:600] or None,
+                as_of=str(r["published_at"].date()),
+            )
+            items.append(
+                {
+                    "source_id": sid,
+                    "headline": r["headline"],
+                    "headline_en": r["title_en"],
+                    "outlet": r["outlet_name"] or r["outlet"],
+                    "region": r["region"],
+                    "language": r["language"],
+                    "tier": r["tier"],
+                    "published": r["published_at"].isoformat(timespec="minutes"),
+                    "linked_to_holding": r["linked"],
+                    "story_id": r["story_id"],
+                }
+            )
+        if len(items) < SEMANTIC_ENOUGH and self.embedder is not None:
+            items.extend(
+                await self._semantic_wire(
+                    query,
+                    region,
+                    language,
+                    days,
+                    {r["id"] for r in rows},
+                    SEMANTIC_ENOUGH,
+                    ticker,
+                )
+            )
+        return {"items": items, "note": "Wire items are headlines; they do not alert."}
+
+    async def _semantic_wire(
+        self,
+        query: str,
+        region: str | None,
+        language: str | None,
+        days: int,
+        have: set[int],
+        want: int,
+        ticker: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Wire items close in meaning to the query, in any language, when the words matched
+        too few. Only items embedded by the same model are compared."""
+        assert self.embedder is not None
+        try:
+            (vector,) = await self.embedder.embed([query])
+        except EmbeddingError:
+            return []
+        rows = await self.pool.fetch(
+            "select a.id, a.url, a.headline, a.title_en, a.summary, a.outlet, a.outlet_name,"
+            " a.region, a.language, a.tier, a.published_at, a.linked, e.vector,"
+            " i.cluster_id as story_id from public.news_article a"
+            " join public.news_embedding e on e.article_id = a.id"
+            " left join public.news_item i on i.id = a.news_item_id"
+            " where a.published_at >= $1 and e.model = $2 and e.dim = $3"
+            " and ($4::text is null or a.region = upper($4))"
+            " and ($5::text is null or a.language = lower($5))"
+            " and ($7::text is null or $7 = any(i.tickers))"
+            " order by a.published_at desc limit $6",
+            dt.datetime.now(dt.UTC) - dt.timedelta(days=max(1, min(90, days))),
+            self.embedder.model,
+            self.embedder.dimensions,
+            region,
+            language,
+            SEMANTIC_CANDIDATES,
+            ticker,
+        )
+        scored = sorted(
+            (
+                (cosine(vector, r["vector"]), r)
+                for r in rows
+                if r["id"] not in have and len(r["vector"]) == len(vector)
+            ),
+            key=lambda pair: pair[0],
+            reverse=True,
+        )
+        out: list[dict[str, Any]] = []
+        for score, r in scored[:want]:
+            if score < SEMANTIC_MIN_COSINE:
+                break
+            sid = self.registry.add(
+                "news_item",
+                f"wire:{r['id']}",
+                r["title_en"] or r["headline"],
+                url=r["url"],
+                tier=r["tier"],
+                snippet=(r["summary"] or "")[:600] or None,
+                as_of=str(r["published_at"].date()),
+            )
+            out.append(
+                {
+                    "source_id": sid,
+                    "headline": r["headline"],
+                    "headline_en": r["title_en"],
+                    "outlet": r["outlet_name"] or r["outlet"],
+                    "region": r["region"],
+                    "language": r["language"],
+                    "tier": r["tier"],
+                    "published": r["published_at"].isoformat(timespec="minutes"),
+                    "linked_to_holding": r["linked"],
+                    "story_id": r["story_id"],
+                    "match": f"similar in meaning ({score:.2f}), not the same words",
+                }
+            )
+        return out
+
+    async def _tool_get_story_thread(self, story_id: int) -> dict[str, Any]:
+        from steward.news.read_analysis import thread_detail
+
+        if isinstance(story_id, bool) or not isinstance(story_id, int):
+            return {"error": "story_id must be an integer"}
+        if not 1 <= story_id <= MAX_ID:
+            return {"error": f"story {story_id} does not exist"}
+        thread_id = await self.pool.fetchval(
+            "select thread_id from public.story_cluster where id = $1", story_id
+        )
+        if thread_id is None:
+            return {"error": f"story {story_id} is not in a thread"}
+        detail = await thread_detail(self.pool, thread_id)
+        if detail is None:
+            return {"error": f"no thread {thread_id}"}
+        steps = []
+        for step in detail.timeline:
+            sid = self.registry.add(
+                "observation",
+                f"story:{step.story_id}",
+                step.headline,
+                app_path="/news",
+                tier=2,
+                snippet=f"{step.lifecycle}; severity {step.severity}",
+            )
+            steps.append(
+                {
+                    "source_id": sid,
+                    "story_id": step.story_id,
+                    "headline": step.headline,
+                    "at": step.at.isoformat(timespec="minutes"),
+                    "severity": step.severity,
+                    "status": step.lifecycle,
+                    "new": step.diff.new,
+                    "changed": step.diff.changed,
+                    "corrected": step.diff.retracted,
+                    "still_unknown": step.diff.unknown,
+                }
+            )
+        return {"thread": detail.thread.title, "ticker": detail.thread.ticker, "steps": steps}
 
     async def _tool_search_reports(self, query: str) -> dict[str, Any]:
         rows = await self.pool.fetch(

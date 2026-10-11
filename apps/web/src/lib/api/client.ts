@@ -56,6 +56,7 @@ export type Exposure = Schemas["Exposure"];
 export type NewsFeed = Schemas["NewsFeed"];
 export type NewsItemOut = Schemas["NewsItemOut"];
 export type StoryOut = Schemas["StoryOut"];
+export type StoryEvidence = Schemas["StoryEvidence"];
 export type AlertOut = Schemas["AlertOut"];
 export type ReportSummary = Schemas["ReportSummary"];
 export type ReportOut = Schemas["ReportOut"];

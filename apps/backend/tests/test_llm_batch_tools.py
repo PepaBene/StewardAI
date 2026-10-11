@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from steward.config.prompts import PromptsConfig
 from steward.llm import wire
 from steward.llm.types import Message, Request, ToolCall, ToolSpec
-from steward.news.classify import ClaudeClassifier
+from steward.news.classify import LLMClassifier
 
 
 class Answer(BaseModel):
@@ -184,16 +184,13 @@ class _NoBatchLLM:
         return [None] * len(requests)
 
 
-def test_classify_many_returns_none_for_unanswered_groups_and_nothing_for_claude() -> None:
+def test_classify_many_returns_none_for_unanswered_groups() -> None:
     llm = _NoBatchLLM()
-    classifier = ClaudeClassifier(None, "gpt-6-luna", llm=llm)  # type: ignore[arg-type]
+    classifier = LLMClassifier(llm, "gpt-6-luna")  # type: ignore[arg-type]
     today = dt.date(2026, 10, 6)
     assert asyncio.run(classifier.classify_many([], today)) == []
     out = asyncio.run(classifier.classify_many([((), ()), ((), ())], today))
     assert out == [None, None] and llm.asked == 2
-    claude = ClaudeClassifier(None, "claude-haiku-4-5", llm=llm)  # type: ignore[arg-type]
-    assert asyncio.run(claude.classify_many([((), ())], today)) == [None]
-    assert llm.asked == 2  # a Claude model never goes to the batch path
 
 
 # --------------------------------------------------------------- prompt overrides
@@ -202,10 +199,10 @@ def test_classify_many_returns_none_for_unanswered_groups_and_nothing_for_claude
 def test_an_override_limited_to_some_providers_is_not_sent_to_others() -> None:
     prompts = PromptsConfig(
         overrides={"chat_assistant": "a custom prompt of enough length"},
-        override_providers={"chat_assistant": ["anthropic"]},
+        override_providers={"chat_assistant": ["google"]},
     )
     assert (
-        prompts.text("chat_assistant", "default", "claude-sonnet-5")
+        prompts.text("chat_assistant", "default", "gemini-3.8-flash")
         == "a custom prompt of enough length"
     )
     assert prompts.text("chat_assistant", "default", "gpt-6-luna") == "default"

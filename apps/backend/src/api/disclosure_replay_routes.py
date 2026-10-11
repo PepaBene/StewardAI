@@ -15,6 +15,7 @@ from pydantic import AwareDatetime, BaseModel, Field
 
 from api.auth import Owner
 from api.db import Pool
+from steward.ai import AINotConfigured
 from steward.config.jobs import ChatSettings, JobsConfig
 from steward.config.store import load_active
 from steward.disclosure import answer as answer_mod
@@ -121,10 +122,13 @@ async def disclosure_answer(body: AnswerRequest, pool: Pool, _owner: Owner) -> A
     if body.phrase and out["grounded"]:
         stored = await load_active(pool, "jobs", JobsConfig)
         chat: ChatSettings = (stored.body if stored else JobsConfig()).chat
-        # Claude models are off, so a Claude chat model finds no key and the template stays.
-        reworded = await answer_mod.phrase(
-            create_llm(get_settings(), None), chat.model, out, out["evidence"]
-        )
+        # Without a provider key the template stays.
+        try:
+            llm = create_llm(get_settings())
+        except AINotConfigured:
+            reworded = None
+        else:
+            reworded = await answer_mod.phrase(llm, chat.model, out, out["evidence"])
         if reworded:
             out["text"], phrased_by = reworded, chat.model
     return AnswerOut(ticker=ticker, as_of=when, phrased_by=phrased_by, **out)

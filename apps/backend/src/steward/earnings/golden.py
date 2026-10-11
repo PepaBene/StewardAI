@@ -10,8 +10,8 @@ Extractors:
 - `--oracle` (default, used in CI): returns the labels themselves. Scores the validator,
   not the model: every correct, real-world figure must pass validation, and every KPI must
   get a verdict.
-- `--live`: calls Claude (ANTHROPIC_API_KEY) and measures extraction accuracy. With
-  `--record DIR` it also saves each case's model output, so the run can be replayed.
+- `--live`: calls the model (OPENAI_API_KEY or GOOGLE_API_KEY) and measures extraction
+  accuracy. With `--record DIR` it also saves each case's model output, so the run can be replayed.
 - `--replay DIR`: re-scores saved model output without any API call.
 
 Exit status 1 when accuracy is below `--min-accuracy` (default 0.95, the Phase 2 target).
@@ -32,7 +32,7 @@ from steward.ai import Usage
 from steward.config.thesis import ThesisConfig, ThesisKPI
 from steward.config.verification import VerificationConfig
 from steward.documents.fetch import Document
-from steward.earnings.extract import ClaudeExtractor, ExtractionRequest, Extractor
+from steward.earnings.extract import ExtractionRequest, Extractor, LLMExtractor
 from steward.earnings.metrics import BASE_METRICS
 from steward.earnings.periods import likely_reported_period
 from steward.earnings.schema import ExtractedFigure, ExtractionResult
@@ -312,10 +312,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else "")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--oracle", action="store_true", help="labels as extraction (default)")
-    mode.add_argument("--live", action="store_true", help="call Claude")
+    mode.add_argument("--live", action="store_true", help="call the model")
     mode.add_argument("--replay", type=Path, help="re-score saved model output")
     parser.add_argument("--record", type=Path, help="with --live: save model output here")
-    parser.add_argument("--model", default="claude-sonnet-5")
+    parser.add_argument("--model", default="gpt-6.1-sol")
     parser.add_argument("--effort", default="high")
     parser.add_argument("--cases", type=Path, default=DEFAULT_DIR)
     parser.add_argument("--only", help="comma-separated case ids")
@@ -332,9 +332,7 @@ def main(argv: list[str] | None = None) -> int:
         from steward.llm.routing import create_routing_client
         from steward.settings import get_settings
 
-        extractor = ClaudeExtractor(
-            create_routing_client(get_settings())[0], args.model, args.effort
-        )
+        extractor = LLMExtractor(create_routing_client(get_settings())[0], args.model, args.effort)
     elif args.replay:
         extractor = ReplayExtractor(args.replay, cases)
     else:

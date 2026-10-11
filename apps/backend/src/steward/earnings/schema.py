@@ -1,4 +1,4 @@
-"""The JSON the extraction call must return (Claude structured output), one object per
+"""The JSON the extraction call must return (structured model output), one object per
 figure. Everything here is a claim until the validator has checked it against the
 archived document."""
 

@@ -9,7 +9,6 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-import anthropic
 import asyncpg
 import httpx
 import pytest
@@ -28,6 +27,7 @@ from steward.config.store import save_config
 from steward.config.verification import ClaimVerifierSettings, TrustSettings
 from steward.earnings.golden import DEFAULT_DIR as GOLDEN_DIR
 from steward.earnings.golden import OracleExtractor, evaluate, load_cases
+from steward.llm.types import LLMError
 from steward.news.corroborate import OtherStory, decide
 from steward.news.digest import (
     DigestBody,
@@ -148,8 +148,8 @@ async def test_job_log_filters_pages_and_sums_costs(
         "succeeded",
         params={"ticker": "AAPL_US_EQ"},
         steps=[
-            ("locate", "succeeded", 0.0125, "claude-haiku-4-5"),
-            ("extract", "succeeded", 0.25, "claude-sonnet-5"),
+            ("locate", "succeeded", 0.0125, "gpt-6-luna"),
+            ("extract", "succeeded", 0.25, "gpt-6.1-sol"),
         ],
     )
     await add_job(backend_pool, "earnings_check", "succeeded", params={"ticker": "MSFT_US_EQ"})
@@ -185,7 +185,7 @@ async def test_impact_note_carries_its_run_status_and_cost(
         "event_escalation",
         "succeeded",
         steps=[
-            ("write", "succeeded", 0.04, "claude-sonnet-5"),
+            ("write", "succeeded", 0.04, "gpt-6.1-sol"),
             ("search", "succeeded", 0.01, None),
         ],
     )
@@ -213,7 +213,7 @@ async def test_impact_note_carries_its_run_status_and_cost(
     note = (await api.get(f"/escalations/{report}")).json()
     assert note["job_id"] == job and note["job_status"] == "succeeded"
     assert note["cost_usd"] == pytest.approx(0.05)
-    assert note["models"] == ["claude-sonnet-5"]
+    assert note["models"] == ["gpt-6.1-sol"]
     listed = (await api.get("/escalations")).json()
     assert [n["id"] for n in listed] == [report]
     assert (await api.get(f"/escalations/{report + 1}")).status_code == 404
@@ -473,7 +473,7 @@ class FakeClaimVerifier:
 
     async def check(self, claims: Any, today: dt.date) -> tuple[list[ClaimVerdict], Usage]:
         if self.fail:
-            raise anthropic.APIConnectionError(request=httpx.Request("POST", "https://x.test"))
+            raise LLMError("connection error")
         self.asked.extend(claims)
         return [
             ClaimVerdict(
@@ -922,7 +922,7 @@ async def test_a_broken_prompt_fails_the_evals_gate_and_reverting_passes(tmp_pat
     good = 'SYSTEM_PROMPT = "Classify each item by event type."\n'
     prompt.write_text(good)
     data.write_text("{}")
-    component = Component("classification", (prompt,), (data,), lambda: "claude-x", 0.85)
+    component = Component("classification", (prompt,), (data,), lambda: "gpt-x", 0.85)
     calls: list[str] = []
 
     def scorer_for(value: float) -> Any:

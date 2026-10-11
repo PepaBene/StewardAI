@@ -94,7 +94,7 @@ async def test_model_labels_are_recorded_as_such_and_never_measured(
             item_ref=f"i{i}",
             machine_value="open_market_buy",
             human_value="open_market_buy",
-            by="claude-model (not a human)",
+            by="ai-model (not a human)",
             kind="model",
         )
     gate = await adjudication.measure(backend_pool, "insider_class", "s")

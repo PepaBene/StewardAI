@@ -86,7 +86,8 @@ success for your account.
 | Diffbot | `DIFFBOT_API_KEY` | diffbot.com | about 10,000 credits/month | owner-triggered company research (`POST /holdings/{ticker}/company-research/diffbot`), off by default | on demand |
 | People Data Labs | `PEOPLE_DATA_LABS_API_KEY` | peopledatalabs.com | about 100 company enrichments/month | owner-triggered company-only enrichment (`.../company-research/pdl`), no personal data, off by default | on demand |
 | OpenFIGI | `OPENFIGI_API_KEY` (optional) | openfigi.com/api | higher rate with key; works without | identifier mapping in `reference_data` | weekly job |
-| Anthropic | `ANTHROPIC_API_KEY` | console.anthropic.com | pay-as-you-go (not free) | extraction, classification, digests | n/a |
+| OpenAI | `OPENAI_API_KEY` | platform.openai.com | pay-as-you-go (not free) | extraction, classification, digests, research, chat | n/a |
+| Google AI | `GOOGLE_API_KEY` | aistudio.google.com | free tier, then pay-as-you-go | gemini models, grounded search, news embeddings | n/a |
 | Keyless | none | n/a | courteous pacing / `Retry-After` | ECB, Eurostat, ČNB (macro_collect); World Bank, OECD, BIS (`public_data_collect`); GLEIF, ESMA FIRDS/FITRS, filings.xbrl.org ESEF, iShares/Vanguard issuer pages, Yahoo price fallback, Nager.Date holidays | per provider table above |
 
 ### Enabling a provider (three gates)
@@ -132,7 +133,7 @@ appears as a coverage gap (`GET /data/coverage`, `GET /sources/access`).
 | `UN_COMTRADE_API_KEY` | Comtrade steps skipped; trade-exposure alerts have no new observations | World Bank, OECD, BIS |
 | `EPO_OPS_*` | patent refresh route answers 409; no new legal-status readings, so no patent alerts | stored patent families (a missing reading keeps the last known status, never "expired") |
 | `DIFFBOT_API_KEY`, `PEOPLE_DATA_LABS_API_KEY` | owner-triggered enrichment unavailable (409) | all |
-| `ANTHROPIC_API_KEY` | AI steps fail; deterministic collectors and the free-source alert evaluator still run | |
+| `OPENAI_API_KEY` and `GOOGLE_API_KEY` | AI steps fail; deterministic collectors and the free-source alert evaluator still run | |
 | `free_source_alerts.enabled=false` (Event rules) | the evaluator writes nothing; no new alerts or trail rows | collectors and reads |
 
 ## Jobs and endpoints added in Phases 2-7
@@ -170,7 +171,7 @@ free-source-alerts}`.
 ## Exposure builder (`exposure_build`)
 
 Weekly. Reads only public filings and the app's own archive; no extra key beyond
-`SEC_USER_AGENT`, `ANTHROPIC_API_KEY` and the Supabase storage secret.
+`SEC_USER_AGENT`, a model key and the Supabase storage secret.
 
 | Step | Source | Written |
 |---|---|---|

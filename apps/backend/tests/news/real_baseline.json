@@ -1,0 +1,98 @@
+{
+  "model": "gemini-3.8-flash",
+  "recorded": "2026-10-10",
+  "pooled": [
+    223,
+    253
+  ],
+  "segments": {
+    "event:analyst_rating": [
+      2,
+      6
+    ],
+    "event:capital_allocation": [
+      4,
+      4
+    ],
+    "event:central_bank": [
+      12,
+      13
+    ],
+    "event:earnings_release": [
+      2,
+      2
+    ],
+    "event:insider_transaction": [
+      10,
+      10
+    ],
+    "event:m_and_a": [
+      5,
+      7
+    ],
+    "event:macro_surprise": [
+      6,
+      7
+    ],
+    "event:management_change": [
+      1,
+      4
+    ],
+    "event:other": [
+      155,
+      163
+    ],
+    "event:product_business": [
+      13,
+      17
+    ],
+    "event:regulatory_legal": [
+      12,
+      19
+    ],
+    "event:sector_competitor": [
+      1,
+      1
+    ],
+    "language:cs": [
+      8,
+      8
+    ],
+    "language:de": [
+      11,
+      12
+    ],
+    "language:en": [
+      204,
+      233
+    ],
+    "region:CA": [
+      7,
+      8
+    ],
+    "region:CZ": [
+      13,
+      14
+    ],
+    "region:DE": [
+      3,
+      8
+    ],
+    "region:GB": [
+      15,
+      16
+    ],
+    "region:JP": [
+      6,
+      8
+    ],
+    "region:KR": [
+      3,
+      4
+    ],
+    "region:unknown": [
+      176,
+      195
+    ]
+  }
+}

@@ -1,0 +1,445 @@
+{
+  "note": "Golden cases for the model techniques. Each case is a story and what a model returned for it; the expected value is what the code must keep after verification. They test the checking code, not the model, so they run without a key. Written by the coding assistant (an AI model), not reviewed by a human.",
+  "extraction": [
+    {
+      "id": "ex-quote-in-text",
+      "items": [{"id": 1, "headline": "Acme raises 2026 outlook", "body": "Acme Corp raised its full-year revenue guidance to $12.4 billion on Tuesday."}],
+      "raw": {"event_type": "guidance_change", "action": "raised guidance", "status": "official",
+              "magnitude": {"value": 12.4, "unit": "USD billion", "text": "$12.4 billion"},
+              "key_claims": [{"text": "Acme raised guidance", "item_id": 1, "span": "raised its full-year revenue guidance to $12.4 billion"}]},
+      "expect": {"claims": 1, "magnitude": true, "event_type": "guidance_change"}
+    },
+    {
+      "id": "ex-invented-quote",
+      "items": [{"id": 1, "headline": "Acme raises 2026 outlook", "body": "Acme Corp raised its full-year revenue guidance on Tuesday."}],
+      "raw": {"event_type": "guidance_change", "action": "raised guidance", "status": "official",
+              "key_claims": [{"text": "Acme will double output", "item_id": 1, "span": "Acme will double its output next year"}]},
+      "expect": {"claims": 0}
+    },
+    {
+      "id": "ex-one-bad-claim-dropped",
+      "items": [{"id": 1, "headline": "Beta to buy Gamma", "body": "Beta Ltd agreed to buy Gamma Inc for 3.1 billion euros in cash."}],
+      "raw": {"event_type": "m_and_a", "action": "acquisition", "status": "official",
+              "key_claims": [
+                {"text": "Beta buys Gamma", "item_id": 1, "span": "agreed to buy Gamma Inc for 3.1 billion euros"},
+                {"text": "Regulators object", "item_id": 1, "span": "regulators have already objected"}]},
+      "expect": {"claims": 1, "event_type": "m_and_a"}
+    },
+    {
+      "id": "ex-number-not-in-text",
+      "items": [{"id": 1, "headline": "Delta cuts dividend", "body": "Delta plc cut its quarterly dividend sharply on Monday."}],
+      "raw": {"event_type": "dividend_cut", "action": "cut dividend", "status": "official",
+              "magnitude": {"value": 40, "unit": "%", "text": "40%"},
+              "key_claims": [{"text": "Dividend cut", "item_id": 1, "span": "cut its quarterly dividend sharply"}]},
+      "expect": {"claims": 1, "magnitude": false}
+    },
+    {
+      "id": "ex-unknown-event-type",
+      "items": [{"id": 1, "headline": "Epsilon opens a plant", "body": "Epsilon SA opened a new battery plant in Poland."}],
+      "raw": {"event_type": "plant_opening", "action": "opened plant", "status": "reported",
+              "key_claims": [{"text": "Plant opened", "item_id": 1, "span": "opened a new battery plant in Poland"}]},
+      "expect": {"claims": 1, "event_type": "other"}
+    },
+    {
+      "id": "ex-bad-date-dropped",
+      "items": [{"id": 1, "headline": "Zeta CEO resigns", "body": "Zeta Group's chief executive resigned effective next month."}],
+      "raw": {"event_type": "management_change", "action": "CEO resigns", "status": "official",
+              "effective": "next month", "occurred": "2026-10-09",
+              "key_claims": [{"text": "CEO resigns", "item_id": 1, "span": "chief executive resigned effective next month"}]},
+      "expect": {"claims": 1, "effective": null, "occurred": "2026-10-09"}
+    },
+    {
+      "id": "ex-claim-on-an-item-outside-the-story-is-rejected",
+      "items": [{"id": 1, "headline": "Eta wins contract", "body": "Eta Corp won a 500 million dollar defence contract."},
+                {"id": 2, "headline": "Eta contract details", "body": "The award runs for five years."}],
+      "raw": {"event_type": "product_business", "action": "contract win", "status": "reported",
+              "key_claims": [{"text": "Five-year award", "item_id": 99, "span": "The award runs for five years"}]},
+      "expect": {"claims": 0}
+    },
+    {
+      "id": "ex-case-and-spacing-tolerated",
+      "items": [{"id": 1, "headline": "Theta results", "body": "Theta   reported  quarterly profit of 1.2 billion dollars."}],
+      "raw": {"event_type": "earnings_release", "action": "results", "status": "official",
+              "key_claims": [{"text": "Profit", "item_id": 1, "span": "Theta reported quarterly profit of 1.2 billion dollars"}]},
+      "expect": {"claims": 1}
+    }
+  ],
+  "framing": [
+    {
+      "id": "fr-kept",
+      "items": [{"id": 1, "headline": "Omega recalls cars", "body": "Omega recalled 40,000 cars over a brake fault, the company said."},
+                {"id": 2, "headline": "Omega brake recall", "body": "Omega said it will recall 40,000 vehicles because of faulty brakes."}],
+      "raw": {"agreement": "agree", "outlets": [
+        {"item_id": 1, "headline_claim": "Omega recalls 40,000 cars", "numbers_cited": ["40,000"], "quotes": ["recalled 40,000 cars over a brake fault"]},
+        {"item_id": 2, "headline_claim": "Omega recalls 40,000 vehicles", "numbers_cited": ["40,000"], "quotes": ["will recall 40,000 vehicles"]}]},
+      "expect": {"outlets": 2, "agreement": "agree", "quotes": [1, 1]}
+    },
+    {
+      "id": "fr-invented-quote-and-number-dropped",
+      "items": [{"id": 1, "headline": "Pi cuts jobs", "body": "Pi will cut 300 jobs in Ohio."},
+                {"id": 2, "headline": "Pi layoffs", "body": "Pi confirmed layoffs at its Ohio plant."}],
+      "raw": {"agreement": "agree", "outlets": [
+        {"item_id": 1, "headline_claim": "Pi cuts 300 jobs", "numbers_cited": ["300", "5,000"], "quotes": ["Pi will cut 300 jobs", "the CEO called it painful"]},
+        {"item_id": 2, "headline_claim": "Pi confirms layoffs"}]},
+      "expect": {"outlets": 2, "quotes": [1, 0], "numbers": [1, 0]}
+    },
+    {
+      "id": "fr-one-outlet-is-not-a-comparison",
+      "items": [{"id": 1, "headline": "Rho sells unit", "body": "Rho agreed to sell its unit."},
+                {"id": 2, "headline": "Rho news", "body": "Rho agreed to sell."}],
+      "raw": {"agreement": "agree", "outlets": [
+        {"item_id": 1, "headline_claim": "Rho sells unit"},
+        {"item_id": 99, "headline_claim": "Rho sells unit again"}]},
+      "expect": {"none": true}
+    },
+    {
+      "id": "fr-conflict-without-a-named-conflict-becomes-agree",
+      "items": [{"id": 1, "headline": "Sigma profit", "body": "Sigma profit rose."},
+                {"id": 2, "headline": "Sigma earnings", "body": "Sigma earnings rose."}],
+      "raw": {"agreement": "conflict", "outlets": [
+        {"item_id": 1, "headline_claim": "Profit rose"}, {"item_id": 2, "headline_claim": "Earnings rose"}]},
+      "expect": {"outlets": 2, "agreement": "agree"}
+    }
+  ],
+  "claims": [
+    {
+      "id": "cl-supported-with-quote",
+      "items": [{"id": 1, "headline": "Tau annual report", "body": "Tau reported revenue of 8.1 billion euros for the year.", "evidence_kind": "primary_filing"}],
+      "claims": ["Tau revenue was 8.1 billion euros"],
+      "raw": [{"claim_index": 0, "verdict": "supported", "primary_item_id": 1, "quote": "Tau reported revenue of 8.1 billion euros for the year"}],
+      "expect": ["supported"]
+    },
+    {
+      "id": "cl-quote-not-in-document",
+      "items": [{"id": 1, "headline": "Tau annual report", "body": "Tau reported revenue of 8.1 billion euros for the year.", "evidence_kind": "primary_filing"}],
+      "claims": ["Tau revenue was 8.1 billion euros"],
+      "raw": [{"claim_index": 0, "verdict": "supported", "primary_item_id": 1, "quote": "Tau revenue was exactly 8.1 billion euros"}],
+      "expect": ["unverified"]
+    },
+    {
+      "id": "cl-claim-number-not-in-document",
+      "items": [{"id": 1, "headline": "Upsilon filing", "body": "Upsilon reported revenue of 4 billion dollars.", "evidence_kind": "regulator"}],
+      "claims": ["Upsilon revenue was 5 billion dollars"],
+      "raw": [{"claim_index": 0, "verdict": "supported", "primary_item_id": 1, "quote": "Upsilon reported revenue of 4 billion dollars"}],
+      "expect": ["unverified"]
+    },
+    {
+      "id": "cl-a-media-item-is-not-a-primary-document",
+      "items": [{"id": 1, "headline": "Phi blog", "body": "Phi reported profit of 2 billion dollars.", "evidence_kind": "media"}],
+      "claims": ["Phi profit was 2 billion dollars"],
+      "raw": [{"claim_index": 0, "verdict": "supported", "primary_item_id": 1, "quote": "Phi reported profit of 2 billion dollars"}],
+      "expect": ["unverified"]
+    },
+    {
+      "id": "cl-contradicted-keeps-quote",
+      "items": [{"id": 1, "headline": "Chi notice", "body": "Chi did not agree to any takeover offer, the notice states.", "evidence_kind": "company_release"}],
+      "claims": ["Chi accepted the takeover offer"],
+      "raw": [{"claim_index": 0, "verdict": "contradicted", "primary_item_id": 1, "quote": "Chi did not agree to any takeover offer"}],
+      "expect": ["contradicted"]
+    },
+    {
+      "id": "cl-missing-verdict-is-unverified",
+      "items": [{"id": 1, "headline": "Psi notice", "body": "Psi paid a dividend.", "evidence_kind": "company_release"}],
+      "claims": ["Psi paid a dividend", "Psi raised its dividend"],
+      "raw": [],
+      "expect": ["unverified", "unverified"]
+    }
+  ],
+  "sentiment": [
+    {
+      "id": "se-kept",
+      "items": [{"id": 1, "headline": "Iota beats", "body": "Iota shares surged after it beat profit forecasts by a wide margin."}],
+      "raw": [{"entity": "Iota", "direction": "positive", "strength": 0.8, "item_id": 1, "span": "Iota shares surged after it beat profit forecasts"}],
+      "expect": {"aspects": 1, "intensity": 0.8}
+    },
+    {
+      "id": "se-span-not-in-item",
+      "items": [{"id": 1, "headline": "Kappa slips", "body": "Kappa shares slipped in quiet trade."}],
+      "raw": [{"entity": "Kappa", "direction": "negative", "strength": 0.9, "item_id": 1, "span": "Kappa faces a fraud probe"}],
+      "expect": {"aspects": 0, "intensity": 0.0}
+    },
+    {
+      "id": "se-strength-clamped",
+      "items": [{"id": 1, "headline": "Lambda jumps", "body": "Lambda stock jumped on takeover talk."}],
+      "raw": [{"entity": "Lambda", "direction": "positive", "strength": 3.5, "item_id": 1, "span": "Lambda stock jumped on takeover talk"}],
+      "expect": {"aspects": 1, "intensity": 1.0}
+    },
+    {
+      "id": "se-neutral-has-no-strength",
+      "items": [{"id": 1, "headline": "Mu holds", "body": "Mu kept its rating unchanged on Friday."}],
+      "raw": [{"entity": "Mu", "direction": "neutral", "strength": 0.7, "item_id": 1, "span": "Mu kept its rating unchanged"}],
+      "expect": {"aspects": 1, "intensity": 0.0}
+    },
+    {
+      "id": "se-one-reading-per-entity",
+      "items": [{"id": 1, "headline": "Nu falls", "body": "Nu fell sharply. Nu also warned on margins."}],
+      "raw": [{"entity": "Nu", "direction": "negative", "strength": 0.4, "item_id": 1, "span": "Nu fell sharply"},
+              {"entity": "NU ", "direction": "negative", "strength": 0.7, "item_id": 1, "span": "Nu also warned on margins"}],
+      "expect": {"aspects": 1, "intensity": 0.7}
+    },
+    {
+      "id": "se-unknown-item",
+      "items": [{"id": 1, "headline": "Xi flat", "body": "Xi ended flat."}],
+      "raw": [{"entity": "Xi", "direction": "mixed", "strength": 0.5, "item_id": 7, "span": "Xi ended flat"}],
+      "expect": {"aspects": 0, "intensity": 0.0}
+    }
+  ],
+  "impact": [
+    {
+      "id": "im-direct-holding",
+      "headline": "Nova beats forecasts", "ticker": "NOVA_US_EQ",
+      "graph": {"nodes": [{"symbol": "NOVA", "weight": 0.10}], "edges": []},
+      "expect": {"chains": [["direct", "NOVA", "high"]], "direct": 0.1, "reached": 0.0, "state": "reported"}
+    },
+    {
+      "id": "im-supplier-event-reaches-held-customer",
+      "headline": "Chipco fab fire", "ticker": "CHIP_TW_EQ",
+      "graph": {"nodes": [{"symbol": "CHIP"}, {"symbol": "NOVA", "weight": 0.10}],
+                "edges": [{"supplier": "CHIP", "customer": "NOVA", "product": "chips", "share": 0.2}]},
+      "expect": {"chains": [["second_order", "NOVA", "high"]], "direct": 0.0, "reached": 0.1}
+    },
+    {
+      "id": "im-link-without-a-stated-share-is-medium",
+      "headline": "Chipco fab fire", "ticker": "CHIP_TW_EQ",
+      "graph": {"nodes": [{"symbol": "CHIP"}, {"symbol": "NOVA", "weight": 0.10}],
+                "edges": [{"supplier": "CHIP", "customer": "NOVA", "product": "chips"}]},
+      "expect": {"chains": [["second_order", "NOVA", "medium"]]}
+    },
+    {
+      "id": "im-old-link-is-low",
+      "headline": "Chipco fab fire", "ticker": "CHIP_TW_EQ",
+      "graph": {"nodes": [{"symbol": "CHIP"}, {"symbol": "NOVA", "weight": 0.10}],
+                "edges": [{"supplier": "CHIP", "customer": "NOVA", "product": "chips", "share": 0.2, "as_of": "2022-01-01"}]},
+      "expect": {"chains": [["second_order", "NOVA", "low"]]}
+    },
+    {
+      "id": "im-customer-event-reaches-held-supplier-upstream",
+      "headline": "Nova cuts orders", "ticker": "NOVA_US_EQ",
+      "graph": {"nodes": [{"symbol": "CHIP", "weight": 0.04}, {"symbol": "NOVA"}],
+                "edges": [{"supplier": "CHIP", "customer": "NOVA", "product": "chips", "share": 0.3}]},
+      "expect": {"chains": [["second_order", "CHIP", "high"]], "direct": 0.0, "reached": 0.04}
+    },
+    {
+      "id": "im-unheld-end-of-path-is-not-exposure",
+      "headline": "Chipco fab fire", "ticker": "CHIP_TW_EQ",
+      "graph": {"nodes": [{"symbol": "CHIP"}, {"symbol": "NOVA"}],
+                "edges": [{"supplier": "CHIP", "customer": "NOVA", "product": "chips", "share": 0.2}]},
+      "expect": {"chains": [], "reached": 0.0}
+    },
+    {
+      "id": "im-story-about-no-company-has-no-path",
+      "headline": "Oil prices jump",
+      "graph": {"nodes": [{"symbol": "NOVA", "weight": 0.10}], "edges": []},
+      "expect": {"chains": [], "direct": 0.0}
+    },
+    {
+      "id": "im-shared-commodity-is-an-attribute-chain",
+      "headline": "Copper surges on supply cut",
+      "extraction": {"event_type": "other", "action": "price move", "status": "reported",
+                     "affected_entities": [{"name": "Copper", "kind": "commodity", "direction": "up", "confidence": "high"}]},
+      "attributes": {"MINE": {"commodity": "copper"}, "BANK": {"sector": "banks"}},
+      "graph": {"nodes": [{"symbol": "MINE", "weight": 0.05}, {"symbol": "BANK", "weight": 0.07}], "edges": []},
+      "expect": {"chains": [["attribute", "MINE", "medium"]], "attribute": 0.05}
+    },
+    {
+      "id": "im-low-confidence-entity-gives-a-low-attribute-chain",
+      "headline": "Copper may surge",
+      "extraction": {"event_type": "other", "action": "price move", "status": "rumour",
+                     "affected_entities": [{"name": "copper", "kind": "commodity", "direction": "up", "confidence": "low"}]},
+      "attributes": {"MINE": {"commodity": "Copper"}},
+      "graph": {"nodes": [{"symbol": "MINE", "weight": 0.05}], "edges": []},
+      "expect": {"chains": [["attribute", "MINE", "low"]], "state": "rumoured"}
+    },
+    {
+      "id": "im-attribute-skips-a-holding-already-reached",
+      "headline": "Mine strike", "ticker": "MINE_US_EQ",
+      "extraction": {"event_type": "other", "action": "strike", "status": "confirmed",
+                     "affected_entities": [{"name": "copper", "kind": "commodity", "direction": "down", "confidence": "high"}]},
+      "attributes": {"MINE": {"commodity": "copper"}},
+      "graph": {"nodes": [{"symbol": "MINE", "weight": 0.05}], "edges": []},
+      "expect": {"chains": [["direct", "MINE", "high"]], "attribute": 0.0, "state": "confirmed"}
+    },
+    {
+      "id": "im-a-different-name-is-not-a-match",
+      "headline": "Copper surges",
+      "extraction": {"event_type": "other", "action": "price move", "status": "reported",
+                     "affected_entities": [{"name": "Copper", "kind": "commodity", "direction": "up", "confidence": "high"}]},
+      "attributes": {"MINE": {"commodity": "copper ore"}},
+      "graph": {"nodes": [{"symbol": "MINE", "weight": 0.05}], "edges": []},
+      "expect": {"chains": []}
+    },
+    {
+      "id": "im-primary-confirmed-story-is-a-confirmed-event",
+      "headline": "Chipco fab fire", "ticker": "CHIP_TW_EQ", "lifecycle": "primary_confirmed",
+      "graph": {"nodes": [{"symbol": "CHIP"}, {"symbol": "NOVA", "weight": 0.10}],
+                "edges": [{"supplier": "CHIP", "customer": "NOVA", "product": "chips", "share": 0.2}]},
+      "expect": {"state": "confirmed"}
+    },
+    {
+      "id": "im-path-sentence-is-attached-and-a-bad-index-dropped",
+      "headline": "Chipco fab fire", "ticker": "CHIP_TW_EQ",
+      "graph": {"nodes": [{"symbol": "CHIP"}, {"symbol": "NOVA", "weight": 0.10}],
+                "edges": [{"supplier": "CHIP", "customer": "NOVA", "product": "chips", "share": 0.2}]},
+      "notes": {"paths": [{"path_index": 0, "text": " Nova loses its chip supply. "}, {"path_index": 7, "text": "Invented path."}]},
+      "expect": {"chains": [["second_order", "NOVA", "high"]], "notes": ["Nova loses its chip supply."]}
+    },
+    {
+      "id": "im-hypothesis-kept-only-for-an-unreached-held-company",
+      "headline": "Chipco fab fire", "ticker": "CHIP_TW_EQ",
+      "graph": {"nodes": [{"symbol": "CHIP"}, {"symbol": "NOVA", "weight": 0.10}, {"symbol": "ACME", "weight": 0.03}],
+                "edges": [{"supplier": "CHIP", "customer": "NOVA", "product": "chips", "share": 0.2}]},
+      "notes": {"hypotheses": [
+        {"holding": "ACME", "via": ["Boardco"], "relation": "buys boards from Boardco", "text": "Acme may be short of boards.", "confidence": "high"},
+        {"holding": "NOVA", "via": [], "relation": "same", "text": "Duplicate of a graph path."},
+        {"holding": "GHOST", "via": [], "relation": "none", "text": "Not held."},
+        {"holding": "ACME", "via": [], "relation": "none", "text": "  "}]},
+      "expect": {"chains": [["second_order", "NOVA", "high"], ["hypothesis", "ACME", "low"]],
+                 "weights": [0.1, null], "notes": [null, "Acme may be short of boards."]}
+    }
+  ],
+  "thesis": [
+    {
+      "id": "th-strengthens-is-supports",
+      "headline": "Pear revenue up 9%",
+      "thesis": {"ticker": "PEAR", "why_owned": "Services growth", "kpis": [{"id": "rev-growth", "metric": "revenue_growth_yoy", "operator": ">=", "threshold": 5, "unit": "%"}], "exit_conditions": ["Loss of the China market"]},
+      "extraction": {"event_type": "earnings_release", "action": "results", "status": "reported", "key_claims": [{"text": "Revenue grew 9%", "item_id": 1, "span": "x"}]},
+      "raw": [{"kind": "kpi", "ref": "rev-growth", "effect": "strengthens", "reason": "Growth is above the 5% threshold.", "claim_index": 0}],
+      "expect": [["kpi", "rev-growth", "supports", "Revenue grew 9%"]]
+    },
+    {
+      "id": "th-weakening-without-a-primary-source-is-only-review",
+      "headline": "Pear loses China",
+      "thesis": {"ticker": "PEAR", "why_owned": "Services growth", "exit_conditions": ["Loss of the China market"]},
+      "extraction": {"event_type": "regulatory_legal", "action": "ban", "status": "reported", "key_claims": [{"text": "China bans Pear devices", "item_id": 1, "span": "x"}]},
+      "raw": [{"kind": "exit_condition", "ref": "Loss of the China market", "effect": "weakens", "reason": "A ban ends sales there.", "claim_index": 0}],
+      "expect": [["exit_condition", "Loss of the China market", "review", "China bans Pear devices"]]
+    },
+    {
+      "id": "th-primary-confirmed-weakening-is-a-breach",
+      "headline": "Pear loses China", "lifecycle": "primary_confirmed",
+      "thesis": {"ticker": "PEAR", "why_owned": "Services growth", "exit_conditions": ["Loss of the China market"]},
+      "extraction": {"event_type": "regulatory_legal", "action": "ban", "status": "official", "key_claims": [{"text": "China bans Pear devices", "item_id": 1, "span": "x"}]},
+      "raw": [{"kind": "exit_condition", "ref": "Loss of the China market", "effect": "weakens", "reason": "A ban ends sales there.", "claim_index": 0}],
+      "expect": [["exit_condition", "Loss of the China market", "breach", "China bans Pear devices"]]
+    },
+    {
+      "id": "th-owner-confirmation-counts-as-a-primary-source",
+      "headline": "Pear loses China", "owner_confirmed": true,
+      "thesis": {"ticker": "PEAR", "why_owned": "Services growth", "exit_conditions": ["Loss of the China market"]},
+      "extraction": {"event_type": "regulatory_legal", "action": "ban", "status": "reported", "key_claims": [{"text": "China bans Pear devices", "item_id": 1, "span": "x"}]},
+      "raw": [{"kind": "exit_condition", "ref": "Loss of the China market", "effect": "weakens", "reason": "A ban ends sales there.", "claim_index": 0}],
+      "expect": [["exit_condition", "Loss of the China market", "breach", "China bans Pear devices"]]
+    },
+    {
+      "id": "th-why-owned-is-never-a-breach",
+      "headline": "Pear services slow", "lifecycle": "primary_confirmed",
+      "thesis": {"ticker": "PEAR", "why_owned": "Services growth"},
+      "extraction": {"event_type": "earnings_release", "action": "results", "status": "official", "key_claims": [{"text": "Services growth slowed to 2%", "item_id": 1, "span": "x"}]},
+      "raw": [{"kind": "why_owned", "ref": "why_owned", "effect": "weakens", "reason": "Services is the reason for owning it.", "claim_index": 0}],
+      "expect": [["why_owned", "why_owned", "review", "Services growth slowed to 2%"]]
+    },
+    {
+      "id": "th-invented-assumption-and-neutral-are-dropped",
+      "headline": "Pear news",
+      "thesis": {"ticker": "PEAR", "why_owned": "Services growth", "kpis": [{"id": "rev-growth", "metric": "revenue_growth_yoy", "operator": ">=", "threshold": 5, "unit": "%"}]},
+      "extraction": {"event_type": "other", "action": "news", "status": "reported", "key_claims": [{"text": "A claim", "item_id": 1, "span": "x"}]},
+      "raw": [{"kind": "kpi", "ref": "margin", "effect": "weakens", "reason": "No such KPI.", "claim_index": 0},
+              {"kind": "kpi", "ref": "rev-growth", "effect": "neutral", "reason": "Not relevant.", "claim_index": 0},
+              {"kind": "exit_condition", "ref": "Anything", "effect": "weakens", "reason": "No such condition.", "claim_index": 0}],
+      "expect": []
+    },
+    {
+      "id": "th-claim-that-does-not-exist-or-no-reason-is-dropped",
+      "headline": "Pear news",
+      "thesis": {"ticker": "PEAR", "why_owned": "Services growth", "kpis": [{"id": "rev-growth", "metric": "revenue_growth_yoy", "operator": ">=", "threshold": 5, "unit": "%"}]},
+      "extraction": {"event_type": "other", "action": "news", "status": "reported", "key_claims": [{"text": "A claim", "item_id": 1, "span": "x"}]},
+      "raw": [{"kind": "kpi", "ref": "rev-growth", "effect": "weakens", "reason": "Cites claim 4.", "claim_index": 4},
+              {"kind": "kpi", "ref": "rev-growth", "effect": "weakens", "reason": "Cites claim -1.", "claim_index": -1},
+              {"kind": "kpi", "ref": "rev-growth", "effect": "weakens", "reason": "  ", "claim_index": 0}],
+      "expect": []
+    }
+  ],
+  "brief": [
+    {
+      "id": "br-rank-score",
+      "kind": "rank",
+      "rows": [
+        {"args": {"severity": 3, "exposure": 0.10, "novelty": "new"}, "expect": 0.1},
+        {"args": {"severity": 3, "exposure": 0.10, "novelty": "update"}, "expect": 0.06},
+        {"args": {"severity": 3, "exposure": 0.10, "novelty": "repeat"}, "expect": 0.0},
+        {"args": {"severity": 3, "exposure": 0.10, "novelty": "recycled"}, "expect": 0.0},
+        {"args": {"severity": 0, "exposure": 0.10, "novelty": "new"}, "expect": 0.025},
+        {"args": {"severity": 3, "exposure": 0.0, "novelty": "new"}, "expect": 0.005},
+        {"args": {"severity": 3, "exposure": 0.10, "novelty": null}, "expect": 0.1}
+      ]
+    },
+    {
+      "id": "br-rank-nudges-are-bounded",
+      "kind": "rank",
+      "rows": [
+        {"args": {"severity": 3, "exposure": 0.10, "novelty": "new", "sentiment": 1.0, "sentiment_weight": 0.2}, "expect": 0.12},
+        {"args": {"severity": 3, "exposure": 0.10, "novelty": "new", "sentiment": 5.0, "sentiment_weight": 0.2}, "expect": 0.12},
+        {"args": {"severity": 3, "exposure": 0.10, "novelty": "new", "sentiment": -1.0, "sentiment_weight": 0.2}, "expect": 0.1},
+        {"args": {"severity": 3, "exposure": 0.10, "novelty": "new", "topics": 2}, "expect": 0.11},
+        {"args": {"severity": 3, "exposure": 0.10, "novelty": "new", "topics": 10}, "expect": 0.115},
+        {"args": {"severity": 3, "exposure": 0.10, "novelty": "repeat", "sentiment": 1.0, "sentiment_weight": 0.2, "topics": 3}, "expect": 0.0}
+      ]
+    },
+    {
+      "id": "br-written-line-and-every-fallback-to-the-headline",
+      "kind": "lines",
+      "stories": [
+        {"story_id": 1, "ticker": "ACME_US_EQ", "exposure": 0.08, "items": [{"id": 11, "headline": "Acme raises guidance to 12.4 billion"}], "claims": ["Acme raised guidance to $12.4 billion"]},
+        {"story_id": 2, "ticker": "BETA_US_EQ", "items": [{"id": 21, "headline": "Beta profit up"}]},
+        {"story_id": 3, "ticker": "GAMMA_US_EQ", "items": [{"id": 31, "headline": "Gamma opens plant"}]},
+        {"story_id": 4, "ticker": "DELTA_US_EQ", "items": [{"id": 41, "headline": "Delta cuts jobs"}]},
+        {"story_id": 5, "ticker": "EPS_US_EQ", "items": [{"id": 51, "headline": "Epsilon news"}]},
+        {"story_id": 6, "ticker": "ZETA_US_EQ", "items": [{"id": 61, "headline": "Zeta news"}]}
+      ],
+      "written": [
+        {"story_id": 1, "text": " Acme raised guidance to 12.4 billion. ", "why": "It is 8% of the portfolio.", "item_ids": [11]},
+        {"story_id": 2, "text": "Beta profit up 15%", "why": "Strong.", "item_ids": [21]},
+        {"story_id": 3, "text": "Gamma opens a plant", "why": "Growth.", "item_ids": [99]},
+        {"story_id": 4, "text": "  ", "why": "Empty.", "item_ids": [41]},
+        {"story_id": 5, "text": "Epsilon makes news", "why": "No citation.", "item_ids": []}
+      ],
+      "expect": [
+        [1, true, "Acme raised guidance to 12.4 billion."],
+        [2, false, "Beta profit up"],
+        [3, false, "Gamma opens plant"],
+        [4, false, "Delta cuts jobs"],
+        [5, false, "Epsilon news"],
+        [6, false, "Zeta news"]
+      ]
+    },
+    {
+      "id": "br-a-number-in-the-why-or-watch-line-must-also-exist",
+      "kind": "lines",
+      "stories": [
+        {"story_id": 1, "ticker": "ACME_US_EQ", "items": [{"id": 11, "headline": "Acme raises guidance to 12.4 billion"}]},
+        {"story_id": 2, "ticker": "BETA_US_EQ", "items": [{"id": 21, "headline": "Beta results due 3 November"}]}
+      ],
+      "written": [
+        {"story_id": 1, "text": "Acme raised guidance", "why": "Up 20% on last year.", "item_ids": [11]},
+        {"story_id": 2, "text": "Beta reports soon", "why": "Results are due.", "watch": "The 3 November results.", "item_ids": [21]}
+      ],
+      "expect": [[1, false, "Acme raises guidance to 12.4 billion"], [2, true, "Beta reports soon"]]
+    },
+    {
+      "id": "br-morning-sections-follow-market-open-order",
+      "kind": "sections", "of": "morning",
+      "tickers": ["AAPL_US_EQ", "7203_JP_EQ", "SAP_DE_EQ", null, "0700_HK_EQ"],
+      "expect": [["Asia", ["7203_JP_EQ", "0700_HK_EQ"]], ["Europe", ["SAP_DE_EQ"]], ["Americas", ["AAPL_US_EQ"]], ["Other", [null]]]
+    },
+    {
+      "id": "br-holding-brief-is-one-list",
+      "kind": "sections", "of": "holding",
+      "tickers": ["AAPL_US_EQ", "7203_JP_EQ"],
+      "expect": [["What changed", ["AAPL_US_EQ", "7203_JP_EQ"]]]
+    },
+    {
+      "id": "br-empty-holding-brief-has-no-section",
+      "kind": "sections", "of": "holding", "tickers": [], "expect": []
+    }
+  ]
+}

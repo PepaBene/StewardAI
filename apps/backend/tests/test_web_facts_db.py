@@ -48,7 +48,7 @@ async def test_owner_decision_is_never_overwritten(backend_pool: asyncpg.Pool) -
         "approved",
         None,
         "ai",
-        "claude-sonnet-5",
+        "gpt-6.1-sol",
         job_id,
     )
     assert first is not None
@@ -68,7 +68,7 @@ async def test_owner_decision_is_never_overwritten(backend_pool: asyncpg.Pool) -
         "approved",
         None,
         "ai",
-        "claude-sonnet-5",
+        "gpt-6.1-sol",
         job_id,
     )
     assert again is None
@@ -98,7 +98,7 @@ async def test_gaps_and_supersede(backend_pool: asyncpg.Pool) -> None:
         "approved",
         None,
         "ai",
-        "claude-sonnet-5",
+        "gpt-6.1-sol",
         job_id,
     )
     # an open fact: the slot is no longer a gap to search

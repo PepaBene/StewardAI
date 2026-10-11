@@ -23,7 +23,7 @@ const FULL: ResearchProfilesConfig = {
       name: "Deep dive",
       sections: [...SECTION_IDS].reverse(),
       depth: "deep",
-      model: "claude-opus-5-5",
+      model: "gpt-6.1-sol",
       effort: "max",
       max_steps: 60,
       max_searches: 40,
@@ -38,7 +38,7 @@ const FULL: ResearchProfilesConfig = {
       name: "Screen",
       sections: ["valuation"],
       depth: "brief",
-      model: "claude-haiku-4-5",
+      model: "gpt-6-luna",
       effort: "low",
       max_steps: 1,
       max_searches: 0,
@@ -109,7 +109,7 @@ describe("research profiles form", () => {
     form.profiles[1].id = "deep-dive";
     form.profiles[0].sections = [];
     form.profiles[0].max_steps = "201";
-    form.profiles[1].model = "gpt-5";
+    form.profiles[1].model = "llama-4";
     form.profiles[1].source_tiers = [];
     form.profiles[1].name = " ";
     form.default_profile = "screen";

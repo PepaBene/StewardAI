@@ -16,10 +16,10 @@ src/
                      profiles, verification, news sources, event rules, notifications,
                      budget) + versioned store (history, diff, rollback, export/import)
     documents/       fetching source documents, HTML/PDF to text, snippet matching
-    earnings/        earnings check: locate, extract (Claude), validate, verdicts, calendar,
+    earnings/        earnings check: locate, extract (model), validate, verdicts, calendar,
                      XBRL reconciliation, owner review queue, thesis board, golden-set
                      evaluation (`python -m steward.earnings.golden`)
-    news/            news pipeline: collectors, normalise, cluster, link, classify (Claude
+    news/            news pipeline: collectors, normalise, cluster, link, classify (model
                      Haiku), corroborate, escalate (Sonnet impact notes), digest; RNS, EQS
                      and EDGAR full-text collectors; classification eval (`python -m
                      steward.news.eval`)
@@ -33,7 +33,7 @@ src/
     macro/           Eurostat, ECB and FRED series into macro_series, surprise events
     sources/         SEC EDGAR, Finnhub, OpenFIGI, ESMA, GLEIF, Wikidata, Stooq adapters
     trading212/      read-only Trading212 client (+ `python -m steward.trading212`)
-    ai.py            Anthropic client, per-step token counts
+    ai.py            per-step token counts
     costs.py         cost from the Budget config's price table
     monitor.py       alerts for failed jobs, missed runs and news coverage gaps
     heartbeat.py     worker heartbeat row + external ping (`python -m steward.heartbeat_check`)
@@ -92,7 +92,7 @@ uv run python -m steward.trading212          # print positions from the Trading2
 uv run python -m steward.trading212 --env live
 
 uv run python -m steward.earnings.golden      # golden set through validator + verdicts
-uv run python -m steward.earnings.golden --live --record runs/$(date +%F)   # measure Claude
+uv run python -m steward.earnings.golden --live --record runs/$(date +%F)   # measure the model
 uv run python -m steward.news.eval             # labelled news set through the eval harness
 uv run python -m steward.news.eval --live      # measure classification (target >= 85 %)
 
@@ -238,9 +238,9 @@ nothing); read it with `GET /alerts/free-source-trail`. Tests: `tests/test_free_
 
 - **Earnings check** (`earnings_check`, queued by `earnings_due` at report date +1, +2 and
   +4 days, or on demand). Locate: EDGAR 8-K item 2.02 or 6-K exhibit 99.1 near the report
-  date; else one Claude web search restricted to the holding profile's domains, whose answer
+  date; else one model web search restricted to the holding profile's domains, whose answer
   is used only if it was among the search results. The code fetches the document (size-capped),
-  archives the exact bytes in Storage keyed by SHA-256, and converts it to text. One Claude
+  archives the exact bytes in Storage keyed by SHA-256, and converts it to text. One model
   call (Sonnet 5 by default, set in the Jobs config) gets only that document and returns
   figures as JSON with the number as written and a verbatim snippet; it has no tools. The
   validator then checks every figure in code (see `steward/earnings/validate.py`: snippet
@@ -257,8 +257,8 @@ nothing); read it with `GET /alerts/free-source-trail`. Tests: `tests/test_free_
 - **Golden set.** `tests/golden/earnings`: 23 real releases (Apple, Microsoft, NVIDIA, SAP,
   Novo Nordisk) from EDGAR with 272 labelled figures. CI runs them with the labels as the
   extraction, which proves every correct real-world figure passes validation and every KPI
-  gets a verdict. `--live` measures Claude's extraction accuracy (Phase 2 target 95 %).
-  The labels were read by Claude and US figures cross-checked against XBRL; hand-check them
+  gets a verdict. `--live` measures the model extraction accuracy (Phase 2 target 95 %).
+  The labels were read by a model and US figures cross-checked against XBRL; hand-check them
   and add your own holdings.
 - **News pipeline** (`news_ingest`, every 2 h 06:00-22:00 Prague by default). Every enabled
   source of the news_sources config is read (so a source added there is read on the next
@@ -365,7 +365,7 @@ nothing); read it with `GET /alerts/free-source-trail`. Tests: `tests/test_free_
   `conflict`, until the owner decides.
 - **Evals gate** (`evals` CI job). Extraction, classification and the claim verifier each
   have a fingerprint (prompt code, schema, default model, eval set). Unchanged since
-  `evals/baseline.json`: no API call. Changed: with the `ANTHROPIC_API_KEY` repository
+  `evals/baseline.json`: no API call. Changed: with the `GOOGLE_API_KEY` repository
   secret the live eval runs and fails below its target (98 %, 85 %, 100 %) or one point
   below the recorded score; without the secret the change fails as unmeasured, until a
   live run is recorded with `--write-baseline`. Before a baseline exists, a run without the

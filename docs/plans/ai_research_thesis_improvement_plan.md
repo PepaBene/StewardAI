@@ -1,7 +1,7 @@
 # AI research and thesis creation improvement plan
 
 **Status:** research-backed proposal  
-**Date:** 2026-09-30  
+**Date:** 2026-09-30 (status refreshed 2026-10-10)  
 **Scope:** Deep research, thesis creation/review, research chat, and configurable AI analysis in StewardAI
 
 ## Executive recommendation
@@ -11,6 +11,25 @@ Build one **grounded research workflow** over StewardAI’s existing domain serv
 The repository already documents substantial foundations: research and chat are queued worker jobs; research profiles configure sections, depth, model, search/step budgets, allowed source tiers, peers and output language; the research report separates code-written and model-written sections; valuation figures are computed in code; citations resolve to stored sources; and the worker checkpoints AI steps. The backend has dedicated `steward.research` and `steward.chat` packages, `research_routes.py` and `chat_routes.py`, configurable research profiles and prompts, as well as an existing report and thesis UI. The technical product description also calls for strategy-aware research, reports on non-held tickers, chat that can answer from database facts, and claim-level citations.
 
 The main improvement is to make these capabilities comprehensive and reliable across **all relevant backend data**, general research questions, and user-defined output formats. Avoid passing the whole database to the model. Expose a versioned catalog of typed, bounded, auditable read tools, then build an evidence-linked report that can be reproduced and checked.
+
+## Status after the disclosure, Morningstar, quant and news work (verified in code, 2026-10-10)
+
+The four data plans are implemented, which changes the starting point of every phase below. The phases keep their scope; this table says what is already in place and what is left.
+
+| Phase | State | What exists / what remains |
+|---|---|---|
+| 0 Baseline | Partial | Exists: claim-verifier eval set (`verify/eval.py`, `evals_gate.py`, replay and feedback in `verify/`), news golden sets and an eval gate (`news/eval*.py`, `tests/golden`). Remains: a capability map of tools vs datasets (the chat tool list in the [agentic plan](agentic_workflows_and_rag_plan.md) is the start), the 30–50 research/chat cases, and per-run traces of retrieval, web queries and cost by step. |
+| 1 Typed data access | Partial | Exists: `data_context/` read models with `known_as_of` point-in-time cutoffs (country, industry, company, and `evidence.py` for positions, insiders, deals, dependencies, consensus, filed notes); research `gather` now writes ownership/13F, relationships, risk and liquidity sections from stored records; chat tools grew from 7 to 15 (stress test, theme exposure, event paths, fund overlap, performance attribution, decision scorecard, news wire and story threads). Remains: chat tools for insider/13F/consensus/deal evidence, price and risk history, fundamentals and valuation, macro, strategy rules and transactions; one uniform `source_id`/`as_of`/missing-vs-zero envelope across all tools. |
+| 2 Planning and web quality | Not started | Research is still a fixed chain with a gap finder (`research/gaps.py`) and source-tier-limited web search; there is no planner schema, no deep-mode query iteration, and no counter-evidence search step. Profiles already control sections, depth, tiers, peers, language and budgets. |
+| 3 Output and thesis authoring | Partial | Exists: configurable profile sections (code-written vs model-written split), a thesis first-draft generator (`thesis/draft.py`: facts-only prompt, lines that cite no fact are dropped, nothing saved until the owner edits), bear case, per-figure sources and server-side PDF (Morningstar plan). Remains: separate report templates from profiles, versioned template schemas, thesis *update* proposals as field-by-field diffs, immutable snapshots of template/profile/prompt/strategy versions per run. |
+| 4 Claim grounding | Partial | Exists: sentence-level source IDs, claim verifier over every model sentence, "insufficient evidence" path, code-owned numbers. Remains: typed claim ledger (fact / calculation / interpretation / forecast), strategy-rule status per claim, confidence tied to evidence coverage. The news engine has its own claim checks (`news/claims.py`) that could share the ledger format. |
+| 5 Security and eval | Partial | Exists: read-only tool design, owner-confirmed `propose_job`, budget guard and routing, redaction. Remains: injected-article regression case, retention/deletion controls for traces, research-specific regression gates on prompt/model/tool changes. |
+
+Cross-plan notes:
+
+- Retrieval over prose is covered by the [agentic and RAG plan](agentic_workflows_and_rag_plan.md) (AG2), not here. News already has multilingual embeddings and semantic search; filings, reports and theses do not.
+- Research profiles and prompts are model-routed through `llm/routing`; keep the "adapter so the provider can change" rule in Phase 2 pointed at that layer.
+- News-derived thesis links, impact chains and framing-conflict flags exist in the news engine; Phase 4's "disconfirming evidence" step should consume them rather than re-search.
 
 ## Current architecture and product intent
 
@@ -22,7 +41,7 @@ From the repository’s technical description and code layout:
 - Existing reports and UI handle structured research sections, valuation, sentence-level source IDs and source cards. The app also stores strategy, per-holding theses/KPIs, prompts and configuration history.
 - Chat is intended to query backend data, search/fetch the web, answer with sources, and start a job when the question merits a longer report.
 
-Relevant implementation areas include `apps/backend/src/steward/research/`, `apps/backend/src/steward/chat/`, `apps/backend/src/steward/config/research.py`, `apps/backend/src/api/research_routes.py`, `apps/backend/src/api/chat_routes.py`, and `apps/web/src/lib/research/report.ts`. During implementation, inventory actual read tools, source records, schemas and profile validation against this plan before changing them; this plan does not assume every capability described in the product document is fully implemented in the current runtime.
+Relevant implementation areas include `apps/backend/src/steward/research/`, `apps/backend/src/steward/chat/`, `apps/backend/src/steward/config/research.py`, `apps/backend/src/api/research_routes.py`, `apps/backend/src/api/chat_routes.py`, and `apps/web/src/lib/research/report.ts`. Since this section was written, `steward.data_context`, `steward.thesis`, `steward.verify`, `steward.decision`, `steward.news` (analysis engine, wire, embeddings) and `steward.events` have been added or grown; see the status table above. During implementation, inventory actual read tools, source records, schemas and profile validation against this plan before changing them; this plan does not assume every capability described in the product document is fully implemented in the current runtime.
 
 ## Research findings
 

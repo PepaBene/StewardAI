@@ -6263,6 +6263,116 @@
         }
       }
     },
+    "/stories/{story_id}/evidence": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Story Evidence",
+        "description": "Why a story is linked, confirmed, disputed or corrected: its items with their\nprovenance kind, independence group and link reasons, and every lifecycle change with the\nevidence behind it.",
+        "operationId": "get_story_evidence",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "story_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Story Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryEvidence"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stories/{story_id}/close": {
+      "post": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Close Story",
+        "description": "Close a story (lifecycle `resolved`) or reopen it.",
+        "operationId": "close_story",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "story_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Story Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoryClosing"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryEvidence"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/news/event-types": {
       "get": {
         "tags": [
@@ -6709,6 +6819,946 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/jobs/news-analysis": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run News Analysis",
+        "description": "Analyse recent stories now: novelty, threads, market context, themes and the model\ntechniques selected in the news settings.",
+        "operationId": "run_news_analysis",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/news-brief": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run News Brief",
+        "description": "Write the morning brief now (on a Monday also the weekly and per-holding briefs).",
+        "operationId": "run_news_brief",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/stories/{story_id}/analysis": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Story Analysis",
+        "description": "What the analysis engine found for a story: the extracted event with its cited claims,\nnovelty, impact chains onto the portfolio, thread step, framing comparison, claim check,\nmarket context and thesis links. A technique that has not run (or is off) is null.",
+        "operationId": "get_story_analysis",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "story_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Story Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryAnalysis"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/threads": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Threads",
+        "description": "Developing situations with their story counts, newest update first.",
+        "operationId": "get_threads",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                  "examples": [
+                    "AAPL_US_EQ"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "quiet",
+                    "closed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ThreadOut"
+                  },
+                  "title": "Response Get Threads"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/threads/{thread_id}": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Thread",
+        "description": "A thread's timeline: each story with what it added to the thread.",
+        "operationId": "get_thread",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wire": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Wire",
+        "description": "Every fresh item from every enabled source, linked to a holding or not, newest first.",
+        "operationId": "get_wire",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "region",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Region"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 8
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language"
+            }
+          },
+          {
+            "name": "outlet",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outlet"
+            }
+          },
+          {
+            "name": "tier",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 3,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tier"
+            }
+          },
+          {
+            "name": "topic",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Topic"
+            }
+          },
+          {
+            "name": "linked",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Linked"
+            }
+          },
+          {
+            "name": "paywall",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "metered",
+                    "hard"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Paywall"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "before_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 9223372036854775807,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WirePage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/news/briefs": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Briefs",
+        "description": "Written briefs, newest first. Every line cites stored news items.",
+        "operationId": "get_briefs",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "morning",
+                    "weekly",
+                    "holding",
+                    "region",
+                    "theme"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                  "examples": [
+                    "AAPL_US_EQ"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BriefOut"
+                  },
+                  "title": "Response Get Briefs"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/news/themes": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Themes",
+        "description": "Daily wire and story counts per portfolio watch theme, with regime flags.",
+        "operationId": "get_themes",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "default": 14,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ThemeDay"
+                  },
+                  "title": "Response Get Themes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/news/event-study": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Event Study",
+        "description": "What stories of each type, region and outlet tier were followed by, from the owner's own\nhistory: the median abnormal 3-day move with quartiles and the number of stories. A\ndescription of the past, not a forecast.",
+        "operationId": "get_event_study",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StudyRow"
+                  },
+                  "type": "array",
+                  "title": "Response Get Event Study"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/news/ops": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get News Ops",
+        "description": "What the news jobs cost over the window, the cost per useful event, the owner's marks,\nand the incidents to review: severe stories nobody was alerted to, and alerts marked not\nuseful.",
+        "operationId": "get_news_ops",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 30,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpsReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/news/ops/incidents/{story_id}": {
+      "put": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Put Incident Status",
+        "description": "Acknowledge or resolve an incident from the ops report. A resolved incident leaves the\nreport; an acknowledged one stays, marked as seen. Only a story that is an incident of that\nkind is accepted.",
+        "operationId": "put_incident_status",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "story_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Story Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/news/marks/candidates": {
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get Mark Candidates",
+        "description": "Items and stories the owner marked as wrong, as benchmark cases with `expected` left\nempty. The owner labels them and adds them to the benchmark file; nothing here changes\nthe benchmark or any model.",
+        "operationId": "get_mark_candidates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CandidateCase"
+                  },
+                  "title": "Response Get Mark Candidates"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/news/feedback": {
+      "post": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Post News Feedback",
+        "description": "Mark an item, story, claim or brief line (wrong entity, duplicate, misread, missing\nsource, useful, not useful). Feedback feeds the benchmark, never model training.",
+        "operationId": "post_news_feedback",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewsFeedbackIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewsFeedbackOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "news"
+        ],
+        "summary": "Get News Feedback",
+        "operationId": "get_news_feedback",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "target",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "item",
+                    "story",
+                    "claim",
+                    "brief_line"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Target"
+            }
+          },
+          {
+            "name": "target_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Target Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NewsFeedbackOut"
+                  },
+                  "title": "Response Get News Feedback"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/jobs/digest": {
@@ -26898,6 +27948,53 @@
         ],
         "title": "AdjustedReturnCoverage"
       },
+      "AffectedEntity": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "company",
+              "sector",
+              "country",
+              "commodity",
+              "currency",
+              "rate"
+            ],
+            "title": "Kind"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "mixed",
+              "unclear"
+            ],
+            "title": "Direction"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Confidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "direction",
+          "confidence"
+        ],
+        "title": "AffectedEntity"
+      },
       "AggregateReport": {
         "properties": {
           "as_of": {
@@ -27028,13 +28125,14 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "description": "Judges each suggestion from the evidence given.",
-            "default": "claude-sonnet-5",
+            "default": "gpt-6.1-sol",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "effort": {
@@ -27054,7 +28152,7 @@
               }
             ],
             "title": "Effort",
-            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+            "description": "Unset: effort is not sent and the model's default applies."
           },
           "listings": {
             "type": "boolean",
@@ -27141,6 +28239,67 @@
         "title": "AiApprovalSettings",
         "description": "AI approval of suggested listings and peers. Nothing waits for a click; every decision\nis recorded with its reasons and the owner can overturn it (an owner decision is final)."
       },
+      "AiSearchCost": {
+        "properties": {
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "searches": {
+            "type": "integer",
+            "title": "Searches"
+          },
+          "cost_usd": {
+            "type": "number",
+            "title": "Cost Usd"
+          },
+          "leads": {
+            "type": "integer",
+            "title": "Leads",
+            "description": "Verified leads the model returned."
+          },
+          "new_items": {
+            "type": "integer",
+            "title": "New Items",
+            "description": "Leads stored as new wire items (the rest were known)."
+          },
+          "cost_per_search": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per Search"
+          },
+          "cost_per_new_item": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per New Item",
+            "description": "Null while the lane has stored no new item."
+          }
+        },
+        "type": "object",
+        "required": [
+          "runs",
+          "searches",
+          "cost_usd",
+          "leads",
+          "new_items",
+          "cost_per_search",
+          "cost_per_new_item"
+        ],
+        "title": "AiSearchCost",
+        "description": "What the AI search lane spent against what it brought in, from the job steps."
+      },
       "AlertDigestGroupOut": {
         "properties": {
           "ticker": {
@@ -27180,6 +28339,44 @@
           "latest_known_at"
         ],
         "title": "AlertDigestGroupOut"
+      },
+      "AlertLatency": {
+        "properties": {
+          "alerts": {
+            "type": "integer",
+            "title": "Alerts"
+          },
+          "p50_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Minutes",
+            "description": "Median minutes from the first item's publication to the alert being sent."
+          },
+          "p95_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alerts",
+          "p50_minutes",
+          "p95_minutes"
+        ],
+        "title": "AlertLatency"
       },
       "AlertOut": {
         "properties": {
@@ -27427,6 +28624,40 @@
           "failed"
         ],
         "title": "AlertScanOut"
+      },
+      "AlertVolume": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "direct": {
+            "type": "integer",
+            "title": "Direct"
+          },
+          "indirect": {
+            "type": "integer",
+            "title": "Indirect",
+            "description": "Alerts for stories that reached the holding only through an indirect link."
+          },
+          "per_day": {
+            "type": "number",
+            "title": "Per Day"
+          },
+          "indirect_per_day": {
+            "type": "number",
+            "title": "Indirect Per Day"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "direct",
+          "indirect",
+          "per_day",
+          "indirect_per_day"
+        ],
+        "title": "AlertVolume"
       },
       "AlertWhyOut": {
         "properties": {
@@ -29851,6 +31082,13 @@
             "enum": [
               "rns",
               "eqs",
+              "tdnet",
+              "hkex",
+              "cninfo",
+              "dart",
+              "gazette",
+              "fca_nsm",
+              "filings",
               "any"
             ],
             "title": "Service",
@@ -29861,7 +31099,7 @@
             "maxLength": 200,
             "minLength": 1,
             "title": "Pattern",
-            "description": "Case-insensitive regular expression matched against the announcement type (RNS: the headline, e.g. 'Final Results'; EQS: the category, e.g. 'Ad-hoc')."
+            "description": "Case-insensitive regular expression matched against the announcement type (RNS: the headline, e.g. 'Final Results'; EQS: the category, e.g. 'Ad-hoc'; TDnet, CNINFO, DART and HKEX: the title in the filing's own language)."
           },
           "event_type": {
             "anyOf": [
@@ -30179,6 +31417,46 @@
           "compared"
         ],
         "title": "AreaCount"
+      },
+      "Aspect": {
+        "properties": {
+          "entity": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Entity"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "positive",
+              "negative",
+              "mixed",
+              "neutral"
+            ],
+            "title": "Direction"
+          },
+          "strength": {
+            "type": "number",
+            "title": "Strength"
+          },
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "span": {
+            "type": "string",
+            "title": "Span"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity",
+          "direction",
+          "strength",
+          "item_id",
+          "span"
+        ],
+        "title": "Aspect"
       },
       "Assumptions": {
         "properties": {
@@ -32811,6 +34089,219 @@
         ],
         "title": "BridgeOut"
       },
+      "BriefBody": {
+        "properties": {
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/BriefSection"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "suppressed": {
+            "type": "integer",
+            "title": "Suppressed",
+            "default": 0
+          },
+          "generated_without_model": {
+            "type": "boolean",
+            "title": "Generated Without Model",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "sections"
+        ],
+        "title": "BriefBody"
+      },
+      "BriefLine": {
+        "properties": {
+          "story_id": {
+            "type": "integer",
+            "title": "Story Id"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "why": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why"
+          },
+          "watch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Watch"
+          },
+          "item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Item Ids"
+          },
+          "severity": {
+            "type": "integer",
+            "title": "Severity"
+          },
+          "lifecycle": {
+            "type": "string",
+            "title": "Lifecycle"
+          },
+          "novelty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Novelty"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "alert_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert Score"
+          },
+          "written_by_model": {
+            "type": "boolean",
+            "title": "Written By Model",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "story_id",
+          "ticker",
+          "text",
+          "item_ids",
+          "severity",
+          "lifecycle",
+          "score"
+        ],
+        "title": "BriefLine"
+      },
+      "BriefOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "morning",
+              "weekly",
+              "holding",
+              "region",
+              "theme"
+            ],
+            "title": "Kind"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "period_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Period End"
+          },
+          "body": {
+            "$ref": "#/components/schemas/BriefBody"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "ticker",
+          "period_start",
+          "period_end",
+          "body",
+          "model",
+          "created_at"
+        ],
+        "title": "BriefOut"
+      },
+      "BriefSection": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/BriefLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "lines"
+        ],
+        "title": "BriefSection"
+      },
       "Bucket": {
         "properties": {
           "key": {
@@ -33035,13 +34526,14 @@
           },
           "downgrade_model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Downgrade Model",
             "description": "The model non-critical requests use at the cap (`downgrade_noncritical`).",
-            "default": "claude-haiku-4-5",
+            "default": "gpt-6-luna",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "critical_job_types": {
@@ -33100,6 +34592,10 @@
                 "twelve_data_corporate_actions",
                 "ai_approvals",
                 "ir_discovery",
+                "news_ai_search",
+                "news_triage",
+                "news_analysis",
+                "news_brief",
                 "gap_research",
                 "exposure_build",
                 "factor_returns",
@@ -33174,6 +34670,10 @@
                 "twelve_data_corporate_actions",
                 "ai_approvals",
                 "ir_discovery",
+                "news_ai_search",
+                "news_triage",
+                "news_analysis",
+                "news_brief",
                 "gap_research",
                 "exposure_build",
                 "factor_returns",
@@ -33202,6 +34702,84 @@
             ],
             "title": "Default Job Cap Usd",
             "description": "Most AI spend of one run of a job type not in `per_job_cap_usd`. Null: no cap."
+          },
+          "per_job_monthly_cap_usd": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "propertyNames": {
+              "enum": [
+                "portfolio_sync",
+                "earnings_check",
+                "thesis_verdicts",
+                "earnings_calendar",
+                "earnings_calendar_full",
+                "earnings_due",
+                "fact_reconcile",
+                "reference_data",
+                "price_history",
+                "intraday_prices",
+                "holiday_refresh",
+                "macro_collect",
+                "public_data_collect",
+                "source_audit",
+                "event_escalation",
+                "monitor",
+                "news_ingest",
+                "daily_digest",
+                "weekly_digest",
+                "research",
+                "ownership_13f",
+                "insider_trades",
+                "etf_look_through",
+                "monthly_review",
+                "chat",
+                "sec_xbrl",
+                "valuation_refresh",
+                "control_stakes",
+                "nport_holdings",
+                "fund_probes",
+                "fund_characteristics_audit",
+                "fund_issuer_facts",
+                "free_source_alerts",
+                "change_alerts",
+                "shadow_snapshot",
+                "shadow_report",
+                "raw_retention",
+                "zero_cost_gate",
+                "returns_refresh",
+                "exchange_probes",
+                "ir_releases",
+                "sec_fsds_backfill",
+                "pdmr_uk",
+                "graph_review",
+                "fmp_company",
+                "alpha_vantage_statements",
+                "epo_patents",
+                "companies_house_filings",
+                "edinet_filings",
+                "twelve_data_corporate_actions",
+                "ai_approvals",
+                "ir_discovery",
+                "news_ai_search",
+                "news_triage",
+                "news_analysis",
+                "news_brief",
+                "gap_research",
+                "exposure_build",
+                "factor_returns",
+                "disclosure_sources",
+                "disclosure_ingest",
+                "disclosure_identifiers",
+                "disclosure_deals",
+                "disclosure_esef",
+                "disclosure_estimates",
+                "disclosure_alerts"
+              ]
+            },
+            "type": "object",
+            "title": "Per Job Monthly Cap Usd",
+            "description": "Most AI spend of one job type per calendar month (Europe/Prague), in USD, so one stage cannot use the whole monthly budget. A run over it fails before its next request, whatever its criticality."
           }
         },
         "additionalProperties": false,
@@ -33370,6 +34948,119 @@
           "realised_volatility"
         ],
         "title": "CalibrationOut"
+      },
+      "CandidateCase": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "mark": {
+            "type": "string",
+            "title": "Mark"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "marked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Marked At"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "outlet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlet"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          },
+          "candidates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "expected": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected",
+            "description": "Left empty on purpose: the owner supplies the right answer."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "mark",
+          "note",
+          "marked_at",
+          "headline",
+          "summary",
+          "outlet",
+          "published_at"
+        ],
+        "title": "CandidateCase"
       },
       "CapitalAllocation": {
         "properties": {
@@ -34842,12 +36533,13 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
-            "default": "claude-sonnet-5",
+            "default": "gpt-6.1-sol",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "effort": {
@@ -34867,7 +36559,7 @@
               }
             ],
             "title": "Effort",
-            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+            "description": "Unset: effort is not sent and the model's default applies."
           },
           "rules_first": {
             "type": "boolean",
@@ -34880,7 +36572,7 @@
             "maximum": 100.0,
             "minimum": 1.0,
             "title": "Max Steps",
-            "description": "Claude calls plus tool rounds per answer.",
+            "description": "Model calls plus tool rounds per answer.",
             "default": 30
           },
           "max_searches": {
@@ -34975,6 +36667,62 @@
           "tolerance"
         ],
         "title": "CheckOut"
+      },
+      "CheckedClaim": {
+        "properties": {
+          "claim": {
+            "type": "string",
+            "title": "Claim"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "supported",
+              "contradicted",
+              "unverified"
+            ],
+            "title": "Verdict"
+          },
+          "primary_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Url"
+          },
+          "primary_outlet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Outlet"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim",
+          "verdict"
+        ],
+        "title": "CheckedClaim"
       },
       "Checklist": {
         "properties": {
@@ -35582,12 +37330,13 @@
           },
           "model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
-            "default": "claude-haiku-4-5",
+            "default": "gpt-6-luna",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "effort": {
@@ -35607,7 +37356,7 @@
               }
             ],
             "title": "Effort",
-            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+            "description": "Unset: effort is not sent and the model's default applies."
           },
           "mode": {
             "type": "string",
@@ -35655,6 +37404,22 @@
         "type": "object",
         "title": "ClaimVerifierSettings",
         "description": "The claim verifier (layer 4): every model-written sentence is checked against the\nsnippets it cites before a report is stored or sent."
+      },
+      "ClaimsOut": {
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/CheckedClaim"
+            },
+            "type": "array",
+            "title": "Claims"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claims"
+        ],
+        "title": "ClaimsOut"
       },
       "ClosedThesis": {
         "properties": {
@@ -43067,12 +44832,13 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
-            "default": "claude-sonnet-5",
+            "default": "gpt-6.1-sol",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "effort": {
@@ -43092,7 +44858,7 @@
               }
             ],
             "title": "Effort",
-            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+            "description": "Unset: effort is not sent and the model's default applies."
           },
           "use_batch": {
             "type": "boolean",
@@ -44213,6 +45979,27 @@
         ],
         "title": "DisputedStory"
       },
+      "Divergence": {
+        "properties": {
+          "regions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Regions"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "regions",
+          "summary"
+        ],
+        "title": "Divergence"
+      },
       "DocumentVersionOut": {
         "properties": {
           "id": {
@@ -44824,13 +46611,14 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "description": "Reads report dates off IR calendar pages.",
-            "default": "claude-haiku-4-5",
+            "default": "gpt-6-luna",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "effort": {
@@ -44850,7 +46638,7 @@
               }
             ],
             "title": "Effort",
-            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+            "description": "Unset: effort is not sent and the model's default applies."
           },
           "lookahead_days": {
             "type": "integer",
@@ -44934,23 +46722,25 @@
         "properties": {
           "extraction_model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Extraction Model",
-            "default": "claude-sonnet-5",
+            "default": "gpt-6.1-sol",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "locate_model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Locate Model",
             "description": "Searches for the release when EDGAR has none (non-US issuers).",
-            "default": "claude-sonnet-5",
+            "default": "gpt-6.1-sol",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "effort": {
@@ -44982,14 +46772,14 @@
               }
             ],
             "title": "Locate Effort",
-            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+            "description": "Unset: effort is not sent and the model's default applies."
           },
           "max_steps": {
             "type": "integer",
             "maximum": 200.0,
             "minimum": 2.0,
             "title": "Max Steps",
-            "description": "Claude calls plus document fetches per run.",
+            "description": "Model calls plus document fetches per run.",
             "default": 40
           },
           "max_searches": {
@@ -45599,12 +47389,13 @@
           },
           "model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
-            "default": "claude-sonnet-5",
+            "default": "gpt-6.1-sol",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "effort": {
@@ -45624,14 +47415,14 @@
               }
             ],
             "title": "Effort",
-            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+            "description": "Unset: effort is not sent and the model's default applies."
           },
           "max_steps": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 1.0,
             "title": "Max Steps",
-            "description": "Claude calls plus web searches per escalation.",
+            "description": "Model calls plus web searches per escalation.",
             "default": 30
           },
           "max_searches": {
@@ -47608,6 +49399,92 @@
         ],
         "title": "EventTypeInfo"
       },
+      "EvidenceItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "outlet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlet"
+          },
+          "tier": {
+            "type": "integer",
+            "title": "Tier"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "description": "Provenance kind; null on items stored before N5."
+          },
+          "independence_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Independence Key",
+            "description": "Items sharing a key are one source (a wire and its republishers)."
+          },
+          "is_correction": {
+            "type": "boolean",
+            "title": "Is Correction"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/ItemLink"
+            },
+            "type": "array",
+            "title": "Links",
+            "description": "Why the item is tied to each holding."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "headline",
+          "outlet",
+          "tier",
+          "kind",
+          "independence_key",
+          "is_correction",
+          "published_at",
+          "links"
+        ],
+        "title": "EvidenceItem"
+      },
       "EvidenceLink": {
         "properties": {
           "fact_id": {
@@ -48919,13 +50796,14 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "description": "Reads annual reports for currencies and inputs.",
-            "default": "claude-sonnet-5",
+            "default": "gpt-6.1-sol",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "effort": {
@@ -48945,7 +50823,7 @@
               }
             ],
             "title": "Effort",
-            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+            "description": "Unset: effort is not sent and the model's default applies."
           },
           "filings_per_run": {
             "type": "integer",
@@ -51263,6 +53141,55 @@
         ],
         "title": "FeedbackOut"
       },
+      "FetchPolicy": {
+        "properties": {
+          "rungs": {
+            "items": {
+              "type": "integer",
+              "enum": [
+                1,
+                2,
+                3,
+                4
+              ]
+            },
+            "type": "array",
+            "title": "Rungs",
+            "description": "Ladder rungs allowed, tried in order: 1 feed text, 2 polite fetch + extractor, 3 browser render, 4 official API. Empty: headline and summary only."
+          },
+          "max_requests_per_hour": {
+            "type": "integer",
+            "maximum": 3600.0,
+            "minimum": 0.0,
+            "title": "Max Requests Per Hour",
+            "description": "Article page fetches per hour for this source.",
+            "default": 30
+          },
+          "retention_days": {
+            "type": "integer",
+            "maximum": 3650.0,
+            "minimum": 1.0,
+            "title": "Retention Days",
+            "description": "Days the extracted text is kept.",
+            "default": 90
+          },
+          "display": {
+            "type": "string",
+            "enum": [
+              "full",
+              "excerpt",
+              "link_only"
+            ],
+            "title": "Display",
+            "description": "What the app shows of the text: full, a short excerpt, or only a link. Analysis may use more than is displayed.",
+            "default": "excerpt"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FetchPolicy",
+        "description": "How far the article-text ladder (news/fulltext.py) may go for a source's items."
+      },
       "Figure": {
         "properties": {
           "value": {
@@ -52322,6 +54249,46 @@
           "source_url"
         ],
         "title": "ForwardObservationInput"
+      },
+      "FramingComparison": {
+        "properties": {
+          "outlets": {
+            "items": {
+              "$ref": "#/components/schemas/OutletFraming"
+            },
+            "type": "array",
+            "title": "Outlets"
+          },
+          "agreement": {
+            "type": "string",
+            "enum": [
+              "agree",
+              "conflict",
+              "divergent"
+            ],
+            "title": "Agreement"
+          },
+          "conflicts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Conflicts"
+          },
+          "divergences": {
+            "items": {
+              "$ref": "#/components/schemas/Divergence"
+            },
+            "type": "array",
+            "title": "Divergences"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outlets",
+          "agreement"
+        ],
+        "title": "FramingComparison"
       },
       "FredSeries": {
         "properties": {
@@ -54873,13 +56840,14 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "description": "Searches for facts and approves them.",
-            "default": "claude-sonnet-5",
+            "default": "gpt-6.1-sol",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "effort": {
@@ -54899,7 +56867,7 @@
               }
             ],
             "title": "Effort",
-            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+            "description": "Unset: effort is not sent and the model's default applies."
           },
           "slots": {
             "items": {
@@ -57784,6 +59752,26 @@
             ],
             "description": "Hand-entered per-share figures for holdings without an automatic source."
           },
+          "executives": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Executives",
+            "description": "Named executives (CEO, CFO, chair). News naming one links to the holding."
+          },
+          "brands": {
+            "items": {
+              "type": "string",
+              "maxLength": 200,
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Brands",
+            "description": "Product and brand names that are not part of the company name."
+          },
           "competitors": {
             "items": {
               "type": "string",
@@ -59316,6 +61304,142 @@
         ],
         "title": "IdentityOverride"
       },
+      "ImpactChain": {
+        "properties": {
+          "relation": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "second_order",
+              "attribute",
+              "hypothesis"
+            ],
+            "title": "Relation"
+          },
+          "holding": {
+            "type": "string",
+            "title": "Holding"
+          },
+          "chain": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Chain",
+            "description": "Company symbols from the event to the holding."
+          },
+          "links": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Links"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight",
+            "description": "Portfolio share in the holding (exposure, not a return forecast); null for a hypothesis."
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "relation",
+          "holding",
+          "chain",
+          "confidence",
+          "weight"
+        ],
+        "title": "ImpactChain"
+      },
+      "ImpactResult": {
+        "properties": {
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "chains": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactChain"
+            },
+            "type": "array",
+            "title": "Chains"
+          },
+          "direct_weight": {
+            "type": "number",
+            "title": "Direct Weight"
+          },
+          "reached_weight": {
+            "type": "number",
+            "title": "Reached Weight"
+          },
+          "attribute_weight": {
+            "type": "number",
+            "title": "Attribute Weight",
+            "description": "Portfolio share in holdings the story reaches only through a shared sector, country, currency, commodity or rate classification (no supply-chain link).",
+            "default": 0.0
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "chains",
+          "direct_weight",
+          "reached_weight"
+        ],
+        "title": "ImpactResult"
+      },
       "ImportResult": {
         "properties": {
           "saved": {
@@ -59341,6 +61465,126 @@
           "unchanged"
         ],
         "title": "ImportResult"
+      },
+      "Incident": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "`unalerted_severe` or `alert_not_useful`"
+          },
+          "story_id": {
+            "type": "integer",
+            "title": "Story Id"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "first_seen": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Seen"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "acknowledged",
+              "resolved"
+            ],
+            "title": "Status",
+            "default": "open"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "story_id",
+          "headline",
+          "ticker",
+          "severity",
+          "first_seen",
+          "reason"
+        ],
+        "title": "Incident",
+        "description": "A story the owner may need to look at: a severe one nobody was alerted to, or an alert\nthe owner marked as not useful."
+      },
+      "IncidentUpdate": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "unalerted_severe",
+              "alert_not_useful"
+            ],
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "acknowledged",
+              "resolved"
+            ],
+            "title": "Status"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "status"
+        ],
+        "title": "IncidentUpdate"
       },
       "IndexComparison": {
         "properties": {
@@ -61762,13 +64006,14 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "description": "Searches for the pages and approves them.",
-            "default": "claude-sonnet-5",
+            "default": "gpt-6.1-sol",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "effort": {
@@ -61788,7 +64033,7 @@
               }
             ],
             "title": "Effort",
-            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+            "description": "Unset: effort is not sent and the model's default applies."
           },
           "max_searches": {
             "type": "integer",
@@ -62526,6 +64771,18 @@
           "term": {
             "type": "string",
             "title": "Term"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence",
+            "description": "How sure the link is: 1 for the source or an identifier, lower for a name, lowest for a competitor, supplier, customer or topic. Null before N5."
           }
         },
         "type": "object",
@@ -62535,6 +64792,29 @@
           "term"
         ],
         "title": "ItemLink"
+      },
+      "JobCost": {
+        "properties": {
+          "job_type": {
+            "type": "string",
+            "title": "Job Type"
+          },
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "cost_usd": {
+            "type": "number",
+            "title": "Cost Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_type",
+          "runs",
+          "cost_usd"
+        ],
+        "title": "JobCost"
       },
       "JobDetail": {
         "properties": {
@@ -63269,6 +65549,22 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Finds investor-relations pages for holdings that have none (web search, checked and approved by AI). Default: Mondays 07:30."
           },
+          "news_ai_search": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Asks a search-capable model for recent news on holdings the wire covers thinly. Results are leads at the lowest tier: they never alert on their own. On by default (it spends on web searches, within the budget). Default: daily 06:20."
+          },
+          "news_triage": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Triages new wire items on a cheap model: relevance, topic, entities and a one-line gloss. On by default (it spends on a model, within the budget). Default: hourly at :10."
+          },
+          "news_analysis": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Analyses new stories: novelty, threads, market context and themes in code, plus the model techniques selected in the news settings. Default: every 3 hours."
+          },
+          "news_brief": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Writes the morning brief (and on Mondays the weekly brief and the per-holding briefs) from stored stories, each line citing its items. On by default (it spends on a model). Default: daily 06:30."
+          },
           "gap_research": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Searches reliable web pages for facts the structured sources left empty (next report date, shares outstanding, description); AI approves them. Default: Wednesdays 08:00."
@@ -63909,6 +66205,32 @@
           "available"
         ],
         "title": "KellyOut"
+      },
+      "KeyClaim": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "One checkable statement."
+          },
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id",
+            "description": "The item whose text contains the span."
+          },
+          "span": {
+            "type": "string",
+            "title": "Span",
+            "description": "Verbatim quote from that item's text supporting the claim."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "item_id",
+          "span"
+        ],
+        "title": "KeyClaim"
       },
       "KeyFigure": {
         "properties": {
@@ -65030,6 +67352,60 @@
         ],
         "title": "LegalLink"
       },
+      "LifecycleStep": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "from_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From State"
+          },
+          "to_state": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "corroborated",
+              "primary_confirmed",
+              "disputed",
+              "corrected",
+              "resolved"
+            ],
+            "title": "To State"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Evidence",
+            "description": "The items and results behind it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "from_state",
+          "to_state",
+          "reason",
+          "evidence"
+        ],
+        "title": "LifecycleStep"
+      },
       "LimitLine": {
         "properties": {
           "key": {
@@ -65139,6 +67515,59 @@
           "unit"
         ],
         "title": "Line"
+      },
+      "LinkedAssumption": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "kpi",
+              "exit_condition",
+              "why_owned"
+            ],
+            "title": "Kind"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref"
+          },
+          "effect": {
+            "type": "string",
+            "enum": [
+              "strengthens",
+              "weakens",
+              "neutral"
+            ],
+            "title": "Effect"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "claim": {
+            "type": "string",
+            "title": "Claim"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "review",
+              "breach"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "ref",
+          "effect",
+          "reason",
+          "claim",
+          "status"
+        ],
+        "title": "LinkedAssumption"
       },
       "LinkedPair": {
         "properties": {
@@ -66826,6 +69255,57 @@
         "title": "MacroSettings",
         "description": "Macro series collected into `macro_series` (numbers in digests come only from here)."
       },
+      "Magnitude": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "The number as written, or null."
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit",
+            "description": "Unit or currency as written, or null."
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "The figure as it appears in the text."
+          },
+          "vs_expectation": {
+            "type": "string",
+            "enum": [
+              "above",
+              "in_line",
+              "below",
+              "unknown"
+            ],
+            "title": "Vs Expectation",
+            "default": "unknown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "unit",
+          "text"
+        ],
+        "title": "Magnitude"
+      },
       "ManagerChange": {
         "properties": {
           "cik": {
@@ -67730,6 +70210,76 @@
         ],
         "title": "MappedExposure"
       },
+      "MarketContext": {
+        "properties": {
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark"
+          },
+          "base_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Date"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/WindowMove"
+            },
+            "type": "array",
+            "title": "Windows"
+          },
+          "earnings_near": {
+            "type": "boolean",
+            "title": "Earnings Near"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "benchmark",
+          "base_date",
+          "windows",
+          "earnings_near",
+          "complete"
+        ],
+        "title": "MarketContext"
+      },
       "MarketHoliday": {
         "properties": {
           "calendar": {
@@ -68400,7 +70950,7 @@
           "provider": {
             "type": "string",
             "title": "Provider",
-            "description": "anthropic, openai or google, from the model id.",
+            "description": "openai or google, from the model id.",
             "default": "unknown"
           }
         },
@@ -68416,11 +70966,12 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "input_per_mtok": {
@@ -69312,6 +71863,121 @@
         ],
         "title": "NewsFeed"
       },
+      "NewsFeedbackIn": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "enum": [
+              "item",
+              "story",
+              "claim",
+              "brief_line"
+            ],
+            "title": "Target"
+          },
+          "target_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Target Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "wrong_entity",
+              "duplicate",
+              "misread",
+              "missing_source",
+              "useful",
+              "not_useful",
+              "confirmed"
+            ],
+            "title": "Kind"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "target_id",
+          "kind"
+        ],
+        "title": "NewsFeedbackIn"
+      },
+      "NewsFeedbackOut": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "enum": [
+              "item",
+              "story",
+              "claim",
+              "brief_line"
+            ],
+            "title": "Target"
+          },
+          "target_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Target Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "wrong_entity",
+              "duplicate",
+              "misread",
+              "missing_source",
+              "useful",
+              "not_useful",
+              "confirmed"
+            ],
+            "title": "Kind"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "target_id",
+          "kind",
+          "id",
+          "created_at"
+        ],
+        "title": "NewsFeedbackOut"
+      },
       "NewsItemOut": {
         "properties": {
           "id": {
@@ -69542,12 +72208,13 @@
         "properties": {
           "classification_model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Classification Model",
-            "default": "claude-haiku-4-5",
+            "default": "gpt-6-luna",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "classification_effort": {
@@ -69567,7 +72234,7 @@
               }
             ],
             "title": "Classification Effort",
-            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+            "description": "Unset: effort is not sent and the model's default applies."
           },
           "classification_batch_size": {
             "type": "integer",
@@ -69593,12 +72260,13 @@
           },
           "corroboration_model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Corroboration Model",
-            "default": "claude-haiku-4-5",
+            "default": "gpt-6-luna",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "corroboration_effort": {
@@ -69618,7 +72286,7 @@
               }
             ],
             "title": "Corroboration Effort",
-            "description": "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level sets an extended-thinking budget instead (low 2k to max 32k tokens)."
+            "description": "Unset: effort is not sent and the model's default applies."
           },
           "corroboration_max_searches": {
             "type": "integer",
@@ -69659,6 +72327,453 @@
             "title": "Edgar Fts Max Hits",
             "description": "Most EDGAR full-text search hits read per query (100 per request; EDGAR serves at most 10,000). A query with more is noted in the collect step.",
             "default": 100
+          },
+          "translation_model": {
+            "type": "string",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Translation Model",
+            "description": "Translates the headline and summary of non-English wire items to English (the original is kept). A cheap model: the work is volume, not judgement.",
+            "default": "gpt-6-luna",
+            "examples": [
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
+            ]
+          },
+          "translation_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Effort",
+            "description": "Unset: effort is not sent and the model's default applies."
+          },
+          "translation_per_run": {
+            "type": "integer",
+            "maximum": 5000.0,
+            "minimum": 0.0,
+            "title": "Translation Per Run",
+            "description": "Items translated per run (0: no translation); linked items first.",
+            "default": 300
+          },
+          "search_lead_model": {
+            "type": "string",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Search Lead Model",
+            "description": "The model that web-searches for recent news on thinly covered holdings.",
+            "default": "gpt-6-luna",
+            "examples": [
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
+            ]
+          },
+          "search_lead_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Lead Effort",
+            "description": "Unset: effort is not sent and the model's default applies."
+          },
+          "ai_search_max_searches": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Ai Search Max Searches",
+            "description": "Web searches per holding per run.",
+            "default": 3
+          },
+          "ai_search_max_holdings": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Ai Search Max Holdings",
+            "description": "Holdings searched per run (0: none).",
+            "default": 10
+          },
+          "ai_search_thin_below": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Ai Search Thin Below",
+            "description": "A holding is searched when the wire has fewer than this many items for it in the window.",
+            "default": 3
+          },
+          "ai_search_days": {
+            "type": "integer",
+            "maximum": 14.0,
+            "minimum": 1.0,
+            "title": "Ai Search Days",
+            "description": "How far back leads are asked for, and the window.",
+            "default": 3
+          },
+          "analysis_techniques": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "extraction",
+                "novelty",
+                "impact",
+                "thread",
+                "framing",
+                "claims",
+                "market",
+                "themes",
+                "thesis",
+                "sentiment"
+              ]
+            },
+            "type": "array",
+            "title": "Analysis Techniques",
+            "description": "The analysis techniques that run. The default four are computed in code and cost nothing; the others call a model (extraction first: impact chains, framing, claim checks and thesis links read its output)."
+          },
+          "extraction_model": {
+            "type": "string",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Extraction Model",
+            "description": "Extracts the typed event (actors, magnitude, claims with cited spans) from a story's stored text.",
+            "default": "gpt-6-luna",
+            "examples": [
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
+            ]
+          },
+          "extraction_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Effort",
+            "description": "Unset: effort is not sent and the model's default applies."
+          },
+          "analysis_model": {
+            "type": "string",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Analysis Model",
+            "description": "Writes impact chains, framing comparisons, claim checks and thesis links.",
+            "default": "gemini-3.8-flash",
+            "examples": [
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
+            ]
+          },
+          "analysis_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Effort",
+            "description": "Unset: effort is not sent and the model's default applies."
+          },
+          "brief_model": {
+            "type": "string",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Brief Model",
+            "description": "Writes the morning and weekly briefs.",
+            "default": "gemini-3.8-flash",
+            "examples": [
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
+            ]
+          },
+          "brief_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brief Effort",
+            "description": "Unset: effort is not sent and the model's default applies."
+          },
+          "analysis_per_run": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Analysis Per Run",
+            "description": "Stories analysed by the model techniques per run (0: none); the most severe and newest first.",
+            "default": 25
+          },
+          "analysis_min_severity": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Analysis Min Severity",
+            "description": "Stories below this severity are not sent to a model for analysis.",
+            "default": 1
+          },
+          "framing_min_outlets": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 2.0,
+            "title": "Framing Min Outlets",
+            "description": "A framing comparison needs this many independent outlets on the story.",
+            "default": 3
+          },
+          "novelty_window_days": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Novelty Window Days",
+            "description": "How far back a story is compared for novelty.",
+            "default": 30
+          },
+          "novelty_repeat_similarity": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.5,
+            "title": "Novelty Repeat Similarity",
+            "description": "Cosine similarity at or above which a story repeats an earlier one.",
+            "default": 0.88
+          },
+          "novelty_update_similarity": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.3,
+            "title": "Novelty Update Similarity",
+            "description": "Cosine similarity at or above which a story updates an earlier one (below the repeat level).",
+            "default": 0.72
+          },
+          "thread_window_days": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Thread Window Days",
+            "description": "A story joins a thread whose last update is within this many days.",
+            "default": 21
+          },
+          "brief_max_lines": {
+            "type": "integer",
+            "maximum": 40.0,
+            "minimum": 3.0,
+            "title": "Brief Max Lines",
+            "description": "Most lines in one brief (the highest ranked).",
+            "default": 12
+          },
+          "brief_alert": {
+            "type": "boolean",
+            "title": "Brief Alert",
+            "description": "Send the morning brief's top lines through the alert routing (Telegram or email, by your alert rules) when it is written.",
+            "default": false
+          },
+          "gdelt_themes": {
+            "type": "boolean",
+            "title": "Gdelt Themes",
+            "description": "Fetch GDELT's average tone and share of coverage for each watch theme once a day (free, no key, one request per five seconds). Shown next to the theme counts; never used for ranking or alerts.",
+            "default": false
+          },
+          "gdelt_max_themes": {
+            "type": "integer",
+            "maximum": 40.0,
+            "minimum": 1.0,
+            "title": "Gdelt Max Themes",
+            "description": "Most themes fetched from GDELT per run.",
+            "default": 6
+          },
+          "theme_narratives": {
+            "type": "boolean",
+            "title": "Theme Narratives",
+            "description": "On Mondays the brief job writes a short cited narrative for each watch theme with enough items in the week (needs the brief model's key).",
+            "default": true
+          },
+          "triage_model": {
+            "type": "string",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Triage Model",
+            "description": "Triages each wire item: relevance to a global equity portfolio, topic, named entities and a one-line gloss. Decides what gets full text and analysis.",
+            "default": "gpt-6-luna",
+            "examples": [
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
+            ]
+          },
+          "triage_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Effort",
+            "description": "Unset: effort is not sent and the model's default applies."
+          },
+          "triage_per_run": {
+            "type": "integer",
+            "maximum": 2000.0,
+            "minimum": 0.0,
+            "title": "Triage Per Run",
+            "description": "Wire items triaged per run (0: none).",
+            "default": 200
+          },
+          "triage_fulltext_relevance": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Triage Fulltext Relevance",
+            "description": "An unlinked wire item triaged at this relevance or above is also fetched for full text (linked items always are).",
+            "default": 2
+          },
+          "batch_extraction": {
+            "type": "boolean",
+            "title": "Batch Extraction",
+            "description": "Send extraction through the provider's batch endpoint (half price, but a run waits up to an hour for the results).",
+            "default": false
+          },
+          "sector_benchmarks": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Sector Benchmarks",
+            "description": "Price symbol of the sector index to measure a holding against, by the holding's sector (for example {'Technology': 'xlk.us'}). Without an entry the country's market index is used."
+          },
+          "auto_resolve_days": {
+            "type": "integer",
+            "maximum": 180.0,
+            "minimum": 0.0,
+            "title": "Auto Resolve Days",
+            "description": "A story that is confirmed or corroborated and has had no new item for this many days is marked resolved (0: only you resolve stories).",
+            "default": 14
+          },
+          "sentiment_weight": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Sentiment Weight",
+            "description": "How much a strong verified sentiment can raise a story's rank in the briefs (0: sentiment is not used for ranking).",
+            "default": 0.25
+          },
+          "indirect_alert_min_severity": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Indirect Alert Min Severity",
+            "description": "A story that reaches its holding only through a competitor, supplier, customer or watch topic alerts only from this severity up (direct links alert from 1).",
+            "default": 2
+          },
+          "embedding_model": {
+            "type": "string",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Embedding Model",
+            "description": "Multilingual embedding of each wire item, used to group the same event reported in different languages. Needs GOOGLE_API_KEY.",
+            "default": "gemini-embedding-2",
+            "examples": [
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
+            ]
+          },
+          "embedding_dimensions": {
+            "type": "integer",
+            "maximum": 3072.0,
+            "minimum": 128.0,
+            "title": "Embedding Dimensions",
+            "default": 768
+          },
+          "embedding_per_run": {
+            "type": "integer",
+            "maximum": 5000.0,
+            "minimum": 0.0,
+            "title": "Embedding Per Run",
+            "description": "Items embedded per run (0: none).",
+            "default": 600
+          },
+          "embedding_duplicate_threshold": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.5,
+            "title": "Embedding Duplicate Threshold",
+            "description": "Cosine similarity at or above which two wire items within the window are the same event. High on purpose: a missed duplicate costs a repeat in the wire, a wrong one hides a story. Tune with `python -m steward.news.eval_cluster --live`.",
+            "default": 0.9
+          },
+          "duplicate_window_hours": {
+            "type": "integer",
+            "maximum": 168.0,
+            "minimum": 1.0,
+            "title": "Duplicate Window Hours",
+            "description": "Items further apart than this are not grouped.",
+            "default": 36
+          },
+          "fulltext_per_run": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 0.0,
+            "title": "Fulltext Per Run",
+            "description": "Article pages fetched per run for holding-linked wire items (0: none). Each source's own hourly allowance (`fetch.max_requests_per_hour`) also applies.",
+            "default": 40
+          },
+          "fulltext_browser_fallback": {
+            "type": "boolean",
+            "title": "Fulltext Browser Fallback",
+            "description": "Read an article page in a headless browser when a plain request is refused (HTTP 403/429) or the page is an empty JavaScript shell. Never logs in or bypasses a paywall. Needs Playwright (the `browser` extra).",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -69704,7 +72819,17 @@
               "rns",
               "eqs",
               "edgar_fts",
-              "alpha_vantage"
+              "alpha_vantage",
+              "news_sitemap",
+              "gdelt",
+              "ai_search",
+              "tdnet",
+              "hkex",
+              "cninfo",
+              "dart",
+              "gazette",
+              "fca_nsm",
+              "filings"
             ],
             "title": "Type",
             "description": "rss: an RSS or Atom feed. page: a news page read daily; new links on it become items. edgar: every holding's SEC filings. finnhub: US company news. google_news: a Google News query per holding (unofficial endpoint). rns: UK regulatory announcements per holding (Investegate company page). eqs: German regulatory announcements (EQS News company page from the holding profile's regulatory_news_urls). edgar_fts: SEC full-text search for each holding's watch topics and for other filers naming it."
@@ -69745,6 +72870,71 @@
             "title": "Macro",
             "description": "A macro or central-bank source: its items are kept without matching a holding and appear under Markets and macro.",
             "default": false
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region",
+            "description": "ISO country of the outlet or authority (US, GB, JP, ...). Null: global."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z]{2,3}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language",
+            "description": "Language of the source's items when the feed does not say (ISO 639)."
+          },
+          "paywall": {
+            "type": "string",
+            "enum": [
+              "open",
+              "metered",
+              "hard"
+            ],
+            "title": "Paywall",
+            "description": "open: the article page is readable. metered: some free reads. hard: only headline and summary are public. Never bypassed.",
+            "default": "open"
+          },
+          "state_media": {
+            "type": "boolean",
+            "title": "State Media",
+            "description": "State-run media: labelled, and never the only corroboration of a political story.",
+            "default": false
+          },
+          "bias_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bias Note",
+            "description": "Short label shown with the outlet (tabloid, trade press, state media)."
+          },
+          "needs_alt": {
+            "type": "boolean",
+            "title": "Needs Alt",
+            "description": "The feed is blocked or gone (HTTP 402/403/404); kept off until another route (Google News query, browser rung) is configured.",
+            "default": false
+          },
+          "fetch": {
+            "$ref": "#/components/schemas/FetchPolicy"
           }
         },
         "additionalProperties": false,
@@ -69764,6 +72954,22 @@
             "const": 1,
             "title": "Schema Version",
             "default": 1
+          },
+          "portfolio_topics": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioTopic"
+            },
+            "type": "array",
+            "title": "Portfolio Topics",
+            "description": "Watch topics for the whole portfolio (macro, regulation, rates, currencies, sectors, supply chain). Matching wire items are tagged with the topic id."
+          },
+          "syndication_groups": {
+            "items": {
+              "$ref": "#/components/schemas/SyndicationGroup"
+            },
+            "type": "array",
+            "title": "Syndication Groups",
+            "description": "Outlets that republish one wire's copy. A story carried by several of them counts as one independent source, not several."
           },
           "sources": {
             "items": {
@@ -70265,6 +73471,64 @@
         ],
         "title": "NotificationsConfigVersion"
       },
+      "NoveltyOut": {
+        "properties": {
+          "novelty": {
+            "type": "string",
+            "enum": [
+              "new",
+              "update",
+              "repeat",
+              "recycled"
+            ],
+            "title": "Novelty"
+          },
+          "surprise": {
+            "type": "string",
+            "enum": [
+              "none",
+              "in_line",
+              "above",
+              "below",
+              "unknown"
+            ],
+            "title": "Surprise"
+          },
+          "similarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Similarity"
+          },
+          "similar_story_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Similar Story Id"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "novelty",
+          "surprise",
+          "basis"
+        ],
+        "title": "NoveltyOut"
+      },
       "NportCoverage": {
         "properties": {
           "state": {
@@ -70706,6 +73970,128 @@
           "share"
         ],
         "title": "OperationLine"
+      },
+      "OpsReport": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "latency": {
+            "$ref": "#/components/schemas/AlertLatency"
+          },
+          "volume": {
+            "$ref": "#/components/schemas/AlertVolume"
+          },
+          "cost_usd": {
+            "type": "number",
+            "title": "Cost Usd"
+          },
+          "by_job": {
+            "items": {
+              "$ref": "#/components/schemas/JobCost"
+            },
+            "type": "array",
+            "title": "By Job"
+          },
+          "useful_events": {
+            "type": "integer",
+            "title": "Useful Events"
+          },
+          "cost_per_useful_event": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per Useful Event",
+            "description": "Null while no story has been marked useful or alerted and left unmarked."
+          },
+          "marks": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Marks"
+          },
+          "incidents": {
+            "items": {
+              "$ref": "#/components/schemas/Incident"
+            },
+            "type": "array",
+            "title": "Incidents"
+          },
+          "ai_search": {
+            "$ref": "#/components/schemas/AiSearchCost"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "latency",
+          "volume",
+          "cost_usd",
+          "by_job",
+          "useful_events",
+          "cost_per_useful_event",
+          "marks",
+          "incidents",
+          "ai_search"
+        ],
+        "title": "OpsReport"
+      },
+      "OutletFraming": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "headline_claim": {
+            "type": "string",
+            "title": "Headline Claim"
+          },
+          "emphasised_cause": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emphasised Cause"
+          },
+          "numbers_cited": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Numbers Cited"
+          },
+          "quotes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Quotes"
+          },
+          "omitted": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Omitted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "headline_claim"
+        ],
+        "title": "OutletFraming"
       },
       "OverCap": {
         "properties": {
@@ -75822,6 +79208,64 @@
         ],
         "title": "PortfolioRisk"
       },
+      "PortfolioTopic": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Id",
+            "examples": [
+              "max-single-position"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "macro",
+              "regulation",
+              "rates",
+              "currency",
+              "sector",
+              "supply_chain",
+              "other"
+            ],
+            "title": "Kind",
+            "default": "other"
+          },
+          "keywords": {
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 2
+            },
+            "type": "array",
+            "maxItems": 40,
+            "minItems": 1,
+            "title": "Keywords"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "keywords"
+        ],
+        "title": "PortfolioTopic",
+        "description": "A portfolio-level watch topic: wire items that mention one of its keywords are tagged\nwith it, so a relevant story that names no holding is still found by topic. A tag never\nlinks an item to a holding and never alerts."
+      },
       "PortfolioValuation": {
         "properties": {
           "as_of": {
@@ -77959,6 +81403,17 @@
               "news_corroboration",
               "news_escalation",
               "news_digest",
+              "news_translation",
+              "news_search_leads",
+              "news_triage",
+              "news_sentiment",
+              "news_theme",
+              "news_extract",
+              "news_impact",
+              "news_framing",
+              "news_claims",
+              "news_thesis",
+              "news_brief",
               "research_writer",
               "monthly_review",
               "chat_assistant",
@@ -78023,6 +81478,17 @@
                 "news_corroboration",
                 "news_escalation",
                 "news_digest",
+                "news_translation",
+                "news_search_leads",
+                "news_triage",
+                "news_sentiment",
+                "news_theme",
+                "news_extract",
+                "news_impact",
+                "news_framing",
+                "news_claims",
+                "news_thesis",
+                "news_brief",
                 "research_writer",
                 "monthly_review",
                 "chat_assistant",
@@ -78049,7 +81515,6 @@
               "items": {
                 "type": "string",
                 "enum": [
-                  "anthropic",
                   "openai",
                   "google"
                 ]
@@ -78065,6 +81530,17 @@
                 "news_corroboration",
                 "news_escalation",
                 "news_digest",
+                "news_translation",
+                "news_search_leads",
+                "news_triage",
+                "news_sentiment",
+                "news_theme",
+                "news_extract",
+                "news_impact",
+                "news_framing",
+                "news_claims",
+                "news_thesis",
+                "news_brief",
                 "research_writer",
                 "monthly_review",
                 "chat_assistant",
@@ -83166,12 +86642,13 @@
           },
           "model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
-            "default": "claude-opus-5-5",
+            "default": "gpt-6.1-sol",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "effort": {
@@ -83191,7 +86668,7 @@
             "maximum": 200.0,
             "minimum": 1.0,
             "title": "Max Steps",
-            "description": "Claude calls plus web searches per run.",
+            "description": "Model calls plus web searches per run.",
             "default": 60
           },
           "max_searches": {
@@ -84283,12 +87760,13 @@
         "properties": {
           "model": {
             "type": "string",
-            "pattern": "^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
             "title": "Model",
-            "default": "claude-opus-5-5",
+            "default": "gpt-6.1-sol",
             "examples": [
-              "claude-sonnet-5",
-              "gpt-6-luna"
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
             ]
           },
           "effort": {
@@ -84308,7 +87786,7 @@
             "maximum": 50.0,
             "minimum": 1.0,
             "title": "Max Steps",
-            "description": "Claude calls per review.",
+            "description": "Model calls per review.",
             "default": 10
           },
           "use_batch": {
@@ -88337,6 +91815,24 @@
         ],
         "title": "Sentence"
       },
+      "SentimentResult": {
+        "properties": {
+          "aspects": {
+            "items": {
+              "$ref": "#/components/schemas/Aspect"
+            },
+            "type": "array",
+            "title": "Aspects"
+          },
+          "intensity": {
+            "type": "number",
+            "title": "Intensity",
+            "default": 0.0
+          }
+        },
+        "type": "object",
+        "title": "SentimentResult"
+      },
       "SeriesEffect": {
         "properties": {
           "series_id": {
@@ -90966,7 +94462,17 @@
               "rns",
               "eqs",
               "edgar_fts",
-              "alpha_vantage"
+              "alpha_vantage",
+              "news_sitemap",
+              "gdelt",
+              "ai_search",
+              "tdnet",
+              "hkex",
+              "cninfo",
+              "dart",
+              "gazette",
+              "fca_nsm",
+              "filings"
             ],
             "title": "Type"
           },
@@ -91036,6 +94542,171 @@
             "type": "boolean",
             "title": "Healthy",
             "description": "healthy = enabled, last fetched within the Jobs config's monitoring.news_coverage_hours, and that fetch recorded no error or note"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded",
+              "down",
+              "unknown",
+              "disabled"
+            ],
+            "title": "State",
+            "description": "down: the circuit breaker is open after repeated failures (the outlet is unreachable, which is not the same as no news); degraded: the last read failed; unknown: never read successfully.",
+            "default": "unknown"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region",
+            "description": "ISO country of the outlet."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "paywall": {
+            "type": "string",
+            "enum": [
+              "open",
+              "metered",
+              "hard"
+            ],
+            "title": "Paywall",
+            "default": "open"
+          },
+          "state_media": {
+            "type": "boolean",
+            "title": "State Media",
+            "default": false
+          },
+          "needs_alt": {
+            "type": "boolean",
+            "title": "Needs Alt",
+            "description": "Feed blocked or gone; kept off.",
+            "default": false
+          },
+          "consecutive_failures": {
+            "type": "integer",
+            "title": "Consecutive Failures",
+            "default": 0
+          },
+          "backoff_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backoff Until",
+            "description": "Breaker reopens then."
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "runs_7d": {
+            "type": "integer",
+            "title": "Runs 7D",
+            "default": 0
+          },
+          "fetched_7d": {
+            "type": "integer",
+            "title": "Fetched 7D",
+            "default": 0
+          },
+          "stored_linked_7d": {
+            "type": "integer",
+            "title": "Stored Linked 7D",
+            "description": "Items that became story items.",
+            "default": 0
+          },
+          "stored_wire_7d": {
+            "type": "integer",
+            "title": "Stored Wire 7D",
+            "description": "Items kept on the wire only.",
+            "default": 0
+          },
+          "avg_latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Latency Ms",
+            "description": "Average time the feed or API took to answer, last 7 days."
+          },
+          "fulltext_by_rung_7d": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Fulltext By Rung 7D",
+            "description": "Article texts stored in the last 7 days per fetch method: '1' the feed's own text, '2' a polite page fetch with the extractor, '3' a browser render, '4' an official API."
+          },
+          "fulltext_truncated_7d": {
+            "type": "integer",
+            "title": "Fulltext Truncated 7D",
+            "description": "Of those, texts that look cut off (paywall, teaser).",
+            "default": 0
+          },
+          "fulltext_failed_7d": {
+            "type": "integer",
+            "title": "Fulltext Failed 7D",
+            "description": "Articles first seen in the last 7 days whose text fetch failed.",
+            "default": 0
+          },
+          "delay_p50_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delay P50 Min",
+            "description": "Median minutes from an article's publication to the app first seeing it, last 7 days."
+          },
+          "delay_p95_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delay P95 Min",
+            "description": "95th percentile of the same."
           }
         },
         "type": "object",
@@ -93157,6 +96828,365 @@
         ],
         "title": "Story"
       },
+      "StoryAnalysis": {
+        "properties": {
+          "story_id": {
+            "type": "integer",
+            "title": "Story Id"
+          },
+          "extraction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StoryExtraction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "novelty": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NoveltyOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImpactResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thread": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThreadStepOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "framing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FramingComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "claims": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClaimsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "market": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MarketContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thesis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sentiment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SentimentResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "models": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Models",
+            "description": "The model behind each technique that used one."
+          }
+        },
+        "type": "object",
+        "required": [
+          "story_id"
+        ],
+        "title": "StoryAnalysis"
+      },
+      "StoryClosing": {
+        "properties": {
+          "closed": {
+            "type": "boolean",
+            "title": "Closed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "closed"
+        ],
+        "title": "StoryClosing"
+      },
+      "StoryEvidence": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "lifecycle": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "corroborated",
+              "primary_confirmed",
+              "disputed",
+              "corrected",
+              "resolved"
+            ],
+            "title": "Lifecycle"
+          },
+          "lifecycle_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifecycle Reason"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "confirmed",
+              "unconfirmed",
+              "disputed",
+              "sentiment"
+            ],
+            "title": "Status"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "corroborated",
+              "unconfirmed",
+              "disputed"
+            ],
+            "title": "Confidence"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At",
+            "description": "When the owner closed (resolved) it."
+          },
+          "independent_sources": {
+            "type": "integer",
+            "title": "Independent Sources",
+            "description": "Independence groups among the items."
+          },
+          "primary_evidence": {
+            "type": "integer",
+            "title": "Primary Evidence",
+            "description": "Items that are primary evidence."
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/LifecycleStep"
+            },
+            "type": "array",
+            "title": "History",
+            "description": "Every lifecycle change, oldest first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "headline",
+          "lifecycle",
+          "lifecycle_reason",
+          "status",
+          "confidence",
+          "status_reason",
+          "closed_at",
+          "independent_sources",
+          "primary_evidence",
+          "items",
+          "history"
+        ],
+        "title": "StoryEvidence"
+      },
+      "StoryExtraction": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "actors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Actors"
+          },
+          "affected_entities": {
+            "items": {
+              "$ref": "#/components/schemas/AffectedEntity"
+            },
+            "type": "array",
+            "title": "Affected Entities"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "magnitude": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Magnitude"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "occurred": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred"
+          },
+          "announced": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Announced"
+          },
+          "effective": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "rumour",
+              "reported",
+              "confirmed",
+              "official"
+            ],
+            "title": "Status"
+          },
+          "key_claims": {
+            "items": {
+              "$ref": "#/components/schemas/KeyClaim"
+            },
+            "type": "array",
+            "title": "Key Claims"
+          },
+          "interpretation": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Interpretation"
+          },
+          "speculation": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Speculation"
+          },
+          "unknowns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknowns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "action",
+          "status"
+        ],
+        "title": "StoryExtraction"
+      },
       "StoryOut": {
         "properties": {
           "id": {
@@ -93216,6 +97246,20 @@
               "disputed"
             ],
             "title": "Confidence"
+          },
+          "lifecycle": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "corroborated",
+              "primary_confirmed",
+              "disputed",
+              "corrected",
+              "resolved"
+            ],
+            "title": "Lifecycle",
+            "description": "Where the story is: reported to resolved.",
+            "default": "reported"
           },
           "status_reason": {
             "anyOf": [
@@ -93734,6 +97778,49 @@
           "reason"
         ],
         "title": "StressReplay"
+      },
+      "StudyRow": {
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "region": {
+            "type": "string",
+            "title": "Region"
+          },
+          "tier": {
+            "type": "integer",
+            "title": "Tier"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N"
+          },
+          "median_pct": {
+            "type": "number",
+            "title": "Median Pct"
+          },
+          "p25_pct": {
+            "type": "number",
+            "title": "P25 Pct"
+          },
+          "p75_pct": {
+            "type": "number",
+            "title": "P75 Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "region",
+          "tier",
+          "n",
+          "median_pct",
+          "p25_pct",
+          "p75_pct"
+        ],
+        "title": "StudyRow"
       },
       "StyleBand": {
         "properties": {
@@ -94746,6 +98833,40 @@
         ],
         "title": "SwitchResponse"
       },
+      "SyndicationGroup": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "title": "Name",
+            "examples": [
+              "max-single-position"
+            ]
+          },
+          "domains": {
+            "items": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+              "examples": [
+                "reuters.com"
+              ]
+            },
+            "type": "array",
+            "minItems": 2,
+            "title": "Domains"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "domains"
+        ],
+        "title": "SyndicationGroup",
+        "description": "Outlets that republish one wire's copy: one independence group, counted once as a\nsource however many of them carry a story. The first domain is the group's key."
+      },
       "TailLine": {
         "properties": {
           "horizon_weeks": {
@@ -95139,6 +99260,83 @@
           "alerts"
         ],
         "title": "TestAlertResult"
+      },
+      "ThemeDay": {
+        "properties": {
+          "theme": {
+            "type": "string",
+            "title": "Theme"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "wire_items": {
+            "type": "integer",
+            "title": "Wire Items"
+          },
+          "stories": {
+            "type": "integer",
+            "title": "Stories"
+          },
+          "regions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Regions"
+          },
+          "flag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "spike",
+                  "spread"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flag"
+          },
+          "tone": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone",
+            "description": "GDELT's average tone of worldwide coverage of the theme that day (negative below zero); null when GDELT is off or has no data."
+          },
+          "attention": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attention",
+            "description": "GDELT's share of monitored coverage the theme took that day."
+          }
+        },
+        "type": "object",
+        "required": [
+          "theme",
+          "day",
+          "wire_items",
+          "stories",
+          "regions",
+          "flag"
+        ],
+        "title": "ThemeDay"
       },
       "ThemeDefinition": {
         "properties": {
@@ -96058,6 +100256,22 @@
         "title": "ThesisKPI",
         "description": "An absolute threshold the owner sets. v1 has no consensus-estimate comparisons."
       },
+      "ThesisOut": {
+        "properties": {
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedAssumption"
+            },
+            "type": "array",
+            "title": "Links"
+          }
+        },
+        "type": "object",
+        "required": [
+          "links"
+        ],
+        "title": "ThesisOut"
+      },
       "ThesisPrefill": {
         "properties": {
           "ticker": {
@@ -96310,6 +100524,187 @@
         },
         "type": "object",
         "title": "ThesisVerdictsRequest"
+      },
+      "ThreadDetail": {
+        "properties": {
+          "thread": {
+            "$ref": "#/components/schemas/ThreadOut"
+          },
+          "timeline": {
+            "items": {
+              "$ref": "#/components/schemas/ThreadStep"
+            },
+            "type": "array",
+            "title": "Timeline"
+          }
+        },
+        "type": "object",
+        "required": [
+          "thread",
+          "timeline"
+        ],
+        "title": "ThreadDetail"
+      },
+      "ThreadDiffOut": {
+        "properties": {
+          "new": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "New"
+          },
+          "changed": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Changed"
+          },
+          "retracted": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Retracted"
+          },
+          "unknown": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown"
+          }
+        },
+        "type": "object",
+        "title": "ThreadDiffOut"
+      },
+      "ThreadOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Opened At"
+          },
+          "last_update_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Update At"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "quiet",
+              "closed"
+            ],
+            "title": "State"
+          },
+          "stories": {
+            "type": "integer",
+            "title": "Stories"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "title",
+          "opened_at",
+          "last_update_at",
+          "state",
+          "stories"
+        ],
+        "title": "ThreadOut"
+      },
+      "ThreadStep": {
+        "properties": {
+          "story_id": {
+            "type": "integer",
+            "title": "Story Id"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "lifecycle": {
+            "type": "string",
+            "title": "Lifecycle"
+          },
+          "diff": {
+            "$ref": "#/components/schemas/ThreadDiffOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "story_id",
+          "headline",
+          "at",
+          "severity",
+          "lifecycle",
+          "diff"
+        ],
+        "title": "ThreadStep"
+      },
+      "ThreadStepOut": {
+        "properties": {
+          "thread_id": {
+            "type": "integer",
+            "title": "Thread Id"
+          },
+          "opened": {
+            "type": "boolean",
+            "title": "Opened"
+          },
+          "diff": {
+            "$ref": "#/components/schemas/ThreadDiffOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "thread_id",
+          "opened",
+          "diff"
+        ],
+        "title": "ThreadStepOut"
       },
       "TierCheck": {
         "properties": {
@@ -99846,6 +104241,55 @@
         ],
         "title": "WikidataSummary"
       },
+      "WindowMove": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "stock_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Pct"
+          },
+          "benchmark_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Pct"
+          },
+          "abnormal_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Abnormal Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "stock_pct",
+          "benchmark_pct",
+          "abnormal_pct"
+        ],
+        "title": "WindowMove"
+      },
       "WindowOut": {
         "properties": {
           "label": {
@@ -99997,6 +104441,240 @@
           "benchmark"
         ],
         "title": "WindowOut"
+      },
+      "WireItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "title_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title En"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          },
+          "outlet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlet"
+          },
+          "outlet_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlet Name"
+          },
+          "tier": {
+            "type": "integer",
+            "title": "Tier"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          },
+          "linked": {
+            "type": "boolean",
+            "title": "Linked"
+          },
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Topics"
+          },
+          "fetch_state": {
+            "type": "string",
+            "title": "Fetch State"
+          },
+          "paywall": {
+            "type": "string",
+            "title": "Paywall"
+          },
+          "state_media": {
+            "type": "boolean",
+            "title": "State Media"
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
+          "story_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Story Id"
+          },
+          "story_severity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Story Severity"
+          },
+          "story_lifecycle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Story Lifecycle"
+          },
+          "gloss": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gloss",
+            "description": "One plain sentence from triage, when triage has read the item."
+          },
+          "relevance": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relevance",
+            "description": "Triage relevance: 0 noise, 1 background, 2 may matter, 3 material."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "headline",
+          "title_en",
+          "summary",
+          "language",
+          "region",
+          "outlet",
+          "outlet_name",
+          "tier",
+          "published_at",
+          "linked",
+          "topics",
+          "fetch_state",
+          "paywall",
+          "state_media",
+          "group_id",
+          "story_id",
+          "story_severity",
+          "story_lifecycle"
+        ],
+        "title": "WireItem"
+      },
+      "WirePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WireItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_before_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_before_id"
+        ],
+        "title": "WirePage"
       },
       "WorldBankIndicator": {
         "properties": {

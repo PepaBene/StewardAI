@@ -7,7 +7,7 @@ Two checks, in order:
    (thousands separators and a trailing ".0" ignored). A sentence that states a figure its
    sources do not contain is unsupported without a model call. Four-digit years and
    quarter labels ("Q3") are not figures.
-2. Support, by a separate Haiku call: each remaining sentence with its snippets; the model
+2. Support, by a separate model call: each remaining sentence with its snippets; the model
    answers supported or not, with a reason. It sees nothing but the sentences and snippets.
 
 Per the Verification config an unsupported sentence is removed (`strip`) or kept and marked
@@ -23,12 +23,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Literal, Protocol
 
-import anthropic
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
 from steward.config.jobs import effort_kwargs
 from steward.config.verification import ClaimVerifierSettings
+from steward.llm.routing import RoutingClient
+from steward.llm.types import LLMError
 
 CheckStatus = Literal["supported", "unsupported", "unchecked"]
 
@@ -245,10 +246,10 @@ def claims_prompt(claims: Sequence[Claim], today: dt.date) -> str:
     return "\n".join(parts)
 
 
-class ClaudeClaimVerifier:
+class LLMClaimVerifier:
     def __init__(
         self,
-        client: anthropic.AsyncAnthropic,
+        client: RoutingClient,
         model: str,
         system: str = SYSTEM,
         effort: str | None = None,
@@ -258,7 +259,7 @@ class ClaudeClaimVerifier:
         self._effort = effort
         # The owner's override from the Prompts config, else the built-in default. No cache
         # breakpoint: the batches share only this ~150-token prompt, far below the minimum
-        # cacheable prefix (4096 tokens on Haiku 4.5), and each batch's claims differ.
+        # cacheable prefix (thousands of tokens), and each batch's claims differ.
         self._system = system
 
     async def check(
@@ -358,13 +359,13 @@ async def check_claims(
     if not to_model:
         return outcome
     if verifier is None:
-        outcome.note = "claim verifier not called: ANTHROPIC_API_KEY is not set"
+        outcome.note = "claim verifier not called: no OpenAI or Google API key is set"
         for claim in to_model:
             results[claim.index] = ClaimResult(claim.index, "unchecked", "not checked")
         return outcome
     try:
         verdicts, usage = await verifier.check(to_model, today)
-    except anthropic.APIError as exc:
+    except LLMError as exc:
         outcome.note = f"claim verifier failed: {exc}"[:300]
         verdicts, usage = [], None
     outcome.usage = usage

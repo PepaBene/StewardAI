@@ -195,6 +195,26 @@ def test_quiet_hours_window() -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_price_text_and_cjk_particles_in_linking() -> None:
+    from steward.news.link import HoldingTerms
+
+    linker = Linker(
+        [
+            HoldingTerms(ticker="700_HK_EQ", names=["Tencent"], symbols=["700"]),
+            HoldingTerms(ticker="7203_JP_EQ", names=["トヨタ自動車"]),
+        ]
+    )
+    assert linker.link("Buyer pays $700 million for startup") == []
+    assert [x.ticker for x in linker.link("Shares of $700 rose")] == ["700_HK_EQ"]
+    assert [x.ticker for x in linker.link("トヨタ自動車は決算を発表した")] == ["7203_JP_EQ"]
+
+
+def test_independence_key_reduces_to_the_registrable_domain() -> None:
+    sources = NewsSourcesConfig()
+    assert sources.independence_key("markets.ft.com") == sources.independence_key("ft.com")
+    assert sources.independence_key("news.example.co.uk") == "example.co.uk"
+
+
 def _linker() -> Linker:
     apple = HoldingProfile(
         ticker="AAPL_US_EQ",

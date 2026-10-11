@@ -272,8 +272,8 @@ class JobContext:
 
 JobHandler = Callable[[JobContext], Awaitable[None]]
 
-# The job whose handler is running in this task (and the tasks it starts): the Anthropic
-# client in steward.ai reads it to apply the Budget config's caps to every request of a job.
+# The job whose handler is running in this task (and the tasks it starts): the model
+# client in steward.llm reads it to apply the Budget config's caps to every request of a job.
 current_job: ContextVar[JobContext | None] = ContextVar("current_job", default=None)
 # The step being run in this task, with its job: the client counts every response against it.
 current_step: ContextVar[tuple[JobContext, StepHandle] | None] = ContextVar(

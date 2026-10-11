@@ -4,7 +4,7 @@ Real past quarterly earnings releases, as SEC EDGAR serves them, each with label
 figures. It is meant for evaluating the earnings extraction: run the extractor on
 `document.html.gz` and compare what it returns against `figures`.
 
-> **Labels are AI-read and not yet verified.** Claude read every figure in this set from the
+> **Labels are AI-read and not yet verified.** An AI model read every figure in this set from the
 > documents and has not hand-checked them against anything except the XBRL crosscheck described
 > below. The owner has not checked them either. Before you rely on a case, check its figures
 > by hand against the document and change `labelled_by` once you have. Extend the set to the

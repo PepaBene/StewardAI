@@ -11,9 +11,11 @@ import {
   eventRulesFromBody,
   eventRulesToBody,
   newRule,
+  formatPortfolioTopics,
   notificationsFromBody,
   notificationsToBody,
   parseDomainTiers,
+  parsePortfolioTopics,
   parseSurpriseBands,
   PER_HOLDING,
   sourcesFromBody,
@@ -62,12 +64,13 @@ describe("news sources form", () => {
   const defaults = {
     schema_version: 1 as const,
     sources: [
-      { id: "edgar-filings", name: "EDGAR", tier: 1 as const, type: "edgar" as const, url: null, enabled: true, tickers: [], macro: false },
-      { id: "ecb-press", name: "ECB", tier: 1 as const, type: "rss" as const, url: "https://www.ecb.europa.eu/rss/press.html", enabled: true, tickers: [], macro: true },
+      { id: "edgar-filings", name: "EDGAR", tier: 1 as const, type: "edgar" as const, url: null, enabled: true, tickers: [], macro: false, paywall: "open" as const, state_media: false, needs_alt: false },
+      { id: "ecb-press", name: "ECB", tier: 1 as const, type: "rss" as const, url: "https://www.ecb.europa.eu/rss/press.html", enabled: true, tickers: [], macro: true, paywall: "open" as const, state_media: false, needs_alt: false },
     ],
     domain_tiers: [{ domain: "reuters.com", tier: 2 as const }],
     blocked_domains: [],
     allowed_domains: ["reuters.com"],
+    portfolio_topics: [],
     unknown_outlet_tier: 3 as const,
     freshness_hours: 72,
     include_tier3: false,
@@ -76,6 +79,20 @@ describe("news sources form", () => {
 
   it("round-trips", () => {
     expect(sourcesToBody(sourcesFromBody(null, defaults))).toEqual(defaults);
+  });
+
+  it("keeps the fields the form has no input for (region, language, paywall, fetch policy)", () => {
+    const seeded = {
+      ...defaults,
+      sources: [
+        { ...defaults.sources[1], region: "DE", language: "de", paywall: "hard" as const, state_media: true, fetch: { rungs: [], display: "link_only" as const } },
+      ],
+    };
+    const form = sourcesFromBody(seeded as never, defaults);
+    form.sources[0].name = "Renamed";
+    const out = sourcesToBody(form).sources![0];
+    expect(out).toMatchObject({ name: "Renamed", region: "DE", language: "de", paywall: "hard", state_media: true });
+    expect(out.fetch).toEqual({ rungs: [], display: "link_only" });
   });
 
   it("keeps the macro flag and the aggregator allow list", () => {
@@ -96,7 +113,37 @@ describe("news sources form", () => {
     rns.url = "https://www.investegate.co.uk";
     expect(sourcesToBody(form).sources!.find((s) => s.type === "rns")!.url).toBeNull();
     expect(sourcesToBody(sourcesFromBody(null, DEFAULT_SOURCES))).toEqual(DEFAULT_SOURCES);
-    expect(DEFAULT_SOURCES.sources!.filter((s) => s.macro).map((s) => s.id)).toEqual(["fed-press", "ecb-press", "cnb-press"]);
+    expect(DEFAULT_SOURCES.sources!.filter((s) => s.macro).map((s) => s.id)).toEqual([
+      "fed-press",
+      "ecb-press",
+      "cnb-press",
+      "boj-whatsnew",
+      "boe-news",
+      "bundesbank-press",
+      "boc-press",
+    ]);
+  });
+
+  it("edits portfolio watch topics one per line and keeps a disabled topic disabled", () => {
+    const form = sourcesFromBody(null, DEFAULT_SOURCES);
+    expect(form.portfolio_topics.split("\n")[0]).toBe("rates | Interest rates | rates | interest rate, rate cut, rate hike, central bank, yield curve, inflation");
+    form.portfolio_topics = "off Rates | Rates | rates | interest rate, cut\nfx | FX | currency |  yen ,euro ";
+    expect(sourcesToBody(form).portfolio_topics).toEqual([
+      { id: "rates", label: "Rates", kind: "rates", keywords: ["interest rate", "cut"], enabled: false },
+      { id: "fx", label: "FX", kind: "currency", keywords: ["yen", "euro"], enabled: true },
+    ]);
+    expect(parsePortfolioTopics(formatPortfolioTopics(DEFAULT_SOURCES.portfolio_topics!))).toEqual(DEFAULT_SOURCES.portfolio_topics);
+  });
+
+  it("covers the official disclosure sources of each market, per holding with no URL", () => {
+    expect(PER_HOLDING).toEqual(expect.arrayContaining(["tdnet", "hkex", "cninfo", "dart", "gazette", "fca_nsm", "filings"]));
+    const form = sourcesFromBody(null, DEFAULT_SOURCES);
+    const tdnet = form.sources.find((s) => s.type === "tdnet")!;
+    tdnet.url = "https://example.com";
+    expect(sourcesToBody(form).sources!.find((s) => s.type === "tdnet")!.url).toBeNull();
+    const services = DEFAULT_ANNOUNCEMENT_RULES.map((r) => r.service);
+    for (const s of ["tdnet", "hkex", "cninfo", "dart", "gazette", "fca_nsm", "filings"]) expect(services).toContain(s);
+    expect(services.at(-1)).toBe("any");
   });
 
   it("drops the URL of per-holding sources and parses domain tiers", () => {

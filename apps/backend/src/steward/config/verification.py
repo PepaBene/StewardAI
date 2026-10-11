@@ -55,7 +55,7 @@ class ClaimVerifierSettings(ConfigModel):
     snippets it cites before a report is stored or sent."""
 
     enabled: bool = True
-    model: ModelId = "claude-haiku-4-5"
+    model: ModelId = "gpt-6-luna"
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     mode: Literal["strip", "mark"] = Field(
         default="strip",

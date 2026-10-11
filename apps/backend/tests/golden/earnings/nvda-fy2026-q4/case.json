@@ -285,6 +285,6 @@
     }
   ],
   "absent_metrics": [],
-  "labelled_by": "claude (AI-read from the document; owner has not hand-checked)",
+  "labelled_by": "AI model (AI-read from the document; owner has not hand-checked)",
   "notes": "Reported figures are taken from the condensed consolidated statement of income; adjusted figures from the GAAP to non-GAAP reconciliation (columns: this quarter, prior quarter, same quarter last year). XBRL crosscheck of reported figures: 8 match, 0 mismatch, 2 not checkable. 8 fourth-quarter values were checked against annual minus nine-month XBRL facts (source 'xbrl_derived'). Fourth-quarter diluted EPS has no quarterly XBRL fact and cannot be derived by subtraction."
 }

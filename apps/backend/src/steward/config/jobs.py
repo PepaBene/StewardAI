@@ -85,74 +85,47 @@ def cron_trigger(expression: str, tz: ZoneInfo) -> CronTrigger:
 ModelId = Annotated[
     str,
     Field(
-        pattern=r"^(claude|gpt|gemini)-[a-z0-9.-]{1,64}$",
-        examples=["claude-sonnet-5", "gpt-6-luna"],
+        pattern=r"^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+        examples=["gpt-6.1-sol", "gpt-6-luna", "gemini-3.8-flash"],
     ),
 ]
 
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
-EFFORT_HELP = (
-    "Unset: effort is not sent and the model's default applies. On Haiku 4 models the level "
-    "sets an extended-thinking budget instead (low 2k to max 32k tokens)."
-)
+
+AnalysisTechnique = Literal[
+    "extraction",
+    "novelty",
+    "impact",
+    "thread",
+    "framing",
+    "claims",
+    "market",
+    "themes",
+    "thesis",
+    "sentiment",
+]
+# The techniques computed in code, which cost nothing and so run by default.
+CODE_TECHNIQUES: tuple[AnalysisTechnique, ...] = ("novelty", "thread", "market", "themes")
+EFFORT_HELP = "Unset: effort is not sent and the model's default applies."
 # Web-search tiers: 1 the company, regulators and statistics offices; 2 established outlets;
 # 3 everything else on the allow-list.
 SourceTier = Literal[1, 2, 3]
 DEFAULT_SOURCE_TIERS: tuple[SourceTier, ...] = (1, 2)
 
 
-def supports_effort(model: str) -> bool:
-    """Haiku 4 models reject the effort parameter."""
-    return not model.startswith("claude-haiku-4")
-
-
-# Claude Haiku 4 models take no effort parameter; their equivalent is extended thinking with
-# a token budget, sized per effort level.
-THINKING_BUDGET: dict[str, int] = {
-    "low": 2048,
-    "medium": 4096,
-    "high": 8192,
-    "xhigh": 16384,
-    "max": 32000,
-}
-
-
-def reasoning_kwargs(
-    model: str,
-    effort: str | None,
-    max_tokens: int,
-    output_config: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """`max_tokens`, `output_config` and `thinking` for a Messages call at `effort`.
-
-    Models that take effort get it in `output_config` (merged with `output_config`, e.g. a
-    response format). Haiku 4 models get extended thinking with `THINKING_BUDGET[effort]`
-    tokens instead, and `max_tokens` grows by that budget so the answer keeps its room.
-    No effort: nothing is added (the model's default)."""
-    config = dict(output_config or {})
+def effort_kwargs(model: str, effort: str | None, max_tokens: int) -> dict[str, Any]:
+    """`max_tokens` and `effort` for a `client.messages.parse` call. No effort: nothing is
+    added and the model's default applies. `model` is accepted so a call site need not know
+    which models take an effort level."""
+    del model
     out: dict[str, Any] = {"max_tokens": max_tokens}
     if effort is not None:
-        if supports_effort(model):
-            # xhigh arrived with Opus 4.7; the 4.6 models top out at high below max.
-            if effort == "xhigh" and model.endswith("-4-6"):
-                effort = "high"
-            config["effort"] = effort
-        else:
-            budget = THINKING_BUDGET[effort]
-            out["thinking"] = {"type": "enabled", "budget_tokens": budget}
-            out["max_tokens"] = max_tokens + budget
-    if config:
-        out["output_config"] = config
+        out["effort"] = effort
     return out
 
 
-def effort_kwargs(model: str, effort: str | None, max_tokens: int) -> dict[str, Any]:
-    """`reasoning_kwargs` without a response format."""
-    return reasoning_kwargs(model, effort, max_tokens)
-
-
 def check_effort(model: str, effort: str | None, field: str) -> None:
-    """Every effort level is valid for every model (Haiku 4 maps it to a thinking budget)."""
+    """Every effort level is valid for every model."""
     del model, effort, field
 
 
@@ -165,15 +138,15 @@ def _unique_tiers(tiers: list[int]) -> list[int]:
 class EarningsCheckSettings(ConfigModel):
     """The earnings thesis check: find the release, extract figures, validate, judge KPIs."""
 
-    extraction_model: ModelId = "claude-sonnet-5"
+    extraction_model: ModelId = "gpt-6.1-sol"
     locate_model: ModelId = Field(
-        default="claude-sonnet-5",
+        default="gpt-6.1-sol",
         description="Searches for the release when EDGAR has none (non-US issuers).",
     )
     effort: Effort = "high"
     locate_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_steps: int = Field(
-        default=40, ge=2, le=200, description="Claude calls plus document fetches per run."
+        default=40, ge=2, le=200, description="Model calls plus document fetches per run."
     )
     max_searches: int = Field(default=20, ge=0, le=100, description="Web searches per run.")
     check_days_after_report: list[Annotated[int, Field(ge=0, le=30)]] = Field(
@@ -205,7 +178,7 @@ class EarningsCalendarSettings(ConfigModel):
     """Next report dates: Finnhub for US issuers, the IR calendar page otherwise."""
 
     model: ModelId = Field(
-        default="claude-haiku-4-5", description="Reads report dates off IR calendar pages."
+        default="gpt-6-luna", description="Reads report dates off IR calendar pages."
     )
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     lookahead_days: int = Field(default=120, ge=7, le=400)
@@ -234,7 +207,7 @@ class AiApprovalSettings(ConfigModel):
     is recorded with its reasons and the owner can overturn it (an owner decision is final)."""
 
     model: ModelId = Field(
-        default="claude-sonnet-5", description="Judges each suggestion from the evidence given."
+        default="gpt-6.1-sol", description="Judges each suggestion from the evidence given."
     )
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     listings: bool = Field(default=True, description="Approve suggested listing matches.")
@@ -285,7 +258,7 @@ class ExposureBuildSettings(ConfigModel):
     when a verbatim quote in the filing prints it."""
 
     model: ModelId = Field(
-        default="claude-sonnet-5", description="Reads annual reports for currencies and inputs."
+        default="gpt-6.1-sol", description="Reads annual reports for currencies and inputs."
     )
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     filings_per_run: int = Field(
@@ -310,7 +283,7 @@ class IrDiscoverySettings(ConfigModel):
     AI approve them. Pages the owner already set are never changed."""
 
     model: ModelId = Field(
-        default="claude-sonnet-5", description="Searches for the pages and approves them."
+        default="gpt-6.1-sol", description="Searches for the pages and approves them."
     )
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_searches: int = Field(
@@ -396,7 +369,7 @@ class GapResearchSettings(ConfigModel):
     structured data and are approved by AI against the source tiers below."""
 
     model: ModelId = Field(
-        default="claude-sonnet-5", description="Searches for facts and approves them."
+        default="gpt-6.1-sol", description="Searches for facts and approves them."
     )
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     slots: list[GapSlotKey] = Field(
@@ -492,7 +465,7 @@ class GapResearchSettings(ConfigModel):
 class NewsSettings(ConfigModel):
     """The news pipeline after ingest: classification, corroboration."""
 
-    classification_model: ModelId = "claude-haiku-4-5"
+    classification_model: ModelId = "gpt-6-luna"
     classification_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     classification_batch_size: int = Field(
         default=50, ge=5, le=100, description="Items per classification call."
@@ -507,7 +480,7 @@ class NewsSettings(ConfigModel):
     classification_batch_wait_minutes: float = Field(
         default=30, ge=1, le=1440, description="How long a classification batch is waited for."
     )
-    corroboration_model: ModelId = "claude-haiku-4-5"
+    corroboration_model: ModelId = "gpt-6-luna"
     corroboration_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     corroboration_max_searches: int = Field(
         default=10, ge=0, le=50, description="Web searches per corroboration call."
@@ -532,16 +505,224 @@ class NewsSettings(ConfigModel):
         description="Most EDGAR full-text search hits read per query (100 per request; EDGAR "
         "serves at most 10,000). A query with more is noted in the collect step.",
     )
+    translation_model: ModelId = Field(
+        default="gpt-6-luna",
+        description="Translates the headline and summary of non-English wire items to English "
+        "(the original is kept). A cheap model: the work is volume, not judgement.",
+    )
+    translation_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    translation_per_run: int = Field(
+        default=300,
+        ge=0,
+        le=5000,
+        description="Items translated per run (0: no translation); linked items first.",
+    )
+    search_lead_model: ModelId = Field(
+        default="gpt-6-luna",
+        description="The model that web-searches for recent news on thinly covered holdings.",
+    )
+    search_lead_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    ai_search_max_searches: int = Field(
+        default=3, ge=1, le=20, description="Web searches per holding per run."
+    )
+    ai_search_max_holdings: int = Field(
+        default=10, ge=0, le=100, description="Holdings searched per run (0: none)."
+    )
+    ai_search_thin_below: int = Field(
+        default=3,
+        ge=1,
+        le=100,
+        description="A holding is searched when the wire has fewer than this many items for "
+        "it in the window.",
+    )
+    ai_search_days: int = Field(
+        default=3, ge=1, le=14, description="How far back leads are asked for, and the window."
+    )
+    analysis_techniques: list[AnalysisTechnique] = Field(
+        default_factory=lambda: list(CODE_TECHNIQUES),
+        description="The analysis techniques that run. The default four are computed in code and "
+        "cost nothing; the others call a model (extraction first: impact chains, framing, claim "
+        "checks and thesis links read its output).",
+    )
+    extraction_model: ModelId = Field(
+        default="gpt-6-luna",
+        description="Extracts the typed event (actors, magnitude, claims with cited spans) from "
+        "a story's stored text.",
+    )
+    extraction_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    analysis_model: ModelId = Field(
+        default="gemini-3.8-flash",
+        description="Writes impact chains, framing comparisons, claim checks and thesis links.",
+    )
+    analysis_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    brief_model: ModelId = Field(
+        default="gemini-3.8-flash", description="Writes the morning and weekly briefs."
+    )
+    brief_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    analysis_per_run: int = Field(
+        default=25,
+        ge=0,
+        le=500,
+        description="Stories analysed by the model techniques per run (0: none); the most severe "
+        "and newest first.",
+    )
+    analysis_min_severity: int = Field(
+        default=1,
+        ge=0,
+        le=3,
+        description="Stories below this severity are not sent to a model for analysis.",
+    )
+    framing_min_outlets: int = Field(
+        default=3,
+        ge=2,
+        le=20,
+        description="A framing comparison needs this many independent outlets on the story.",
+    )
+    novelty_window_days: int = Field(
+        default=30, ge=1, le=120, description="How far back a story is compared for novelty."
+    )
+    novelty_repeat_similarity: float = Field(
+        default=0.88,
+        ge=0.5,
+        le=1.0,
+        description="Cosine similarity at or above which a story repeats an earlier one.",
+    )
+    novelty_update_similarity: float = Field(
+        default=0.72,
+        ge=0.3,
+        le=1.0,
+        description="Cosine similarity at or above which a story updates an earlier one "
+        "(below the repeat level).",
+    )
+    thread_window_days: int = Field(
+        default=21,
+        ge=1,
+        le=120,
+        description="A story joins a thread whose last update is within this many days.",
+    )
+    brief_max_lines: int = Field(
+        default=12, ge=3, le=40, description="Most lines in one brief (the highest ranked)."
+    )
+    brief_alert: bool = Field(
+        default=False,
+        description="Send the morning brief's top lines through the alert routing (Telegram or "
+        "email, by your alert rules) when it is written.",
+    )
+    gdelt_themes: bool = Field(
+        default=False,
+        description="Fetch GDELT's average tone and share of coverage for each watch theme once "
+        "a day (free, no key, one request per five seconds). Shown next to the theme counts; "
+        "never used for ranking or alerts.",
+    )
+    gdelt_max_themes: int = Field(
+        default=6, ge=1, le=40, description="Most themes fetched from GDELT per run."
+    )
+    theme_narratives: bool = Field(
+        default=True,
+        description="On Mondays the brief job writes a short cited narrative for each watch "
+        "theme with enough items in the week (needs the brief model's key).",
+    )
+    triage_model: ModelId = Field(
+        default="gpt-6-luna",
+        description="Triages each wire item: relevance to a global equity portfolio, topic, "
+        "named entities and a one-line gloss. Decides what gets full text and analysis.",
+    )
+    triage_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    triage_per_run: int = Field(
+        default=200, ge=0, le=2000, description="Wire items triaged per run (0: none)."
+    )
+    triage_fulltext_relevance: int = Field(
+        default=2,
+        ge=1,
+        le=3,
+        description="An unlinked wire item triaged at this relevance or above is also fetched "
+        "for full text (linked items always are).",
+    )
+    batch_extraction: bool = Field(
+        default=False,
+        description="Send extraction through the provider's batch endpoint (half price, but a "
+        "run waits up to an hour for the results).",
+    )
+    sector_benchmarks: dict[str, str] = Field(
+        default_factory=lambda: {},
+        description="Price symbol of the sector index to measure a holding against, by the "
+        "holding's sector (for example {'Technology': 'xlk.us'}). Without an entry the "
+        "country's market index is used.",
+    )
+    auto_resolve_days: int = Field(
+        default=14,
+        ge=0,
+        le=180,
+        description="A story that is confirmed or corroborated and has had no new item for this "
+        "many days is marked resolved (0: only you resolve stories).",
+    )
+    sentiment_weight: float = Field(
+        default=0.25,
+        ge=0.0,
+        le=1.0,
+        description="How much a strong verified sentiment can raise a story's rank in the "
+        "briefs (0: sentiment is not used for ranking).",
+    )
+    indirect_alert_min_severity: int = Field(
+        default=2,
+        ge=0,
+        le=3,
+        description="A story that reaches its holding only through a competitor, supplier, "
+        "customer or watch topic alerts only from this severity up (direct links alert from 1).",
+    )
+    embedding_model: ModelId = Field(
+        default="gemini-embedding-2",
+        description="Multilingual embedding of each wire item, used to group the same event "
+        "reported in different languages. Needs GOOGLE_API_KEY.",
+    )
+    embedding_dimensions: int = Field(default=768, ge=128, le=3072)
+    embedding_per_run: int = Field(
+        default=600, ge=0, le=5000, description="Items embedded per run (0: none)."
+    )
+    embedding_duplicate_threshold: float = Field(
+        default=0.90,
+        ge=0.5,
+        le=1.0,
+        description="Cosine similarity at or above which two wire items within the window are "
+        "the same event. High on purpose: a missed duplicate costs a repeat in the wire, a "
+        "wrong one hides a story. Tune with `python -m steward.news.eval_cluster --live`.",
+    )
+    duplicate_window_hours: int = Field(
+        default=36, ge=1, le=168, description="Items further apart than this are not grouped."
+    )
+    fulltext_per_run: int = Field(
+        default=40,
+        ge=0,
+        le=500,
+        description="Article pages fetched per run for holding-linked wire items (0: none). "
+        "Each source's own hourly allowance (`fetch.max_requests_per_hour`) also applies.",
+    )
+    fulltext_browser_fallback: bool = Field(
+        default=False,
+        description="Read an article page in a headless browser when a plain request is refused "
+        "(HTTP 403/429) or the page is an empty JavaScript shell. Never logs in or bypasses a "
+        "paywall. Needs Playwright (the `browser` extra).",
+    )
 
     @model_validator(mode="after")
     def _effort_supported(self) -> Self:
         check_effort(self.classification_model, self.classification_effort, "classification_effort")
         check_effort(self.corroboration_model, self.corroboration_effort, "corroboration_effort")
+        check_effort(self.translation_model, self.translation_effort, "translation_effort")
+        check_effort(self.search_lead_model, self.search_lead_effort, "search_lead_effort")
+        check_effort(self.extraction_model, self.extraction_effort, "extraction_effort")
+        check_effort(self.analysis_model, self.analysis_effort, "analysis_effort")
+        check_effort(self.brief_model, self.brief_effort, "brief_effort")
+        check_effort(self.triage_model, self.triage_effort, "triage_effort")
+        if self.novelty_update_similarity >= self.novelty_repeat_similarity:
+            raise ValueError("novelty_update_similarity must be below novelty_repeat_similarity")
+        if len(set(self.analysis_techniques)) != len(self.analysis_techniques):
+            raise ValueError("analysis_techniques lists a technique twice")
         return self
 
 
 class DigestSettings(ConfigModel):
-    model: ModelId = "claude-sonnet-5"
+    model: ModelId = "gpt-6.1-sol"
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     use_batch: bool = Field(
         default=True, description="Write the summary through the Batch API (half price)."
@@ -829,10 +1010,10 @@ class EscalationSettings(ConfigModel):
     """Event escalation: an impact note on a confirmed severity-2+ story or a price move."""
 
     enabled: bool = True
-    model: ModelId = "claude-sonnet-5"
+    model: ModelId = "gpt-6.1-sol"
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     max_steps: int = Field(
-        default=30, ge=1, le=100, description="Claude calls plus web searches per escalation."
+        default=30, ge=1, le=100, description="Model calls plus web searches per escalation."
     )
     max_searches: int = Field(default=15, ge=0, le=50)
     min_severity: int = Field(default=2, ge=1, le=3)
@@ -1341,7 +1522,7 @@ class MonitorSettings(ConfigModel):
 class ChatSettings(ConfigModel):
     """The chat panel's assistant: DB tools, web search on tiered outlets, cited answers."""
 
-    model: ModelId = "claude-sonnet-5"
+    model: ModelId = "gpt-6.1-sol"
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     rules_first: bool = Field(
         default=True,
@@ -1349,7 +1530,7 @@ class ChatSettings(ConfigModel):
         "the database with a template (no model call); everything else goes to the assistant.",
     )
     max_steps: int = Field(
-        default=30, ge=1, le=100, description="Claude calls plus tool rounds per answer."
+        default=30, ge=1, le=100, description="Model calls plus tool rounds per answer."
     )
     max_searches: int = Field(default=15, ge=0, le=50, description="Web searches per answer.")
     history_messages: int = Field(
@@ -1372,9 +1553,9 @@ class ChatSettings(ConfigModel):
 class ReviewSettings(ConfigModel):
     """The monthly review: compliance and figures in code, proposed actions by the model."""
 
-    model: ModelId = "claude-opus-5-5"
+    model: ModelId = "gpt-6.1-sol"
     effort: Effort = "high"
-    max_steps: int = Field(default=10, ge=1, le=50, description="Claude calls per review.")
+    max_steps: int = Field(default=10, ge=1, le=50, description="Model calls per review.")
     use_batch: bool = Field(
         default=True, description="Propose the actions through the Batch API (half price)."
     )
@@ -1987,6 +2168,29 @@ class JobsConfig(ConfigModel):
         description="Finds investor-relations pages for holdings that have none (web search, "
         "checked and approved by AI). Default: Mondays 07:30.",
     )
+    news_ai_search: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="20 6 * * *"),
+        description="Asks a search-capable model for recent news on holdings the wire covers "
+        "thinly. Results are leads at the lowest tier: they never alert on their own. On by "
+        "default (it spends on web searches, within the budget). Default: daily 06:20.",
+    )
+    news_triage: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="10 * * * *"),
+        description="Triages new wire items on a cheap model: relevance, topic, entities and a "
+        "one-line gloss. On by default (it spends on a model, within the budget). Default: hourly "
+        "at :10.",
+    )
+    news_analysis: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="25 */3 * * *"),
+        description="Analyses new stories: novelty, threads, market context and themes in code, "
+        "plus the model techniques selected in the news settings. Default: every 3 hours.",
+    )
+    news_brief: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="30 6 * * *"),
+        description="Writes the morning brief (and on Mondays the weekly brief and the "
+        "per-holding briefs) from stored stories, each line citing its items. On by default "
+        "(it spends on a model). Default: daily 06:30.",
+    )
     gap_research: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="0 8 * * 3"),
         description="Searches reliable web pages for facts the structured sources left empty "
@@ -2110,6 +2314,10 @@ class JobsConfig(ConfigModel):
             "edinet_filings": self.edinet_filings,
             "ai_approvals": self.ai_approvals,
             "ir_discovery": self.ir_discovery,
+            "news_ai_search": self.news_ai_search,
+            "news_triage": self.news_triage,
+            "news_analysis": self.news_analysis,
+            "news_brief": self.news_brief,
             "gap_research": self.gap_research,
             "exposure_build": self.exposure_build,
             "factor_returns": self.factor_returns,

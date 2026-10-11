@@ -1,6 +1,6 @@
 """The earnings thesis check job (`earnings_check`, params {"ticker", "report_date"?, "url"?}).
 
-locate -> fetch and archive -> extract (Claude, document only, no tools) -> validate in code
+locate -> fetch and archive -> extract (model, document only, no tools) -> validate in code
 -> store facts -> verdicts from verified facts. Extraction and judgement are separate:
 the verdict step never sees the page, only validated figures.
 
@@ -21,7 +21,7 @@ import asyncpg
 import httpx
 
 from steward import __version__
-from steward.ai import AINotConfigured, Usage, create_client
+from steward.ai import AINotConfigured, Usage
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import EarningsCheckSettings, JobsConfig
 from steward.config.prompts import load_prompts
@@ -31,11 +31,11 @@ from steward.config.verification import VerificationConfig
 from steward.documents.fetch import FetchError, default_headers, fetch_document
 from steward.earnings import metrics as metric_names
 from steward.earnings.extract import SYSTEM_PROMPT as EXTRACTION_SYSTEM
-from steward.earnings.extract import ClaudeExtractor, ExtractionError, ExtractionRequest, Extractor
+from steward.earnings.extract import ExtractionError, ExtractionRequest, Extractor, LLMExtractor
 from steward.earnings.ir_scan import locate_on_pages
 from steward.earnings.locate import (
     SEARCH_SYSTEM,
-    ClaudeSearchLocator,
+    LLMSearchLocator,
     Located,
     LocateError,
     Locator,
@@ -113,8 +113,7 @@ async def earnings_check_handler(ctx: JobContext) -> None:
     if settings.supabase_url is None or settings.supabase_secret_key is None:
         raise JobFailed("SUPABASE_URL and SUPABASE_SECRET_KEY are needed to archive evidence")
     try:
-        anthropic_client = create_client(settings)
-        client = routing_client(anthropic_client, create_llm(settings, anthropic_client))
+        client = routing_client(create_llm(settings))
     except AINotConfigured as exc:
         raise JobFailed(str(exc)) from exc
     stored_jobs = await load_active(ctx.pool, "jobs", JobsConfig)
@@ -129,14 +128,14 @@ async def earnings_check_handler(ctx: JobContext) -> None:
             storage=SupabaseStorage(
                 http, settings.supabase_url, settings.supabase_secret_key.get_secret_value()
             ),
-            extractor=ClaudeExtractor(
+            extractor=LLMExtractor(
                 client,
                 cfg.extraction_model,
                 cfg.effort,
                 prompts.text("earnings_extraction", EXTRACTION_SYSTEM, cfg.extraction_model),
             ),
             edgar=edgar,
-            locator=ClaudeSearchLocator(
+            locator=LLMSearchLocator(
                 client,
                 cfg.locate_model,
                 cfg.max_searches,
@@ -168,7 +167,7 @@ async def thesis_verdicts_handler(ctx: JobContext) -> None:
 
 
 class _Budget:
-    """Claude calls plus document fetches, capped per run by the Jobs config."""
+    """Model calls plus document fetches, capped per run by the Jobs config."""
 
     def __init__(self, limit: int) -> None:
         self.limit = limit

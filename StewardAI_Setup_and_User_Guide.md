@@ -1,7 +1,7 @@
 # StewardAI — setup and user guide
 
 A single owner's self-hosted portfolio copilot: it reads your Trading212 portfolio, stores
-your strategy and per-holding theses, and uses Claude to monitor, verify, and research your
+your strategy and per-holding theses, and uses language models (OpenAI and Google) to monitor, verify, and research your
 holdings. This guide covers getting it running and what every screen actually does. For the
 original design spec, see
 [AI_Portfolio_Copilot_Technical_Product_Description.md](AI_Portfolio_Copilot_Technical_Product_Description.md);
@@ -115,8 +115,7 @@ The variables, grouped by what they're for:
 | `NEXT_PUBLIC_API_BASE_URL` | no (default `http://localhost:8000`) | Where the frontend finds the Python API. |
 | `CORS_ORIGINS` | yes in prod | Comma-separated origins the API accepts (defaults to `http://localhost:3000` for dev). |
 | `T212_ENV`, `T212_API_KEY`, `T212_API_SECRET` | yes | Trading212 demo or live account, **read-only** key. Verify with `cd apps/backend && uv run python -m steward.trading212`. |
-| `ANTHROPIC_API_KEY` | yes | Claude API key — powers extraction, news classification, digests, impact notes, research, the monthly review, chat, and the claim verifier. |
-| `ANTHROPIC_WORKSPACE_ID` | no | Only for org-level keys scoped to a workspace. |
+| `OPENAI_API_KEY`, `GOOGLE_API_KEY` | at least one | OpenAI and Google keys (the default models are `gpt-6.1-sol`, `gpt-6-luna`, `gemini-3.8-flash`) — power extraction, news classification, digests, impact notes, research, the monthly review, chat, and the claim verifier. |
 | `SEC_USER_AGENT` | for EDGAR | Required by SEC's EDGAR API: filings, Form 13F, Forms 3/4/5 insider trades, Schedule 13D/G control stakes, N-PORT fund positions, XBRL fundamentals. Without it those jobs fail with a clear message. |
 | `FINNHUB_API_KEY` | no | Adds a US earnings-calendar and company-news source. |
 | `FRED_API_KEY` | no | Adds Fed macro series (Eurostat/ECB series need no key). |
@@ -377,7 +376,7 @@ Typical schedule (all configurable):
 |---|---|---|
 | Portfolio sync | daily | Trading212 positions, FX rates, a day's snapshot, new transactions, drift. |
 | News ingest | every 2h, 06:00–22:00 | Reads every enabled source, links items to holdings, clusters duplicates, classifies and corroborates. |
-| Earnings check | on report date +1/+2/+4 days, or on demand | Locates the release, extracts figures with Claude, validates them in code, judges KPI verdicts. |
+| Earnings check | on report date +1/+2/+4 days, or on demand | Locates the release, extracts figures with a model, validates them in code, judges KPI verdicts. |
 | Thesis verdicts | on demand (or after a thesis/fact change) | Re-judges KPI pass/breach/unknown from currently verified facts. |
 | Daily / weekly digest | 07:00 weekdays / Sun 18:00 | Assembles and sends the cited summary report. |
 | Monthly review | first weekday of the month | Compliance table, KPI statuses, cited proposed actions. |

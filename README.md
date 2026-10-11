@@ -1,7 +1,7 @@
 # StewardAI
 
 A single-user, self-hosted portfolio copilot: it reads a Trading212 portfolio, stores the
-owner's strategy and per-holding theses, and uses Claude to monitor, explain and research.
+owner's strategy and per-holding theses, and uses language models (OpenAI and Google) to monitor, explain and research.
 The full design is in
 [AI_Portfolio_Copilot_Technical_Product_Description.md](AI_Portfolio_Copilot_Technical_Product_Description.md).
 
@@ -10,14 +10,14 @@ phase 2b).** Phase 1 syncs Trading212 daily with ČNB/ECB FX and shows drift, Ov
 Holdings. Phase 1b adds the strategy and jobs editors, config version history with diff,
 rollback and JSON export/import, the transactions view, deployment packaging (`deploy/`)
 with a worker heartbeat, and a live-data sign-off report. Phase 2 checks each results
-release (archived, read by Claude into figures with verbatim snippets, validated in code,
+release (archived, read by a model into figures with verbatim snippets, validated in code,
 judged against the thesis KPIs); its follow-ups add report-date triggers with retries,
 XBRL reconciliation and restatements, the owner review queue, the thesis board and
 per-call cost accounting. Phase 2b resolves identity and structure (OpenFIGI, ESMA,
 GLEIF, Wikidata), stores price history and risk metrics, FX history and the exchange
 calendar, and raises lifecycle events. Phase 3 is the news pipeline: feeds, IR pages,
 EDGAR filings and full-text search, RNS/EQS (off by default), Finnhub and macro sources are
-ingested, clustered, linked, classified by Claude Haiku and corroborated; confirmed events
+ingested, clustered, linked, classified by a model and corroborated; confirmed events
 alert through Telegram or email under the notification rules, get a Sonnet impact note
 when severe, and daily and weekly digests cite every claim. Rule breaches, price moves,
 macro surprises, failed jobs, missed runs and coverage gaps alert once each. Phase 4

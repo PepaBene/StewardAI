@@ -1,7 +1,7 @@
 """The Budget config's spend limits, checked before every AI request of a job.
 
-`steward.ai.create_client` returns a client whose every Messages request (single and batch)
-first asks `before_request` here, for the job running in the current task
+The model client in `steward.llm` makes every request (single and batch)
+first ask `before_request` here, for the job running in the current task
 (`steward.jobs.runner.current_job`; requests outside a job, such as the eval scripts, are not
 limited). The check is one small query per request:
 
@@ -11,6 +11,9 @@ limited). The check is one small query per request:
   response's usage, as the step will be).
 - A run whose own spend has reached its cap (`per_job_cap_usd`, else `default_job_cap_usd`)
   fails before its next request.
+- A job type's own monthly cap (`per_job_monthly_cap_usd`) stops its runs before their next
+  request once the month's spend of that job type reaches it, so one stage cannot use up the
+  whole monthly budget.
 - At the monthly cap, a job type not in `critical_job_types` fails before its next request
   (`pause_noncritical`) or has the request sent to `downgrade_model`
   (`downgrade_noncritical`); `alert_only` only alerts.
@@ -35,7 +38,6 @@ from steward.config.notifications import NotificationsConfig
 from steward.config.store import load_active
 from steward.costs import PriceTable
 from steward.jobs.runner import JobContext, JobFailed
-from steward.llm.types import provider_of
 from steward.notify.alerts import create_alerts
 from steward.notify.route import AlertRequest
 
@@ -45,8 +47,8 @@ BUDGET_TZ = ZoneInfo("Europe/Prague")
 
 
 class BudgetExceeded(JobFailed):
-    """A request refused by the Budget config's caps. It is not an `anthropic.APIError`, so
-    call sites that retry or skip on API errors let it fail the step and the job."""
+    """A request refused by the Budget config's caps. It is not an `LLMError`, so
+    call sites that retry or skip on model errors let it fail the step and the job."""
 
 
 def month_of(moment: dt.datetime) -> str:
@@ -114,10 +116,12 @@ async def before_request(
     model: str,
     *,
     now: dt.datetime | None = None,
-    can_switch_provider: bool = False,
+    can_switch_provider: bool = True,
 ) -> str:
     """The model to send a request of `ctx`'s job with (`model`, or the downgrade model at
-    the monthly cap); raises `BudgetExceeded` when the request must not be sent."""
+    the monthly cap); raises `BudgetExceeded` when the request must not be sent.
+    `can_switch_provider` is accepted for existing callers and has no effect."""
+    del can_switch_provider
     state = await _state(ctx)
     cfg = state.config
     now = now or dt.datetime.now(dt.UTC)
@@ -144,6 +148,23 @@ async def before_request(
             f"AI budget of one {ctx.job_type} run reached ({_usd(spent)} of {_usd(job_cap)});"
             " the run is stopped"
         )
+    type_cap = cfg.job_monthly_cap(ctx.job_type)
+    if type_cap is not None:
+        earlier: Decimal = await ctx.pool.fetchval(
+            "select coalesce(sum(s.cost_usd), 0) from public.job_step s"
+            " join public.job j on j.id = s.job_id"
+            " where s.cost_usd is not null and j.job_type = $1 and s.job_id <> $2"
+            " and s.started_at >= $3 and s.started_at < $4",
+            ctx.job_type,
+            ctx.job_id,
+            start,
+            end,
+        )
+        if earlier + spent >= Decimal(str(type_cap)):
+            raise BudgetExceeded(
+                f"monthly AI budget of {ctx.job_type} jobs reached"
+                f" ({_usd(earlier + spent)} of {_usd(type_cap)}); the run is stopped"
+            )
     cap = cfg.monthly_cap_usd
     if cap is None:
         return model
@@ -156,13 +177,6 @@ async def before_request(
     if cfg.at_cap == "pause_noncritical":
         raise BudgetExceeded(
             f"monthly AI budget reached ({_usd(total)} of {_usd(cap)}); non-critical jobs paused"
-        )
-    if provider_of(cfg.downgrade_model) != provider_of(model) and not can_switch_provider:
-        # A raw Anthropic request cannot be re-sent to another provider's model; calls made
-        # through `steward.llm` can, so only those survive a cross-provider downgrade.
-        raise BudgetExceeded(
-            f"monthly AI budget reached ({_usd(total)} of {_usd(cap)}); this call cannot move to"
-            f" {cfg.downgrade_model} and is paused"
         )
     if model != cfg.downgrade_model:
         state.downgraded[model] = cfg.downgrade_model

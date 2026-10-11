@@ -37,7 +37,7 @@ Plan P0.6, written **2026-10-07**, before any collector is enabled. A dataset is
 
 ### Measured 2026-10-08 on the production database (labels by the model, not a person)
 
-The owner asked the model to adjudicate with its own judgement. Labels are stored under sample key `prod-20261008-model`, reviewer `claude-model (not a human)`, every note starting `[model-adjudicated]`. The process above asks for a person, so **no gate below counts as passed for release**; the numbers say where the datasets stand and which defects to fix.
+The owner asked the model to adjudicate with its own judgement. Labels are stored under sample key `prod-20261008-model`, reviewer `ai-model (not a human)`, every note starting `[model-adjudicated]`. The process above asks for a person, so **no gate below counts as passed for release**; the numbers say where the datasets stand and which defects to fix.
 
 | Dataset | Labelled | Correct | Rate | Bar | Result |
 |---|---|---|---|---|---|

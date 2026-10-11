@@ -299,6 +299,30 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Finds investor-relations pages for holdings that have none, by web search; checks them and has AI approve them. Pages you set yourself are never changed.",
     cron: "30 7 * * 1",
   },
+  news_ai_search: {
+    label: "AI news search",
+    description:
+      "Asks a search-capable model for recent news on holdings the wire covers thinly. Results are leads at the lowest tier and never alert on their own. Off by default because it spends on web searches.",
+    cron: "20 6 * * *",
+  },
+  news_triage: {
+    label: "News triage",
+    description:
+      "Reads new wire items on a cheap model and records relevance, topic, named entities and a one-line gloss. Decides which unlinked items are fetched in full. Off by default because it spends on a model.",
+    cron: "10 * * * *",
+  },
+  news_analysis: {
+    label: "News analysis",
+    description:
+      "Analyses new stories: novelty, threads, market context and themes in code, plus the model techniques chosen in the news settings (event extraction, impact chains, framing, claim checks, thesis links).",
+    cron: "25 */3 * * *",
+  },
+  news_brief: {
+    label: "News brief",
+    description:
+      "Writes the morning brief, and on Mondays the weekly and per-holding briefs, from stored stories. Every line cites its items. Off by default because it spends on a model.",
+    cron: "30 6 * * *",
+  },
   gap_research: {
     label: "Gap research",
     description:
@@ -374,8 +398,8 @@ export const DEFAULT_JOBS: JobsConfig = {
     SCHEDULE_KEYS.map((k) => [k, { enabled: !OFF_BY_DEFAULT.includes(k), cron: SCHEDULES[k].cron, timezone: DEFAULT_TIMEZONE }]),
   ) as Record<ScheduleKey, JobSchedule>),
   earnings_check: {
-    extraction_model: "claude-sonnet-5",
-    locate_model: "claude-sonnet-5",
+    extraction_model: "gpt-6.1-sol",
+    locate_model: "gpt-6.1-sol",
     effort: "high",
     locate_effort: null,
     max_steps: 40,
@@ -385,9 +409,9 @@ export const DEFAULT_JOBS: JobsConfig = {
     xbrl_for_filings: true,
     kpi_history_periods: 8,
   },
-  earnings_calendar_settings: { model: "claude-haiku-4-5", effort: null, lookahead_days: 120, refresh_within_days: 14, use_batch: true, batch_wait_minutes: 60 },
+  earnings_calendar_settings: { model: "gpt-6-luna", effort: null, lookahead_days: 120, refresh_within_days: 14, use_batch: true, batch_wait_minutes: 60 },
   ai_approval: {
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: null,
     listings: true,
     peers: true,
@@ -403,7 +427,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     batch_wait_minutes: 60,
   },
   ir_discovery_settings: {
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: null,
     max_searches: 4,
     holdings_per_run: 6,
@@ -430,7 +454,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     robots_exempt_domains: [],
   },
   exposure_build_settings: {
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: null,
     filings_per_run: 6,
     extract_inputs: true,
@@ -438,7 +462,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     map_products: true,
   },
   gap_research_settings: {
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: null,
     slots: ["next_report_date", "shares_outstanding", "company_description"],
     max_searches: 3,
@@ -489,21 +513,65 @@ export const DEFAULT_JOBS: JobsConfig = {
     ],
   },
   news: {
-    classification_model: "claude-haiku-4-5",
+    classification_model: "gpt-6-luna",
     classification_effort: null,
     classification_batch_size: 50,
     classification_use_batch: true,
     classification_batch_wait_minutes: 30,
-    corroboration_model: "claude-haiku-4-5",
+    corroboration_model: "gpt-6-luna",
     corroboration_effort: null,
     corroboration_max_searches: 10,
     corroboration_rounds: 3,
     recheck_hours: 48,
     max_items_per_run: 10_000,
     edgar_fts_max_hits: 100,
+    translation_model: "gpt-6-luna",
+    translation_effort: null,
+    translation_per_run: 300,
+    search_lead_model: "gpt-6-luna",
+    search_lead_effort: null,
+    ai_search_max_searches: 3,
+    ai_search_max_holdings: 10,
+    ai_search_thin_below: 3,
+    ai_search_days: 3,
+    analysis_techniques: ["novelty", "thread", "market", "themes"],
+    extraction_model: "gpt-6-luna",
+    extraction_effort: null,
+    analysis_model: "gemini-3.8-flash",
+    analysis_effort: null,
+    brief_model: "gemini-3.8-flash",
+    brief_effort: null,
+    analysis_per_run: 25,
+    analysis_min_severity: 1,
+    framing_min_outlets: 3,
+    novelty_window_days: 30,
+    novelty_repeat_similarity: 0.88,
+    novelty_update_similarity: 0.72,
+    thread_window_days: 21,
+    brief_max_lines: 12,
+    brief_alert: false,
+    gdelt_themes: false,
+    gdelt_max_themes: 6,
+    theme_narratives: true,
+    triage_model: "gpt-6-luna",
+    triage_effort: null,
+    triage_per_run: 200,
+    triage_fulltext_relevance: 2,
+    batch_extraction: false,
+    sector_benchmarks: {},
+    auto_resolve_days: 14,
+    sentiment_weight: 0.25,
+    indirect_alert_min_severity: 2,
+    embedding_model: "gemini-embedding-2",
+    embedding_dimensions: 768,
+    embedding_per_run: 600,
+    embedding_duplicate_threshold: 0.9,
+    duplicate_window_hours: 36,
+    fulltext_per_run: 40,
+    fulltext_browser_fallback: false,
   },
   digest: {
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: null,
     use_batch: true,
     batch_wait_minutes: 60,
@@ -514,7 +582,7 @@ export const DEFAULT_JOBS: JobsConfig = {
   },
   escalation: {
     enabled: true,
-    model: "claude-sonnet-5",
+    model: "gpt-6.1-sol",
     effort: null,
     max_steps: 30,
     max_searches: 15,
@@ -592,9 +660,9 @@ export const DEFAULT_JOBS: JobsConfig = {
     intraday_cache_seconds: 120,
   },
   calendar: { holiday_countries: ["CZ", "US", "DE", "GB"], exchange_closures: [] },
-  chat: { model: "claude-sonnet-5", effort: null, max_steps: 30, max_searches: 15, history_messages: 100, source_tiers: [1, 2], rules_first: true },
+  chat: { model: "gpt-6.1-sol", effort: null, max_steps: 30, max_searches: 15, history_messages: 100, source_tiers: [1, 2], rules_first: true },
   review: {
-    model: "claude-opus-5-5",
+    model: "gpt-6.1-sol",
     effort: "high",
     max_steps: 10,
     use_batch: true,
@@ -633,19 +701,10 @@ export const DEFAULT_JOBS: JobsConfig = {
   xbrl: { enabled: true, quarterly: true, read_ads_ratio: true, max_document_mb: 40 },
 };
 
-/** Model ids offered as suggestions; any `claude-…` id is accepted. */
-export const MODEL_SUGGESTIONS = [
-  "claude-fable-5-1",
-  "claude-opus-5-5",
-  "claude-opus-5",
-  "claude-opus-4-8",
-  "claude-sonnet-5",
-  "claude-sonnet-4-6",
-  "claude-haiku-4-5",
-];
+/** Model ids offered as suggestions; any `gpt-…` or `gemini-…` id is accepted. */
+export const MODEL_SUGGESTIONS = ["gpt-6.1-sol", "gpt-6-luna", "gemini-3.8-flash"];
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
-export const EFFORT_OPTIONAL_HINT =
-  "Model default: effort is not sent. On Haiku 4 models the level sets an extended-thinking budget (low 2k to max 32k tokens).";
+export const EFFORT_OPTIONAL_HINT = "Model default: effort is not sent.";
 export const TIERS = [1, 2, 3] as const;
 
 /** "2, 1, 2" -> [1, 2]: outlet tiers, ascending and unique; anything else is dropped. */
@@ -692,7 +751,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "locate_model", label: "Locate model", kind: "model", hint: "Searches for the release when EDGAR has none." },
       { key: "effort", label: "Extraction effort", kind: "effort" },
       { key: "locate_effort", label: "Locate effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
-      { key: "max_steps", label: "Step cap per run", kind: "int", min: 2, max: 200, hint: "Claude calls plus document fetches." },
+      { key: "max_steps", label: "Step cap per run", kind: "int", min: 2, max: 200, hint: "Model calls plus document fetches." },
       { key: "max_searches", label: "Web searches per run", kind: "int", min: 0, max: 100 },
       { key: "check_days_after_report", label: "Days after the report date to check", kind: "int-list", hint: "Comma separated, e.g. 1, 2, 4 (retries until the release is found)." },
       { key: "max_document_mb", label: "Largest document (MB)", kind: "int", min: 1, max: 32 },
@@ -788,6 +847,49 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "recheck_hours", label: "Re-check unconfirmed stories for (hours)", kind: "int", min: 1, max: 168 },
       { key: "max_items_per_run", label: "Classification cap per run", kind: "int", min: 10, max: 100_000, hint: "Cost guard." },
       { key: "edgar_fts_max_hits", label: "EDGAR full-text hits per query", kind: "int", min: 10, max: 10_000, hint: "Read 100 per request; EDGAR serves at most 10,000. A query with more is noted in the collect step." },
+      { key: "translation_model", label: "Translation model", kind: "model" },
+      { key: "translation_effort", label: "Translation effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
+      { key: "translation_per_run", label: "Items translated per run", kind: "int", min: 0, max: 5000, hint: "0 turns translation off." },
+      { key: "embedding_model", label: "Embedding model", kind: "model", hint: "Groups the same event across languages." },
+      { key: "embedding_dimensions", label: "Embedding dimensions", kind: "int", min: 128, max: 3072 },
+      { key: "embedding_per_run", label: "Items embedded per run", kind: "int", min: 0, max: 5000, hint: "0 turns embedding off." },
+      { key: "embedding_duplicate_threshold", label: "Duplicate similarity threshold", kind: "number", hint: "Cosine similarity at or above which two reports are one event. Set from the cross-language evaluation." },
+      { key: "duplicate_window_hours", label: "Duplicate window (hours)", kind: "int", min: 1, max: 168 },
+      { key: "fulltext_per_run", label: "Articles read in full per run", kind: "int", min: 0, max: 1000 },
+      { key: "fulltext_browser_fallback", label: "Browser fallback for article pages", kind: "bool", hint: "Needs Playwright. Never logs in or bypasses a paywall." },
+      { key: "search_lead_model", label: "AI search model", kind: "model" },
+      { key: "search_lead_effort", label: "AI search effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
+      { key: "ai_search_max_searches", label: "Web searches per holding", kind: "int", min: 1, max: 20 },
+      { key: "ai_search_max_holdings", label: "Holdings searched per run", kind: "int", min: 0, max: 100 },
+      { key: "ai_search_thin_below", label: "Search holdings with fewer items than", kind: "int", min: 1, max: 100 },
+      { key: "ai_search_days", label: "AI search window (days)", kind: "int", min: 1, max: 14 },
+      { key: "indirect_alert_min_severity", label: "Lowest severity that alerts for an indirect link", kind: "int", min: 0, max: 3 },
+      { key: "triage_model", label: "Triage model", kind: "model", hint: "Cheap model that scores each wire item." },
+      { key: "triage_effort", label: "Triage effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
+      { key: "triage_per_run", label: "Wire items triaged per run", kind: "int", min: 0, max: 2000, hint: "0 turns triage off." },
+      { key: "triage_fulltext_relevance", label: "Relevance that earns full text for an unlinked item", kind: "int", min: 1, max: 3 },
+      { key: "batch_extraction", label: "Send extraction through the batch endpoint", kind: "bool", hint: "Half price, but a run waits up to an hour." },
+      { key: "auto_resolve_days", label: "Days of quiet before a confirmed story is resolved", kind: "int", min: 0, max: 180, hint: "0: only you resolve stories." },
+      { key: "sentiment_weight", label: "Sentiment weight in brief ranking", kind: "number", hint: "0 to 1. How much a strong verified sentiment can raise a story's rank." },
+      { key: "brief_alert", label: "Alert the top lines of the morning brief", kind: "bool" },
+      { key: "theme_narratives", label: "Write a weekly narrative per theme", kind: "bool" },
+      { key: "gdelt_themes", label: "Fetch GDELT tone and attention for themes", kind: "bool", hint: "Free, no key. Shown next to theme counts; never used for ranking or alerts." },
+      { key: "gdelt_max_themes", label: "Themes fetched from GDELT per run", kind: "int", min: 1, max: 40 },
+      { key: "analysis_techniques", label: "Analysis techniques", kind: "words", hint: "Comma-separated: novelty, thread, market, themes (free, computed in code) and extraction, impact, framing, claims, thesis, sentiment (call a model; impact, claims and thesis need extraction)." },
+      { key: "extraction_model", label: "Event extraction model", kind: "model" },
+      { key: "extraction_effort", label: "Event extraction effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
+      { key: "analysis_model", label: "Analysis model", kind: "model", hint: "Impact explanations, framing, claim checks and thesis links." },
+      { key: "analysis_effort", label: "Analysis effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
+      { key: "brief_model", label: "Brief model", kind: "model" },
+      { key: "brief_effort", label: "Brief effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
+      { key: "analysis_per_run", label: "Stories analysed by a model per run", kind: "int", min: 0, max: 500, hint: "0 turns the model techniques off. The most severe and newest go first." },
+      { key: "analysis_min_severity", label: "Lowest severity analysed by a model", kind: "int", min: 0, max: 3 },
+      { key: "framing_min_outlets", label: "Outlets needed for a framing comparison", kind: "int", min: 2, max: 20 },
+      { key: "novelty_window_days", label: "Novelty window (days)", kind: "int", min: 1, max: 120 },
+      { key: "novelty_repeat_similarity", label: "Repeat similarity", kind: "number", hint: "Cosine similarity at or above which a story repeats an earlier one." },
+      { key: "novelty_update_similarity", label: "Update similarity", kind: "number", hint: "Below the repeat similarity." },
+      { key: "thread_window_days", label: "Thread window (days)", kind: "int", min: 1, max: 120 },
+      { key: "brief_max_lines", label: "Lines per brief", kind: "int", min: 3, max: 40 },
     ],
   },
   digest: {
@@ -811,7 +913,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
       { key: "enabled", label: "Write impact notes", kind: "bool", hint: "Off: no escalation is queued." },
       { key: "model", label: "Model", kind: "model" },
       { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
-      { key: "max_steps", label: "Step cap per note", kind: "int", min: 1, max: 100, hint: "Claude calls plus web searches." },
+      { key: "max_steps", label: "Step cap per note", kind: "int", min: 1, max: 100, hint: "Model calls plus web searches." },
       { key: "max_searches", label: "Web searches per note", kind: "int", min: 0, max: 50, hint: "Restricted to the outlet tiers below." },
       { key: "source_tiers", label: "Outlet tiers web search may use", kind: "tiers", hint: "Tiers are set per domain in Config: News sources." },
       { key: "min_severity", label: "Escalate stories from severity", kind: "severity" },
@@ -878,7 +980,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
     fields: [
       { key: "model", label: "Model", kind: "model" },
       { key: "effort", label: "Effort", kind: "effort-optional", hint: EFFORT_OPTIONAL_HINT },
-      { key: "max_steps", label: "Step cap per answer", kind: "int", min: 1, max: 100, hint: "Claude calls plus tool rounds." },
+      { key: "max_steps", label: "Step cap per answer", kind: "int", min: 1, max: 100, hint: "Model calls plus tool rounds." },
       { key: "max_searches", label: "Web searches per answer", kind: "int", min: 0, max: 50 },
       { key: "history_messages", label: "Earlier messages sent along", kind: "int", min: 2, max: 500 },
       { key: "rules_first", label: "Answer portfolio value and cash questions from the database", kind: "bool", hint: "Short, closed questions only; no model call. Everything else goes to the assistant." },
@@ -891,7 +993,7 @@ export const SETTINGS: { [S in SettingsKey]: { title: string; description: strin
     fields: [
       { key: "model", label: "Model", kind: "model" },
       { key: "effort", label: "Effort", kind: "effort" },
-      { key: "max_steps", label: "Claude calls per review", kind: "int", min: 1, max: 50 },
+      { key: "max_steps", label: "Model calls per review", kind: "int", min: 1, max: 50 },
       { key: "use_batch", label: "Propose through the Batch API (half price)", kind: "bool" },
       { key: "batch_wait_minutes", label: "Wait for the batch (minutes)", kind: "int", min: 1, max: 720, hint: "Then the actions are proposed directly." },
       {
@@ -1222,7 +1324,11 @@ export function jobsToBody(form: JobsForm): JobsConfig {
       else if (field.kind === "lines") out[field.key] = list(String(v), /\n/);
       else if (field.kind === "symbol-lines") out[field.key] = parseSymbolLines(String(v));
       else if (field.kind === "codes") out[field.key] = list(String(v), /[\s,;]+/).map((c) => c.toUpperCase());
-      else if (field.kind === "words") out[field.key] = list(String(v), /[\s,;]+/);
+      else if (field.kind === "words") {
+        const words = list(String(v), /[\s,;]+/);
+        // The backend matches technique names exactly, so "Novelty" must not silently switch one off.
+        out[field.key] = field.key === "analysis_techniques" ? words.map((w) => w.toLowerCase()) : words;
+      }
       else if (field.kind === "effort-optional") out[field.key] = String(v).trim() || null;
       else if (field.kind === "tiers") out[field.key] = parseTiers(String(v));
       else if (field.kind === "int-list")

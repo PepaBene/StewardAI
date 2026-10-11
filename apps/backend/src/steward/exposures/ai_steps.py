@@ -6,7 +6,6 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-import anthropic
 import asyncpg
 import pydantic
 
@@ -39,11 +38,13 @@ from steward.graph.dependencies import (
 )
 from steward.graph.jobs import load_graph_holdings
 from steward.jobs.runner import JobContext
+from steward.llm.routing import RoutingClient
+from steward.llm.types import LLMError
 from steward.sources.edgar import EdgarClient, EdgarError
 from steward.storage import EvidenceStore
 
 # What one holding's AI call can raise without the others being affected.
-AI_ERRORS = (anthropic.APIError, pydantic.ValidationError, ValueError)
+AI_ERRORS = (LLMError, pydantic.ValidationError, ValueError)
 RETRY_EMPTY_AFTER_DAYS = 30
 
 
@@ -111,7 +112,7 @@ async def _source(
 
 async def run_products(
     ctx: JobContext,
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     cfg: ExposureBuildSettings,
     holdings: Sequence[Mapping[str, Any]],
     usage: Usage,
@@ -181,7 +182,7 @@ async def _previous_detail(pool: asyncpg.Pool, ticker: str) -> Any:
 
 async def run_inputs(
     ctx: JobContext,
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     cfg: ExposureBuildSettings,
     edgar: EdgarClient | None,
     holdings: Sequence[Mapping[str, Any]],
@@ -288,7 +289,7 @@ async def run_inputs(
 
 async def run_dependencies(
     ctx: JobContext,
-    client: anthropic.AsyncAnthropic,
+    client: RoutingClient,
     cfg: ExposureBuildSettings,
     edgar: EdgarClient | None,
     holdings: Sequence[Mapping[str, Any]],

@@ -2,7 +2,7 @@
 
 1. A URL given with the run (the owner pointing at a specific release).
 2. SEC EDGAR: the 8-K item 2.02 or 6-K filed on or just after the report date.
-3. A Claude web search restricted to the holding profile's domains (its IR site, results
+3. A model web search restricted to the holding profile's domains (its IR site, results
    pages and any extra domains). The URL it returns is used only if it appeared in the
    search results and its host is one of those domains, so a hallucinated or off-site
    link is never fetched.
@@ -13,13 +13,14 @@ from dataclasses import dataclass
 from typing import Any, Protocol, cast
 from urllib.parse import urlsplit
 
-import anthropic
 import pydantic
 from pydantic import BaseModel, Field
 
 from steward.ai import Usage
 from steward.config.jobs import effort_kwargs
 from steward.earnings.periods import period_label
+from steward.llm.routing import RoutingClient
+from steward.llm.types import LLMError
 from steward.research.writer import web_search_tool
 
 
@@ -104,10 +105,10 @@ def _result_urls(content: list[Any]) -> set[str]:
     return urls
 
 
-class ClaudeSearchLocator:
+class LLMSearchLocator:
     def __init__(
         self,
-        client: anthropic.AsyncAnthropic,
+        client: RoutingClient,
         model: str,
         max_searches: int,
         system: str = SEARCH_SYSTEM,
@@ -132,31 +133,24 @@ class ClaudeSearchLocator:
             f"Allowed domains: {', '.join(request.domains)}.\n"
             f"Known results pages:{hints or ' none'}"
         )
-        messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
-        seen: set[str] = set()
-        for _ in range(3):  # pause_turn continuations
-            try:
-                response = await self._client.messages.parse(
-                    model=self._model,
-                    system=self._system,
-                    messages=messages,  # type: ignore[arg-type]
-                    # Haiku 4 models take only the older web search tool version.
-                    tools=cast(
-                        Any,
-                        [web_search_tool(self._model, self._max_searches, tuple(request.domains))],
-                    ),
-                    output_format=LocatedDocument,
-                    **effort_kwargs(self._model, self._effort, 8000),
-                )
-            except anthropic.APIError as exc:
-                raise LocateError(f"search call failed: {exc}", usage) from exc
-            except (pydantic.ValidationError, ValueError) as exc:
-                raise LocateError(f"the search answer was not valid JSON: {exc}", usage) from exc
-            usage.add(response.usage)
-            seen |= _result_urls(response.content)
-            if response.stop_reason != "pause_turn":
-                break
-            messages.append({"role": "assistant", "content": response.content})
+        try:
+            response = await self._client.messages.parse(
+                model=self._model,
+                system=self._system,
+                messages=cast(Any, [{"role": "user", "content": prompt}]),
+                tools=cast(
+                    Any,
+                    [web_search_tool(self._model, self._max_searches, tuple(request.domains))],
+                ),
+                output_format=LocatedDocument,
+                **effort_kwargs(self._model, self._effort, 8000),
+            )
+        except LLMError as exc:
+            raise LocateError(f"search call failed: {exc}", usage) from exc
+        except (pydantic.ValidationError, ValueError) as exc:
+            raise LocateError(f"the search answer was not valid JSON: {exc}", usage) from exc
+        usage.add(response.usage)
+        seen = _result_urls(response.content)
         answer = response.parsed_output
         if answer is None or not answer.url:
             return None, usage

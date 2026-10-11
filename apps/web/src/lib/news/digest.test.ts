@@ -42,7 +42,7 @@ const body: DigestBody = {
   ],
   alerts_sent: 1,
   dropped_sentences: 0,
-  writer: "claude-sonnet-5",
+  writer: "gpt-6.1-sol",
 };
 
 describe("digest citations", () => {

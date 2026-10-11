@@ -8,27 +8,23 @@ Code writes everything factual:
 - flags: positions large against their market's daily turnover (FITRS), holdings sharing an
   ultimate parent (GLEIF) and their combined weight, and falling 13F holder counts.
 
-The model (Opus 5.5 by default) reads that and proposes actions. Each action must cite a
+The model reads that and proposes actions. Each action must cite a
 strategy rule id or a thesis KPI ("TICKER:kpi_id") that exists; code drops any action that
 cites neither, so no action is published without a citation.
 """
 
-import asyncio
 import datetime as dt
 import json
 import logging
 from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
+from typing import TYPE_CHECKING, Literal, Protocol
 
-import anthropic
 import asyncpg
 import pydantic
-from anthropic import transform_schema
-from anthropic.types import MessageParam
 from pydantic import BaseModel, Field
 
-from steward.ai import AINotConfigured, Usage, create_client
-from steward.config.jobs import JobsConfig, ReviewSettings, effort_kwargs, reasoning_kwargs
+from steward.ai import AINotConfigured, Usage
+from steward.config.jobs import JobsConfig, ReviewSettings, effort_kwargs
 from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.config.strategy import (
@@ -41,9 +37,9 @@ from steward.config.strategy import (
 from steward.config.thesis import ThesesConfig
 from steward.jobs.runner import JobContext
 from steward.journal.service import scorecard as journal_scorecard
-from steward.llm.client import LLM, create_llm
-from steward.llm.routing import routing_client
-from steward.llm.types import Message, Request, provider_of
+from steward.llm.client import create_llm
+from steward.llm.routing import RoutingClient, routing_client
+from steward.llm.types import LLMError, Message, Request
 from steward.ownership.read import holding_ownership
 from steward.performance.alerts import PerformanceBreach, alert_performance
 from steward.performance.review import performance_review
@@ -213,37 +209,31 @@ reviewed less often than their tier requires (speculative monthly, others quarte
 """
 
 
-class ClaudeReviewWriter:
-    """Proposes the actions: through the Batch API when `use_batch` is set (the review is not
-    time-sensitive; half price), falling back to direct calls when the batch does not finish
-    within `batch_wait_minutes` or fails. No cache breakpoint: one call a month, and a retry
-    only after a failure, so a cache write would almost never be read back."""
+class LLMReviewWriter:
+    """Proposes the actions: through the provider's batch API when `use_batch` is set (the
+    review is not time-sensitive; half price), falling back to direct calls when the batch
+    does not finish within `batch_wait_minutes` or fails."""
 
     def __init__(
         self,
-        client: anthropic.AsyncAnthropic,
+        client: RoutingClient,
         settings: ReviewSettings,
         system: str = SYSTEM,
         poll_seconds: float = 30.0,
-        llm: LLM | None = None,
     ) -> None:
         self._client = client
         self._settings = settings
         self._system = system
         self._poll = poll_seconds
-        self._llm = llm
 
-    def _messages(self, material: str, today: dt.date) -> list[MessageParam]:
-        return [cast(MessageParam, {"role": "user", "content": f"Today is {today}.\n\n{material}"})]
+    def _messages(self, material: str, today: dt.date) -> list[dict[str, str]]:
+        return [{"role": "user", "content": f"Today is {today}.\n\n{material}"}]
 
     async def propose(
         self, material: str, today: dt.date
     ) -> tuple[ReviewDraft | None, Usage, str | None]:
         if self._settings.use_batch:
-            if provider_of(self._settings.model) == "anthropic":
-                batched = await self._propose_batch(material, today)
-            else:
-                batched = await self._propose_batch_other(material, today)
+            batched = await self._propose_batch(material, today)
             if batched is not None:
                 return batched
         return await self._propose_direct(material, today)
@@ -251,66 +241,8 @@ class ClaudeReviewWriter:
     async def _propose_batch(
         self, material: str, today: dt.date
     ) -> tuple[ReviewDraft | None, Usage, str | None] | None:
-        """The draft through the Batch API, or None to fall back to direct calls (the batch
-        did not finish in time or failed before a message came back). A message that came
-        back is final, parseable or not, so its batch-priced tokens are recorded exactly."""
-        usage = Usage(model=self._settings.model, batch=True)
-        params = {
-            "model": self._settings.model,
-            "system": self._system,
-            "messages": self._messages(material, today),
-            **reasoning_kwargs(
-                self._settings.model,
-                self._settings.effort,
-                16000,
-                {
-                    "format": {
-                        "type": "json_schema",
-                        "schema": transform_schema(ReviewDraft.model_json_schema()),
-                    }
-                },
-            ),
-        }
-        try:
-            batch = await self._client.messages.batches.create(
-                requests=[{"custom_id": "review", "params": cast(Any, params)}]
-            )
-            loop = asyncio.get_running_loop()
-            deadline = loop.time() + self._settings.batch_wait_minutes * 60
-            while batch.processing_status != "ended":
-                if loop.time() > deadline:
-                    await self._client.messages.batches.cancel(batch.id)
-                    logger.warning("review batch %s not done in time; calling directly", batch.id)
-                    return None
-                await asyncio.sleep(self._poll)
-                batch = await self._client.messages.batches.retrieve(batch.id)
-            async for result in await self._client.messages.batches.results(batch.id):
-                if result.custom_id != "review":
-                    continue
-                if result.result.type != "succeeded":
-                    logger.warning("review batch request %s", result.result.type)
-                    return None
-                message = result.result.message
-                usage.add(message.usage)
-                if message.stop_reason == "refusal":
-                    return None, usage, "the model declined"
-                text = "".join(getattr(b, "text", "") for b in message.content if b.type == "text")
-                try:
-                    return ReviewDraft.model_validate_json(text), usage, None
-                except pydantic.ValidationError:
-                    return None, usage, f"no parseable answer ({message.stop_reason})"
-        except anthropic.APIError as exc:
-            logger.warning("review batch failed (%s); calling directly", exc)
-            return None
-        return None
-
-    async def _propose_batch_other(
-        self, material: str, today: dt.date
-    ) -> tuple[ReviewDraft | None, Usage, str | None] | None:
-        """The draft through OpenAI's or Google's batch API, or None to fall back to direct
-        calls. An answer that came back is final, parseable or not."""
-        if self._llm is None:
-            return None
+        """The draft through the provider's batch API, or None to fall back to direct calls.
+        An answer that came back is final, parseable or not."""
         request = Request(
             model=self._settings.model,
             system=self._system,
@@ -319,11 +251,15 @@ class ClaudeReviewWriter:
             effort=self._settings.effort,
             max_tokens=16000,
         )
-        (done,) = await self._llm.complete_batch(
-            [request],
-            poll_seconds=self._poll,
-            wait_minutes=self._settings.batch_wait_minutes,
-        )
+        try:
+            (done,) = await self._client.llm.complete_batch(
+                [request],
+                poll_seconds=self._poll,
+                wait_minutes=self._settings.batch_wait_minutes,
+            )
+        except LLMError as exc:
+            logger.warning("review batch failed (%s); calling directly", exc)
+            return None
         if done is None:
             return None
         usage = Usage(model=self._settings.model, batch=True)
@@ -348,7 +284,7 @@ class ClaudeReviewWriter:
                     **effort_kwargs(self._settings.model, self._settings.effort, 16000),
                     output_format=ReviewDraft,
                 )
-            except anthropic.APIError as exc:
+            except LLMError as exc:
                 note = f"the call failed: {exc}"[:300]
                 continue
             except (pydantic.ValidationError, ValueError):
@@ -939,7 +875,7 @@ async def build_review(
     )
     usage: Usage | None = None
     if writer is None:
-        notes.append("Actions not proposed: ANTHROPIC_API_KEY is not set.")
+        notes.append("Actions not proposed: no OpenAI or Google API key is set.")
     else:
         limit_keys = await open_risk_limit_keys(pool)
         draft, usage, note = await writer.propose(
@@ -1087,10 +1023,8 @@ async def monthly_review_handler(ctx: JobContext) -> None:
     review = (jobs.body if jobs else JobsConfig()).review
     system = (await load_prompts(ctx.pool)).text("monthly_review", SYSTEM, review.model)
     try:
-        anthropic_client = create_client(settings)
-        llm = create_llm(settings, anthropic_client)
-        writer: ReviewWriter | None = ClaudeReviewWriter(
-            routing_client(anthropic_client, llm), review, system, llm=llm
+        writer: ReviewWriter | None = LLMReviewWriter(
+            routing_client(create_llm(settings)), review, system
         )
     except AINotConfigured:
         writer = None
