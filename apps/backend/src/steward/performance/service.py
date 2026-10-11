@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import datetime as dt
 from collections import defaultdict
+from collections.abc import Collection
+from dataclasses import dataclass
 from decimal import Decimal
 from itertools import pairwise
 from typing import Any
@@ -73,10 +75,11 @@ def _d(value: float | Decimal | None) -> Decimal | None:
 
 
 async def _snapshots(pool: asyncpg.Pool) -> list[asyncpg.Record]:
-    """Daily account snapshots in the latest snapshot's base currency, oldest first."""
+    """Daily account snapshots in the latest snapshot's base currency, oldest first. The days
+    before the first Trading212 snapshot are the ones rebuilt from the ledger."""
     rows: list[asyncpg.Record] = await pool.fetch(
         "select snapshot_date, captured_at, total_base, cash_base, invested_base, account_currency,"
-        " base_currency, fx_rate, total_value, invested_value from public.account_snapshot"
+        " base_currency, fx_rate, total_value, invested_value from public.account_history"
         " order by snapshot_date"
     )
     if not rows:
@@ -816,6 +819,67 @@ async def ledger_entries(pool: asyncpg.Pool, settings: PerformanceSettings) -> l
     return await _ledger(pool, account_currency, settings)
 
 
+@dataclass
+class Record:
+    """The stored position history with the trades, income and costs between snapshot days,
+    from which the value and flow of any set of tickers can be built (`sleeve`)."""
+
+    valuation_days: list[dt.date]
+    positions: list[PositionDay]
+    trades: list[Trade]
+    income: list[Amount]
+    costs: list[Amount]
+    fx_for_trades: dict[tuple[dt.date, str], Decimal]
+    day_values: list[DayValue]
+    base_currency: str
+
+    def sleeve(self, tickers: Collection[str]) -> list[DayValue]:
+        return sleeve_days(
+            tickers, self.valuation_days, self.positions, self.trades, self.income, self.costs,
+            self.fx_for_trades, ticker_fx_lookup(self.positions),
+        )  # fmt: skip
+
+
+async def load_record(pool: asyncpg.Pool, settings: PerformanceSettings) -> Record | None:
+    """The stored history, or None when fewer than two daily snapshots exist."""
+    snapshots = await _snapshots(pool)
+    if len(snapshots) < 2:
+        return None
+    account_currency = snapshots[-1]["account_currency"]
+    ledger = await _ledger(pool, account_currency, settings)
+    rows = await pool.fetch(
+        "select snapshot_date, ticker, quantity, current_price, fx_rate, value_base"
+        " from public.position_history where base_currency = $1 order by snapshot_date",
+        snapshots[-1]["base_currency"],
+    )
+    positions = [PositionDay(x["snapshot_date"], x["ticker"], x["quantity"], x["current_price"],
+                             x["fx_rate"], x["value_base"]) for x in rows]  # fmt: skip
+    valuation_days = [s["snapshot_date"] for s in snapshots]
+    rate_by_day = {s["snapshot_date"]: s["fx_rate"] for s in snapshots}
+    trades: list[Trade] = []
+    income: list[Amount] = []
+    costs: list[Amount] = []
+    stamps = [(s["snapshot_date"], s.get("captured_at")) for s in snapshots]
+    for e in ledger:
+        if e.needs_fx or not e.ticker:
+            continue
+        nearest = bucket_snapshot(e, stamps)  # the interval it falls in, by capture time
+        if nearest is None:
+            continue
+        rate = rate_by_day[nearest]
+        if e.kind in (Kind.BUY, Kind.SELL) and e.price is not None:
+            trades.append(Trade(nearest, e.ticker, e.quantity, e.price))
+            if e.fees:
+                costs.append(Amount(nearest, e.fees * rate, e.ticker))
+        elif e.kind is Kind.DIVIDEND:
+            income.append(Amount(nearest, e.gross * rate, e.ticker))
+    return Record(
+        valuation_days, positions, trades, income, costs,
+        {(p.day, p.ticker): p.fx for p in positions},
+        _day_values(snapshots, ledger), snapshots[-1]["base_currency"],
+    )  # fmt: skip
+
+
 def _sleeve_out(s: Any, tickers: list[str]) -> r.SleeveOut:
     return r.SleeveOut(
         name=s.name, start=s.start, end=s.end, days=s.days, total_return=r.num(s.total_return),
@@ -840,48 +904,15 @@ async def sleeves_report(
 
     if not settings.core_tickers:
         return unavailable("List your core ETFs in the settings to compare them with your stocks.")
-    snapshots = await _snapshots(pool)
-    if len(snapshots) < 2:
+    record = await load_record(pool, settings)
+    if record is None:
         return unavailable("fewer than two daily snapshots are stored")
-    account_currency = snapshots[-1]["account_currency"]
-    ledger = await _ledger(pool, account_currency, settings)
-    rows = await pool.fetch(
-        "select snapshot_date, ticker, quantity, current_price, fx_rate, value_base"
-        " from public.position_snapshot where base_currency = $1 order by snapshot_date",
-        snapshots[-1]["base_currency"],
-    )
-    positions = [PositionDay(x["snapshot_date"], x["ticker"], x["quantity"], x["current_price"],
-                             x["fx_rate"], x["value_base"]) for x in rows]  # fmt: skip
-    valuation_days = [s["snapshot_date"] for s in snapshots]
-    rate_by_day = {s["snapshot_date"]: s["fx_rate"] for s in snapshots}
-    fx_for_trades = {(p.day, p.ticker): p.fx for p in positions}
+    valuation_days = record.valuation_days
     core = set(settings.core_tickers)
-    held = {p.ticker for p in positions}
+    held = {p.ticker for p in record.positions}
     stocks = held - core
-    trades: list[Trade] = []
-    income: list[Amount] = []
-    costs: list[Amount] = []
-    stamps = [(s["snapshot_date"], s.get("captured_at")) for s in snapshots]
-    for e in ledger:
-        if e.needs_fx or not e.ticker:
-            continue
-        nearest = bucket_snapshot(e, stamps)  # the interval it falls in, by capture time
-        if nearest is None:
-            continue
-        rate = rate_by_day[nearest]
-        if e.kind in (Kind.BUY, Kind.SELL) and e.price is not None:
-            trades.append(Trade(nearest, e.ticker, e.quantity, e.price))
-            if e.fees:
-                costs.append(Amount(nearest, e.fees * rate, e.ticker))
-        elif e.kind is Kind.DIVIDEND:
-            income.append(Amount(nearest, e.gross * rate, e.ticker))
-    fallback = ticker_fx_lookup(positions)
-    core_series = sleeve_days(
-        core, valuation_days, positions, trades, income, costs, fx_for_trades, fallback
-    )
-    stock_series = sleeve_days(
-        stocks, valuation_days, positions, trades, income, costs, fx_for_trades, fallback
-    )
+    core_series = record.sleeve(core)
+    stock_series = record.sleeve(stocks)
     outcome = compare_sleeves(
         core_series, stock_series, lookback_years=lookback_years,
         gap_points=settings.sleeve_gap_points,

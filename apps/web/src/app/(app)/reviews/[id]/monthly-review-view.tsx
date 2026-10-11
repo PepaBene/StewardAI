@@ -339,6 +339,34 @@ function Review({ report }: { report: ReviewReportOut }) {
             </ul>
           </section>
 
+          {(body.risk_notes ?? []).length > 0 ? (
+            <section aria-labelledby="review-risk-heading" className={SECTION}>
+              <BlueprintCorners />
+              <h2 id="review-risk-heading" className="text-[22px] leading-tight font-semibold">
+                Portfolio risk
+              </h2>
+              <ul className="space-y-1 text-sm">
+                {(body.risk_notes ?? []).map((line, i) => (
+                  <li key={i} className="max-w-prose">{line}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {(body.bench_notes ?? []).length > 0 ? (
+            <section aria-labelledby="review-bench-heading" className={SECTION}>
+              <BlueprintCorners />
+              <h2 id="review-bench-heading" className="text-[22px] leading-tight font-semibold">
+                Bench
+              </h2>
+              <ul className="space-y-1 text-sm">
+                {(body.bench_notes ?? []).map((line, i) => (
+                  <li key={i} className="max-w-prose">{line}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           <ActionsSection report={report} />
         </article>
 

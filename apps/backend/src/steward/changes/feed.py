@@ -9,6 +9,7 @@ Areas the stored data cannot compare are listed, not left out."""
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -240,69 +241,92 @@ async def holding_weights(pool: asyncpg.Pool, day: dt.date) -> dict[str, float]:
     return {r["ticker"]: float(r["value_base"]) / total for r in rows} if total > 0 else {}
 
 
+def _latest_as_of(
+    rows: list[asyncpg.Record], cuts: tuple[dt.datetime, ...], identity: tuple[str, ...]
+) -> list[list[asyncpg.Record]]:
+    """Per cut-off, the newest row of each identity known by then. `rows` are ordered by the
+    identity columns and then `known_at desc, id desc`, so one pass over a single read gives
+    every state; reading once per cut-off scanned the same rows again for each."""
+    seen: list[set[tuple[Any, ...]]] = [set() for _ in cuts]
+    picked: list[list[asyncpg.Record]] = [[] for _ in cuts]
+    for r in rows:
+        key = tuple(r[c] for c in identity)
+        for i, cut in enumerate(cuts):
+            if key not in seen[i] and r["known_at"] <= cut:
+                seen[i].add(key)
+                picked[i].append(r)
+    return picked
+
+
 async def _fundamentals(
-    pool: asyncpg.Pool, tickers: list[str], at: dt.datetime
-) -> dict[tuple[Any, ...], Record]:
+    pool: asyncpg.Pool, tickers: list[str], cuts: tuple[dt.datetime, ...]
+) -> list[dict[tuple[Any, ...], Record]]:
     rows = await pool.fetch(
-        "select distinct on (ticker, concept, period_start, period_end, unit)"
-        " id, ticker, concept, period_start, period_end, unit, value, known_at, source_url"
+        "select id, ticker, concept, period_start, period_end, unit, value, known_at, source_url"
         " from public.financial_statement_fact"
         " where ticker = any($1::text[]) and value is not null and known_at <= $2"
         " and concept ~* $3"
         " and jsonb_array_length(coalesce(dimensions->'members', '[]'::jsonb)) = 0"
         " order by ticker, concept, period_start, period_end, unit, known_at desc, id desc",
-        tickers, at, _CONCEPTS,
+        tickers, max(cuts), _CONCEPTS,
     )  # fmt: skip
-    return {
-        (
-            r["ticker"].split("_")[0],
-            r["concept"],
-            r["period_start"],
-            r["period_end"],
-            r["unit"],
-        ): Record(
-            r["value"],
-            Ref(
-                table="financial_statement_fact",
-                id=str(r["id"]),
-                known_at=r["known_at"],
-                url=r["source_url"],
-            ),
-        )
-        for r in rows
-    }
+    identity = ("ticker", "concept", "period_start", "period_end", "unit")
+    return [
+        {
+            (
+                r["ticker"].split("_")[0],
+                r["concept"],
+                r["period_start"],
+                r["period_end"],
+                r["unit"],
+            ): Record(
+                r["value"],
+                Ref(
+                    table="financial_statement_fact",
+                    id=str(r["id"]),
+                    known_at=r["known_at"],
+                    url=r["source_url"],
+                ),
+            )
+            for r in picked
+        }
+        for picked in _latest_as_of(rows, cuts, identity)
+    ]
 
 
 async def _estimates(
-    pool: asyncpg.Pool, tickers: list[str], at: dt.datetime
-) -> dict[tuple[Any, ...], Record]:
+    pool: asyncpg.Pool, tickers: list[str], cuts: tuple[dt.datetime, ...]
+) -> list[dict[tuple[Any, ...], Record]]:
     rows = await pool.fetch(
-        "select distinct on (ticker, kind, provider, metric, basis, fiscal_period)"
-        " id, ticker, kind, provider, metric, basis, fiscal_period, value, known_at, source_url"
-        " from public.forward_observation"
+        "select id, ticker, kind, provider, metric, basis, fiscal_period, value, known_at,"
+        " source_url from public.forward_observation"
         " where ticker = any($1::text[]) and value is not null and known_at <= $2"
         " order by ticker, kind, provider, metric, basis, fiscal_period, known_at desc, id desc",
-        tickers, at,
+        tickers, max(cuts),
     )  # fmt: skip
-    return {
-        (
-            r["ticker"].split("_")[0],
-            r["kind"],
-            r["provider"],
-            r["metric"],
-            r["basis"],
-            r["fiscal_period"],
-        ): Record(
-            r["value"],
-            Ref(
-                table="forward_observation",
-                id=str(r["id"]),
-                known_at=r["known_at"],
-                url=r["source_url"],
-            ),
-        )
-        for r in rows
-    }
+    identity = ("ticker", "kind", "provider", "metric", "basis", "fiscal_period")
+    return [
+        {
+            (
+                r["ticker"].split("_")[0],
+                r["kind"],
+                r["provider"],
+                r["metric"],
+                r["basis"],
+                r["fiscal_period"],
+            ): Record(
+                r["value"],
+                Ref(
+                    table="forward_observation",
+                    id=str(r["id"]),
+                    known_at=r["known_at"],
+                    url=r["source_url"],
+                ),
+            )
+            for r in picked
+        }
+        for picked in _latest_as_of(rows, cuts, identity)
+    ]
 
 
 def _label_fact(key: tuple[Any, ...]) -> str:
@@ -601,19 +625,29 @@ async def build_feed(pool: asyncpg.Pool, since: dt.date | None = None) -> Change
     items: list[ChangeItem] = []
     areas: list[AreaCount] = []
 
-    old_f, new_f = (
-        await _fundamentals(pool, tickers, old_cut),
-        await _fundamentals(pool, tickers, now_cut),
-    )
+    # The areas read different tables and do not depend on each other, so they run together.
+    async with asyncio.TaskGroup() as group:
+        t_fundamentals = group.create_task(_fundamentals(pool, tickers, (old_cut, now_cut)))
+        t_estimates = group.create_task(_estimates(pool, tickers, (old_cut, now_cut)))
+        t_funds = group.create_task(_fund_changes(pool, weights, old_cut, (old_day, now_day)))
+        t_graph = group.create_task(_graph(pool, old_cut, weights))
+        t_macro = group.create_task(_macro(pool, old_cut))
+        t_ownership = group.create_task(_ownership(pool, tickers, weights))
+        t_insiders = group.create_task(_insiders(pool, tickers, weights, now_cut))
+        t_patents = group.create_task(_patents(pool, weights, old_cut))
+    old_f, new_f = t_fundamentals.result()
+    old_e, new_e = t_estimates.result()
+    fund_result = t_funds.result()
+    graph_result = t_graph.result()
+    macro_result = t_macro.result()
+    ownership_result = t_ownership.result()
+    insider_result = t_insiders.result()
+    patent_result = t_patents.result()
     d = compare(old_f, new_f)
     got = _items_from("fundamentals", d, _label_fact, weights)
     items += got
     areas.append(AreaCount(area="fundamentals", items=len(got), compared=len(new_f)))
 
-    old_e, new_e = (
-        await _estimates(pool, tickers, old_cut),
-        await _estimates(pool, tickers, now_cut),
-    )
     got = _items_from("estimates", compare(old_e, new_e), _label_estimate, weights)
     items += got
     areas.append(AreaCount(area="estimates", items=len(got), compared=len(new_e)))
@@ -647,7 +681,7 @@ async def build_feed(pool: asyncpg.Pool, since: dt.date | None = None) -> Change
     items += got
     areas.append(AreaCount(area="price", items=len(got), compared=compared, note=price_note))
 
-    got, n = await _fund_changes(pool, weights, old_cut, (old_day, now_day))
+    got, n = fund_result
     items += got
     areas.append(
         AreaCount(
@@ -657,20 +691,20 @@ async def build_feed(pool: asyncpg.Pool, since: dt.date | None = None) -> Change
             note=None if n else "Fewer than two stored holdings snapshots for any held fund.",
         )
     )
-    got, n = await _graph(pool, old_cut, weights)
+    got, n = graph_result
     items += got
     areas.append(AreaCount(area="graph", items=len(got), compared=n))
-    got, n = await _macro(pool, old_cut)
+    got, n = macro_result
     items += got
     areas.append(AreaCount(area="macro", items=len(got), compared=n))
 
-    got, n, note = await _ownership(pool, tickers, weights)
+    got, n, note = ownership_result
     items += got
     areas.append(AreaCount(area="ownership", items=len(got), compared=n, note=note))
-    got, n = await _insiders(pool, tickers, weights, now_cut)
+    got, n = insider_result
     items += got
     areas.append(AreaCount(area="insiders", items=len(got), compared=n))
-    got, n = await _patents(pool, weights, old_cut)
+    got, n = patent_result
     items += got
     areas.append(
         AreaCount(

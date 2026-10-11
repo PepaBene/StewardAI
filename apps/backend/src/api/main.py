@@ -50,6 +50,7 @@ from api.nport_routes import router as nport_router
 from api.pdmr_routes import router as pdmr_router
 from api.performance_routes import router as performance_router
 from api.prompts_routes import router as prompts_router
+from api.ranking_routes import router as ranking_router
 from api.reference_routes import router as reference_router
 from api.release_routes import router as release_router
 from api.research_context_routes import router as research_context_router
@@ -254,6 +255,7 @@ def create_app() -> FastAPI:
     app.include_router(source_router)
     app.include_router(valuation_router)
     app.include_router(router)
+    app.include_router(ranking_router)
     app.include_router(prompts_router)
     app.include_router(budget_router)
     app.include_router(research_router)  # before news: /reports/search vs /reports/{id}

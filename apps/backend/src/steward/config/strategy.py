@@ -1,5 +1,6 @@
 """Strategy config: goals, target allocation with bands, and the structured rules code evaluates."""
 
+import datetime as dt
 from typing import Annotated, Literal, Self
 
 from pydantic import Field, model_validator
@@ -67,6 +68,18 @@ class PositionWeightRule(_RuleBase):
     type: Literal["position_weight"]
     value: Weight
     ticker: Ticker | None = None
+    exclude: list[Ticker] = Field(
+        default_factory=list,
+        description="Holdings the rule skips (the core ETFs); they still count toward the "
+        "look-through limit. Only for a rule that applies to every position.",
+    )
+
+    @model_validator(mode="after")
+    def _exclude_needs_general_rule(self) -> Self:
+        if self.exclude and self.ticker is not None:
+            raise ValueError("`exclude` only applies to a rule that names no single ticker")
+        require_unique(f"exclude in rule {self.id}", self.exclude)
+        return self
 
 
 class CategoryWeightRule(_RuleBase):
@@ -114,6 +127,55 @@ class PretradeThresholds(ConfigModel):
         description="Largest share of portfolio volatility one stock may account for (null: "
         "shown but not judged).",
     )
+    score_for_full_start: float | None = Field(
+        default=None,
+        gt=0,
+        le=10,
+        description="The risk-adjusted score ((annualised thesis return - cash rate) / "
+        "volatility) that earns the full tier starting cap. A stock scoring half of it starts "
+        "at half the cap; a ceiling only, never above the tier cap. Null: not applied.",
+    )
+    event_loss_budget: float | None = Field(
+        default=None,
+        gt=0,
+        le=1,
+        description="Most of the portfolio one results day may cost, as a fraction (0.01 = 1 %). "
+        "The starting size is cut so that the stock's largest past move on a report date stays "
+        "inside it. Null: not applied.",
+    )
+    equity_premium: float = Field(
+        default=0.05,
+        ge=0,
+        le=0.2,
+        description="Yearly return above cash the market is assumed to pay; the anchor a thesis "
+        "return is pulled toward in the quarter-Kelly bound.",
+    )
+    confidence_low: float = Field(
+        default=0.2, ge=0, le=1, description="Weight on the thesis return at conviction 1."
+    )
+    confidence_high: float = Field(
+        default=0.8, ge=0, le=1, description="Weight on the thesis return at conviction 5."
+    )
+
+    @model_validator(mode="after")
+    def _confidence_ordered(self) -> Self:
+        if self.confidence_low > self.confidence_high:
+            raise ValueError("confidence_low must not exceed confidence_high")
+        return self
+
+
+class StressEpisodeConfig(ConfigModel):
+    key: Annotated[str, Field(pattern=r"^[a-z0-9_]{2,30}$", examples=["brexit_vote"])]
+    label: Annotated[str, Field(min_length=1, max_length=60)]
+    start: dt.date = Field(description="The peak, or the last day before the shock.")
+    end: dt.date = Field(description="The trough.")
+    note: Annotated[str, Field(max_length=200)] = ""
+
+    @model_validator(mode="after")
+    def _ordered(self) -> Self:
+        if self.end <= self.start:
+            raise ValueError("an episode must end after it starts")
+        return self
 
 
 class RiskLimits(ConfigModel):
@@ -125,8 +187,10 @@ class RiskLimits(ConfigModel):
 
     max_volatility: Weight | None = Field(
         default=None,
-        description="Ceiling on the portfolio's annualised volatility (0.20 = 20 %), measured "
-        "on the time-weighted daily returns over the last year.",
+        description="Ceiling on the portfolio's annualised volatility (0.20 = 20 %). Tested two "
+        "ways: realized, on the time-weighted daily returns over the last year, and as a "
+        "forecast from today's weights (the higher of the EWMA and Ledoit-Wolf covariance "
+        "models, cash at zero volatility). A breach of either forces a thesis review.",
     )
     max_beta: float | None = Field(
         default=None,
@@ -161,10 +225,18 @@ class RiskLimits(ConfigModel):
         "level of the last year (0.20 = 20 % below the peak), on the deposit- and "
         "withdrawal-adjusted value.",
     )
+    drawdown_warnings: list[Weight] = Field(
+        default_factory=lambda: [0.10, 0.15],
+        max_length=5,
+        description="Early-warning rungs below `max_drawdown` (0.10 = 10 % below the peak). Each "
+        "raises a note naming the positions that drive the fall and the theses due for "
+        "re-confirmation; the limit itself is unchanged. Only used when `max_drawdown` is set.",
+    )
     max_pair_correlation: Weight | None = Field(
         default=None,
-        description="Ceiling on the correlation of two held positions' daily returns over the "
-        "last year (0.85). Only pairs weighing at least `correlation_min_combined_weight` "
+        description="Ceiling on the correlation of two held positions' weekly base-currency "
+        "returns over the last two years (0.85). Only pairs weighing at least "
+        "`correlation_min_combined_weight` "
         "together are checked, so small positions do not raise noise.",
     )
     correlation_min_combined_weight: Weight = Field(
@@ -177,6 +249,21 @@ class RiskLimits(ConfigModel):
         description="Ceiling on the portfolio's one-day historical 95 % value at risk, as a share "
         "of the portfolio (0.03 = 3 %), from the last year of daily returns. A descriptive "
         "estimate of the sample, not a forecast.",
+    )
+    max_es_95_month: Weight | None = Field(
+        default=None,
+        description="Ceiling on the portfolio's one-month 95 % Expected Shortfall (the average "
+        "loss in the worst 5 % of months), as a share of the portfolio (0.10 = 10 %), from the "
+        "larger of the historical and filtered-historical estimates on weekly returns.",
+    )
+    max_drawdown_probability: Weight | None = Field(
+        default=None,
+        description="Ceiling on the simulated chance that the portfolio falls by `max_drawdown` "
+        "from a peak at some point within `drawdown_probability_years` (0.15 = 15 %). Needs "
+        "`max_drawdown`.",
+    )
+    drawdown_probability_years: int = Field(
+        default=3, ge=1, le=3, description="Horizon of the drawdown probability, in years."
     )
     max_tracking_error: Weight | None = Field(
         default=None,
@@ -208,10 +295,82 @@ class RiskLimits(ConfigModel):
         description="Flag a saved valuation scenario of a held stock whose explicit-year free "
         "cash flow growth exceeds this rate in any year.",
     )
+    tier_risk_budgets: dict[Bucket, Weight] | None = Field(
+        default=None,
+        description="Ceiling on each risk tier's share of the portfolio's forecast volatility "
+        "(Euler risk contributions of the ex-ante model), by tier bucket in the 'risk' "
+        "dimension, e.g. {'core': 0.45, 'growth': 0.45, 'speculative': 0.25}. A tier not listed "
+        "is unchecked.",
+    )
+    min_effective_bets: float | None = Field(
+        default=None,
+        gt=0,
+        le=100,
+        description="Floor on the effective number of independent bets (Meucci's entropy of the "
+        "principal-component risk shares): a book of many names can still be one bet.",
+    )
+    tier_speculative_volatility: Weight | None = Field(
+        default=None,
+        description="A holding in the core or growth tier whose annualised volatility (one year "
+        "of daily local-currency returns, as on its page) is above this (0.35 = 35 %) no longer "
+        "meets the tier and needs a review. The owner reclassifies by hand.",
+    )
+    tier_core_max_volatility: Weight | None = Field(
+        default=None,
+        description="A core-tier holding whose annualised volatility is above this (0.25 = 25 %) "
+        "no longer meets the core criterion and needs a review.",
+    )
+    auto_tiers: bool = Field(
+        default=False,
+        description="Work out each holding's risk tier from its own numbers instead of listing "
+        "holdings in the strategy: speculative if volatility is above "
+        "`tier_speculative_volatility`, market cap is below `tier_speculative_market_cap` or "
+        "it is not profitable; core only if market cap is above `tier_core_min_market_cap`, "
+        "volatility is at or below "
+        "`tier_core_max_volatility` and it is profitable; growth otherwise. A fund has no market "
+        "cap or profit and is tiered by volatility alone. A classification entered by the owner "
+        "still wins.",
+    )
+    tier_speculative_market_cap: float = Field(
+        default=2e9, gt=0, description="Market cap in USD below which a stock is speculative."
+    )
+    tier_core_min_market_cap: float = Field(
+        default=1e10, gt=0, description="Market cap in USD a core stock must exceed."
+    )
+    max_stock_risk_share: Weight | None = Field(
+        default=0.08,
+        description="Ceiling on one stock's share of the portfolio's forecast volatility (0.08 "
+        "= 8 %), from the ex-ante model. Funds the single-position rule exempts are not "
+        "judged. A review prompt, not an instruction to trade (null: off).",
+    )
+    thesis_volatility_multiple: float | None = Field(
+        default=1.5,
+        gt=1,
+        le=10,
+        description="A held stock whose three-month realized volatility is above this multiple "
+        "of the volatility band in its thesis opens a 'thesis risk profile changed' finding "
+        "(null: off). It asks for a review; it never means 'sell'.",
+    )
     on_breach: Severity = Field(
         default="severity_2",
         description="Severity of a risk-limit breach (alerted when it opens).",
     )
+    stress_episodes: list[StressEpisodeConfig] = Field(
+        default_factory=list,
+        max_length=12,
+        description="Past episodes replayed on today's holdings in addition to the built-in "
+        "ones (2008, 2011, the end of the CZK floor, 2020, 2022). Use the market peak and "
+        "trough dates. An entry with the key of a built-in one replaces it.",
+    )
+
+    @model_validator(mode="after")
+    def _drawdown_rungs_distinct(self) -> Self:
+        # Each rung's finding key is its whole-percent value; two rungs in one percent would
+        # hide each other.
+        keys = [round(r * 100) for r in self.drawdown_warnings]
+        if len(set(keys)) != len(keys):
+            raise ValueError("drawdown_warnings must differ by at least one percentage point")
+        return self
 
 
 class StrategyConfig(ConfigModel):

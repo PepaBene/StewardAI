@@ -277,7 +277,7 @@ export function HoldingContent({
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <KpiBarsPanel ticker={ticker} kpis={detail.kpis} hasThesis={Boolean(thesis)} />
-        <DrawdownPanel history={priceData} portfolioIndex={indexPoints} />
+        <DrawdownPanel history={priceData} portfolioIndex={indexPoints} ticker={ticker} />
         <NextReportPanel detail={detail} today={isoDay(now)} />
       </div>
 

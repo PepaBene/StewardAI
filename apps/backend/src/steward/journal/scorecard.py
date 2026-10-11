@@ -60,6 +60,51 @@ class DecisionOutcome(BaseModel):
         return self.price_now / self.price_at_decision - 1
 
 
+def _change(
+    then: float | None, now: float | None, ccy_then: str | None, ccy_now: str | None
+) -> float | None:
+    """Price change between two prices of one stock; None when a price is missing or the
+    currencies differ or are unknown for the stored series."""
+    if not then or now is None:
+        return None
+    if ccy_then and (not ccy_now or quote_unit_of(ccy_then) != quote_unit_of(ccy_now)):
+        return None
+    return now / then - 1
+
+
+class SwitchOutcome(BaseModel):
+    """One logged switch joined to what the two stocks did afterwards."""
+
+    id: int
+    switched_on: dt.date
+    sold: str
+    bought: str
+    sold_price: float | None = None
+    sold_currency: str | None = None
+    sold_now: float | None = None
+    sold_currency_now: str | None = None
+    bought_price: float | None = None
+    bought_currency: str | None = None
+    bought_now: float | None = None
+    bought_currency_now: str | None = None
+
+    @property
+    def sold_change(self) -> float | None:
+        return _change(self.sold_price, self.sold_now, self.sold_currency, self.sold_currency_now)
+
+    @property
+    def bought_change(self) -> float | None:
+        return _change(
+            self.bought_price, self.bought_now, self.bought_currency, self.bought_currency_now
+        )
+
+    @property
+    def difference(self) -> float | None:
+        """Bought minus sold, in price change since the switch; positive: the switch paid."""
+        b, s = self.bought_change, self.sold_change
+        return b - s if b is not None and s is not None else None
+
+
 class Row(BaseModel):
     label: str
     entry_ids: list[int] = Field(
@@ -263,6 +308,41 @@ def risk_held(outcomes: list[DecisionOutcome]) -> Section:
     )
 
 
+def switch_section(switches: list[SwitchOutcome] | None) -> Section:
+    """The stock bought against the stock sold, from each switch date. Price changes only, in
+    each stock's own currency, without dividends or the tax and costs the switch carried."""
+    title = "Switches"
+    if switches is None:
+        return unavailable("switches", title, "The switch log could not be read.")
+    compared = [s for s in switches if s.difference is not None]
+    if len(compared) < MIN_DECISIONS:
+        return _too_few("switches", title, len(compared), "switches with prices for both stocks")
+    diffs = [d for s in compared if (d := s.difference) is not None]
+    paid = [d for d in diffs if d > 0]
+    return Section(
+        id="switches",
+        title=title,
+        status="ok",
+        n=len(compared),
+        note="Price change of the stock bought minus that of the stock sold, from the switch "
+        "date to the latest stored close. Tax and costs the switch carried are not included.",
+        rows=[
+            Row(
+                label="The stock bought did better than the one sold",
+                entry_ids=sorted(s.id for s in compared),
+                n=len(compared),
+                share=len(paid) / len(compared),
+            ),
+            Row(
+                label="Median difference since the switch",
+                entry_ids=sorted(s.id for s in compared),
+                n=len(diffs),
+                median_change=median(diffs),
+            ),
+        ],
+    )
+
+
 def unavailable(id_: str, title: str, reason: str) -> Section:
     return Section(id=id_, title=title, status="unavailable", note=reason)
 
@@ -274,6 +354,8 @@ def build_scorecard(
     until: dt.date,
     ticker: str | None = None,
     reason: str | None = None,
+    switches: list[SwitchOutcome] | None = None,
+    safety_margin: float | None = None,
 ) -> Scorecard:
     window = [o for o in outcomes if since <= o.decided_on <= until and o.decision != "review"]
     filtered_by: list[str] = []
@@ -290,14 +372,23 @@ def build_scorecard(
         bought_vs_passed(window),
         sales(window, "trim", "after_trim", "Profit-taking after trims"),
         sales(window, "sell", "after_sell", "Stocks after they were sold"),
-        unavailable(
-            "switches",
-            "Switches",
-            "No switch log exists yet, so a bought stock cannot be compared with the one sold.",
+        switch_section(
+            [s for s in switches if since <= s.switched_on <= until]
+            if switches is not None
+            else None
         ),
         risk_held(window),
     ]
     suggestions: list[str] = []
+    switched = next((s for s in sections if s.id == "switches"), None)
+    if switched and switched.status == "ok":
+        share, diff = switched.rows[0].share, switched.rows[1].median_change
+        if share is not None and diff is not None and (share < 0.5 or diff <= 0):
+            now = f" (now {safety_margin:.0%})" if safety_margin is not None else ""
+            suggestions.append(
+                "Switches did not beat holding the stock sold; raise the switching safety "
+                f"margin{now}."
+            )
     bought = next((s for s in sections if s.id == "bought_vs_passed"), None)
     if bought and bought.status == "ok":
         b, p = bought.rows

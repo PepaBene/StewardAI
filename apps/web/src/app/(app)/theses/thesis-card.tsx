@@ -27,6 +27,7 @@ import { formatDate, formatPercent, formatRelative } from "@/lib/format";
 import { useNow } from "@/lib/hooks/use-now";
 import { cn } from "@/lib/utils";
 
+import { PositionRisk } from "./position-risk";
 import { VerdictPanel } from "./verdict-panel";
 
 export const STATE_TONE: Record<ThesisState, ChartTone> = {
@@ -149,6 +150,8 @@ export function ThesisCard({
           </p>
         </div>
       </details>
+
+      {row.held ? <PositionRisk ticker={row.ticker} /> : null}
 
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-border-soft px-[18px] py-2 text-[11px] text-text-muted">
         <span className="num">

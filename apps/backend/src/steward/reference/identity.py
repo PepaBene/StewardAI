@@ -842,6 +842,16 @@ async def holding_tickers(pool: asyncpg.Pool) -> list[str]:
     return sorted({r["ticker"] for r in rows})
 
 
+async def bench_tickers(pool: asyncpg.Pool, held: Sequence[str]) -> list[str]:
+    """Tickers with a stored thesis that are not held: the bench (principle 7d). They get prices
+    like holdings so their expected return and risk can be ranked before a purchase."""
+    from steward.config.thesis import ThesesConfig
+
+    theses = await load_active(pool, "theses", ThesesConfig)
+    owned = set(held)
+    return sorted({t.ticker for t in (theses.body.theses if theses else [])} - owned)
+
+
 async def run_reference_data(ctx: JobContext, deps: ReferenceDeps) -> None:
     pool = ctx.pool
     async with ctx.step("load_config") as step:

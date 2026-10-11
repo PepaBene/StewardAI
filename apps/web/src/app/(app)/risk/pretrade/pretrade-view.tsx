@@ -4,16 +4,17 @@ import { useState } from "react";
 
 import { Field, Problem, problemText, TEXTAREA } from "@/components/risk/common";
 import { PretradeChecks } from "@/components/risk/pretrade-checks";
+import { TradeRiskPanel } from "@/components/risk/trade-risk-panel";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
-import { parseLegs, parseNumber, type PretradeResult } from "@/lib/risk/risk";
+import { parseLegs, parseNumber, type PretradeResponse } from "@/lib/risk/risk";
 
 export function PretradeView() {
   const [text, setText] = useState("");
   const [deposit, setDeposit] = useState("");
-  const [result, setResult] = useState<PretradeResult | null>(null);
+  const [result, setResult] = useState<PretradeResponse | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -62,12 +63,22 @@ export function PretradeView() {
         </div>
       </Blueprint>
       {result ? (
-        <Blueprint className="p-4">
-          <PanelHeading level={2} kicker={result.is_switch ? "Switch" : "Trade"} title="What the checks say" />
-          <div className="mt-3">
-            <PretradeChecks result={result} />
-          </div>
-        </Blueprint>
+        <>
+          <Blueprint className="p-4">
+            <PanelHeading level={2} kicker={result.is_switch ? "Switch" : "Trade"} title="What the checks say" />
+            <div className="mt-3">
+              <PretradeChecks result={result} />
+            </div>
+          </Blueprint>
+          {result.risk ? (
+            <Blueprint className="p-4">
+              <PanelHeading level={2} kicker="Risk model" title="Your risk before and after" />
+              <div className="mt-3">
+                <TradeRiskPanel risk={result.risk} />
+              </div>
+            </Blueprint>
+          ) : null}
+        </>
       ) : null}
     </div>
   );

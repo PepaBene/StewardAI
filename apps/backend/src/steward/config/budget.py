@@ -77,6 +77,7 @@ BudgetJobType = Literal[
     "news_brief",
     "gap_research",
     "exposure_build",
+    "factor_returns",
     "disclosure_sources",
     "disclosure_ingest",
     "disclosure_identifiers",

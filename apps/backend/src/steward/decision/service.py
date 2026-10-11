@@ -7,6 +7,7 @@ import datetime as dt
 import logging
 from collections.abc import Iterable
 from decimal import Decimal
+from typing import Any
 
 import asyncpg
 from pydantic import BaseModel, Field, field_validator
@@ -31,7 +32,7 @@ from steward.decision.shocks import (
     apply_shocks,
     standard_set,
 )
-from steward.fx.convert import normalise_currency
+from steward.fx.convert import normalise_currency, price_in_unit
 from steward.fx.history import load_fx_history
 from steward.lookthrough.read import PortfolioIn
 from steward.performance.reports import LotsResponse
@@ -39,6 +40,8 @@ from steward.performance.service import lots_report
 from steward.performance.settings import load_latest_settings
 from steward.portfolio.drift import HoldingValue, compute_drift
 from steward.portfolio.risk import _risk_free
+from steward.portfolio.risk_tier import with_saved_tiers
+from steward.portfolio.trade_risk import TradeRisk, checks_from, trade_risk
 from steward.reference import risk as ref_risk
 from steward.reference.price_series import choose_series, holding_symbols
 from steward.reference.read import load_series
@@ -318,7 +321,7 @@ async def load_strategy(pool: asyncpg.Pool) -> StrategyConfig:
     stored = await load_active(pool, "strategy", StrategyConfig)
     if stored is None:
         raise NoStrategy
-    return stored.body
+    return await with_saved_tiers(pool, stored.body)
 
 
 async def _latest_positions(pool: asyncpg.Pool) -> dict[str, asyncpg.Record]:
@@ -329,6 +332,19 @@ async def _latest_positions(pool: asyncpg.Pool) -> dict[str, asyncpg.Record]:
         " where p.snapshot_date = (select max(snapshot_date) from public.position_snapshot)"
     )
     return {r["ticker"]: r for r in rows}
+
+
+def _bear_in_quote(target: Any, quote: str | None) -> float | None:
+    """The thesis's bear-case price in the unit the stock is quoted in (GBP target, GBX quote:
+    times 100); None when there is none or the currencies differ."""
+    if target is None:
+        return None
+    bear = target.scenarios.bear if target.scenarios else target.bear_case
+    if bear is None:
+        return None
+    if not quote:
+        return float(bear)
+    return price_in_unit(float(bear), target.currency, quote)
 
 
 async def resolve_tickers(pool: asyncpg.Pool, typed: Iterable[str]) -> dict[str, str]:
@@ -656,9 +672,11 @@ async def build_pretrade_context(
             price=price,
             quote_currency=quote,
             sell_target=target.sell_target if target else None,
-            bear_case=(
-                target.bear_case if target and (not quote or target.currency == quote) else None
+            expected_value=(
+                target.scenarios.expected_value if target and target.scenarios else None
             ),
+            base_value=target.scenarios.base if target and target.scenarios else None,
+            bear_case=_bear_in_quote(target, quote),
             target_currency=target.currency if target else None,
             has_thesis=thesis is not None,
             thesis_gaps=thesis.missing_requirements() if thesis else [],
@@ -714,14 +732,23 @@ async def build_pretrade_context(
     return ctx, portfolio, positions
 
 
+class PretradeResponse(pt.PretradeResult):
+    risk: TradeRisk | None = Field(
+        default=None,
+        description="Ex-ante risk of the book before and after the trades (plan Q5.1).",
+    )
+
+
 async def run_pretrade(
     pool: asyncpg.Pool, owner_id: str, request: PretradeRequest
-) -> pt.PretradeResult:
+) -> PretradeResponse:
     loaded = await xray_service.load_cached(pool, owner_id)
     rules = request.rules
     if rules is None:
         strategy = await load_strategy(pool)
         rules = pt.PretradeRules(**strategy.pretrade.model_dump())
+        if rules.risk_contribution_cap is None:
+            rules.risk_contribution_cap = strategy.risk.max_stock_risk_share
     ctx, portfolio, positions = await build_pretrade_context(
         pool, owner_id, request.trades, rules, deposit=request.deposit, loaded=loaded
     )
@@ -729,7 +756,15 @@ async def run_pretrade(
     await _attach_rates(pool, ctx, portfolio)
     await _attach_covariance(pool, ctx, portfolio, request.trades)
     await _attach_lookthrough(pool, owner_id, ctx, request, loaded)
-    return pt.run(request.trades, ctx)
+    risk: TradeRisk | None
+    try:
+        risk = await trade_risk(pool, request.trades, request.deposit)
+    except Exception as exc:  # the rule checks must still come back
+        log.warning("ex-ante what-if failed: %s", exc)
+        risk = TradeRisk(available=False, reason=f"the ex-ante model failed: {exc}")
+    ctx.extra_checks += checks_from(risk)
+    result = pt.run(request.trades, ctx)
+    return PretradeResponse(**result.model_dump(), risk=risk)
 
 
 async def _attach_covariance(

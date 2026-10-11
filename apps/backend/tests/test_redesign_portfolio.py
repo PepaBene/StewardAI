@@ -448,7 +448,8 @@ async def test_price_history_collects_the_market_strip_symbols(
 
         assert await run_job(backend_pool, "price_history", job, trigger="manual") == "succeeded"
 
-    assert sorted(requested) == ["^px", "^spx", "^stoxx"]  # ^spx once: benchmark and strip
+    # the strip's symbols are collected (^spx once: benchmark and strip) beside the proxy ETFs
+    assert {"^px", "^spx", "^stoxx"} <= set(requested) and requested.count("^spx") == 1
     stored = await backend_pool.fetchval("select count(*) from price_bar where symbol = '^px'")
     assert stored == 2
     gaps = await backend_pool.fetchval("select value from sync_state where key = $1", GAPS_KEY)

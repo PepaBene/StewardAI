@@ -14,7 +14,6 @@ from api.auth import Owner
 from api.db import Pool
 from steward import saved
 from steward.analytics.versions import version
-from steward.decision import pretrade as pt
 from steward.decision import rebalance as rb
 from steward.decision import service as svc
 from steward.decision import whatif
@@ -178,9 +177,12 @@ async def post_rebalance(
 
 
 @router.post("/pretrade")
-async def post_pretrade(body: svc.PretradeRequest, pool: Pool, owner: Owner) -> pt.PretradeResult:
+async def post_pretrade(
+    body: svc.PretradeRequest, pool: Pool, owner: Owner
+) -> svc.PretradeResponse:
     """A pass/flag list for a proposed buy, add, sale or switch, citing the strategy's principles
-    8, 9 and 10 and your own caps. It never blocks and never places a trade."""
+    8, 9 and 10 and your own caps, with the ex-ante risk of the book before and after. It never
+    blocks and never places a trade."""
     try:
         return await svc.run_pretrade(pool, owner.user_id, await svc.canonical_trades(pool, body))
     except svc.NoHoldings as err:

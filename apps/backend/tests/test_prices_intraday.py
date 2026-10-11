@@ -103,6 +103,26 @@ def test_yahoo_daily_bars_are_exchange_days_and_skip_a_session_in_progress() -> 
     assert yahoo.daily_range(735) == "2y" and yahoo.daily_range(20) == "1mo"
 
 
+async def test_a_history_beyond_ten_years_asks_yahoo_for_dated_daily_bars() -> None:
+    """`range=max` comes back monthly whatever the interval; the live proxies and indices had
+    one bar a month because of it. A named range up to 10 years keeps `range`."""
+    seen: list[dict[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(dict(request.url.params))
+        return httpx.Response(200, text=fixture("yahoo_cez_pr_1d.json"))
+
+    now = dt.datetime(2026, 10, 9, 20, 0, tzinfo=UTC)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        await yahoo.yahoo_daily(http, "XLK", dt.date(2006, 10, 9), now)
+        await yahoo.yahoo_daily(http, "AAPL", dt.date(2016, 10, 10), now)
+    long_call, ten_year_call = seen
+    assert "range" not in long_call and long_call["interval"] == "1d"
+    assert long_call["period1"] == str(int(dt.datetime(2006, 10, 9, tzinfo=UTC).timestamp()))
+    assert long_call["period2"] == str(int(dt.datetime(2026, 10, 10, tzinfo=UTC).timestamp()))
+    assert ten_year_call["range"] == "10y" and "period1" not in ten_year_call
+
+
 async def test_yahoo_waits_out_a_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     waits: list[float] = []
 
@@ -422,7 +442,7 @@ async def test_stooq_refusal_falls_back_to_yahoo_daily_and_px_to_the_pse_page(
         " and symbol = 'CEZ.PR' and kind = 'chart_1d'"
     )
     assert payload["http_status"] == 200 and payload["body"] == fixture("yahoo_cez_pr_1d.json")
-    assert "range=2y" in payload["url"] and "interval=1d" in payload["url"]
+    assert "range=10y" in payload["url"] and "interval=1d" in payload["url"]
 
     sources = json.loads(
         await backend_pool.fetchval("select value from sync_state where key = $1", SOURCES_KEY)

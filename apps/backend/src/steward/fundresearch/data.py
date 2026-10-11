@@ -14,7 +14,10 @@ from typing import Any, Literal
 import asyncpg
 from pydantic import BaseModel, Field
 
+from steward.config.holding_profiles import HoldingProfilesConfig
+from steward.config.store import load_active
 from steward.lookthrough.read import SnapshotIn, hydrate_snapshots
+from steward.reference.price_series import choose_series, holding_symbols
 
 FACT_KEYS = (
     "replication_method",
@@ -165,12 +168,19 @@ async def load_fund(
         as_of or dt.date.max,
     )
     listings = await pool.fetch(
-        """select i.t212_ticker, i.name, i.exchange, i.currency, i.price_symbol,
-                  case when i.price_symbol is null then false else exists
-                    (select 1 from public.price_bar b where b.symbol = i.price_symbol) end as has_prices
+        """select i.t212_ticker, i.name, i.exchange, i.currency, i.price_symbol
            from public.instrument i where i.isin=$1 order by i.t212_ticker""",
         isin,
     )
+    # The instrument's symbol is Stooq style (or missing for a fund) while bars may be stored
+    # under a Yahoo symbol, so each listing's series is chosen the way every other reader does.
+    profiles = await load_active(pool, "holding_profiles", HoldingProfilesConfig)
+    wanted = await holding_symbols(
+        pool,
+        [r["t212_ticker"] for r in listings],
+        profiles.body if profiles else HoldingProfilesConfig(),
+    )
+    chosen = await choose_series(pool, wanted)
     if meta is None and sheet is None and not listings:
         return None
     snapshot = None
@@ -198,8 +208,10 @@ async def load_fund(
                 name=r["name"],
                 exchange=r["exchange"],
                 currency=r["currency"],
-                price_symbol=r["price_symbol"],
-                has_prices=bool(r["has_prices"]),
+                price_symbol=ref.symbol
+                if (ref := chosen.get(r["t212_ticker"]))
+                else r["price_symbol"],
+                has_prices=ref is not None,
             )
             for r in listings
         ],

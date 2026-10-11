@@ -136,7 +136,57 @@ def build_series(key: str, obs: Sequence[Obs], view: View = "restated") -> Serie
                 original=None,
             )
     series.ttm, series.ttm_end = _ttm(series, counts=counts)
+    if series.ttm is None and not counts:
+        series.ttm, series.ttm_end = _ttm_from_ytd(series, cumulative)
     return series
+
+
+def _ttm_from_ytd(
+    series: Series, cumulative: dict[dt.date, dict[dt.date, Val]]
+) -> tuple[Val | None, dt.date | None]:
+    """Trailing twelve months as the last fiscal year plus this year's year-to-date minus the
+    same period a year earlier, for when the individual quarters were not stored. Needs all
+    three filed figures; a missing one leaves the TTM absent."""
+    best: tuple[dt.date, dt.date, Val] | None = None  # (start, end, value) of the newest YTD
+    for start, by_end in cumulative.items():
+        for end, val in by_end.items():
+            days = (end - start).days
+            if days > QUARTER_DAYS[1] and not _within(days, ANNUAL_DAYS):  # a partial year
+                if best is None or end > best[1]:
+                    best = (start, end, val)
+    if best is None:
+        return None, None
+    start, end, current = best
+    year = dt.timedelta(days=364)
+    fiscal_year = next(
+        (
+            v
+            for e, v in series.annual.items()
+            if abs((e - (start - dt.timedelta(days=1))).days) <= MATCH_DAYS
+        ),
+        None,
+    )
+    prior = next(
+        (
+            v
+            for s, by_end in cumulative.items()
+            if abs((s - (start - year)).days) <= MATCH_DAYS
+            for e, v in by_end.items()
+            if abs((e - (end - year)).days) <= MATCH_DAYS
+        ),
+        None,
+    )
+    if fiscal_year is None or prior is None:
+        return None, None
+    return (
+        Val(
+            fiscal_year.value + current.value - prior.value,
+            current.obs,
+            derived="last fiscal year + year-to-date − the same period a year earlier",
+            restated=fiscal_year.restated or current.restated or prior.restated,
+        ),
+        end,
+    )
 
 
 def _ttm(series: Series, *, counts: bool = False) -> tuple[Val | None, dt.date | None]:

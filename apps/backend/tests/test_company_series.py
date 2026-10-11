@@ -77,3 +77,27 @@ def test_a_year_to_date_average_does_not_become_a_quarter() -> None:
         "revenue", [obs("revenue", "USD", o.start, o.end, str(o.value)) for o in data if o.start]
     )
     assert flow.quarter  # the same shape for a flow derives quarters
+
+
+def test_ttm_without_the_individual_quarters_uses_fy_plus_ytd_minus_prior_ytd() -> None:
+    # NVIDIA's shape: the fiscal year, this year's six months and last year's six months are
+    # stored, but not the first quarters, so four quarters cannot be summed.
+    data = [
+        obs("rev", "USD", dt.date(2025, 1, 27), dt.date(2026, 1, 25), "215938"),
+        obs("rev", "USD", dt.date(2026, 1, 26), dt.date(2026, 7, 26), "177837"),
+        obs("rev", "USD", dt.date(2026, 4, 27), dt.date(2026, 7, 26), "96221"),
+        obs("rev", "USD", dt.date(2025, 1, 27), dt.date(2025, 7, 27), "90805"),
+    ]
+    s = build_series("rev", data)
+    assert s.ttm_end == dt.date(2026, 7, 26)
+    assert s.ttm is not None and s.ttm.value == D("302970")
+    assert s.ttm.derived is not None and "year-to-date" in s.ttm.derived
+
+
+def test_ttm_stays_the_last_fiscal_year_when_the_prior_year_to_date_is_missing() -> None:
+    data = [
+        obs("rev", "USD", dt.date(2025, 1, 27), dt.date(2026, 1, 25), "215938"),
+        obs("rev", "USD", dt.date(2026, 1, 26), dt.date(2026, 7, 26), "177837"),
+    ]
+    s = build_series("rev", data)
+    assert s.ttm_end == dt.date(2026, 1, 25) and s.ttm is not None and s.ttm.derived is None

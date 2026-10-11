@@ -51,6 +51,7 @@ from steward.ownership.insider_collect import insider_trades_handler
 from steward.ownership.nport_collect import nport_holdings_handler
 from steward.ownership.pdmr_collect import pdmr_uk_handler
 from steward.portfolio.sync import portfolio_sync_handler
+from steward.quant.french_store import factor_returns_handler
 from steward.reference.exchange_probes import exchange_probes_handler
 from steward.reference.identity import reference_data_handler
 from steward.reference.intraday import intraday_prices_handler
@@ -136,6 +137,7 @@ JobType = Literal[
     "news_brief",
     "gap_research",
     "exposure_build",
+    "factor_returns",
     "disclosure_sources",
     "disclosure_ingest",
     "disclosure_identifiers",
@@ -204,6 +206,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "news_brief": news_brief_handler,
     "gap_research": gap_research_handler,
     "exposure_build": exposure_build_handler,
+    "factor_returns": factor_returns_handler,
     "disclosure_sources": disclosure_sources_handler,
     "disclosure_ingest": disclosure_ingest_handler,
     "disclosure_identifiers": disclosure_identifiers_handler,

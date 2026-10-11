@@ -680,7 +680,12 @@ function RulesPanel({ form, errors, set }: SectionProps) {
                     <TextField className="w-44" label="Rule id" path={`rules.${i}.id`} errors={errors} value={r.id} onChange={(v) => setRule(r.key, { id: v })} hint="Lowercase words joined by hyphens." />
                     <SelectField className="w-44" label="Checks" path={`rules.${i}.type`} errors={errors} value={r.type} options={RULE_TYPES} onChange={(v) => setRule(r.key, { type: v })} />
                     {r.type === "position_weight" ? (
-                      <TextField className="w-40" label="Ticker (optional)" path={`rules.${i}.ticker`} errors={errors} value={r.ticker} onChange={(v) => setRule(r.key, { ticker: v.trim() })} />
+                      <>
+                        <TextField className="w-40" label="Ticker (optional)" path={`rules.${i}.ticker`} errors={errors} value={r.ticker} onChange={(v) => setRule(r.key, { ticker: v.trim() })} />
+                        {!r.ticker.trim() ? (
+                          <TextField className="w-56" label="Except (optional)" path={`rules.${i}.exclude`} errors={errors} value={r.exclude} onChange={(v) => setRule(r.key, { exclude: v })} hint="Tickers the rule skips, separated by commas." />
+                        ) : null}
+                      </>
                     ) : null}
                     {r.type === "category_weight" ? (
                       <>
@@ -745,6 +750,12 @@ function RiskPanel({ form, errors, set }: SectionProps) {
         <TextField label="Max one sector (%)" path="risk.max_sector_weight" errors={errors} inputMode="decimal" value={form.risk_max_sector_weight} onChange={(v) => set({ risk_max_sector_weight: v })} hint="Share of the whole portfolio, counting what funds hold." />
         <TextField label="Max one country (%)" path="risk.max_country_weight" errors={errors} inputMode="decimal" value={form.risk_max_country_weight} onChange={(v) => set({ risk_max_country_weight: v })} hint="Share of the whole portfolio, counting what funds hold." />
         <TextField label="Max drawdown (%)" path="risk.max_drawdown" errors={errors} inputMode="decimal" value={form.risk_max_drawdown} onChange={(v) => set({ risk_max_drawdown: v })} hint="Fall from the highest level of the last year." />
+        <TextField label="Worst-month loss, one month in twenty (%)" path="risk.max_es_95_month" errors={errors} inputMode="decimal" value={form.risk_max_es_95_month} onChange={(v) => set({ risk_max_es_95_month: v })} hint="The average loss in the worst 5 % of months, from the weekly record. Blank switches it off." />
+        <TextField label="Chance of the max-drawdown fall (%)" path="risk.max_drawdown_probability" errors={errors} inputMode="decimal" value={form.risk_max_drawdown_probability} onChange={(v) => set({ risk_max_drawdown_probability: v })} hint="Simulated chance of the max-drawdown fall within the years below. Needs a max drawdown. Blank switches it off." />
+        <TextField label="Years for that chance (1 to 3)" path="risk.drawdown_probability_years" errors={errors} inputMode="numeric" value={form.risk_drawdown_probability_years} onChange={(v) => set({ risk_drawdown_probability_years: v })} />
+        <TextField label="Drawdown early warnings (%)" path="risk.drawdown_warnings" errors={errors} inputMode="decimal" value={form.risk_drawdown_warnings} onChange={(v) => set({ risk_drawdown_warnings: v })} hint="Notes at these falls, separated by commas. They apply when a max drawdown is set." />
+        <TextField label="One stock's share of portfolio risk (%)" path="risk.max_stock_risk_share" errors={errors} inputMode="decimal" value={form.risk_max_stock_risk_share} onChange={(v) => set({ risk_max_stock_risk_share: v })} hint="Largest part of the portfolio's swings one stock may cause. Blank switches it off." />
+        <TextField label="Review when volatility passes (times the thesis band)" path="risk.thesis_volatility_multiple" errors={errors} inputMode="decimal" value={form.risk_thesis_volatility_multiple} onChange={(v) => set({ risk_thesis_volatility_multiple: v })} hint="A held stock whose last three months swing this many times more than its thesis expects opens a review. Blank switches it off." />
         <TextField label="Max pair correlation (0 to 1)" path="risk.max_pair_correlation" errors={errors} inputMode="decimal" value={form.risk_max_pair_correlation} onChange={(v) => set({ risk_max_pair_correlation: v })} hint="Two holdings that move together, last year." />
         <TextField label="Correlation applies from combined weight (%)" path="risk.correlation_min_combined_weight" errors={errors} inputMode="decimal" value={form.risk_correlation_min_combined_weight} onChange={(v) => set({ risk_correlation_min_combined_weight: v })} hint="Of the invested value; smaller pairs are ignored." />
         <TextField label="Max one-day loss, 95% (%)" path="risk.max_var_95" errors={errors} inputMode="decimal" value={form.risk_max_var_95} onChange={(v) => set({ risk_max_var_95: v })} hint="Historical value at risk over the last year; describes the sample, not a forecast." />

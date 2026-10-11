@@ -12,6 +12,7 @@ import { formatSignedPct } from "@/lib/portfolio/money";
 import type { RiskFigures } from "@/lib/portfolio/performance";
 import { formatSharpe, riskFreeShort, sharpeExplanation, sharpeLabel } from "@/lib/portfolio/sharpe";
 
+const fetchExAnte = () => getBrowserApiClient().GET("/portfolio/risk/ex-ante");
 const fetchRisk = () => getBrowserApiClient().GET("/portfolio/risk", { params: { query: { days: 365 } } });
 
 /**
@@ -31,6 +32,8 @@ export function RiskStatTile({
   sparkNote: string;
 }) {
   const { state } = useApiResource(fetchRisk);
+  const { state: exAnte } = useApiResource(fetchExAnte);
+  const forecast = exAnte.kind === "ok" ? exAnte.data.volatility_forecast : null;
   const risk = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
   const tipId = useId();
   const p = risk?.portfolio ?? null;
@@ -39,7 +42,8 @@ export function RiskStatTile({
 
   const secondary = figures ? (
     <>
-      Vol {figures.volatility != null ? formatPct(figures.volatility, 1) : "—"} · Max DD{" "}
+      Vol {figures.volatility != null ? formatPct(figures.volatility, 1) : "—"}
+      {forecast != null ? <> (forecast {formatPct(forecast, 1)})</> : null} · Max DD{" "}
       {figures.maxDrawdown != null ? formatPct(figures.maxDrawdown, 1) : "—"}
       {figures.beta != null ? <> · β {formatNumber(figures.beta, 2)}</> : null}
       {figures.return != null ? <> · return {formatSignedPct(figures.return)}</> : null}
