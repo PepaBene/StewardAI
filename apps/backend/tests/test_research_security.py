@@ -68,8 +68,9 @@ def test_chat_tools_write_nothing_but_a_proposal(name: str) -> None:
 
 def test_research_modules_write_only_the_report_and_its_working_records() -> None:
     """The research package writes the report (run.py) and manages its own working records
-    (retention.py), and keeps its learned domain verdicts (domains.py) and web facts (web_facts.py). It never touches configuration, positions or theses: those change only
-    through the owner's accept routes."""
+    (retention.py), and keeps its learned domain verdicts (domains.py) and web facts
+    (web_facts.py). It never touches configuration, positions or theses: those change
+    only through the owner's accept routes."""
     forbidden = re.compile(
         r"(insert\s+into|update|delete\s+from)\s+(public\.)?"
         r"(config_version|position|holding|transaction|thesis|theses|strategy|portfolio\w*)\b",
