@@ -11267,7 +11267,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -11989,6 +11989,13 @@ export interface components {
              * @description Outlet tiers web search may use and an answer may cite (News sources config).
              */
             source_tiers?: (1 | 2 | 3)[];
+            /**
+             * Freshness Days
+             * @description Days after which the data_freshness tool calls a dataset stale: portfolio_snapshot, news, macro, fundamentals, price_bars, fx, insider_filings, transactions. A dataset left out uses its built-in limit.
+             */
+            freshness_days?: {
+                [key: string]: number;
+            };
         };
         /** CheckOut */
         CheckOut: {
@@ -22071,6 +22078,8 @@ export interface components {
             shadow_report?: components["schemas"]["JobSchedule"];
             /** @description Blanks old raw payloads (normalized data stays) and deletes fetch-audit rows past the horizon. Default: daily 03:15. */
             raw_retention?: components["schemas"]["JobSchedule"];
+            /** @description Deletes the checkpoints and tool traces of research and chat jobs that succeeded more than `research.trace_retention_days` ago (reports stay). Default: daily 03:40. */
+            research_trace_retention?: components["schemas"]["JobSchedule"];
             /** @description Audits the access ledger and the budgets collectors pass to the governor against the free quotas; reads only. Default: daily 03:20. */
             zero_cost_gate?: components["schemas"]["JobSchedule"];
             /** @description Compute and store price and total returns for held securities. Default: weekdays 23:45. */
@@ -22150,6 +22159,7 @@ export interface components {
             prices?: components["schemas"]["PriceSettings"];
             calendar?: components["schemas"]["CalendarSettings"];
             chat?: components["schemas"]["ChatSettings"];
+            research?: components["schemas"]["ResearchRetentionSettings"];
             review?: components["schemas"]["ReviewSettings"];
             ownership?: components["schemas"]["OwnershipSettings"];
             valuation?: components["schemas"]["ValuationSettings"];
@@ -29706,6 +29716,8 @@ export interface components {
              * @description When the owner deleted the run's working records.
              */
             trace_purged_at?: string | null;
+            /** Tool Calls */
+            tool_calls?: components["schemas"]["ToolCallRecord"][];
         };
         /** ResearchContext */
         ResearchContext: {
@@ -29883,6 +29895,18 @@ export interface components {
              */
             allow_forums: boolean;
             /**
+             * Forum Domains
+             * @description Extra hosts treated as forums or social media, added to the built-in list. Labelled as forum and searched only when forums are allowed.
+             */
+            forum_domains?: string[];
+            /**
+             * Stale Days
+             * @description Days after which a cited source of a kind counts as stale, overriding the built-in limit. Kinds: price, news_item, search, observation, default; `default` covers any other kind. Empty = built-in limits.
+             */
+            stale_days?: {
+                [key: string]: number;
+            };
+            /**
              * Iterate
              * @description After the first pass, search again for sections left thin, corroborate single-source claims, and stop when the sections have enough or the budget is used.
              * @default false
@@ -29985,6 +30009,18 @@ export interface components {
              * @description Company name hint.
              */
             name?: string | null;
+        };
+        /**
+         * ResearchRetentionSettings
+         * @description What the research_trace_retention job keeps.
+         */
+        ResearchRetentionSettings: {
+            /**
+             * Trace Retention Days
+             * @description Checkpoints and tool traces of succeeded research and chat jobs older than this are deleted. Reports, their sources and claim ledgers stay.
+             * @default 30
+             */
+            trace_retention_days: number;
         };
         /** ResearchSection */
         ResearchSection: {
@@ -35386,6 +35422,58 @@ export interface components {
             dividends: number;
             /** Fees */
             fees: number;
+        };
+        /** ToolCallRecord */
+        ToolCallRecord: {
+            /** Tool */
+            tool: string;
+            /** Args */
+            args?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "missing" | "failed" | "skipped";
+            /**
+             * Ok
+             * @default false
+             */
+            ok: boolean;
+            /** Error */
+            error?: string | null;
+            /**
+             * Ms
+             * @default 0
+             */
+            ms: number;
+            /**
+             * Sources Added
+             * @default 0
+             */
+            sources_added: number;
+            /**
+             * Bytes
+             * @default 0
+             */
+            bytes: number;
+            /**
+             * Figures
+             * @description Figures in the result by status (ok, stale, ...).
+             */
+            figures?: {
+                [key: string]: number;
+            };
+            /**
+             * As Of
+             * @description The newest as-of date among figures.
+             */
+            as_of?: string | null;
+            /** Sections */
+            sections?: string[];
+            /** Note */
+            note?: string | null;
         };
         /** TopHolder */
         TopHolder: {

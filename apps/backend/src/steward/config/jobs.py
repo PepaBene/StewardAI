@@ -1519,6 +1519,19 @@ class MonitorSettings(ConfigModel):
     )
 
 
+# Days after which the chat `data_freshness` tool calls each dataset stale.
+DEFAULT_FRESHNESS_DAYS: dict[str, int] = {
+    "portfolio_snapshot": 5,
+    "news": 3,
+    "macro": 45,
+    "fundamentals": 120,
+    "price_bars": 7,
+    "fx": 7,
+    "insider_filings": 30,
+    "transactions": 30,
+}
+
+
 class ChatSettings(ConfigModel):
     """The chat panel's assistant: DB tools, web search on tiered outlets, cited answers."""
 
@@ -1542,12 +1555,38 @@ class ChatSettings(ConfigModel):
         description="Outlet tiers web search may use and an answer may cite (News sources config).",
     )
 
+    freshness_days: dict[str, Annotated[int, Field(ge=1, le=3650)]] = Field(
+        default_factory=lambda: dict(DEFAULT_FRESHNESS_DAYS),
+        description="Days after which the data_freshness tool calls a dataset stale: "
+        f"{', '.join(DEFAULT_FRESHNESS_DAYS)}. A dataset left out uses its built-in limit.",
+    )
+
     _tiers = field_validator("source_tiers")(_unique_tiers)
+
+    @field_validator("freshness_days")
+    @classmethod
+    def _known_datasets(cls, value: dict[str, int]) -> dict[str, int]:
+        unknown = sorted(set(value) - set(DEFAULT_FRESHNESS_DAYS))
+        if unknown:
+            raise ValueError(f"unknown datasets in freshness_days: {unknown}")
+        return value
 
     @model_validator(mode="after")
     def _effort_supported(self) -> Self:
         check_effort(self.model, self.effort, "effort")
         return self
+
+
+class ResearchRetentionSettings(ConfigModel):
+    """What the research_trace_retention job keeps."""
+
+    trace_retention_days: int = Field(
+        default=30,
+        ge=1,
+        le=3650,
+        description="Checkpoints and tool traces of succeeded research and chat jobs older than "
+        "this are deleted. Reports, their sources and claim ledgers stay.",
+    )
 
 
 class ReviewSettings(ConfigModel):
@@ -2044,6 +2083,13 @@ class JobsConfig(ConfigModel):
             "horizon. Default: daily 03:15."
         ),
     )
+    research_trace_retention: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="40 3 * * *"),
+        description=(
+            "Deletes the checkpoints and tool traces of research and chat jobs that succeeded "
+            "more than `research.trace_retention_days` ago (reports stay). Default: daily 03:40."
+        ),
+    )
     zero_cost_gate: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="20 3 * * *"),
         description=(
@@ -2263,6 +2309,7 @@ class JobsConfig(ConfigModel):
     prices: PriceSettings = Field(default_factory=PriceSettings)
     calendar: CalendarSettings = Field(default_factory=CalendarSettings)
     chat: ChatSettings = Field(default_factory=ChatSettings)
+    research: ResearchRetentionSettings = Field(default_factory=ResearchRetentionSettings)
     review: ReviewSettings = Field(default_factory=ReviewSettings)
     ownership: OwnershipSettings = Field(default_factory=OwnershipSettings)
     valuation: ValuationSettings = Field(default_factory=ValuationSettings)
@@ -2300,6 +2347,7 @@ class JobsConfig(ConfigModel):
             "shadow_snapshot": self.shadow_snapshot,
             "shadow_report": self.shadow_report,
             "raw_retention": self.raw_retention,
+            "research_trace_retention": self.research_trace_retention,
             "zero_cost_gate": self.zero_cost_gate,
             "returns_refresh": self.returns_refresh,
             "exchange_probes": self.exchange_probes,

@@ -17,7 +17,7 @@ nothing rests on stale data without saying so.
 
 import datetime as dt
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -216,11 +216,18 @@ def _flagged(s: Source) -> bool:
     return bool(s.caveat and INJECTION_CAVEAT in s.caveat)
 
 
-def _stale(s: Source, today: dt.date) -> bool:
+def stale_limits(overrides: Mapping[str, int] | None = None) -> dict[str, int]:
+    """The built-in limits per source kind with the profile's overrides on top. The key
+    `default` is the limit for a kind not listed."""
+    return {**STALE_DAYS, "default": STALE_DEFAULT, **(overrides or {})}
+
+
+def _stale(s: Source, today: dt.date, limits: Mapping[str, int] | None = None) -> bool:
     day = _parse(s.as_of)
     if day is None:
         return False
-    limit = STALE_DAYS.get(s.kind, STALE_DEFAULT)
+    table = limits if limits is not None else stale_limits()
+    limit = table.get(s.kind, table.get("default", STALE_DEFAULT))
     return (today - day).days > limit
 
 
@@ -262,7 +269,12 @@ def _rate(
 # ------------------------------------------------------------------ the ledger
 
 
-def build_claims(sections: Sequence[SectionInput], reg: Registry, today: dt.date) -> list[Claim]:
+def build_claims(
+    sections: Sequence[SectionInput],
+    reg: Registry,
+    today: dt.date,
+    limits: Mapping[str, int] | None = None,
+) -> list[Claim]:
     claims: list[Claim] = []
     for section in sections:
         for index, raw in enumerate(section.sentences):
@@ -305,7 +317,7 @@ def build_claims(sections: Sequence[SectionInput], reg: Registry, today: dt.date
                     confidence=label,
                     why=why,
                     period=max(days).isoformat() if days else None,
-                    stale=any(_stale(s, today) for s in sources),
+                    stale=any(_stale(s, today, limits) for s in sources),
                     review=review,
                 )
             )
@@ -392,12 +404,18 @@ def _balance(claims: list[Claim], sections: Sequence[SectionInput]) -> Balance:
     )
 
 
-def _coverage(reg: Registry, claims: list[Claim], now: dt.datetime, notes: list[str]) -> Coverage:
+def _coverage(
+    reg: Registry,
+    claims: list[Claim],
+    now: dt.datetime,
+    notes: list[str],
+    limits: Mapping[str, int] | None = None,
+) -> Coverage:
     cited = {e.source_id for c in claims for e in c.evidence}
     used = [s for s in reg.sources if s.id in cited]
     days = [d for s in used if (d := _parse(s.as_of))]
     today = now.date()
-    stale = [s.id for s in used if _stale(s, today)]
+    stale = [s.id for s in used if _stale(s, today, limits)]
     undated = [s.id for s in used if not s.as_of and not s.retrieved_at]
     notices = list(notes)
     if stale:
@@ -551,8 +569,11 @@ def build_ledger(
     kpi_version: int | None = None,
     strategy_version: int | None = None,
     notes: list[str] | None = None,
+    stale_days: Mapping[str, int] | None = None,
 ) -> ClaimLedger:
-    claims = build_claims(sections, reg, now.date())
+    """`stale_days` overrides the built-in stale limit per source kind (the profile's setting)."""
+    limits = stale_limits(stale_days)
+    claims = build_claims(sections, reg, now.date(), limits)
     strategy = strategy_checks(claims, kpis, rules, kpi_version, strategy_version)
     balance = _balance(claims, sections)
     checks = verify_ledger(claims, sections, reg, valuation, strategy, balance)
@@ -564,7 +585,7 @@ def build_ledger(
         checks=checks,
         strategy=strategy,
         balance=balance,
-        coverage=_coverage(reg, claims, now, notes or []),
+        coverage=_coverage(reg, claims, now, notes or [], limits),
         confidence=confidence,
         confidence_why=why,
     )

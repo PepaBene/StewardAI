@@ -18,6 +18,7 @@ import asyncpg
 from steward.analytics.contract import AnalyticsResult, Status
 from steward.chat import envelope as env
 from steward.company import ratios, service, valuation
+from steward.config.jobs import DEFAULT_FRESHNESS_DAYS, JobsConfig
 from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig
@@ -870,23 +871,33 @@ async def thesis_and_reports(pool: asyncpg.Pool, registry: Registry, ticker: str
 # ------------------------------------------------------------------ freshness
 
 
-FRESHNESS_PROBES: tuple[tuple[str, str, str, int], ...] = (
-    ("portfolio_snapshot", "select max(snapshot_date) from public.account_snapshot", "date", 5),
-    ("news", "select max(published_at) from public.news_item", "ts", 3),
-    ("macro", "select max(known_at) from public.macro_observation", "ts", 45),
-    ("fundamentals", "select max(fetched_at) from public.fundamentals", "ts", 120),
-    ("price_bars", "select max(date) from public.price_bar", "date", 7),
-    ("fx", "select max(rate_date) from public.fx_rate", "date", 7),
-    ("insider_filings", "select max(filed) from public.insider_filing", "ts", 30),
-    ("transactions", "select max(occurred_at) from public.transaction", "ts", 30),
+FRESHNESS_PROBES: tuple[tuple[str, str, str], ...] = (
+    ("portfolio_snapshot", "select max(snapshot_date) from public.account_snapshot", "date"),
+    ("news", "select max(published_at) from public.news_item", "ts"),
+    ("macro", "select max(known_at) from public.macro_observation", "ts"),
+    ("fundamentals", "select max(fetched_at) from public.fundamentals", "ts"),
+    ("price_bars", "select max(date) from public.price_bar", "date"),
+    ("fx", "select max(rate_date) from public.fx_rate", "date"),
+    ("insider_filings", "select max(filed) from public.insider_filing", "ts"),
+    ("transactions", "select max(occurred_at) from public.transaction", "ts"),
 )
+
+
+async def freshness_limits(pool: asyncpg.Pool) -> dict[str, int]:
+    """Stale-after days per dataset: the built-in limits with `chat.freshness_days` of the
+    active jobs config on top."""
+    stored = await load_active(pool, "jobs", JobsConfig)
+    configured = (stored.body if stored else JobsConfig()).chat.freshness_days
+    return {**DEFAULT_FRESHNESS_DAYS, **configured}
 
 
 async def data_freshness(pool: asyncpg.Pool) -> dict[str, Any]:
     """When each research dataset was last updated, and whether that is stale for it."""
     today = _today()
+    limits = await freshness_limits(pool)
     datasets: list[dict[str, Any]] = []
-    for name, sql, _, max_age in FRESHNESS_PROBES:
+    for name, sql, _ in FRESHNESS_PROBES:
+        max_age = limits[name]
         try:
             latest = await pool.fetchval(sql)
         except asyncpg.PostgresError as exc:

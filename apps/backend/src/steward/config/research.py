@@ -68,6 +68,8 @@ DomainName = Annotated[
     ),
 ]
 CustomId = Annotated[str, Field(pattern=r"^custom-[a-z0-9]+(-[a-z0-9]+)*$", max_length=40)]
+# Source kinds a stale limit can be set for (built-in values: steward.research.ledger).
+STALE_KINDS: tuple[str, ...] = ("price", "news_item", "search", "observation", "default")
 MAX_CUSTOM_SECTIONS = 6
 MAX_TEMPLATE_SECTIONS = 20
 
@@ -132,6 +134,18 @@ class ResearchProfile(ConfigModel):
         default=False,
         description="Let search use forums and social media. Their sentences are labelled.",
     )
+    forum_domains: list[DomainName] = Field(
+        default_factory=list,
+        max_length=40,
+        description="Extra hosts treated as forums or social media, added to the built-in list. "
+        "Labelled as forum and searched only when forums are allowed.",
+    )
+    stale_days: dict[str, Annotated[int, Field(ge=1, le=3650)]] = Field(
+        default_factory=dict,
+        description="Days after which a cited source of a kind counts as stale, overriding the "
+        f"built-in limit. Kinds: {', '.join(STALE_KINDS)}; `default` covers any other kind. "
+        "Empty = built-in limits.",
+    )
     iterate: bool = Field(
         default=False,
         description="After the first pass, search again for sections left thin, corroborate "
@@ -155,6 +169,12 @@ class ResearchProfile(ConfigModel):
         overlap = set(self.allow_domains) & set(self.deny_domains)
         if overlap:
             raise ValueError(f"domains both allowed and denied: {sorted(overlap)}")
+        unknown = sorted(set(self.stale_days) - set(STALE_KINDS))
+        if unknown:
+            raise ValueError(f"unknown source kinds in stale_days: {unknown}")
+        forum_overlap = set(self.forum_domains) & (set(self.deny_domains) | set(self.allow_domains))
+        if forum_overlap:
+            raise ValueError(f"forum domains also allowed or denied: {sorted(forum_overlap)}")
         return self
 
 

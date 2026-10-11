@@ -627,14 +627,19 @@ class ChatTools:
         self,
         pool: asyncpg.Pool,
         registry: Registry,
-        conversation_id: int,
+        conversation_id: int | None,
         message_id: int | None,
         embedder: Embedder | None = None,
+        *,
+        owner_id: str | None = None,
     ) -> None:
+        # Outside chat (the research run) there is no conversation: `conversation_id` is None,
+        # and owner-scoped tools use `owner_id` if given, else report that they have no owner.
         self.pool = pool
         self.registry = registry
         self.conversation_id = conversation_id
         self.message_id = message_id
+        self.owner_id = owner_id
         self.embedder = embedder
         self.used: list[str] = []
         self.actions: list[int] = []
@@ -734,6 +739,10 @@ class ChatTools:
         return await research_tools.data_freshness(self.pool)
 
     async def _owner(self) -> str | None:
+        if self.owner_id is not None:
+            return self.owner_id
+        if self.conversation_id is None:
+            return None
         return await analytics_tools.conversation_owner(self.pool, self.conversation_id)
 
     async def _tool_stress_test(self) -> dict[str, Any]:

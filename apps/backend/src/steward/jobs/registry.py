@@ -57,6 +57,7 @@ from steward.reference.identity import reference_data_handler
 from steward.reference.intraday import intraday_prices_handler
 from steward.reference.prices import holiday_refresh_handler, price_history_handler
 from steward.reference.returns import returns_refresh_handler
+from steward.research.retention import research_trace_retention_handler
 from steward.research.run import research_handler
 from steward.research.web_facts import gap_research_handler
 from steward.review.monthly import monthly_review_handler
@@ -116,6 +117,7 @@ JobType = Literal[
     "shadow_snapshot",
     "shadow_report",
     "raw_retention",
+    "research_trace_retention",
     "zero_cost_gate",
     "returns_refresh",
     "exchange_probes",
@@ -185,6 +187,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "shadow_snapshot": shadow_snapshot_handler,
     "shadow_report": shadow_report_handler,
     "raw_retention": raw_retention_handler,
+    "research_trace_retention": research_trace_retention_handler,
     "zero_cost_gate": zero_cost_gate_handler,
     "returns_refresh": returns_refresh_handler,
     "exchange_probes": exchange_probes_handler,

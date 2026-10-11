@@ -19,6 +19,10 @@ from typing import Any
 
 import asyncpg
 
+from steward.config.jobs import JobsConfig
+from steward.config.store import load_active
+from steward.jobs.runner import JobContext, JobFailed
+
 
 def scrub_body(body: dict[str, Any], now: dt.datetime) -> dict[str, Any]:
     """The stored report with its working records removed. Counts stay in `search_summary`."""
@@ -96,6 +100,20 @@ async def purge_old_traces(
             )
         )
     return {"checkpoints": checkpoints, "traces": traces}
+
+
+async def research_trace_retention_handler(ctx: JobContext) -> None:
+    """Daily: purge_old_traces with the configured `research.trace_retention_days` (a job
+    parameter of the same name overrides it for a manual run)."""
+    stored = await load_active(ctx.pool, "jobs", JobsConfig)
+    days = (stored.body if stored else JobsConfig()).research.trace_retention_days
+    if "trace_retention_days" in ctx.params:
+        days = int(ctx.params["trace_retention_days"])
+    if days < 1:
+        raise JobFailed("trace_retention_days must be at least 1")
+    async with ctx.step("purge") as step:
+        counts = await purge_old_traces(ctx.pool, days, dt.datetime.now(dt.UTC))
+        step.detail.update(older_than_days=days, **counts)
 
 
 REVIEW_STATES = ("owner_confirmed", "owner_rejected", "unreviewed")

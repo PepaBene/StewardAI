@@ -84,6 +84,7 @@ class SourcePolicy:
     deny: tuple[str, ...] = ()
     trusted: tuple[str, ...] = ()
     allow_forums: bool = False
+    forum_hosts: tuple[str, ...] = FORUM_HOSTS
 
     @classmethod
     def for_profile(
@@ -98,6 +99,7 @@ class SourcePolicy:
             deny=tuple(dict.fromkeys([*profile.deny_domains, *blocked])),
             trusted=tuple(profile.allow_domains),
             allow_forums=profile.allow_forums,
+            forum_hosts=tuple(dict.fromkeys([*FORUM_HOSTS, *profile.forum_domains])),
         )
 
     def search_domains(self, tiered: tuple[str, ...]) -> tuple[str, ...]:
@@ -106,7 +108,7 @@ class SourcePolicy:
         wanted = [d for d in tiered if not _matches(normalise_host(d), self.deny)]
         wanted += [d for d in self.trusted if not _matches(d, self.deny)]
         if self.allow_forums:
-            wanted += [d for d in FORUM_HOSTS if not _matches(d, self.deny)]
+            wanted += [d for d in self.forum_hosts if not _matches(d, self.deny)]
         return tuple(dict.fromkeys(wanted))[:80]
 
     def decide(self, host: str | None) -> Decision:
@@ -120,7 +122,7 @@ class SourcePolicy:
             return Decision(True, tier, ROLE_BY_TIER[tier], None)
         if _matches(host, self.trusted):
             return Decision(True, None, "owner_trusted", ROLE_CAVEATS["owner_trusted"])
-        if _matches(host, FORUM_HOSTS):
+        if _matches(host, self.forum_hosts):
             if self.allow_forums:
                 return Decision(True, None, "forum", ROLE_CAVEATS["forum"])
             return Decision(False, None, None, "forums are not enabled in this profile")

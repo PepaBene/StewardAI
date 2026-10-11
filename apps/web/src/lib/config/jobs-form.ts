@@ -210,6 +210,12 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Prune old raw provider payloads; normalized data stays.",
     cron: "15 3 * * *",
   },
+  research_trace_retention: {
+    label: "Research trace retention",
+    description:
+      "Delete checkpoints and tool traces of old finished research and chat jobs.",
+    cron: "40 3 * * *",
+  },
   zero_cost_gate: {
     label: "Zero-cost gate",
     description:

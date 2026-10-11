@@ -146,6 +146,9 @@ class SectionRequest:
     policy: str = ""
     existing: str = ""
     horizon_days: int | None = None
+    # What the plan's stored-data tools returned for this section (see research.read_tools):
+    # after the cached material, before the task.
+    tool_evidence: str = ""
 
 
 @dataclass
@@ -177,6 +180,8 @@ def section_prompt(request: SectionRequest) -> str:
         else ""
     )
     added = f"{request.added_material}\n\n" if request.added_material else ""
+    if request.tool_evidence:
+        added += f"{request.tool_evidence}\n\n"
     title = request.title or SECTION_TITLES[request.section]
     task = request.task or SECTION_TASKS[request.section]
     extra = ""

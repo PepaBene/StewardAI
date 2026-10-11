@@ -237,6 +237,32 @@ def test_forums_are_blocked_unless_the_profile_enables_them_and_then_labelled() 
     assert not policy().decide("unknown-blog.example").allowed
 
 
+def test_forum_domains_extend_the_built_in_list_per_profile() -> None:
+    assert not policy().decide("forum.example.org").allowed
+    off = policy(forum_domains=["forum.example.org"]).decide("www.forum.example.org")
+    assert not off.allowed and "not enabled" in (off.reason or "")
+    on = policy(allow_forums=True, forum_domains=["forum.example.org"])
+    assert on.decide("old.forum.example.org").role == "forum"
+    assert on.decide("reddit.com").role == "forum"  # built-ins stay
+    assert "forum.example.org" in on.search_domains(("sec.gov",))
+    searched = policy(forum_domains=["forum.example.org"]).search_domains(("sec.gov",))
+    assert searched == ("sec.gov",)
+
+
+def test_forum_and_stale_settings_are_validated_and_default_to_the_built_ins() -> None:
+    assert profile().forum_domains == [] and profile().stale_days == {}
+    for bad in (
+        {"forum_domains": ["x.example.org"], "deny_domains": ["x.example.org"]},
+        {"forum_domains": ["x.example.org"], "allow_domains": ["x.example.org"]},
+        {"forum_domains": ["Not A Domain"]},
+        {"stale_days": {"video": 5}},
+        {"stale_days": {"price": 0}},
+    ):
+        with pytest.raises(ValidationError):
+            profile(**bad)
+    assert profile(stale_days={"price": 14}).stale_days == {"price": 14}
+
+
 def test_deny_removes_a_domain_from_the_search_list_too() -> None:
     p = policy(deny_domains=["reuters.com"])
     assert p.search_domains(("sec.gov", "reuters.com", "www.reuters.com")) == ("sec.gov",)

@@ -4,7 +4,7 @@ import datetime as dt
 from typing import Literal
 
 from steward.research.gather import Valuation
-from steward.research.ledger import SectionInput, build_ledger, claim_type
+from steward.research.ledger import SectionInput, build_ledger, claim_type, stale_limits
 from steward.research.sources import CheckStatus, CitedSentence, Registry
 from steward.research.untrusted import (
     flag_sources,
@@ -208,6 +208,16 @@ def test_a_stale_price_is_noted_and_a_dated_span_is_given() -> None:
     assert ledger.coverage.stale_sources == ["S4"]
     assert ledger.coverage.data_from == ledger.coverage.data_to == "2026-08-01"
     assert any("freshness" in n for n in ledger.coverage.notices)
+
+
+def test_stale_limits_can_be_overridden_per_source_kind() -> None:
+    sections = [section("business", "model", sentence("The close was recent.", ["S4"]))]
+    relaxed = build_ledger(sections, registry(), [], NOW, stale_days={"price": 100})
+    assert not relaxed.claims[0].stale and relaxed.coverage.stale_sources == []
+    # a kind that is not overridden keeps its built-in limit
+    strict = build_ledger(sections, registry(), [], NOW, stale_days={"news_item": 1})
+    assert strict.claims[0].stale and strict.coverage.stale_sources == ["S4"]
+    assert stale_limits()["price"] == 7 and stale_limits({"default": 9})["default"] == 9
 
 
 def test_report_confidence_needs_most_claims_high_and_no_warning() -> None:

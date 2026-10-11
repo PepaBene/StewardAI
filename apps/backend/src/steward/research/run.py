@@ -4,12 +4,15 @@ checkpointed chain of steps under a research profile and a report template.
 1. plan (code): the questions, tools, web intents, source tiers, counter-evidence search and
    stop conditions, written down before anything is searched;
 2. gather (code): the source registry and the code sections (figures from stored records);
-3. one step per model-written section (the profile's model, web search on allowed sources);
-4. follow-up rounds (profiles that iterate): sections left thin are searched again, single-
+3. read_tools (code, no model): the plan's stored-data tools, the same typed read tools chat
+   uses, called with bounded arguments; their sources join the registry and their results
+   go to the sections that planned them as extra evidence, with a record of each call;
+4. one step per model-written section (the profile's model, web search on allowed sources);
+5. follow-up rounds (profiles that iterate): sections left thin are searched again, single-
    source claims are checked against a second source, until the sections have enough or the
    budget is used;
-5. the claim verifier over every model-written sentence;
-6. store the report, with the run snapshot and, by authoring mode, a thesis proposal or review.
+6. the claim verifier over every model-written sentence;
+7. store the report, with the run snapshot and, by authoring mode, a thesis proposal or review.
 
 Each completed step's output is a `job_checkpoint`. If the worker is killed mid-run, the
 queue redelivers the job and the run resumes: completed steps are read back, not redone
@@ -26,6 +29,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from steward.ai import AINotConfigured
+from steward.chat.tools import ChatTools
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.news_sources import NewsSourcesConfig
 from steward.config.prompts import load_prompts
@@ -42,6 +46,13 @@ from steward.research.gather import Gathered, Valuation, gather
 from steward.research.layout import SectionSpec, investigation_profile, resolve_layout
 from steward.research.ledger import ClaimLedger, SectionInput, build_ledger
 from steward.research.plan import ResearchPlan, build_plan, effective_searches, focus_for
+from steward.research.read_tools import (
+    ReadToolRun,
+    ToolCallRecord,
+    comparison,
+    evidence_for,
+    run_read_tools,
+)
 from steward.research.snapshot import RunSnapshot, take_snapshot
 from steward.research.source_policy import PRIORITY_TEXT, SourcePolicy
 from steward.research.sources import CitedSentence, Registry, Source
@@ -151,6 +162,9 @@ class ResearchBody(BaseModel):
     trace_purged_at: str | None = Field(
         default=None, description="When the owner deleted the run's working records."
     )
+    # The plan's stored-data tools as the run called them (the same tools chat uses), one
+    # compact record per call, so research and chat can be compared. Older reports have none.
+    tool_calls: list[ToolCallRecord] = Field(default_factory=list)
 
 
 @dataclass
@@ -301,6 +315,29 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             counter_search=bool(plan.counter_evidence_intent),
             iterate=plan.iterate,
         )
+
+    async def do_read_tools() -> dict[str, Any]:
+        async with ctx.step("read_tools") as step:
+            tools = ChatTools(pool, reg, None, None)
+            outcome = await run_read_tools(tools.call, reg, plan, ticker)
+            step.detail.update(
+                calls=len(outcome.records),
+                by_status=comparison(outcome.records),
+                sources_added=len(outcome.sources),
+            )
+            return outcome.model_dump(mode="json")
+
+    registry_size = len(reg.sources)
+    tool_run = ReadToolRun.model_validate(await ctx.checkpoint("read_tools", do_read_tools))
+    if len(reg.sources) < registry_size + len(tool_run.sources):
+        # Resumed: the tools did not run again, so put the sources they added back, in order.
+        for src in tool_run.sources:
+            reg.add(
+                src.kind,
+                src.ref,
+                src.title,
+                **src.model_dump(exclude={"id", "kind", "ref", "title"}),
+            )
     snapshot = take_snapshot(
         now=deps.now,
         profile=profile.model_dump(mode="json"),
@@ -377,6 +414,9 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                     policy=PRIORITY_TEXT if searches else "",
                     existing=existing,
                     horizon_days=profile.date_horizon_days,
+                    tool_evidence=evidence_for(
+                        tool_run, spec.id, first=spec.id == model_specs[0].id
+                    ),
                 )
             )
             step.usage = result.usage.step_usage()
@@ -679,6 +719,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                 )
         if profile.language == "cs":
             notes.append("Sections written from stored records are in English.")
+        notes.extend(tool_run.notices)
         proposal = build_proposal(
             profile.authoring,
             ticker,
@@ -722,6 +763,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                 (r.id, f"{r.type} {r.operator} {getattr(r, 'value', '')}".strip())
                 for r in (strategy.enabled_rules if strategy else [])
             ],
+            stale_days=profile.stale_days,
             kpi_version=theses_v.id if theses_v else None,
             strategy_version=strategy_v.id if strategy_v else None,
             notes=[n for n in notes if "Sections written" not in n],
@@ -762,6 +804,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             ledger=ledger,
             flagged_sources=flagged,
             links_removed=links_removed,
+            tool_calls=tool_run.records,
         )
         report_id: int = await pool.fetchval(
             "insert into public.report (type, ticker, title, body, body_md, profile,"
