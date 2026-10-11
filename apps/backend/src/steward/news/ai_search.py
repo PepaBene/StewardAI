@@ -15,11 +15,13 @@ import datetime as dt
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.ai import AINotConfigured, Usage
+from steward.budget_guard import BudgetExceeded
 from steward.config.jobs import JobsConfig
 from steward.config.news_sources import NewsSource
 from steward.config.prompts import load_prompts
@@ -87,11 +89,19 @@ class SearchLeadError(Exception):
 def verified_leads(ticker: str, leads: Sequence[Lead], done: Completion) -> list[FoundLead]:
     """The leads whose URL is one of the call's citations, with the citation's title as the
     headline. A lead the provider did not cite, or one with no title, is dropped."""
-    cited = {canonical_url(c.url): c for c in done.citations}
+    cited: dict[str, Any] = {}
+    for c in done.citations:
+        try:
+            cited[canonical_url(c.url)] = c
+        except ValueError:  # not an http(s) link: never a lead
+            continue
     out: list[FoundLead] = []
     seen: set[str] = set()
     for lead in leads:
-        key = canonical_url(lead.url)
+        try:
+            key = canonical_url(lead.url)
+        except ValueError:
+            continue
         citation = cited.get(key)
         if citation is None or key in seen:
             continue
@@ -241,6 +251,11 @@ async def news_ai_search_handler(ctx: JobContext) -> None:
                 )
             except SearchLeadError as exc:
                 errors[ticker] = str(exc)[:200]
+            except BudgetExceeded as exc:
+                # The cap is reached: keep the leads found so far (the store step below still
+                # runs) and stop, as the triage job does.
+                errors[ticker] = f"budget: {str(exc)[:150]}"
+                break
         step.detail.update(leads=len(found), errors=errors)
         step.usage = usage.step_usage()
     async with ctx.step("store") as step:

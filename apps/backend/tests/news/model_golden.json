@@ -49,12 +49,12 @@
       "expect": {"claims": 1, "effective": null, "occurred": "2026-10-09"}
     },
     {
-      "id": "ex-wrong-item-falls-back-to-story",
+      "id": "ex-claim-on-an-item-outside-the-story-is-rejected",
       "items": [{"id": 1, "headline": "Eta wins contract", "body": "Eta Corp won a 500 million dollar defence contract."},
                 {"id": 2, "headline": "Eta contract details", "body": "The award runs for five years."}],
       "raw": {"event_type": "product_business", "action": "contract win", "status": "reported",
               "key_claims": [{"text": "Five-year award", "item_id": 99, "span": "The award runs for five years"}]},
-      "expect": {"claims": 1}
+      "expect": {"claims": 0}
     },
     {
       "id": "ex-case-and-spacing-tolerated",

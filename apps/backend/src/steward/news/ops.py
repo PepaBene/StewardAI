@@ -162,6 +162,21 @@ async def incidents(pool: asyncpg.Pool, since: dt.datetime, limit: int = 50) -> 
 
 IncidentStatus = Literal["open", "acknowledged", "resolved"]
 
+# What makes a story an incident of each kind (the same conditions `incidents` selects on).
+INCIDENT_CONDITIONS = {
+    "unalerted_severe": (
+        "c.severity = 3 and not c.recycled and c.duplicate_of is null"
+        " and c.status in ('confirmed', 'unconfirmed', 'disputed')"
+        " and not exists (select 1 from public.alert a where a.cluster_id = c.id"
+        "  and a.status in ('sent', 'pending'))"
+    ),
+    "alert_not_useful": (
+        "exists (select 1 from public.alert a where a.cluster_id = c.id and a.status = 'sent')"
+        " and exists (select 1 from public.news_feedback f where f.target = 'story'"
+        "  and f.target_id = c.id::text and f.kind = 'not_useful')"
+    ),
+}
+
 
 async def set_incident_status(
     pool: asyncpg.Pool,
@@ -170,9 +185,16 @@ async def set_incident_status(
     status: IncidentStatus,
     note: str | None,
 ) -> bool:
-    """Record the owner's handling of one incident. False when the story does not exist."""
+    """Record the owner's handling of one incident. False when the story is not an incident of
+    that kind (as `incidents` defines it, without its time window); an unknown `kind` raises
+    ValueError."""
+    if kind not in INCIDENT_CONDITIONS:
+        raise ValueError(f"unknown incident kind {kind!r}")
     if not await pool.fetchval(
-        "select exists (select 1 from public.story_cluster where id = $1)", story_id
+        "select exists (select 1 from public.story_cluster c where c.id = $1 and "  # noqa: S608
+        + INCIDENT_CONDITIONS[kind]
+        + ")",
+        story_id,
     ):
         return False
     await pool.execute(

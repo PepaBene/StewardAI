@@ -465,6 +465,11 @@ async def translate_pending(
     return detail, usage
 
 
+DRIFT_PREFIX = "parser drift"
+# Source types whose items are diffed against a baseline (page: new links; rss: undated links),
+# so an empty item list can be normal; their structural check is made inside `collect_source`.
+DIFFED_SOURCE_TYPES = frozenset({"page", "rss"})
+INFO_NOTE_PREFIXES = ("first read",)
 BREAKER_AFTER = 3
 BACKOFF_BASE = dt.timedelta(minutes=10)
 BACKOFF_MAX = dt.timedelta(hours=6)
@@ -532,6 +537,13 @@ async def record_source_runs(
         )
 
 
+def _canonical_or_none(url: str) -> str | None:
+    try:
+        return canonical_url(url)
+    except ValueError:
+        return None
+
+
 async def undated_baseline(
     pool: asyncpg.Pool, source_id: str, items: list[RawItem]
 ) -> tuple[list[RawItem], list[str]]:
@@ -542,7 +554,11 @@ async def undated_baseline(
     key = f"news_rss_undated:{source_id}"
     stored = await pool.fetchval("select value from public.sync_state where key = $1", key)
     previous = set(json.loads(stored)["links"]) if stored else None
-    undated = [canonical_url(i.url) for i in items if i.published_at is None]
+    # An item whose URL cannot be made canonical is not baselined (and is kept only if dated);
+    # store_items drops it with a reason.
+    undated = [
+        c for i in items if i.published_at is None and (c := _canonical_or_none(i.url)) is not None
+    ]
     if previous is None or undated:
         await pool.execute(
             "insert into public.sync_state (key, value) values ($1, $2::jsonb)"
@@ -554,7 +570,11 @@ async def undated_baseline(
         i
         for i in items
         if i.published_at is not None
-        or (previous is not None and canonical_url(i.url) not in previous)
+        or (
+            previous is not None
+            and (c := _canonical_or_none(i.url)) is not None
+            and c not in previous
+        )
     ]
     notes = (
         [f"first read: {len(undated)} undated links recorded as baseline"]
@@ -574,13 +594,18 @@ async def collect_source(
     rules: EventRulesConfig | None = None,
     google_news_locale: GoogleNewsLocale | None = None,
     fts_max_hits: int = FTS_MAX_HITS,
+    pending_validators: dict[str, tuple[str | None, str | None]] | None = None,
 ) -> tuple[list[RawItem], list[str]]:
+    """One source's items and notes. A feed's new ETag / Last-Modified are not stored here but
+    put in `pending_validators` for the caller to commit once the items are stored: a crash
+    in between would otherwise turn the next read into a 304 for items never stored."""
     rules = rules or EventRulesConfig()
     scoped = tuple(source.tickers)
     feeds = [h for h in holdings.feed_info if not scoped or h.ticker in scoped]
     if source.type == "rss":
         validators = await pool.fetchrow(
-            "select etag, http_last_modified from public.source where id = $1", source.id
+            "select etag, http_last_modified, last_item_count from public.source where id = $1",
+            source.id,
         )
         rss_items, etag, modified = await collect_rss_conditional(
             deps.http,
@@ -590,13 +615,24 @@ async def collect_source(
             validators["etag"] if validators else None,
             validators["http_last_modified"] if validators else None,
         )
-        await pool.execute(
-            "update public.source set etag = $2, http_last_modified = $3 where id = $1",
-            source.id,
-            etag,
-            modified,
-        )
-        return await undated_baseline(pool, source.id, rss_items)
+        if pending_validators is not None:
+            pending_validators[source.id] = (etag, modified)
+        else:
+            await pool.execute(
+                "update public.source set etag = $2, http_last_modified = $3 where id = $1",
+                source.id,
+                etag,
+                modified,
+            )
+        kept, baseline_notes = await undated_baseline(pool, source.id, rss_items)
+        previous_count = validators["last_item_count"] if validators else None
+        if not rss_items and previous_count:
+            # The feed answered (not a 304) with no entries after yielding some.
+            baseline_notes = [
+                *baseline_notes,
+                f"{DRIFT_PREFIX}: 0 entries (previous run {previous_count})",
+            ]
+        return kept, baseline_notes
     if source.type == "news_sitemap":
         return (
             await collect_news_sitemap(
@@ -618,13 +654,20 @@ async def collect_source(
         items, current = await collect_page(
             deps.http, source.id, str(source.url), scoped, previous, deps.now()
         )
-        await pool.execute(
-            "insert into public.sync_state (key, value) values ($1, $2::jsonb)"
-            " on conflict (key) do update set value = excluded.value",
-            key,
-            json.dumps({"links": current[:1000]}),
-        )
-        return items, [] if previous is not None else ["first read: links recorded as baseline"]
+        if current or previous is None:  # an empty parse never replaces a good baseline
+            await pool.execute(
+                "insert into public.sync_state (key, value) values ($1, $2::jsonb)"
+                " on conflict (key) do update set value = excluded.value",
+                key,
+                json.dumps({"links": current[:1000]}),
+            )
+        if previous is None:
+            return items, ["first read: links recorded as baseline"]
+        if previous and not current:
+            # `collect_page` returns only new links, so no items is normal for a quiet page;
+            # no links at all after a page that had some is a structurally empty parse.
+            return items, [f"{DRIFT_PREFIX}: no links found (previous read {len(previous)})"]
+        return items, []
     if source.type == "edgar":
         if deps.edgar is None:
             return [], ["SEC_USER_AGENT is not set"]
@@ -736,14 +779,16 @@ async def record_filing_hits(pool: asyncpg.Pool, fts: FtsResult) -> None:
 def item_tier(
     item: RawItem, source: NewsSource, config: NewsSourcesConfig, ir_domains: set[str]
 ) -> int:
+    if source.type == "ai_search":
+        # A model's lead is unverified whatever domain it names: a lead on a tier-1 or tier-2
+        # domain must not become a story or an alert before its own text is judged.
+        return 3
     host = item.outlet_host
     if host and any(host == d or host.endswith(f".{d}") for d in ir_domains):
         return 1
     configured = config.domain_tier(host)
     if configured is not None:
         return configured
-    if source.type == "ai_search":
-        return 3
     if source.type in AGGREGATOR_TYPES:
         return config.unknown_outlet_tier
     return source.tier
@@ -870,14 +915,28 @@ async def store_items(
     since = now - dt.timedelta(hours=config.sources.freshness_hours)
     linker = Linker(holdings.terms)
     by_url: dict[str, tuple[RawItem, NewsSource]] = {}
+    best_tier: dict[str, int] = {}
+    bad_url = 0
     for item, source in items:
         stats.per_source[source.id].fetched += 1
-        canonical = canonical_url(item.url)
+        try:
+            canonical = canonical_url(item.url)
+        except ValueError:
+            # One unparseable or non-http link skips that item, never the run.
+            stats.per_source[source.id].drops["bad_url"] += 1
+            bad_url += 1
+            continue
+        tier = item_tier(item, source, config.sources, holdings.ir_domains)
         if canonical in by_url:
             stats.per_source[source.id].drops["duplicate_url"] += 1
+            if tier < best_tier[canonical]:
+                # The same URL from two sources keeps the better (lower) tier's copy.
+                by_url[canonical] = (item, source)
+                best_tier[canonical] = tier
         else:
             by_url[canonical] = (item, source)
-    stats.duplicate += len(items) - len(by_url)
+            best_tier[canonical] = tier
+    stats.duplicate += len(items) - bad_url - len(by_url)
     existing = {
         r["url"]
         for r in await pool.fetch(
@@ -951,6 +1010,7 @@ async def store_items(
         async with pool.acquire() as conn, conn.transaction():
             digest = item_hash(item.headline, item.summary)
             cluster_id = best_cluster(fingerprint, members) or simhash_cluster(digest, members)
+            new_cluster = cluster_id is None
             if cluster_id is None:
                 cluster_id = await conn.fetchval(
                     "insert into public.story_cluster (headline, headline_key, best_tier,"
@@ -999,6 +1059,10 @@ async def store_items(
                 is_correction(item.headline),
             )
             if item_id is None:
+                if new_cluster:
+                    # The insert lost a race: do not leave the cluster made for it empty.
+                    await conn.execute("delete from public.story_cluster where id = $1", cluster_id)
+                    stats.new_clusters -= 1
                 stats.duplicate += 1
                 tally.drops["duplicate_url"] += 1
                 continue
@@ -1704,6 +1768,7 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
     freshness_days = max(1, config.sources.freshness_hours // 24)
     collected: list[tuple[RawItem, NewsSource]] = []
     runs: dict[str, SourceRun] = {}
+    pending_validators: dict[str, tuple[str | None, str | None]] = {}
     for source in enabled:
         async with ctx.step(f"collect:{source.id}") as step:
             health = await pool.fetchrow(
@@ -1730,18 +1795,38 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
                     config.event_rules,
                     config.sources.google_news_locale,
                     config.news.edgar_fts_max_hits,
+                    pending_validators=pending_validators,
                 )
             except NotModified:
                 items, notes, not_modified = [], [], True
             except (FetchError, httpx.HTTPError, ValueError) as exc:
                 items, notes, error = [], [], str(exc)[:500]
+            except Exception as exc:  # noqa: BLE001 - one bad source must not stop the ingest
+                # A parser hitting an unexpected shape (AttributeError, TypeError, KeyError...)
+                # is that source's error, recorded like any other; the other sources still run.
+                logger.exception("news source %s failed", source.id)
+                items, notes, error = [], [], f"{type(exc).__name__}: {exc}"[:500]
             latency_ms = round((time.monotonic() - started) * 1000)
             previous_count = health["last_item_count"] if health else None
-            if not error and not not_modified and not items and previous_count:
-                # A feed that answers but yields nothing after yielding items: the layout or
+            if (
+                not error
+                and not not_modified
+                and not items
+                and not notes
+                and previous_count
+                and source.type not in DIFFED_SOURCE_TYPES
+            ):
+                # A source that answers but yields nothing after yielding items: the layout or
                 # the URL may have changed. Reported, and counted against the breaker.
-                notes = [*notes, f"parser drift: 0 items (previous run {previous_count})"]
-            drift = bool(notes) and notes[-1].startswith("parser drift")
+                notes = [f"{DRIFT_PREFIX}: 0 items (previous run {previous_count})"]
+            drift = any(n.startswith(DRIFT_PREFIX) for n in notes)
+            if not error and not items and not drift:
+                # A collector that reports errors and returns nothing (missing key, every
+                # holding rate-limited) failed; it did not find "no news". Notes that only
+                # describe a baseline read are not errors.
+                problems = [n for n in notes if not n.startswith(INFO_NOTE_PREFIXES)]
+                if problems:
+                    error = "; ".join(problems)[:500]
             failed = error is not None or drift
             collected.extend((item, source) for item in items)
             runs[source.id] = SourceRun(
@@ -1777,6 +1862,14 @@ async def run_news_pipeline(ctx: JobContext, deps: NewsDeps) -> None:
         stats = await store_items(pool, collected, config, holdings, now, ctx.job_id)
         step.detail.update(stats.detail())
         await record_source_runs(pool, ctx.job_id, now, runs, stats)
+        # Only now that the items are stored may a feed's next read answer 304 for them.
+        for source_id, (etag, modified) in pending_validators.items():
+            await pool.execute(
+                "update public.source set etag = $2, http_last_modified = $3 where id = $1",
+                source_id,
+                etag,
+                modified,
+            )
         await pool.execute(
             "update public.filing_hit h set news_item_id = n.id from public.news_item n"
             " where h.news_item_id is null and h.kind = 'topic' and n.url = h.url"

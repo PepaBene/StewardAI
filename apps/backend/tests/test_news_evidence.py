@@ -54,6 +54,9 @@ def test_correction_notices_are_found_in_four_languages_but_revisions_are_not() 
     assert is_correction("[기재정정]분기보고서")
     assert not is_correction("業績予想の修正に関するお知らせ")  # a forecast revision is news
     assert not is_correction("Apple corrects course on pricing")
+    assert not is_correction("Stocks slide as market correction deepens")
+    assert not is_correction("Market correction: what investors should do")
+    assert is_correction("(Corrected) Apple cuts guidance")
 
 
 def test_lifecycle_states_in_order_of_precedence() -> None:

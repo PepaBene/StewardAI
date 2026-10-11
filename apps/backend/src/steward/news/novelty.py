@@ -41,13 +41,17 @@ class NoveltyResult:
 def centroid(vectors: Sequence[Sequence[float]]) -> list[float]:
     if not vectors:
         return []
-    dim = len(vectors[0])
+    # Embeddings of another dimension (a changed embedding model) cannot be averaged with the
+    # rest: keep the most common dimension, the first seen on a tie, and skip the others.
+    dims = [len(v) for v in vectors]
+    dim = max(dict.fromkeys(dims), key=dims.count)
+    same = [v for v in vectors if len(v) == dim]
     total = [0.0] * dim
-    for v in vectors:
+    for v in same:
         for i, x in enumerate(v):
             total[i] += x
     try:
-        return normalise([x / len(vectors) for x in total])
+        return normalise([x / len(same) for x in total])
     except EmbeddingError:
         return []
 

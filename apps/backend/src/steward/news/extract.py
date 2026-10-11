@@ -112,8 +112,9 @@ def verified(story: StoryMaterial, raw: StoryExtraction) -> StoryExtraction | No
     claims: list[KeyClaim] = []
     for claim in raw.key_claims:
         item = story.item(claim.item_id)
-        texts = [item.text] if item is not None else [i.text for i in story.items]
-        if verify_span(claim.span, texts):
+        if item is None:
+            continue  # cites an item that is not in this story: its span cannot be attributed
+        if verify_span(claim.span, [item.text]):
             claims.append(claim)
     if not claims:
         return None

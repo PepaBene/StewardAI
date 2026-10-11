@@ -2,6 +2,7 @@
 a correction notice, the owner closing a story, indirect-link alerting and portfolio topics."""
 
 import datetime as dt
+import json
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -181,7 +182,26 @@ async def test_a_story_reached_only_through_a_competitor_needs_a_higher_severity
         assert story.indirect_only is False  # Apple is named in the headline
         story.status, story.severity = "confirmed", 2
         outcome["direct"] = await route_story(ctx, story, config, holdings, NOON, None)
-        story.indirect_only = True
+        # Make the story reach Apple only through a competitor link, and let `load_story`
+        # derive the flag from the stored links rather than setting it by hand.
+        await ctx.pool.execute(
+            "update public.news_item set links = $2::jsonb where cluster_id = $1",
+            sid,
+            json.dumps(
+                [
+                    {
+                        "ticker": "AAPL_US_EQ",
+                        "via": "competitor",
+                        "term": "Samsung",
+                        "confidence": 0.5,
+                    }
+                ]
+            ),
+        )
+        story = await load_story(ctx.pool, sid, config.event_rules)
+        assert story is not None
+        assert story.indirect_only is True
+        story.status, story.severity = "confirmed", 2
         outcome["indirect"] = await route_story(ctx, story, config, holdings, NOON, None)
 
     await run_job(backend_pool, "news_ingest", handler, trigger="manual")

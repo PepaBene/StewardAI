@@ -18,7 +18,7 @@ from steward.ai import Usage
 from steward.llm.cache import ResultCache
 from steward.llm.client import LLM
 from steward.news.analysis import StoryMaterial, items_block, structured, verify_span
-from steward.news.translate import numbers_in
+from steward.news.translate import invents_numbers, numbers_in
 
 SYSTEM_PROMPT = """\
 You compare how different news outlets report the same event, for a personal portfolio monitor. \
@@ -67,24 +67,37 @@ def verified(story: StoryMaterial, raw: FramingComparison) -> FramingComparison 
     """The comparison with unverifiable parts removed; None when fewer than two outlets remain."""
     seen: set[int] = set()
     outlets: list[OutletFraming] = []
+    texts = [i.text for i in story.items]
     for o in raw.outlets:
         item = story.item(o.item_id)
         if item is None or o.item_id in seen or not o.headline_claim.strip():
             continue
+        if invents_numbers(o.headline_claim, [item.text]):
+            continue
         seen.add(o.item_id)
         have = set(numbers_in(item.text))
+        cause = (o.emphasised_cause or "").strip()
         outlets.append(
             o.model_copy(
                 update={
+                    "emphasised_cause": cause
+                    if cause and not invents_numbers(cause, [item.text])
+                    else None,
                     "quotes": [q for q in o.quotes if verify_span(q, [item.text])],
                     "numbers_cited": [
                         n for n in o.numbers_cited if all(d in have for d in numbers_in(n))
                     ],
+                    "omitted": [x for x in o.omitted if not invents_numbers(x, texts)],
                 }
             )
         )
     if len(outlets) < 2:
         return None
+    # Conflict and divergence sentences are about the items together: a figure in them must be
+    # in at least one item's text.
+    conflicts = [c for c in raw.conflicts if not invents_numbers(c, texts)]
+    divergences = [d for d in raw.divergences if not invents_numbers(d.summary, texts)]
+    raw = raw.model_copy(update={"conflicts": conflicts, "divergences": divergences})
     agreement = raw.agreement
     if agreement == "conflict" and not raw.conflicts:
         agreement = "agree"

@@ -122,12 +122,19 @@ def holding_terms(
     return terms
 
 
+_CJK = re.compile(r"[぀-ヿ㐀-䶿一-鿿가-힯]")
+
+
 def _name_pattern(term: str) -> re.Pattern[str]:
     """Whole-word match. Short or all-caps names (SAP, ASML) must match their case exactly
     so ordinary words do not. A single-word name (Target, Apple, Shell) is often an ordinary
     word too, so it matches as written or in capitals ("TARGET"), never "price target".
     Longer multi-word names match case-insensitively."""
     escaped = re.escape(term).replace(r"\ ", r"\s+")
+    if _CJK.search(term):
+        # CJK text has no spaces: a name is followed by a particle or more text ("トヨタは"),
+        # which the word-boundary test below would refuse.
+        return re.compile(escaped)
     if len(term) <= 4 or term.isupper():
         return re.compile(rf"(?<![\w&]){escaped}(?![\w&])")
     if not re.search(r"\s", term.strip()):
@@ -147,7 +154,9 @@ def topic_pattern(topic: str) -> re.Pattern[str]:
 def _symbol_pattern(symbol: str) -> re.Pattern[str]:
     s = re.escape(symbol)
     exchanges = r"(?:NASDAQ|NYSE|Nasdaq|NYSE\s+American|XETRA|Xetra|ETR|FRA|CPH|LSE|AMS|EPA|SWX)"
-    return re.compile(rf"(\${s}\b|\(\s*{s}\s*\)|{exchanges}\s*:\s*{s}\b)")
+    # "$700 million" and "$700.50" are prices, not the cashtag $700.
+    price = r"(?![.,]\d)(?!\s*(?i:million|billion|trillion|thousand|mn|bn|m|b|k)\b)"
+    return re.compile(rf"(\${s}\b{price}|\(\s*{s}\s*\)|{exchanges}\s*:\s*{s}\b)")
 
 
 class Linker:

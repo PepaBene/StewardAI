@@ -509,6 +509,12 @@ describe("jobs form: optional effort, tiers and the other preferences", () => {
     expect(jobsToBody(form).escalation!.source_tiers).toEqual([1, 2]);
   });
 
+  it("lower-cases analysis technique names so a capital cannot switch one off", () => {
+    const form = jobsFromBody(FULL);
+    form.settings.news.values.analysis_techniques = "Novelty, THREAD;Extraction  market";
+    expect(jobsToBody(form).news!.analysis_techniques).toEqual(["novelty", "thread", "extraction", "market"]);
+  });
+
   it("keeps a saved body without the new fields on today's defaults", () => {
     const old = structuredClone(FULL) as unknown as Record<string, Record<string, unknown>>;
     delete old.review.use_batch;

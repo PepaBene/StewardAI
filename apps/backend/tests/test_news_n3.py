@@ -126,9 +126,27 @@ def test_a_translation_must_keep_every_number() -> None:
         check_translation(src, TranslatedItem(index=0, headline_en="x 12 billion", summary_en=None))
         is None
     )
-    assert numbers_in("1.234,5 und ３００") == ["12345", "300"]
-    # Digits glued to letters (Q3) are not standalone numbers.
+    assert numbers_in("1.234,5 und ３００") == ["1234.5", "300"]
+    # Digits after letters (Q3) are labels, not numbers.
     assert numbers_in("Q3 results") == []
+    # A decimal separator is meaningful, a thousands group is not.
+    assert numbers_in("1.5 and 15 and 1,5 and 1,500") == ["1.5", "15", "1.5", "1500"]
+    assert numbers_in("0.500 and 2,50") == ["0.5", "2.5"]
+    # Unit letters glued to the number do not hide it.
+    assert numbers_in("$12bn, 3x EBITDA, 5m units") == ["12", "3", "5"]
+    assert numbers_in("5億円") == []
+    assert (
+        check_translation(
+            source("Umsatz 12bn"), TranslatedItem(index=0, headline_en="x 12 billion", summary_en=None)
+        )
+        is not None
+    )
+    assert (
+        check_translation(
+            source("Umsatz 1.5bn"), TranslatedItem(index=0, headline_en="x 15 billion", summary_en=None)
+        )
+        is None
+    )
 
 
 def test_empty_or_runaway_translations_are_rejected() -> None:

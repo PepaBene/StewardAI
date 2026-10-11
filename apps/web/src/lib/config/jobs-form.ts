@@ -1315,7 +1315,11 @@ export function jobsToBody(form: JobsForm): JobsConfig {
       else if (field.kind === "lines") out[field.key] = list(String(v), /\n/);
       else if (field.kind === "symbol-lines") out[field.key] = parseSymbolLines(String(v));
       else if (field.kind === "codes") out[field.key] = list(String(v), /[\s,;]+/).map((c) => c.toUpperCase());
-      else if (field.kind === "words") out[field.key] = list(String(v), /[\s,;]+/);
+      else if (field.kind === "words") {
+        const words = list(String(v), /[\s,;]+/);
+        // The backend matches technique names exactly, so "Novelty" must not silently switch one off.
+        out[field.key] = field.key === "analysis_techniques" ? words.map((w) => w.toLowerCase()) : words;
+      }
       else if (field.kind === "effort-optional") out[field.key] = String(v).trim() || null;
       else if (field.kind === "tiers") out[field.key] = parseTiers(String(v));
       else if (field.kind === "int-list")

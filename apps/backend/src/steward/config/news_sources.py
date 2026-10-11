@@ -756,6 +756,20 @@ def _default_portfolio_topics() -> list[PortfolioTopic]:
     ]  # fmt: skip
 
 
+_SECOND_LEVEL_LABELS = frozenset({"co", "com", "org", "net", "gov", "ac", "ne", "or", "edu"})
+
+
+def registrable_domain(host: str) -> str:
+    """`markets.ft.com` -> `ft.com`; `news.bbc.co.uk` -> `bbc.co.uk`. A simple rule, not the
+    public-suffix list: the last two labels, or three when the second-last is a generic
+    second-level label under a two-letter country code. An IP address is left whole."""
+    labels = host.split(".")
+    if len(labels) <= 2 or all(label.isdigit() for label in labels):
+        return host
+    keep = 3 if len(labels[-1]) == 2 and labels[-2] in _SECOND_LEVEL_LABELS else 2
+    return ".".join(labels[-keep:])
+
+
 class NewsSourcesConfig(ConfigModel):
     """Stored as `config_version` rows, domain `news_sources`."""
 
@@ -820,14 +834,15 @@ class NewsSourcesConfig(ConfigModel):
         return best[1] if best else None
 
     def independence_key(self, host: str | None) -> str:
-        """The outlet's independence group key (its group's first domain), else the host."""
+        """The outlet's independence group key (its group's first domain), else the host's
+        registrable domain (markets.ft.com and ft.com are one outlet)."""
         if not host:
             return ""
         clean = host.lower().removeprefix("www.")
         for group in self.syndication_groups:
             if any(clean == d or clean.endswith(f".{d}") for d in group.domains):
                 return str(group.domains[0])
-        return clean
+        return registrable_domain(clean)
 
     def group_members(self, hosts: Collection[str]) -> frozenset[str]:
         """`hosts` plus every other domain of the groups they belong to (so a search does not

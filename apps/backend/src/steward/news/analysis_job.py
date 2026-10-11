@@ -12,7 +12,9 @@ alerts.
 """
 
 import datetime as dt
+import json
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -62,7 +64,9 @@ from steward.xray.supply_chain import SupplyChain
 
 logger = logging.getLogger(__name__)
 
-SELECT_DAYS = 3
+# Long enough for a story's 3- and 5-trading-day market windows to complete (5 trading days
+# is up to 9 calendar days with a weekend), so the event study is not starved.
+SELECT_DAYS = 10
 BATCH_WAIT_MINUTES = 60.0
 
 
@@ -112,15 +116,33 @@ async def analysis_exists(pool: asyncpg.Pool, cluster_id: int, kind: str, hash_:
 
 
 async def pick_stories(pool: asyncpg.Pool, now: dt.datetime) -> list[tuple[int, int]]:
-    """(story id, severity) of the stories seen recently, most severe and newest first."""
+    """(story id, severity) of the stories seen recently that have at least one item, highest
+    exposure x materiality first (then newest). Exposure is the holding weight the story's latest
+    impact analysis found, so a story the portfolio does not hold ranks below one it does at the
+    same severity; a story not yet analysed counts at the ranking floor."""
     rows = await pool.fetch(
-        "select id, coalesce(severity, 0) as severity from public.story_cluster"
-        " where last_seen >= $1 and duplicate_of is null"
-        " order by severity desc nulls last, last_seen desc limit $2",
+        "select c.id, coalesce(c.severity, 0) as severity, c.last_seen,"
+        " coalesce((select p.payload from public.story_analysis p where p.cluster_id = c.id"
+        "  and p.kind = 'impact' order by p.created_at desc, p.id desc limit 1), '{}'::jsonb)"
+        "  as impact"
+        " from public.story_cluster c where c.last_seen >= $1 and c.duplicate_of is null"
+        " and exists (select 1 from public.news_item i where i.cluster_id = c.id)",
         now - dt.timedelta(days=SELECT_DAYS),
-        MAX_STORIES,
     )
-    return [(r["id"], r["severity"]) for r in rows]
+
+    def rank(r: asyncpg.Record) -> tuple[float, dt.datetime]:
+        raw = r["impact"]
+        impact: dict[str, Any] = json.loads(raw) if isinstance(raw, str) else dict(raw)
+        exposure = (
+            float(impact.get("direct_weight") or 0)
+            + 0.5 * float(impact.get("reached_weight") or 0)
+            + impacts.ATTRIBUTE_RANK_FACTOR * float(impact.get("attribute_weight") or 0)
+        )
+        materiality = (r["severity"] + 1) / 4
+        return (max(exposure, briefs.EXPOSURE_FLOOR) * materiality, r["last_seen"])
+
+    ranked = sorted(rows, key=rank, reverse=True)[:MAX_STORIES]
+    return [(r["id"], r["severity"]) for r in ranked]
 
 
 async def fetch_gdelt(pool: asyncpg.Pool, limit: int, now: dt.datetime) -> dict[str, Any]:
@@ -382,6 +404,9 @@ class AnalysisRun:
         if await analysis_exists(self.pool, story.cluster_id, "impact", hash_):
             return
         if explain:
+            # The code-only result is kept under its own hash when the model step fails, so the
+            # "explained" hash stays unsaved and the next run asks the model again.
+            code_only_hash = input_hash("impact", result.model_dump(mode="json"), None, None)
             try:
                 result = await impacts.explain_chains(
                     self.llm,
@@ -396,11 +421,16 @@ class AnalysisRun:
                     effort=self.news.analysis_effort,
                     cache=self.cache("news_impact"),
                 )
-            except BudgetExceeded as exc:
-                self.stopped = True
-                self.counts.failed("budget", exc)
-            except AnalysisError as exc:
-                self.counts.failed(f"impact:{story.cluster_id}", exc)
+            except (BudgetExceeded, AnalysisError) as exc:
+                if isinstance(exc, BudgetExceeded):
+                    self.stopped = True
+                    self.counts.failed("budget", exc)
+                else:
+                    self.counts.failed(f"impact:{story.cluster_id}", exc)
+                await self.save(
+                    story, "impact", code_only_hash, None, result.model_dump(mode="json")
+                )
+                return
         await self.save(
             story, "impact", hash_, model if explain else None, result.model_dump(mode="json")
         )
@@ -558,14 +588,15 @@ async def news_analysis_handler(ctx: JobContext) -> None:
     prompts = await load_prompts(ctx.pool)
     run = AnalysisRun(ctx, news, prompts, make_llm())
     picked = await pick_stories(ctx.pool, now)
-    model_ids = [sid for sid, severity in picked if severity >= news.analysis_min_severity][
-        : news.analysis_per_run
-    ]
     stories: dict[int, StoryMaterial] = {}
     for sid, _ in picked:
         story = await load_story(ctx.pool, sid)
         if story is not None and story.items:
             stories[sid] = story
+    # A story with no items takes no `analysis_per_run` slot.
+    model_ids = [
+        sid for sid, severity in picked if sid in stories and severity >= news.analysis_min_severity
+    ][: news.analysis_per_run]
 
     strategy = await load_active(ctx.pool, "strategy", StrategyConfig)
     classifications: dict[str, dict[str, str]] = (
@@ -602,7 +633,7 @@ async def news_analysis_handler(ctx: JobContext) -> None:
                         await run.thread(story)
                     else:
                         await run.market(story, benchmarks, sectors)
-                except (asyncpg.PostgresError, ValueError) as exc:
+                except (asyncpg.PostgresError, ValueError, IndexError) as exc:
                     run.counts.failed(f"{technique}:{story.cluster_id}", exc)
         if "thread" in run.techniques:
             await thread_logic.quiet_old_threads(ctx.pool, now, news.thread_window_days)
@@ -717,12 +748,25 @@ async def write_theme_briefs(
 
 
 BRIEF_ALERT_LINES = 3
+ALERT_LINE_CHARS = 240
+
+
+def notification_text(text: str, limit: int = ALERT_LINE_CHARS) -> str:
+    """Feed-controlled text for a notification: control characters and markup-ish angle
+    brackets removed, whitespace collapsed to single spaces, bounded to `limit` characters."""
+    cleaned = re.sub(r"[\x00-\x1f\x7f<>]+", " ", text)
+    cleaned = " ".join(cleaned.split())
+    return cleaned if len(cleaned) <= limit else cleaned[: limit - 1].rstrip() + "…"
 
 
 async def alert_brief(ctx: JobContext, body: briefs.BriefBody, now: dt.datetime) -> str:
     """Send the morning brief's top lines through the alert routing, once a day. What the
     notification rules decide (channel, quiet hours, daily cap) applies as for any alert."""
-    lines = sorted((ln for s in body.sections for ln in s.lines), key=lambda ln: -ln.score)
+    # Ranked without the sentiment nudge: sentiment never decides what is sent.
+    lines = sorted(
+        (ln for s in body.sections for ln in s.lines),
+        key=lambda ln: (-(ln.alert_score if ln.alert_score is not None else ln.score), ln.story_id),
+    )
     top = lines[:BRIEF_ALERT_LINES]
     if not top:
         return "no lines"
@@ -734,7 +778,8 @@ async def alert_brief(ctx: JobContext, body: briefs.BriefBody, now: dt.datetime)
     stored = await load_active(ctx.pool, "notifications", NotificationsConfig)
     config = stored.body if stored else NotificationsConfig()
     message = "Morning brief:\n" + "\n".join(
-        f"- {ln.ticker + ': ' if ln.ticker else ''}{ln.text}" for ln in top
+        f"- {notification_text(ln.ticker) + ': ' if ln.ticker else ''}{notification_text(ln.text)}"
+        for ln in top
     )
     created = await create_alerts(
         ctx.pool,

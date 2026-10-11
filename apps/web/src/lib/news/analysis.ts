@@ -156,7 +156,9 @@ export function parseWireFilters(params: URLSearchParams): WireFilters {
 export function wireFiltersToSearch(filters: WireFilters): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
-    if (value.trim()) params.set(key, value.trim());
+    // Kept as typed (only blank values dropped): trimming here would eat the space in "Nikkei Asia"
+    // while it is being typed. wireQuery trims when the API query is built.
+    if (value.trim()) params.set(key, value);
   }
   const text = params.toString();
   return text ? `?${text}` : "";

@@ -44,6 +44,15 @@ describe("wire filters", () => {
     expect(wireQuery(EMPTY_WIRE_FILTERS, null, 50).linked).toBeUndefined();
   });
 
+  it("keeps a typed space in the address and trims only when the API query is built", () => {
+    const typing = { ...EMPTY_WIRE_FILTERS, outlet: "Nikkei ", q: "  " };
+    expect(wireFiltersToSearch(typing)).toBe("?outlet=Nikkei+");
+    expect(parseWireFilters(new URLSearchParams(wireFiltersToSearch(typing))).outlet).toBe("Nikkei ");
+    expect(wireQuery(typing, null, 50).outlet).toBe("Nikkei");
+    expect(wireQuery(typing, null, 50).q).toBeUndefined();
+    expect(wireQuery({ ...EMPTY_WIRE_FILTERS, outlet: "Nikkei Asia" }, null, 50).outlet).toBe("Nikkei Asia");
+  });
+
   it("shows the translation only when it differs", () => {
     expect(wireHeadline({ headline: "円安が進む", title_en: "Yen weakens" })).toEqual({ text: "Yen weakens", translated: true });
     expect(wireHeadline({ headline: "Yen weakens", title_en: "Yen weakens" }).translated).toBe(false);

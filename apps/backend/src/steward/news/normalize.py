@@ -22,10 +22,15 @@ _TRACKING_PARAMS = re.compile(
 
 
 def canonical_url(url: str) -> str:
+    """The dedupe form of a URL. Raises ValueError for a URL that cannot be an article link
+    (unparseable, a bad port, or a scheme other than http/https such as javascript: or ftp:).
+    Callers skip such items with a drop reason rather than letting one feed item stop a run."""
     parts = urlsplit(url.strip())
     scheme = parts.scheme.lower() or "https"
+    if scheme not in ("http", "https"):
+        raise ValueError(f"unsupported URL scheme: {scheme!r}")
     host = (parts.hostname or "").lower()
-    port = parts.port
+    port = parts.port  # raises ValueError on a non-numeric or out-of-range port
     netloc = (
         host
         if port is None or (scheme, port) in (("http", 80), ("https", 443))

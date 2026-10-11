@@ -23,7 +23,7 @@ import hashlib
 import importlib
 import importlib.metadata
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Collection
 from dataclasses import dataclass
 from typing import Any
 
@@ -348,20 +348,27 @@ async def purge_expired(pool: asyncpg.Pool, now: dt.datetime) -> int:
 
 
 async def fulltext_candidates(
-    pool: asyncpg.Pool, limit: int, since: dt.datetime, unlinked_relevance: int | None = None
+    pool: asyncpg.Pool,
+    limit: int,
+    since: dt.datetime,
+    unlinked_relevance: int | None = None,
+    exclude_sources: Collection[str] = (),
 ) -> list[asyncpg.Record]:
     """Wire items worth article text, newest first: linked to a holding, or triaged at
-    `unlinked_relevance` or above, and not yet fetched. (The whole wire is never fetched: the
-    funnel in section 8 of the plan.)"""
+    `unlinked_relevance` or above, and not yet fetched, leaving out `exclude_sources` (sources
+    with no policy or no allowance left, whose rows would otherwise fill the limit and starve
+    the rest). (The whole wire is never fetched: the funnel in section 8 of the plan.)"""
     rows: list[asyncpg.Record] = await pool.fetch(
         "select a.id, a.url, a.source_id, a.summary, a.news_item_id"
         " from public.news_article a"
         " where (a.linked or ($3::int is not null and (a.triage->>'relevance')::int >= $3))"
         " and a.fetch_state in ('headline', 'summary') and a.first_seen_at >= $2"
+        " and a.source_id <> all($4::text[])"
         " order by a.published_at desc limit $1",
         limit,
         since,
         unlinked_relevance,
+        list(exclude_sources),
     )
     return rows
 
@@ -377,6 +384,9 @@ async def hourly_budget_left(
         now - dt.timedelta(hours=1),
     )
     return max(0, policy.max_requests_per_hour - int(used or 0))
+
+
+MAX_CANDIDATE_ROUNDS = 5
 
 
 async def run_fulltext(
@@ -398,34 +408,52 @@ async def run_fulltext(
     errors: list[str] = []
     allowance: dict[str, int] = {}
     since = now - dt.timedelta(hours=sources.freshness_hours)
-    rows = await fulltext_candidates(pool, limit, since, unlinked_relevance)
-    counts["candidates"] = len(rows)
-    for row in rows:
-        policy = policies.get(row["source_id"])
-        if policy is None:
-            continue
-        if not policy.rungs:
-            result = FulltextResult(url=row["url"], state="skipped", note="policy: no fetch")
-        else:
-            if row["source_id"] not in allowance:
-                allowance[row["source_id"]] = await hourly_budget_left(
-                    pool, row["source_id"], policy, now
-                )
-            if allowance[row["source_id"]] <= 0:
+    # Sources with no policy or no allowance left are left out of the next candidate query, so
+    # their rows cannot fill the limit and starve the sources that can still be fetched.
+    blocked: set[str] = set()
+    seen: set[int] = set()
+    processed = 0
+    for _ in range(MAX_CANDIDATE_ROUNDS):
+        rows = await fulltext_candidates(
+            pool, limit - processed, since, unlinked_relevance, blocked
+        )
+        rows = [r for r in rows if r["id"] not in seen]
+        if not rows:
+            break
+        counts["candidates"] += len(rows)
+        seen.update(r["id"] for r in rows)
+        blocked_before = len(blocked)
+        for row in rows:
+            policy = policies.get(row["source_id"])
+            if policy is None:
+                blocked.add(row["source_id"])
                 continue
-            allowance[row["source_id"]] -= 1
-            result = await acquire_fulltext(
-                row["url"],
-                policy,
-                summary=row["summary"],
-                fetcher=fetcher,
-                render=render,
-                api=api,
-            )
-        await store_result(pool, row["id"], row["news_item_id"], result, policy, now)
-        counts[result.state] += 1
-        if result.state == "failed" and result.note and len(errors) < 10:
-            errors.append(f"{row['url']}: {result.note}")
+            if not policy.rungs:
+                result = FulltextResult(url=row["url"], state="skipped", note="policy: no fetch")
+            else:
+                if row["source_id"] not in allowance:
+                    allowance[row["source_id"]] = await hourly_budget_left(
+                        pool, row["source_id"], policy, now
+                    )
+                if allowance[row["source_id"]] <= 0:
+                    blocked.add(row["source_id"])
+                    continue
+                allowance[row["source_id"]] -= 1
+                result = await acquire_fulltext(
+                    row["url"],
+                    policy,
+                    summary=row["summary"],
+                    fetcher=fetcher,
+                    render=render,
+                    api=api,
+                )
+            await store_result(pool, row["id"], row["news_item_id"], result, policy, now)
+            counts[result.state] += 1
+            processed += 1
+            if result.state == "failed" and result.note and len(errors) < 10:
+                errors.append(f"{row['url']}: {result.note}")
+        if processed >= limit or len(blocked) == blocked_before:
+            break
     if errors:
         counts_detail: dict[str, Any] = {**counts, "errors": errors}
         return counts_detail

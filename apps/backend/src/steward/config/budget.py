@@ -96,6 +96,7 @@ DEFAULT_MONTHLY_CAPS_USD: dict[BudgetJobType, float] = {
     "news_analysis": 4.0,
     "news_brief": 1.5,
     "news_ai_search": 2.5,
+    "news_triage": 1.0,
 }
 
 
@@ -226,6 +227,10 @@ class BudgetConfig(ConfigModel):
         for job_type, cap in self.per_job_monthly_cap_usd.items():
             if cap <= 0:
                 raise ValueError(f"per_job_monthly_cap_usd[{job_type}] must be greater than 0")
+        if "news_ingest" in {str(k) for k in self.per_job_monthly_cap_usd}:
+            # A monthly cap raises BudgetExceeded and stops the run; the news plan says a capped
+            # stage degrades and never stops ingestion, so ingestion cannot have one.
+            raise ValueError("per_job_monthly_cap_usd cannot cap news_ingest: it must not stop")
         if self.at_cap == "downgrade_noncritical" and not any(
             p.model == self.downgrade_model for p in self.prices
         ):

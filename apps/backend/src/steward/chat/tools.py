@@ -30,6 +30,7 @@ from steward.data_context.research import (
 )
 from steward.earnings.read import holding_detail
 from steward.news.embeddings import Embedder, EmbeddingError, GeminiEmbedder, cosine
+from steward.news.read_analysis import like_pattern
 from steward.portfolio.read import portfolio_overview
 from steward.research.sources import Registry
 
@@ -260,6 +261,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
 SEMANTIC_MIN_COSINE = 0.6
 SEMANTIC_CANDIDATES = 4000
 SEMANTIC_ENOUGH = 8
+MAX_ID = 2**63 - 1  # the largest bigint id the database holds
 
 
 class QueryEmbedder:
@@ -302,6 +304,10 @@ class ChatTools:
             result: dict[str, Any] = await handler(**args)
         except TypeError as exc:
             return {"error": f"bad arguments: {exc}"}
+        except asyncpg.DataError as exc:
+            # A model-chosen value the database cannot take (an id out of range) is a tool error
+            # the model can correct, not a failure of the whole chat job.
+            return {"error": f"bad arguments: {str(exc)[:200]}"}
         return result
 
     async def _owner(self) -> str | None:
@@ -442,8 +448,8 @@ class ChatTools:
             " from q, public.news_item i left join public.story_cluster c on c.id = i.cluster_id"
             " where ($1::text is null or $1 = any(i.tickers)) and i.published_at >= $3"
             " and ($2::text is null or case when coalesce(numnode(q.tsq), 0) > 0"
-            " then i.search @@ q.tsq else i.headline ilike '%' || $2::text || '%'"
-            " or i.summary ilike '%' || $2::text || '%' end)"
+            " then i.search @@ q.tsq else i.headline ilike $4 escape '\\'"
+            " or i.summary ilike $4 escape '\\' end)"
             " order by score desc, i.published_at desc limit 15)"
             " select hits.*, case when hits.fts then ts_headline('english',"
             " coalesce(hits.summary, hits.headline), q.tsq,"
@@ -452,6 +458,7 @@ class ChatTools:
             ticker,
             query or None,
             dt.datetime.now(dt.UTC) - dt.timedelta(days=max(1, min(365, days))),
+            like_pattern(query) if query else None,
         )
         items = []
         for r in rows:
@@ -488,6 +495,13 @@ class ChatTools:
         days: int = 14,
         oldest_first: bool = False,
     ) -> dict[str, Any]:
+        query = query.strip()
+        if not query:
+            return {"error": "query must not be empty"}
+        since = dt.datetime.now(dt.UTC) - dt.timedelta(days=max(1, min(90, days)))
+        # The words match through the full-text index and the English title through a bounded
+        # date range, as two index-friendly queries combined: one OR across both would scan the
+        # whole table. `%` and `_` in the query are literal, not wildcards.
         rows = await self.pool.fetch(
             "select a.id, a.url, a.headline, a.title_en, a.summary, a.outlet, a.outlet_name,"
             " a.region, a.language, a.tier, a.published_at, a.linked, i.cluster_id as story_id"
@@ -495,16 +509,19 @@ class ChatTools:
             " where a.published_at >= $1 and ($2::text is null or a.region = upper($2))"
             " and ($3::text is null or a.language = lower($3))"
             " and ($4::text is null or $4 = any(i.tickers))"
-            " and (a.search @@ websearch_to_tsquery('simple', $5)"
-            " or coalesce(a.title_en, '') ilike '%' || $5 || '%')"
+            " and a.id in (select m.id from public.news_article m where m.published_at >= $1"
+            "  and m.search @@ websearch_to_tsquery('simple', $5)"
+            "  union select t.id from public.news_article t where t.published_at >= $1"
+            "  and coalesce(t.title_en, '') ilike $7 escape '\\')"
             " order by case when $6 then extract(epoch from a.published_at)"
             " else -extract(epoch from a.published_at) end limit 15",
-            dt.datetime.now(dt.UTC) - dt.timedelta(days=max(1, min(90, days))),
+            since,
             region,
             language,
             ticker,
             query,
             oldest_first,
+            like_pattern(query),
         )
         items = []
         for r in rows:
@@ -534,7 +551,13 @@ class ChatTools:
         if len(items) < SEMANTIC_ENOUGH and self.embedder is not None:
             items.extend(
                 await self._semantic_wire(
-                    query, region, language, days, {r["id"] for r in rows}, SEMANTIC_ENOUGH
+                    query,
+                    region,
+                    language,
+                    days,
+                    {r["id"] for r in rows},
+                    SEMANTIC_ENOUGH,
+                    ticker,
                 )
             )
         return {"items": items, "note": "Wire items are headlines; they do not alert."}
@@ -547,6 +570,7 @@ class ChatTools:
         days: int,
         have: set[int],
         want: int,
+        ticker: str | None = None,
     ) -> list[dict[str, Any]]:
         """Wire items close in meaning to the query, in any language, when the words matched
         too few. Only items embedded by the same model are compared."""
@@ -564,6 +588,7 @@ class ChatTools:
             " where a.published_at >= $1 and e.model = $2 and e.dim = $3"
             " and ($4::text is null or a.region = upper($4))"
             " and ($5::text is null or a.language = lower($5))"
+            " and ($7::text is null or $7 = any(i.tickers))"
             " order by a.published_at desc limit $6",
             dt.datetime.now(dt.UTC) - dt.timedelta(days=max(1, min(90, days))),
             self.embedder.model,
@@ -571,6 +596,7 @@ class ChatTools:
             region,
             language,
             SEMANTIC_CANDIDATES,
+            ticker,
         )
         scored = sorted(
             (
@@ -614,6 +640,10 @@ class ChatTools:
     async def _tool_get_story_thread(self, story_id: int) -> dict[str, Any]:
         from steward.news.read_analysis import thread_detail
 
+        if isinstance(story_id, bool) or not isinstance(story_id, int):
+            return {"error": "story_id must be an integer"}
+        if not 1 <= story_id <= MAX_ID:
+            return {"error": f"story {story_id} does not exist"}
         thread_id = await self.pool.fetchval(
             "select thread_id from public.story_cluster where id = $1", story_id
         )

@@ -121,9 +121,34 @@ async def assign_thread(
     threshold: float,
 ) -> tuple[int, bool]:
     """The thread the story belongs to (created when none fits) and whether it was created.
-    A story that already has a thread keeps it."""
+    A story that already has a thread keeps it.
+
+    Matching and creating run under a transaction-scoped advisory lock per holding, and a new
+    thread is attached to the story before the lock is released, so two concurrent runs cannot
+    each create a thread for the same developing situation."""
     if story.thread_id is not None:
         return story.thread_id, False
+    async with pool.acquire() as conn, conn.transaction():
+        await conn.execute(
+            "select pg_advisory_xact_lock(hashtext($1))", f"story_thread:{story.ticker or ''}"
+        )
+        # Another run may have attached a thread to this very story while this one waited.
+        current = await conn.fetchval(
+            "select thread_id from public.story_cluster where id = $1", story.cluster_id
+        )
+        if current is not None:
+            return int(current), False
+        return await _assign_locked(pool, conn, story, own, window_days, threshold)
+
+
+async def _assign_locked(
+    pool: asyncpg.Pool,
+    conn: asyncpg.Connection,
+    story: StoryMaterial,
+    own: Sequence[float],
+    window_days: int,
+    threshold: float,
+) -> tuple[int, bool]:
     if story.ticker is not None:
         rows = await _thread_members(
             pool, story.ticker, story.last_seen - dt.timedelta(days=window_days)
@@ -154,12 +179,17 @@ async def assign_thread(
                     break
         if chosen is not None:
             return chosen, False
-    created = await pool.fetchval(
+    created = await conn.fetchval(
         "insert into public.story_thread (ticker, title, opened_at, last_update_at)"
         " values ($1, $2, $3, $3) returning id",
         story.ticker,
         story.headline[:200],
         story.first_seen,
+    )
+    await conn.execute(
+        "update public.story_cluster set thread_id = $1 where id = $2 and thread_id is null",
+        created,
+        story.cluster_id,
     )
     return int(created), True
 
@@ -204,7 +234,7 @@ async def record_update(
     )
     await pool.execute(
         "update public.story_thread set last_update_at = greatest(last_update_at, $2),"
-        " state = 'open' where id = $1",
+        " state = case when state = 'closed' then state else 'open' end where id = $1",
         thread_id,
         story.last_seen,
     )

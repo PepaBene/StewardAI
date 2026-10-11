@@ -163,7 +163,7 @@ async def test_an_ai_search_lead_is_stored_at_tier_three_and_never_alerts(
             {"id": "ai-search", "name": "AI search", "tier": 3, "type": "ai_search"},
         ],
     )
-    url = "https://www.somewire.example/apple-acquires-startup"
+    url = "https://www.reuters.com/markets/deals/apple-acquires-startup"
     llm = FakeSearchLLM(
         SearchLeads(
             leads=[
@@ -173,7 +173,7 @@ async def test_an_ai_search_lead_is_stored_at_tier_three_and_never_alerts(
         ),
         [Citation(url, "Apple acquires a startup for $2 billion")],
     )
-    monkeypatch.setattr(ai_search, "create_llm", lambda settings, client: llm)
+    monkeypatch.setattr(ai_search, "create_llm", lambda settings: llm)
 
     status = await run_job(backend_pool, "news_ai_search", news_ai_search_handler, trigger="manual")
 
@@ -191,7 +191,11 @@ async def test_an_ai_search_lead_is_stored_at_tier_three_and_never_alerts(
         )
         == 0
     )
-    # Tier-3 leads never reach a story, so there is nothing to alert on.
+    # The lead names a tier-2 domain (reuters.com) yet stays tier 3: it is wire only, never a
+    # news_item or story, so there is nothing to alert on.
+    assert row["linked"] is False
+    assert await backend_pool.fetchval("select count(*) from news_item where url = $1", url) == 0
+    assert await backend_pool.fetchval("select count(*) from story_cluster") == 0
     assert await backend_pool.fetchval("select count(*) from alert") == 0
     cost = await backend_pool.fetchval(
         "select count(*) from job_step s join job j on j.id = s.job_id"

@@ -94,13 +94,22 @@ async def store_embeddings(
     )
 
 
-async def recent_vectors(pool: asyncpg.Pool, model: str, since: dt.datetime) -> list[Vec]:
+MAX_RECENT_VECTORS = 5000
+
+
+async def recent_vectors(
+    pool: asyncpg.Pool, model: str, since: dt.datetime, limit: int = MAX_RECENT_VECTORS
+) -> list[Vec]:
+    """Vectors of articles first seen since `since`, newest first and at most `limit`: the
+    matching is O(new x all) in Python, so an old backlog must not grow it without bound."""
     rows = await pool.fetch(
         "select a.id, a.published_at, a.group_id, e.vector from public.news_article a"
         " join public.news_embedding e on e.article_id = a.id"
-        " where e.model = $1 and a.first_seen_at >= $2",
+        " where e.model = $1 and a.first_seen_at >= $2"
+        " order by a.first_seen_at desc, a.id desc limit $3",
         model,
         since,
+        limit,
     )
     return [
         Vec(r["id"], tuple(r["vector"]), r["published_at"].timestamp(), r["group_id"]) for r in rows
@@ -181,7 +190,8 @@ async def merge_story_clusters(
             await conn.execute(
                 "update public.story_cluster c set last_seen = greatest(c.last_seen, now()),"
                 " best_tier = s.best_tier, source_count = s.outlets from (select min(tier) as"
-                " best_tier, count(distinct coalesce(outlet, url)) as outlets from"
+                " best_tier, count(distinct coalesce(nullif(independence_key, ''), outlet, url))"
+                " as outlets from"
                 " public.news_item where cluster_id = $1) s where c.id = $1",
                 older["cluster_id"],
             )

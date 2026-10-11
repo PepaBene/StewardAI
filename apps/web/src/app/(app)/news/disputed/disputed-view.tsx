@@ -43,6 +43,7 @@ import {
   splitDisputed,
 } from "@/lib/news/disputed";
 import { eventLabel } from "@/lib/news/labels";
+import { isExternalUrl } from "@/lib/sources/sources";
 import { cn } from "@/lib/utils";
 
 type Load = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; stories: DisputedStory[] };
@@ -60,6 +61,9 @@ export function DisputedView() {
 
   useEffect(() => {
     let cancelled = false;
+    // A changed filter or a reload must not show the old list under the new filter.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoad({ kind: "loading" });
     getBrowserApiClient()
       .GET("/stories/disputed", { params: { query: { include_resolved: includeResolved } } })
       .then(({ data, response }) => {
@@ -305,10 +309,14 @@ function SourceColumn({
                 </time>
               ) : null}
             </p>
-            <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent-ink hover:underline">
-              <span className="[overflow-wrap:anywhere]">{s.headline ?? s.url}</span>
-              <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
-            </a>
+            {isExternalUrl(s.url) ? (
+              <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent-ink hover:underline">
+                <span className="[overflow-wrap:anywhere]">{s.headline ?? s.url}</span>
+                <ExternalLinkIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-text-muted" />
+              </a>
+            ) : (
+              <span className="inline-flex [overflow-wrap:anywhere]">{s.headline ?? s.url}</span>
+            )}
             {typeof s.news_item_id === "number" ? (
               <FeedbackControl
                 className="flex"

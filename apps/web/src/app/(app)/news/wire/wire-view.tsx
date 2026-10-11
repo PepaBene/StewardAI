@@ -3,7 +3,7 @@
 import { ExternalLinkIcon, LoaderCircleIcon, RefreshCwIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDateTime } from "@/lib/format";
+import { isExternalUrl } from "@/lib/sources/sources";
 import {
   isWireFiltered,
   LIFECYCLE_LABELS,
@@ -27,6 +28,12 @@ import {
 import { cn } from "@/lib/utils";
 
 const PAGE = 50;
+/** Wait this long after the last keystroke before the filter reaches the URL (and the API). */
+const TYPING_DELAY_MS = 350;
+
+type TextDraft = Pick<WireFilters, "q" | "region" | "language" | "outlet" | "topic">;
+
+const textDraft = (f: WireFilters): TextDraft => ({ q: f.q, region: f.region, language: f.language, outlet: f.outlet, topic: f.topic });
 
 const CONTROL =
   "w-full rounded-md border border-border bg-surface-raised px-2 py-1.5 text-sm text-text shadow-xs outline-none placeholder:text-text-muted focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/30";
@@ -34,7 +41,7 @@ const CONTROL =
 type Load =
   | { kind: "loading" }
   | { kind: "error"; message: string }
-  | { kind: "ok"; items: WireItem[]; next: number | null; loadingMore: boolean };
+  | { kind: "ok"; items: WireItem[]; next: number | null; loadingMore: boolean; moreError: string | null };
 
 /** The wire: every headline from every enabled source, linked to a holding or not. */
 export function WireView() {
@@ -42,7 +49,11 @@ export function WireView() {
   const pathname = usePathname();
   const params = useSearchParams();
   const filters = useMemo(() => parseWireFilters(new URLSearchParams(params.toString())), [params]);
-  const [draftQ, setDraftQ] = useState(filters.q);
+  // What is typed, kept untrimmed so "Nikkei Asia" can be typed; it reaches the URL after a pause.
+  const [draft, setDraft] = useState<TextDraft>(() => textDraft(filters));
+  const pushed = useRef(wireFiltersToSearch(filters));
+  // Bumped by every (re)load so a late response to an older filter is dropped.
+  const generation = useRef(0);
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [reloadKey, setReloadKey] = useState(0);
   const [showOriginal, setShowOriginal] = useState(false);
@@ -68,13 +79,14 @@ export function WireView() {
 
   useEffect(() => {
     let cancelled = false;
+    generation.current += 1;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoad({ kind: "loading" });
     getBrowserApiClient()
       .GET("/wire", { params: { query: wireQuery(filters, null, PAGE) } })
       .then(({ data, response }) => {
         if (cancelled) return;
-        if (data) setLoad({ kind: "ok", items: data.items as WireItem[], next: data.next_before_id ?? null, loadingMore: false });
+        if (data) setLoad({ kind: "ok", items: data.items as WireItem[], next: data.next_before_id ?? null, loadingMore: false, moreError: null });
         else setLoad({ kind: "error", message: `The API answered HTTP ${response.status}.` });
       })
       .catch((err: unknown) => {
@@ -85,20 +97,50 @@ export function WireView() {
     };
   }, [filters, reloadKey]);
 
-  const set = (change: Partial<WireFilters>) =>
-    router.replace(`${pathname}${wireFiltersToSearch({ ...filters, ...change })}`, { scroll: false });
+  // Back/forward or a link changed the URL filters: show them in the inputs.
+  useEffect(() => {
+    const search = wireFiltersToSearch(filters);
+    if (search === pushed.current) return;
+    pushed.current = search;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDraft(textDraft(filters));
+  }, [filters]);
+
+  function push(next: WireFilters) {
+    const search = wireFiltersToSearch(next);
+    pushed.current = search;
+    router.replace(`${pathname}${search}`, { scroll: false });
+  }
+
+  useEffect(() => {
+    const search = wireFiltersToSearch({ ...filters, ...draft });
+    if (search === pushed.current) return;
+    const timer = setTimeout(() => push({ ...filters, ...draft }), TYPING_DELAY_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, filters]);
+
+  const set = (change: Partial<WireFilters>) => push({ ...filters, ...draft, ...change });
 
   async function more() {
-    if (load.kind !== "ok" || load.next === null) return;
-    setLoad({ ...load, loadingMore: true });
-    const { data } = await getBrowserApiClient().GET("/wire", { params: { query: wireQuery(filters, load.next, PAGE) } });
-    setLoad((l) =>
-      l.kind === "ok"
-        ? data
-          ? { kind: "ok", items: [...l.items, ...(data.items as WireItem[])], next: data.next_before_id ?? null, loadingMore: false }
-          : { ...l, loadingMore: false }
-        : l,
-    );
+    if (load.kind !== "ok" || load.next === null || load.loadingMore) return;
+    const gen = generation.current;
+    setLoad({ ...load, loadingMore: true, moreError: null });
+    try {
+      const { data, response } = await getBrowserApiClient().GET("/wire", { params: { query: wireQuery(filters, load.next, PAGE) } });
+      if (gen !== generation.current) return;
+      setLoad((l) =>
+        l.kind !== "ok"
+          ? l
+          : data
+            ? { kind: "ok", items: [...l.items, ...(data.items as WireItem[])], next: data.next_before_id ?? null, loadingMore: false, moreError: null }
+            : { ...l, loadingMore: false, moreError: `The API answered HTTP ${response.status}.` },
+      );
+    } catch (err) {
+      if (gen !== generation.current) return;
+      const message = err instanceof Error ? err.message : String(err);
+      setLoad((l) => (l.kind === "ok" ? { ...l, loadingMore: false, moreError: message } : l));
+    }
   }
 
   return (
@@ -126,21 +168,21 @@ export function WireView() {
         className="grid grid-cols-2 items-end gap-3 md:grid-cols-4 lg:grid-cols-8"
         onSubmit={(e) => {
           e.preventDefault();
-          set({ q: draftQ });
+          set({});
         }}
         aria-label="Wire filters"
       >
         <Field label="Search" className="col-span-2">
-          <input className={CONTROL} value={draftQ} onChange={(e) => setDraftQ(e.target.value)} placeholder="Words in the headline" />
+          <input className={CONTROL} value={draft.q} onChange={(e) => setDraft((d) => ({ ...d, q: e.target.value }))} placeholder="Words in the headline" />
         </Field>
         <Field label="Region">
-          <input className={cn(CONTROL, "uppercase")} maxLength={2} value={filters.region} onChange={(e) => set({ region: e.target.value })} placeholder="JP" />
+          <input className={cn(CONTROL, "uppercase")} maxLength={2} value={draft.region} onChange={(e) => setDraft((d) => ({ ...d, region: e.target.value }))} placeholder="JP" />
         </Field>
         <Field label="Language">
-          <input className={CONTROL} maxLength={8} value={filters.language} onChange={(e) => set({ language: e.target.value })} placeholder="ja" />
+          <input className={CONTROL} maxLength={8} value={draft.language} onChange={(e) => setDraft((d) => ({ ...d, language: e.target.value }))} placeholder="ja" />
         </Field>
         <Field label="Outlet">
-          <input className={CONTROL} value={filters.outlet} onChange={(e) => set({ outlet: e.target.value })} placeholder="reuters.com" />
+          <input className={CONTROL} value={draft.outlet} onChange={(e) => setDraft((d) => ({ ...d, outlet: e.target.value }))} placeholder="reuters.com" />
         </Field>
         <Field label="Tier">
           <select className={CONTROL} value={filters.tier} onChange={(e) => set({ tier: e.target.value })}>
@@ -166,7 +208,7 @@ export function WireView() {
           </select>
         </Field>
         <Field label="Theme">
-          <input className={CONTROL} value={filters.topic} onChange={(e) => set({ topic: e.target.value })} placeholder="rates" />
+          <input className={CONTROL} value={draft.topic} onChange={(e) => setDraft((d) => ({ ...d, topic: e.target.value }))} placeholder="rates" />
         </Field>
         <div className="col-span-2 flex gap-2 md:col-span-1">
           <Button type="submit" size="sm">
@@ -178,7 +220,8 @@ export function WireView() {
               variant="ghost"
               size="sm"
               onClick={() => {
-                setDraftQ("");
+                setDraft({ q: "", region: "", language: "", outlet: "", topic: "" });
+                pushed.current = "";
                 router.replace(pathname, { scroll: false });
               }}
             >
@@ -219,6 +262,7 @@ export function WireView() {
                 {load.loadingMore ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : null}
                 Older items
               </Button>
+              {load.moreError ? <AlertMessage title="Could not load older items">{load.moreError}</AlertMessage> : null}
             </div>
           ) : null}
         </>
@@ -259,10 +303,14 @@ function WireRow({ item, showOriginal }: { item: WireItem; showOriginal: boolean
           </Link>
         ))}
       </p>
-      <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 text-base font-medium hover:text-accent-ink hover:underline">
-        <span className="[overflow-wrap:anywhere]">{text}</span>
-        <ExternalLinkIcon aria-hidden="true" className="mt-1 size-3 shrink-0 text-text-muted" />
-      </a>
+      {isExternalUrl(item.url) ? (
+        <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 text-base font-medium hover:text-accent-ink hover:underline">
+          <span className="[overflow-wrap:anywhere]">{text}</span>
+          <ExternalLinkIcon aria-hidden="true" className="mt-1 size-3 shrink-0 text-text-muted" />
+        </a>
+      ) : (
+        <span className="inline-flex text-base font-medium [overflow-wrap:anywhere]">{text}</span>
+      )}
       {translated ? (
         <p lang={item.language ?? undefined} className="text-sm text-text-muted [overflow-wrap:anywhere]">
           Original: {item.headline}

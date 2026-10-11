@@ -20,6 +20,7 @@ from steward.llm.cache import ResultCache
 from steward.llm.client import LLM
 from steward.news.analysis import StoryMaterial, structured
 from steward.news.extract import StoryExtraction
+from steward.news.translate import invents_numbers
 
 SYSTEM_PROMPT = """\
 You relate one news story to an investor's written thesis for a holding. You are given the \
@@ -79,10 +80,19 @@ def checked(
     source for a breach (a model reading never breaches an assumption on its own)."""
     refs = valid_refs(thesis)
     out: list[LinkedAssumption] = []
+    # A figure in the reason must be in the story's text, its claims or the owner's thesis.
+    known = [
+        story.headline,
+        *(i.text for i in story.items),
+        *(c.text for c in extraction.key_claims),
+        thesis_text(thesis),
+    ]
     for link in raw.links:
         if link.effect == "neutral" or link.ref not in refs[link.kind]:
             continue
         if not 0 <= link.claim_index < len(extraction.key_claims) or not link.reason.strip():
+            continue
+        if invents_numbers(link.reason, known):
             continue
         if link.effect == "strengthens":
             status: Literal["supports", "review", "breach"] = "supports"

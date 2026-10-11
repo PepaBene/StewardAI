@@ -4,7 +4,9 @@ name: News eval gate
 # (apps/backend/tests/news/baseline_benchmark.json): a language, region or event-type segment
 # of 10 or more items that is clearly worse than the baseline, or pooled accuracy under 85 %,
 # fails the run. It spends a few cents, so it runs weekly and on request, not on every push.
-# Needs the OPENAI_API_KEY secret (the baseline model is gpt-6-luna); without it the job is skipped.
+# Needs the OPENAI_API_KEY secret (the baseline model is gpt-6-luna); without it the live gate
+# step is skipped (the offline golden cases still run). The job runs only when the repository
+# variable NEWS_EVAL_ENABLED is 'true'. Relevance accuracy is gated too (target 85 %).
 
 on:
   workflow_dispatch:
@@ -21,9 +23,8 @@ jobs:
     defaults:
       run:
         working-directory: apps/backend
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
+      # Actions are pinned by tag, not commit SHA; pin to SHAs if the repository policy needs it.
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
@@ -31,7 +32,20 @@ jobs:
       - run: uv sync --locked
       - name: Golden cases for the code techniques (offline)
         run: uv run python -m steward.news.eval_analysis
+      # A job-level `if` cannot read secrets, so the key is checked in a step (the secret is
+      # exposed only to the steps that need it).
+      - name: Check for the OpenAI key
+        id: key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: echo "present=$([ -n "$OPENAI_API_KEY" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - name: Classifier benchmark skipped (no OPENAI_API_KEY secret)
+        if: ${{ steps.key.outputs.present != 'true' }}
+        run: echo "OPENAI_API_KEY is not set; the live classifier gate was skipped."
       - name: Classifier benchmark against the baseline
+        if: ${{ steps.key.outputs.present == 'true' }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: >-
           uv run python -m steward.news.eval --live --set benchmark --model gpt-6-luna
           --gate tests/news/baseline_benchmark.json

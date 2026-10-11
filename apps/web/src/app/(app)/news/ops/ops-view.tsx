@@ -18,7 +18,7 @@ type Candidate = components["schemas"]["CandidateCase"];
 
 const DAYS = [7, 30, 90] as const;
 
-type Load = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; report: OpsReport; marks: Candidate[] };
+type Load = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; report: OpsReport; marks: Candidate[] | null };
 
 /** What the news jobs cost, how fast alerts arrive, how many were indirect, and what to review. */
 export function OpsView() {
@@ -27,14 +27,25 @@ export function OpsView() {
 
   useEffect(() => {
     const api = getBrowserApiClient();
+    let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoad({ kind: "loading" });
-    Promise.all([api.GET("/news/ops", { params: { query: { days } } }), api.GET("/news/marks/candidates")])
+    Promise.all([
+      api.GET("/news/ops", { params: { query: { days } } }),
+      // A failed marks request must not read as "no marks yet": null means it failed.
+      api.GET("/news/marks/candidates").catch(() => null),
+    ])
       .then(([ops, marks]) => {
-        if (ops.data) setLoad({ kind: "ok", report: ops.data, marks: marks.data ?? [] });
+        if (cancelled) return;
+        if (ops.data) setLoad({ kind: "ok", report: ops.data, marks: marks?.data ?? null });
         else setLoad({ kind: "error", message: `The API answered HTTP ${ops.response.status}.` });
       })
-      .catch((err: unknown) => setLoad({ kind: "error", message: err instanceof Error ? err.message : String(err) }));
+      .catch((err: unknown) => {
+        if (!cancelled) setLoad({ kind: "error", message: err instanceof Error ? err.message : String(err) });
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [days]);
 
   return (
@@ -78,7 +89,7 @@ export function OpsView() {
   );
 }
 
-function Report({ report, marks }: { report: OpsReport; marks: Candidate[] }) {
+function Report({ report, marks }: { report: OpsReport; marks: Candidate[] | null }) {
   const { latency, volume } = report;
   return (
     <>
@@ -160,7 +171,9 @@ function Report({ report, marks }: { report: OpsReport; marks: Candidate[] }) {
           Items you marked wrong. Each needs the right answer from you before it can join the benchmark; nothing here changes
           a score or a model.
         </p>
-        {marks.length === 0 ? (
+        {marks === null ? (
+          <AlertMessage title="Could not load your marks">The marks request failed, so this list is unknown, not empty. Reload to try again.</AlertMessage>
+        ) : marks.length === 0 ? (
           <p className="text-sm text-text-muted">No wrong-item marks yet.</p>
         ) : (
           <ul className="m-0 list-none divide-y divide-border p-0 text-sm">

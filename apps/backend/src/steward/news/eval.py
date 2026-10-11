@@ -236,6 +236,9 @@ def main() -> None:
     parser.add_argument("--gate", type=Path, help="fail if a segment is worse than this baseline")
     parser.add_argument("--save-baseline", type=Path, help="write this run as the baseline")
     args = parser.parse_args()
+    if args.gate and not args.live:
+        # Without a model the oracle classifier is scored against its own labels and always passes.
+        sys.exit("--gate needs --live: the oracle run would pass against its own labels.")
     # The report names Japanese and Chinese items; a Windows console code page cannot print them.
     sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     path = SETS[args.set]
@@ -259,6 +262,11 @@ def main() -> None:
         print(f"\nbaseline written to {args.save_baseline}")
     baseline = load_baseline(args.gate) if args.gate else None
     failures = check(pooled, score.segments, baseline)
+    if score.total and score.relevant / score.total < TARGET:
+        failures.append(
+            f"relevance {score.relevant}/{score.total} = {score.relevant / score.total:.1%}"
+            f" is below the target {TARGET:.0%}"
+        )
     if args.gate is None:
         print("\nno baseline given: only the pooled target was checked")
     for failure in failures:

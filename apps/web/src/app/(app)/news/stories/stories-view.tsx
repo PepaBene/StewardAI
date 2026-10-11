@@ -19,19 +19,30 @@ import { cn } from "@/lib/utils";
 type Load =
   | { kind: "loading" }
   | { kind: "error"; message: string }
-  | { kind: "ok"; threads: ThreadOut[]; study: StudyRow[] };
+  | { kind: "ok"; threads: ThreadOut[]; study: StudyRow[] | null };
 
 /** Developing situations: each thread with its stories in order and what each one added. */
 export function StoriesView() {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   useEffect(() => {
     const api = getBrowserApiClient();
-    Promise.all([api.GET("/threads", { params: { query: { limit: 100 } } }), api.GET("/news/event-study")])
+    let cancelled = false;
+    Promise.all([
+      api.GET("/threads", { params: { query: { limit: 100 } } }),
+      // null marks a failed event-study request so it is not shown as "no study".
+      api.GET("/news/event-study").catch(() => null),
+    ])
       .then(([threads, study]) => {
-        if (threads.data) setLoad({ kind: "ok", threads: threads.data, study: study.data ?? [] });
+        if (cancelled) return;
+        if (threads.data) setLoad({ kind: "ok", threads: threads.data, study: study?.data ?? null });
         else setLoad({ kind: "error", message: `The API answered HTTP ${threads.response.status}.` });
       })
-      .catch((err: unknown) => setLoad({ kind: "error", message: err instanceof Error ? err.message : String(err) }));
+      .catch((err: unknown) => {
+        if (!cancelled) setLoad({ kind: "error", message: err instanceof Error ? err.message : String(err) });
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -66,7 +77,10 @@ export function StoriesView() {
           ))}
         </ul>
       ) : null}
-      {load.kind === "ok" && load.study.length > 0 ? <Study rows={load.study} /> : null}
+      {load.kind === "ok" && load.study === null ? (
+        <AlertMessage title="Could not load the event study">The request failed, so the study is unknown, not empty.</AlertMessage>
+      ) : null}
+      {load.kind === "ok" && load.study && load.study.length > 0 ? <Study rows={load.study} /> : null}
     </div>
   );
 }
@@ -77,13 +91,24 @@ function ThreadCard({ thread }: { thread: ThreadOut }) {
   const [detail, setDetail] = useState<ThreadDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [fetching, setFetching] = useState(false);
+
   async function toggle() {
     const next = !open;
     setOpen(next);
-    if (next && detail === null) {
-      const { data, response } = await getBrowserApiClient().GET("/threads/{thread_id}", { params: { path: { thread_id: thread.id } } });
-      if (data) setDetail(data as ThreadDetail);
-      else setError(`The API answered HTTP ${response.status}.`);
+    if (next && detail === null && !fetching) {
+      // A retry starts clean: the old error must not outlive the new attempt.
+      setError(null);
+      setFetching(true);
+      try {
+        const { data, response } = await getBrowserApiClient().GET("/threads/{thread_id}", { params: { path: { thread_id: thread.id } } });
+        if (data) setDetail(data as ThreadDetail);
+        else setError(`The API answered HTTP ${response.status}.`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setFetching(false);
+      }
     }
   }
 

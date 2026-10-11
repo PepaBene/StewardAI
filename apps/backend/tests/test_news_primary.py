@@ -374,3 +374,27 @@ async def test_gazette_keeps_notices_naming_the_company_and_labels_the_status() 
         )
     assert [i.url for i in result.items] == ["https://www.thegazette.co.uk/notice/1"]
     assert result.items[0].event_type == "entity_status"
+
+
+def test_gazette_whole_name_match_rejects_a_longer_company_name() -> None:
+    from steward.news.primary_sources import names_company
+
+    wanted = name_key("Next plc")
+    assert names_company(wanted, "Notice of winding-up of Next plc")
+    assert not names_company(wanted, "Next Day Couriers Ltd: strike-off")
+    assert not names_company(wanted, "Big Next Holdings Limited")
+    assert name_key("Acme P.L.C.") == name_key("Acme plc")  # dotted legal forms
+    assert code_key("285A") != code_key("285B")
+    assert code_key("00700") == code_key("700")
+
+
+@pytest.mark.asyncio
+async def test_tdnet_error_on_a_later_page_is_reported() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "_001_" in str(request.url):
+            return httpx.Response(200, text=TDNET_PAGE)
+        return httpx.Response(500)
+
+    async with client(handler) as http:
+        result = await collect_tdnet(http, "tdnet", [holding("X_JP_EQ", "JP", "7603")], RULES, TODAY)
+    assert any("page 2" in e for e in result.errors)

@@ -19,6 +19,7 @@ import re
 import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
@@ -82,15 +83,48 @@ class TranslationError(Exception):
 
 
 _NBSP = chr(0xA0)
-_NUMBER = re.compile(rf"(?<!\w)\d(?:[\d.,{_NBSP}]*\d)?(?!\w)")
+# A number, optionally with ASCII unit letters glued to it ("12bn", "3x", "5m"). Digits after a
+# letter or CJK character ("Q3", "FY26", "第3") are labels, and a CJK unit after the digits
+# ("5億円") is not checked: those units are rewritten when translating ("500 million").
+_NUMBER = re.compile(
+    rf"(?<!\w)(?P<num>\d(?:[\d.,{_NBSP}]*\d)?)(?:[A-Za-z]{{1,10}}(?![A-Za-z0-9])|(?!\w))"
+)
+_SEPARATOR = re.compile(rf"[.,{_NBSP}]")
+
+
+def _canonical_number(raw: str) -> str:
+    """The value of `raw` as a plain decimal string: "1,5" and "1.5" are both "1.5" (not
+    "15") and "1.234,5" is "1234.5". The unit is not part of the value: a translation rewrites
+    it ("12bn" becomes "12 billion"), so only the digits are compared."""
+    parts = _SEPARATOR.split(raw)
+    if len(parts) == 1:
+        whole, frac = parts[0], ""
+    elif len(parts[-1]) == 3 and parts[0] not in {"0", "00"} and all(len(p) == 3 for p in parts[1:]):
+        whole, frac = "".join(parts), ""  # "1,500" and "1.500" are thousands groups
+    else:
+        whole, frac = "".join(parts[:-1]), parts[-1]
+    value = Decimal(f"{whole}.{frac or '0'}")
+    return format(value.normalize(), "f")
 
 
 def numbers_in(text: str) -> list[str]:
-    """The standalone numbers in `text` as digit strings with separators removed ("1,5" and
-    "1.5" both become "15"), full-width digits folded to ASCII. Digits glued to letters ("Q3",
-    "5億円") are not standalone numbers and are not checked."""
+    """The numbers in `text` as canonical decimal strings, full-width digits folded to ASCII.
+    A decimal separator stays meaningful ("1.5" is not "15"); unit letters glued to a number
+    ("12bn", "3x", "5m") do not hide it. Digits after letters or CJK characters ("Q3", "第3")
+    are labels and are not checked."""
     folded = unicodedata.normalize("NFKC", text)
-    return [re.sub(r"\D", "", m) for m in _NUMBER.findall(folded)]
+    return [_canonical_number(m["num"]) for m in _NUMBER.finditer(folded)]
+
+
+def invents_numbers(text: str, sources: Sequence[str]) -> bool:
+    """Whether `text` carries a number that none of the `sources` has. This is the check every
+    saved model sentence passes at least: a figure the stored text does not contain is the
+    model's own. (Whether a sentence without numbers is faithful to its source cannot be checked
+    in code; those are the owner's marks in the benchmark.)"""
+    have: set[str] = set()
+    for source in sources:
+        have |= set(numbers_in(source))
+    return any(n not in have for n in numbers_in(text))
 
 
 def check_translation(source: TranslateItem, raw: TranslatedItem) -> Translation | None:

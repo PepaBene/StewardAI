@@ -117,6 +117,9 @@ class BriefLine(BaseModel):
     lifecycle: str
     novelty: str | None = None
     score: float
+    # The score without the sentiment nudge: what alerts rank by, so sentiment never decides
+    # which lines are sent. Equals `score` for briefs stored before this field existed.
+    alert_score: float | None = None
     written_by_model: bool = False
 
 
@@ -138,6 +141,7 @@ class Candidate:
     novelty: str | None
     claims: tuple[str, ...]
     score: float
+    alert_score: float | None = None
 
 
 async def candidates(
@@ -192,7 +196,8 @@ async def candidates(
         if score <= 0:
             suppressed += 1
             continue
-        out.append(Candidate(story, exposure, novelty, claims, score))
+        alert_score = rank_score(story.severity, exposure, novelty, topics=int(topics or 0))
+        out.append(Candidate(story, exposure, novelty, claims, score, alert_score))
     out.sort(key=lambda c: (-c.score, c.story.cluster_id))
     return out, suppressed
 
@@ -210,6 +215,7 @@ def plain_line(c: Candidate) -> BriefLine:
         lifecycle=story.lifecycle,
         novelty=c.novelty,
         score=round(c.score, 5),
+        alert_score=round(c.alert_score if c.alert_score is not None else c.score, 5),
     )
 
 
@@ -295,6 +301,7 @@ def build_lines(chosen: Sequence[Candidate], written: Mapping[int, WrittenLine])
                     lifecycle=c.story.lifecycle,
                     novelty=c.novelty,
                     score=round(c.score, 5),
+                    alert_score=round(c.alert_score if c.alert_score is not None else c.score, 5),
                     written_by_model=True,
                 )
             )

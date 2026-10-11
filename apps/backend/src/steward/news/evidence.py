@@ -87,15 +87,20 @@ def evidence_kind(
 
 
 _CORRECTION = re.compile(
-    r"\b(correction|corrected|retract(?:s|ed|ion)?|amended|restated|"
-    r"berichtigung|rectificatif)\b|訂正|更正|정정",
+    # "Correction" / "Corrected" only as a label (at the start, after a bracket, or before a
+    # colon or dash): "market correction" and "price correction" are ordinary news words.
+    r"[(\[]\s*(?:correction|corrected)\b|"
+    r"(?<!market )(?<!stock )(?<!price )(?<!bond )(?<!equity )"
+    r"\b(?:correction|corrected)\s*[:–—-]|"
+    r"\b(retract(?:s|ed|ion)?|amended|restated|berichtigung|rectificatif)\b|訂正|更正|정정",
     re.IGNORECASE,
 )
 
 
 def is_correction(headline: str) -> bool:
     """A headline that says it corrects an earlier report or filing. Revisions such as
-    guidance changes (業績予想の修正) are news, not corrections, and do not match."""
+    guidance changes (業績予想の修正) and "market correction" are news, not corrections, and do
+    not match."""
     return _CORRECTION.search(headline) is not None
 
 

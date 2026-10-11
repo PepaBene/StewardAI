@@ -3,7 +3,7 @@
 import { LoaderCircleIcon, PlayIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 const KINDS = ["morning", "region", "weekly", "holding", "theme"] as const;
 type Kind = (typeof KINDS)[number];
 
-type Load = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; briefs: BriefOut[]; themes: ThemeDay[] };
+type Load = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; briefs: BriefOut[]; themes: ThemeDay[] | null };
 
 /** The briefs: what happened by region in the order the markets open, every line tied to its story. */
 export function BriefView() {
@@ -44,20 +44,28 @@ export function BriefView() {
   const wanted = params.get("kind");
   const kind: Kind = KINDS.includes(wanted as Kind) ? (wanted as Kind) : "morning";
   const [load, setLoad] = useState<Load>({ kind: "loading" });
-  const [running, setRunning] = useState<"idle" | "queued" | "error">("idle");
+  const [running, setRunning] = useState<"idle" | "starting" | "queued" | "error">("idle");
+
+  // Only the newest request may write: switching the tab drops the answer for the old one.
+  const requestSeq = useRef(0);
 
   const refresh = useCallback(() => {
+    const seq = ++requestSeq.current;
     const api = getBrowserApiClient();
     Promise.all([
       api.GET("/news/briefs", { params: { query: { kind, limit: 10 } } }),
-      api.GET("/news/themes", { params: { query: { days: 7 } } }),
+      // null marks a failed themes request so it is not shown as "no themes".
+      api.GET("/news/themes", { params: { query: { days: 7 } } }).catch(() => null),
     ])
       .then(([briefs, themes]) => {
+        if (seq !== requestSeq.current) return;
         // Defaulted response fields are always sent (see `Sent` in lib/news/analysis.ts).
-        if (briefs.data) setLoad({ kind: "ok", briefs: briefs.data, themes: (themes.data ?? []) as ThemeDay[] });
+        if (briefs.data) setLoad({ kind: "ok", briefs: briefs.data, themes: themes?.data ? (themes.data as ThemeDay[]) : null });
         else setLoad({ kind: "error", message: `The API answered HTTP ${briefs.response.status}.` });
       })
-      .catch((err: unknown) => setLoad({ kind: "error", message: err instanceof Error ? err.message : String(err) }));
+      .catch((err: unknown) => {
+        if (seq === requestSeq.current) setLoad({ kind: "error", message: err instanceof Error ? err.message : String(err) });
+      });
   }, [kind]);
 
   useEffect(() => {
@@ -67,15 +75,21 @@ export function BriefView() {
   }, [refresh]);
 
   async function runNow() {
-    const { response } = await getBrowserApiClient().POST("/jobs/news-brief");
-    setRunning(response.ok ? "queued" : "error");
+    if (running === "starting" || running === "queued") return;
+    setRunning("starting");
+    try {
+      const { response } = await getBrowserApiClient().POST("/jobs/news-brief");
+      setRunning(response.ok ? "queued" : "error");
+    } catch {
+      setRunning("error");
+    }
   }
 
   const all = load.kind === "ok" ? load.briefs : [];
   // A theme digest is one brief per theme; every other kind shows its newest brief only.
   const shown = kind === "theme" ? latestPerTicker(all) : all.slice(0, 1);
   const latest = shown[0];
-  const flagged = load.kind === "ok" ? load.themes.filter((t) => t.flag || (t.tone !== null && t.tone !== undefined)) : [];
+  const flagged = load.kind === "ok" && load.themes ? load.themes.filter((t) => t.flag || (t.tone !== null && t.tone !== undefined)) : [];
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
@@ -89,7 +103,7 @@ export function BriefView() {
           </span>
         }
         aside={
-          <Button variant="outline" size="sm" onClick={() => void runNow()} disabled={running === "queued"}>
+          <Button variant="outline" size="sm" onClick={() => void runNow()} disabled={running === "queued" || running === "starting"}>
             <PlayIcon aria-hidden="true" />
             {running === "queued" ? "Queued" : "Write now"}
           </Button>
@@ -129,6 +143,9 @@ export function BriefView() {
       {shown.map((b) => (
         <Brief key={b.id} brief={b} />
       ))}
+      {load.kind === "ok" && load.themes === null ? (
+        <AlertMessage title="Could not load the themes">The themes request failed, so the weekly theme list is unknown, not empty.</AlertMessage>
+      ) : null}
       {flagged.length > 0 ? (
         <section aria-labelledby="themes-heading" className="space-y-2">
           <h2 id="themes-heading" className="text-[22px] leading-tight font-semibold">

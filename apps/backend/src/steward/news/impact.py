@@ -16,7 +16,7 @@ forecast of return.
 """
 
 import datetime as dt
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Mapping, Sequence
 from typing import Literal
 
 import asyncpg
@@ -28,6 +28,7 @@ from steward.llm.cache import ResultCache
 from steward.llm.client import LLM
 from steward.news.analysis import StoryMaterial, structured
 from steward.news.extract import StoryExtraction
+from steward.news.translate import invents_numbers
 from steward.xray.supply_chain import SupplyChain, symbol_of
 
 SYSTEM_PROMPT = """\
@@ -251,11 +252,25 @@ def graph_chains(
 
 
 def apply_notes(
-    result: ImpactResult, paths: list[EventPath], notes: ImpactNotes, graph: SupplyChain
+    result: ImpactResult,
+    paths: list[EventPath],
+    notes: ImpactNotes,
+    graph: SupplyChain,
+    sources: Sequence[str] | None = None,
 ) -> ImpactResult:
-    """Attach the model's sentences to the verified chains and keep valid hypotheses."""
+    """Attach the model's sentences to the verified chains and keep valid hypotheses.
+    With `sources` (the text the model was given), a sentence carrying a number none of them
+    has is dropped."""
+
+    def invented(text: str) -> bool:
+        return sources is not None and invents_numbers(text, sources)
+
     chains = list(result.chains)
-    by_index = {n.path_index: n.text.strip() for n in notes.paths if n.text.strip()}
+    by_index = {
+        n.path_index: n.text.strip()
+        for n in notes.paths
+        if n.text.strip() and not invented(n.text)
+    }
     second = [i for i, c in enumerate(chains) if c.relation == "second_order"]
     for idx, chain_pos in enumerate(second):
         text = by_index.get(idx)
@@ -264,7 +279,7 @@ def apply_notes(
     held = {n.symbol for n in graph.nodes if n.weight > 0}
     for h in notes.hypotheses:
         holding = symbol_of(h.holding)
-        if holding not in held or not h.text.strip():
+        if holding not in held or not h.text.strip() or invented(h.text):
             continue
         if any(c.holding == holding and c.relation != "hypothesis" for c in chains):
             continue
@@ -327,4 +342,8 @@ async def explain_chains(
         cache_key="news_impact",
         max_tokens=2500,
     )
-    return apply_notes(result, paths, notes, graph)
+    sources = [
+        notes_prompt(story, extraction, paths, held),
+        *(i.text for i in story.items),
+    ]
+    return apply_notes(result, paths, notes, graph, sources)

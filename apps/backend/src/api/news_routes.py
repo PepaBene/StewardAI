@@ -450,12 +450,13 @@ class IncidentUpdate(BaseModel):
 
 @router.put("/news/ops/incidents/{story_id}", tags=["news"], status_code=status.HTTP_204_NO_CONTENT)
 async def put_incident_status(
-    story_id: int, body: IncidentUpdate, pool: Pool, _owner: Owner
+    story_id: IdPath, body: IncidentUpdate, pool: Pool, _owner: Owner
 ) -> None:
     """Acknowledge or resolve an incident from the ops report. A resolved incident leaves the
-    report; an acknowledged one stays, marked as seen."""
+    report; an acknowledged one stays, marked as seen. Only a story that is an incident of that
+    kind is accepted."""
     if not await set_incident_status(pool, body.kind, story_id, body.status, body.note):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No story {story_id}")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Story {story_id} is not a {body.kind}")
 
 
 @router.get("/news/marks/candidates", tags=["news"])

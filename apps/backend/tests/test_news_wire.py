@@ -110,11 +110,14 @@ def test_fetch_policy_rungs_must_ascend() -> None:
 
 
 def test_per_job_monthly_cap_is_validated() -> None:
-    cfg = BudgetConfig(per_job_monthly_cap_usd={"news_ingest": 3.0})
-    assert cfg.job_monthly_cap("news_ingest") == 3.0
+    cfg = BudgetConfig(per_job_monthly_cap_usd={"news_analysis": 3.0})
+    assert cfg.job_monthly_cap("news_analysis") == 3.0
     assert cfg.job_monthly_cap("research") is None
+    assert BudgetConfig().job_monthly_cap("news_triage") is not None
+    with pytest.raises(ValidationError, match="news_ingest"):
+        BudgetConfig(per_job_monthly_cap_usd={"news_ingest": 3.0})
     with pytest.raises(ValidationError):
-        BudgetConfig(per_job_monthly_cap_usd={"news_ingest": 0})
+        BudgetConfig(per_job_monthly_cap_usd={"news_analysis": 0})
     with pytest.raises(ValidationError):
         BudgetConfig(per_job_monthly_cap_usd={"no_such_job": 1})  # type: ignore[dict-item]
 
@@ -184,7 +187,8 @@ def test_gdelt_articles_become_tagged_items() -> None:
     assert len(items) == 1
     item = items[0]
     assert item.language == "ja" and item.outlet_host == "nikkei.com"
-    assert item.tickers == ("7203",)
+    # A query hit is not a direct link: the linker must match the name in the text.
+    assert item.tickers == ()
     assert item.published_at == dt.datetime(2026, 10, 10, 10, 15, tzinfo=dt.UTC)
     assert parse_gdelt("not a dict", "g", "T") == []
 

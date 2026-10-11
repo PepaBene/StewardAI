@@ -216,6 +216,48 @@ async def test_a_run_over_its_own_cap_is_stopped(backend_pool: asyncpg.Pool) -> 
 
 
 @pytest.mark.db
+async def test_a_job_type_over_its_monthly_cap_is_stopped(backend_pool: asyncpg.Pool) -> None:
+    await _budget(backend_pool, per_job_monthly_cap_usd={"news_analysis": 2.0})
+    earlier = await create_job(backend_pool, "news_analysis", "manual")
+    await _step(backend_pool, earlier, "1.5", NOW)
+    # Last month's run of the same type does not count.
+    await _step(backend_pool, earlier, "50", NOW - dt.timedelta(days=40))
+    ctx = await _ctx(backend_pool, "news_analysis")
+    assert await budget_guard.before_request(ctx, "gpt-6.1-sol", now=NOW) == "gpt-6.1-sol"
+    # 50k output tokens of gpt-6.1-sol at $10/Mtok = $0.50: the month reaches $2.
+    usage = type("U", (), {"input_tokens": 0, "output_tokens": 50_000})()
+    budget_guard.after_response(ctx, "gpt-6.1-sol", usage)
+    with pytest.raises(BudgetExceeded, match="monthly AI budget of news_analysis jobs reached"):
+        await budget_guard.before_request(ctx, "gpt-6.1-sol", now=NOW)
+    # Other job types, even a critical one, are not held by it.
+    other = await _ctx(backend_pool, "daily_digest")
+    await budget_guard.before_request(other, "gpt-6.1-sol", now=NOW)
+
+
+@pytest.mark.db
+async def test_the_monthly_job_cap_applies_to_critical_jobs_too(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    await _budget(backend_pool, per_job_monthly_cap_usd={"chat": 1.0})
+    earlier = await create_job(backend_pool, "chat", "manual")
+    await _step(backend_pool, earlier, "1", NOW)
+    ctx = await _ctx(backend_pool, "chat")
+    with pytest.raises(BudgetExceeded, match="monthly AI budget of chat jobs reached"):
+        await budget_guard.before_request(ctx, "gpt-6.1-sol", now=NOW)
+
+
+@pytest.mark.db
+async def test_news_ingest_is_never_stopped_by_the_default_caps(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    await _budget(backend_pool)
+    earlier = await create_job(backend_pool, "news_ingest", "manual")
+    await _step(backend_pool, earlier, "100", NOW)
+    ctx = await _ctx(backend_pool, "news_ingest")
+    assert await budget_guard.before_request(ctx, "gpt-6.1-sol", now=NOW) == "gpt-6.1-sol"
+
+
+@pytest.mark.db
 async def test_the_client_applies_the_guard_inside_a_job(backend_pool: asyncpg.Pool) -> None:
     """The client every call site gets from steward.llm: a paused job fails before anything is
     sent; a downgraded request is sent to the cheaper model."""

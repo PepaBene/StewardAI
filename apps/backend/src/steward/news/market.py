@@ -112,6 +112,45 @@ async def load_closes(
     return list(await load_prices(pool, symbol, since, until))
 
 
+# The earliest UTC time the exchange of a country is closed whatever the daylight-saving season
+# (the close in the summer offset, which is the earlier one). A story first seen at or after it
+# is credited to the next day's session: counting the day's move would credit the story with a
+# move that happened before it was published. An unknown country uses the latest of these (the
+# US close), the conservative choice for a tz this code does not know.
+MARKET_CLOSE_UTC: Mapping[str, dt.time] = {
+    "US": dt.time(20, 0),
+    "CA": dt.time(20, 0),
+    "GB": dt.time(15, 30),
+    "DE": dt.time(15, 30),
+    "FR": dt.time(15, 30),
+    "NL": dt.time(15, 30),
+    "CH": dt.time(15, 30),
+    "ES": dt.time(15, 30),
+    "IT": dt.time(15, 30),
+    "SE": dt.time(15, 30),
+    "JP": dt.time(6, 0),
+    "HK": dt.time(8, 0),
+    "CN": dt.time(7, 0),
+    "AU": dt.time(6, 0),
+}
+DEFAULT_CLOSE_UTC = dt.time(20, 0)
+
+
+def event_day_of(
+    first_seen: dt.datetime, event_date: dt.date | None, country: str | None
+) -> dt.date:
+    """The first trading day a story can move the price: the UTC date it was first seen, the
+    next day when it came out at or after the market close, or the event's own earlier date."""
+    seen = first_seen if first_seen.tzinfo else first_seen.replace(tzinfo=dt.UTC)
+    seen = seen.astimezone(dt.UTC)
+    if event_date and event_date < seen.date():
+        return event_date  # the event itself is older than the report; its time is unknown
+    close = MARKET_CLOSE_UTC.get((country or "").upper(), DEFAULT_CLOSE_UTC)
+    if seen.time() >= close:
+        return seen.date() + dt.timedelta(days=1)
+    return seen.date()
+
+
 async def market_context(
     pool: asyncpg.Pool,
     story: StoryMaterial,
@@ -130,10 +169,8 @@ async def market_context(
     )
     if row is None or not row["price_symbol"]:
         return None
-    event_day = (
-        story.event_date
-        if story.event_date and story.event_date <= story.first_seen.date()
-        else story.first_seen.date()
+    event_day = event_day_of(
+        story.first_seen, story.event_date, row["home_country"] or region_of(story.ticker)
     )
     since = event_day - dt.timedelta(days=LOOKBACK_DAYS)
     until = event_day + dt.timedelta(days=LOOKAHEAD_DAYS)

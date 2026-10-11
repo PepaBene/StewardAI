@@ -227,6 +227,16 @@ class WirePage(BaseModel):
     next_before_id: int | None
 
 
+TITLE_SEARCH_DAYS = 90
+
+
+def like_pattern(text: str) -> str:
+    """`text` as a `like` pattern that matches it anywhere: `%`, `_` and the escape character
+    `\\` in it are literal (use with `escape '\\'`)."""
+    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
 async def wire(pool: asyncpg.Pool, f: WireFilters) -> WirePage:
     clauses: list[str] = []
     args: list[Any] = []
@@ -239,8 +249,8 @@ async def wire(pool: asyncpg.Pool, f: WireFilters) -> WirePage:
         add("a.region = ?", f.region.upper())
     if f.language:
         add("a.language = ?", f.language.lower())
-    if f.outlet:
-        add("a.outlet ilike '%' || ? || '%'", f.outlet)
+    if f.outlet and f.outlet.strip():
+        add("a.outlet ilike ? escape '\\'", like_pattern(f.outlet.strip()))
     if f.tier:
         add("a.tier = ?", f.tier)
     if f.topic:
@@ -249,11 +259,20 @@ async def wire(pool: asyncpg.Pool, f: WireFilters) -> WirePage:
         add("a.linked = ?", f.linked)
     if f.paywall:
         add("s.paywall = ?", f.paywall)
-    if f.q:
-        add(
-            "(a.search @@ plainto_tsquery('simple', ?)"
-            " or coalesce(a.title_en, '') ilike '%' || ? || '%')",
-            f.q,
+    if f.q and f.q.strip():
+        query = f.q.strip()
+        args.append(query)
+        words = len(args)
+        args.append(like_pattern(query))
+        title = len(args)
+        # Two index-friendly queries combined (the full-text index, and a bounded date range for
+        # the title substring): one OR across both would scan the whole table.
+        clauses.append(
+            "a.id in (select m.id from public.news_article m"  # noqa: S608
+            f" where m.search @@ plainto_tsquery('simple', ${words})"
+            " union select t.id from public.news_article t"
+            f" where t.published_at >= now() - interval '{TITLE_SEARCH_DAYS} days'"
+            f" and coalesce(t.title_en, '') ilike ${title} escape '\\')"
         )
     if f.before_id:
         add("a.id < ?", f.before_id)
@@ -326,8 +345,10 @@ async def theme_days(pool: asyncpg.Pool, days: int) -> list[ThemeDay]:
         " array_agg(region order by region) filter (where region <> '' and wire_items > 0)"
         " as regions, max(flag) as flag, max(tone) as tone, max(attention) as attention"
         " from public.news_theme_day"
-        " where day >= current_date - $1::int group by theme, day order by day desc, theme",
-        days,
+        " where day >= $1::date group by theme, day order by day desc, theme",
+        # The days are UTC dates (`update_themes`); the database's `current_date` follows the
+        # session time zone, which is not guaranteed to be UTC.
+        dt.datetime.now(dt.UTC).date() - dt.timedelta(days=days),
     )
     return [ThemeDay(**{**dict(r), "regions": list(r["regions"] or [])}) for r in rows]
 

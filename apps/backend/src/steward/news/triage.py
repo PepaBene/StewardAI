@@ -157,6 +157,16 @@ async def triage_batch(
         seen.add(row.index)
         checked = check(item, row)
         if checked is None:
+            # Rejected by the code checks: record the attempt so the same item is not sent
+            # again (and paid for again) on every run for the next 48 hours. No relevance or
+            # gloss is stored, so nothing downstream reads it as a triage result.
+            await pool.execute(
+                "update public.news_article set triage = $2::jsonb, triaged_at = $3"
+                " where id = $1 and triaged_at is null",
+                item.article_id,
+                json.dumps({"rejected": "failed checks", "model": model}),
+                now,
+            )
             continue
         await pool.execute(
             "update public.news_article set triage = $2::jsonb, triaged_at = $3"

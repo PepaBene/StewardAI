@@ -172,7 +172,9 @@ def parse_gdelt(payload: object, source_id: str, ticker: str) -> list[RawItem]:
                 language=language,
                 outlet_host=domain.lower().removeprefix("www.") or None,
                 outlet_name=domain or None,
-                tickers=(ticker,),
+                # A name query hit is not about the holding until the text says so: the linker
+                # matches names itself, so no direct (confidence 1.0) link is claimed here.
+                tickers=(),
             )
         )
     return items

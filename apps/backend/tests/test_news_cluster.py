@@ -69,6 +69,12 @@ def test_outlet_suffixes_and_wire_prefixes_are_ignored() -> None:
     assert headline_key("Apple to buy X for $2bln") == headline_key("Apple to buy X for $2 billion")
 
 
+def test_canonical_url_rejects_non_http_schemes_and_bad_ports() -> None:
+    for bad in ("javascript:alert(1)", "ftp://x.test/a", "https://x.test:notaport/a"):
+        with pytest.raises(ValueError):
+            canonical_url(bad)
+
+
 def test_canonical_url_drops_tracking_and_fragments() -> None:
     a = canonical_url("https://WWW.Reuters.com/tech/apple/?utm_source=rss&utm_medium=x#top")
     b = canonical_url("https://www.reuters.com/tech/apple")

@@ -7,6 +7,7 @@ removed from the config are given the plain `outlet` kind only when they are not
 otherwise they are left alone, because guessing a primary kind would overstate the evidence.
 """
 
+import json
 from collections.abc import Callable, Collection, Mapping
 
 import asyncpg
@@ -16,6 +17,7 @@ from steward.news.evidence import evidence_kind, is_correction
 from steward.news.normalize import host_of
 
 BATCH = 500
+CURSOR_KEY = "news_provenance_backfill_cursor"
 
 
 async def backfill_provenance(
@@ -26,16 +28,30 @@ async def backfill_provenance(
     limit: int = BATCH,
 ) -> int:
     """Classify up to `limit` items that have no evidence kind; the number updated."""
+    # Rows left alone below stay null, so a plain "newest 500 without a kind" would fetch them
+    # forever and starve the rest: walk by id with a cursor kept between runs instead.
+    stored = await pool.fetchval("select value from public.sync_state where key = $1", CURSOR_KEY)
+    cursor = int(json.loads(stored).get("after", 0)) if stored else 0
     rows = await pool.fetch(
         "select id, source_id, tier, url, outlet, headline from public.news_item"
-        " where evidence_kind is null order by id desc limit $1",
+        " where evidence_kind is null and id > $2 order by id limit $1",
         limit,
+        cursor,
+    )
+    next_cursor = rows[-1]["id"] if len(rows) >= limit else 0  # a short page ends the sweep
+    await pool.execute(
+        "insert into public.sync_state (key, value) values ($1, $2::jsonb)"
+        " on conflict (key) do update set value = excluded.value",
+        CURSOR_KEY,
+        json.dumps({"after": next_cursor}),
     )
     key: Callable[[str | None], str] = sources_config.independence_key
     done = 0
     for r in rows:
         source = sources.get(r["source_id"])
-        host = host_of(r["url"]) or r["outlet"]
+        # The same host as a new item gets (`outlet_host or host_of(url)`), so the
+        # independence key does not differ between stored and backfilled rows.
+        host = r["outlet"] or host_of(r["url"])
         if source is None:
             # Unknown source: only an ordinary outlet can be said without it.
             if r["tier"] != 2:

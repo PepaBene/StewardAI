@@ -12,7 +12,7 @@ import hashlib
 import re
 import time
 import urllib.robotparser
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 
@@ -22,6 +22,7 @@ from steward.research.browser import BrowserRenderer
 from steward.research.browser import available as browser_available
 
 ROBOTS_AGENT = "StewardAI"
+MAX_ROBOTS_REDIRECTS = 3
 REFUSED = re.compile(r"HTTP (403|429)\b")
 CHALLENGE_MARKERS = ("just a moment", "verify you are human", "captcha", "access denied")
 
@@ -79,8 +80,19 @@ class PoliteFetcher:
             return self._robots[host]
         parser: urllib.robotparser.RobotFileParser | None
         try:
-            response = await self._http.get(f"{scheme}://{host}/robots.txt", timeout=15.0)
-            if response.status_code >= 500:
+            robots_url = f"{scheme}://{host}/robots.txt"
+            response = await self._http.get(robots_url, timeout=15.0)
+            # The client does not follow redirects. Follow a few by hand (robots.txt moved to
+            # https or www); one that never settles is unknown, so treated as closed.
+            for _ in range(MAX_ROBOTS_REDIRECTS):
+                location = response.headers.get("location")
+                if not 300 <= response.status_code < 400 or not location:
+                    break
+                robots_url = urljoin(robots_url, location)
+                if urlsplit(robots_url).scheme not in ("http", "https"):
+                    break
+                response = await self._http.get(robots_url, timeout=15.0)
+            if response.status_code >= 500 or 300 <= response.status_code < 400:
                 parser = None
             else:
                 parser = urllib.robotparser.RobotFileParser()

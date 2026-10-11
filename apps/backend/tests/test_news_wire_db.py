@@ -153,7 +153,9 @@ async def test_failing_feed_opens_the_breaker_and_never_looks_like_no_news(
     )
     assert health is not None
     assert health["consecutive_failures"] == 3 and health["backoff_until"] is not None
-    assert health["health"] == "down" or health["backoff_until"] <= dt.datetime.now(dt.UTC)
+    # Third consecutive failure at NOON + 15 min: the breaker opens for the base 10 minutes,
+    # measured on the pipeline clock.
+    assert health["backoff_until"] == NOON + dt.timedelta(minutes=25)
     assert "404" in health["last_error"]
 
     # While the breaker is open the feed is not requested again.

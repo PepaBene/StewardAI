@@ -336,3 +336,44 @@ async def test_the_wire_feedback_and_themes_read_side(
     # Themes: the seeded watch topics tag nothing in this fixture, so there are no rows, and the
     # query still answers.
     assert await theme_days(backend_pool, 14) == []
+
+
+async def test_quiet_confirmed_stories_resolve_and_others_do_not(
+    backend_pool: asyncpg.Pool, feeds: Feeds, http: Any
+) -> None:
+    await prepare(backend_pool, feeds, http, ["novelty"])
+    ids = [r["id"] for r in await backend_pool.fetch("select id from story_cluster order by id")]
+    assert len(ids) >= 3
+    old = dt.datetime.now(dt.UTC) - dt.timedelta(days=30)
+    quiet, recent, disputed = ids[:3]
+    await backend_pool.execute(
+        "update story_cluster set lifecycle = 'corroborated', last_seen = $2 where id = $1",
+        quiet,
+        old,
+    )
+    await backend_pool.execute(
+        "update story_cluster set lifecycle = 'corroborated', last_seen = now() where id = $1",
+        recent,
+    )
+    await backend_pool.execute(
+        "update story_cluster set lifecycle = 'disputed', last_seen = $2 where id = $1",
+        disputed,
+        old,
+    )
+
+    now = dt.datetime.now(dt.UTC)
+    assert await analysis_job.resolve_quiet_stories(backend_pool, now, 0) == 0
+    assert await analysis_job.resolve_quiet_stories(backend_pool, now, 14) == 1
+
+    states = {
+        r["id"]: r["lifecycle"]
+        for r in await backend_pool.fetch("select id, lifecycle from story_cluster")
+    }
+    assert states[quiet] == "resolved"
+    assert states[recent] == "corroborated" and states[disputed] == "disputed"
+    event = await backend_pool.fetchrow(
+        "select from_state from story_lifecycle_event where cluster_id = $1"
+        " and to_state = 'resolved'",
+        quiet,
+    )
+    assert event is not None and event["from_state"] == "corroborated"

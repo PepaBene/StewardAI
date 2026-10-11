@@ -590,7 +590,9 @@ async def collect_google_news(
         if url is None:
             continue
         try:
-            items = await collect_rss(http, source_id, url, (holding.ticker,))
+            # No direct ticker: a name query hit is linked only when the linker matches the
+            # holding's name in the text, not at confidence 1.0 by the query alone.
+            items = await collect_rss(http, source_id, url, ())
         except FetchError as exc:
             result.errors.append(f"{holding.ticker}: {exc}")
             continue

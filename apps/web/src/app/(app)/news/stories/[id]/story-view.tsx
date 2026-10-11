@@ -2,7 +2,7 @@
 
 import { ExternalLinkIcon, LoaderCircleIcon } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
@@ -29,11 +29,12 @@ import {
   type StoryAnalysis,
 } from "@/lib/news/analysis";
 import { eventLabel } from "@/lib/news/labels";
+import { isExternalUrl } from "@/lib/sources/sources";
 
 type Load =
   | { kind: "loading" }
   | { kind: "error"; message: string }
-  | { kind: "ok"; evidence: StoryEvidence; analysis: StoryAnalysis | null };
+  | { kind: "ok"; evidence: StoryEvidence; analysis: StoryAnalysis | null; analysisError: string | null };
 
 function Panel({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
@@ -52,35 +53,60 @@ function Panel({ title, note, children }: { title: string; note?: string; childr
 export function StoryView({ id }: { id: number }) {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [closing, setClosing] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
+  // Only the newest request may write: a late answer for an older story or refresh is dropped.
+  const requestSeq = useRef(0);
 
   const refresh = useCallback(async () => {
+    const seq = ++requestSeq.current;
     const api = getBrowserApiClient();
     try {
       const [evidence, analysis] = await Promise.all([
         api.GET("/stories/{story_id}/evidence", { params: { path: { story_id: id } } }),
-        api.GET("/stories/{story_id}/analysis", { params: { path: { story_id: id } } }),
+        // A failed analysis request is its own error, not "not analysed yet".
+        api.GET("/stories/{story_id}/analysis", { params: { path: { story_id: id } } }).catch((err: unknown) => ({
+          data: undefined,
+          response: undefined,
+          failure: err instanceof Error ? err.message : String(err),
+        })),
       ]);
-      if (evidence.data) setLoad({ kind: "ok", evidence: evidence.data, analysis: (analysis.data as StoryAnalysis | undefined) ?? null });
-      else
+      if (seq !== requestSeq.current) return;
+      if (evidence.data) {
+        const analysisData = analysis.data as StoryAnalysis | undefined;
+        const failure = "failure" in analysis ? analysis.failure : analysis.response ? `The API answered HTTP ${analysis.response.status}.` : "No answer.";
+        setLoad({ kind: "ok", evidence: evidence.data, analysis: analysisData ?? null, analysisError: analysisData ? null : failure });
+      } else
         setLoad({
           kind: "error",
           message: evidence.response.status === 404 ? "This story does not exist." : `The API answered HTTP ${evidence.response.status}.`,
         });
     } catch (err) {
+      if (seq !== requestSeq.current) return;
       setLoad({ kind: "error", message: err instanceof Error ? err.message : String(err) });
     }
   }, [id]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoad({ kind: "loading" });
     void refresh();
   }, [refresh]);
 
   async function toggleClosed(closed: boolean) {
     setClosing(true);
-    await getBrowserApiClient().POST("/stories/{story_id}/close", { params: { path: { story_id: id } }, body: { closed } });
-    await refresh();
-    setClosing(false);
+    setCloseError(null);
+    try {
+      const { response } = await getBrowserApiClient().POST("/stories/{story_id}/close", {
+        params: { path: { story_id: id } },
+        body: { closed },
+      });
+      if (!response.ok) setCloseError(`The API answered HTTP ${response.status}; the story was not ${closed ? "closed" : "reopened"}.`);
+      else await refresh();
+    } catch (err) {
+      setCloseError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setClosing(false);
+    }
   }
 
   if (load.kind === "loading")
@@ -92,7 +118,7 @@ export function StoryView({ id }: { id: number }) {
     );
   if (load.kind === "error") return <AlertMessage title="Could not load the story">{load.message}</AlertMessage>;
 
-  const { evidence, analysis } = load;
+  const { evidence, analysis, analysisError } = load;
   const hasAnalysis = analysis !== null && Object.entries(analysis).some(([k, v]) => k !== "story_id" && k !== "models" && v !== null);
   return (
     <div className="flex flex-col gap-5">
@@ -122,6 +148,7 @@ export function StoryView({ id }: { id: number }) {
         }
       />
       <NewsTabs active="stories" />
+      {closeError ? <AlertMessage title="Could not change the story">{closeError}</AlertMessage> : null}
 
       <Panel
         title="Evidence"
@@ -139,10 +166,14 @@ export function StoryView({ id }: { id: number }) {
                   {formatDateTime(item.published_at)}
                 </time>
               </p>
-              <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent-ink hover:underline">
-                <span className="[overflow-wrap:anywhere]">{item.headline}</span>
-                <ExternalLinkIcon aria-hidden="true" className="mt-1 size-3 shrink-0 text-text-muted" />
-              </a>
+              {isExternalUrl(item.url) ? (
+                <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent-ink hover:underline">
+                  <span className="[overflow-wrap:anywhere]">{item.headline}</span>
+                  <ExternalLinkIcon aria-hidden="true" className="mt-1 size-3 shrink-0 text-text-muted" />
+                </a>
+              ) : (
+                <span className="inline-flex [overflow-wrap:anywhere]">{item.headline}</span>
+              )}
               {item.links.length > 0 ? (
                 <p className="text-xs text-text-muted">
                   Linked to {item.links.map((l) => `${l.ticker} by ${l.via}`).join(", ")}
@@ -166,7 +197,8 @@ export function StoryView({ id }: { id: number }) {
         ) : null}
       </Panel>
 
-      {!hasAnalysis ? (
+      {analysisError ? <AlertMessage title="Could not load the analysis">{analysisError}</AlertMessage> : null}
+      {!hasAnalysis && !analysisError ? (
         <EmptyState title="Not analysed yet">
           The news analysis job writes novelty, the story thread and the other findings here. Turn on more techniques under
           Config, Jobs, News.
@@ -250,8 +282,8 @@ function AnalysisPanels({ analysis }: { analysis: StoryAnalysis }) {
                   <span className="text-xs text-text-muted">{c.confidence} confidence</span>
                 </p>
                 {c.chain.length > 1 ? <p className="font-mono text-xs text-text-muted">{c.chain.join(" > ")}</p> : null}
-                {c.links.map((l) => (
-                  <p key={l} className="text-xs text-text-muted">
+                {c.links.map((l, j) => (
+                  <p key={`${j}:${l}`} className="text-xs text-text-muted">
                     {l}
                   </p>
                 ))}
@@ -298,8 +330,8 @@ function AnalysisPanels({ analysis }: { analysis: StoryAnalysis }) {
             <div>
               <p className="kicker">Changed</p>
               <ul className="m-0 list-none space-y-1 p-0 text-sm">
-                {thread.diff.changed.map((c) => (
-                  <li key={c.now}>
+                {thread.diff.changed.map((c, i) => (
+                  <li key={`${i}:${c.now}`}>
                     {c.now} <span className="text-text-muted">(was: {c.was})</span>
                   </li>
                 ))}
@@ -316,8 +348,8 @@ function AnalysisPanels({ analysis }: { analysis: StoryAnalysis }) {
             {framing.agreement === "agree" ? "The outlets agree on the facts." : framing.agreement === "conflict" ? "The outlets conflict on a fact." : "The facts agree; the framing differs by region."}
           </p>
           <TextList title="Conflicts" items={framing.conflicts} />
-          {framing.divergences.map((d) => (
-            <p key={d.summary} className="text-sm">
+          {framing.divergences.map((d, i) => (
+            <p key={`${i}:${d.summary}`} className="text-sm">
               <span className="font-mono text-xs">{d.regions.join(", ")}</span> {d.summary}
             </p>
           ))}
@@ -360,8 +392,8 @@ function AnalysisPanels({ analysis }: { analysis: StoryAnalysis }) {
               ))}
             </tbody>
           </table>
-          {market.notes.map((n) => (
-            <p key={n} className="text-xs text-text-muted">
+          {market.notes.map((n, i) => (
+            <p key={`${i}:${n}`} className="text-xs text-text-muted">
               {n}.
             </p>
           ))}
@@ -394,17 +426,21 @@ function ClaimsPanel({ claims }: { claims: NonNullable<StoryAnalysis["claims"]>[
       note={`${totals.supported} supported, ${totals.contradicted} contradicted, ${totals.unverified} not verified.`}
     >
       <ul className="m-0 list-none space-y-2 p-0 text-sm">
-        {claims.map((c) => (
-          <li key={c.claim} className="space-y-0.5">
+        {claims.map((c, i) => (
+          <li key={`${i}:${c.claim}`} className="space-y-0.5">
             <p>
               <span className="font-medium">{VERDICT_LABELS[c.verdict]}.</span> {c.claim}
             </p>
             {c.quote && c.primary_url ? (
               <blockquote className="border-l-2 border-border pl-3 text-xs text-text-muted [overflow-wrap:anywhere]">
                 &ldquo;{c.quote}&rdquo;{" "}
-                <a href={c.primary_url} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">
-                  {c.primary_outlet ?? "primary document"}
-                </a>
+                {isExternalUrl(c.primary_url) ? (
+                  <a href={c.primary_url} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">
+                    {c.primary_outlet ?? "primary document"}
+                  </a>
+                ) : (
+                  <span>{c.primary_outlet ?? "primary document"}</span>
+                )}
               </blockquote>
             ) : null}
           </li>
@@ -420,8 +456,8 @@ function TextList({ title, items }: { title: string; items: string[] }) {
     <div>
       <p className="kicker">{title}</p>
       <ul className="m-0 list-disc space-y-0.5 pl-5 text-sm">
-        {items.map((t) => (
-          <li key={t}>{t}</li>
+        {items.map((t, i) => (
+          <li key={`${i}:${t}`}>{t}</li>
         ))}
       </ul>
     </div>

@@ -50,7 +50,8 @@ MAX_PAGE_BYTES = 3_000_000
 TDNET_BASE = "https://www.release.tdnet.info/inbs/"
 TDNET_PAGE = TDNET_BASE + "I_list_{page:03d}_{day}.html"
 TDNET_MAX_PAGES = 20
-HKEX_SEARCH = "https://www1.hkexnews.hk/search/titleSearchServlet.do"
+HKEX_ROW_RANGE = 3000
+HKEX_SEARCH ="https://www1.hkexnews.hk/search/titleSearchServlet.do"
 HKEX_BASE = "https://www1.hkexnews.hk"
 CNINFO_QUERY = "https://www.cninfo.com.cn/new/hisAnnouncement/query"
 CNINFO_LOOKUP = "https://www.cninfo.com.cn/new/information/topSearch/query"
@@ -73,9 +74,9 @@ class Disclosure:
 
 
 def code_key(code: str | None) -> str:
-    """A stock code as the digits it is compared on: Hong Kong 00700 and 700 are one code."""
-    digits = re.sub(r"\D", "", code or "")
-    return digits.lstrip("0")
+    """A stock code as the characters it is compared on: Hong Kong 00700 and 700 are one code.
+    Letters are kept (Japanese codes such as 285A), so 285A and 285B do not collapse to 285."""
+    return re.sub(r"[^0-9A-Z]", "", (code or "").upper()).lstrip("0")
 
 
 def holdings_by_code(
@@ -188,12 +189,15 @@ async def collect_tdnet(
                 )
             except FetchError as exc:
                 # A day with no further page answers 404: the end of that day's list.
-                if page == 1 and "HTTP 404" not in str(exc):
-                    result.errors.append(f"{day}: {exc}")
+                if "HTTP 404" not in str(exc):
+                    # Later pages count too: a failed page 2+ means the list is incomplete.
+                    result.errors.append(f"{day} page {page}: {exc}")
                 break
             rows = parse_tdnet(document.data.decode("utf-8", errors="replace"), day)
             if not rows:
                 break
+            if page == TDNET_MAX_PAGES:
+                result.errors.append(f"{day}: read {TDNET_MAX_PAGES} pages, list may be longer")
             for holding in {h.ticker: h for h in by_code.values()}.values():
                 mine = [d for d in rows if by_code.get(code_key(d.code)) is holding]
                 result.items.extend(
@@ -255,7 +259,7 @@ async def collect_hkex(
         "sortDir": "0", "sortByOptions": "DateTime", "category": "0", "market": "SEHK",
         "stockId": "-1", "documentType": "-1", "fromDate": start.strftime("%Y%m%d"),
         "toDate": today.strftime("%Y%m%d"), "title": "", "searchType": "0", "t1code": "-2",
-        "t2Gcode": "-2", "t2code": "-2", "rowRange": "3000", "lang": "EN",
+        "t2Gcode": "-2", "t2code": "-2", "rowRange": str(HKEX_ROW_RANGE), "lang": "EN",
     }  # fmt: skip
     try:
         response = await http.get(HKEX_SEARCH, params=params, headers=default_headers())
@@ -264,6 +268,8 @@ async def collect_hkex(
     except (httpx.HTTPError, ValueError) as exc:
         result.errors.append(f"HKEXnews: {exc}")
         return result
+    if len(rows) >= HKEX_ROW_RANGE:
+        result.errors.append(f"HKEXnews: {len(rows)} rows read, the row range; some may be missing")
     for holding in {h.ticker: h for h in by_code.values()}.values():
         mine = [d for d in rows if by_code.get(code_key(d.code)) is holding]
         result.items.extend(
@@ -449,7 +455,35 @@ _COMPANY_SUFFIX = re.compile(
 
 def name_key(name: str) -> str:
     """A company name with legal-form words and punctuation removed, for a whole-name match."""
-    return " ".join(_COMPANY_SUFFIX.sub(" ", re.sub(r"[^\w\s]", " ", name.lower())).split())
+    # "P.L.C." and "N.V." are one word each, not three single letters.
+    joined = re.sub(r"(?<=\b\w)\.", "", name.lower())
+    return " ".join(_COMPANY_SUFFIX.sub(" ", re.sub(r"[^\w\s]", " ", joined)).split())
+
+
+def names_company(wanted: str, text: str) -> bool:
+    """Whether `text` names the company whose `name_key` is `wanted` as a whole name: the words
+    in order, not continued by another capitalised word on either side. "Next Day Couriers
+    Ltd" does not name "Next plc", a substring test would say it does."""
+    words = re.findall(r"[\w']+", text)
+    lowered = [name_key(w) for w in words]
+    target = wanted.split()
+    n = len(target)
+    if not n:
+        return False
+    # Words that name_key drops (plc, ltd, the) are transparent to the run.
+    kept = [(i, w) for i, w in enumerate(lowered) if w]
+    for start in range(len(kept) - n + 1):
+        if [w for _, w in kept[start : start + n]] != target:
+            continue
+        first, last = kept[start][0], kept[start + n - 1][0]
+        after = words[last + 1] if last + 1 < len(words) else None
+        before = words[first - 1] if first >= 1 else None
+        if after is not None and lowered[last + 1] and (after[0].isupper() or after[0].isdigit()):
+            continue
+        if before is not None and lowered[first - 1] and before[0].isupper():
+            continue
+        return True
+    return False
 
 
 async def collect_gazette(
@@ -480,7 +514,7 @@ async def collect_gazette(
             result.errors.append(f"{holding.ticker}: {exc}")
             continue
         for item in parse_feed(document.data, source_id, tickers=(holding.ticker,), feed_url=url):
-            if wanted not in name_key(f"{item.headline} {item.summary or ''}"):
+            if not names_company(wanted, f"{item.headline} {item.summary or ''}"):
                 continue
             result.items.append(
                 RawItem(
@@ -560,7 +594,8 @@ async def collect_fca_nsm(
     for holding in holdings:
         if holding.home_country == "GB":
             for name in holding.names:
-                if len(name_key(name)) >= 4:
+                # An exact whole-name lookup, so short names (BP, BT) are safe here.
+                if len(name_key(name)) >= 2:
                     wanted.setdefault(name_key(name), holding)
     if not wanted:
         return result
