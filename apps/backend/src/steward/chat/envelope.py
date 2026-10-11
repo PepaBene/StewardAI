@@ -12,6 +12,8 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any, Literal
 
+from steward.research.untrusted import instruction_like, neutralise
+
 Status = Literal["ok", "missing", "not_applicable", "stale", "failed"]
 STATUSES: tuple[str, ...] = ("ok", "missing", "not_applicable", "stale", "failed")
 
@@ -95,6 +97,19 @@ def page(rows: Sequence[Any], limit: int, total: int | None = None) -> dict[str,
         "truncated": known_total > shown,
         **({"total": known_total} if total is not None else {}),
     }
+
+
+def neutralise_tree(value: Any) -> Any:
+    """A copy of a tool result in which each string that reads like an instruction to the model
+    (stored news, filing or web text) has those sentences replaced by a marker. Other values,
+    and strings that read normally, are returned untouched."""
+    if isinstance(value, str):
+        return neutralise(value) if instruction_like(value) else value
+    if isinstance(value, dict):
+        return {k: neutralise_tree(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [neutralise_tree(v) for v in value]
+    return value
 
 
 def stamp(result: dict[str, Any], tool: str, now: dt.datetime) -> dict[str, Any]:

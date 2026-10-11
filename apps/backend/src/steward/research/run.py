@@ -230,13 +230,12 @@ def single_source_claims(
     out: dict[str, list[str]] = {}
     for spec in specs:
         for s in written.get(spec.id, {}).get("sentences", []):
-            ids = s.get("source_ids", [])
-            source = reg.get(ids[0]) if len(ids) == 1 else None
-            if (
-                source is not None
-                and source.kind in ("search", "news_item")
-                and source.tier != 1
-                and source.role != "primary"
+            found = [r for i in s.get("source_ids", []) if (r := reg.get(i)) is not None]
+            # Two ids from one publisher are still one source.
+            publishers = {(host_of(r.url) if r.url else None) or r.id for r in found}
+            if len(publishers) == 1 and all(
+                r.kind in ("search", "news_item") and r.tier != 1 and r.role != "primary"
+                for r in found
             ):
                 out.setdefault(spec.id, []).append(s["text"])
     return {k: v[:MAX_CORROBORATE] for k, v in out.items()}

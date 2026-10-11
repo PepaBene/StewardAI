@@ -19,7 +19,7 @@ import httpx
 
 from steward.chat import analytics_tools, research_tools
 from steward.chat.analytics_tools import SELECTOR_KINDS
-from steward.chat.envelope import stamp
+from steward.chat.envelope import neutralise_tree, stamp
 from steward.chat.research_tools import EVIDENCE_SECTIONS, RISK_KINDS
 from steward.config.research import ResearchProfilesConfig
 from steward.config.store import load_active
@@ -658,7 +658,7 @@ class ChatTools:
                 "bytes": len(json.dumps(result, default=str)),
             }
         )
-        return stamp(result, name, dt.datetime.now(dt.UTC))
+        return stamp(neutralise_tree(result), name, dt.datetime.now(dt.UTC))
 
     async def _dispatch(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         handler = getattr(self, f"_tool_{name}", None)

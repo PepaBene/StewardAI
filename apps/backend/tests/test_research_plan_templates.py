@@ -361,6 +361,27 @@ def test_single_source_claims_pick_secondary_sources_only() -> None:
     assert single_source_claims(specs, written, reg) == {"business": ["from news", "from web"]}
 
 
+def test_two_pages_of_one_publisher_are_still_a_single_source() -> None:
+    reg = Registry()
+
+    def page(url: str) -> str:
+        return reg.add("search", url, "T", url=url, tier=2, role="quality_news")
+
+    a = page("https://www.reuters.com/a")
+    b = page("https://reuters.com/b")
+    other = page("https://ft.com/c")
+    specs = resolve_layout(profile(sections=["business"]), None)
+    written = {
+        "business": {
+            "sentences": [
+                {"text": "same publisher", "source_ids": [a, b]},
+                {"text": "two publishers", "source_ids": [a, other]},
+            ]
+        }
+    }
+    assert single_source_claims(specs, written, reg) == {"business": ["same publisher"]}
+
+
 # --- views and rendering ---------------------------------------------------------------------
 
 

@@ -36,6 +36,7 @@ from steward.llm.types import (
 )
 from steward.news.normalize import host_of
 from steward.research.sources import Registry, Source
+from steward.research.untrusted import flag_sources, strip_outbound
 from steward.settings import get_settings
 from steward.verify.claims import Claim, check_claims
 
@@ -372,6 +373,10 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
                 settings.source_tiers,
             )
             await mark_unsupported_figures(sentences, registry)
+            flag_sources(registry.sources)
+            allowed = {s.url for s in registry.sources if s.url}
+            for sentence in sentences:
+                sentence.text, _ = strip_outbound(sentence.text, allowed)
         answer = ChatAnswer(
             sentences=sentences,
             sources=registry.sources,
