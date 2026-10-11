@@ -5462,6 +5462,177 @@
         }
       }
     },
+    "/research/{report_id}/trace/purge": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Purge Research Trace",
+        "description": "Delete the working records of a research run: the URL list, web snippets, the resume\ncheckpoints and the tool trace. The report's sentences, sources and claim ledger stay.",
+        "operationId": "purge_research_trace",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TracePurged"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/research/{report_id}/claims/{claim_id}/review": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Review Claim",
+        "description": "The owner confirms or rejects one claim of the report's ledger. The sentence is not\nchanged; the review state is kept beside it.",
+        "operationId": "review_claim",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Report Id"
+            }
+          },
+          {
+            "name": "claim_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^c[0-9]{1,6}$",
+              "title": "Claim Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimReviewed"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/maintenance/purge-traces": {
+      "post": {
+        "tags": [
+          "research"
+        ],
+        "summary": "Purge Traces",
+        "description": "Delete the checkpoints and tool traces of succeeded jobs finished more than N days ago.",
+        "operationId": "purge_traces",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "older_than_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3650,
+              "minimum": 1,
+              "default": 30,
+              "title": "Older Than Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TracePurged"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/reviews": {
       "get": {
         "tags": [
@@ -32888,6 +33059,50 @@
         ],
         "title": "BacktestResponse"
       },
+      "Balance": {
+        "properties": {
+          "has_support": {
+            "type": "boolean",
+            "title": "Has Support"
+          },
+          "has_challenge": {
+            "type": "boolean",
+            "title": "Has Challenge"
+          },
+          "has_unknowns": {
+            "type": "boolean",
+            "title": "Has Unknowns"
+          },
+          "has_scenarios": {
+            "type": "boolean",
+            "title": "Has Scenarios"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing"
+          },
+          "not_requested": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not Requested"
+          }
+        },
+        "type": "object",
+        "required": [
+          "has_support",
+          "has_challenge",
+          "has_unknowns",
+          "has_scenarios",
+          "missing",
+          "not_requested"
+        ],
+        "title": "Balance"
+      },
       "BaseTotals": {
         "properties": {
           "base_currency": {
@@ -37001,159 +37216,6 @@
         ],
         "title": "CitedSentence"
       },
-      "Claim": {
-        "properties": {
-          "claim_id": {
-            "type": "string",
-            "title": "Claim Id",
-            "description": "Stable id built from the record's natural key (series, geography, period; never a row id, which changes when the same value is fetched again); cite it, never the number."
-          },
-          "domain": {
-            "type": "string",
-            "enum": [
-              "macro",
-              "trade",
-              "financial",
-              "forward",
-              "company_research",
-              "business_network",
-              "patents"
-            ],
-            "title": "Domain"
-          },
-          "subject": {
-            "type": "string",
-            "title": "Subject"
-          },
-          "metric": {
-            "type": "string",
-            "title": "Metric"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string",
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Value"
-          },
-          "text_value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Text Value"
-          },
-          "unit": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Unit"
-          },
-          "currency": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Currency"
-          },
-          "period": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Period"
-          },
-          "known_as_of": {
-            "type": "string",
-            "format": "date",
-            "title": "Known As Of",
-            "description": "Date the record became known to the app."
-          },
-          "source": {
-            "type": "string",
-            "title": "Source"
-          },
-          "provenance": {
-            "type": "string",
-            "enum": [
-              "primary",
-              "vendor",
-              "owner",
-              "community",
-              "unclassified"
-            ],
-            "title": "Provenance"
-          },
-          "source_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Url"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          }
-        },
-        "type": "object",
-        "required": [
-          "claim_id",
-          "domain",
-          "subject",
-          "metric",
-          "label",
-          "value",
-          "unit",
-          "period",
-          "known_as_of",
-          "source",
-          "provenance",
-          "source_url"
-        ],
-        "title": "Claim"
-      },
       "ClaimCheckSummary": {
         "properties": {
           "mode": {
@@ -37203,6 +37265,120 @@
         ],
         "title": "ClaimCheckSummary",
         "description": "What the claim verifier did to a report, stored with it."
+      },
+      "ClaimLedger": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Version",
+            "default": 1
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/steward__research__ledger__Claim"
+            },
+            "type": "array",
+            "title": "Claims"
+          },
+          "by_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Type"
+          },
+          "by_confidence": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Confidence"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/LedgerCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "strategy": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyCheck"
+            },
+            "type": "array",
+            "title": "Strategy"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Balance"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/steward__research__ledger__Coverage"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence",
+            "description": "The report as a whole, from its claims and checks."
+          },
+          "confidence_why": {
+            "type": "string",
+            "title": "Confidence Why"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claims",
+          "by_type",
+          "by_confidence",
+          "checks",
+          "strategy",
+          "balance",
+          "coverage",
+          "confidence",
+          "confidence_why"
+        ],
+        "title": "ClaimLedger"
+      },
+      "ClaimReview": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "owner_confirmed",
+              "owner_rejected",
+              "unreviewed"
+            ],
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "ClaimReview"
+      },
+      "ClaimReviewed": {
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "title": "Claim Id"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim_id",
+          "state"
+        ],
+        "title": "ClaimReviewed"
       },
       "ClaimRow": {
         "properties": {
@@ -49873,6 +50049,73 @@
           "context"
         ],
         "title": "EvidenceLink"
+      },
+      "EvidenceRef": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "retrieved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieved At"
+          },
+          "exists": {
+            "type": "boolean",
+            "title": "Exists",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "kind"
+        ],
+        "title": "EvidenceRef"
       },
       "EvidenceSpan": {
         "properties": {
@@ -67035,6 +67278,41 @@
           "fallback"
         ],
         "title": "LastAttempt"
+      },
+      "LedgerCheck": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "error",
+              "warning",
+              "info"
+            ],
+            "title": "Severity"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "claims": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Claims"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ],
+        "title": "LedgerCheck"
       },
       "LedgerEntryInput": {
         "properties": {
@@ -87064,6 +87342,42 @@
                 "type": "null"
               }
             ]
+          },
+          "ledger": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClaimLedger"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flagged_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flagged Sources",
+            "description": "Sources with instruction-like text, treated as data."
+          },
+          "links_removed": {
+            "type": "integer",
+            "title": "Links Removed",
+            "description": "Links or images in model text that were not report sources.",
+            "default": 0
+          },
+          "trace_purged_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Purged At",
+            "description": "When the owner deleted the run's working records."
           }
         },
         "type": "object",
@@ -87105,7 +87419,7 @@
           },
           "claims": {
             "items": {
-              "$ref": "#/components/schemas/Claim"
+              "$ref": "#/components/schemas/steward__data_context__research__Claim"
             },
             "type": "array",
             "title": "Claims"
@@ -98437,6 +98751,84 @@
         ],
         "title": "StoryResolution"
       },
+      "StrategyCheck": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "thesis_kpi",
+              "strategy_rule"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "The config version the rule comes from."
+          },
+          "rule": {
+            "type": "string",
+            "title": "Rule",
+            "description": "The condition as configured, e.g. 'gross_margin >= 10 %'."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "supports",
+              "challenges",
+              "mixed",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence"
+          },
+          "named_by": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Named By",
+            "description": "Claims in the report that name it."
+          },
+          "formal": {
+            "type": "boolean",
+            "title": "Formal",
+            "description": "True when the status comes from a stored check, not from the report's text."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "version",
+          "rule",
+          "status",
+          "formal"
+        ],
+        "title": "StrategyCheck",
+        "description": "One configured rule or thesis KPI, the condition it states, and where the report stands."
+      },
       "StrategyConfig": {
         "properties": {
           "schema_version": {
@@ -102500,6 +102892,32 @@
           "amount"
         ],
         "title": "TotalByCurrency"
+      },
+      "TracePurged": {
+        "properties": {
+          "urls": {
+            "type": "integer",
+            "title": "Urls",
+            "description": "Discovered-URL records removed from the report."
+          },
+          "checkpoints": {
+            "type": "integer",
+            "title": "Checkpoints",
+            "description": "Step checkpoints deleted (the job cannot resume)."
+          },
+          "traces": {
+            "type": "integer",
+            "title": "Traces",
+            "description": "Tool traces removed from step details."
+          }
+        },
+        "type": "object",
+        "required": [
+          "urls",
+          "checkpoints",
+          "traces"
+        ],
+        "title": "TracePurged"
       },
       "TrackedManager": {
         "properties": {
@@ -108447,6 +108865,159 @@
         ],
         "title": "CoverageEntry"
       },
+      "steward__data_context__research__Claim": {
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "title": "Claim Id",
+            "description": "Stable id built from the record's natural key (series, geography, period; never a row id, which changes when the same value is fetched again); cite it, never the number."
+          },
+          "domain": {
+            "type": "string",
+            "enum": [
+              "macro",
+              "trade",
+              "financial",
+              "forward",
+              "company_research",
+              "business_network",
+              "patents"
+            ],
+            "title": "Domain"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "text_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "known_as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "Known As Of",
+            "description": "Date the record became known to the app."
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "vendor",
+              "owner",
+              "community",
+              "unclassified"
+            ],
+            "title": "Provenance"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim_id",
+          "domain",
+          "subject",
+          "metric",
+          "label",
+          "value",
+          "unit",
+          "period",
+          "known_as_of",
+          "source",
+          "provenance",
+          "source_url"
+        ],
+        "title": "Claim"
+      },
       "steward__discovery__engine__Check": {
         "properties": {
           "metric": {
@@ -108738,6 +109309,195 @@
           "denominator"
         ],
         "title": "Check"
+      },
+      "steward__research__ledger__Claim": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "c1, c2, ... in report order."
+          },
+          "section_id": {
+            "type": "string",
+            "title": "Section Id"
+          },
+          "index": {
+            "type": "integer",
+            "title": "Index",
+            "description": "Position of the sentence in its section."
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "calculation",
+              "interpretation",
+              "strategy_assessment",
+              "forecast",
+              "unknown"
+            ],
+            "title": "Type"
+          },
+          "written_by": {
+            "type": "string",
+            "enum": [
+              "code",
+              "model"
+            ],
+            "title": "Written By"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceRef"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "check": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "supported",
+                  "unsupported",
+                  "unchecked"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence"
+          },
+          "why": {
+            "type": "string",
+            "title": "Why",
+            "description": "What the confidence label rests on."
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period",
+            "description": "The newest date among its sources."
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "default": false
+          },
+          "review": {
+            "type": "string",
+            "enum": [
+              "unreviewed",
+              "machine_checked",
+              "flagged",
+              "owner_confirmed",
+              "owner_rejected"
+            ],
+            "title": "Review",
+            "default": "unreviewed"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule",
+            "description": "For a strategy assessment: the rule or KPI it names."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "section_id",
+          "index",
+          "text",
+          "type",
+          "written_by",
+          "evidence",
+          "confidence",
+          "why"
+        ],
+        "title": "Claim"
+      },
+      "steward__research__ledger__Coverage": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          },
+          "data_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data From"
+          },
+          "data_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data To"
+          },
+          "stale_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stale Sources"
+          },
+          "undated_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Undated Sources"
+          },
+          "notices": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of"
+        ],
+        "title": "Coverage"
       }
     },
     "securitySchemes": {

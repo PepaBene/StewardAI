@@ -1926,6 +1926,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/research/{report_id}/trace/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Purge Research Trace
+         * @description Delete the working records of a research run: the URL list, web snippets, the resume
+         *     checkpoints and the tool trace. The report's sentences, sources and claim ledger stay.
+         */
+        post: operations["purge_research_trace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/research/{report_id}/claims/{claim_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Claim
+         * @description The owner confirms or rejects one claim of the report's ledger. The sentence is not
+         *     changed; the review state is kept beside it.
+         */
+        post: operations["review_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/maintenance/purge-traces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Purge Traces
+         * @description Delete the checkpoints and tool traces of succeeded jobs finished more than N days ago.
+         */
+        post: operations["purge_traces"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reviews": {
         parameters: {
             query?: never;
@@ -10551,6 +10613,21 @@ export interface components {
             /** Caveats */
             caveats: string[];
         };
+        /** Balance */
+        Balance: {
+            /** Has Support */
+            has_support: boolean;
+            /** Has Challenge */
+            has_challenge: boolean;
+            /** Has Unknowns */
+            has_unknowns: boolean;
+            /** Has Scenarios */
+            has_scenarios: boolean;
+            /** Missing */
+            missing: string[];
+            /** Not Requested */
+            not_requested: string[];
+        };
         /** BaseTotals */
         BaseTotals: {
             /** Base Currency */
@@ -11994,52 +12071,6 @@ export interface components {
             /** Check Reason */
             check_reason?: string | null;
         };
-        /** Claim */
-        Claim: {
-            /**
-             * Claim Id
-             * @description Stable id built from the record's natural key (series, geography, period; never a row id, which changes when the same value is fetched again); cite it, never the number.
-             */
-            claim_id: string;
-            /**
-             * Domain
-             * @enum {string}
-             */
-            domain: "macro" | "trade" | "financial" | "forward" | "company_research" | "business_network" | "patents";
-            /** Subject */
-            subject: string;
-            /** Metric */
-            metric: string;
-            /** Label */
-            label: string;
-            /** Value */
-            value: number | string | null;
-            /** Text Value */
-            text_value?: string | null;
-            /** Unit */
-            unit: string | null;
-            /** Currency */
-            currency?: string | null;
-            /** Period */
-            period: string | null;
-            /**
-             * Known As Of
-             * Format: date
-             * @description Date the record became known to the app.
-             */
-            known_as_of: string;
-            /** Source */
-            source: string;
-            /**
-             * Provenance
-             * @enum {string}
-             */
-            provenance: "primary" | "vendor" | "owner" | "community" | "unclassified";
-            /** Source Url */
-            source_url: string | null;
-            /** Note */
-            note?: string | null;
-        };
         /**
          * ClaimCheckSummary
          * @description What the claim verifier did to a report, stored with it.
@@ -12073,6 +12104,54 @@ export interface components {
             removed: number;
             /** Note */
             note?: string | null;
+        };
+        /** ClaimLedger */
+        ClaimLedger: {
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+            /** Claims */
+            claims: components["schemas"]["steward__research__ledger__Claim"][];
+            /** By Type */
+            by_type: {
+                [key: string]: number;
+            };
+            /** By Confidence */
+            by_confidence: {
+                [key: string]: number;
+            };
+            /** Checks */
+            checks: components["schemas"]["LedgerCheck"][];
+            /** Strategy */
+            strategy: components["schemas"]["StrategyCheck"][];
+            balance: components["schemas"]["Balance"];
+            coverage: components["schemas"]["steward__research__ledger__Coverage"];
+            /**
+             * Confidence
+             * @description The report as a whole, from its claims and checks.
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /** Confidence Why */
+            confidence_why: string;
+        };
+        /** ClaimReview */
+        ClaimReview: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "owner_confirmed" | "owner_rejected" | "unreviewed";
+        };
+        /** ClaimReviewed */
+        ClaimReviewed: {
+            /** Claim Id */
+            claim_id: string;
+            /** State */
+            state: string;
         };
         /** ClaimRow */
         ClaimRow: {
@@ -16449,6 +16528,26 @@ export interface components {
              * @description The archived text around the snippet.
              */
             context: string | null;
+        };
+        /** EvidenceRef */
+        EvidenceRef: {
+            /** Source Id */
+            source_id: string;
+            /** Kind */
+            kind: string;
+            /** Role */
+            role?: string | null;
+            /** Tier */
+            tier?: number | null;
+            /** As Of */
+            as_of?: string | null;
+            /** Retrieved At */
+            retrieved_at?: string | null;
+            /**
+             * Exists
+             * @default true
+             */
+            exists: boolean;
         };
         /** EvidenceSpan */
         EvidenceSpan: {
@@ -22379,6 +22478,20 @@ export interface components {
             error: string | null;
             /** Fallback */
             fallback: string | null;
+        };
+        /** LedgerCheck */
+        LedgerCheck: {
+            /** Code */
+            code: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "error" | "warning" | "info";
+            /** Message */
+            message: string;
+            /** Claims */
+            claims?: string[];
         };
         /** LedgerEntryInput */
         LedgerEntryInput: {
@@ -29576,6 +29689,23 @@ export interface components {
             snapshot?: components["schemas"]["RunSnapshot"] | null;
             thesis_proposal?: components["schemas"]["ThesisProposal"] | null;
             thesis_review?: components["schemas"]["ThesisReview"] | null;
+            ledger?: components["schemas"]["ClaimLedger"] | null;
+            /**
+             * Flagged Sources
+             * @description Sources with instruction-like text, treated as data.
+             */
+            flagged_sources?: string[];
+            /**
+             * Links Removed
+             * @description Links or images in model text that were not report sources.
+             * @default 0
+             */
+            links_removed: number;
+            /**
+             * Trace Purged At
+             * @description When the owner deleted the run's working records.
+             */
+            trace_purged_at?: string | null;
         };
         /** ResearchContext */
         ResearchContext: {
@@ -29592,7 +29722,7 @@ export interface components {
              */
             as_of: string;
             /** Claims */
-            claims: components["schemas"]["Claim"][];
+            claims: components["schemas"]["steward__data_context__research__Claim"][];
             /** Gaps */
             gaps: components["schemas"]["ContextGap"][];
             /**
@@ -33718,6 +33848,46 @@ export interface components {
             note?: string | null;
         };
         /**
+         * StrategyCheck
+         * @description One configured rule or thesis KPI, the condition it states, and where the report stands.
+         */
+        StrategyCheck: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "thesis_kpi" | "strategy_rule";
+            /** Id */
+            id: string;
+            /**
+             * Version
+             * @description The config version the rule comes from.
+             */
+            version: number | null;
+            /**
+             * Rule
+             * @description The condition as configured, e.g. 'gross_margin >= 10 %'.
+             */
+            rule: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "supports" | "challenges" | "mixed" | "unknown";
+            /** Evidence */
+            evidence?: string | null;
+            /**
+             * Named By
+             * @description Claims in the report that name it.
+             */
+            named_by?: string[];
+            /**
+             * Formal
+             * @description True when the status comes from a stored check, not from the report's text.
+             */
+            formal: boolean;
+        };
+        /**
          * StrategyConfig
          * @description The owner's investment strategy.
          *
@@ -35266,6 +35436,24 @@ export interface components {
              * @description Sum of `amount` over the filtered rows.
              */
             amount: number;
+        };
+        /** TracePurged */
+        TracePurged: {
+            /**
+             * Urls
+             * @description Discovered-URL records removed from the report.
+             */
+            urls: number;
+            /**
+             * Checkpoints
+             * @description Step checkpoints deleted (the job cannot resume).
+             */
+            checkpoints: number;
+            /**
+             * Traces
+             * @description Tool traces removed from step details.
+             */
+            traces: number;
         };
         /** TrackedManager */
         TrackedManager: {
@@ -37277,6 +37465,52 @@ export interface components {
             /** Reason */
             reason: string | null;
         };
+        /** Claim */
+        steward__data_context__research__Claim: {
+            /**
+             * Claim Id
+             * @description Stable id built from the record's natural key (series, geography, period; never a row id, which changes when the same value is fetched again); cite it, never the number.
+             */
+            claim_id: string;
+            /**
+             * Domain
+             * @enum {string}
+             */
+            domain: "macro" | "trade" | "financial" | "forward" | "company_research" | "business_network" | "patents";
+            /** Subject */
+            subject: string;
+            /** Metric */
+            metric: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: number | string | null;
+            /** Text Value */
+            text_value?: string | null;
+            /** Unit */
+            unit: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Period */
+            period: string | null;
+            /**
+             * Known As Of
+             * Format: date
+             * @description Date the record became known to the app.
+             */
+            known_as_of: string;
+            /** Source */
+            source: string;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "primary" | "vendor" | "owner" | "community" | "unclassified";
+            /** Source Url */
+            source_url: string | null;
+            /** Note */
+            note?: string | null;
+        };
         /** Check */
         steward__discovery__engine__Check: {
             /** Metric */
@@ -37375,6 +37609,83 @@ export interface components {
             issues: number;
             /** Note */
             note?: string | null;
+        };
+        /** Claim */
+        steward__research__ledger__Claim: {
+            /**
+             * Id
+             * @description c1, c2, ... in report order.
+             */
+            id: string;
+            /** Section Id */
+            section_id: string;
+            /**
+             * Index
+             * @description Position of the sentence in its section.
+             */
+            index: number;
+            /** Text */
+            text: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "fact" | "calculation" | "interpretation" | "strategy_assessment" | "forecast" | "unknown";
+            /**
+             * Written By
+             * @enum {string}
+             */
+            written_by: "code" | "model";
+            /** Evidence */
+            evidence: components["schemas"]["EvidenceRef"][];
+            /** Check */
+            check?: ("supported" | "unsupported" | "unchecked") | null;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /**
+             * Why
+             * @description What the confidence label rests on.
+             */
+            why: string;
+            /**
+             * Period
+             * @description The newest date among its sources.
+             */
+            period?: string | null;
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+            /**
+             * Review
+             * @default unreviewed
+             * @enum {string}
+             */
+            review: "unreviewed" | "machine_checked" | "flagged" | "owner_confirmed" | "owner_rejected";
+            /**
+             * Rule
+             * @description For a strategy assessment: the rule or KPI it names.
+             */
+            rule?: string | null;
+        };
+        /** Coverage */
+        steward__research__ledger__Coverage: {
+            /** As Of */
+            as_of: string;
+            /** Data From */
+            data_from?: string | null;
+            /** Data To */
+            data_to?: string | null;
+            /** Stale Sources */
+            stale_sources?: string[];
+            /** Undated Sources */
+            undated_sources?: string[];
+            /** Notices */
+            notices?: string[];
         };
     };
     responses: never;
@@ -40307,6 +40618,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ThesisProposalApplied"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_research_trace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TracePurged"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_claim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: number;
+                claim_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimReview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimReviewed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_traces: {
+        parameters: {
+            query?: {
+                older_than_days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TracePurged"];
                 };
             };
             /** @description Validation Error */

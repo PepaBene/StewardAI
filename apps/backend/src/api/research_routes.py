@@ -15,6 +15,7 @@ from api.routes import BaseVersionParam, NoteParam, _as_dict, _enqueue, _not_fou
 from steward.config import ResearchProfilesConfig, ThesesConfig
 from steward.config.store import load_active
 from steward.portfolio.read import JobSummary
+from steward.research.retention import purge_old_traces, purge_report_trace, set_claim_review
 from steward.research.run import ResearchBody, render_md
 from steward.research.views import apply_view
 from steward.review.monthly import ReviewBody
@@ -192,6 +193,64 @@ class ReviewReportOut(BaseModel):
     job_id: int | None
     body: ReviewBody
     body_md: str
+
+
+class TracePurged(BaseModel):
+    urls: int = Field(description="Discovered-URL records removed from the report.")
+    checkpoints: int = Field(description="Step checkpoints deleted (the job cannot resume).")
+    traces: int = Field(description="Tool traces removed from step details.")
+
+
+class ClaimReview(BaseModel):
+    state: Literal["owner_confirmed", "owner_rejected", "unreviewed"]
+
+
+class ClaimReviewed(BaseModel):
+    claim_id: str
+    state: str
+
+
+@router.post("/research/{report_id}/trace/purge", tags=["research"])
+async def purge_research_trace(report_id: IdPath, pool: Pool, _owner: Owner) -> TracePurged:
+    """Delete the working records of a research run: the URL list, web snippets, the resume
+    checkpoints and the tool trace. The report's sentences, sources and claim ledger stay."""
+    try:
+        counts = await purge_report_trace(pool, report_id, dt.datetime.now(dt.UTC))
+    except LookupError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No research report {report_id}") from None
+    return TracePurged(**counts)
+
+
+@router.post("/research/{report_id}/claims/{claim_id}/review", tags=["research"])
+async def review_claim(
+    report_id: IdPath,
+    claim_id: Annotated[str, Path(pattern=r"^c[0-9]{1,6}$")],
+    body: ClaimReview,
+    pool: Pool,
+    _owner: Owner,
+) -> ClaimReviewed:
+    """The owner confirms or rejects one claim of the report's ledger. The sentence is not
+    changed; the review state is kept beside it."""
+    row = await _research_row(pool, report_id)
+    try:
+        updated = set_claim_review(json.loads(row["body"]), claim_id, body.state)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from None
+    await pool.execute(
+        "update public.report set body = $2::jsonb where id = $1", report_id, json.dumps(updated)
+    )
+    return ClaimReviewed(claim_id=claim_id, state=body.state)
+
+
+@router.post("/maintenance/purge-traces", tags=["research"])
+async def purge_traces(
+    pool: Pool,
+    _owner: Owner,
+    older_than_days: Annotated[int, Query(ge=1, le=3650)] = 30,
+) -> TracePurged:
+    """Delete the checkpoints and tool traces of succeeded jobs finished more than N days ago."""
+    counts = await purge_old_traces(pool, older_than_days, dt.datetime.now(dt.UTC))
+    return TracePurged(urls=0, **counts)
 
 
 @router.get("/reviews", tags=["research"])

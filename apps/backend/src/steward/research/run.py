@@ -40,10 +40,12 @@ from steward.llm.routing import routing_client
 from steward.news.normalize import host_of
 from steward.research.gather import Gathered, Valuation, gather
 from steward.research.layout import SectionSpec, investigation_profile, resolve_layout
+from steward.research.ledger import ClaimLedger, SectionInput, build_ledger
 from steward.research.plan import ResearchPlan, build_plan, effective_searches, focus_for
 from steward.research.snapshot import RunSnapshot, take_snapshot
 from steward.research.source_policy import PRIORITY_TEXT, SourcePolicy
 from steward.research.sources import CitedSentence, Registry, Source
+from steward.research.untrusted import flag_sources, neutralise, strip_outbound
 from steward.research.views import View, apply_view
 from steward.research.web import DiscoveredUrl, SearchHit, discovered, merge_discovered
 from steward.research.writer import SYSTEM as WRITER_SYSTEM
@@ -138,6 +140,17 @@ class ResearchBody(BaseModel):
     snapshot: RunSnapshot | None = None
     thesis_proposal: ThesisProposal | None = None
     thesis_review: ThesisReview | None = None
+    # Phase 4: every sentence as a typed, checked claim; Phase 5: what untrusted text did.
+    ledger: ClaimLedger | None = None
+    flagged_sources: list[str] = Field(
+        default_factory=list, description="Sources with instruction-like text, treated as data."
+    )
+    links_removed: int = Field(
+        default=0, description="Links or images in model text that were not report sources."
+    )
+    trace_purged_at: str | None = Field(
+        default=None, description="When the owner deleted the run's working records."
+    )
 
 
 @dataclass
@@ -150,10 +163,10 @@ class ResearchDeps:
 
 
 def _source_line(s: Source) -> str:
-    text = (s.snippet or "")[:600]
+    text = neutralise(s.snippet)[:600]
     label = f"tier {s.tier or '?'}" if s.role is None else f"{s.role}, tier {s.tier or '?'}"
     caveat = f" [{s.caveat}]" if s.caveat else ""
-    return f"[{s.id}] ({s.kind}, {label}, {s.as_of or ''}) {s.title}: {text}{caveat}"
+    return f"[{s.id}] ({s.kind}, {label}, {s.as_of or ''}) {neutralise(s.title)}: {text}{caveat}"
 
 
 def material_text(g: Gathered, reg: Registry) -> str:
@@ -279,6 +292,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
 
     gathered = Gathered.model_validate(await ctx.checkpoint("gather", do_gather))
     reg = Registry.load(gathered.sources)
+    flagged = flag_sources(reg.sources)
     plan = build_plan(profile, layout, ticker=ticker, name=gathered.name, today=deps.now.date())
     async with ctx.step("plan") as step:
         step.detail.update(
@@ -403,15 +417,18 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                         retrieved_at=deps.now.isoformat(timespec="seconds"),
                     )
                     if len(reg.sources) > before:
+                        flag_sources(reg.sources[before:])
                         out["new_sources"].append(reg.sources[-1].model_dump())
                     cited_urls.add(url)
                     ids.append(sid)
-                if not d.text.strip() or not ids:
+                text, removed = strip_outbound(d.text, {s.url for s in reg.sources if s.url})
+                out["links_removed"] = int(out.get("links_removed", 0)) + removed
+                if not text or not ids:
                     dropped += 1
                     continue
                 out["sentences"].append(
                     CitedSentence(
-                        text=d.text.strip(),
+                        text=text,
                         source_ids=list(dict.fromkeys(ids)),
                         written_by="model",
                     ).model_dump()
@@ -544,6 +561,9 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                 base["sentences"] = [*base["sentences"], *got["sentences"]]
                 base["discovered"] = [*base.get("discovered", []), *got.get("discovered", [])]
                 base["dropped"] = int(base.get("dropped", 0)) + int(got.get("dropped", 0))
+                base["links_removed"] = int(base.get("links_removed", 0)) + int(
+                    got.get("links_removed", 0)
+                )
                 base["search_errors"] = [
                     *base.get("search_errors", []),
                     *got.get("search_errors", []),
@@ -667,10 +687,45 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             theses_v.id if theses_v else None,
             {s.id: s.sentences for s in sections if s.written_by == "model"},
         )
-        review = (
+        kpi_review = (
             await review_thesis(pool, ticker, thesis, theses_v.id if theses_v else None)
-            if profile.authoring == "review_thesis"
+            if thesis is not None
             else None
+        )
+        review = kpi_review if profile.authoring == "review_thesis" else None
+        flagged = sorted(
+            {*flagged, *(s.id for s in reg.sources if s.caveat and "instruction-like" in s.caveat)}
+        )
+        links_removed = sum(int(w.get("links_removed", 0)) for w in written.values())
+        if flagged:
+            notes.append(
+                f"{len(flagged)} source(s) contained instruction-like text; it was treated as "
+                "data and their claims are marked low confidence."
+            )
+        ledger = build_ledger(
+            [
+                SectionInput(
+                    id=s.id,
+                    written_by="model" if s.written_by == "model" else "code",
+                    sentences=s.sentences,
+                    note=s.note,
+                )
+                for s in sections
+            ],
+            reg,
+            gathered.valuation,
+            deps.now,
+            kpis=[
+                (k.kpi_id, k.rule, k.status, k.rationale)
+                for k in (kpi_review.kpis if kpi_review else [])
+            ],
+            rules=[
+                (r.id, f"{r.type} {r.operator} {getattr(r, 'value', '')}".strip())
+                for r in (strategy.enabled_rules if strategy else [])
+            ],
+            kpi_version=theses_v.id if theses_v else None,
+            strategy_version=strategy_v.id if strategy_v else None,
+            notes=[n for n in notes if "Sections written" not in n],
         )
         body = ResearchBody(
             ticker=ticker,
@@ -705,6 +760,9 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             snapshot=snapshot,
             thesis_proposal=proposal,
             thesis_review=review,
+            ledger=ledger,
+            flagged_sources=flagged,
+            links_removed=links_removed,
         )
         report_id: int = await pool.fetchval(
             "insert into public.report (type, ticker, title, body, body_md, profile,"
@@ -735,11 +793,26 @@ def render_md(body: ResearchBody, view: View | None = None) -> str:
     `body_md` is the detailed one, so a template's `default_view` only steers readers."""
     shown = apply_view(body, view or "detailed") if (view or "detailed") != "detailed" else body
     lines = [f"# {shown.name} ({shown.ticker})", "", shown.headline, ""]
+    ledger = shown.ledger
+    if ledger:
+        span_cov = ledger.coverage
+        span = (
+            f", data from {span_cov.data_from} to {span_cov.data_to}" if span_cov.data_from else ""
+        )
+        lines += [
+            f"_As of {span_cov.as_of[:10]}{span}. Evidence confidence: {ledger.confidence} "
+            f"({ledger.confidence_why})._",
+            *[f"_{n}_" for n in span_cov.notices],
+            "",
+        ]
+    by_position = {(c.section_id, c.index): c for c in ledger.claims} if ledger else {}
     for section in shown.sections:
         lines += [f"## {section.title}", ""]
-        for s in section.sentences:
+        for i, s in enumerate(section.sentences):
             mark = " [not supported by its sources]" if s.check == "unsupported" else ""
-            lines.append(f"{s.text} [{', '.join(s.source_ids)}]{mark}")
+            claim = by_position.get((section.id, i))
+            tag = f" ({claim.type.replace('_', ' ')}, {claim.confidence})" if claim else ""
+            lines.append(f"{s.text} [{', '.join(s.source_ids)}]{tag}{mark}")
         if section.note:
             lines.append(f"_{section.note}_")
         lines.append("")

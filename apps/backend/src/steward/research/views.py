@@ -26,11 +26,13 @@ def apply_view(body: "ResearchBody", view: View) -> "ResearchBody":
         cap = CONCISE_MODEL_SENTENCES if section.written_by == "model" else CONCISE_CODE_SENTENCES
         sections.append(section.model_copy(update={"sentences": section.sentences[:cap]}))
     cited = {i for s in sections for sentence in s.sentences for i in sentence.source_ids}
+    kept = {(s.id, i) for s in sections for i in range(len(s.sentences))}
     return body.model_copy(
         update={
             "view": "concise",
             "sections": sections,
             "sources": [s for s in body.sources if s.id in cited],
             "discovered_urls": [],
+            "ledger": body.ledger.restricted(kept) if body.ledger else None,
         }
     )

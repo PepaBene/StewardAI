@@ -87,6 +87,11 @@ const BODY: ResearchBody = {
   searches_used: 2,
   dropped_sentences: 1,
   notes: [],
+  mode: "standard",
+  view: "detailed",
+  default_view: "detailed",
+  authoring: "research_only",
+  links_removed: 0,
 };
 
 describe("research report: citations and source cards", () => {
