@@ -167,6 +167,18 @@ Phases 4 and 5 are built in the backend for the research job. The chat answer pa
 
 No screen shows the ledger, claim types, confidence labels, the as-of and coverage notice, strategy checks, the balance result, flagged sources, the review buttons or the purge control. The API types were regenerated.
 
+**Verification and process**
+
+1. The full backend suite has still not been run (the earlier attempt was killed for low memory). Run on their own and passing: the new ledger, security and gate unit tests, the new Phase 4–5 DB tests, the Phase 2–3 DB and plan tests, and the research resume test. No other older test that touches research reports or routes was re-run after `ResearchBody` gained fields and `research_routes.py` gained routes.
+2. No test file for the OpenAPI export was found, so the regenerated `openapi.json` and `schema.d.ts` are checked only by `tsc` and by the routes importing cleanly.
+3. The web suite passes except `scripts/check-colors.test.ts`, which timed out at 5 seconds scanning `src/`. It was not re-run with a longer limit, so whether it is flaky or slow on this machine is not known.
+4. `evals/research_gate.json` is a fingerprint of prompts, tasks, tools, default templates and the ledger, untrusted-text and source-policy code. Any edit to those files fails `test_research_gate.py` until `python -m steward.research.gate --write-baseline` is run. This is intended, but it is not yet wired into CI beside `evals_gate`.
+5. The live eval baseline (`evals/baseline.json`) was not re-run: no provider key here.
+6. The new DB tests take several minutes (about 3 minutes for the Phase 4–5 file) because every DB test migrates a fresh database; they must still run one process at a time.
+7. Fake sentences in tests must keep avoiding digits (the code-side claim check), and ledger tests that use digits need the number in the source snippet.
+8. Four mypy errors in `tests/test_phase1b.py` and `tests/test_phase5.py` predate this work and remain.
+9. A recursive search over `src` was killed for low memory during this work; later searches were scoped to single packages.
+
 ## Research findings
 
 ### What a useful research agent does
