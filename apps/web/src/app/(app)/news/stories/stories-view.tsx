@@ -182,15 +182,15 @@ function Study({ rows }: { rows: StudyRow[] }) {
         that type, with the middle half of cases and the number of stories. It describes what happened; it does not predict
         what will.
       </p>
-      <table className="num w-full max-w-2xl text-sm">
+      <table aria-label="Typical move by event type, region and outlet tier" className="num w-full max-w-2xl text-sm">
         <thead className="text-left text-xs text-text-muted">
           <tr>
-            <th className="py-1 font-normal">Event</th>
-            <th className="font-normal">Region</th>
-            <th className="font-normal">Best outlet tier</th>
-            <th className="font-normal">Stories</th>
-            <th className="font-normal">Median</th>
-            <th className="font-normal">Middle half</th>
+            <th scope="col" className="py-1 font-normal">Event</th>
+            <th scope="col" className="font-normal">Region</th>
+            <th scope="col" className="font-normal">Best outlet tier</th>
+            <th scope="col" className="font-normal">Stories</th>
+            <th scope="col" className="font-normal">Median</th>
+            <th scope="col" className="font-normal">Middle half</th>
           </tr>
         </thead>
         <tbody>

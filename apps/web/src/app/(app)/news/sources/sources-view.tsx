@@ -76,17 +76,17 @@ export function SourcesView() {
             <caption className="sr-only">News sources and their health</caption>
             <thead className="text-xs text-text-muted">
               <tr className="border-b border-border">
-                <th className="py-2 pr-3 font-normal">Source</th>
-                <th className="pr-3 font-normal">Tier</th>
-                <th className="pr-3 font-normal">State</th>
-                <th className="pr-3 font-normal">Region</th>
-                <th className="pr-3 font-normal">Last success</th>
-                <th className="num pr-3 font-normal">Items a day</th>
-                <th className="num pr-3 font-normal">Kept for holdings</th>
-                <th className="pr-3 font-normal">Article text, last week</th>
-                <th className="pr-3 font-normal">Seen after publication</th>
-                <th className="num pr-3 font-normal">Answer time</th>
-                <th className="font-normal">Last error</th>
+                <th scope="col" className="py-2 pr-3 font-normal">Source</th>
+                <th scope="col" className="pr-3 font-normal">Tier</th>
+                <th scope="col" className="pr-3 font-normal">State</th>
+                <th scope="col" className="pr-3 font-normal">Region</th>
+                <th scope="col" className="pr-3 font-normal">Last success</th>
+                <th scope="col" className="num pr-3 font-normal">Items a day</th>
+                <th scope="col" className="num pr-3 font-normal">Kept for holdings</th>
+                <th scope="col" className="pr-3 font-normal">Article text, last week</th>
+                <th scope="col" className="pr-3 font-normal">Seen after publication</th>
+                <th scope="col" className="num pr-3 font-normal">Answer time</th>
+                <th scope="col" className="font-normal">Last error</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">

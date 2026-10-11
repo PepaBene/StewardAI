@@ -2,6 +2,14 @@
 -- Run it in a transaction, newest migration first. The migration file itself is never edited.
 -- Sources of the type fca_nsm must be deleted first, or the restored constraint fails loudly.
 -- Proven by apps/backend/tests/test_lifecycle_phase8.py (needs STEWARD_TEST_DATABASE_URL).
+-- PRECONDITION: no source may use the type fca_nsm, which the restored CHECK constraint
+-- (source_type_check) forbids; the rollback stops with a clear error before changing anything.
+do $$ begin
+  if exists (select 1 from public.source where type = 'fca_nsm') then
+    raise exception 'rollback precondition failed: public.source holds rows of type fca_nsm; delete them first (delete from public.source where type = ''fca_nsm'')';
+  end if;
+end $$;
+
 alter table public.source drop constraint if exists source_type_check;
 alter table public.source add constraint source_type_check
   check (type in ('rss','page','edgar','finnhub','google_news','alpha_vantage','reference',

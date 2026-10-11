@@ -383,13 +383,13 @@ function AnalysisPanels({ analysis, items }: { analysis: StoryAnalysis; items: S
           title="What the market did"
           note="A description of the past, measured from the last close before the story. Not a prediction."
         >
-          <table className="num w-full max-w-md text-sm">
+          <table aria-label="Price move after publication" className="num w-full max-w-md text-sm">
             <thead className="text-left text-xs text-text-muted">
               <tr>
-                <th className="py-1 font-normal">After</th>
-                <th className="py-1 font-normal">Holding</th>
-                <th className="py-1 font-normal">{market.benchmark ?? "Benchmark"}</th>
-                <th className="py-1 font-normal">Difference</th>
+                <th scope="col" className="py-1 font-normal">After</th>
+                <th scope="col" className="py-1 font-normal">Holding</th>
+                <th scope="col" className="py-1 font-normal">{market.benchmark ?? "Benchmark"}</th>
+                <th scope="col" className="py-1 font-normal">Difference</th>
               </tr>
             </thead>
             <tbody>

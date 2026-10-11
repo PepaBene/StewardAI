@@ -108,9 +108,9 @@ function Report({ report, marks }: { report: OpsReport; marks: Candidate[] | nul
             <caption className="sr-only">News job spend</caption>
             <thead className="text-xs text-text-muted">
               <tr className="border-b border-border">
-                <th className="py-2 pr-3 font-normal">Job</th>
-                <th className="num pr-3 font-normal">Runs</th>
-                <th className="num font-normal">Spend</th>
+                <th scope="col" className="py-2 pr-3 font-normal">Job</th>
+                <th scope="col" className="num pr-3 font-normal">Runs</th>
+                <th scope="col" className="num font-normal">Spend</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
