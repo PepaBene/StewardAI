@@ -68,7 +68,7 @@ describe("verification form", () => {
       wrongPenalty: "1.5",
       usefulReward: "",
       demoteBelow: "x",
-      claimModel: "gpt-5",
+      claimModel: "llama-4",
     };
     expect(validateVerificationForm(form)).toEqual({
       sanity_max_change_qoq: ["Must be more than 0."],

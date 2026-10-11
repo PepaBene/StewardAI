@@ -82,7 +82,7 @@ Status: `open`, `fixed`, `rejected` (false positive), `deferred` (reason given).
 | # | Where | Issue | Status |
 |---|---|---|---|
 | T1 | `test_news_n6_db.py:175-227` | Fake LLM returns empty framing/claims/notes; only extraction, novelty, thread rows asserted. No coverage of impact, framing, claims, thesis, market, themes saves. | deferred: needs a multi-outlet story fixture; golden sets cover the verification code |
-| T2 | tests | No coverage of `resolve_quiet_stories`, `alert_brief`, `fetch_gdelt`, `write_theme_briefs`, `extract_batched`, sentiment job path. | partly fixed: tests added for alert_brief, fetch_gdelt, event_day_of, centroid, framing numbers, like_pattern, resolve_quiet_stories; still none for write_theme_briefs, extract_batched, sentiment job path |
+| T2 | tests | No coverage of `resolve_quiet_stories`, `alert_brief`, `fetch_gdelt`, `write_theme_briefs`, `extract_batched`, sentiment job path. | fixed: tests added for alert_brief, fetch_gdelt, event_day_of, centroid, framing numbers, like_pattern, resolve_quiet_stories, theme narratives, sentiment job path, batched extraction |
 | T3 | `test_news_n3_db.py:157` | Lead is wire-only so zero alerts is trivial. | fixed |
 | T4 | `test_news_wire_db.py:136` | `health == "down" or backoff_until <= now` likely always true. | fixed |
 | T5 | `test_news_n5_db.py:153` | Sets `indirect_only` by hand; link-derived path untested. | fixed |
@@ -111,7 +111,7 @@ Live-model runs, keys (DART, EDINET), browser verification, human label review, 
 ## Resolution (2026-10-10)
 
 Fixes by three worker passes (ingestion, analysis/budget/chat/api, web) and a plan-doc edit.
-Checks run: backend news, jobs, chat, budget DB tests against the local Postgres container (77 passed for the targeted set; one stale mock in `test_news_n3_db.py` was fixed: `create_llm` takes one argument); `python -m steward.news.eval_analysis` 73/73; web `npm run typecheck`, eslint on the news, sources and config folders, vitest on `src/lib/news`, `config`, `sources` (186 passed, 2 failed in `research-profiles-form.test.ts` and `verification-form.test.ts`, files this work did not touch).
+Checks run: backend news, jobs, chat, budget DB tests against the local Postgres container (77 passed for the targeted set; one stale mock in `test_news_n3_db.py` was fixed: `create_llm` takes one argument); `python -m steward.news.eval_analysis` 73/73; web `npm run typecheck`, eslint on the news, sources and config folders, vitest on `src/lib/news`, `config`, `sources` (the two pre-existing failures in `research-profiles-form.test.ts` and `verification-form.test.ts` were stale "gpt-5" fixtures and are fixed; the 5 `test_llm*.py` failures were stale after the Claude removal and are fixed too).
 R1: the agent also moved the `ai_search` check first in `item_tier` as a defensive change; the original path was unreachable for ai_search leads, so the finding stays rejected as a live bug.
 `news_triage` default monthly cap is 1.0 USD (a choice made in the fix; change in `config/budget.py`).
 No commit was made.

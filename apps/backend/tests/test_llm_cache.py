@@ -54,7 +54,7 @@ async def test_a_repeated_request_is_answered_from_the_cache() -> None:
     pool = FakePool()
     cache = ResultCache(pool, "ai_approvals")  # type: ignore[arg-type]
     fake = FakeLLM()
-    client = RoutingClient(None, fake, cache)  # type: ignore[arg-type]
+    client = RoutingClient(fake, cache)  # type: ignore[arg-type]
     args: dict[str, Any] = {
         "model": "gpt-6-luna",
         "system": "s",
@@ -73,7 +73,7 @@ async def test_a_repeated_request_is_answered_from_the_cache() -> None:
 async def test_a_call_with_tools_or_without_a_schema_is_never_cached() -> None:
     pool = FakePool()
     fake = FakeLLM()
-    client = RoutingClient(None, fake, ResultCache(pool, "x"))  # type: ignore[arg-type]
+    client = RoutingClient(fake, ResultCache(pool, "x"))  # type: ignore[arg-type]
     args: dict[str, Any] = {"model": "gpt-6-luna", "system": "s", "messages": []}
     await client.messages.parse(**args, tools=[{"type": "web_search_20260209"}], output_format=Out)
     await client.messages.parse(**args)
@@ -93,13 +93,13 @@ async def test_a_search_answer_is_cached_only_when_it_has_sources() -> None:
     pool = FakePool()
     unsourced = FakeLLM()  # answered from memory: no sources
     cache = ResultCache(pool, "x", search_ttl_days=3)  # type: ignore[arg-type]
-    client = RoutingClient(None, unsourced, cache)  # type: ignore[arg-type]
+    client = RoutingClient(unsourced, cache)  # type: ignore[arg-type]
     await client.messages.parse(**args)
     await client.messages.parse(**args)
     assert unsourced.calls == 2 and not pool.rows
 
     sourced = FakeLLM([Citation("https://ir.example.com/", "IR")])
-    client = RoutingClient(None, sourced, cache)  # type: ignore[arg-type]
+    client = RoutingClient(sourced, cache)  # type: ignore[arg-type]
     await client.messages.parse(**args)
     await client.messages.parse(**args)
     assert sourced.calls == 1 and len(pool.rows) == 1

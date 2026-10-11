@@ -34,6 +34,7 @@ from steward.news.read_analysis import (
     thread_detail,
     wire,
 )
+from steward.news.sentiment import RawSentiment
 from steward.news.thesis_link import ThesisLinkOut, ThesisLinks
 from tests.test_news_pipeline import (
     NOON,
@@ -78,6 +79,7 @@ class FakeAnalysisLLM:
 
     def __init__(self, bad_span: bool = False, budget_after: int | None = None) -> None:
         self.calls: list[str] = []
+        self.batches: list[int] = []
         self.bad_span = bad_span
         self.budget_after = budget_after
 
@@ -90,6 +92,10 @@ class FakeAnalysisLLM:
         items = json.loads(text.split("Items:\n", 1)[1])
         first: dict[str, Any] = items[0]
         return first
+
+    async def complete_batch(self, requests: list[Any], wait_minutes: float = 60.0) -> list[Any]:
+        self.batches.append(len(requests))
+        return [await self.complete(r) for r in requests]
 
     async def complete(self, request: Any) -> SimpleNamespace:
         name = request.schema.__name__
@@ -121,6 +127,28 @@ class FakeAnalysisLLM:
                     )
                 ]
             )
+        elif request.schema is RawSentiment:
+            first = self.first_item(request)
+            parsed = RawSentiment.model_validate(
+                {
+                    "aspects": [
+                        {
+                            "entity": "Apple",
+                            "direction": "negative",
+                            "strength": 3.0,
+                            "item_id": first["item_id"],
+                            "span": first["text"][:50],
+                        },
+                        {
+                            "entity": "Apple",
+                            "direction": "negative",
+                            "strength": 0.2,
+                            "item_id": first["item_id"],
+                            "span": "a sentence that is nowhere",
+                        },
+                    ]
+                }
+            )
         elif request.schema is ImpactNotes:
             parsed = ImpactNotes()
         elif request.schema is FramingComparison:
@@ -137,7 +165,13 @@ class FakeAnalysisLLM:
         )
 
 
-async def prepare(pool: asyncpg.Pool, feeds: Feeds, http: Any, techniques: list[str]) -> None:
+async def prepare(
+    pool: asyncpg.Pool,
+    feeds: Feeds,
+    http: Any,
+    techniques: list[str],
+    extra: dict[str, Any] | None = None,
+) -> None:
     await setup_config(pool)
     async with pool.acquire() as conn:
         await save_config(
@@ -150,6 +184,7 @@ async def prepare(pool: asyncpg.Pool, feeds: Feeds, http: Any, techniques: list[
                         "analysis_techniques": techniques,
                         "analysis_per_run": 50,
                         "analysis_min_severity": 0,
+                        **(extra or {}),
                     },
                 }
             ),
@@ -336,6 +371,42 @@ async def test_the_wire_feedback_and_themes_read_side(
     # Themes: the seeded watch topics tag nothing in this fixture, so there are no rows, and the
     # query still answers.
     assert await theme_days(backend_pool, 14) == []
+
+
+async def test_sentiment_keeps_one_verified_aspect_per_entity_with_a_clamped_strength(
+    backend_pool: asyncpg.Pool, feeds: Feeds, http: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await prepare(backend_pool, feeds, http, ["extraction", "sentiment"])
+    monkeypatch.setattr(analysis_job, "make_llm", lambda: FakeAnalysisLLM())
+    alerts_before = await backend_pool.fetchval("select count(*) from alert")
+
+    assert await analyse(backend_pool) == "succeeded"
+
+    rows = await analysis_rows(backend_pool)
+    assert rows["sentiment"] == rows["extraction"] > 0
+    story = await backend_pool.fetchval("select cluster_id from story_analysis limit 1")
+    payload = await latest_analysis(backend_pool, story, "sentiment")
+    assert payload is not None
+    # The aspect with an invented span is dropped, and 3.0 is clamped to 1.
+    assert [a["entity"] for a in payload["aspects"]] == ["Apple"]
+    assert payload["aspects"][0]["strength"] == 1.0 and payload["intensity"] == 1.0
+    # Sentiment never touches what alerts: the analysis run created no alert.
+    assert await backend_pool.fetchval("select count(*) from alert") == alerts_before
+
+
+async def test_batched_extraction_sends_the_stories_as_one_batch(
+    backend_pool: asyncpg.Pool, feeds: Feeds, http: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await prepare(backend_pool, feeds, http, ["extraction"], {"batch_extraction": True})
+    llm = FakeAnalysisLLM()
+    monkeypatch.setattr(analysis_job, "make_llm", lambda: llm)
+    stories = await backend_pool.fetchval("select count(*) from story_cluster")
+    assert stories >= 2
+
+    assert await analyse(backend_pool) == "succeeded"
+
+    assert (await analysis_rows(backend_pool))["extraction"] == stories
+    assert llm.batches == [stories]
 
 
 async def test_quiet_confirmed_stories_resolve_and_others_do_not(
