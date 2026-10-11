@@ -110,7 +110,7 @@ def rule_compliance(
         else:  # a rule type this module does not know: never guess
             out[rule.id] = RuleCompliance(
                 status="unknown", reason="rule type not evaluated", **base
-            )  # type: ignore[arg-type]
+            )
             continue
         if unknown is not None or measured is None:
             out[rule.id] = RuleCompliance(
@@ -118,7 +118,7 @@ def rule_compliance(
                 reason=unknown or "no measure",
                 scope=scope,
                 unit=unit,
-                **base,  # type: ignore[arg-type]
+                **base,
             )
             continue
         hit_finding = next((f for f in findings if f.key == f"rule:{rule.id}:{suffix}"), None)
@@ -137,7 +137,7 @@ def rule_compliance(
             reason=reason,
             scope=scope,
             unit=unit,
-            **base,  # type: ignore[arg-type]
+            **base,
         )
     return out
 

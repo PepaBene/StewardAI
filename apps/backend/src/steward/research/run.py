@@ -440,7 +440,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                         cache_read_tokens=result.usage.cache_read_tokens,
                         cost_usd=cost_of(result.usage),
                         ms=result.ms,
-                        outcome=outcome,  # type: ignore[arg-type]
+                        outcome=outcome,
                         note=clip(chosen.fallback_reason or "", 160) or None,
                     ).model_dump()
                 }
@@ -601,7 +601,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                     searches=result.usage.searches,
                     cost_usd=cost_of(result.usage),
                     ms=ms,
-                    outcome=call_outcome,  # type: ignore[arg-type]
+                    outcome=call_outcome,
                     note=clip(result.note or "", 160) or None,
                 ).model_dump(),
             }
@@ -711,7 +711,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         try:
             return dict(await ctx.checkpoint(key, run))
         except _FailedCall:
-            return failed["out"]
+            return dict(failed["out"])
 
     for index, spec in enumerate(model_specs):
 

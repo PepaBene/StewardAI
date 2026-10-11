@@ -15,7 +15,7 @@ the report says who wrote it and whether the owner edited it.
 import json
 import re
 import time
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
@@ -150,8 +150,8 @@ def foreign_hosts(text: str, allow_domains: list[str], known: Collection[str] = 
     return bad
 
 
-def _known_tools(groups: list[str]) -> list[str]:
-    return [t for t in tools_for(groups) if t in catalog.TOOLS]
+def _known_tools(groups: Sequence[str]) -> list[str]:
+    return [t for t in tools_for(list(groups)) if t in catalog.TOOLS]
 
 
 def _own_hosts(questions: list[PlanQuestion]) -> set[str]:
@@ -181,7 +181,7 @@ class PlanProblem(ValueError):
 def _check_question(
     text: str,
     intent: str | None,
-    groups: list[str],
+    groups: Sequence[str],
     searches: int,
     profile: ResearchProfile,
     known: Collection[str] = (),

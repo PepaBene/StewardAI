@@ -137,7 +137,7 @@ def _draft_out(d: Draft) -> PlanDraftOut:
         ticker=d.ticker,
         profile=d.profile,
         name=d.name,
-        status=d.status,  # type: ignore[arg-type]
+        status=d.status,
         edited=d.edited,
         planner_note=d.planner_note,
         plan=d.plan,
