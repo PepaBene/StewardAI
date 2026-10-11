@@ -59,6 +59,12 @@ against and which thesis KPIs or exit conditions are involved. Do not answer fro
 general knowledge about a company: if the tools return nothing, say what you looked at. \
 Propose a job only when the question needs it, and say what you proposed and why.
 
+Tool figures come with a status. "missing", "not_applicable" and "failed" mean there is no \
+value: say so and why, never write a zero or an estimate in its place. "stale" means the \
+value is the latest known but old: give its as_of date. Name the period, currency and unit \
+that come with a figure. A list marked truncated is not everything: say it is partial or \
+ask for the next page. Check data_freshness before stating that something is recent.
+
 The owner's strategy is core-satellite: a global ETF core, plus individual stocks, each \
 backed by a written thesis (why owned, KPIs, exit conditions, valuation scenarios, \
 expected return, risk profile) that must beat the core after costs and taxes within a \
@@ -409,6 +415,10 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
             unsourced=sum(1 for s in sentences if s.no_source),
             tools=tools.used,
             actions=tools.actions,
+            model=result.usage.model,
+            trace=tools.trace,
+            sources=len(registry.sources),
+            shape=answer.shape,
         )
     return reply
 

@@ -93,6 +93,12 @@ def _market(member: Any, data: StockInputs) -> Market:
     return market_from(data.closes, member.currency, shares)
 
 
+async def load_market(pool: asyncpg.Pool, ticker: str) -> tuple[Any, Market] | None:
+    """The universe member and its price history in major units, without loading statements."""
+    got = (await _inputs(pool, [ticker])).get(ticker)
+    return None if got is None else (got[0], _market(*got))
+
+
 async def load_company(
     pool: asyncpg.Pool, ticker: str, cutoff: dt.datetime | None = None
 ) -> Company | None:

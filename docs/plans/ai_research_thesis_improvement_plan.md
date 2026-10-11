@@ -18,8 +18,8 @@ The four data plans are implemented, which changes the starting point of every p
 
 | Phase | State | What exists / what remains |
 |---|---|---|
-| 0 Baseline | Partial | Exists: claim-verifier eval set (`verify/eval.py`, `evals_gate.py`, replay and feedback in `verify/`), news golden sets and an eval gate (`news/eval*.py`, `tests/golden`). Remains: a capability map of tools vs datasets (the chat tool list in the [agentic plan](agentic_workflows_and_rag_plan.md) is the start), the 30–50 research/chat cases, and per-run traces of retrieval, web queries and cost by step. |
-| 1 Typed data access | Partial | Exists: `data_context/` read models with `known_as_of` point-in-time cutoffs (country, industry, company, and `evidence.py` for positions, insiders, deals, dependencies, consensus, filed notes); research `gather` now writes ownership/13F, relationships, risk and liquidity sections from stored records; chat tools grew from 7 to 15 (stress test, theme exposure, event paths, fund overlap, performance attribution, decision scorecard, news wire and story threads). Remains: chat tools for insider/13F/consensus/deal evidence, price and risk history, fundamentals and valuation, macro, strategy rules and transactions; one uniform `source_id`/`as_of`/missing-vs-zero envelope across all tools. |
+| 0 Baseline | Done for chat (2026-10-11) | Exists: claim-verifier eval set (`verify/eval.py`, `evals_gate.py`), news golden sets, and now the [capability map](ai_research_capability_map.md) generated from `chat/catalog.py` and tested against the real tool list; 41 labelled research/chat cases in `evals/research_cases.json` over ten categories with a trace scorer (`chat/benchmark.py`); a per-call trace (tool, arguments, ms, ok/error, sources added, bytes) on every chat answer step. Remains: a research-job trace of the same kind (web queries and URLs arrive with Phase 2), user feedback linked to a run, and a live runner that replays the cases against a model and records human review scores. |
+| 1 Typed data access | Done for chat (2026-10-11) | Exists: `data_context/` read models with `known_as_of` cutoffs; research `gather` sections from stored records; chat tools grew from 27 to 37 with `filing_evidence` (filed notes, 13D/G, 13F, N-PORT, insider, dependencies, deals, consensus), `fundamentals`, `valuation_scenarios`, `price_history`, `macro_series`, `strategy_rules`, `transactions` (paged), `risk_history`, `thesis_and_reports` and `data_freshness`; the shared figure envelope (`chat/envelope.py`: status ok/missing/not_applicable/stale/failed, unit, currency, period, `as_of`, `source_id`, reason) used by all of them; every result stamped with `tool` and `retrieved_at`; all lists capped with a stated `page`. Remains: move the earlier analytics tools' figures into the envelope, FX and intraday quote tools, reading saved valuation scenarios, and giving the research job the same tools (the research report still reads through `gather`). |
 | 2 Planning and web quality | Not started | Research is still a fixed chain with a gap finder (`research/gaps.py`) and source-tier-limited web search; there is no planner schema, no deep-mode query iteration, and no counter-evidence search step. Profiles already control sections, depth, tiers, peers, language and budgets. |
 | 3 Output and thesis authoring | Partial | Exists: configurable profile sections (code-written vs model-written split), a thesis first-draft generator (`thesis/draft.py`: facts-only prompt, lines that cite no fact are dropped, nothing saved until the owner edits), bear case, per-figure sources and server-side PDF (Morningstar plan). Remains: separate report templates from profiles, versioned template schemas, thesis *update* proposals as field-by-field diffs, immutable snapshots of template/profile/prompt/strategy versions per run. |
 | 4 Claim grounding | Partial | Exists: sentence-level source IDs, claim verifier over every model sentence, "insufficient evidence" path, code-owned numbers. Remains: typed claim ledger (fact / calculation / interpretation / forecast), strategy-rule status per claim, confidence tied to evidence coverage. The news engine has its own claim checks (`news/claims.py`) that could share the ledger format. |
@@ -30,6 +30,46 @@ Cross-plan notes:
 - Retrieval over prose is covered by the [agentic and RAG plan](agentic_workflows_and_rag_plan.md) (AG2), not here. News already has multilingual embeddings and semantic search; filings, reports and theses do not.
 - Research profiles and prompts are model-routed through `llm/routing`; keep the "adapter so the provider can change" rule in Phase 2 pointed at that layer.
 - News-derived thesis links, impact chains and framing-conflict flags exist in the news engine; Phase 4's "disconfirming evidence" step should consume them rather than re-search.
+
+## Gaps left after Phases 0 and 1 (2026-10-11)
+
+Phases 0 and 1 are built for chat only. Everything below is still open; later phases and exit criteria depend on it.
+
+**Phase 0 (baseline)**
+
+1. The research report job has no per-call trace like chat's. Its steps record usage and checkpoints, not retrieval records, web queries and URLs, retries or output validation.
+2. No live benchmark runner. `chat/benchmark.py` scores a trace but nothing replays the 41 cases against a model, stores scores per run, or compares runs. The labels name expected tool groups, datasets and traps, not expected internal fact values, because those need seeded data.
+3. Only the retrieval failure stage is scored by code. Analysis, citation, strategy and rendering failures, fact and numeric accuracy, citation support, strategy traceability and balance are scored by hand with no review tool or stored scores.
+4. User feedback is not linked to a run. Cost and latency by step exist as usage in `job_step`, but there is no per-profile or per-case view.
+5. Redaction and retention of traces are not decided. The chat trace keeps clipped arguments and result sizes, not bodies; there is no deletion control (Phase 5).
+6. The benchmark does not change with holdings and data, and has no cases built from real failures yet.
+7. The decisions the plan wanted captured in Phase 0 are still open: custom formats as sections or schemas, export formats, full-portfolio default, languages and regions, and quick versus deep cost budgets.
+
+**Phase 1 (data access)**
+
+1. The 27 earlier chat tools (stress test, risk forecast, factor tilts, theme exposure, event paths and the rest) are stamped with `tool` and `retrieved_at` and register sources, but their figures are not in the envelope; missing, stale and zero are not told apart inside them.
+2. The research report job does not use the new tools. It still reads data through `gather`, so research and chat can disagree on freshness and shape.
+3. No tools for FX rates, intraday quotes, listing liquidity, raw statement lines, segment revenue, share counts, corporate actions, peers, ETF breakdowns, fund NAV and factsheets, patents, procurement awards, or the coverage and quality review queues.
+4. `valuation_scenarios` uses default assumptions only and ignores the owner's saved scenarios. It builds ratios without peers, so peer comparisons are missing.
+5. `fundamentals` returns the latest value per ratio, not the series. Multi-period trends need a further call or tool.
+6. `filing_evidence` returns one section per call, cut to a few items with long passages shortened; there is no pagination or "more" call for it, `macro_series` or `risk_history`.
+7. `risk_history` shows top-level numbers only, and cannot compare snapshots that have different method versions.
+8. `price_history` covers daily closes only, thinned to 120 points, with no benchmark or total-return series.
+9. The "prior reports" side of `thesis_and_reports` returns the last two research or review reports with 600-character excerpts and no structured sections. Digest and escalation reports are excluded.
+10. Freshness limits per dataset in `data_freshness` are fixed constants, not configuration; it probes eight datasets and does not cover filings, 13F, N-PORT or consensus per ticker.
+11. Source records for tool figures carry a snippet of the values, not the filing passage; ratio and valuation sources point at the company page rather than a stored record id.
+12. No least-privilege check: tools run under the backend role, and scope is "owner" by convention (owner-only data is not filtered per user because the app has one owner).
+13. Tool descriptions and the system-prompt addition are not evaluated: the chat component's eval fingerprint will change and `evals/baseline.json` needs a re-run with `--write-baseline` before the eval gate passes.
+
+**Test coverage of the new code**
+
+1. `tests/test_research_tools_db.py` covers strategy, transactions, risk history, macro, thesis and reports, evidence coverage, freshness and uncovered-ticker errors. The success paths of `fundamentals`, `valuation_scenarios` and `price_history` (a covered company with statements and prices) and of `filing_evidence` with real records are not tested, because they need a seeded filing and price fixture.
+2. No test drives the model loop with the new tools, so tool selection by the model is unmeasured until the live runner exists.
+3. The older tests that construct `ChatTools` or compare exact tool results were not re-run after results gained `tool` and `retrieved_at`.
+
+**Later phases (unchanged, not started)**
+
+Phase 2 planner, query iteration and counter-evidence search; Phase 3 report templates, thesis update diffs and immutable run snapshots; Phase 4 typed claim ledger and strategy-rule status per claim; Phase 5 injected-article regression case, retention and deletion, and regression gates. See the table above.
 
 ## Current architecture and product intent
 
