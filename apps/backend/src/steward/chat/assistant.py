@@ -352,7 +352,17 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
         if google_key
         else None
     )
-    tools = ChatTools(pool, registry, conversation_id, message_id, embedder)
+    docs_cfg = (jobs.body if jobs else JobsConfig()).document_index_settings
+    doc_embedder = (
+        QueryEmbedder(
+            google_key.get_secret_value(), docs_cfg.embedding_model, docs_cfg.embedding_dimensions
+        )
+        if google_key
+        else None
+    )
+    tools = ChatTools(
+        pool, registry, conversation_id, message_id, embedder, doc_embedder=doc_embedder
+    )
     async with ctx.step("answer") as step:
         if deps.assistant is None:
             result = AssistantResult(

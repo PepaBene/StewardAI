@@ -46,6 +46,8 @@ const BODY: ResearchBody = {
   depth: "standard",
   model: "gpt-6.1-sol",
   language: "en",
+  engine: "fixed",
+  agents: [],
   sections: [
     {
       id: "financial_trend",

@@ -60,6 +60,9 @@ WebEmphasis = Literal["internal", "balanced", "web"]
 # What a run does with its findings. None of them changes the active thesis: the others attach
 # a proposal or a review to the report, and the owner accepts a proposal field by field.
 Authoring = Literal["research_only", "draft_thesis", "propose_update", "review_thesis"]
+Engine = Literal["fixed", "agentic"]
+Lens = Literal["financials", "filings_events", "news_web", "portfolio_risk", "counter_case"]
+ALL_LENSES: tuple[Lens, ...] = get_args(Lens)
 DomainName = Annotated[
     str,
     Field(
@@ -168,9 +171,42 @@ class ResearchProfile(ConfigModel):
     planner_model: ModelId | None = Field(
         default=None, description="The model that writes the plan; unset = the claim verifier's."
     )
+    # Agentic engine: specialist workers gather the evidence with the app's read tools (and web
+    # search where their lens allows it), the profile's model then writes the sections from
+    # their findings. "fixed" is the original pipeline: the writer searches inside each section.
+    engine: Engine = Field(
+        default="fixed",
+        description="fixed: one writer call per section, searching inside it. agentic: "
+        "specialist workers gather findings first (cheap model, own tools, own caps), then "
+        "the profile's model writes each section from them. Both keep the claim check.",
+    )
+    lenses: list[Lens] = Field(
+        default_factory=lambda: list(ALL_LENSES),
+        min_length=1,
+        description="The workers an agentic run starts, one per lens.",
+    )
+    worker_model: ModelId = Field(
+        default="gpt-6-luna", description="Model of the workers (agentic engine)."
+    )
+    worker_effort: Literal["low", "medium", "high"] = "low"
+    worker_max_steps: int = Field(
+        default=12, ge=2, le=40, description="Model calls (tool rounds) one worker may use."
+    )
+    worker_max_searches: int = Field(
+        default=8,
+        ge=0,
+        le=30,
+        description="Web searches one worker may run; all workers together stay inside the "
+        "profile's max_searches.",
+    )
+    parallel_workers: int = Field(
+        default=2, ge=1, le=2, description="Workers running at the same time (cost control)."
+    )
 
     @model_validator(mode="after")
     def _unique_sections(self) -> Self:
+        if len(set(self.lenses)) != len(self.lenses):
+            raise ValueError("a lens is listed twice")
         if len(set(self.sections)) != len(self.sections):
             raise ValueError("a section is listed twice")
         overlap = set(self.allow_domains) & set(self.deny_domains)
@@ -315,6 +351,32 @@ def _defaults() -> list[ResearchProfile]:
             max_rounds=2,
             template_id="thesis-memo",
             authoring="draft_thesis",
+        ),
+        ResearchProfile(
+            id="deep-agentic",
+            name="Deep thesis workup (agents)",
+            sections=[
+                "executive_summary",
+                "business",
+                "financial_trend",
+                "moat_risks",
+                "valuation",
+                "scenarios",
+                "catalysts",
+                "counter_case",
+                "strategy_fit",
+                "thesis_kpis",
+                "open_questions",
+            ],
+            depth="deep",
+            max_steps=100,
+            max_searches=60,
+            mode="deep_thesis",
+            iterate=True,
+            max_rounds=2,
+            template_id="thesis-memo",
+            authoring="draft_thesis",
+            engine="agentic",
         ),
         ResearchProfile(
             id="earnings-update",

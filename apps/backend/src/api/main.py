@@ -37,6 +37,7 @@ from api.fund_routes import router as fund_router
 from api.fundamentals_routes import router as fundamentals_router
 from api.gate_routes import router as gate_router
 from api.graph_routes import router as graph_router
+from api.inbox_routes import router as inbox_router
 from api.insider_activity_routes import router as insider_activity_router
 from api.insider_routes import router as insider_router
 from api.insight_routes import router as insight_router
@@ -265,6 +266,7 @@ def create_app() -> FastAPI:
     app.include_router(web_fact_router)
     app.include_router(verify_router)
     app.include_router(chat_router)
+    app.include_router(inbox_router)
     app.include_router(fundamentals_router)
     app.include_router(free_sources_router)
     app.include_router(watchlist_router)

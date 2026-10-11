@@ -326,11 +326,12 @@ def _result_datum(
 
 
 async def valuation_scenarios(
-    pool: asyncpg.Pool, registry: Registry, ticker: str
+    pool: asyncpg.Pool, registry: Registry, ticker: str, owner_id: str | None = None
 ) -> dict[str, Any]:
-    """The app's scenario DCF under default assumptions built from the company's own filed
-    growth: a range across scenarios, never a single target. The assumptions are placeholders
-    to edit, not forecasts, and the answer must say so."""
+    """The app's scenario DCF: the owner's newest saved scenario set when there is one, else
+    default assumptions built from the company's own filed growth. A range across scenarios,
+    never a single target. Defaults are placeholders to edit, not forecasts, and the answer
+    must say so; saved assumptions are the owner's own and are labelled as such."""
     company = await service.load_company(pool, ticker)
     if company is None:
         return {"error": f"{ticker} is not in the covered universe"}
@@ -342,14 +343,21 @@ async def valuation_scenarios(
         sector=company.sector,
         industry=company.industry,
     )
-    defaults = valuation.default_scenarios(company.annual)
+    saved = None
+    if owner_id:
+        sets = await service.list_scenarios(pool, owner_id, ticker)
+        # A set is append-only, so the newest row is the latest version of the latest-saved set.
+        saved = max(sets, key=lambda x: x.created_at, default=None)
+    if saved is not None:
+        request = valuation.ValuationRequest(scenarios=saved.assumptions, selected=saved.selected)
+        basis = (
+            f"the owner's saved set '{saved.name}' v{saved.version} ({saved.created_at:%Y-%m-%d})"
+        )
+    else:
+        request = valuation.ValuationRequest(scenarios=valuation.default_scenarios(company.annual))
+        basis = "default assumptions"
     result = valuation.build_valuation(
-        ticker,
-        company.annual,
-        company.quarterly,
-        company.market,
-        view,
-        valuation.ValuationRequest(scenarios=defaults),
+        ticker, company.annual, company.quarterly, company.market, view, request
     )
     lines = [
         f"{s.name}: {s.value_per_share.value:.4g} per share"
@@ -359,7 +367,7 @@ async def valuation_scenarios(
     sid = registry.add(
         "observation",
         f"valuation:{ticker}:{result.method_version}:{result.price_date}",
-        f"{ticker} scenario valuation (default assumptions)",
+        f"{ticker} scenario valuation ({basis})",
         app_path=f"/companies/{ticker}",
         tier=2,
         snippet="; ".join(lines)[:1500] or None,
@@ -381,6 +389,13 @@ async def valuation_scenarios(
     return {
         "ticker": ticker,
         "source_id": sid,
+        "assumptions_basis": "owner_saved" if saved is not None else "default_placeholder",
+        "assumptions_detail": basis,
+        **(
+            {"saved_set": {"name": saved.name, "version": saved.version, "note": saved.note}}
+            if saved is not None
+            else {}
+        ),
         "price": env.datum(result.price, currency=currency, as_of=result.price_date, unit="price")
         if result.price is not None
         else env.absent("missing", "no price stored for this ticker", unit="price"),

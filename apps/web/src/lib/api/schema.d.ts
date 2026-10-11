@@ -3640,6 +3640,163 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Inbox
+         * @description Items the event agents left, newest first. `unread` counts items still new.
+         */
+        get: operations["list_inbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Inbox Item */
+        get: operations["get_inbox_item"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Inbox Status
+         * @description Mark an item read or dismiss it. Dismissing declines an open proposed action.
+         */
+        patch: operations["set_inbox_status"];
+        trace?: never;
+    };
+    "/inbox/{item_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give Feedback
+         * @description Say whether the item was useful. Feeds the candidate evaluation cases.
+         */
+        post: operations["give_feedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/{item_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Inbox Action
+         * @description Start the job the agent proposed. Only this call starts anything.
+         */
+        post: operations["confirm_inbox_action"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/{item_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline Inbox Action */
+        post: operations["decline_inbox_action"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Agent Notes
+         * @description The owner's working notes the agent reads. The agent never writes them.
+         */
+        get: operations["list_agent_notes"];
+        put?: never;
+        /** Add Agent Note */
+        post: operations["add_agent_note"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent-notes/{note_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Agent Note */
+        delete: operations["delete_agent_note"];
+        options?: never;
+        head?: never;
+        /** Edit Agent Note */
+        patch: operations["edit_agent_note"];
+        trace?: never;
+    };
+    "/ops/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Route Stats
+         * @description Runs, failures, cost and latency (median and 95th percentile) per kind of work.
+         */
+        get: operations["get_route_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/segments": {
         parameters: {
             query?: never;
@@ -9119,6 +9276,21 @@ export interface components {
              */
             confidence: "low" | "medium" | "high";
         };
+        /** AgentNote */
+        AgentNote: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Text */
+            text: string;
+            /** Active */
+            active: boolean;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+        };
         /** AggregateReport */
         AggregateReport: {
             /**
@@ -11333,7 +11505,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "document_index" | "inbox_scan" | "inbox_agent" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -15295,6 +15467,61 @@ export interface components {
             regions: string[];
             /** Summary */
             summary: string;
+        };
+        /**
+         * DocumentIndexSettings
+         * @description The passage index that `search_documents` reads: filings and results releases, your
+         *     reports, theses and notes, and news, split into passages and embedded. Text is indexed
+         *     first (keyword search works at once); embedding is capped per run, newest first, so one run
+         *     costs a bounded amount. A changed document is re-indexed; an unchanged one is never
+         *     embedded twice.
+         */
+        DocumentIndexSettings: {
+            /**
+             * Embedding Model
+             * @description Embeds the passages and the search queries. Changing it re-embeds every passage over the following runs.
+             * @default gemini-embedding-2
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            embedding_model: string;
+            /**
+             * Embedding Dimensions
+             * @description 768 is the dimension the vector index is built for; others are stored and searched without the index.
+             * @default 768
+             */
+            embedding_dimensions: number;
+            /**
+             * Embed Per Run
+             * @description Passages embedded per run (0: none).
+             * @default 1500
+             */
+            embed_per_run: number;
+            /**
+             * Filings Per Run
+             * @description Archived documents read and split per run.
+             * @default 20
+             */
+            filings_per_run: number;
+            /**
+             * Reports Per Run
+             * @description Reports indexed per run.
+             * @default 200
+             */
+            reports_per_run: number;
+            /**
+             * News Per Run
+             * @description News items indexed per run.
+             * @default 600
+             */
+            news_per_run: number;
+            /**
+             * News Days
+             * @description News older than this is not added to the index (full-text search over the stored news is unaffected).
+             * @default 365
+             */
+            news_days: number;
         };
         /** DocumentVersionOut */
         DocumentVersionOut: {
@@ -20763,6 +20990,120 @@ export interface components {
              */
             unchanged: string[];
         };
+        /** InboxFeedbackIn */
+        InboxFeedbackIn: {
+            /**
+             * Feedback
+             * @enum {string}
+             */
+            feedback: "useful" | "not_useful";
+            /** Note */
+            note?: string | null;
+        };
+        /** InboxItem */
+        InboxItem: {
+            /** Id */
+            id: number;
+            /** Trigger Key */
+            trigger_key: string;
+            /** Trigger Kind */
+            trigger_kind: string;
+            /** Trigger Ref */
+            trigger_ref: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Severity */
+            severity: number | null;
+            /** Headline */
+            headline: string;
+            /** Body */
+            body: {
+                [key: string]: unknown;
+            };
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "new" | "read" | "actioned" | "dismissed";
+            /** Proposed Action */
+            proposed_action: {
+                [key: string]: unknown;
+            } | null;
+            /** Action Status */
+            action_status: ("proposed" | "confirmed" | "declined") | null;
+            /** Action Job Id */
+            action_job_id: number | null;
+            /** Feedback */
+            feedback: ("useful" | "not_useful") | null;
+            /** Feedback Note */
+            feedback_note: string | null;
+            /** Job Id */
+            job_id: number | null;
+            /** Created At */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+        };
+        /** InboxList */
+        InboxList: {
+            /** Items */
+            items: components["schemas"]["InboxItem"][];
+            /** Unread */
+            unread: number;
+        };
+        /**
+         * InboxSettings
+         * @description Event-driven agents: each new escalation note or thesis-breach alert starts one bounded
+         *     run that reads the app's records and leaves an inbox item with the evidence and at most
+         *     one proposed action. A run never trades, never edits a thesis and never starts a job: the
+         *     owner confirms a proposed action in the inbox.
+         */
+        InboxSettings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Model
+             * @description The model of the agent run.
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            model: string;
+            /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies.
+             * @default low
+             */
+            effort: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Max Steps
+             * @description Model calls per run.
+             * @default 8
+             */
+            max_steps: number;
+            /**
+             * Lookback Days
+             * @description Triggers older than this are not picked up.
+             * @default 7
+             */
+            lookback_days: number;
+            /**
+             * Max Per Scan
+             * @description Runs one scan may queue, newest trigger first.
+             * @default 5
+             */
+            max_per_scan: number;
+            /**
+             * Min Severity
+             * @description Alerts below this severity start no run.
+             * @default 2
+             */
+            min_severity: number;
+        };
         /**
          * Incident
          * @description A story the owner may need to look at: a severe one nobody was alerted to, or an alert
@@ -22194,6 +22535,10 @@ export interface components {
             gap_research?: components["schemas"]["JobSchedule"];
             /** @description Builds each holding's revenue-by-country exposure from its latest annual SEC XBRL filing (reported basis). Your own exposure entries are never changed. Default: Tuesdays 05:50. */
             exposure_build?: components["schemas"]["JobSchedule"];
+            /** @description Splits new filings, reports, theses, notes and news into passages and embeds them for document search. Default: daily 03:20. */
+            document_index?: components["schemas"]["JobSchedule"];
+            /** @description Looks for new escalation notes and thesis-breach alerts and queues an agent run for each, which leaves an inbox item. Default: hourly at :10. */
+            inbox_scan?: components["schemas"]["JobSchedule"];
             /** @description Downloads the Ken French Data Library daily factor returns (market, size, value, profitability, investment, momentum) for the Developed, Europe and US markets, which the factor exposures use. The library adds a month at a time. Default: Mondays 05:30. */
             factor_returns?: components["schemas"]["JobSchedule"];
             /** @description Re-test every disclosure source, store the result, switch a failing one off and the SEC sources on when they pass. Default: daily 06:00. */
@@ -22212,6 +22557,8 @@ export interface components {
             disclosure_alerts?: components["schemas"]["JobSchedule"];
             earnings_check?: components["schemas"]["EarningsCheckSettings"];
             exposure_build_settings?: components["schemas"]["ExposureBuildSettings"];
+            document_index_settings?: components["schemas"]["DocumentIndexSettings"];
+            inbox_settings?: components["schemas"]["InboxSettings"];
             ir_discovery_settings?: components["schemas"]["IrDiscoverySettings"];
             gap_research_settings?: components["schemas"]["GapResearchSettings"];
             ai_approval?: components["schemas"]["AiApprovalSettings"];
@@ -25115,6 +25462,27 @@ export interface components {
              * @description Why a block or the whole filing stored nothing.
              */
             skipped: string[];
+        };
+        /** NoteIn */
+        NoteIn: {
+            /** Ticker */
+            ticker?: string | null;
+            /** Text */
+            text: string;
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean;
+        };
+        /** NotePatch */
+        NotePatch: {
+            /** Ticker */
+            ticker?: string | null;
+            /** Text */
+            text?: string | null;
+            /** Active */
+            active?: boolean | null;
         };
         /** NoteSentence */
         NoteSentence: {
@@ -29926,6 +30294,13 @@ export interface components {
             trace_purged_at?: string | null;
             /** Tool Calls */
             tool_calls?: components["schemas"]["ToolCallRecord"][];
+            /**
+             * Engine
+             * @default fixed
+             */
+            engine: string;
+            /** Agents */
+            agents?: components["schemas"]["WorkerRecord"][];
             trace?: components["schemas"]["ResearchTrace"] | null;
         };
         /** ResearchContext */
@@ -30175,6 +30550,51 @@ export interface components {
              * @description The model that writes the plan; unset = the claim verifier's.
              */
             planner_model?: string | null;
+            /**
+             * Engine
+             * @description fixed: one writer call per section, searching inside it. agentic: specialist workers gather findings first (cheap model, own tools, own caps), then the profile's model writes each section from them. Both keep the claim check.
+             * @default fixed
+             * @enum {string}
+             */
+            engine: "fixed" | "agentic";
+            /**
+             * Lenses
+             * @description The workers an agentic run starts, one per lens.
+             */
+            lenses?: ("financials" | "filings_events" | "news_web" | "portfolio_risk" | "counter_case")[];
+            /**
+             * Worker Model
+             * @description Model of the workers (agentic engine).
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            worker_model: string;
+            /**
+             * Worker Effort
+             * @default low
+             * @enum {string}
+             */
+            worker_effort: "low" | "medium" | "high";
+            /**
+             * Worker Max Steps
+             * @description Model calls (tool rounds) one worker may use.
+             * @default 12
+             */
+            worker_max_steps: number;
+            /**
+             * Worker Max Searches
+             * @description Web searches one worker may run; all workers together stay inside the profile's max_searches.
+             * @default 8
+             */
+            worker_max_searches: number;
+            /**
+             * Parallel Workers
+             * @description Workers running at the same time (cost control).
+             * @default 2
+             */
+            parallel_workers: number;
         };
         /**
          * ResearchProfilesConfig
@@ -31184,6 +31604,30 @@ export interface components {
              * @default 0
              */
             steps: number;
+        };
+        /** RouteStat */
+        RouteStat: {
+            /** Route */
+            route: string;
+            /** Runs */
+            runs: number;
+            /** Failed */
+            failed: number;
+            /**
+             * Unpriced Runs
+             * @description Runs with steps that carry no cost.
+             */
+            unpriced_runs: number;
+            /** Cost Total Usd */
+            cost_total_usd: number;
+            /** Cost Median Usd */
+            cost_median_usd: number | null;
+            /** Cost P95 Usd */
+            cost_p95_usd: number | null;
+            /** Seconds Median */
+            seconds_median: number | null;
+            /** Seconds P95 */
+            seconds_p95: number | null;
         };
         /** Row */
         Row: {
@@ -33909,6 +34353,14 @@ export interface components {
          * @enum {string}
          */
         Status: "complete" | "partial" | "unavailable" | "paid_only" | "disputed";
+        /** StatusIn */
+        StatusIn: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "read" | "dismissed";
+        };
         /** StockRequest */
         StockRequest: {
             /**
@@ -37156,6 +37608,74 @@ export interface components {
             items: components["schemas"]["WireItem"][];
             /** Next Before Id */
             next_before_id: number | null;
+        };
+        /**
+         * WorkerRecord
+         * @description What one worker did, stored with the report (metadata only).
+         */
+        WorkerRecord: {
+            /**
+             * Lens
+             * @enum {string}
+             */
+            lens: "financials" | "filings_events" | "news_web" | "portfolio_risk" | "counter_case";
+            /**
+             * Model
+             * @default
+             */
+            model: string;
+            /**
+             * Outcome
+             * @default not_run
+             * @enum {string}
+             */
+            outcome: "ok" | "no_findings" | "failed" | "refused" | "step_cap" | "not_run";
+            /**
+             * Steps
+             * @default 0
+             */
+            steps: number;
+            /** Tool Calls */
+            tool_calls?: string[];
+            /**
+             * Searches
+             * @default 0
+             */
+            searches: number;
+            /**
+             * Findings
+             * @default 0
+             */
+            findings: number;
+            /**
+             * Dropped
+             * @default 0
+             */
+            dropped: number;
+            /**
+             * Input Tokens
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Cache Read Tokens
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /** Cost Usd */
+            cost_usd?: number | null;
+            /**
+             * Ms
+             * @default 0
+             */
+            ms: number;
+            /** Note */
+            note?: string | null;
         };
         /** WorldBankIndicator */
         WorldBankIndicator: {
@@ -43910,6 +44430,352 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_inbox: {
+        parameters: {
+            query?: {
+                status?: ("new" | "read" | "actioned" | "dismissed") | null;
+                ticker?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_inbox_item: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_inbox_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    give_feedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InboxFeedbackIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_inbox_action: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_inbox_action: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_agent_notes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentNote"][];
+                };
+            };
+        };
+    };
+    add_agent_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentNote"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_agent_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_agent_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentNote"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_route_stats: {
+        parameters: {
+            query?: {
+                days?: number;
+                /** @description Only runs that called a model. */
+                ai_only?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteStat"][];
                 };
             };
             /** @description Validation Error */

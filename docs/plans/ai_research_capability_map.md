@@ -24,9 +24,11 @@ and `retrieved_at`. Tools added in phase 1 also report each figure in the shared
 | Orders, dividends and cash movements | `transaction`, `transaction_fee` | `transactions`, `decision_scorecard`, `performance_explain` | daily sync | none |
 | Daily closes, quotes and FX | `price_bar`, `market_quote`, `fx_rate` | `price_history`, `fx_rates`, `latest_quote`, `listing_liquidity` | daily; quotes intraday | No total-return or adjusted series; benchmark comparison is price return only. |
 | Filed statements and the ratios computed from them | `financial_statement_fact`, `fundamentals`, `xbrl_filing` | `fundamentals`, `holding`, `statement_lines`, `share_counts`, `segment_revenue` | on each filing | Statement lines and segments come only from stored filings (SEC XBRL and parsed facts); other markets have no raw lines. |
-| Scenario DCF, reverse DCF and reference multiples | `company_valuation_scenario` | `valuation_scenarios`, `start_size`, `idea_factor_fit` | computed on request | Saved owner scenarios are not read back; the tool uses default assumptions. |
-| Filed notes, control stakes, 13F, N-PORT, insider activity, deals, dependencies, consensus | `fact`, `evidence`, `control_stake_filing`, `form13f_filing`, `nport_holding`, `insider_filing`, `deal_event`, `entity_relationship`, `estimate_value` | `filing_evidence`, `company_context`, `event_paths` | on each filing | none |
-| Stored news, wire articles, story clusters and threads | `news_item`, `news_article`, `story_cluster`, `story_thread`, `news_embedding` | `search_news`, `search_wire`, `get_story_thread` | continuous | none |
+| Scenario DCF, reverse DCF and reference multiples | `company_valuation_scenario` | `valuation_scenarios`, `start_size`, `idea_factor_fit` | computed on request | none |
+| Filed notes, control stakes, 13F, N-PORT, insider activity, deals, dependencies, consensus | `fact`, `evidence`, `control_stake_filing`, `form13f_filing`, `nport_holding`, `insider_filing`, `deal_event`, `entity_relationship`, `estimate_value` | `filing_evidence`, `company_context`, `event_paths`, `event_feed` | on each filing | none |
+| Passages of archived filings and results releases, your reports, theses and notes, and news | `document_chunk` | `search_documents` | daily index run | Only documents the index job has processed; filings that were never archived (fetched on the fly by the exposure builder) and disclosure-register documents are not indexed yet. |
+| The owner's working notes for the assistant, general or per holding | `agent_note` | `agent_notes` | when the owner edits them | none |
+| Stored news, wire articles, story clusters and threads | `news_item`, `news_article`, `story_cluster`, `story_thread`, `news_embedding` | `search_news`, `search_wire`, `get_story_thread`, `event_feed` | continuous | none |
 | Macro and commodity series; country context | `macro_observation`, `macro_series` | `macro_series`, `country_context` | per series release | none |
 | Sector, country and industry context for a company | `issuer`, `security`, `listing` | `company_context`, `country_context`, `corporate_actions`, `peers` | on change | none |
 | The owner's strategy: goals, targets, hard limits, rules, risk limits | `config_version` | `strategy_rules`, `portfolio_overview` | owner edits | none |
@@ -63,13 +65,16 @@ and `retrieved_at`. Tools added in phase 1 also report each figure in the shared
 | `over_cap_positions` | portfolio | `analytics_tools.over_cap_positions` | positions over cap | owner | strategy limits |
 | `theme_exposure` | portfolio | `analytics_tools.theme` | one theme | owner | mapping ids |
 | `event_paths` | filed_evidence | `analytics_tools.event_reach` | bounded graph walk | owner | edge ids |
+| `search_documents` | documents | `retrieval.search.search (full text + embeddings, RRF)` | 20 passages, 2 per document | owner | passage text with source URL or app page and date |
+| `agent_notes` | agent_notes | `SQL on agent_note` | 20 active notes | owner | note id and edit date |
+| `event_feed` | filed_evidence, news | `events.feed.build` | 25 items, 90 days | owner | story URL and outlet tier per item |
 | `fund_overlap` | funds | `analytics_tools.fund_overlap` | one ticker | owner | fund snapshot |
 | `performance_explain` | transactions | `analytics_tools.performance_explain` | up to a year | owner | snapshot dates |
 | `decision_scorecard` | transactions | `analytics_tools.decision_scorecard` | last year | owner | journal ids |
 | `propose_job` | actions | `chat_action insert` | one proposal | owner | action id |
 | `filing_evidence` | filed_evidence | `data_context.evidence` | 10 items by default, 25 at most, as-of cutoff | global | source URL, passage and known-at per item |
 | `fundamentals` | fundamentals | `company.ratios.build_ratios` | 80 ratios, or 300 points with periods | global | ratio group source with filed periods |
-| `valuation_scenarios` | valuation | `company.valuation.build_valuation` | 5 default scenarios | global | method version and price date |
+| `valuation_scenarios` | valuation | `company.valuation.build_valuation` | 5 scenarios: the owner's newest saved set, else defaults | owner | method version, price date and whether the assumptions are saved or default |
 | `price_history` | prices | `company.service.load_market` | 120 points, 10 years, optional benchmark | global | last close date, thinning stated |
 | `fx_rates` | prices | `SQL on fx_rate` | 60 fixings, 365 days | global | fixing date and source |
 | `latest_quote` | prices | `SQL on market_quote` | latest per provider | global | quote time and provider |

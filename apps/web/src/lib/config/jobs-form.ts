@@ -341,6 +341,18 @@ export const SCHEDULES: Record<ScheduleKey, { label: string; description: string
       "Builds each holding's revenue-by-country exposure from its latest annual SEC filing. Only single countries are mapped; your own exposure entries are never changed, and a row you delete is not rebuilt.",
     cron: "50 5 * * 2",
   },
+  inbox_scan: {
+    label: "Agent inbox scan",
+    description:
+      "Looks for new escalation notes and thesis-breach alerts and starts an agent run for each, which leaves an inbox item. Nothing it proposes starts until you confirm it.",
+    cron: "10 * * * *",
+  },
+  document_index: {
+    label: "Document index",
+    description:
+      "Splits new filings, reports, theses, notes and news into passages and embeds them for document search in chat. Embedding costs a little per run; the passages embedded per run are capped in the job settings.",
+    cron: "20 3 * * *",
+  },
   factor_returns: {
     label: "Factor returns",
     description:

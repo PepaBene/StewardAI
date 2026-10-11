@@ -17,7 +17,7 @@ from typing import Any
 import asyncpg
 import httpx
 
-from steward.chat import analytics_tools, data_tools, research_tools
+from steward.chat import analytics_tools, data_tools, legacy_envelope, research_tools
 from steward.chat.analytics_tools import SELECTOR_KINDS
 from steward.chat.data_tool_defs import DATA_TOOL_DEFINITIONS
 from steward.chat.envelope import neutralise_tree, stamp
@@ -36,9 +36,19 @@ from steward.earnings.read import holding_detail
 from steward.news.embeddings import Embedder, EmbeddingError, GeminiEmbedder, cosine
 from steward.news.read_analysis import like_pattern
 from steward.portfolio.read import portfolio_overview
-from steward.research.sources import Registry
+from steward.research.sources import Registry, SourceKind
+from steward.retrieval import search as retrieval_search
+from steward.retrieval.search import Filters
 
 ACTION_KINDS = ("earnings_check", "research", "portfolio_sync")
+DOCUMENT_KINDS = ("filing", "report", "thesis", "note", "news")
+DOCUMENT_SOURCE_KIND: dict[str, SourceKind] = {
+    "filing": "observation",
+    "note": "observation",
+    "report": "report",
+    "thesis": "thesis",
+    "news": "news_item",
+}
 REPORT_PATHS = {
     "research": "/research/{}",
     "review": "/reviews/{}",
@@ -126,6 +136,37 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "input_schema": {
             "type": "object",
             "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "search_documents",
+        "description": "Passage search over the prose the app holds: archived filings and "
+        "results releases, the owner's reports, theses and notes, and news. Combines keyword "
+        "and meaning-based matching, so it finds a passage that uses different words from the "
+        "question. Each hit is a short passage with its section, date, source URL or app page "
+        "and a registry id to cite; the top hits also carry the surrounding section. Use it "
+        "for 'what does the 10-K say about X', 'what did I write about Y' and 'what do the "
+        "documents say about Z'. Figures belong to the data tools: read them there, not from "
+        "a passage. It reads only what has been indexed, so say when nothing matches.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "What to find, in plain words."},
+                "ticker": {"type": "string", "description": "Optional, e.g. AAPL_US_EQ."},
+                "kinds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["filing", "report", "thesis", "note", "news"],
+                    },
+                    "description": "Optional: limit to these kinds of document.",
+                },
+                "since": {"type": "string", "description": "Optional ISO date, earliest."},
+                "until": {"type": "string", "description": "Optional ISO date, latest."},
+                "limit": {"type": "integer", "description": "Passages, 1-20 (default 8)."},
+            },
             "required": ["query"],
             "additionalProperties": False,
         },
@@ -379,6 +420,37 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "agent_notes",
+        "description": "The owner's own working notes for the assistant: standing instructions "
+        "and context about a holding or about how to read events (for example 'Nexperia "
+        "matters to this holding because of its chip supply'). Read them before judging an "
+        "event; they are the owner's words, not findings, so say when you lean on one. "
+        "Optional ticker adds that holding's notes to the general ones.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"ticker": {"type": "string", "description": "e.g. TSM_US_EQ"}},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "event_feed",
+        "description": "Recent classified news stories about companies that reach the "
+        "portfolio along supply-chain links, most serious first: headline, outlet, whether it "
+        "is confirmed, reported or a rumour, the direction, the share of the portfolio "
+        "reached and whether it would meet the high-severity alert rule. Use for 'what has "
+        "happened lately that touches my holdings'. Optional ticker narrows it. Lists only; "
+        "stories are auto-classified, so say so.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "days": {"type": "integer", "description": "Look-back days, 1-90 (default 14)."},
+                "ticker": {"type": "string", "description": "e.g. TSM or TSM_US_EQ"},
+                "limit": {"type": "integer", "description": "Items, 1-25 (default 10)."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "event_paths",
         "description": "Where an event at one company (a supplier outage, a lost customer) "
         "reaches the portfolio along supply-chain links you or filings recorded, with each "
@@ -474,10 +546,11 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "name": "valuation_scenarios",
-        "description": "The app's scenario DCF for one covered company under default "
-        "assumptions built from its own filed growth: value per share per scenario, the range, "
-        "the price, the discount-rate build and the filed inputs. The assumptions are "
-        "placeholders, not forecasts; there is no single target value.",
+        "description": "The app's scenario DCF for one covered company: value per share per "
+        "scenario, the range, the price, the discount-rate build and the filed inputs. Uses the "
+        "owner's newest saved scenario set when one exists (assumptions_basis owner_saved), "
+        "otherwise default placeholders built from its own filed growth (say they are not "
+        "forecasts). There is no single target value.",
         "input_schema": {
             "type": "object",
             "properties": {"ticker": {"type": "string"}},
@@ -641,6 +714,7 @@ class ChatTools:
         embedder: Embedder | None = None,
         *,
         owner_id: str | None = None,
+        doc_embedder: Embedder | None = None,
     ) -> None:
         # Outside chat (the research run) there is no conversation: `conversation_id` is None,
         # and owner-scoped tools use `owner_id` if given, else report that they have no owner.
@@ -650,6 +724,8 @@ class ChatTools:
         self.message_id = message_id
         self.owner_id = owner_id
         self.embedder = embedder
+        # Embeds document-search queries; must be the model the passages were embedded with.
+        self.doc_embedder = doc_embedder
         self.used: list[str] = []
         self.actions: list[int] = []
         # One entry per call, for the job's step detail: what was asked, how long it took,
@@ -660,7 +736,7 @@ class ChatTools:
         self.used.append(name)
         started = time.monotonic()
         known = len(self.registry.sources)
-        result = await self._dispatch(name, args)
+        result = legacy_envelope.wrap(name, await self._dispatch(name, args), self.registry)
         self.trace.append(
             {
                 "tool": name,
@@ -706,7 +782,9 @@ class ChatTools:
         return await research_tools.fundamentals(self.pool, self.registry, ticker, groups, periods)
 
     async def _tool_valuation_scenarios(self, ticker: str) -> dict[str, Any]:
-        return await research_tools.valuation_scenarios(self.pool, self.registry, ticker)
+        return await research_tools.valuation_scenarios(
+            self.pool, self.registry, ticker, await self._owner()
+        )
 
     async def _tool_price_history(
         self, ticker: str, days: int = 365, benchmark: str | None = None
@@ -881,6 +959,42 @@ class ChatTools:
             return {"error": "this conversation has no owner"}
         return await analytics_tools.event_reach(
             self.pool, self.registry, owner, symbol, direction, state
+        )
+
+    async def _tool_agent_notes(self, ticker: str | None = None) -> dict[str, Any]:
+        rows = await self.pool.fetch(
+            "select id, ticker, text, updated_at from public.agent_note where active"
+            " and (ticker is null or ticker = $1) order by ticker nulls first, id limit 20",
+            ticker,
+        )
+        notes = []
+        for r in rows:
+            sid = self.registry.add(
+                "observation",
+                f"agent_note:{r['id']}",
+                f"Owner note{' on ' + r['ticker'] if r['ticker'] else ''}",
+                app_path="/agent-notes",
+                tier=1,
+                snippet=r["text"],
+                as_of=str(r["updated_at"].date()),
+            )
+            notes.append(
+                {"source_id": sid, "ticker": r["ticker"], "note": r["text"], "author": "owner"}
+            )
+        return {
+            "tool": "agent_notes",
+            "notes": notes,
+            "note": None if notes else "The owner has written no notes for this scope.",
+        }
+
+    async def _tool_event_feed(
+        self, days: int = 14, ticker: str | None = None, limit: int = 10
+    ) -> dict[str, Any]:
+        owner = await self._owner()
+        if owner is None:
+            return {"error": "this conversation has no owner"}
+        return await analytics_tools.event_feed(
+            self.pool, self.registry, owner, days, ticker, limit
         )
 
     async def _tool_fund_overlap(self, ticker: str) -> dict[str, Any]:
@@ -1183,6 +1297,70 @@ class ChatTools:
                     "match": f"similar in meaning ({score:.2f}), not the same words",
                 }
             )
+        return out
+
+    async def _tool_search_documents(
+        self,
+        query: str,
+        ticker: str | None = None,
+        kinds: list[str] | None = None,
+        since: str | None = None,
+        until: str | None = None,
+        limit: int = 8,
+    ) -> dict[str, Any]:
+        if not isinstance(query, str) or not query.strip():
+            return {"error": "give a query"}
+        bad = [k for k in kinds or [] if k not in DOCUMENT_KINDS]
+        if bad:
+            return {"error": f"kinds must be among {', '.join(DOCUMENT_KINDS)}"}
+        filters = Filters(
+            tickers=(ticker.strip(),) if ticker and ticker.strip() else (),
+            kinds=tuple(kinds or ()),
+            since=dt.date.fromisoformat(since) if since else None,
+            until=dt.date.fromisoformat(until) if until else None,
+        )
+        found = await retrieval_search.search(
+            self.pool,
+            self.doc_embedder or self.embedder,
+            query.strip(),
+            filters=filters,
+            limit=limit,
+        )
+        hits = []
+        for rank, h in enumerate(found.hits):
+            sid = self.registry.add(
+                DOCUMENT_SOURCE_KIND[h.kind],
+                f"chunk:{h.chunk_id}",
+                f"{h.title}"
+                + (f" - {h.section_path}" if h.section_path not in (None, h.title) else ""),
+                url=h.source_url,
+                app_path=h.app_path,
+                tier=h.tier,
+                snippet=h.text[:1500],
+                as_of=str(h.as_of) if h.as_of else None,
+            )
+            hits.append(
+                {
+                    "source_id": sid,
+                    "kind": h.kind,
+                    "title": h.title,
+                    "section": h.section_path,
+                    "date": str(h.as_of) if h.as_of else None,
+                    "tickers": list(h.tickers),
+                    "passage": h.text[:1500],
+                    **({"section_context": h.context[:1200]} if rank < 3 and h.context else {}),
+                    "matched_by": [
+                        n
+                        for n, r in (("keywords", h.keyword_rank), ("meaning", h.vector_rank))
+                        if r is not None
+                    ],
+                }
+            )
+        out: dict[str, Any] = {"passages": hits}
+        if not hits:
+            out["note"] = "no indexed passage matches; the documents may not be indexed yet"
+        if found.notes:
+            out["notes"] = found.notes
         return out
 
     async def _tool_get_story_thread(self, story_id: int) -> dict[str, Any]:

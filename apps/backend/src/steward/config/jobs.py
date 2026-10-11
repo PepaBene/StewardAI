@@ -252,6 +252,63 @@ class AiApprovalSettings(ConfigModel):
         return self
 
 
+class DocumentIndexSettings(ConfigModel):
+    """The passage index that `search_documents` reads: filings and results releases, your
+    reports, theses and notes, and news, split into passages and embedded. Text is indexed
+    first (keyword search works at once); embedding is capped per run, newest first, so one run
+    costs a bounded amount. A changed document is re-indexed; an unchanged one is never
+    embedded twice."""
+
+    embedding_model: ModelId = Field(
+        default="gemini-embedding-2",
+        description="Embeds the passages and the search queries. Changing it re-embeds every "
+        "passage over the following runs.",
+    )
+    embedding_dimensions: int = Field(
+        default=768,
+        ge=128,
+        le=3072,
+        description="768 is the dimension the vector index is built for; others are stored "
+        "and searched without the index.",
+    )
+    embed_per_run: int = Field(
+        default=1500, ge=0, le=20000, description="Passages embedded per run (0: none)."
+    )
+    filings_per_run: int = Field(
+        default=20, ge=0, le=200, description="Archived documents read and split per run."
+    )
+    reports_per_run: int = Field(default=200, ge=0, le=2000, description="Reports indexed per run.")
+    news_per_run: int = Field(default=600, ge=0, le=5000, description="News items indexed per run.")
+    news_days: int = Field(
+        default=365,
+        ge=7,
+        le=730,
+        description="News older than this is not added to the index (full-text search over "
+        "the stored news is unaffected).",
+    )
+
+
+class InboxSettings(ConfigModel):
+    """Event-driven agents: each new escalation note or thesis-breach alert starts one bounded
+    run that reads the app's records and leaves an inbox item with the evidence and at most
+    one proposed action. A run never trades, never edits a thesis and never starts a job: the
+    owner confirms a proposed action in the inbox."""
+
+    enabled: bool = True
+    model: ModelId = Field(default="gpt-6-luna", description="The model of the agent run.")
+    effort: Effort | None = Field(default="low", description=EFFORT_HELP)
+    max_steps: int = Field(default=8, ge=2, le=30, description="Model calls per run.")
+    lookback_days: int = Field(
+        default=7, ge=1, le=60, description="Triggers older than this are not picked up."
+    )
+    max_per_scan: int = Field(
+        default=5, ge=1, le=50, description="Runs one scan may queue, newest trigger first."
+    )
+    min_severity: int = Field(
+        default=2, ge=0, le=3, description="Alerts below this severity start no run."
+    )
+
+
 class ExposureBuildSettings(ConfigModel):
     """The AI steps of the exposure builder. The country split from XBRL needs no AI and always
     runs. Each annual report is read at most once; nothing is guessed: a figure is stored only
@@ -2249,6 +2306,16 @@ class JobsConfig(ConfigModel):
         "SEC XBRL filing (reported basis). Your own exposure entries are never changed. "
         "Default: Tuesdays 05:50.",
     )
+    document_index: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="20 3 * * *"),
+        description="Splits new filings, reports, theses, notes and news into passages and "
+        "embeds them for document search. Default: daily 03:20.",
+    )
+    inbox_scan: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="10 * * * *"),
+        description="Looks for new escalation notes and thesis-breach alerts and queues an "
+        "agent run for each, which leaves an inbox item. Default: hourly at :10.",
+    )
     factor_returns: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="30 5 * * 1"),
         description="Downloads the Ken French Data Library daily factor returns (market, size, "
@@ -2294,6 +2361,8 @@ class JobsConfig(ConfigModel):
     )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
     exposure_build_settings: ExposureBuildSettings = Field(default_factory=ExposureBuildSettings)
+    document_index_settings: DocumentIndexSettings = Field(default_factory=DocumentIndexSettings)
+    inbox_settings: InboxSettings = Field(default_factory=InboxSettings)
     ir_discovery_settings: IrDiscoverySettings = Field(default_factory=IrDiscoverySettings)
     gap_research_settings: GapResearchSettings = Field(default_factory=GapResearchSettings)
     ai_approval: AiApprovalSettings = Field(default_factory=AiApprovalSettings)
@@ -2368,6 +2437,8 @@ class JobsConfig(ConfigModel):
             "news_brief": self.news_brief,
             "gap_research": self.gap_research,
             "exposure_build": self.exposure_build,
+            "document_index": self.document_index,
+            "inbox_scan": self.inbox_scan,
             "factor_returns": self.factor_returns,
             "disclosure_sources": self.disclosure_sources,
             "disclosure_ingest": self.disclosure_ingest,

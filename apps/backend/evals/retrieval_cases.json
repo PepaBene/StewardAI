@@ -1,0 +1,5 @@
+{
+  "description": "Retrieval evaluation set (agentic workflows and RAG plan, AG2). Each case is a question and the stored documents a good search must surface: {\"kind\": \"report\", \"ref\": \"<report id>\"}, {\"kind\": \"filing\", \"ref\": \"<evidence sha256>\"}, {\"kind\": \"thesis\", \"ref\": \"<ticker>\"}, {\"kind\": \"note\", \"ref\": \"<note id>\"}, {\"kind\": \"news\", \"ref\": \"<news item id>\"}. Write the cases against the real corpus after the first document_index run, including paraphrased queries that share no words with the passage, then run `python -m steward.retrieval.eval --k 5` and keep the embeddings only if hybrid recall beats keyword recall. See steward/retrieval/eval.py.",
+  "version": 1,
+  "cases": []
+}

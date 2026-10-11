@@ -117,6 +117,7 @@ export const OTHER_PAGES = [
   { href: "/config", label: "Config: Export or import", keywords: "backup json file git" },
   { href: "/status#reference-gaps", label: "Reference data gaps", keywords: "identity unresolved figi isin lei stooq prices missing symbol coverage" },
   { href: "/news/disputed", label: "Disputed stories", keywords: "news contradicted conflicting sources resolve confirm false side by side" },
+  { href: "/inbox", label: "Agent inbox", keywords: "inbox agent events proposed action confirm notes cost latency routes" },
   { href: "/escalations", label: "Impact notes (escalations)", keywords: "escalations reports thesis kpi exit price move confirmed stories" },
   { href: "/reviews", label: "Monthly reviews", keywords: "reports review compliance rules breach pass proposed actions month" },
   { href: "/reports?type=research", label: "Search reports", keywords: "archive full text search digests reviews research impact notes find phrase ticker" },

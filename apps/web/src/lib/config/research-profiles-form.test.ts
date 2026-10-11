@@ -81,6 +81,7 @@ describe("research profiles form", () => {
       "standard",
       "quick",
       "deep-thesis",
+      "deep-agentic",
       "earnings-update",
     ]);
     expect(researchProfilesToBody(form)).toEqual(DEFAULT_RESEARCH_PROFILES);
@@ -378,8 +379,14 @@ describe("web default profiles and templates match the backend defaults", () => 
   const profile = (id: string) => defaults.profiles!.find((p) => p.id === id)!;
   const template = (id: string) => defaults.templates!.find((t) => t.id === id)!;
 
-  it("has the four profiles and two templates, standard as default", () => {
-    expect(defaults.profiles!.map((p) => p.id)).toEqual(["standard", "quick", "deep-thesis", "earnings-update"]);
+  it("has the five profiles and two templates, standard as default", () => {
+    expect(defaults.profiles!.map((p) => p.id)).toEqual([
+      "standard",
+      "quick",
+      "deep-thesis",
+      "deep-agentic",
+      "earnings-update",
+    ]);
     expect(defaults.default_profile).toBe("standard");
     expect(defaults.templates!.map((t) => t.id)).toEqual(["thesis-memo", "update-note"]);
   });
@@ -394,6 +401,13 @@ describe("web default profiles and templates match the backend defaults", () => 
       min_sentences: 2,
       authoring: "research_only",
       planning: "code",
+      engine: "fixed",
+      lenses: ["financials", "filings_events", "news_web", "portfolio_risk", "counter_case"],
+      worker_model: "gpt-6-luna",
+      worker_effort: "low",
+      worker_max_steps: 12,
+      worker_max_searches: 8,
+      parallel_workers: 2,
     });
     const pick = (p: ReturnType<typeof profile>) => ({
       mode: p.mode,

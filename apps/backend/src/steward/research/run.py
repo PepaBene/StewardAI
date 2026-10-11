@@ -25,6 +25,7 @@ import datetime as dt
 import json
 import math
 import time
+from collections import Counter
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -45,6 +46,14 @@ from steward.jobs.runner import JobContext, JobFailed
 from steward.llm.client import create_llm
 from steward.llm.routing import routing_client
 from steward.news.normalize import host_of
+from steward.research.agents import (
+    AgentRun,
+    LLMWorker,
+    Worker,
+    WorkerRecord,
+    findings_text,
+    run_agents,
+)
 from steward.research.gather import Gathered, Valuation, gather
 from steward.research.layout import SectionSpec, investigation_profile, resolve_layout
 from steward.research.ledger import ClaimLedger, SectionInput, build_ledger
@@ -193,9 +202,28 @@ class ResearchBody(BaseModel):
     # The plan's stored-data tools as the run called them (the same tools chat uses), one
     # compact record per call, so research and chat can be compared. Older reports have none.
     tool_calls: list[ToolCallRecord] = Field(default_factory=list)
+    # The engine that ran and, for the agentic one, what each worker did (metadata only).
+    engine: str = "fixed"
+    agents: list[WorkerRecord] = Field(default_factory=list)
     # Per-call trace of the run (model calls, searches, retrieval, output validation): metadata
     # only, removed by the purge and the retention job. Older reports have none.
     trace: ResearchTrace | None = None
+
+
+def agent_model_trace(record: WorkerRecord) -> ModelCallTrace:
+    outcome = {"ok": "ok", "no_findings": "ok", "refused": "refused", "not_run": "skipped"}
+    return ModelCallTrace(
+        step=f"worker:{record.lens}",
+        model=record.model,
+        input_tokens=record.input_tokens,
+        output_tokens=record.output_tokens,
+        cache_read_tokens=record.cache_read_tokens,
+        searches=record.searches,
+        cost_usd=record.cost_usd,
+        ms=record.ms,
+        outcome=outcome.get(record.outcome, "failed"),
+        note=clip(record.note or "", 160) or None,
+    )
 
 
 @dataclass
@@ -206,6 +234,7 @@ class ResearchDeps:
     app_url: str | None = None
     prompts: dict[str, str] = field(default_factory=dict)  # the system texts, for the snapshot
     planner: ResearchPlanner | None = None  # the model planning step; None = code plan
+    worker: Worker | None = None  # the agentic engine's lens worker; None = fixed pipeline
 
 
 def _source_line(s: Source) -> str:
@@ -526,9 +555,84 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
     per_section_searches = math.ceil(first_searches / len(model_specs)) if model_specs else 0
     budget = {"steps": 0, "searches": 0}
     written: dict[str, dict[str, Any]] = {}
+
+    agent_run: AgentRun | None = None
+    agent_notes: list[str] = []
+    if profile.engine == "agentic" and model_specs and deps.worker is not None:
+        # Workers spend from the same profile budget: leave one step per section for the
+        # writer, divide the rest between the lenses, and cap their searches by the first-pass
+        # share. The writer then searches nothing in the first pass: the workers did.
+        step_room = first_steps - len(model_specs)
+        worker_steps = min(profile.worker_max_steps, step_room // len(profile.lenses))
+
+        async def do_agents() -> dict[str, Any]:
+            async with ctx.step("agents") as step:
+                run_out = await run_agents(
+                    deps.worker,  # type: ignore[arg-type]
+                    lenses=list(profile.lenses),
+                    name=gathered.name,
+                    ticker=ticker,
+                    today=deps.now.date().isoformat(),
+                    model=profile.worker_model,
+                    effort=profile.worker_effort,
+                    max_steps=worker_steps,
+                    worker_searches=profile.worker_max_searches,
+                    total_searches=first_searches,
+                    parallel=profile.parallel_workers,
+                    domains=domains,
+                    caller=ChatTools(pool, reg, None, None).call,
+                    registry=reg,
+                    tier_of=tier_of,
+                    cost_of=lambda u: cost_of(u),
+                )
+                total = Usage(model=profile.worker_model)
+                for rec in run_out.records:
+                    total.input_tokens += rec.input_tokens
+                    total.output_tokens += rec.output_tokens
+                    total.cache_read_tokens += rec.cache_read_tokens
+                    total.searches += rec.searches
+                step.usage = total.step_usage()
+                step.detail.update(
+                    workers=len(run_out.records),
+                    findings=len(run_out.findings),
+                    sources_added=run_out.sources_added,
+                    searches=run_out.searches_used,
+                    by_outcome=dict(Counter(r.outcome for r in run_out.records)),
+                )
+                return {
+                    "run": run_out.model_dump(mode="json"),
+                    "sources": [s.model_dump(mode="json") for s in reg.sources[known_sources:]],
+                }
+
+        if worker_steps >= 2:
+            known_sources = len(reg.sources)
+            stored = await ctx.checkpoint("agents", do_agents)
+            agent_run = AgentRun.model_validate(stored["run"])
+            for src in (Source.model_validate(s) for s in stored["sources"]):
+                # Resumed: the workers did not run again, so put their sources back, in order.
+                reg.add(
+                    src.kind,
+                    src.ref,
+                    src.title,
+                    **src.model_dump(exclude={"id", "kind", "ref", "title"}),
+                )
+            flag_sources(reg.sources[known_sources:])
+            budget["steps"] += sum(r.steps for r in agent_run.records)
+            budget["searches"] += agent_run.searches_used
+            trace_parts.extend(
+                {"model": agent_model_trace(r).model_dump()} for r in agent_run.records
+            )
+        else:
+            agent_notes.append(
+                "Agentic engine skipped: the profile's step budget leaves too little for workers."
+            )
+    if agent_run is not None:
+        per_section_searches = 0
     # The gathered material is identical for every section (the writer caches it); sources
     # added by search go in a separate, per-section part.
     material = material_text(gathered, reg)
+    if agent_run is not None and (block := findings_text(agent_run)):
+        material += f"\n\n{block}"
     gathered_count = len(reg.sources)
 
     async def write_section(
@@ -963,6 +1067,9 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         if profile.language == "cs":
             notes.append("Sections written from stored records are in English.")
         notes.extend(tool_run.notices)
+        notes.extend(agent_notes)
+        if agent_run is not None:
+            notes.extend(agent_run.notices)
         proposal = build_proposal(
             profile.authoring,
             ticker,
@@ -1076,6 +1183,8 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             flagged_sources=flagged,
             links_removed=links_removed,
             tool_calls=tool_run.records,
+            engine=profile.engine,
+            agents=agent_run.records if agent_run else [],
             trace=trace,
         )
         report_id: int = await pool.fetchval(
@@ -1185,11 +1294,15 @@ async def research_handler(ctx: JobContext) -> None:
     planner: ResearchPlanner | None = None
     writer_system = prompts.text("research_writer", WRITER_SYSTEM)
     verifier_system = prompts.text("claim_verifier", VERIFIER_SYSTEM)
+    worker: Worker | None = None
     try:
-        client = routing_client(create_llm(settings))
+        llm = create_llm(settings)
+        client = routing_client(llm)
     except AINotConfigured:
         writer = verifier = None
     else:
+        if profile and profile.engine == "agentic":
+            worker = LLMWorker(llm)
         cheap = (verification.body if verification else VerificationConfig()).claim_verifier.model
         if profile and profile.planning == "model":
             planner = LLMResearchPlanner(client, profile.planner_model or cheap)
@@ -1216,5 +1329,6 @@ async def research_handler(ctx: JobContext) -> None:
             app_url=settings.app_url,
             prompts={"research_writer": writer_system, "claim_verifier": verifier_system},
             planner=planner,
+            worker=worker,
         ),
     )

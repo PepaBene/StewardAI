@@ -34,6 +34,7 @@ from steward.fundamentals.ir_discovery import ir_discovery_handler
 from steward.fundresearch.issuer_sync import fund_issuer_facts_handler
 from steward.funds.drift import fund_characteristics_audit_handler
 from steward.graph.jobs import graph_review_handler
+from steward.inbox.run import inbox_agent_handler, inbox_scan_handler
 from steward.jobs.runner import JobHandler
 from steward.lookthrough.collect import etf_look_through_handler
 from steward.macro.collect import macro_collect_handler
@@ -60,6 +61,7 @@ from steward.reference.returns import returns_refresh_handler
 from steward.research.retention import research_trace_retention_handler
 from steward.research.run import research_handler
 from steward.research.web_facts import gap_research_handler
+from steward.retrieval.job import document_index_handler
 from steward.review.monthly import monthly_review_handler
 from steward.sources.audit import source_audit_handler
 from steward.sources.fund_probes import fund_probes_handler
@@ -139,6 +141,9 @@ JobType = Literal[
     "news_brief",
     "gap_research",
     "exposure_build",
+    "document_index",
+    "inbox_scan",
+    "inbox_agent",
     "factor_returns",
     "disclosure_sources",
     "disclosure_ingest",
@@ -209,6 +214,9 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "news_brief": news_brief_handler,
     "gap_research": gap_research_handler,
     "exposure_build": exposure_build_handler,
+    "document_index": document_index_handler,
+    "inbox_scan": inbox_scan_handler,
+    "inbox_agent": inbox_agent_handler,
     "factor_returns": factor_returns_handler,
     "disclosure_sources": disclosure_sources_handler,
     "disclosure_ingest": disclosure_ingest_handler,
