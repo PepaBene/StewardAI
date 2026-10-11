@@ -22,7 +22,7 @@ from steward.news.analysis_job import news_analysis_handler
 from steward.news.claims import ClaimVerdicts
 from steward.news.extract import StoryExtraction
 from steward.news.framing import FramingComparison
-from steward.news.impact import ImpactNotes
+from steward.news.impact import ImpactNotes, PathNote
 from steward.news.read_analysis import (
     NewsFeedbackIn,
     WireFilters,
@@ -193,7 +193,16 @@ class FakeAnalysisLLM:
                 }
             )
         elif request.schema is ImpactNotes:
-            parsed = ImpactNotes()
+            parsed = (
+                ImpactNotes(
+                    paths=[
+                        PathNote(path_index=0, text="Apple parts are used in Microsoft devices."),
+                        PathNote(path_index=1, text="This note has no path."),
+                    ]
+                )
+                if self.rich
+                else ImpactNotes()
+            )
         elif request.schema is FramingComparison:
             parsed = (
                 self.framing(request)
@@ -497,6 +506,63 @@ async def test_framing_and_claim_checks_are_saved_with_only_their_verified_parts
     checked = claims["claims"][0]
     assert checked["verdict"] == "supported"
     assert checked["primary_url"] == "https://ir.apple.test/n/1" and checked["quote"]
+
+
+async def test_impact_chains_come_from_the_graph_and_the_model_only_adds_a_sentence(
+    backend_pool: asyncpg.Pool, feeds: Feeds, http: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from steward.xray.supply_chain import SupplyChain, SupplyEdge, SupplyNode
+
+    edge = SupplyEdge(
+        id=None,
+        supplier="AAPL",
+        customer="MSFT",
+        product="parts",
+        customer_share=0.2,
+        source_url="https://sec.gov/x",
+        as_of=dt.date.today(),
+        origin="filing",
+    )
+    graph = SupplyChain(
+        nodes=[
+            SupplyNode(
+                symbol="AAPL", name="Apple", weight=0.1, held=True, direct_weight=0.1, level=0
+            ),
+            SupplyNode(
+                symbol="MSFT", name="Microsoft", weight=0.05, held=True, direct_weight=0.05, level=1
+            ),
+        ],
+        edges=[edge],
+        linked=[],
+        held_in_graph=0.15,
+        notes=[],
+    )
+
+    async def fake_graph(pool: Any) -> tuple[Any, dict[str, list[str]], None]:
+        return graph, {}, None
+
+    await prepare(backend_pool, feeds, http, ["extraction", "impact"])
+    monkeypatch.setattr(analysis_job, "load_graph", fake_graph)
+    monkeypatch.setattr(analysis_job, "make_llm", lambda: FakeAnalysisLLM(rich=True))
+
+    assert await analyse(backend_pool) == "succeeded"
+
+    guidance = await backend_pool.fetchval(
+        "select id from story_cluster where headline like 'Apple cuts full-year guidance%'"
+    )
+    impact = await latest_analysis(backend_pool, guidance, "impact")
+    assert impact is not None
+    chains = {(c["relation"], c["holding"]): c for c in impact["chains"]}
+    # The chains are the graph's; the model supplied only the sentence on the second-order one.
+    assert set(chains) == {("direct", "AAPL"), ("second_order", "MSFT")}
+    assert chains[("second_order", "MSFT")]["note"] == "Apple parts are used in Microsoft devices."
+    assert chains[("direct", "AAPL")]["note"] is None
+    assert impact["direct_weight"] == pytest.approx(0.1)
+    assert impact["reached_weight"] == pytest.approx(0.05)
+    model = await backend_pool.fetchval(
+        "select model from story_analysis where cluster_id = $1 and kind = 'impact'", guidance
+    )
+    assert model  # explained by the model, not the code-only result
 
 
 async def test_quiet_confirmed_stories_resolve_and_others_do_not(

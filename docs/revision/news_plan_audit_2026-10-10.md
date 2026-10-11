@@ -21,7 +21,7 @@ Status: `open`, `fixed`, `rejected` (false positive), `deferred` (reason given).
 | M2 | `ai_search.py:152,241` | Only `SearchLeadError` caught; BudgetExceeded escapes, the store step is skipped, leads lost, failed-job alert daily at the 2.5 USD cap. | fixed |
 | M3 | `analysis_job.py:384-406` | If `explain_chains` raises, the code-only result is saved under the "explained" hash; never retried; row records a model that did not run. | fixed |
 | M4 | `translate.py:85` `numbers_in` | Numbers glued to letters ("$12bn", "3x", "5m") not checked; separators stripped so "1.5" equals "15". Used by briefs, glosses, claim verdicts, extraction magnitude. | fixed |
-| M5 | extraction, framing, thesis, impact, brief | PLAN MISMATCH "zero uncited claims saved": framing `headline_claim`/`emphasised_cause`/conflicts, thesis `reason`, impact notes and hypotheses, brief `why`/`watch` are saved without span check. | fixed for numbers; sentences without numbers cannot be verified in code (remaining gap) |
+| M5 | extraction, framing, thesis, impact, brief | PLAN MISMATCH "zero uncited claims saved": framing `headline_claim`/`emphasised_cause`/conflicts, thesis `reason`, impact notes and hypotheses, brief `why`/`watch` are saved without span check. | fixed: numbers are checked everywhere; sentences that report the text (framing headline claim and cause, brief line text) are also checked for content words in the sources (`ungrounded`, needs 3+ words). Reasons, hypotheses and conflict sentences are interpretation and get the number check only |
 | M6 | `analysis_job.py:725`, `brief.py:92` | PLAN MISMATCH "sentiment never alerts": `alert_brief` picks top 3 by `score`, which includes the sentiment nudge. | fixed |
 | M7 | `analysis_job.py:561-568` | PLAN MISMATCH lazy top-N: `pick_stories` orders by severity and `last_seen`, not exposure x materiality; a story with no items consumes an `analysis_per_run` slot; no on-demand analysis. | fixed |
 | M8 | `extract.py:114-115` | Claim whose `item_id` is not a story item is span-checked against all items and kept with the wrong `item_id`. | fixed |
@@ -81,7 +81,7 @@ Status: `open`, `fixed`, `rejected` (false positive), `deferred` (reason given).
 
 | # | Where | Issue | Status |
 |---|---|---|---|
-| T1 | `test_news_n6_db.py:175-227` | Fake LLM returns empty framing/claims/notes; only extraction, novelty, thread rows asserted. No coverage of impact, framing, claims, thesis, market, themes saves. | fixed: framing (quotes, invented-figure cause and conflict dropped) and claim check saves are asserted; impact notes are not (needs an exposure graph fixture) |
+| T1 | `test_news_n6_db.py:175-227` | Fake LLM returns empty framing/claims/notes; only extraction, novelty, thread rows asserted. No coverage of impact, framing, claims, thesis, market, themes saves. | fixed: framing, claim check and impact chains are asserted (impact chains come from a patched exposure graph; the model supplies only the sentence) |
 | T2 | tests | No coverage of `resolve_quiet_stories`, `alert_brief`, `fetch_gdelt`, `write_theme_briefs`, `extract_batched`, sentiment job path. | fixed: tests added for alert_brief, fetch_gdelt, event_day_of, centroid, framing numbers, like_pattern, resolve_quiet_stories, theme narratives, sentiment job path, batched extraction |
 | T3 | `test_news_n3_db.py:157` | Lead is wire-only so zero alerts is trivial. | fixed |
 | T4 | `test_news_wire_db.py:136` | `health == "down" or backoff_until <= now` likely always true. | fixed |

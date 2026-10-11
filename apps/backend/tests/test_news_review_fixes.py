@@ -181,6 +181,46 @@ async def test_fetch_gdelt_stops_at_the_first_failure_and_stores_nothing_for_it(
     assert json.dumps(out)
 
 
+def test_a_sentence_about_something_the_sources_never_mention_is_ungrounded() -> None:
+    from steward.news.translate import ungrounded, unsupported
+
+    source = ["Apple cuts full-year guidance on weak iPhone demand in China"]
+    assert not ungrounded("Apple lowered its guidance because iPhone demand was weak", source)
+    assert not ungrounded("Apple guidance lowered on weaker iPhone demand", source)
+    assert not ungrounded("A ban ends sales there", source)  # too few words to judge
+    assert ungrounded("The central bank raised interest rates sharply", source)
+    assert unsupported("Apple guidance fell by 40%", source)  # a grounded sentence, invented figure
+    assert unsupported("Tariffs hit shipping insurers", source)  # no invented number, off topic
+    assert not unsupported("Apple guidance weakened", source)
+    # Text with no comparable words (CJK, or only short words) is not judged by this check.
+    assert not ungrounded("アップルは下方修正した", source)
+    assert not ungrounded("It is up a lot", source)
+
+
+def test_a_brief_line_off_topic_for_its_story_is_rejected() -> None:
+    from steward.news.brief import accepted
+
+    story = Story()
+    candidate = SimpleNamespace(
+        story=SimpleNamespace(
+            headline="Alpha agrees a 12bn deal",
+            items=[SimpleNamespace(id=1, text="Alpha agrees a 12bn takeover of Beta")],
+            severity=3,
+        ),
+        claims=["Alpha will buy Beta"],
+        exposure=0.1,
+    )
+    on_topic = SimpleNamespace(
+        item_ids=[1], text="Alpha agrees to buy Beta in a 12bn takeover", why="", watch=None
+    )
+    off_topic = SimpleNamespace(
+        item_ids=[1], text="Central banks held interest rates steady", why="", watch=None
+    )
+    assert accepted(candidate, on_topic)  # type: ignore[arg-type]
+    assert not accepted(candidate, off_topic)  # type: ignore[arg-type]
+    assert story is not None
+
+
 def test_canonical_url_keeps_numeric_article_ids_but_strips_word_tracking() -> None:
     from steward.news.normalize import canonical_url
 

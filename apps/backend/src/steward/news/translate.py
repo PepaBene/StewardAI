@@ -15,6 +15,7 @@ its original text and its embedding.
 """
 
 import json
+import math
 import re
 import unicodedata
 from collections.abc import Sequence
@@ -119,14 +120,53 @@ def numbers_in(text: str) -> list[str]:
 
 
 def invents_numbers(text: str, sources: Sequence[str]) -> bool:
-    """Whether `text` carries a number that none of the `sources` has. This is the check every
-    saved model sentence passes at least: a figure the stored text does not contain is the
-    model's own. (Whether a sentence without numbers is faithful to its source cannot be checked
-    in code; those are the owner's marks in the benchmark.)"""
+    """Whether `text` carries a number that none of the `sources` has. A figure the stored text
+    does not contain is the model's own."""
     have: set[str] = set()
     for source in sources:
         have |= set(numbers_in(source))
     return any(n not in have for n in numbers_in(text))
+
+
+_WORD = re.compile(r"[^\W\d_]{5,}", re.UNICODE)
+_STOPWORDS = frozenset(
+    "about above after again against among because before being between could during every "
+    "other should their there these they those through under until where which while would "
+    "also however while since still that this with from have been were will into over than "
+    "then them what when whom more most some such only both each very".split()
+)
+MIN_GROUNDED = 0.34
+MIN_WORDS = 3
+
+
+def _stems(text: str) -> set[str]:
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    return {w[:5] for w in _WORD.findall(folded) if w not in _STOPWORDS}
+
+
+def ungrounded(text: str, sources: Sequence[str], min_ratio: float = MIN_GROUNDED) -> bool:
+    """Whether a sentence shares too few content words with the `sources` it claims to rest on.
+
+    Words of five letters or more (stopwords aside) are compared by their first five letters, so
+    plurals and endings match; at least `min_ratio` of the sentence's words must occur in a
+    source. This does not prove a sentence is faithful, it catches the ones that are about
+    something the text never mentions. It is for sentences that report what the text says; a
+    reason or a hypothesis is interpretation and uses other words, so it gets the number check
+    only. A sentence with fewer than `MIN_WORDS` such words (a short one, or CJK text) has too
+    little to judge and is not rejected here."""
+    mine = _stems(text)
+    if len(mine) < MIN_WORDS:
+        return False
+    have: set[str] = set()
+    for source in sources:
+        have |= _stems(source)
+    grounded = sum(1 for w in mine if w in have)
+    return grounded < max(1, math.ceil(min_ratio * len(mine)))
+
+
+def unsupported(text: str, sources: Sequence[str]) -> bool:
+    """A model sentence that invents a number or is not about anything in its sources."""
+    return invents_numbers(text, sources) or ungrounded(text, sources)
 
 
 def check_translation(source: TranslateItem, raw: TranslatedItem) -> Translation | None:

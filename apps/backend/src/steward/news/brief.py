@@ -28,7 +28,7 @@ from steward.llm.client import LLM
 from steward.news.analysis import StoryMaterial, latest_analysis, load_story, structured
 from steward.news.impact import ATTRIBUTE_RANK_FACTOR
 from steward.news.market import region_of
-from steward.news.translate import numbers_in
+from steward.news.translate import numbers_in, ungrounded
 
 SYSTEM_PROMPT = """\
 You write lines for a portfolio brief from verified facts about news stories. Each story has an \
@@ -235,7 +235,12 @@ def accepted(c: Candidate, line: WrittenLine) -> bool:
     have |= set(numbers_in(f"{c.exposure * 100:.0f}% {c.exposure * 100:.1f}%"))
     have |= {str(c.story.severity)}
     mentioned = numbers_in(line.text) + numbers_in(line.why) + numbers_in(line.watch or "")
-    return all(n in have for n in mentioned)
+    if not all(n in have for n in mentioned):
+        return False
+    # The line itself reports the story: it must be about what the story says. (`why` and
+    # `watch` are interpretation and look ahead, so they are held to the number check only.)
+    facts = [c.story.headline, *(i.text for i in c.story.items), *c.claims]
+    return not ungrounded(line.text, facts)
 
 
 def facts_block(chosen: Sequence[Candidate]) -> str:
