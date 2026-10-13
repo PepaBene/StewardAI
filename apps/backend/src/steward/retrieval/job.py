@@ -33,6 +33,7 @@ async def document_index_handler(ctx: JobContext) -> None:
                 "new": stats.documents,
                 "unchanged": stats.skipped,
                 "passages": stats.children,
+                "vectors_kept": stats.reused,
             }
 
         # Owner-edited records: every run re-reads them, the text hash decides what changes.

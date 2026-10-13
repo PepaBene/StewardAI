@@ -537,6 +537,13 @@ class NewsSettings(ConfigModel):
     classification_batch_size: int = Field(
         default=50, ge=5, le=100, description="Items per classification call."
     )
+    rules_first_classification: bool = Field(
+        default=True,
+        description="Settle in code, without the model, a watch-topic hit linked to holdings "
+        "only through the topic term (other, not relevant) and a headline that repeats an "
+        "already classified one with the same candidate holdings (it takes that label). "
+        "Measured on the stored wire: 598 of 598 and 87 of 87 matched the model.",
+    )
     classification_use_batch: bool = Field(
         default=True,
         description="Send a run's classification calls through the provider's batch API (half"
@@ -589,6 +596,13 @@ class NewsSettings(ConfigModel):
         description="The model that web-searches for recent news on thinly covered holdings.",
     )
     search_lead_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    ai_search_provider: Literal["model", "brave"] = Field(
+        default="model",
+        description="Who finds the leads: 'model' (the search model's built-in web search) or "
+        "'brave' (a plain search API for the links, at a fraction of the fee; needs "
+        "BRAVE_API_KEY, and the model then only drops pages that are not about the company). "
+        "Switch only after the lead-recall check against the model path.",
+    )
     ai_search_max_searches: int = Field(
         default=3, ge=1, le=20, description="Web searches per holding per run."
     )
@@ -1604,6 +1618,15 @@ class ChatSettings(ConfigModel):
 
     model: ModelId = "gpt-6.1-sol"
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    escalation_model: ModelId | None = Field(
+        default=None,
+        description="Cascade (cost lever C6): when set, a question the model above could not "
+        "answer (no parseable answer, a refusal, the step cap, or an answer that says it has "
+        "too little evidence or cites nothing) is asked again on this stronger model. Leave "
+        "empty until the chat question set shows the cheaper model above holds quality; the "
+        "first attempt is still paid for.",
+    )
+    escalation_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     rules_first: bool = Field(
         default=True,
         description="Answer a short, closed question about the portfolio's value or cash from "

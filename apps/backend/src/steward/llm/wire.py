@@ -371,6 +371,18 @@ def openai_batch_results(text: str, requests: Sequence[Request]) -> list[Complet
     return _by_index(found, len(requests))
 
 
+def _batch_request(req: Request) -> dict[str, Any]:
+    """A request as the batch endpoint takes it. Batch mode ignores `responseJsonSchema` (a live
+    probe on 13 October 2026: the model answered with its own structure, strings where the
+    schema wants objects, so every batched digest was discarded and asked again directly, paid
+    twice); the same schema under the underscore name is honoured."""
+    body = google_body(req)
+    config = body["generationConfig"]
+    if "responseJsonSchema" in config:
+        config["_responseJsonSchema"] = config.pop("responseJsonSchema")
+    return body
+
+
 def google_batch_body(requests: Sequence[Request], name: str) -> dict[str, Any]:
     """The `batchGenerateContent` body: the requests inline, each tagged with its key."""
     return {
@@ -379,7 +391,7 @@ def google_batch_body(requests: Sequence[Request], name: str) -> dict[str, Any]:
             "input_config": {
                 "requests": {
                     "requests": [
-                        {"request": google_body(r), "metadata": {"key": custom_id(i)}}
+                        {"request": _batch_request(r), "metadata": {"key": custom_id(i)}}
                         for i, r in enumerate(requests)
                     ]
                 }

@@ -287,10 +287,23 @@ async def mark_unsupported_figures(sentences: list[ChatSentence], registry: Regi
             sentences[i].unsupported = result.reason
 
 
+def needs_escalation(result: AssistantResult) -> bool:
+    """The signals that a cheaper model's turn should be asked again on a stronger one: nothing
+    parseable (a failed call, a refusal, the step cap), the model's own "not enough evidence",
+    or an answer with no source or link on any sentence. Judged before the citation checks, so
+    the signal is the model's, not the verifier's."""
+    draft = result.draft
+    if draft is None or draft.insufficient_evidence:
+        return True
+    return not any(s.source_ids or s.urls for s in draft.sentences)
+
+
 @dataclass
 class ChatDeps:
     assistant: ChatAssistant | None
     now: dt.datetime
+    # The stronger model for a turn that `needs_escalation` (settings.chat.escalation_model).
+    escalation: ChatAssistant | None = None
 
 
 async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
@@ -363,8 +376,27 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
     tools = ChatTools(
         pool, registry, conversation_id, message_id, embedder, doc_embedder=doc_embedder
     )
+    cascade: AssistantResult | None = None
+    if deps.assistant is not None and deps.escalation is not None:
+        # The cascade: the cheaper model tries first, in a step of its own so its cost is
+        # priced on its own model; only a turn with a failure signal is asked again.
+        async with ctx.step("first_try") as first:
+            cascade = await deps.assistant.answer(
+                history, question["content"], tools, deps.now.date()
+            )
+            first.usage = cascade.usage.step_usage()
+            escalate = needs_escalation(cascade)
+            first.detail.update(escalated=escalate, note=cascade.note)
+        if escalate:
+            async with ctx.step("escalate") as second:
+                cascade = await deps.escalation.answer(
+                    history, question["content"], tools, deps.now.date()
+                )
+                second.usage = cascade.usage.step_usage()
     async with ctx.step("answer") as step:
-        if deps.assistant is None:
+        if cascade is not None:
+            result = cascade
+        elif deps.assistant is None:
             result = AssistantResult(
                 None, Usage(model="none"), {}, "no OpenAI or Google API key is set"
             )
@@ -471,9 +503,21 @@ async def _run_chat_job(ctx: JobContext) -> None:
             domains,
             prompts.text("chat_assistant", SYSTEM, chat_settings.model),
         )
+    escalation: ChatAssistant | None = None
+    esc_model = chat_settings.escalation_model
+    if assistant is not None and esc_model and esc_model != chat_settings.model:
+        escalated = chat_settings.model_copy(
+            update={"model": esc_model, "effort": chat_settings.escalation_effort}
+        )
+        escalation = LLMChatAssistant(
+            llm, escalated, domains, prompts.text("chat_assistant", SYSTEM, esc_model)
+        )
     if chat_settings.rules_first:
         # Closed questions (portfolio value, cash) are answered from the read models.
         from steward.chat.rules import RuleChatAssistant
 
         assistant = RuleChatAssistant(assistant, chat_settings.model)
-    await run_chat(ctx, ChatDeps(assistant=assistant, now=dt.datetime.now(dt.UTC)))
+    await run_chat(
+        ctx,
+        ChatDeps(assistant=assistant, now=dt.datetime.now(dt.UTC), escalation=escalation),
+    )

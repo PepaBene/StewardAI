@@ -168,6 +168,21 @@ Added 11 October 2026. Goal: the lowest AI cost that still passes the existing q
 
 Items C1 to C3 need no migration and are the first work. C1(d) is the biggest single change and the only "big" one.
 
+### C1–C8 status (13 October 2026)
+
+All eight are in code. Anything that changes a model or effort in the live `jobs` config (version 63) is **not applied**: it waits for the owner after the gate result below.
+
+| # | State | Evidence and what is left |
+| --- | --- | --- |
+| C1 | Done, switchable | Search answers are cached (3 days; 1 day for news corroboration, escalation and research sections) in `news_ai_search`, corroboration, escalation, research, `ir_discovery`, `web_facts`. `news.ai_search_provider = "brave"` uses a plain search API (`search_api.py`, needs `BRAVE_API_KEY`) and a luna pick step; default stays `model`. Left: compare the leads of both providers on a real run before switching. |
+| C2 | Gated for two jobs | Digest (below): no luna effort passes. Claim verifier: `verify/eval.py --effort` added so the claims gate can be run per effort; apply a lower effort only after it passes. Left: `gap_research`, `peers`, `discover`, approvals have no side-by-side harness. |
+| C3 | Done | `Request.cache_key` is now forwarded by `RoutingClient` (it was dropped there) and sent as `prompt_cache_key`; the research writer uses `research:<job_id>`. Left: read the cache-read share in `GET /costs/summary` after a few runs. |
+| C4 | Done, one bug found and fixed | Gemini batch ignored `responseJsonSchema` (live probe: the model answered in its own shape, `overview` as a list of strings), so every Gemini batch answer was discarded and asked again directly, paid twice. Batch requests now send the schema as `_responseJsonSchema` (probe: valid). So the earlier "batch barely used" is also "batch on Google never worked". Left: turn `use_batch` on per job, one at a time, and watch `job_step.batch`. |
+| C5 | Gated for the digest only | `news/eval_digest.py` writes the same window with each candidate and counts sentences that survive the claim check. On 13 October: baseline `gemini-3.8-flash` 7 sentences, 5 supported, 2 unsupported; `gpt-6-luna` 7 / 1 / 6; `luna:low` 5 / 2 / 3; `luna:medium` 6 / 3 / 3. All three **fail**; the digest stays on flash. It is one window, so rerun with `--days-back` before treating it as final, and note flash's price doubles on 1 January 2027. Other flash jobs (`ai_approvals`, `gap_research`, `ir_discovery`, `exposure_build`, earnings locate) have no harness yet. |
+| C6 | Done, off by default | Chat tries `chat.model`, and `chat.escalation_model` answers the one turn when the first answer is empty, uncited or flagged (`needs_escalation`). Left: set the escalation model and measure the escalation rate on the AG0 chat set. |
+| C7 | Done, on by default | `news/classify_rules.py` settles two cases in code before any model call (`news.rules_first_classification`, with a web switch): a watch-topic hit linked to holdings only through the topic term (other, not relevant), and a headline that repeats an already classified one with the same candidate holdings (takes that label). Measured on the stored wire: 598 of 598 and 87 of 87 matched the model's label. Everything else goes to the model unchanged. |
+| C8 | Done | Per-claim verdict cache, research-section cache, embedding vectors kept when a document's chunk text is unchanged. |
+
 ### Thesis deep research (expected to be the largest cost; implemented, not yet run)
 
 Second round, 11 October 2026, from reading `research/run.py`, `writer.py`, `web.py`, `config/research.py` and `thesis/draft.py`. No deep-thesis run exists in `job_step` yet, so every number below is an estimate until D0.

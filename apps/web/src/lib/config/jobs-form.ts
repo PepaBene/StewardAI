@@ -590,6 +590,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     classification_batch_size: 50,
     classification_use_batch: true,
     classification_batch_wait_minutes: 30,
+    rules_first_classification: true,
     corroboration_model: "gpt-6-luna",
     corroboration_effort: null,
     corroboration_max_searches: 10,
@@ -602,6 +603,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     translation_per_run: 300,
     search_lead_model: "gpt-6-luna",
     search_lead_effort: null,
+    ai_search_provider: "model",
     ai_search_max_searches: 3,
     ai_search_max_holdings: 10,
     ai_search_thin_below: 3,
@@ -813,6 +815,8 @@ export const DEFAULT_JOBS: JobsConfig = {
   chat: {
     model: "gpt-6.1-sol",
     effort: null,
+    escalation_model: null,
+    escalation_effort: null,
     max_steps: 30,
     max_searches: 15,
     history_messages: 100,
@@ -889,10 +893,13 @@ export type SettingField<S extends SettingsKey> = {
    * `lines`: a string list, one per line. `codes`: a list of upper-case codes, separated by
    * commas or spaces. `words`: a list of identifiers as typed, separated by commas or spaces.
    * `number`: a decimal. `effort-optional`: an effort or "" for unset (null: not sent, the
-   * model's default). `tiers`: outlet tiers 1-3, edited as checkboxes.
+   * model's default). `tiers`: outlet tiers 1-3, edited as checkboxes. `model-optional`: a
+   * model id or "" for unset (null: the feature is off). `choice`: one of `options`.
    */
   kind:
     | "model"
+    | "model-optional"
+    | "choice"
     | "text"
     | "int"
     | "number"
@@ -909,6 +916,7 @@ export type SettingField<S extends SettingsKey> = {
   hint?: string;
   min?: number;
   max?: number;
+  options?: readonly { value: string; label: string }[];
 };
 
 export const SETTINGS: {
@@ -1446,6 +1454,12 @@ export const SETTINGS: {
         max: 100,
       },
       {
+        key: "rules_first_classification",
+        label: "Classify routine items by rule first",
+        kind: "bool",
+        hint: "Price-data notices, repeat headlines and known filing forms are labelled in code; only the rest goes to the model. Off: the model reads everything.",
+      },
+      {
         key: "corroboration_model",
         label: "Corroboration model",
         kind: "model",
@@ -1561,6 +1575,16 @@ export const SETTINGS: {
         label: "AI search effort",
         kind: "effort-optional",
         hint: EFFORT_OPTIONAL_HINT,
+      },
+      {
+        key: "ai_search_provider",
+        label: "Who finds the leads",
+        kind: "choice",
+        options: [
+          { value: "model", label: "The search model's own web search" },
+          { value: "brave", label: "A plain search API (Brave)" },
+        ],
+        hint: "The plain search API costs a fraction of a model search and needs BRAVE_API_KEY; the model then only drops pages that are not about the company. Switch after comparing the leads it finds.",
       },
       {
         key: "ai_search_max_searches",
@@ -2078,6 +2102,18 @@ export const SETTINGS: {
         min: 1,
         max: 100,
         hint: "Model calls plus tool rounds.",
+      },
+      {
+        key: "escalation_model",
+        label: "Stronger model for a failed turn",
+        kind: "model-optional",
+        hint: "Empty: off. When set, a question the model above cannot answer (nothing parseable, a refusal, the step cap, too little evidence, or no sources) is asked again on this one. The first attempt is still paid for, so turn it on only once the model above holds quality on your questions.",
+      },
+      {
+        key: "escalation_effort",
+        label: "Stronger model effort",
+        kind: "effort-optional",
+        hint: EFFORT_OPTIONAL_HINT,
       },
       {
         key: "max_searches",
@@ -2702,7 +2738,10 @@ export function jobsToBody(form: JobsForm): JobsConfig {
           field.key === "analysis_techniques"
             ? words.map((w) => w.toLowerCase())
             : words;
-      } else if (field.kind === "effort-optional")
+      } else if (
+        field.kind === "effort-optional" ||
+        field.kind === "model-optional"
+      )
         out[field.key] = String(v).trim() || null;
       else if (field.kind === "tiers") out[field.key] = parseTiers(String(v));
       else if (field.kind === "int-list")

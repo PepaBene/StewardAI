@@ -65,3 +65,19 @@ async def test_a_model_answers_in_the_response_shape_call_sites_read() -> None:
     assert out.usage.input_tokens == 10
     body = seen[0].read().decode()
     assert "page text" in body and '"effort":"low"' in body.replace(" ", "")
+
+
+async def test_a_cache_key_reaches_the_provider_as_the_prompt_cache_key() -> None:
+    seen: list[httpx.Request] = []
+    client = routed(seen)
+    for key in ("research:7", None):
+        await client.messages.parse(
+            model="gpt-6-luna",
+            system="s",
+            messages=[{"role": "user", "content": "hi"}],
+            output_format=Out,
+            cache_key=key,
+        )
+    with_key, without = (r.read().decode().replace(" ", "") for r in seen)
+    assert '"prompt_cache_key":"research:7"' in with_key
+    assert "prompt_cache_key" not in without

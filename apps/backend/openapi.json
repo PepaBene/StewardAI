@@ -38029,6 +38029,43 @@
             "title": "Effort",
             "description": "Unset: effort is not sent and the model's default applies."
           },
+          "escalation_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+                "examples": [
+                  "gpt-6.1-sol",
+                  "gpt-6-luna",
+                  "gemini-3.8-flash"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escalation Model",
+            "description": "Cascade (cost lever C6): when set, a question the model above could not answer (no parseable answer, a refusal, the step cap, or an answer that says it has too little evidence or cites nothing) is asked again on this stronger model. Leave empty until the chat question set shows the cheaper model above holds quality; the first attempt is still paid for."
+          },
+          "escalation_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escalation Effort",
+            "description": "Unset: effort is not sent and the model's default applies."
+          },
           "rules_first": {
             "type": "boolean",
             "title": "Rules First",
@@ -74568,6 +74605,12 @@
             "description": "Items per classification call.",
             "default": 50
           },
+          "rules_first_classification": {
+            "type": "boolean",
+            "title": "Rules First Classification",
+            "description": "Settle in code, without the model, a watch-topic hit linked to holdings only through the topic term (other, not relevant) and a headline that repeats an already classified one with the same candidate holdings (it takes that label). Measured on the stored wire: 598 of 598 and 87 of 87 matched the model.",
+            "default": true
+          },
           "classification_use_batch": {
             "type": "boolean",
             "title": "Classification Use Batch",
@@ -74721,6 +74764,16 @@
             ],
             "title": "Search Lead Effort",
             "description": "Unset: effort is not sent and the model's default applies."
+          },
+          "ai_search_provider": {
+            "type": "string",
+            "enum": [
+              "model",
+              "brave"
+            ],
+            "title": "Ai Search Provider",
+            "description": "Who finds the leads: 'model' (the search model's built-in web search) or 'brave' (a plain search API for the links, at a fraction of the fee; needs BRAVE_API_KEY, and the model then only drops pages that are not about the company). Switch only after the lead-recall check against the model path.",
+            "default": "model"
           },
           "ai_search_max_searches": {
             "type": "integer",

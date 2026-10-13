@@ -136,6 +136,29 @@ async def test_unchanged_documents_are_skipped_and_changed_ones_replace_their_ch
 
 
 @pytest.mark.db
+async def test_an_edited_document_keeps_the_vectors_of_its_unchanged_passages(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    await index.index_documents(backend_pool, [FILING])
+    embedder = FakeEmbedder()
+    total = (await index.embed_pending(backend_pool, embedder, 1000)).embedded
+    edited = SourceDoc(
+        **{
+            **FILING.__dict__,
+            "text": FILING.text.replace("sells them to fleets", "sells to cities"),
+        }
+    )
+    stats = await index.index_documents(backend_pool, [edited])
+    assert stats.documents == 1 and 0 < stats.reused < stats.children == total
+    again = await index.embed_pending(backend_pool, embedder, 1000)
+    assert again.embedded == total - stats.reused  # only the edited passages pay again
+    changed = await backend_pool.fetchval(
+        "select count(*) from public.document_chunk where not is_parent and embedding is null"
+    )
+    assert changed == 0
+
+
+@pytest.mark.db
 async def test_prune_removes_records_that_left_the_source(backend_pool: asyncpg.Pool) -> None:
     await index.index_documents(
         backend_pool, [REPORT, SourceDoc(**{**REPORT.__dict__, "ref": "8"})]

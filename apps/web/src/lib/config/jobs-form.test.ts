@@ -109,6 +109,7 @@ const FULL: JobsConfig = {
     classification_batch_size: 25,
     classification_use_batch: true,
     classification_batch_wait_minutes: 30,
+    rules_first_classification: true,
     corroboration_model: "gpt-6.1-sol",
     corroboration_effort: "low",
     corroboration_max_searches: 5,
@@ -121,6 +122,7 @@ const FULL: JobsConfig = {
     translation_per_run: 300,
     search_lead_model: "gpt-6-luna",
     search_lead_effort: null,
+    ai_search_provider: "model",
     ai_search_max_searches: 3,
     ai_search_max_holdings: 10,
     ai_search_thin_below: 3,
@@ -217,7 +219,7 @@ const FULL: JobsConfig = {
       { mic: "XETR", date: "2026-12-24", name: "Christmas Eve" },
     ],
   },
-  chat: { model: "gpt-6-luna", effort: null, max_steps: 9, max_searches: 0, history_messages: 20, source_tiers: [1, 2, 3], rules_first: true },
+  chat: { model: "gpt-6-luna", effort: null, escalation_model: null, escalation_effort: null, max_steps: 9, max_searches: 0, history_messages: 20, source_tiers: [1, 2, 3], rules_first: true },
   review: {
     model: "gpt-6.1-sol",
     effort: "max",
@@ -549,6 +551,23 @@ describe("jobs form: market strip", () => {
       { symbol: "^dax", label: "DAX 40", yahoo_symbol: "^GDAXI" },
       { symbol: "^px", label: "^px" },
     ]);
+  });
+});
+
+describe("jobs form: cost switches", () => {
+  it("keeps the cascade and the search API off by default and writes them back", () => {
+    const form = jobsFromBody(null);
+    expect(form.settings.chat.values.escalation_model).toBe("");
+    expect(form.settings.news.values.ai_search_provider).toBe("model");
+    const off = jobsToBody(form);
+    expect(off.chat).toMatchObject({ escalation_model: null, escalation_effort: null });
+    expect(off.news).toMatchObject({ ai_search_provider: "model" });
+    form.settings.chat.values.escalation_model = " gpt-6.1-sol ";
+    form.settings.chat.values.escalation_effort = "high";
+    form.settings.news.values.ai_search_provider = "brave";
+    const on = jobsToBody(form);
+    expect(on.chat).toMatchObject({ escalation_model: "gpt-6.1-sol", escalation_effort: "high" });
+    expect(on.news).toMatchObject({ ai_search_provider: "brave" });
   });
 });
 

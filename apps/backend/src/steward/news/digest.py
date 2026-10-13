@@ -34,6 +34,7 @@ from steward.config.thesis import ThesesConfig
 from steward.config.verification import ClaimVerifierSettings, VerificationConfig
 from steward.earnings.read import EvidenceRelation, FactCheck, evidence_relation
 from steward.jobs.runner import JobContext, JobHandler
+from steward.llm.cache import ResultCache
 from steward.llm.client import LLM, create_llm
 from steward.llm.routing import routing_client
 from steward.llm.types import LLMError, Message, Request
@@ -1046,6 +1047,7 @@ def _handler(kind: DigestKind) -> JobHandler:
                 claim_settings.model,
                 prompts.text("claim_verifier", CLAIM_SYSTEM, claim_settings.model),
                 effort=claim_settings.effort,
+                cache=ResultCache(ctx.pool, "claim_verifier"),
             )
         async with httpx.AsyncClient(
             timeout=30.0, headers={"User-Agent": f"StewardAI/{__version__}"}

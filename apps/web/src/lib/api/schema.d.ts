@@ -12297,6 +12297,16 @@ export interface components {
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
+             * Escalation Model
+             * @description Cascade (cost lever C6): when set, a question the model above could not answer (no parseable answer, a refusal, the step cap, or an answer that says it has too little evidence or cites nothing) is asked again on this stronger model. Leave empty until the chat question set shows the cheaper model above holds quality; the first attempt is still paid for.
+             */
+            escalation_model?: string | null;
+            /**
+             * Escalation Effort
+             * @description Unset: effort is not sent and the model's default applies.
+             */
+            escalation_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
              * Rules First
              * @description Answer a short, closed question about the portfolio's value or cash from the database with a template (no model call); everything else goes to the assistant.
              * @default true
@@ -25064,6 +25074,12 @@ export interface components {
              */
             classification_batch_size: number;
             /**
+             * Rules First Classification
+             * @description Settle in code, without the model, a watch-topic hit linked to holdings only through the topic term (other, not relevant) and a headline that repeats an already classified one with the same candidate holdings (it takes that label). Measured on the stored wire: 598 of 598 and 87 of 87 matched the model.
+             * @default true
+             */
+            rules_first_classification: boolean;
+            /**
              * Classification Use Batch
              * @description Send a run's classification calls through the provider's batch API (half price, answers within minutes to hours) when the model is an OpenAI or Google one. A group the batch does not answer is classified directly. Off: every call is direct, so a severe item is labelled at once.
              * @default true
@@ -25152,6 +25168,13 @@ export interface components {
              * @description Unset: effort is not sent and the model's default applies.
              */
             search_lead_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Ai Search Provider
+             * @description Who finds the leads: 'model' (the search model's built-in web search) or 'brave' (a plain search API for the links, at a fraction of the fee; needs BRAVE_API_KEY, and the model then only drops pages that are not about the company). Switch only after the lead-recall check against the model path.
+             * @default model
+             * @enum {string}
+             */
+            ai_search_provider: "model" | "brave";
             /**
              * Ai Search Max Searches
              * @description Web searches per holding per run.

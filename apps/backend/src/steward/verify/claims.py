@@ -17,6 +17,8 @@ impact note sentence resting only on a web-search result, whose page the code ne
 """
 
 import datetime as dt
+import hashlib
+import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -28,6 +30,7 @@ from pydantic import BaseModel, Field
 from steward.ai import Usage
 from steward.config.jobs import effort_kwargs
 from steward.config.verification import ClaimVerifierSettings
+from steward.llm.cache import ResultCache
 from steward.llm.routing import RoutingClient
 from steward.llm.types import LLMError
 
@@ -253,10 +256,17 @@ class LLMClaimVerifier:
         model: str,
         system: str = SYSTEM,
         effort: str | None = None,
+        cache: ResultCache | None = None,
     ) -> None:
         self._client = client
         self._model = model
         self._effort = effort
+        # Per-claim verdicts (cost lever C8): re-running a report whose sentence and snippets
+        # are unchanged does not ask again. The key holds the model, the system prompt, the
+        # effort, the sentence and its snippets, so any change of those asks again. The date
+        # in the prompt is left out: whether a snippet supports a sentence does not depend on
+        # the day.
+        self._cache = cache
         # The owner's override from the Prompts config, else the built-in default. No cache
         # breakpoint: the batches share only this ~150-token prompt, far below the minimum
         # cacheable prefix (thousands of tokens), and each batch's claims differ.
@@ -267,8 +277,29 @@ class LLMClaimVerifier:
     ) -> tuple[list[ClaimVerdict], Usage]:
         usage = Usage(model=self._model)
         verdicts: list[ClaimVerdict] = []
-        for start in range(0, len(claims), BATCH):
-            batch = claims[start : start + BATCH]
+        keys: dict[int, str] = {}
+        pending = list(claims)
+        if self._cache is not None:
+            pending = []
+            for claim in claims:
+                key = self._claim_key(claim)
+                keys[claim.index] = key
+                hit = await self._cache.get(key)
+                try:
+                    if hit is not None:
+                        verdicts.append(
+                            ClaimVerdict(
+                                index=claim.index,
+                                supported=bool(hit["supported"]),
+                                reason=str(hit["reason"]),
+                            )
+                        )
+                        continue
+                except KeyError:
+                    pass
+                pending.append(claim)
+        for start in range(0, len(pending), BATCH):
+            batch = pending[start : start + BATCH]
             response = await self._client.messages.parse(
                 model=self._model,
                 system=self._system,
@@ -280,7 +311,23 @@ class LLMClaimVerifier:
             parsed: Any = response.parsed_output
             if parsed is not None:
                 verdicts.extend(parsed.verdicts)
+                if self._cache is not None:
+                    asked = {c.index for c in batch}
+                    for verdict in parsed.verdicts:
+                        if verdict.index in asked and verdict.index in keys:
+                            await self._cache.put(
+                                keys[verdict.index],
+                                self._model,
+                                {"supported": verdict.supported, "reason": verdict.reason},
+                            )
         return verdicts, usage
+
+    def _claim_key(self, claim: Claim) -> str:
+        payload = json.dumps(
+            [self._model, self._system, self._effort, claim.text, list(claim.evidence)],
+            ensure_ascii=False,
+        )
+        return hashlib.sha256(payload.encode()).hexdigest()
 
 
 @dataclass

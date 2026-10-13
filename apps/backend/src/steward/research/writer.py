@@ -219,12 +219,20 @@ def section_content(request: SectionRequest) -> str:
 
 class LLMResearchWriter:
     def __init__(
-        self, client: RoutingClient, model: str, effort: str, system: str = SYSTEM
+        self,
+        client: RoutingClient,
+        model: str,
+        effort: str,
+        system: str = SYSTEM,
+        cache_key: str | None = None,
     ) -> None:
         self._client = client
         self._model = model
         self._effort = effort
         self._system = system
+        # One key per run: every section re-sends the same material, so OpenAI should land
+        # them on the same prefix cache (the routing client sends it as prompt_cache_key).
+        self._cache_key = cache_key
 
     async def write(self, request: SectionRequest) -> SectionResult:
         usage = Usage(model=self._model)
@@ -239,6 +247,7 @@ class LLMResearchWriter:
                 system=self._system,
                 messages=[{"role": "user", "content": section_content(request)}],
                 output_format=SectionDraft,
+                cache_key=self._cache_key,
                 **extra,
                 **effort_kwargs(self._model, self._effort, 16000),
             )

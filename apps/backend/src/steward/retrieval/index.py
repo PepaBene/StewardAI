@@ -47,6 +47,7 @@ class IndexStats:
     skipped: int = 0
     parents: int = 0
     children: int = 0
+    reused: int = 0  # passages that kept their vector from the older version
 
 
 def embed_input(title: str, section_path: str | None, text: str) -> str:
@@ -67,17 +68,31 @@ async def is_indexed(pool: asyncpg.Pool | asyncpg.Connection, doc: SourceDoc) ->
     )
 
 
-async def index_document(pool: asyncpg.Pool, doc: SourceDoc) -> tuple[int, int] | None:
+async def index_document(pool: asyncpg.Pool, doc: SourceDoc) -> tuple[int, int, int] | None:
     """Stores one document's chunks, replacing any older version of the same record. Returns
-    (parents, children) written, or None when this exact version is already indexed."""
+    (parents, children, reused) written, or None when this exact version is already indexed.
+
+    A passage whose title, section and text are unchanged keeps the vector the older version
+    had, so editing one section of a long filing or report does not pay to embed the rest
+    again (cost lever C8). `reused` counts those."""
     if await is_indexed(pool, doc):
         return None
     chunked = chunking.chunk(doc.text, doc.title, structured=doc.structured)
     if not chunked.children:
-        return 0, 0
+        return 0, 0, 0
     common = (doc.kind, doc.ref, doc.version)
     shared = (list(doc.tickers), doc.as_of, doc.source_url, doc.app_path, doc.tier)
     async with pool.acquire() as con, con.transaction():
+        old = {
+            (r["title"], r["section_path"], r["text"]): r
+            for r in await con.fetch(
+                "select title, section_path, text, embedding, embedding_model, embedding_dim"
+                " from public.document_chunk where kind = $1 and ref = $2 and not is_parent"
+                " and embedding is not null",
+                doc.kind,
+                doc.ref,
+            )
+        }
         await con.execute(
             "delete from public.document_chunk where kind = $1 and ref = $2", doc.kind, doc.ref
         )
@@ -97,11 +112,12 @@ async def index_document(pool: asyncpg.Pool, doc: SourceDoc) -> tuple[int, int] 
                     *shared,
                 )
             )
-        await con.executemany(
-            "insert into public.document_chunk (kind, ref, version, chunk_index, is_parent,"
-            " parent_id, section_path, title, text, tickers, as_of, source_url, app_path, tier)"
-            " values ($1,$2,$3,$4,false,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
-            [
+        rows = []
+        reused = 0
+        for i, c in enumerate(chunked.children):
+            kept = old.get((doc.title, c.section_path, c.text))
+            reused += kept is not None
+            rows.append(
                 (
                     *common,
                     i,
@@ -110,11 +126,19 @@ async def index_document(pool: asyncpg.Pool, doc: SourceDoc) -> tuple[int, int] 
                     doc.title,
                     c.text,
                     *shared,
+                    kept["embedding"] if kept else None,
+                    kept["embedding_model"] if kept else None,
+                    kept["embedding_dim"] if kept else None,
                 )
-                for i, c in enumerate(chunked.children)
-            ],
+            )
+        await con.executemany(
+            "insert into public.document_chunk (kind, ref, version, chunk_index, is_parent,"
+            " parent_id, section_path, title, text, tickers, as_of, source_url, app_path, tier,"
+            " embedding, embedding_model, embedding_dim)"
+            " values ($1,$2,$3,$4,false,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)",
+            rows,
         )
-    return len(chunked.parents), len(chunked.children)
+    return len(chunked.parents), len(chunked.children), reused
 
 
 async def index_documents(pool: asyncpg.Pool, docs: Sequence[SourceDoc]) -> IndexStats:
@@ -127,6 +151,7 @@ async def index_documents(pool: asyncpg.Pool, docs: Sequence[SourceDoc]) -> Inde
         stats.documents += 1
         stats.parents += written[0]
         stats.children += written[1]
+        stats.reused += written[2]
     return stats
 
 

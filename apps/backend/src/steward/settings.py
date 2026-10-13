@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     alpha_vantage_api_key: SecretStr | None = None
     eodhd_api_key: SecretStr | None = None
     fmp_api_key: SecretStr | None = None
+    # Brave Search API (cost lever C1d): a plain search for `ai_search_provider = "brave"`.
+    brave_api_key: SecretStr | None = None
     twelve_data_api_key: SecretStr | None = None
     un_comtrade_api_key: SecretStr | None = None
     people_data_labs_api_key: SecretStr | None = None
@@ -140,6 +142,7 @@ class Settings(BaseSettings):
             self.alpha_vantage_api_key,
             self.eodhd_api_key,
             self.fmp_api_key,
+            self.brave_api_key,
             self.twelve_data_api_key,
             self.un_comtrade_api_key,
             self.people_data_labs_api_key,

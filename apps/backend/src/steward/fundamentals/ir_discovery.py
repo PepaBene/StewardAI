@@ -37,7 +37,7 @@ from steward.config.store import ConfigConflictError, load_active, save_config
 from steward.earnings.locate import _result_urls
 from steward.fundamentals.ir import IrError, assert_fetchable
 from steward.jobs.runner import JobContext, JobFailed
-from steward.llm.cache import ResultCache
+from steward.llm.cache import SEARCH_CACHE_DAYS, ResultCache
 from steward.llm.client import create_llm
 from steward.llm.routing import RoutingClient, batch_collector, routing_client
 from steward.llm.types import LLMError
@@ -514,7 +514,9 @@ async def ir_discovery_handler(ctx: JobContext) -> None:
         step.detail["registered"] = await register_results_pages(ctx, profiles_stored.body)
     try:
         llm = create_llm(settings)
-        client = routing_client(llm, ResultCache(ctx.pool, "ir_discovery", search_ttl_days=3))
+        client = routing_client(
+            llm, ResultCache(ctx.pool, "ir_discovery", search_ttl_days=SEARCH_CACHE_DAYS)
+        )
     except AINotConfigured as exc:
         raise JobFailed(str(exc)) from exc
     last = {

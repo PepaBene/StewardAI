@@ -44,6 +44,7 @@ from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import VerificationConfig
 from steward.jobs.runner import JobContext, JobFailed
+from steward.llm.cache import SEARCH_CACHE_DAYS_FRESH, ResultCache
 from steward.llm.client import create_llm
 from steward.llm.routing import routing_client
 from steward.news.normalize import host_of
@@ -1303,7 +1304,12 @@ async def research_handler(ctx: JobContext) -> None:
     worker: Worker | None = None
     try:
         llm = create_llm(settings)
-        client = routing_client(llm)
+        # Cost lever C8: a section whose material, prompt, model and effort are unchanged is
+        # not written (or searched) again, so a re-run after a small data change pays only for
+        # the sections that changed. The prompt carries today's date, so a hit is a same-day
+        # re-run. `fresh` in the job params bypasses it (benchmarks, a deliberate second take).
+        reuse = ResultCache(ctx.pool, "research_section", search_ttl_days=SEARCH_CACHE_DAYS_FRESH)
+        client = routing_client(llm, None if ctx.params.get("fresh") else reuse)
     except AINotConfigured:
         writer = verifier = None
     else:
@@ -1313,7 +1319,13 @@ async def research_handler(ctx: JobContext) -> None:
         if profile and profile.planning == "model":
             planner = LLMResearchPlanner(client, profile.planner_model or cheap)
         writer = (
-            LLMResearchWriter(client, profile.model, profile.effort, writer_system)
+            LLMResearchWriter(
+                client,
+                profile.model,
+                profile.effort,
+                writer_system,
+                cache_key=f"research:{ctx.job_id}",
+            )
             if profile
             else None
         )
@@ -1325,6 +1337,7 @@ async def research_handler(ctx: JobContext) -> None:
             claim_settings.model,
             verifier_system,
             effort=claim_settings.effort,
+            cache=ResultCache(ctx.pool, "claim_verifier"),
         )
     await run_research(
         ctx,

@@ -290,6 +290,9 @@ function SettingsCard({
           if (field.kind === "effort-optional") {
             return <SelectField key={field.key} label={field.label} path={path} errors={errors} value={String(value)} options={OPTIONAL_EFFORT_OPTIONS} onChange={(v) => onChange(field.key, v)} hint={field.hint} />;
           }
+          if (field.kind === "choice") {
+            return <SelectField key={field.key} label={field.label} path={path} errors={errors} value={String(value)} options={[...(field.options ?? [])]} onChange={(v) => onChange(field.key, v)} hint={field.hint} />;
+          }
           if (field.kind === "tiers") {
             return (
               <CheckboxGroup
@@ -323,7 +326,7 @@ function SettingsCard({
                   .flatMap(([, ms]) => ms),
               }}
               value={String(value)}
-              list={field.kind === "model" ? listId : undefined}
+              list={field.kind === "model" || field.kind === "model-optional" ? listId : undefined}
               inputMode={field.kind === "int" ? "numeric" : field.kind === "number" ? "decimal" : undefined}
               spellCheck={false}
               onChange={(v) => onChange(field.key, v)}
