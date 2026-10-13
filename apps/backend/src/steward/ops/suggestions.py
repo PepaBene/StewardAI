@@ -12,6 +12,7 @@ from typing import Any
 
 import asyncpg
 
+from steward.autopilot import ledger
 from steward.decision import service as decision
 from steward.decision.rebalance import RebalancePlan, RebalanceRequest, Trade
 from steward.ops import tasks
@@ -53,6 +54,53 @@ def describe(plan: RebalancePlan, currency: str) -> tuple[str, str] | None:
         "tax lots on the rebalance page and place the trades yourself."
     )
     return title, " ".join(lines)[:DETAIL_CAP]
+
+
+def describe_break(
+    ticker: str, weight: float, breaches: list[tuple[str, str, str]]
+) -> tuple[str, str]:
+    """(title, detail) for a held stock whose thesis KPIs are breached. Each breach is
+    (metric, period, rationale), the verdict job's own words."""
+    n = len(breaches)
+    title = f"{ticker}: {n} thesis KPI{'s' if n != 1 else ''} breached"
+    lines = [f"{metric} ({period}): {why}" for metric, period, why in breaches[:4]]
+    lines.append(
+        f"It is {weight:.1%} of the portfolio. Re-read the thesis and decide whether to hold, "
+        "trim or exit; the exit conditions you wrote are on the thesis page."
+    )
+    return title, " ".join(lines)[:DETAIL_CAP]
+
+
+async def suggest_thesis_breaks(pool: asyncpg.Pool) -> dict[str, Any]:
+    """One notice per held stock whose latest verdict on any KPI is a breach. It clears when the
+    verdict job later passes the KPI, or the position is sold."""
+    weights = await ledger.holding_weights(pool)
+    rows = await pool.fetch(
+        "select ticker, metric, coalesce(period, kpi_period) as period, rationale from ("
+        " select distinct on (ticker, kpi_id) ticker, metric, period, kpi_period, status,"
+        "  rationale from public.verdict order by ticker, kpi_id, id desc) latest"
+        " where status = 'breach' and ticker = any($1::text[])",
+        list(weights),
+    )
+    by_ticker: dict[str, list[tuple[str, str, str]]] = {}
+    for r in rows:
+        by_ticker.setdefault(r["ticker"], []).append((r["metric"], r["period"], r["rationale"]))
+    for ticker, breaches in by_ticker.items():
+        title, detail = describe_break(ticker, weights[ticker], breaches)
+        await tasks.see(
+            pool,
+            "thesis_break",
+            ticker,
+            title=title,
+            detail=detail,
+            href="/theses",
+            weight=min(1.0, 0.5 + weights[ticker]),
+            status="needs_owner",
+        )
+    return {
+        "breached": sorted(by_ticker),
+        "resolved": await tasks.settle(pool, "thesis_break", set(by_ticker)),
+    }
 
 
 async def suggest_rebalance(pool: asyncpg.Pool) -> dict[str, Any]:

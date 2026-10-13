@@ -31,7 +31,7 @@ Not built, on purpose or for lack of input:
 - C4 auto-journal/switch log: the owner's record stays the owner's.
 - D6 release-gate automation; provider failover chains.
 - E2 self-tuning config: there is no engagement signal to tune against.
-- E3 thesis-break and opportunity suggestions.
+- E3 opportunity suggestions (thesis-break notices are built: a breached KPI on a held stock).
 - D5 is a forecast notice only (it does not throttle spend). D4 needed no code: the scheduler is
   complete and `weekly_digest` succeeds. C6 and C7 were already covered by existing jobs.
 

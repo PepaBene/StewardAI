@@ -39,7 +39,7 @@ from steward.lookthrough.coverage import refresh_ledger
 from steward.lookthrough.read import load_portfolio
 from steward.ops import budget as budget_forecast
 from steward.ops import keys, tasks
-from steward.ops.suggestions import suggest_rebalance
+from steward.ops.suggestions import suggest_rebalance, suggest_thesis_breaks
 from steward.quality.cockpit import build_cockpit
 from steward.settings import get_settings
 from steward.xray.derive import derive_benchmark_indexes
@@ -317,6 +317,7 @@ async def watchdog_handler(ctx: JobContext) -> None:
     if cfg.suggest_rebalance and now.hour == cfg.suggest_hour_utc:
         async with ctx.step("suggestions") as step:
             step.detail.update(await suggest_rebalance(ctx.pool))
+            step.detail["thesis_breaks"] = await suggest_thesis_breaks(ctx.pool)
     if cfg.key_notices:
         async with ctx.step("keys") as step:
             step.detail.update(await check_keys(ctx.pool, jobs))

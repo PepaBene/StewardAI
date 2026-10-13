@@ -152,6 +152,15 @@ def test_a_suggestion_names_the_biggest_trades_first_and_says_nothing_when_in_ba
     )
 
 
+def test_a_thesis_break_names_the_kpis_and_the_weight() -> None:
+    title, detail = suggestions.describe_break(
+        "AAPL_US_EQ", 0.12, [("revenue_growth", "annual", "5% against a floor of 10%")]
+    )
+    assert title == "AAPL_US_EQ: 1 thesis KPI breached"
+    assert "revenue_growth (annual): 5% against a floor of 10%" in detail
+    assert "12.0% of the portfolio" in detail
+
+
 def test_ops_settings_default_to_acting() -> None:
     cfg = OpsSettings()
     assert cfg.enabled and cfg.repair and cfg.max_attempts == 2
@@ -207,6 +216,39 @@ async def test_a_dismissed_key_stays_dismissed(
     second = await watchdog.check_keys(backend_pool, jobs)
     assert "openai_api_key" not in second["missing"]
     assert all(t.subject != "openai_api_key" for t in await tasks.needs_owner(backend_pool))
+
+
+@pytest.mark.db
+async def test_a_breached_kpi_on_a_held_stock_opens_a_notice_until_it_passes(
+    backend_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def weights(_pool: asyncpg.Pool) -> dict[str, float]:
+        return {"AAPL_US_EQ": 0.12}
+
+    monkeypatch.setattr("steward.autopilot.ledger.holding_weights", weights)
+    from steward.config.store import save_config
+    from steward.config.thesis import ThesesConfig
+
+    async with backend_pool.acquire() as conn:
+        saved = await save_config(conn, "theses", ThesesConfig(theses=[]), created_by=None)
+
+    async def verdict(status: str) -> None:
+        await backend_pool.execute(
+            "insert into public.verdict (ticker, kpi_id, metric, basis, kpi_period, status,"
+            " operator, threshold, threshold_unit, rationale, config_version_id)"
+            " values ('AAPL_US_EQ', 'k1', 'revenue_growth', 'reported', 'annual', $1,"
+            " '>=', 10, '%', 'r', $2)",
+            status,
+            saved.id,
+        )
+
+    await verdict("breach")
+    out = await suggestions.suggest_thesis_breaks(backend_pool)
+    assert out["breached"] == ["AAPL_US_EQ"]
+    assert [t.kind for t in await tasks.needs_owner(backend_pool)] == ["thesis_break"]
+    await verdict("pass")
+    assert (await suggestions.suggest_thesis_breaks(backend_pool))["resolved"] == 1
+    assert await tasks.needs_owner(backend_pool) == []
 
 
 @pytest.mark.db
