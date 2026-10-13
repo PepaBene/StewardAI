@@ -15,6 +15,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from api.alert_trail_routes import router as alert_trail_router
 from api.auth import Owner
+from api.action_routes import router as action_router
 from api.autopilot_routes import router as autopilot_router
 from api.budget_routes import router as budget_router
 from api.chat_routes import router as chat_router
@@ -271,6 +272,7 @@ def create_app() -> FastAPI:
     app.include_router(chat_router)
     app.include_router(inbox_router)
     app.include_router(autopilot_router)
+    app.include_router(action_router)
     app.include_router(fundamentals_router)
     app.include_router(free_sources_router)
     app.include_router(watchlist_router)

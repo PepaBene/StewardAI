@@ -18,7 +18,7 @@ import httpx
 from steward import budget_guard
 from steward.costs import DEFAULT_PRICES
 from steward.jobs.runner import current_job, current_step, record_response
-from steward.llm import wire
+from steward.llm import capture, wire
 from steward.llm.types import (
     AINotConfigured,
     Citation,
@@ -78,6 +78,8 @@ class LLM:
         else:
             _log_unrecorded(done)
         await record_response(done.model, done.usage)
+        if ctx is not None:
+            await capture.record(ctx.pool, ctx.job_id, ctx.job_type, req, done)
         return done
 
     # ------------------------------------------------------------------ OpenAI, Google
@@ -237,6 +239,25 @@ class LLM:
     # ------------------------------------------------------------------ Batch
 
     async def complete_batch(
+        self,
+        requests: Sequence[Request],
+        *,
+        poll_seconds: float = 30.0,
+        wait_minutes: float = 60.0,
+    ) -> list[Completion | None]:
+        """The answers to `requests` as `_complete_batch` returns them, each also kept as
+        training data when the call is made inside a job."""
+        answers = await self._complete_batch(
+            requests, poll_seconds=poll_seconds, wait_minutes=wait_minutes
+        )
+        ctx = current_job.get()
+        if ctx is not None:
+            for req, done in zip(requests, answers, strict=True):
+                if done is not None:
+                    await capture.record(ctx.pool, ctx.job_id, ctx.job_type, req, done)
+        return answers
+
+    async def _complete_batch(
         self,
         requests: Sequence[Request],
         *,

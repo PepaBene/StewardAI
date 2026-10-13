@@ -4205,6 +4205,117 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/actions/kinds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Kinds
+         * @description What the owner can change from a screen or from chat.
+         */
+        get: operations["list_kinds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent Actions */
+        get: operations["recent_actions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/actions/propose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose
+         * @description Check an action and say what it would do. Nothing changes until it is confirmed.
+         */
+        post: operations["propose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/actions/{action_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm */
+        post: operations["confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/actions/{action_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel */
+        post: operations["cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/visuals/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Visual
+         * @description A chart block built from stored records, with its source, date, summary and table.
+         */
+        get: operations["get_visual"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/segments": {
         parameters: {
             query?: never;
@@ -9514,6 +9625,20 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** ActionKind */
+        ActionKind: {
+            /** Name */
+            name: string;
+            /** Title */
+            title: string;
+            /**
+             * Risk
+             * @enum {string}
+             */
+            risk: "low" | "medium" | "high";
+            /** Undo */
+            undo: string;
+        };
         /** ActionOut */
         ActionOut: {
             /** Id */
@@ -9545,6 +9670,42 @@ export interface components {
             created_at: string;
             /** Decided At */
             decided_at: string | null;
+        };
+        /** ActionRow */
+        ActionRow: {
+            /** Id */
+            id: number;
+            /** Action */
+            action: string;
+            /** Args */
+            args: {
+                [key: string]: unknown;
+            };
+            /** Summary */
+            summary: string;
+            /**
+             * Risk
+             * @enum {string}
+             */
+            risk: "low" | "medium" | "high";
+            /** Undo */
+            undo: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "proposed" | "done" | "cancelled" | "failed";
+            /**
+             * Via
+             * @enum {string}
+             */
+            via: "screen" | "chat";
+            /** Reason */
+            reason: string | null;
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            } | null;
         };
         /** Activation */
         Activation: {
@@ -11770,6 +11931,36 @@ export interface components {
             /** Stale */
             stale: boolean;
         };
+        /** Block */
+        Block: {
+            /** Kind */
+            kind: string;
+            /**
+             * Chart
+             * @enum {string}
+             */
+            chart: "bar" | "donut" | "none";
+            /** Title */
+            title: string;
+            /** Unit */
+            unit: string;
+            /** Labels */
+            labels: string[];
+            /** Values */
+            values: number[];
+            /** Source */
+            source: string;
+            /** As Of */
+            as_of: string | null;
+            /** Summary */
+            summary: string;
+            /** Caption */
+            caption?: string | null;
+            /** Table */
+            table: {
+                [key: string]: unknown;
+            }[];
+        };
         /** BoardKpi */
         BoardKpi: {
             kpi: components["schemas"]["ThesisKPI"];
@@ -12223,6 +12414,11 @@ export interface components {
              * @description Annualised, the same weeks.
              */
             realised_volatility: number | null;
+        };
+        /** Cancelled */
+        Cancelled: {
+            /** Action Id */
+            action_id: number;
         };
         /** CandidateCase */
         CandidateCase: {
@@ -13970,6 +14166,14 @@ export interface components {
              * @description Number of changed paths against the previous version; null for the first.
              */
             changes: number | null;
+        };
+        /** ConfirmIn */
+        ConfirmIn: {
+            /**
+             * Second
+             * @default false
+             */
+            second: boolean;
         };
         /** ConfirmedListingResponse */
         ConfirmedListingResponse: {
@@ -23309,6 +23513,7 @@ export interface components {
             autopilot_settings?: components["schemas"]["AutopilotSettings"];
             thesis_settings?: components["schemas"]["ThesisSettings"];
             ops_settings?: components["schemas"]["OpsSettings"];
+            training_capture?: components["schemas"]["TrainingCaptureSettings"];
             /**
              * Fund Documents
              * @description Fund documents to read for facts the issuer readers do not cover (any issuer except iShares and WisdomTree). The daily fund facts job reads the new or changed ones; every fact must quote the document word for word.
@@ -29530,6 +29735,26 @@ export interface components {
             /** Note */
             note: string | null;
             body: components["schemas"]["PromptsConfig"];
+        };
+        /** ProposeIn */
+        ProposeIn: {
+            /** Action */
+            action: string;
+            /**
+             * Args
+             * @default {}
+             */
+            args: {
+                [key: string]: unknown;
+            };
+            /**
+             * Via
+             * @default chat
+             * @enum {string}
+             */
+            via: "screen" | "chat";
+            /** Reason */
+            reason?: string | null;
         };
         /** ProposedAction */
         ProposedAction: {
@@ -37819,6 +38044,30 @@ export interface components {
             news_item_id: number | null;
             /** Job Id */
             job_id: number | null;
+        };
+        /**
+         * TrainingCaptureSettings
+         * @description Keep a redacted copy of each AI call (prompt, answer, usage) so models can later be
+         *     fine-tuned on this app's own work. Nothing is trained or sent anywhere by this.
+         */
+        TrainingCaptureSettings: {
+            /**
+             * Enabled
+             * @description Record each AI call. Off: nothing further is recorded.
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Exclude Job Types
+             * @description Job types whose calls are not recorded. Chat is left out until you opt in.
+             */
+            exclude_job_types?: string[];
+            /**
+             * Max Chars
+             * @description Longest prompt or answer text kept per call; the rest is cut.
+             * @default 60000
+             */
+            max_chars: number;
         };
         /** TransactionFeeOut */
         TransactionFeeOut: {
@@ -46657,6 +46906,187 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AutoDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_kinds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionKind"][];
+                };
+            };
+        };
+    };
+    recent_actions: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cancelled"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_visual: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Block"];
                 };
             };
             /** @description Validation Error */

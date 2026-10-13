@@ -337,6 +337,26 @@ class FundDocument(ConfigModel):
     url: AnyHttpUrl = Field(description="Where the issuer publishes the PDF or page.")
 
 
+class TrainingCaptureSettings(ConfigModel):
+    """Keep a redacted copy of each AI call (prompt, answer, usage) so models can later be
+    fine-tuned on this app's own work. Nothing is trained or sent anywhere by this."""
+
+    enabled: bool = Field(
+        default=True, description="Record each AI call. Off: nothing further is recorded."
+    )
+    exclude_job_types: list[str] = Field(
+        default_factory=lambda: ["chat"],
+        max_length=100,
+        description="Job types whose calls are not recorded. Chat is left out until you opt in.",
+    )
+    max_chars: int = Field(
+        default=60000,
+        ge=1000,
+        le=400000,
+        description="Longest prompt or answer text kept per call; the rest is cut.",
+    )
+
+
 class OpsSettings(ConfigModel):
     """The ops watchdog: fixes what it safely can (retry a failed job, re-run a refresh, lift
     an old provider block), and puts one line in "Needs you" for what it could not."""
@@ -2698,6 +2718,7 @@ class JobsConfig(ConfigModel):
     autopilot_settings: AutopilotSettings = Field(default_factory=AutopilotSettings)
     thesis_settings: ThesisSettings = Field(default_factory=ThesisSettings)
     ops_settings: OpsSettings = Field(default_factory=OpsSettings)
+    training_capture: TrainingCaptureSettings = Field(default_factory=TrainingCaptureSettings)
     fund_documents: list[FundDocument] = Field(
         default_factory=list,
         max_length=60,

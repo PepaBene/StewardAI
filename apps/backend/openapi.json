@@ -12297,6 +12297,294 @@
         }
       }
     },
+    "/actions/kinds": {
+      "get": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "List Kinds",
+        "description": "What the owner can change from a screen or from chat.",
+        "operationId": "list_kinds",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ActionKind"
+                  },
+                  "type": "array",
+                  "title": "Response List Kinds"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/actions": {
+      "get": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Recent Actions",
+        "operationId": "recent_actions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActionRow"
+                  },
+                  "title": "Response Recent Actions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/actions/propose": {
+      "post": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Propose",
+        "description": "Check an action and say what it would do. Nothing changes until it is confirmed.",
+        "operationId": "propose",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionRow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/actions/{action_id}/confirm": {
+      "post": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Confirm",
+        "operationId": "confirm",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Action Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionRow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/actions/{action_id}/cancel": {
+      "post": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Cancel",
+        "operationId": "cancel",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Action Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cancelled"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/visuals/{kind}": {
+      "get": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Get Visual",
+        "description": "A chart block built from stored records, with its source, date, summary and table.",
+        "operationId": "get_visual",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Block"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/holdings/{ticker}/segments": {
       "get": {
         "tags": [
@@ -29715,6 +30003,39 @@
         "title": "ActionCoverageResponse",
         "description": "`GET /holdings/{ticker}/corporate-actions/coverage`."
       },
+      "ActionKind": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "risk": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Risk"
+          },
+          "undo": {
+            "type": "string",
+            "title": "Undo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "title",
+          "risk",
+          "undo"
+        ],
+        "title": "ActionKind"
+      },
       "ActionOut": {
         "properties": {
           "id": {
@@ -29808,6 +30129,95 @@
           "decided_at"
         ],
         "title": "ActionOut"
+      },
+      "ActionRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "args": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Args"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "risk": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Risk"
+          },
+          "undo": {
+            "type": "string",
+            "title": "Undo"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "done",
+              "cancelled",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "via": {
+            "type": "string",
+            "enum": [
+              "screen",
+              "chat"
+            ],
+            "title": "Via"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "action",
+          "args",
+          "summary",
+          "risk",
+          "undo",
+          "status",
+          "via",
+          "reason",
+          "result"
+        ],
+        "title": "ActionRow"
       },
       "Activation": {
         "properties": {
@@ -36218,6 +36628,97 @@
         ],
         "title": "BenchmarkValuation"
       },
+      "Block": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "chart": {
+            "type": "string",
+            "enum": [
+              "bar",
+              "donut",
+              "none"
+            ],
+            "title": "Chart"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "values": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Values"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "caption": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption"
+          },
+          "table": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Table"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "chart",
+          "title",
+          "unit",
+          "labels",
+          "values",
+          "source",
+          "as_of",
+          "summary",
+          "table"
+        ],
+        "title": "Block"
+      },
       "BoardKpi": {
         "properties": {
           "kpi": {
@@ -37686,6 +38187,19 @@
           "realised_volatility"
         ],
         "title": "CalibrationOut"
+      },
+      "Cancelled": {
+        "properties": {
+          "action_id": {
+            "type": "integer",
+            "title": "Action Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_id"
+        ],
+        "title": "Cancelled"
       },
       "CandidateCase": {
         "properties": {
@@ -42644,6 +43158,17 @@
           "changes"
         ],
         "title": "ConfigVersionMeta"
+      },
+      "ConfirmIn": {
+        "properties": {
+          "second": {
+            "type": "boolean",
+            "title": "Second",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ConfirmIn"
       },
       "ConfirmedListingResponse": {
         "properties": {
@@ -69151,6 +69676,9 @@
           "ops_settings": {
             "$ref": "#/components/schemas/OpsSettings"
           },
+          "training_capture": {
+            "$ref": "#/components/schemas/TrainingCaptureSettings"
+          },
           "fund_documents": {
             "items": {
               "$ref": "#/components/schemas/FundDocument"
@@ -86269,6 +86797,45 @@
           "body"
         ],
         "title": "PromptsConfigVersion"
+      },
+      "ProposeIn": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "args": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Args",
+            "default": {}
+          },
+          "via": {
+            "type": "string",
+            "enum": [
+              "screen",
+              "chat"
+            ],
+            "title": "Via",
+            "default": "chat"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "ProposeIn"
       },
       "ProposedAction": {
         "properties": {
@@ -108764,6 +109331,37 @@
           "job_id"
         ],
         "title": "TrailRow"
+      },
+      "TrainingCaptureSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Record each AI call. Off: nothing further is recorded.",
+            "default": true
+          },
+          "exclude_job_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Exclude Job Types",
+            "description": "Job types whose calls are not recorded. Chat is left out until you opt in."
+          },
+          "max_chars": {
+            "type": "integer",
+            "maximum": 400000.0,
+            "minimum": 1000.0,
+            "title": "Max Chars",
+            "description": "Longest prompt or answer text kept per call; the rest is cut.",
+            "default": 60000
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TrainingCaptureSettings",
+        "description": "Keep a redacted copy of each AI call (prompt, answer, usage) so models can later be\nfine-tuned on this app's own work. Nothing is trained or sent anywhere by this."
       },
       "TransactionFeeOut": {
         "properties": {
