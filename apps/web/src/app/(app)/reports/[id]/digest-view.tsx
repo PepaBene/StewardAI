@@ -28,6 +28,7 @@ import { DigestShell } from "@/components/reports/digest-shell";
 import { usePortfolioHistory } from "@/components/reports/reports-shell";
 import { Blueprint, BlueprintCorners, PanelHeading } from "@/components/ui/blueprint";
 import { checkedTextClass, ClaimsSummaryLine, SentenceCheckMark } from "@/components/verify/sentence-check";
+import { useTrackOpen } from "@/lib/use-track-open";
 import {
   getBrowserApiClient,
   type AlertOut,
@@ -75,6 +76,7 @@ import { cn } from "@/lib/utils";
 
 /** /reports/[id]: the digest list of its period beside the digest. */
 export function DigestView({ id }: { id: number }) {
+  useTrackOpen("report", id);
   const fetcher = useCallback(
     () => getBrowserApiClient().GET("/reports/{report_id}", { params: { path: { report_id: id } } }),
     [id],

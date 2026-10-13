@@ -74,6 +74,68 @@ async def engagement(pool: asyncpg.Pool, now: dt.datetime) -> list[Engagement]:
     return [Engagement(r["event_type"], r["sent"], r["acknowledged"]) for r in rows]
 
 
+NOTICE_KIND = "notice_tuning"
+NOTICE_MIN = 8
+# Optional notice kinds and the Ops setting that produces them. Notices that guard money or
+# data (rebalance, thesis break, missing key, release gate) are never switched off.
+OPTIONAL_NOTICES: dict[str, str] = {
+    "opportunity": "suggest_opportunities",
+    "journal_gap": "journal_gaps",
+}
+
+
+def pick_notice(resolved: int, dismissed: int) -> bool:
+    """Switch an optional notice off: enough were closed and every one was dismissed."""
+    return resolved >= NOTICE_MIN and dismissed == resolved
+
+
+async def tune_notices(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, Any]:
+    """A kind of optional notice that was dismissed every time (and never resolved by acting
+    on it) in the last 60 days is switched off in the Ops settings, with a notice saying so.
+    It is the Jobs config, so rolling it back turns the notice on again."""
+    stored = await load_active(pool, "jobs", JobsConfig)
+    config = stored.body if stored else JobsConfig()
+    rows = await pool.fetch(
+        "select kind, count(*) as resolved,"
+        " count(*) filter (where last_action = 'dismissed') as dismissed"
+        " from public.ops_task where kind = any($1::text[]) and status = 'resolved'"
+        " and resolved_at >= $2 group by kind",
+        sorted(OPTIONAL_NOTICES),
+        now - dt.timedelta(days=WINDOW_DAYS),
+    )
+    for r in rows:
+        flag = OPTIONAL_NOTICES[r["kind"]]
+        if not getattr(config.ops_settings, flag) or not pick_notice(r["resolved"], r["dismissed"]):
+            continue
+        new = config.model_copy(
+            update={"ops_settings": config.ops_settings.model_copy(update={flag: False})}
+        )
+        async with pool.acquire() as conn:
+            await save_config(
+                conn,
+                "jobs",
+                new,
+                created_by=None,
+                note=f"Automatic: all {r['resolved']} {r['kind']} notices were dismissed.",
+                expected_active_id=stored.id if stored else None,
+            )
+        await tasks.see(
+            pool,
+            NOTICE_KIND,
+            r["kind"],
+            title=f"{r['kind'].replace('_', ' ').capitalize()} notices are switched off",
+            detail=(
+                f"You dismissed all {r['resolved']} of them in the last {WINDOW_DAYS} days. "
+                f"Turn `{flag}` back on in Jobs config → ops settings if you want them."
+            ),
+            href="/config/jobs",
+            weight=0.1,
+            status="needs_owner",
+        )
+        return {"switched_off": flag}  # one change per run
+    return {"switched_off": None}
+
+
 INBOX_KIND = "inbox_tuning"
 INBOX_MIN_DECIDED = 10
 INBOX_MAX_TOP = 3

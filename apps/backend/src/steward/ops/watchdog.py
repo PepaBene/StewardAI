@@ -47,7 +47,7 @@ from steward.ops import journal_gaps, keys, tasks
 from steward.ops.opportunities import check_opportunities
 from steward.ops.release_gate import check_release_gate
 from steward.ops.suggestions import suggest_rebalance, suggest_thesis_breaks
-from steward.ops.tuning import tune_alerts, tune_inbox
+from steward.ops.tuning import tune_alerts, tune_inbox, tune_notices
 from steward.quality.cockpit import build_cockpit
 from steward.settings import get_settings
 from steward.xray.derive import derive_benchmark_indexes
@@ -335,6 +335,7 @@ async def watchdog_handler(ctx: JobContext) -> None:
         async with ctx.step("tune_alerts") as step:
             step.detail.update(await tune_alerts(ctx.pool, now))
             step.detail["inbox"] = await tune_inbox(ctx.pool, now)
+            step.detail["notices"] = await tune_notices(ctx.pool, now)
     if cfg.suggest_opportunities and owner_id and now.hour == cfg.suggest_hour_utc:
         async with ctx.step("opportunities") as step:
             step.detail.update(await check_opportunities(ctx.pool, uuid.UUID(owner_id)))

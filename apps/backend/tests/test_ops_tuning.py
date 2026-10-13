@@ -9,7 +9,7 @@ import pytest
 from steward.config.event_rules import EventRulesConfig
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
-from steward.ops import tasks
+from steward.ops import engagement, tasks
 from steward.ops import tuning as tn
 
 NOW = dt.datetime.now(dt.UTC)
@@ -56,6 +56,43 @@ async def test_ignored_inbox_items_raise_the_minimum_severity_once(
     stored = await load_active(backend_pool, "jobs", JobsConfig)
     assert stored is not None and stored.body.inbox_settings.min_severity == 3
     assert (await tn.tune_inbox(backend_pool, NOW))["raised"] is None
+
+
+def test_a_notice_is_switched_off_only_when_every_one_was_dismissed() -> None:
+    assert tn.pick_notice(8, 8)
+    assert not tn.pick_notice(7, 7)  # too few
+    assert not tn.pick_notice(10, 9)  # one was acted on
+
+
+@pytest.mark.db
+async def test_a_notice_kind_that_is_always_dismissed_is_switched_off(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    for i in range(8):
+        await backend_pool.execute(
+            "insert into public.ops_task (kind, subject, status, title, last_action, resolved_at)"
+            " values ('opportunity', $1, 'resolved', 't', 'dismissed', now())",
+            f"screen:{i}",
+        )
+    assert (await tn.tune_notices(backend_pool, NOW))["switched_off"] == "suggest_opportunities"
+    stored = await load_active(backend_pool, "jobs", JobsConfig)
+    assert stored is not None and not stored.body.ops_settings.suggest_opportunities
+    assert (await tn.tune_notices(backend_pool, NOW))["switched_off"] is None
+
+
+def test_read_rate_is_the_share_opened() -> None:
+    assert engagement.read_rate(10, 4) == 0.4
+    assert engagement.read_rate(0, 0) is None
+    assert engagement.read_rate(3, 5) == 1.0
+
+
+@pytest.mark.db
+async def test_opens_are_recorded_by_kind(backend_pool: asyncpg.Pool) -> None:
+    await engagement.record(backend_pool, "news_story", "12", "AAPL_US_EQ")
+    await engagement.record(backend_pool, "news_story", "12")
+    await engagement.record(backend_pool, "report", "7")
+    since = NOW - dt.timedelta(days=1)
+    assert await engagement.opened_refs(backend_pool, "news_story", since) == {"12"}
 
 
 async def escalation(pool: asyncpg.Pool, event_type: str, acknowledged: bool) -> None:

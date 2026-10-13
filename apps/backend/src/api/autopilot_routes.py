@@ -5,7 +5,7 @@ import datetime as dt
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import IdPath, Pool
@@ -14,6 +14,7 @@ from steward.autopilot.judge import ApplyError, accept, effective_mode, revert
 from steward.autopilot.kinds import all_kinds
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
+from steward.ops import engagement
 from steward.ops import tasks as ops_tasks
 
 router = APIRouter(tags=["autopilot"])
@@ -203,6 +204,24 @@ async def needs_you(pool: Pool, _owner: Owner) -> NeedsYou:
 
 class Dismissed(BaseModel):
     task_id: int
+
+
+class EngagementIn(BaseModel):
+    kind: engagement.Kind
+    ref: Annotated[str, Field(min_length=1, max_length=120)]
+    ticker: Annotated[str | None, Field(max_length=40)] = None
+
+
+class Recorded(BaseModel):
+    ok: bool = True
+
+
+@router.post("/engagement", status_code=status.HTTP_201_CREATED)
+async def record_engagement(body: EngagementIn, pool: Pool, _owner: Owner) -> Recorded:
+    """Note that the owner opened something. The app uses it to send less of what is never
+    read; it stores the kind and id only."""
+    await engagement.record(pool, body.kind, body.ref, body.ticker)
+    return Recorded()
 
 
 @router.post("/autopilot/notices/{task_id}/dismiss")
