@@ -21,6 +21,7 @@ from steward.jobs.runner import JobContext
 from steward.llm.cache import ResultCache
 from steward.llm.client import create_llm
 from steward.llm.routing import RoutingClient, routing_client
+from steward.ops import liveness
 from steward.settings import get_settings
 
 logger = logging.getLogger("steward.autopilot")
@@ -41,9 +42,16 @@ def _client(ctx: JobContext) -> RoutingClient | None:
 
 
 async def autopilot_handler(ctx: JobContext) -> None:
-    cfg = (await _settings(ctx)).autopilot_settings
+    jobs = await _settings(ctx)
+    cfg = jobs.autopilot_settings
     if not cfg.enabled:
         return
+    if jobs.ops_settings.enabled:
+        # The watchdog checks this job; this job checks the watchdog.
+        async with ctx.step("liveness") as step:
+            step.detail["watchdog_overdue_hours"] = await liveness.check(
+                ctx.pool, liveness.WATCHDOG, dt.datetime.now(dt.UTC)
+            )
     overrides = await ledger.mode_overrides(ctx.pool)
     learned = await ledger.learned_thresholds(ctx.pool)
     client = _client(ctx)

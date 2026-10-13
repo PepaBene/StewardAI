@@ -399,6 +399,46 @@ async def test_apply_failure_escalates_with_the_reason(fake_ledger: FakeLedger) 
     assert "not applied (the item changed)" in fake_ledger.rows[0].summary
 
 
+async def test_an_item_the_owner_settled_meanwhile_is_not_applied(
+    fake_ledger: FakeLedger,
+) -> None:
+    store = Store(open={"a": None})
+
+    class OwnerActsFirst(ScriptedClient):
+        async def _parse(self, **kw: Any) -> Any:
+            store.owner_calls["a"] = "reject"  # the owner settles it while the model thinks
+            return await super()._parse(**kw)
+
+    client = OwnerActsFirst({("gpt-small", "a"): ("accept", 0.95)})
+    out = await run(store, client, settings())
+    assert out["applied"] == 0 and out["escalated"] == 0 and out["settled_meanwhile"] == 1
+    assert store.applied == [] and fake_ledger.rows == []
+
+
+async def test_a_failed_check_before_applying_escalates_instead(
+    fake_ledger: FakeLedger,
+) -> None:
+    store = Store(open={"a": None})
+    client = ScriptedClient({("gpt-small", "a"): ("accept", 0.95)})
+
+    async def verify(pool: Any, cand: Candidate, decision: str) -> list[str]:
+        return ["the value is outside its range"]
+
+    out = await judge.run_kind(
+        None,
+        client,  # type: ignore[arg-type]
+        toy_kind(store, verify=verify),
+        settings(),
+        "auto",
+        {"calls": 10},
+        now=NOW,
+        rng=random.Random(1),  # noqa: S311
+    )
+    assert (out["applied"], out["escalated"], out["verification_failed"]) == (0, 1, 1)
+    assert store.applied == []
+    assert "checked before applying: the value is outside its range" in fake_ledger.rows[0].summary
+
+
 async def test_daily_cap_and_call_budget_limit_a_run(fake_ledger: FakeLedger) -> None:
     store = Store(open={f"r{i}": None for i in range(6)})
     client = ScriptedClient({("gpt-small", f"r{i}"): ("accept", 0.95) for i in range(6)})

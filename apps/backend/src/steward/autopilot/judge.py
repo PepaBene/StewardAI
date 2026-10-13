@@ -67,6 +67,9 @@ Apply = Callable[[asyncpg.Pool, Candidate, str, str], Awaitable[dict[str, Any] |
 Revert = Callable[[asyncpg.Pool, dict[str, Any]], Awaitable[None]]
 Outcome = Callable[[asyncpg.Pool, str], Awaitable[str | None]]
 IsOpen = Callable[[asyncpg.Pool, list[str]], Awaitable[set[str]]]
+# Extra checks run just before a decision is applied: the problems found (empty: all clear).
+# They see the decision the judge reached, and do their own reading of the stored records.
+Verify = Callable[[asyncpg.Pool, "Candidate", str], Awaitable[list[str]]]
 
 
 @dataclass(frozen=True)
@@ -90,6 +93,7 @@ class JudgeKind:
     max_tokens: int = 1500
     # False: calibration never promotes the kind from shadow to auto; the owner sets `auto`.
     promotable: bool = True
+    verify: Verify | None = None
 
 
 @dataclass(frozen=True)
@@ -251,6 +255,15 @@ async def run_kind(
     return out
 
 
+async def still_open(pool: asyncpg.Pool, kind: JudgeKind, cand: Candidate) -> bool:
+    """The last look before a decision is applied: the item is still waiting and the owner has
+    not decided it themselves. The judge's model calls can take minutes, in which time the owner
+    may have settled the item on its page."""
+    if cand.ref not in await kind.is_open(pool, [cand.ref]):
+        return False
+    return not (kind.outcome is not None and await kind.outcome(pool, cand.ref))
+
+
 async def _record(
     pool: asyncpg.Pool,
     kind: JudgeKind,
@@ -299,6 +312,18 @@ async def _record(
     if mode == "shadow":
         await put("shadow", *args, outcome.reasons)
         out["shadow"] += 1
+        return
+    if not await still_open(pool, kind, cand):
+        # Settled by someone else while the judge was thinking: nothing to apply, nothing to ask.
+        out["settled_meanwhile"] = out.get("settled_meanwhile", 0) + 1
+        return
+    problems = await kind.verify(pool, cand, outcome.decision) if kind.verify else []
+    if problems:
+        await put(
+            "escalated", *args, f"not applied (checked before applying: {'; '.join(problems)})"
+        )
+        out["escalated"] += 1
+        out["verification_failed"] = out.get("verification_failed", 0) + 1
         return
     try:
         payload = await kind.apply(pool, cand, outcome.decision, note_for(outcome))
