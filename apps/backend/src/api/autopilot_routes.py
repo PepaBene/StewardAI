@@ -4,6 +4,7 @@ and the owner's levers (revert a decision, accept a recommendation, mark a spot 
 import datetime as dt
 from typing import Annotated, Literal
 
+import asyncpg
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
@@ -14,6 +15,7 @@ from steward.autopilot.judge import ApplyError, accept, effective_mode, revert
 from steward.autopilot.kinds import all_kinds
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
+from steward.engine import overrides
 from steward.ops import engagement
 from steward.ops import tasks as ops_tasks
 
@@ -66,8 +68,34 @@ class NeedsYou(BaseModel):
     items: list[NeedsYouItem]
 
 
-class ReviewIn(BaseModel):
+class WhyIn(BaseModel):
+    reason_code: overrides.Reason | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class ReviewIn(WhyIn):
     verdict: Literal["ok", "wrong"]
+
+
+async def _record_override(
+    pool: asyncpg.Pool,
+    row: ledger.AutoDecision,
+    action: Literal["reverted", "marked_wrong"],
+    why: WhyIn | None,
+) -> None:
+    await overrides.record(
+        pool,
+        area="autopilot",
+        subject_kind=row.kind,
+        subject_ref=row.subject_ref,
+        action=action,
+        via="screen",
+        reason_code=why.reason_code if why else None,
+        note=why.note if why else None,
+        decided_by=row.decided_by,
+        decision_id=row.id,
+        before={"decision": row.decision},
+    )
 
 
 def _decision_or_404(row: ledger.AutoDecision | None, decision_id: int) -> ledger.AutoDecision:
@@ -234,8 +262,11 @@ async def dismiss_notice(task_id: IdPath, pool: Pool, _owner: Owner) -> Dismisse
 
 
 @router.post("/autopilot/decisions/{decision_id}/revert")
-async def revert_decision(decision_id: IdPath, pool: Pool, _owner: Owner) -> ledger.AutoDecision:
-    """Undo an applied decision. It counts as a wrong decision in calibration."""
+async def revert_decision(
+    decision_id: IdPath, pool: Pool, _owner: Owner, body: WhyIn | None = None
+) -> ledger.AutoDecision:
+    """Undo an applied decision. It counts as a wrong decision in calibration. The body, with
+    a reason chip and a note, is optional."""
     row = _decision_or_404(await ledger.get(pool, decision_id), decision_id)
     kind = all_kinds().get(row.kind)
     if kind is None:
@@ -244,6 +275,7 @@ async def revert_decision(decision_id: IdPath, pool: Pool, _owner: Owner) -> led
         await revert(pool, kind, row)
     except ApplyError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    await _record_override(pool, row, "reverted", body)
     return _decision_or_404(await ledger.get(pool, decision_id), decision_id)
 
 
@@ -270,4 +302,6 @@ async def review_decision(
     """The owner's verdict on a spot-checked decision. Calibration counts it."""
     row = _decision_or_404(await ledger.get(pool, decision_id), decision_id)
     await ledger.set_review(pool, row.id, body.verdict, "owner")
+    if body.verdict == "wrong":
+        await _record_override(pool, row, "marked_wrong", body)
     return _decision_or_404(await ledger.get(pool, decision_id), decision_id)

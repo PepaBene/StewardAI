@@ -32,6 +32,7 @@ logger = logging.getLogger("steward.autopilot")
 Mode = Literal["off", "shadow", "auto"]
 
 PROMPT_KEEP = 6000  # characters of the judge's prompt kept in the ledger, for the audit
+UNDONE_MEMORY = dt.timedelta(days=365)  # how long an undone item stays out of the judge's hands
 
 
 class Verdict(BaseModel):
@@ -191,6 +192,8 @@ async def run_kind(
     skip = await ledger.decided_refs(
         pool, kind.name, ("escalated",), now - dt.timedelta(days=settings.rejudge_days)
     )
+    # An item the owner undid is the owner's to settle: the engine never decides it again.
+    skip |= await ledger.decided_refs(pool, kind.name, ("reverted",), now - UNDONE_MEMORY)
     if mode == "shadow":
         skip |= await ledger.decided_refs(pool, kind.name, ("shadow",), now - dt.timedelta(days=90))
     loaded = await kind.load(pool, min(room * 2, 200))

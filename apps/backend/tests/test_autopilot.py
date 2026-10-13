@@ -415,6 +415,22 @@ async def test_an_item_the_owner_settled_meanwhile_is_not_applied(
     assert store.applied == [] and fake_ledger.rows == []
 
 
+async def test_an_item_the_owner_undid_is_never_decided_again(
+    fake_ledger: FakeLedger,
+) -> None:
+    store = Store(open={"a": None})
+    client = ScriptedClient({("gpt-small", "a"): ("accept", 0.95)})
+    await run(store, client, settings())
+    assert store.open["a"] == "accept"
+    row = fake_ledger.rows[0]
+    await judge.revert(None, toy_kind(store), row)  # type: ignore[arg-type]
+    assert store.open["a"] is None and row.status == "reverted"  # back in the queue
+
+    second = ScriptedClient({("gpt-small", "a"): ("accept", 0.95)})
+    out = await run(store, second, settings())
+    assert second.calls == [] and out["judged"] == 0 and store.open["a"] is None
+
+
 async def test_a_failed_check_before_applying_escalates_instead(
     fake_ledger: FakeLedger,
 ) -> None:

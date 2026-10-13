@@ -13,20 +13,23 @@ Two rules are enforced when the registry is built, and tested:
 import json
 import re
 from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Literal
 
 import asyncpg
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from steward.autopilot import ledger
 from steward.autopilot.judge import ApplyError, accept, revert
 from steward.autopilot.kinds import all_kinds
+from steward.engine import overrides
 from steward.ops import tasks as ops_tasks
 from steward.training import labels
 
 Risk = Literal["low", "medium", "high"]
 Via = Literal["screen", "chat"]
+current_via: ContextVar[Via] = ContextVar("current_via", default="screen")
 
 # Words that mean placing or preparing a trade. An action whose name contains one is refused.
 TRADE_WORDS = ("order", "trade", "buy", "sell", "broker", "execute", "submit", "place", "transfer")
@@ -48,8 +51,25 @@ class DecisionArgs(BaseModel):
     decision_id: int = Field(ge=1)
 
 
-class ReviewArgs(DecisionArgs):
+class Why(BaseModel):
+    """Why the owner is overruling the engine; both are optional, one tap or a line of text."""
+
+    reason_code: overrides.Reason | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class RevertArgs(DecisionArgs, Why):
+    pass
+
+
+class ReviewArgs(DecisionArgs, Why):
     verdict: Literal["ok", "wrong"]
+
+    @model_validator(mode="after")
+    def _why_needs_a_wrong_verdict(self) -> "ReviewArgs":
+        if self.verdict == "ok":
+            self.reason_code, self.note = None, None
+        return self
 
 
 class ModeArgs(BaseModel):
@@ -93,7 +113,7 @@ async def _describe_revert(pool: asyncpg.Pool, a: DecisionArgs) -> str:
     return f"Undo the applied {row.kind} decision: {row.summary}"
 
 
-async def _run_revert(pool: asyncpg.Pool, a: DecisionArgs) -> dict[str, Any]:
+async def _run_revert(pool: asyncpg.Pool, a: RevertArgs) -> dict[str, Any]:
     row = await _decision(pool, a.decision_id)
     kind = all_kinds().get(row.kind)
     if kind is None:
@@ -102,6 +122,19 @@ async def _run_revert(pool: asyncpg.Pool, a: DecisionArgs) -> dict[str, Any]:
         await revert(pool, kind, row)
     except ApplyError as exc:
         raise ActionError(str(exc)) from exc
+    await overrides.record(
+        pool,
+        area="autopilot",
+        subject_kind=row.kind,
+        subject_ref=row.subject_ref,
+        action="reverted",
+        via=current_via.get(),
+        reason_code=a.reason_code,
+        note=a.note,
+        decided_by=row.decided_by,
+        decision_id=row.id,
+        before={"decision": row.decision},
+    )
     return {"decision_id": row.id, "kind": row.kind}
 
 
@@ -140,6 +173,20 @@ async def _describe_review(pool: asyncpg.Pool, a: ReviewArgs) -> str:
 async def _run_review(pool: asyncpg.Pool, a: ReviewArgs) -> dict[str, Any]:
     row = await _decision(pool, a.decision_id)
     await ledger.set_review(pool, row.id, a.verdict, "owner")
+    if a.verdict == "wrong":
+        await overrides.record(
+            pool,
+            area="autopilot",
+            subject_kind=row.kind,
+            subject_ref=row.subject_ref,
+            action="marked_wrong",
+            via=current_via.get(),
+            reason_code=a.reason_code,
+            note=a.note,
+            decided_by=row.decided_by,
+            decision_id=row.id,
+            before={"decision": row.decision},
+        )
     return {"decision_id": row.id, "verdict": a.verdict}
 
 
@@ -173,7 +220,7 @@ ACTIONS: dict[str, Action] = {
             "revert_decision",
             "Undo an automatic decision",
             "medium",
-            DecisionArgs,
+            RevertArgs,
             "Not undoable; the decision stays marked wrong and the autopilot learns from it.",
             _describe_revert,
             _run_revert,
@@ -297,6 +344,7 @@ async def confirm(pool: asyncpg.Pool, action_id: int, *, second: bool = False) -
     if claimed is None:
         raise ActionError(f"Action {action_id} is already being run")
     action, parsed = _parse(row.action, row.args)
+    token = current_via.set(row.via)
     try:
         result = await action.run(pool, parsed)
     except ActionError as exc:
@@ -306,6 +354,8 @@ async def confirm(pool: asyncpg.Pool, action_id: int, *, second: bool = False) -
             json.dumps({"error": str(exc)}),
         )
         raise
+    finally:
+        current_via.reset(token)
     await pool.execute(
         "update public.owner_action set result = $2::jsonb where id = $1",
         action_id,

@@ -13,9 +13,9 @@ from fastapi.routing import APIRoute
 from pydantic import BaseModel
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from api.action_routes import router as action_router
 from api.alert_trail_routes import router as alert_trail_router
 from api.auth import Owner
-from api.action_routes import router as action_router
 from api.autopilot_routes import router as autopilot_router
 from api.budget_routes import router as budget_router
 from api.chat_routes import router as chat_router
