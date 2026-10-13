@@ -25,11 +25,31 @@ Built:
 - **Rebalance suggestion** (E3, in part): when positions leave their bands, a daily notice
   with the planner's trades. Nothing is sent to a broker.
 
+Added afterwards:
+
+- **C1 fund documents** (`fundresearch/kid_facts.py`): list a fund's KID or factsheet once in
+  Jobs config → `fund_documents`; the daily fund facts job reads it when it changes. A model
+  proposes the text facts (replication, securities lending, UCITS, inception, domicile, index);
+  each is kept only if it has an allowed form and quotes the document word for word, and the
+  document names the fund's ISIN. Same append-only rules as the iShares/WisdomTree readers.
+  No issuer URL patterns are guessed, so the URL is still the owner's one-time paste.
+- **C3 segment map** (`company/segment_autofill.py`): a geographic revenue member the filing
+  names as a country is mapped to it, daily. Regions are left alone, and a row the owner
+  removed or changed is never written again.
+- **C4 journal gaps** (`ops/journal_gaps.py`): a recent broker trade the journal does not
+  explain, or a sell and a buy that look like a switch, becomes a notice. Nothing is written to
+  the journal or switch log; their reasons stay the owner's.
+- **D1 price breaker**: after 4 Stooq transport failures in a row in a run, the rest of the run
+  goes straight to Yahoo and the other fallbacks (`PriceDeps.stooq_breaker_after`).
+- **E3 thesis-break notices**: a breached KPI on a held stock.
+
 Not built, on purpose or for lack of input:
 
-- C1 fund KID/factsheet extractor; C3 company-input fillers beyond the existing jobs.
-- C4 auto-journal/switch log: the owner's record stays the owner's.
-- D6 release-gate automation; provider failover chains.
+- C3 forward data, corporate actions, case items and EPO patents: each needs a source or a key
+  that is not collected yet.
+- D1 failover for fundamentals, estimates and news: the price chain was the only one with a
+  secondary provider already wired.
+- D6 release-gate automation.
 - E2 self-tuning config: there is no engagement signal to tune against.
 - E3 opportunity suggestions (thesis-break notices are built: a breached KPI on a held stock).
 - D5 is a forecast notice only (it does not throttle spend). D4 needed no code: the scheduler is

@@ -23,12 +23,15 @@ job, so it shows in the job list like any other run.
 
 import datetime as dt
 import logging
+import uuid
 from decimal import Decimal
 from typing import Any
 
 import asyncpg
 
+from steward.autopilot import ledger
 from steward.budget_guard import month_of, month_spend
+from steward.company.segment_autofill import fill_country_maps
 from steward.config.budget import BudgetConfig
 from steward.config.jobs import JobsConfig, OpsSettings
 from steward.config.store import load_active
@@ -38,7 +41,7 @@ from steward.jobs.runner import JobContext, create_job
 from steward.lookthrough.coverage import refresh_ledger
 from steward.lookthrough.read import load_portfolio
 from steward.ops import budget as budget_forecast
-from steward.ops import keys, tasks
+from steward.ops import journal_gaps, keys, tasks
 from steward.ops.suggestions import suggest_rebalance, suggest_thesis_breaks
 from steward.quality.cockpit import build_cockpit
 from steward.settings import get_settings
@@ -318,9 +321,17 @@ async def watchdog_handler(ctx: JobContext) -> None:
         async with ctx.step("suggestions") as step:
             step.detail.update(await suggest_rebalance(ctx.pool))
             step.detail["thesis_breaks"] = await suggest_thesis_breaks(ctx.pool)
+    owner_id = get_settings().owner_user_id
+    if cfg.fill_segment_map and owner_id and now.hour == cfg.suggest_hour_utc:
+        async with ctx.step("company_inputs") as step:
+            held = sorted(await ledger.holding_weights(ctx.pool))
+            step.detail.update(await fill_country_maps(ctx.pool, uuid.UUID(owner_id), held))
     if cfg.key_notices:
         async with ctx.step("keys") as step:
             step.detail.update(await check_keys(ctx.pool, jobs))
+    if cfg.journal_gaps:
+        async with ctx.step("journal_gaps") as step:
+            step.detail.update(await journal_gaps.check_journal_gaps(ctx.pool, now.date()))
     if cfg.budget_forecast:
         async with ctx.step("budget") as step:
             step.detail.update(await check_budget(ctx.pool, now))

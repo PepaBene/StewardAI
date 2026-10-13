@@ -110,6 +110,11 @@ class PriceDeps:
     now: dt.datetime = field(default_factory=lambda: dt.datetime.now(dt.UTC))
     # Waits between Yahoo requests (Yahoo answers bursts with HTTP 429); None: no wait.
     pace: Callable[[float], Awaitable[None]] | None = None
+    # Circuit breaker for the primary source: after this many Stooq transport failures in a row
+    # in one run, the rest of the run goes straight to the fallbacks instead of waiting out a
+    # timeout per symbol. A Stooq answer (data, or "no data") resets the count.
+    stooq_breaker_after: int = 4
+    stooq_failures: int = 0
 
 
 async def store_bars(
@@ -316,9 +321,12 @@ async def collect_series(
     """The source chain for one holding or index: Stooq, else Yahoo. Returns (which source
     delivered, with why Stooq did not; gap reason when neither did)."""
     stooq_gap = NO_STOOQ_SYMBOL
-    if symbols.stooq:
+    if symbols.stooq and deps.stooq_failures >= deps.stooq_breaker_after:
+        stooq_gap = f"Stooq skipped: unreachable {deps.stooq_failures} times in a row this run"
+    elif symbols.stooq:
         count, gap = await collect_symbol(pool, deps, symbols.stooq, years, notes)
         counts[symbols.stooq] = count
+        deps.stooq_failures = deps.stooq_failures + 1 if gap and "unreachable" in gap else 0
         if gap is None:
             return {"source": "stooq", "symbol": symbols.stooq}, None
         stooq_gap = gap

@@ -328,6 +328,15 @@ class InboxSettings(ConfigModel):
     )
 
 
+class FundDocument(ConfigModel):
+    """A fund's KID, factsheet or prospectus, read for the fund's text facts (replication,
+    securities lending, UCITS, inception, domicile, index). Listed once; read again whenever
+    the document changes."""
+
+    isin: str = Field(pattern=r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$", description="The fund's ISIN.")
+    url: AnyHttpUrl = Field(description="Where the issuer publishes the PDF or page.")
+
+
 class OpsSettings(ConfigModel):
     """The ops watchdog: fixes what it safely can (retry a failed job, re-run a refresh, lift
     an old provider block), and puts one line in "Needs you" for what it could not."""
@@ -374,6 +383,16 @@ class OpsSettings(ConfigModel):
     budget_forecast: bool = Field(
         default=True,
         description="Warn once a month when the AI spend is on course to pass the monthly cap.",
+    )
+    fill_segment_map: bool = Field(
+        default=True,
+        description="Once a day, map a held company's revenue members that the filing names as "
+        "a country to that country. Regions and anything you removed or changed are left alone.",
+    )
+    journal_gaps: bool = Field(
+        default=True,
+        description="Tell the owner about a recent trade the journal does not explain, or a sell "
+        "and a buy that look like a switch. Never writes a journal or switch-log entry.",
     )
 
 
@@ -2624,6 +2643,13 @@ class JobsConfig(ConfigModel):
     inbox_settings: InboxSettings = Field(default_factory=InboxSettings)
     autopilot_settings: AutopilotSettings = Field(default_factory=AutopilotSettings)
     ops_settings: OpsSettings = Field(default_factory=OpsSettings)
+    fund_documents: list[FundDocument] = Field(
+        default_factory=list,
+        max_length=60,
+        description="Fund documents to read for facts the issuer readers do not cover (any "
+        "issuer except iShares and WisdomTree). The daily fund facts job reads the new or "
+        "changed ones; every fact must quote the document word for word.",
+    )
     ir_discovery_settings: IrDiscoverySettings = Field(default_factory=IrDiscoverySettings)
     gap_research_settings: GapResearchSettings = Field(default_factory=GapResearchSettings)
     ai_approval: AiApprovalSettings = Field(default_factory=AiApprovalSettings)

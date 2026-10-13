@@ -19317,6 +19317,25 @@ export interface components {
             /** Issuers */
             issuers: number;
         };
+        /**
+         * FundDocument
+         * @description A fund's KID, factsheet or prospectus, read for the fund's text facts (replication,
+         *     securities lending, UCITS, inception, domicile, index). Listed once; read again whenever
+         *     the document changes.
+         */
+        FundDocument: {
+            /**
+             * Isin
+             * @description The fund's ISIN.
+             */
+            isin: string;
+            /**
+             * Url
+             * Format: uri
+             * @description Where the issuer publishes the PDF or page.
+             */
+            url: string;
+        };
         /** FundHolding */
         FundHolding: {
             /** Name */
@@ -23098,6 +23117,11 @@ export interface components {
             inbox_settings?: components["schemas"]["InboxSettings"];
             autopilot_settings?: components["schemas"]["AutopilotSettings"];
             ops_settings?: components["schemas"]["OpsSettings"];
+            /**
+             * Fund Documents
+             * @description Fund documents to read for facts the issuer readers do not cover (any issuer except iShares and WisdomTree). The daily fund facts job reads the new or changed ones; every fact must quote the document word for word.
+             */
+            fund_documents?: components["schemas"]["FundDocument"][];
             ir_discovery_settings?: components["schemas"]["IrDiscoverySettings"];
             gap_research_settings?: components["schemas"]["GapResearchSettings"];
             ai_approval?: components["schemas"]["AiApprovalSettings"];
@@ -26524,6 +26548,18 @@ export interface components {
              * @default true
              */
             budget_forecast: boolean;
+            /**
+             * Fill Segment Map
+             * @description Once a day, map a held company's revenue members that the filing names as a country to that country. Regions and anything you removed or changed are left alone.
+             * @default true
+             */
+            fill_segment_map: boolean;
+            /**
+             * Journal Gaps
+             * @description Tell the owner about a recent trade the journal does not explain, or a sell and a buy that look like a switch. Never writes a journal or switch-log entry.
+             * @default true
+             */
+            journal_gaps: boolean;
         };
         /** OutletFraming */
         OutletFraming: {
