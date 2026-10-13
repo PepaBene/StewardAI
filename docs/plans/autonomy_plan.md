@@ -19,21 +19,25 @@ Deviations from the plan, and why:
 - **Every kind starts in shadow** (decides and logs, applies nothing) and is promoted by
   calibration only. A kind with no `revert` (identifier, deal_party, estimate_pair) is never
   promoted automatically; set it to `auto` in Jobs config → autopilot_settings if you want it.
-  Do that for `estimate_pair` last: the revision-alert gate counts its labels.
+  The revision-alert gate does not count the autopilot's `estimate_pair` labels.
 - **Listings and peers stay on `approvals/ai.py`**; the new `listing`/`peer` kinds are only the
   second stage (stronger model, expiry). Not re-implemented on the framework.
-- **B8 is narrower than planned.** Not automated, on purpose: accepting a thesis proposal
-  (its fields are why owned, exit conditions and pre-mortem, i.e. your stance) and per-claim review
-  (the ledger has no state for "reviewed by the autopilot", and `owner_confirmed` would lie). Built:
-  research queued for a thesis past its review date; proposals still wait for you.
-- **Identity override** has no stored candidate mappings to choose from, so no judge was
-  registered (`approvals.identity` is defined but unregistered).
-- **"Needs you" is ordered by age**, not portfolio weight.
-- **Known issues found**: `reference/listings.write_listing` can flip an AI-confirmed listing
-  back to `suggested` on the next derive (AI decisions leave `decided_by` null); `insider_override`
-  has no queue table, so its open set is a heuristic (code J / unrecognised lines with footnotes).
-- The SQL in every kind and the ledger was written without a database to run it against;
-  the DB-backed tests skip here. Run the suite once with `STEWARD_TEST_DATABASE_URL` set.
+- **Thesis proposals** are a 21st kind, `thesis_proposal`, with three fences: it edits only an
+  existing thesis, only `exit_conditions` and `pre_mortem` (never `why_owned`, KPIs or
+  scenarios), and calibration never promotes it (`promotable=False`; set `auto` in Jobs config
+  yourself). Each accept is a `theses` config version; revert rolls back to the one before it.
+- **Per-claim review is not automated, on purpose**: claims already carry the verifier's
+  `machine_checked`/`flagged` state, nothing downstream waits on the owner's mark, and a new
+  "autopilot reviewed" state would only duplicate the verifier.
+- **Identity override** has no stored candidate mappings to choose from, so no judge is
+  registered (`approvals.identity` is defined but unregistered). Needs a step that writes
+  candidates from OpenFIGI/ESMA first.
+- **"Needs you" is ordered by portfolio weight** (latest snapshot), age as the tiebreak.
+- **Fixed**: `write_listing` keeps any decided listing on re-derive. The revision-alert gate
+  ignores `estimate_pair` labels by the autopilot, so only the owner's labels count.
+- `insider_override` has no queue table, so its open set stays a heuristic (code J / unrecognised
+  lines with footnotes).
+- DB-backed autopilot tests run against `STEWARD_TEST_DATABASE_URL`.
 
 ## Goal and principle
 

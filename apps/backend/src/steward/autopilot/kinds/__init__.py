@@ -18,6 +18,7 @@ KIND_MODULES: tuple[str, ...] = (
     "disclosure_data",
     "news",
     "approvals",
+    "thesis",
 )
 
 

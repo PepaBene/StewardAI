@@ -132,7 +132,7 @@ async def calibrate(
         mode = state[0] if state else policy.mode
         # A decision that cannot be undone is never handed the keys by a statistic: the owner
         # must set such a kind to auto in the Jobs config. Demotion still applies.
-        if kinds[name].revert is None and mode == "shadow":
+        if (kinds[name].revert is None or not kinds[name].promotable) and mode == "shadow":
             continue
         # After a move only decisions made since count, so a promotion is judged on the
         # decisions it let through, not on the shadow record that earned it.

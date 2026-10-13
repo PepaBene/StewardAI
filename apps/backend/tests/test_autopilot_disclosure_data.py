@@ -240,7 +240,11 @@ async def test_apply_refuses_words_it_does_not_know() -> None:
 
 
 async def suggestion(
-    pool: asyncpg.Pool, *, name_only: bool = False, issuer_lei: str | None = None
+    pool: asyncpg.Pool,
+    *,
+    name_only: bool = False,
+    issuer_lei: str | None = None,
+    identifier: str = LEI,
 ) -> tuple[int, int]:
     issuer = await pool.fetchval(
         "insert into public.issuer (legal_name, lei) values ('Acme Corp', $1) returning id",
@@ -257,7 +261,7 @@ async def suggestion(
         """insert into public.provider_identifier
              (provider, identifier_type, identifier, issuer_id, match_status, score, evidence)
            values ('gleif','lei',$1,$2,'suggested',$3,$4::jsonb) returning id""",
-        LEI,
+        identifier,
         issuer,
         0.55 if name_only else 0.95,
         json.dumps(evidence),
@@ -300,8 +304,9 @@ async def test_identifier_name_only_needs_the_note_and_keeps_a_stored_lei(
     )
     assert note == NOTE and issuer
 
-    other, holder = await suggestion(backend_pool, issuer_lei="X" * 20)
-    clash = Candidate(f"identifier:{other}", None, "", {"identifier": LEI})
+    second_lei = "HWUPKR0MPOU8FGXBT394"
+    other, holder = await suggestion(backend_pool, issuer_lei="X" * 20, identifier=second_lei)
+    clash = Candidate(f"identifier:{other}", None, "", {"identifier": second_lei})
     with pytest.raises(ApplyError, match="already holds a different LEI"):
         await dd.identifier.apply(backend_pool, clash, "confirm", NOTE)
     assert await dd.identifier.is_open(backend_pool, [clash.ref]) == {clash.ref}

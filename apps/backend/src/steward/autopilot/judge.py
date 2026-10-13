@@ -88,6 +88,8 @@ class JudgeKind:
     # What an escalation nobody settled in `ttl_days` becomes (None: it waits for the owner).
     expire_decision: str | None = None
     max_tokens: int = 1500
+    # False: calibration never promotes the kind from shadow to auto; the owner sets `auto`.
+    promotable: bool = True
 
 
 @dataclass(frozen=True)
