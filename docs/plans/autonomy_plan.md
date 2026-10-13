@@ -43,15 +43,35 @@ Added afterwards:
   goes straight to Yahoo and the other fallbacks (`PriceDeps.stooq_breaker_after`).
 - **E3 thesis-break notices**: a breached KPI on a held stock.
 
+- **D6 release gate** (`ops/release_gate.py`): a feature you switched on that has failed the
+  gate for `retry_hours` is switched off with a note, a notice says so, and a defect is opened
+  in the pilot defect log (closed as fixed when the gate passes again). Switching off is always
+  allowed; a feature that passes is never touched. Source audits stay yours: they compare
+  against facts you enter.
+- **C4 trade log** (`ops/journal_gaps.py`, `autolog_trades`): each detected trade is put on the
+  timeline as a journal entry (a sell and buy pair as a switch-log row) marked
+  `origin: auto`, with no reasons. They are left out of the scorecard and process review
+  (`written_by_owner`, `switch_by_owner`), and the notice keeps asking for your reasons.
+- **E2 alert tuning** (`ops/tuning.py`): the one engagement signal stored is whether an
+  escalation was acknowledged. An instant alert type with at least 10 alerts in 60 days and
+  under 10% acknowledged drops to a digest highlight (never lower), as a new `event_rules`
+  config version you can roll back. One type per run, 90-day cooldown. The inbox is tuned the
+  same way: when under 10% of at least 10 decided items at the minimum severity were acted on
+  or marked useful in 60 days, `inbox_settings.min_severity` goes up one (never above 3).
+- **E3 opportunities** (`ops/opportunities.py`): a stock that newly matches one of your saved
+  stock screens and is not held. The first look at a screen only records its matches.
+- **C3 case items** (`company/case_autofill.py`): your thesis wording becomes draft case items
+  (why owned as bull, pre-mortem as bear, exit conditions as risk). Never confirmed, never
+  added twice, never over an item you removed.
+
 Not built, on purpose or for lack of input:
 
-- C3 forward data, corporate actions, case items and EPO patents: each needs a source or a key
-  that is not collected yet.
+- C3 forward data, corporate actions and EPO patents: they need provider keys or an ex-date the
+  broker data does not carry; nothing is invented.
 - D1 failover for fundamentals, estimates and news: the price chain was the only one with a
   secondary provider already wired.
-- D6 release-gate automation.
-- E2 self-tuning config: there is no engagement signal to tune against.
-- E3 opportunity suggestions (thesis-break notices are built: a breached KPI on a held stock).
+- D6 auto-audits (they compare against facts you enter).
+- E2 for news source weights and notification volume: no news opens or page views are recorded.
 - D5 is a forecast notice only (it does not throttle spend). D4 needed no code: the scheduler is
   complete and `weekly_digest` succeeds. C6 and C7 were already covered by existing jobs.
 

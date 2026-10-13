@@ -384,6 +384,33 @@ class OpsSettings(ConfigModel):
         default=True,
         description="Warn once a month when the AI spend is on course to pass the monthly cap.",
     )
+    autolog_trades: bool = Field(
+        default=True,
+        description="Put each detected trade on the journal timeline (a journal entry, or a "
+        "switch-log row for a sell and buy pair) marked as automatic. They hold no reasons "
+        "and are left out of the scorecard and process review.",
+    )
+    draft_case_items: bool = Field(
+        default=True,
+        description="Once a day, add your thesis wording to a held company's case items as "
+        "drafts (why owned, pre-mortem, exit conditions). Never confirmed, never added twice.",
+    )
+    tune_alerts: bool = Field(
+        default=True,
+        description="Once a day, lower one instant alert type to a digest highlight when you "
+        "acknowledged under 10% of at least 10 of them in 60 days. A new event-rules version "
+        "you can roll back; never below a digest highlight.",
+    )
+    suggest_opportunities: bool = Field(
+        default=True,
+        description="Once a day, run your saved stock screens and tell you about a stock that "
+        "newly passes one and is not held. The criteria are yours; nothing is ranked or scored.",
+    )
+    release_gate: bool = Field(
+        default=True,
+        description="Switch off a feature you turned on once it has failed the release gate for "
+        "`retry_hours` (a stale input or a failed audit), and say so in Needs you.",
+    )
     fill_segment_map: bool = Field(
         default=True,
         description="Once a day, map a held company's revenue members that the filing names as "
@@ -481,6 +508,21 @@ class AutopilotSettings(ConfigModel):
     )
     draft_min_days: int = Field(
         default=60, ge=1, le=365, description="No new draft for a holding this soon after a report."
+    )
+    author_theses: bool = Field(
+        default=True,
+        description="Write the whole thesis (stance, why owned or why not, KPIs, exit "
+        "conditions, scenarios, targets) for a held, non-core holding that has none, from its "
+        "deep-thesis report and your strategy, and save it as an AI-authored config version "
+        "you can roll back. A trim or exit stance is listed under Needs you.",
+    )
+    author_model: ModelId = Field(default="gpt-6.1-sol", description="Writes the thesis.")
+    author_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    author_max_per_run: int = Field(
+        default=3, ge=1, le=10, description="Most theses one autopilot run writes."
+    )
+    author_report_max_days: int = Field(
+        default=90, ge=1, le=365, description="Oldest deep-thesis report a thesis is written from."
     )
     refresh_review_dates: bool = Field(
         default=True,

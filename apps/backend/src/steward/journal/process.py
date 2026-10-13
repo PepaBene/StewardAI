@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
-from steward.journal.entries import JournalEntry, list_entries
+from steward.journal.entries import JournalEntry, list_entries, written_by_owner
 from steward.performance.benchmark import series_return
 from steward.reference.read import index_series
 from steward.sources.market import quote_unit_of
@@ -193,7 +193,7 @@ def trigger_summary(theses: Sequence[ClosedThesis]) -> TriggerSummary:
 
 
 async def process_report(pool: asyncpg.Pool, owner_id: str) -> ProcessReport:
-    entries = await list_entries(pool, owner_id, limit=2000)
+    entries = [e for e in await list_entries(pool, owner_id, limit=2000) if written_by_owner(e)]
     pairs = closed_pairs(entries)
     if not pairs:
         return ProcessReport(

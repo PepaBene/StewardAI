@@ -11,7 +11,7 @@ from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
 from steward.journal import switches
-from steward.journal.entries import JournalEntry, list_entries
+from steward.journal.entries import JournalEntry, list_entries, written_by_owner
 from steward.journal.scorecard import DecisionOutcome, Scorecard, SwitchOutcome, build_scorecard
 from steward.reference.price_series import choose_series, holding_symbols
 from steward.reference.read import load_series
@@ -118,12 +118,15 @@ async def scorecard(
     reason: str | None = None,
 ) -> Scorecard:
     today = dt.date.today()
-    entries = await list_entries(pool, owner_id, limit=None)
+    entries = [e for e in await list_entries(pool, owner_id, limit=None) if written_by_owner(e)]
     switch_outcomes: list[SwitchOutcome] | None
     try:
-        switch_outcomes = await switches.outcomes(
-            pool, await switches.list_switches(pool, owner_id, limit=2000)
-        )
+        owner_switches = [
+            s
+            for s in await switches.list_switches(pool, owner_id, limit=2000)
+            if switches.switch_by_owner(s)
+        ]
+        switch_outcomes = await switches.outcomes(pool, owner_switches)
     except asyncpg.PostgresError:  # the table is not migrated yet
         switch_outcomes = None
     strategy = await load_active(pool, "strategy", StrategyConfig)

@@ -11111,6 +11111,38 @@ export interface components {
              */
             draft_min_days: number;
             /**
+             * Author Theses
+             * @description Write the whole thesis (stance, why owned or why not, KPIs, exit conditions, scenarios, targets) for a held, non-core holding that has none, from its deep-thesis report and your strategy, and save it as an AI-authored config version you can roll back. A trim or exit stance is listed under Needs you.
+             * @default true
+             */
+            author_theses: boolean;
+            /**
+             * Author Model
+             * @description Writes the thesis.
+             * @default gpt-6.1-sol
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            author_model: string;
+            /**
+             * Author Effort
+             * @description Unset: effort is not sent and the model's default applies.
+             */
+            author_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Author Max Per Run
+             * @description Most theses one autopilot run writes.
+             * @default 3
+             */
+            author_max_per_run: number;
+            /**
+             * Author Report Max Days
+             * @description Oldest deep-thesis report a thesis is written from.
+             * @default 90
+             */
+            author_report_max_days: number;
+            /**
              * Refresh Review Dates
              * @description Move a thesis's review date forward when every KPI passes and the latest research proposes no change. A normal config version you can roll back.
              * @default true
@@ -26548,6 +26580,36 @@ export interface components {
              * @default true
              */
             budget_forecast: boolean;
+            /**
+             * Autolog Trades
+             * @description Put each detected trade on the journal timeline (a journal entry, or a switch-log row for a sell and buy pair) marked as automatic. They hold no reasons and are left out of the scorecard and process review.
+             * @default true
+             */
+            autolog_trades: boolean;
+            /**
+             * Draft Case Items
+             * @description Once a day, add your thesis wording to a held company's case items as drafts (why owned, pre-mortem, exit conditions). Never confirmed, never added twice.
+             * @default true
+             */
+            draft_case_items: boolean;
+            /**
+             * Tune Alerts
+             * @description Once a day, lower one instant alert type to a digest highlight when you acknowledged under 10% of at least 10 of them in 60 days. A new event-rules version you can roll back; never below a digest highlight.
+             * @default true
+             */
+            tune_alerts: boolean;
+            /**
+             * Suggest Opportunities
+             * @description Once a day, run your saved stock screens and tell you about a stock that newly passes one and is not held. The criteria are yours; nothing is ranked or scored.
+             * @default true
+             */
+            suggest_opportunities: boolean;
+            /**
+             * Release Gate
+             * @description Switch off a feature you turned on once it has failed the release gate for `retry_hours` (a stale input or a failed audit), and say so in Needs you.
+             * @default true
+             */
+            release_gate: boolean;
             /**
              * Fill Segment Map
              * @description Once a day, map a held company's revenue members that the filing names as a country to that country. Regions and anything you removed or changed are left alone.

@@ -15,6 +15,8 @@ from typing import Any
 
 import asyncpg
 
+from steward.journal import entries as journal_entries
+from steward.journal import switches as journal_switches
 from steward.ops import tasks
 
 logger = logging.getLogger("steward.ops")
@@ -41,6 +43,9 @@ class Gap:
     detail: str
     href: str
     weight: float
+    fills: tuple[Fill, ...] = ()
+    # "switch" when the fills are a sell and a buy of different stocks, else "trade".
+    kind: str = "trade"
 
 
 def _near(a: dt.date, b: dt.date) -> bool:
@@ -88,6 +93,8 @@ def find_gaps(
                 ),
                 href="/journal",
                 weight=0.6,
+                fills=(sell, buy),
+                kind="switch",
             )
         )
     for f in open_fills:
@@ -106,12 +113,15 @@ def find_gaps(
                 ),
                 href="/journal",
                 weight=0.5,
+                fills=(f,),
             )
         )
     return gaps
 
 
-async def check_journal_gaps(pool: asyncpg.Pool, today: dt.date) -> dict[str, Any]:
+async def check_journal_gaps(
+    pool: asyncpg.Pool, today: dt.date, owner_id: str | None = None
+) -> dict[str, Any]:
     since = today - dt.timedelta(days=LOOKBACK_DAYS)
     rows = await pool.fetch(
         "select ticker, upper(subtype) as side, (occurred_at at time zone 'UTC')::date as day,"
@@ -134,7 +144,8 @@ async def check_journal_gaps(pool: asyncpg.Pool, today: dt.date) -> dict[str, An
         (r["ticker"], r["decided_on"])
         for r in await pool.fetch(
             "select ticker, decided_on from public.decision_journal"
-            " where ticker is not null and decided_on >= $1::date - $2::int",
+            " where ticker is not null and decided_on >= $1::date - $2::int"
+            " and coalesce(snapshot->>'origin', 'owner') = 'owner'",
             since,
             WINDOW_DAYS,
         )
@@ -143,7 +154,8 @@ async def check_journal_gaps(pool: asyncpg.Pool, today: dt.date) -> dict[str, An
         (r["sold_ticker"], r["bought_ticker"], r["switched_on"])
         for r in await pool.fetch(
             "select sold_ticker, bought_ticker, switched_on from public.switch_log"
-            " where switched_on >= $1::date - $2::int",
+            " where switched_on >= $1::date - $2::int"
+            " and coalesce(snapshot->>'origin', 'owner') = 'owner'",
             since,
             WINDOW_DAYS,
         )
@@ -160,7 +172,77 @@ async def check_journal_gaps(pool: asyncpg.Pool, today: dt.date) -> dict[str, An
             weight=g.weight,
             status="needs_owner",
         )
+    logged = await autolog(pool, str(owner_id), gaps) if owner_id else None
     return {
         "gaps": [g.subject for g in gaps],
         "resolved": await tasks.settle(pool, KIND, {g.subject for g in gaps}),
+        "logged": logged,
     }
+
+
+AUTO_HYPOTHESIS = (
+    "Logged automatically from your broker sync. The reasons for this trade have not been "
+    "written yet; add a review entry to this one with yours."
+)
+
+
+async def autolog(pool: asyncpg.Pool, owner_id: str, gaps: list[Gap]) -> dict[str, int]:
+    """Put each unexplained trade on the timeline: a journal entry for a trade, a switch-log row
+    for a sell and buy pair. They are marked `origin: auto`, hold no reasons, and are left out
+    of the scorecard and the process review, so nothing here is graded as a decision you made.
+    Written once per trade."""
+    entries = switches = 0
+    for g in gaps:
+        if g.kind == "switch":
+            sell, buy = g.fills
+            known = await pool.fetchval(
+                "select exists (select 1 from public.switch_log where owner_id = $1"
+                " and sold_ticker = $2 and bought_ticker = $3 and switched_on = $4)",
+                owner_id,
+                sell.ticker,
+                buy.ticker,
+                sell.day,
+            )
+            if not known:
+                await journal_switches.record(
+                    pool,
+                    owner_id,
+                    journal_switches.SwitchIn(
+                        sold_ticker=sell.ticker,
+                        bought_ticker=buy.ticker,
+                        switched_on=sell.day,
+                        sold_value_base=None,
+                        note="Detected from your trades; add the reasons in the note.",
+                    ),
+                    origin="auto",
+                )
+                switches += 1
+            continue
+        (fill,) = g.fills
+        decision = "buy" if fill.side == "BUY" else "sell"
+        known = await pool.fetchval(
+            "select exists (select 1 from public.decision_journal where owner_id = $1"
+            " and ticker = $2 and decision = $3 and decided_on = $4"
+            " and snapshot->>'origin' = 'auto')",
+            owner_id,
+            fill.ticker,
+            decision,
+            fill.day,
+        )
+        if not known:
+            await journal_entries.record(
+                pool,
+                owner_id,
+                journal_entries.JournalEntryIn.model_validate(
+                    {
+                        "scope": "security",
+                        "ticker": fill.ticker,
+                        "decision": decision,
+                        "decided_on": fill.day,
+                        "hypothesis": AUTO_HYPOTHESIS,
+                    }
+                ),
+                origin="auto",
+            )
+            entries += 1
+    return {"entries": entries, "switches": switches}

@@ -34279,6 +34279,59 @@
             "description": "No new draft for a holding this soon after a report.",
             "default": 60
           },
+          "author_theses": {
+            "type": "boolean",
+            "title": "Author Theses",
+            "description": "Write the whole thesis (stance, why owned or why not, KPIs, exit conditions, scenarios, targets) for a held, non-core holding that has none, from its deep-thesis report and your strategy, and save it as an AI-authored config version you can roll back. A trim or exit stance is listed under Needs you.",
+            "default": true
+          },
+          "author_model": {
+            "type": "string",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Author Model",
+            "description": "Writes the thesis.",
+            "default": "gpt-6.1-sol",
+            "examples": [
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
+            ]
+          },
+          "author_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Effort",
+            "description": "Unset: effort is not sent and the model's default applies."
+          },
+          "author_max_per_run": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Author Max Per Run",
+            "description": "Most theses one autopilot run writes.",
+            "default": 3
+          },
+          "author_report_max_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Author Report Max Days",
+            "description": "Oldest deep-thesis report a thesis is written from.",
+            "default": 90
+          },
           "refresh_review_dates": {
             "type": "boolean",
             "title": "Refresh Review Dates",
@@ -77756,6 +77809,36 @@
             "type": "boolean",
             "title": "Budget Forecast",
             "description": "Warn once a month when the AI spend is on course to pass the monthly cap.",
+            "default": true
+          },
+          "autolog_trades": {
+            "type": "boolean",
+            "title": "Autolog Trades",
+            "description": "Put each detected trade on the journal timeline (a journal entry, or a switch-log row for a sell and buy pair) marked as automatic. They hold no reasons and are left out of the scorecard and process review.",
+            "default": true
+          },
+          "draft_case_items": {
+            "type": "boolean",
+            "title": "Draft Case Items",
+            "description": "Once a day, add your thesis wording to a held company's case items as drafts (why owned, pre-mortem, exit conditions). Never confirmed, never added twice.",
+            "default": true
+          },
+          "tune_alerts": {
+            "type": "boolean",
+            "title": "Tune Alerts",
+            "description": "Once a day, lower one instant alert type to a digest highlight when you acknowledged under 10% of at least 10 of them in 60 days. A new event-rules version you can roll back; never below a digest highlight.",
+            "default": true
+          },
+          "suggest_opportunities": {
+            "type": "boolean",
+            "title": "Suggest Opportunities",
+            "description": "Once a day, run your saved stock screens and tell you about a stock that newly passes one and is not held. The criteria are yours; nothing is ranked or scored.",
+            "default": true
+          },
+          "release_gate": {
+            "type": "boolean",
+            "title": "Release Gate",
+            "description": "Switch off a feature you turned on once it has failed the release gate for `retry_hours` (a stale input or a failed audit), and say so in Needs you.",
             "default": true
           },
           "fill_segment_map": {
