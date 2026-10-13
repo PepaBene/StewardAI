@@ -13,6 +13,7 @@ from api.auth import Owner
 from api.db import IdPath, Pool
 from steward.actions import registry
 from steward.chat import visuals
+from steward.engine import timeline
 
 router = APIRouter(tags=["actions"])
 
@@ -37,6 +38,22 @@ class ActionKind(BaseModel):
     title: str
     risk: registry.Risk
     undo: str
+
+
+@router.get("/engine/ledger")
+async def engine_ledger(
+    pool: Pool,
+    _owner: Owner,
+    days: Annotated[int, Query(ge=1, le=90)] = 7,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    source: Annotated[str | None, Query(max_length=40)] = None,
+) -> list[timeline.Entry]:
+    """Everything the engine or the owner changed, newest first, from every ledger."""
+    since = dt.datetime.now(dt.UTC) - dt.timedelta(days=days)
+    try:
+        return await timeline.recent(pool, timeline.Query(since, limit, source))
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 @router.get("/actions/kinds")

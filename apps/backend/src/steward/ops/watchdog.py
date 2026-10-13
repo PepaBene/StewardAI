@@ -42,7 +42,7 @@ from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
 from steward.lookthrough.coverage import refresh_ledger
 from steward.lookthrough.read import load_portfolio
-from steward.ops import anticipate, journal_gaps, keys, liveness, tasks
+from steward.ops import anticipate, delivery, journal_gaps, keys, liveness, tasks
 from steward.ops import budget as budget_forecast
 from steward.ops.opportunities import check_opportunities
 from steward.ops.release_gate import check_release_gate
@@ -324,6 +324,8 @@ async def watchdog_handler(ctx: JobContext) -> None:
             step.detail["autopilot_overdue_hours"] = await liveness.check(
                 ctx.pool, liveness.AUTOPILOT, now
             )
+    async with ctx.step("delivery") as step:
+        step.detail["undelivered"] = await delivery.check(ctx.pool, now)
     if cfg.refresh_derived:
         async with ctx.step("derived_inputs") as step:
             step.detail.update(await refresh_derived(ctx.pool, jobs))

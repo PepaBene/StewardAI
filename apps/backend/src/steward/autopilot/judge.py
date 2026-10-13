@@ -71,6 +71,8 @@ IsOpen = Callable[[asyncpg.Pool, list[str]], Awaitable[set[str]]]
 # Extra checks run just before a decision is applied: the problems found (empty: all clear).
 # They see the decision the judge reached, and do their own reading of the stored records.
 Verify = Callable[[asyncpg.Pool, "Candidate", str], Awaitable[list[str]]]
+# The same look at a decision already applied: what no longer holds (empty: still fine).
+Recheck = Callable[[asyncpg.Pool, ledger.AutoDecision], Awaitable[list[str]]]
 
 
 @dataclass(frozen=True)
@@ -95,6 +97,7 @@ class JudgeKind:
     # False: calibration never promotes the kind from shadow to auto; the owner sets `auto`.
     promotable: bool = True
     verify: Verify | None = None
+    recheck: Recheck | None = None
 
 
 @dataclass(frozen=True)

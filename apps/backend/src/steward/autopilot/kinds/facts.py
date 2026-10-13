@@ -25,6 +25,7 @@ from urllib.parse import urlsplit
 
 import asyncpg
 
+from steward.autopilot import ledger
 from steward.autopilot.judge import ApplyError, Candidate, JudgeKind, RuleResult, Verdict
 from steward.earnings.reconcile import tolerance
 from steward.earnings.review import ReviewError, review_fact
@@ -498,6 +499,47 @@ async def fact_is_open(pool: asyncpg.Pool, refs: list[str]) -> set[str]:
     return {f"fact:{r['id']}" for r in rows}
 
 
+def value_in_excerpt(written: str | None, snippet: str | None) -> bool:
+    """The number as printed appears (digits only) in the stored source excerpt."""
+    digits = re.sub(r"\D", "", written or "")
+    return bool(digits) and digits in re.sub(r"\D", "", snippet or "")
+
+
+async def fact_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    """Invariants a fact must meet before the autopilot settles it, read from the stored row
+    rather than from what the judge was shown. Accepting a value needs the printed number to
+    appear in the stored source excerpt."""
+    held = await pool.fetchrow(_FACT_BY_ID, int(cand.evidence["fact_id"]))
+    if held is None:
+        return ["the fact no longer exists"]
+    found = []
+    if _dec(held["value_units"]) is None:
+        found.append("the fact has no numeric value")
+    if decision == "accept":
+        if not value_in_excerpt(held["value_as_written"], held["snippet"]):
+            found.append("the printed value is not in the stored source excerpt")
+    return found
+
+
+async def fact_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    """An applied fact decision still holds when the fact keeps the status the autopilot gave
+    it and no later extraction has restated it."""
+    fact_id = int(row.evidence.get("fact_id", _fact_id(row.subject_ref)))
+    status = await pool.fetchval("select status from public.fact where id = $1", fact_id)
+    if status is None:
+        return ["the fact no longer exists"]
+    found = []
+    if row.decision == "accept" and status != "verified":
+        found.append(f"the fact is now {status}")
+    if await pool.fetchval(
+        "select exists (select 1 from public.fact where restates_fact_id = $1"
+        " and status in ('verified', 'unverified'))",
+        fact_id,
+    ):
+        found.append("a later filing restated it")
+    return found
+
+
 FACT = JudgeKind(
     name="fact",
     label="Held and quarantined facts",
@@ -515,6 +557,8 @@ FACT = JudgeKind(
     # while" would not be reversible by the owner.
     expire_decision=None,
     max_tokens=1200,
+    verify=fact_verify,
+    recheck=fact_recheck,
 )
 
 

@@ -4,7 +4,7 @@ import datetime as dt
 import logging
 
 from steward.ai import AINotConfigured
-from steward.autopilot import ledger
+from steward.autopilot import ledger, reverify
 from steward.autopilot.calibration import audit, calibrate, review_from_outcomes
 from steward.autopilot.judge import effective_mode, expire_stale, run_kind
 from steward.autopilot.kinds import all_kinds
@@ -122,6 +122,8 @@ async def autopilot_calibration_handler(ctx: JobContext) -> None:
         step.detail["floors"] = await relearn(ctx.pool, kinds, configured, now)
     async with ctx.step("reward_audit") as step:
         step.detail["flagged"] = await engine_audit.audit(ctx.pool, list(kinds), now)
+    async with ctx.step("reverify") as step:
+        step.detail.update(await reverify.sweep(ctx.pool, kinds, now))
     if cfg.auto_calibrate:
         async with ctx.step("calibrate") as step:
             step.detail["moves"] = await calibrate(ctx.pool, kinds, cfg, now)

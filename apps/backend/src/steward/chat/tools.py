@@ -1707,9 +1707,26 @@ class ChatTools:
                     },
                 }
             )
-        week = await ledger.stats(self.pool, dt.datetime.now(dt.UTC) - dt.timedelta(days=7))
+        from steward.engine import timeline
+
+        now = dt.datetime.now(dt.UTC)
+        done = await timeline.recent(
+            self.pool, timeline.Query(now - dt.timedelta(days=7), limit=cap)
+        )
+        week = await ledger.stats(self.pool, now - dt.timedelta(days=7))
         return {
             "tool": "engine_activity",
+            "what_the_engine_did": [
+                {
+                    "when": e.at.isoformat(timespec="minutes"),
+                    "by": e.source,
+                    "kind": e.kind,
+                    "summary": e.summary,
+                    "status": e.status,
+                    "can_undo": e.reversible,
+                }
+                for e in done
+            ],
             "notices": notices,
             "waiting_for_the_owner": waiting,
             "last_7_days": [
