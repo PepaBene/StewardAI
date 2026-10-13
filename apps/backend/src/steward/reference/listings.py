@@ -301,13 +301,15 @@ async def write_listing(
             "select pg_advisory_xact_lock(hashtext('listing'), hashtext($1))", c.ticker
         )
         link = await conn.fetchrow(
-            "select status, decided_by, listing_id, security_id from"
+            "select status, decided_by, decided_at, listing_id, security_id from"
             " public.instrument_security_link where ticker = $1 for update",
             c.ticker,
         )
-        if link is not None and link["decided_by"] is not None:
+        # A decision by the owner or by the AI approver / autopilot (which leaves decided_by
+        # empty but always stamps decided_at) is kept; a derive never writes decided_at.
+        if link is not None and (link["decided_by"] is not None or link["decided_at"] is not None):
             return DeriveResult(
-                c.ticker, "unchanged", link["listing_id"], "owner decision is kept", c.score
+                c.ticker, "unchanged", link["listing_id"], "decision is kept", c.score
             )
         if link is not None and link["status"] == "rejected":
             return DeriveResult(c.ticker, "unchanged", link["listing_id"], "rejected link kept")

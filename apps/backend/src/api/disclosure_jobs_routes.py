@@ -10,7 +10,6 @@ import datetime as dt
 import json
 from typing import Annotated, Any, Literal
 
-import asyncpg
 import httpx
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
@@ -19,6 +18,7 @@ from api.auth import Owner
 from api.db import IdPath, Pool
 from api.routes import Storage
 from steward.disclosure.fetch import DisclosureFetcher, FetchFailure
+from steward.disclosure.identifier_decision import IdentifierDecisionError, decide_suggestion
 from steward.disclosure.identifier_job import (
     gleif_lei_lookup,
     openfigi_figi_lookup,
@@ -245,73 +245,18 @@ async def decide_identifier_suggestion(
     """Confirm or reject one suggestion. A name-only or ambiguous match needs a note of at least
     10 characters. Confirming a LEI or FIGI also fills the issuer's or security's empty
     identifier; an identifier already set is never overwritten."""
-    note = (body.note or "").strip()
-    async with pool.acquire() as conn, conn.transaction():
-        row = await conn.fetchrow(
-            """select p.*, i.legal_name from public.provider_identifier p
-                 left join public.issuer i on i.id = p.issuer_id
-                where p.id = $1 for update of p""",
-            suggestion_id,
+    try:
+        updated = await decide_suggestion(
+            pool, suggestion_id, body.decision, body.note, f"owner:{owner.user_id}"
         )
-        if row is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "No such suggestion")
-        if row["match_status"] != "suggested":
-            raise HTTPException(
-                status.HTTP_409_CONFLICT, f"Already {row['match_status']}; decisions are final"
-            )
-        evidence = row["evidence"]
-        evidence = json.loads(evidence) if isinstance(evidence, str) else dict(evidence or {})
-        flagged = bool(evidence.get("name_only") or evidence.get("ambiguous"))
-        if body.decision == "confirmed" and flagged and len(note) < 10:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY,
-                "A name-only or ambiguous match needs a note of at least 10 characters",
-            )
-        evidence["decision"] = {
-            "by": f"owner:{owner.user_id}",
-            "at": dt.datetime.now(dt.UTC).isoformat(),
-            "note": note or None,
-        }
-        try:
-            if body.decision == "confirmed":
-                target = None
-                if row["identifier_type"] == "lei" and row["issuer_id"] is not None:
-                    target = ("issuer", "lei", row["issuer_id"])
-                elif row["identifier_type"] == "figi" and row["security_id"] is not None:
-                    target = ("security", "figi", row["security_id"])
-                if target is not None:
-                    table, column, record_id = target
-                    changed = await conn.execute(
-                        f"update public.{table} set {column}=$2 where id=$1 and {column} is null",  # noqa: S608 - fixed names
-                        record_id,
-                        row["identifier"],
-                    )
-                    held = await conn.fetchval(
-                        f"select {column} from public.{table} where id=$1",  # noqa: S608
-                        record_id,
-                    )
-                    if changed == "UPDATE 0" and held != row["identifier"]:
-                        raise HTTPException(
-                            status.HTTP_409_CONFLICT,
-                            f"The record already holds a different {column.upper()} ({held}); "
-                            "reject this suggestion or clear the stored one first",
-                        )
-            await conn.execute(
-                "update public.provider_identifier set match_status=$2, evidence=$3::jsonb"
-                " where id=$1",
-                suggestion_id,
-                body.decision,
-                json.dumps(evidence),
-            )
-        except asyncpg.UniqueViolationError as exc:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT, "That identifier already belongs to another record"
-            ) from exc
-        updated = await conn.fetchrow(
-            """select p.*, i.legal_name from public.provider_identifier p
-                 left join public.issuer i on i.id = p.issuer_id where p.id = $1""",
-            suggestion_id,
-        )
+    except IdentifierDecisionError as exc:
+        code = {
+            "missing": status.HTTP_404_NOT_FOUND,
+            "final": status.HTTP_409_CONFLICT,
+            "note": status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "conflict": status.HTTP_409_CONFLICT,
+        }[exc.kind]
+        raise HTTPException(code, str(exc)) from exc
     assert updated is not None
     return _suggestion(updated)
 

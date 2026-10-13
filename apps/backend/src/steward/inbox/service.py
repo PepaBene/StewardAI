@@ -122,7 +122,9 @@ class ActionError(Exception):
         self.conflict = conflict
 
 
-async def confirm_action(pool: asyncpg.Pool, item_id: int, owner_id: str) -> InboxItem:
+async def confirm_action(pool: asyncpg.Pool, item_id: int, owner_id: str | None) -> InboxItem:
+    """Start the proposed job. With no `owner_id` (the autopilot confirming) the job is an
+    event-triggered run with no requester."""
     async with pool.acquire() as conn, conn.transaction():
         row = await conn.fetchrow(
             "select id, proposed_action, action_status from public.inbox_item"
@@ -144,7 +146,7 @@ async def confirm_action(pool: asyncpg.Pool, item_id: int, owner_id: str) -> Inb
         job_id = await create_job(
             conn,
             job_type,
-            "manual",
+            "manual" if owner_id else "event",
             requested_by=owner_id,
             params={**dict(action.get("params", {})), "inbox_item_id": item_id},
         )

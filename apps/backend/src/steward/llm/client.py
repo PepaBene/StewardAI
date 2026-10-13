@@ -92,6 +92,13 @@ class LLM:
                 # Any refusal (busy, or a model without the tier) is answered at standard.
                 pass
             req = dataclasses.replace(req, priority="standard")
+        if req.cache_retention:
+            # A model that does not know the option answers with an error: repeat without it
+            # rather than fail the question.
+            try:
+                return await self._openai_once(req)
+            except LLMError:
+                req = dataclasses.replace(req, cache_retention=None)
         return await self._openai_once(req)
 
     async def _openai_once(self, req: Request) -> Completion:

@@ -1,0 +1,221 @@
+"""Authenticated API routes for the autopilot: what it decided, what it needs from the owner,
+and the owner's levers (revert a decision, accept a recommendation, mark a spot check)."""
+
+import datetime as dt
+from typing import Annotated, Literal
+
+from fastapi import APIRouter, HTTPException, Query, status
+from pydantic import BaseModel
+
+from api.auth import Owner
+from api.db import IdPath, Pool
+from steward.autopilot import ledger
+from steward.autopilot.judge import ApplyError, accept, effective_mode, revert
+from steward.autopilot.kinds import all_kinds
+from steward.config.jobs import JobsConfig
+from steward.config.store import load_active
+
+router = APIRouter(tags=["autopilot"])
+
+STATS_DAYS = 30
+
+
+class KindSummary(BaseModel):
+    kind: str
+    label: str
+    href: str
+    configured_mode: Literal["off", "shadow", "auto"]
+    mode: Literal["off", "shadow", "auto"]
+    decided: int
+    applied: int
+    shadow: int
+    escalated: int
+    reverted: int
+    reviewed: int
+    right: int
+    precision: float | None
+    waiting: int
+
+
+class Summary(BaseModel):
+    days: int
+    kinds: list[KindSummary]
+    waiting: int
+
+
+class NeedsYouItem(BaseModel):
+    id: int
+    kind: str
+    label: str
+    href: str
+    ticker: str | None
+    kind_of_item: Literal["escalation", "spot_check"]
+    recommendation: str
+    confidence: float | None
+    reasons: str
+    age_days: int
+    can_accept: bool
+
+
+class NeedsYou(BaseModel):
+    count: int
+    items: list[NeedsYouItem]
+
+
+class ReviewIn(BaseModel):
+    verdict: Literal["ok", "wrong"]
+
+
+def _decision_or_404(row: ledger.AutoDecision | None, decision_id: int) -> ledger.AutoDecision:
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No autopilot decision {decision_id}")
+    return row
+
+
+@router.get("/autopilot/summary")
+async def get_summary(pool: Pool, _owner: Owner) -> Summary:
+    """Per kind: its mode, what it decided in the last 30 days and how often reviewed
+    decisions were right."""
+    stored = await load_active(pool, "jobs", JobsConfig)
+    cfg = (stored.body if stored else JobsConfig()).autopilot_settings
+    overrides = await ledger.mode_overrides(pool)
+    since = dt.datetime.now(dt.UTC) - dt.timedelta(days=STATS_DAYS)
+    stats = {s.kind: s for s in await ledger.stats(pool, since)}
+    kinds = all_kinds()
+    waiting: dict[str, int] = {}
+    for item in await ledger.escalations(pool):
+        waiting[item.kind] = waiting.get(item.kind, 0) + 1
+    out: list[KindSummary] = []
+    for name, kind in kinds.items():
+        s = stats.get(name) or ledger.KindStats(
+            kind=name, decided=0, applied=0, shadow=0, escalated=0, reverted=0, reviewed=0, right=0
+        )
+        configured = cfg.policy(name).mode
+        out.append(
+            KindSummary(
+                label=kind.label,
+                href=kind.href,
+                configured_mode=configured,
+                mode=effective_mode(configured, overrides.get(name)),
+                precision=s.right / s.reviewed if s.reviewed else None,
+                waiting=waiting.get(name, 0),
+                **s.model_dump(),
+            )
+        )
+    return Summary(days=STATS_DAYS, kinds=out, waiting=sum(waiting.values()))
+
+
+@router.get("/autopilot/decisions")
+async def list_decisions(
+    pool: Pool,
+    _owner: Owner,
+    kind: Annotated[str | None, Query(max_length=60)] = None,
+    decision_status: Annotated[
+        Literal["shadow", "applied", "escalated", "reverted", "closed"] | None,
+        Query(alias="status"),
+    ] = None,
+    ticker: Annotated[str | None, Query(max_length=40)] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> list[ledger.AutoDecision]:
+    return await ledger.list_decisions(
+        pool, kind=kind, status=decision_status, ticker=ticker, limit=limit
+    )
+
+
+@router.get("/autopilot/needs-you")
+async def needs_you(pool: Pool, _owner: Owner) -> NeedsYou:
+    """What the autopilot could not settle with confidence, plus a few applied decisions kept
+    for a spot check. Items already settled elsewhere are dropped (and closed) here."""
+    kinds = all_kinds()
+    now = dt.datetime.now(dt.UTC)
+    rows = await ledger.escalations(pool)
+    open_refs: dict[str, set[str]] = {}
+    for name, kind in kinds.items():
+        refs = [r.subject_ref for r in rows if r.kind == name]
+        open_refs[name] = await kind.is_open(pool, refs) if refs else set()
+    items: list[NeedsYouItem] = []
+    for row in rows:
+        judge = kinds.get(row.kind)
+        if judge is None:
+            continue
+        if row.subject_ref not in open_refs[row.kind]:
+            await ledger.close_escalation(pool, row.kind, row.subject_ref)
+            continue
+        items.append(
+            NeedsYouItem(
+                id=row.id,
+                kind=row.kind,
+                label=judge.label,
+                href=judge.href,
+                ticker=row.ticker,
+                kind_of_item="escalation",
+                recommendation=row.decision,
+                confidence=row.confidence,
+                reasons=row.summary,
+                age_days=(now - row.decided_at).days,
+                can_accept=row.decision in judge.actionable,
+            )
+        )
+    weights = await ledger.holding_weights(pool)
+    # Biggest holdings first, then the oldest; items without a ticker or not held come last.
+    items.sort(key=lambda i: (-weights.get(i.ticker or "", 0.0), -i.age_days))
+    for row in await ledger.spot_checks(pool):
+        judge = kinds.get(row.kind)
+        if judge is None:
+            continue
+        items.append(
+            NeedsYouItem(
+                id=row.id,
+                kind=row.kind,
+                label=judge.label,
+                href=judge.href,
+                ticker=row.ticker,
+                kind_of_item="spot_check",
+                recommendation=row.decision,
+                confidence=row.confidence,
+                reasons=row.summary,
+                age_days=(now - row.decided_at).days,
+                can_accept=False,
+            )
+        )
+    return NeedsYou(count=len(items), items=items)
+
+
+@router.post("/autopilot/decisions/{decision_id}/revert")
+async def revert_decision(decision_id: IdPath, pool: Pool, _owner: Owner) -> ledger.AutoDecision:
+    """Undo an applied decision. It counts as a wrong decision in calibration."""
+    row = _decision_or_404(await ledger.get(pool, decision_id), decision_id)
+    kind = all_kinds().get(row.kind)
+    if kind is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Unknown autopilot kind {row.kind}")
+    try:
+        await revert(pool, kind, row)
+    except ApplyError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    return _decision_or_404(await ledger.get(pool, decision_id), decision_id)
+
+
+@router.post("/autopilot/decisions/{decision_id}/accept")
+async def accept_recommendation(
+    decision_id: IdPath, pool: Pool, _owner: Owner
+) -> ledger.AutoDecision:
+    """Apply the autopilot's recommendation on an item it escalated."""
+    row = _decision_or_404(await ledger.get(pool, decision_id), decision_id)
+    kind = all_kinds().get(row.kind)
+    if kind is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Unknown autopilot kind {row.kind}")
+    try:
+        await accept(pool, kind, row)
+    except ApplyError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    return _decision_or_404(await ledger.get(pool, decision_id), decision_id)
+
+
+@router.post("/autopilot/decisions/{decision_id}/review")
+async def review_decision(
+    decision_id: IdPath, body: ReviewIn, pool: Pool, _owner: Owner
+) -> ledger.AutoDecision:
+    """The owner's verdict on a spot-checked decision. Calibration counts it."""
+    row = _decision_or_404(await ledger.get(pool, decision_id), decision_id)
+    await ledger.set_review(pool, row.id, body.verdict, "owner")
+    return _decision_or_404(await ledger.get(pool, decision_id), decision_id)

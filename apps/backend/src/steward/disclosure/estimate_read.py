@@ -247,8 +247,8 @@ async def sources_for(pool: Pool, issuer_id: int) -> list[est.ConsensusSourceRow
 
 async def gate(pool: Pool) -> est.RevisionGate:
     rows = await pool.fetch(
-        "select earlier_value_id, later_value_id, correct from public.estimate_pair_review order "
-        "by id"
+        "select earlier_value_id, later_value_id, correct from public.estimate_pair_review"
+        " where reviewer <> 'autopilot' order by id"
     )
     return est.revision_gate([dict(r) for r in rows])
 

@@ -3895,6 +3895,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/autopilot/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Summary
+         * @description Per kind: its mode, what it decided in the last 30 days and how often reviewed
+         *     decisions were right.
+         */
+        get: operations["get_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Decisions */
+        get: operations["list_decisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/needs-you": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Needs You
+         * @description What the autopilot could not settle with confidence, plus a few applied decisions kept
+         *     for a spot check. Items already settled elsewhere are dropped (and closed) here.
+         */
+        get: operations["needs_you"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/decisions/{decision_id}/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revert Decision
+         * @description Undo an applied decision. It counts as a wrong decision in calibration.
+         */
+        post: operations["revert_decision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/decisions/{decision_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Recommendation
+         * @description Apply the autopilot's recommendation on an item it escalated.
+         */
+        post: operations["accept_recommendation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/decisions/{decision_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Decision
+         * @description The owner's verdict on a spot-checked decision. Calibration counts it.
+         */
+        post: operations["review_decision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/segments": {
         parameters: {
             query?: never;
@@ -10771,6 +10890,194 @@ export interface components {
             /** Open Mismatches */
             open_mismatches: components["schemas"]["AuditRow"][];
         };
+        /** AutoDecision */
+        AutoDecision: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Subject Ref */
+            subject_ref: string;
+            /** Ticker */
+            ticker: string | null;
+            /** Decision */
+            decision: string;
+            /** Confidence */
+            confidence: number | null;
+            /** Decided By */
+            decided_by: string;
+            /** Summary */
+            summary: string;
+            /** Evidence */
+            evidence: {
+                [key: string]: unknown;
+            };
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "shadow" | "applied" | "escalated" | "reverted" | "closed";
+            /** Revert Payload */
+            revert_payload: {
+                [key: string]: unknown;
+            } | null;
+            /** Sampled */
+            sampled: boolean;
+            /** Review */
+            review: ("ok" | "wrong") | null;
+            /** Reviewed By */
+            reviewed_by: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /**
+             * Decided At
+             * Format: date-time
+             */
+            decided_at: string;
+        };
+        /**
+         * AutopilotKindPolicy
+         * @description How one kind of automatic decision (a fact review, a graph edge, ...) runs.
+         */
+        AutopilotKindPolicy: {
+            /**
+             * Mode
+             * @description off: not run. shadow: decide and log, apply nothing (the owner's own calls and a stronger model's audit are compared with it). auto: apply decisions at or above `min_confidence`. Calibration promotes and demotes between shadow and auto.
+             * @default shadow
+             * @enum {string}
+             */
+            mode: "off" | "shadow" | "auto";
+            /**
+             * Min Confidence
+             * @description Below this the item is escalated, not decided.
+             * @default 0.9
+             */
+            min_confidence: number;
+            /**
+             * Model
+             * @description The judge; empty uses the autopilot default model.
+             */
+            model?: string | null;
+            /**
+             * Escalate Model
+             * @description A stronger second opinion for an item the first model is unsure of; empty uses the autopilot default escalation model.
+             */
+            escalate_model?: string | null;
+            /**
+             * Sample Rate
+             * @description Share of applied decisions kept for a spot check.
+             * @default 0.05
+             */
+            sample_rate: number;
+            /**
+             * Ttl Days
+             * @description An escalated item nobody settled for this long is closed by the kind's expiry rule (where it has one), so no queue grows without bound.
+             * @default 14
+             */
+            ttl_days: number;
+            /**
+             * Daily Cap
+             * @description Most decisions of this kind in 24 hours.
+             * @default 50
+             */
+            daily_cap: number;
+        };
+        /**
+         * AutopilotSettings
+         * @description The autopilot: the app settles its own review queues, logs every decision with its
+         *     evidence, and asks the owner only for what it cannot settle with confidence.
+         */
+        AutopilotSettings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Model
+             * @description The default judge.
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            model: string;
+            /**
+             * Escalate Model
+             * @description The default second opinion; empty for none.
+             * @default gpt-6.1-sol
+             */
+            escalate_model: string | null;
+            /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies.
+             */
+            effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Max Calls Per Run
+             * @default 60
+             */
+            max_calls_per_run: number;
+            /**
+             * Rejudge Days
+             * @description An escalated item is judged again after this long.
+             * @default 7
+             */
+            rejudge_days: number;
+            default?: components["schemas"]["AutopilotKindPolicy"];
+            /**
+             * Kinds
+             * @description Per-kind overrides of `default`, by kind name.
+             */
+            kinds?: {
+                [key: string]: components["schemas"]["AutopilotKindPolicy"];
+            };
+            /**
+             * Auto Calibrate
+             * @description Weekly, promote a shadow kind to auto when its reviewed decisions are right often enough, and demote an auto kind that falls below the floor.
+             * @default true
+             */
+            auto_calibrate: boolean;
+            /**
+             * Promote Precision
+             * @default 0.95
+             */
+            promote_precision: number;
+            /**
+             * Promote Min Reviewed
+             * @default 50
+             */
+            promote_min_reviewed: number;
+            /**
+             * Demote Precision
+             * @default 0.9
+             */
+            demote_precision: number;
+            /**
+             * Research Stale
+             * @description Queue a research run for a held thesis whose review date has passed, so the owner does not have to ask. The report's thesis proposal still waits for you.
+             * @default true
+             */
+            research_stale: boolean;
+            /**
+             * Research Min Days
+             * @description No new run for a holding this soon after a report.
+             * @default 30
+             */
+            research_min_days: number;
+            /**
+             * Research Max Per Run
+             * @description Most research runs one autopilot run may queue.
+             * @default 1
+             */
+            research_max_per_run: number;
+            /**
+             * Audit Per Run
+             * @description Decisions with no review that the calibration job has the stronger model re-judge independently each run (agreement counts as a correct decision).
+             * @default 25
+             */
+            audit_per_run: number;
+        };
         /** AwardDetailOut */
         AwardDetailOut: {
             /** Notice Number */
@@ -11603,7 +11910,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "document_index" | "inbox_scan" | "inbox_agent" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "autopilot" | "autopilot_calibration" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "document_index" | "inbox_scan" | "inbox_agent" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -12324,6 +12631,25 @@ export interface components {
              * @default 15
              */
             max_searches: number;
+            /**
+             * Search Via Api
+             * @description Cost lever H2: search the news through a plain search API (needs BRAVE_API_KEY) instead of the model provider's built-in search, and keep identical searches for a few days. The model gets titles and snippets only, from the outlet tiers allowed above. Falls back to the provider's search when no key is set.
+             * @default false
+             */
+            search_via_api: boolean;
+            /**
+             * Search Cache Days
+             * @description Days an identical API search is answered from memory.
+             * @default 3
+             */
+            search_cache_days: number;
+            /**
+             * Cache Retention
+             * @description Cost lever H1: ask OpenAI to keep the chat prompt prefix cached for 24 hours instead of minutes, so the second question of the day reads the system prompt and tool list at the cached rate. Unverified for every model; leave off until a test call is accepted and the bill shows no cache-write charge that outweighs it.
+             * @default off
+             * @enum {string}
+             */
+            cache_retention: "off" | "24h";
             /**
              * History Messages
              * @description Earlier messages of the conversation sent along.
@@ -15945,6 +16271,12 @@ export interface components {
              */
             locate_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
+             * Result Cache Days
+             * @description Cost lever: when above 0, an identical request (the same release search, the same document read) within this many days is answered from memory instead of being searched and paid for again. A season's re-checks of one issuer then cost nothing; 0 keeps every check fresh.
+             * @default 0
+             */
+            result_cache_days: number;
+            /**
              * Max Steps
              * @description Model calls plus document fetches per run.
              * @default 40
@@ -17441,6 +17773,18 @@ export interface components {
              * @default true
              */
             map_products: boolean;
+            /**
+             * Use Batch
+             * @description Read the run's annual reports through the provider's batch endpoint (half price, the run waits up to the time below). The answers are stored first and the usual step then finds them, so nothing else changes; a report the batch does not answer is read directly.
+             * @default false
+             */
+            use_batch: boolean;
+            /**
+             * Batch Wait Minutes
+             * @description How long a batch of annual reports is waited for.
+             * @default 60
+             */
+            batch_wait_minutes: number;
         };
         /**
          * ExposureContextResponse
@@ -22668,6 +23012,10 @@ export interface components {
             exposure_build?: components["schemas"]["JobSchedule"];
             /** @description Splits new filings, reports, theses, notes and news into passages and embeds them for document search. Default: daily 03:20. */
             document_index?: components["schemas"]["JobSchedule"];
+            /** @description The autopilot: settles the review queues (held facts, graph edges, disclosure reviews, ...) with rules and models, logs every decision and escalates what it cannot settle. Default: every six hours at :20. */
+            autopilot?: components["schemas"]["JobSchedule"];
+            /** @description Compares the autopilot's decisions with the owner's calls and a stronger model's audit, then promotes or demotes each kind. Default: Sundays 07:40. */
+            autopilot_calibration?: components["schemas"]["JobSchedule"];
             /** @description Looks for new escalation notes and thesis-breach alerts and queues an agent run for each, which leaves an inbox item. Default: hourly at :10. */
             inbox_scan?: components["schemas"]["JobSchedule"];
             /** @description Downloads the Ken French Data Library daily factor returns (market, size, value, profitability, investment, momentum) for the Developed, Europe and US markets, which the factor exposures use. The library adds a month at a time. Default: Mondays 05:30. */
@@ -22690,6 +23038,7 @@ export interface components {
             exposure_build_settings?: components["schemas"]["ExposureBuildSettings"];
             document_index_settings?: components["schemas"]["DocumentIndexSettings"];
             inbox_settings?: components["schemas"]["InboxSettings"];
+            autopilot_settings?: components["schemas"]["AutopilotSettings"];
             ir_discovery_settings?: components["schemas"]["IrDiscoverySettings"];
             gap_research_settings?: components["schemas"]["GapResearchSettings"];
             ai_approval?: components["schemas"]["AiApprovalSettings"];
@@ -22908,6 +23257,43 @@ export interface components {
             reason?: string | null;
             /** Formula */
             formula: string;
+        };
+        /** KindSummary */
+        KindSummary: {
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Href */
+            href: string;
+            /**
+             * Configured Mode
+             * @enum {string}
+             */
+            configured_mode: "off" | "shadow" | "auto";
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "off" | "shadow" | "auto";
+            /** Decided */
+            decided: number;
+            /** Applied */
+            applied: number;
+            /** Shadow */
+            shadow: number;
+            /** Escalated */
+            escalated: number;
+            /** Reverted */
+            reverted: number;
+            /** Reviewed */
+            reviewed: number;
+            /** Right */
+            right: number;
+            /** Precision */
+            precision: number | null;
+            /** Waiting */
+            waiting: number;
         };
         /** KpiRow */
         KpiRow: {
@@ -24818,6 +25204,41 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /** NeedsYou */
+        NeedsYou: {
+            /** Count */
+            count: number;
+            /** Items */
+            items: components["schemas"]["NeedsYouItem"][];
+        };
+        /** NeedsYouItem */
+        NeedsYouItem: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Href */
+            href: string;
+            /** Ticker */
+            ticker: string | null;
+            /**
+             * Kind Of Item
+             * @enum {string}
+             */
+            kind_of_item: "escalation" | "spot_check";
+            /** Recommendation */
+            recommendation: string;
+            /** Confidence */
+            confidence: number | null;
+            /** Reasons */
+            reasons: string;
+            /** Age Days */
+            age_days: number;
+            /** Can Accept */
+            can_accept: boolean;
+        };
         /** NetDiscretionary */
         NetDiscretionary: {
             /**
@@ -25350,6 +25771,18 @@ export interface components {
              * @default false
              */
             batch_extraction: boolean;
+            /**
+             * Batch Analysis
+             * @description Send the model stages of the analysis (impact notes, framing, sentiment, thesis link) of stories below severity 3 through the provider's batch endpoint (half price, a run waits up to an hour). Severe stories are analysed directly, at once.
+             * @default false
+             */
+            batch_analysis: boolean;
+            /**
+             * Reuse Repeat Analysis
+             * @description A story the novelty step marks as a repeat of an earlier one with the same holding takes that story's framing, sentiment and impact notes instead of asking the model again. Severe stories are always analysed afresh.
+             * @default false
+             */
+            reuse_repeat_analysis: boolean;
             /**
              * Sector Benchmarks
              * @description Price symbol of the sector index to measure a holding against, by the holding's sector (for example {'Technology': 'xlk.us'}). Without an entry the country's market index is used.
@@ -31211,6 +31644,14 @@ export interface components {
              */
             review_date: string;
         };
+        /** ReviewIn */
+        ReviewIn: {
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "ok" | "wrong";
+        };
         /** ReviewItem */
         ReviewItem: {
             /** Ticker */
@@ -35205,6 +35646,15 @@ export interface components {
              * @default 1.0.0
              */
             method_version: string;
+        };
+        /** Summary */
+        Summary: {
+            /** Days */
+            days: number;
+            /** Kinds */
+            kinds: components["schemas"]["KindSummary"][];
+            /** Waiting */
+            waiting: number;
         };
         /** SupplyChain */
         SupplyChain: {
@@ -45196,6 +45646,177 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RouteStat"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Summary"];
+                };
+            };
+        };
+    };
+    list_decisions: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+                status?: ("shadow" | "applied" | "escalated" | "reverted" | "closed") | null;
+                ticker?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoDecision"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    needs_you: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NeedsYou"];
+                };
+            };
+        };
+    };
+    revert_decision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                decision_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_recommendation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                decision_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_decision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                decision_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoDecision"];
                 };
             };
             /** @description Validation Error */

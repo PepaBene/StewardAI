@@ -25,6 +25,7 @@ from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.exposures.ai_steps import run_dependencies, run_inputs, run_products
 from steward.jobs.runner import JobContext
+from steward.llm.cache import ResultCache
 from steward.llm.client import create_llm
 from steward.llm.routing import routing_client
 from steward.settings import get_settings
@@ -307,7 +308,10 @@ async def _ai_steps(ctx: JobContext, rows: list[dict[str, Any]]) -> None:
     if not (cfg.map_products or cfg.extract_inputs or cfg.extract_dependencies):
         return
     try:
-        client = routing_client(create_llm(settings))
+        # Cost levers E1/E4: an identical read (same filing text, prompt, model, effort) is
+        # answered from the result cache, so a read retried after a month, or repeated after a
+        # profiles conflict, and a product line already mapped for another run, cost nothing.
+        client = routing_client(create_llm(settings), ResultCache(ctx.pool, "exposure_ai"))
     except AINotConfigured as exc:
         async with ctx.step("ai") as step:
             step.detail["skipped"] = str(exc)

@@ -71,6 +71,8 @@ BudgetJobType = Literal[
     "edinet_filings",
     "twelve_data_corporate_actions",
     "ai_approvals",
+    "autopilot",
+    "autopilot_calibration",
     "ir_discovery",
     "news_ai_search",
     "news_triage",

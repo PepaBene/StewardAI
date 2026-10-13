@@ -311,6 +311,18 @@ export const SCHEDULES: Record<
       "Approves suggested listings and peers with AI (and refreshes Finnhub peer candidates first). Every decision is recorded and you can overturn it.",
     cron: "10 7 * * *",
   },
+  autopilot: {
+    label: "Autopilot",
+    description:
+      "Settles the review queues (held facts, graph edges, disclosure reviews and more) with rules and models, logs every decision and escalates what it cannot settle. Every decision can be undone from the Autopilot page.",
+    cron: "20 */6 * * *",
+  },
+  autopilot_calibration: {
+    label: "Autopilot calibration",
+    description:
+      "Checks the autopilot's decisions against your own calls and a stronger model's audit, then lets a queue act on its own once it is right often enough, or pulls it back when it is not.",
+    cron: "40 7 * * 0",
+  },
   ir_discovery: {
     label: "Investor page discovery",
     description:
@@ -446,6 +458,7 @@ export const DEFAULT_JOBS: JobsConfig = {
     locate_model: "gpt-6.1-sol",
     effort: "high",
     locate_effort: null,
+    result_cache_days: 0,
     max_steps: 40,
     max_searches: 20,
     check_days_after_report: [1, 2, 4],
@@ -511,6 +524,8 @@ export const DEFAULT_JOBS: JobsConfig = {
     extract_inputs: true,
     extract_dependencies: true,
     map_products: true,
+    use_batch: false,
+    batch_wait_minutes: 60,
   },
   inbox_settings: {
     enabled: true,
@@ -632,6 +647,8 @@ export const DEFAULT_JOBS: JobsConfig = {
     triage_per_run: 200,
     triage_fulltext_relevance: 2,
     batch_extraction: false,
+    batch_analysis: false,
+    reuse_repeat_analysis: false,
     sector_benchmarks: {},
     auto_resolve_days: 14,
     sentiment_weight: 0.25,
@@ -819,6 +836,9 @@ export const DEFAULT_JOBS: JobsConfig = {
     escalation_effort: null,
     max_steps: 30,
     max_searches: 15,
+    search_via_api: false,
+    search_cache_days: 3,
+    cache_retention: "off",
     history_messages: 100,
     source_tiers: [1, 2],
     rules_first: true,
@@ -944,6 +964,14 @@ export const SETTINGS: {
         label: "Locate effort",
         kind: "effort-optional",
         hint: EFFORT_OPTIONAL_HINT,
+      },
+      {
+        key: "result_cache_days",
+        label: "Days an identical search or read is kept",
+        kind: "int",
+        min: 0,
+        max: 30,
+        hint: "0: every check is fresh. Above 0, re-checking the same issuer within these days costs nothing.",
       },
       {
         key: "max_steps",
@@ -1234,6 +1262,20 @@ export const SETTINGS: {
         label: "Map product lines to trade codes",
         kind: "bool",
         hint: "Stored as an estimate.",
+      },
+      {
+        key: "use_batch",
+        label: "Read the filings through a provider batch (half price)",
+        kind: "bool",
+        hint: "Only for OpenAI and Google models; the run waits for the batch.",
+      },
+      {
+        key: "batch_wait_minutes",
+        label: "Wait for the batch (minutes)",
+        kind: "int",
+        min: 5,
+        max: 240,
+        hint: "After this the filings are read directly.",
       },
     ],
   },
@@ -1653,6 +1695,18 @@ export const SETTINGS: {
         label: "Send extraction through the batch endpoint",
         kind: "bool",
         hint: "Half price, but a run waits up to an hour.",
+      },
+      {
+        key: "batch_analysis",
+        label: "Send the analysis of minor stories through the batch endpoint",
+        kind: "bool",
+        hint: "Half price. Stories of severity 3 or more are always analysed at once.",
+      },
+      {
+        key: "reuse_repeat_analysis",
+        label: "Reuse the analysis of a repeated story",
+        kind: "bool",
+        hint: "A minor story the novelty check calls a repeat copies the notes of the story it repeats instead of asking the model again.",
       },
       {
         key: "auto_resolve_days",
@@ -2121,6 +2175,29 @@ export const SETTINGS: {
         kind: "int",
         min: 0,
         max: 50,
+      },
+      {
+        key: "search_via_api",
+        label: "Search through a plain search API (Brave)",
+        kind: "bool",
+        hint: "A fraction of the model provider's search fee; the model gets titles and snippets from the allowed outlets only. Needs BRAVE_API_KEY, otherwise the provider's search is used.",
+      },
+      {
+        key: "search_cache_days",
+        label: "Days an identical API search is kept",
+        kind: "int",
+        min: 0,
+        max: 14,
+      },
+      {
+        key: "cache_retention",
+        label: "Keep the chat prompt cached",
+        kind: "choice",
+        options: [
+          { value: "off", label: "Minutes (the provider's default)" },
+          { value: "24h", label: "24 hours (OpenAI)" },
+        ],
+        hint: "Unverified for each model. A model that rejects the option is asked again without it.",
       },
       {
         key: "history_messages",

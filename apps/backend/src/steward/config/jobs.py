@@ -145,6 +145,15 @@ class EarningsCheckSettings(ConfigModel):
     )
     effort: Effort = "high"
     locate_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    result_cache_days: int = Field(
+        default=0,
+        ge=0,
+        le=30,
+        description="Cost lever: when above 0, an identical request (the same release search, "
+        "the same document read) within this many days is answered from memory instead of "
+        "being searched and paid for again. A season's re-checks of one issuer then cost "
+        "nothing; 0 keeps every check fresh.",
+    )
     max_steps: int = Field(
         default=40, ge=2, le=200, description="Model calls plus document fetches per run."
     )
@@ -319,6 +328,99 @@ class InboxSettings(ConfigModel):
     )
 
 
+class AutopilotKindPolicy(ConfigModel):
+    """How one kind of automatic decision (a fact review, a graph edge, ...) runs."""
+
+    mode: Literal["off", "shadow", "auto"] = Field(
+        default="shadow",
+        description="off: not run. shadow: decide and log, apply nothing (the owner's own "
+        "calls and a stronger model's audit are compared with it). auto: apply decisions at "
+        "or above `min_confidence`. Calibration promotes and demotes between shadow and auto.",
+    )
+    min_confidence: float = Field(
+        default=0.9, ge=0.5, le=1.0, description="Below this the item is escalated, not decided."
+    )
+    model: ModelId | None = Field(
+        default=None, description="The judge; empty uses the autopilot default model."
+    )
+    escalate_model: ModelId | None = Field(
+        default=None,
+        description="A stronger second opinion for an item the first model is unsure of; "
+        "empty uses the autopilot default escalation model.",
+    )
+    sample_rate: float = Field(
+        default=0.05,
+        ge=0.0,
+        le=1.0,
+        description="Share of applied decisions kept for a spot check.",
+    )
+    ttl_days: int = Field(
+        default=14,
+        ge=1,
+        le=365,
+        description="An escalated item nobody settled for this long is closed by the kind's "
+        "expiry rule (where it has one), so no queue grows without bound.",
+    )
+    daily_cap: int = Field(
+        default=50, ge=1, le=1000, description="Most decisions of this kind in 24 hours."
+    )
+
+
+class AutopilotSettings(ConfigModel):
+    """The autopilot: the app settles its own review queues, logs every decision with its
+    evidence, and asks the owner only for what it cannot settle with confidence."""
+
+    enabled: bool = True
+    model: ModelId = Field(default="gpt-6-luna", description="The default judge.")
+    escalate_model: ModelId | None = Field(
+        default="gpt-6.1-sol", description="The default second opinion; empty for none."
+    )
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    max_calls_per_run: int = Field(default=60, ge=1, le=500)
+    rejudge_days: int = Field(
+        default=7, ge=1, le=90, description="An escalated item is judged again after this long."
+    )
+    default: AutopilotKindPolicy = Field(default_factory=AutopilotKindPolicy)
+    kinds: dict[str, AutopilotKindPolicy] = Field(
+        default_factory=dict, description="Per-kind overrides of `default`, by kind name."
+    )
+    auto_calibrate: bool = Field(
+        default=True,
+        description="Weekly, promote a shadow kind to auto when its reviewed decisions are "
+        "right often enough, and demote an auto kind that falls below the floor.",
+    )
+    promote_precision: float = Field(default=0.95, ge=0.5, le=1.0)
+    promote_min_reviewed: int = Field(default=50, ge=5, le=1000)
+    demote_precision: float = Field(default=0.9, ge=0.0, le=1.0)
+    research_stale: bool = Field(
+        default=True,
+        description="Queue a research run for a held thesis whose review date has passed, "
+        "so the owner does not have to ask. The report's thesis proposal still waits for you.",
+    )
+    research_min_days: int = Field(
+        default=30, ge=1, le=365, description="No new run for a holding this soon after a report."
+    )
+    research_max_per_run: int = Field(
+        default=1, ge=1, le=10, description="Most research runs one autopilot run may queue."
+    )
+    audit_per_run: int = Field(
+        default=25,
+        ge=0,
+        le=200,
+        description="Decisions with no review that the calibration job has the stronger model "
+        "re-judge independently each run (agreement counts as a correct decision).",
+    )
+
+    def policy(self, kind: str) -> AutopilotKindPolicy:
+        return self.kinds.get(kind, self.default)
+
+    @model_validator(mode="after")
+    def _demote_below_promote(self) -> Self:
+        if self.demote_precision > self.promote_precision:
+            raise ValueError("demote_precision cannot exceed promote_precision")
+        return self
+
+
 class ExposureBuildSettings(ConfigModel):
     """The AI steps of the exposure builder. The country split from XBRL needs no AI and always
     runs. Each annual report is read at most once; nothing is guessed: a figure is stored only
@@ -342,6 +444,16 @@ class ExposureBuildSettings(ConfigModel):
     map_products: bool = Field(
         default=True,
         description="Map reported product lines to HS trade codes (always marked estimated).",
+    )
+    use_batch: bool = Field(
+        default=False,
+        description="Read the run's annual reports through the provider's batch endpoint (half "
+        "price, the run waits up to the time below). The answers are stored first and the usual "
+        "step then finds them, so nothing else changes; a report the batch does not answer is "
+        "read directly.",
+    )
+    batch_wait_minutes: int = Field(
+        default=60, ge=5, le=240, description="How long a batch of annual reports is waited for."
     )
 
 
@@ -723,6 +835,18 @@ class NewsSettings(ConfigModel):
         default=False,
         description="Send extraction through the provider's batch endpoint (half price, but a "
         "run waits up to an hour for the results).",
+    )
+    batch_analysis: bool = Field(
+        default=False,
+        description="Send the model stages of the analysis (impact notes, framing, sentiment, "
+        "thesis link) of stories below severity 3 through the provider's batch endpoint (half "
+        "price, a run waits up to an hour). Severe stories are analysed directly, at once.",
+    )
+    reuse_repeat_analysis: bool = Field(
+        default=False,
+        description="A story the novelty step marks as a repeat of an earlier one with the same "
+        "holding takes that story's framing, sentiment and impact notes instead of asking the "
+        "model again. Severe stories are always analysed afresh.",
     )
     sector_benchmarks: dict[str, str] = Field(
         default_factory=lambda: {},
@@ -1636,6 +1760,23 @@ class ChatSettings(ConfigModel):
         default=30, ge=1, le=100, description="Model calls plus tool rounds per answer."
     )
     max_searches: int = Field(default=15, ge=0, le=50, description="Web searches per answer.")
+    search_via_api: bool = Field(
+        default=False,
+        description="Cost lever H2: search the news through a plain search API (needs "
+        "BRAVE_API_KEY) instead of the model provider's built-in search, and keep identical "
+        "searches for a few days. The model gets titles and snippets only, from the outlet "
+        "tiers allowed above. Falls back to the provider's search when no key is set.",
+    )
+    search_cache_days: int = Field(
+        default=3, ge=0, le=14, description="Days an identical API search is answered from memory."
+    )
+    cache_retention: Literal["off", "24h"] = Field(
+        default="off",
+        description="Cost lever H1: ask OpenAI to keep the chat prompt prefix cached for 24 "
+        "hours instead of minutes, so the second question of the day reads the system prompt "
+        "and tool list at the cached rate. Unverified for every model; leave off until a "
+        "test call is accepted and the bill shows no cache-write charge that outweighs it.",
+    )
     history_messages: int = Field(
         default=100, ge=2, le=500, description="Earlier messages of the conversation sent along."
     )
@@ -2344,6 +2485,17 @@ class JobsConfig(ConfigModel):
         description="Splits new filings, reports, theses, notes and news into passages and "
         "embeds them for document search. Default: daily 03:20.",
     )
+    autopilot: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="20 */6 * * *"),
+        description="The autopilot: settles the review queues (held facts, graph edges, "
+        "disclosure reviews, ...) with rules and models, logs every decision and escalates "
+        "what it cannot settle. Default: every six hours at :20.",
+    )
+    autopilot_calibration: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="40 7 * * 0"),
+        description="Compares the autopilot's decisions with the owner's calls and a stronger "
+        "model's audit, then promotes or demotes each kind. Default: Sundays 07:40.",
+    )
     inbox_scan: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="10 * * * *"),
         description="Looks for new escalation notes and thesis-breach alerts and queues an "
@@ -2396,6 +2548,7 @@ class JobsConfig(ConfigModel):
     exposure_build_settings: ExposureBuildSettings = Field(default_factory=ExposureBuildSettings)
     document_index_settings: DocumentIndexSettings = Field(default_factory=DocumentIndexSettings)
     inbox_settings: InboxSettings = Field(default_factory=InboxSettings)
+    autopilot_settings: AutopilotSettings = Field(default_factory=AutopilotSettings)
     ir_discovery_settings: IrDiscoverySettings = Field(default_factory=IrDiscoverySettings)
     gap_research_settings: GapResearchSettings = Field(default_factory=GapResearchSettings)
     ai_approval: AiApprovalSettings = Field(default_factory=AiApprovalSettings)
@@ -2472,6 +2625,8 @@ class JobsConfig(ConfigModel):
             "exposure_build": self.exposure_build,
             "document_index": self.document_index,
             "inbox_scan": self.inbox_scan,
+            "autopilot": self.autopilot,
+            "autopilot_calibration": self.autopilot_calibration,
             "factor_returns": self.factor_returns,
             "disclosure_sources": self.disclosure_sources,
             "disclosure_ingest": self.disclosure_ingest,

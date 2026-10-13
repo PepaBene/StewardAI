@@ -11479,6 +11479,331 @@
         }
       }
     },
+    "/autopilot/summary": {
+      "get": {
+        "tags": [
+          "autopilot"
+        ],
+        "summary": "Get Summary",
+        "description": "Per kind: its mode, what it decided in the last 30 days and how often reviewed\ndecisions were right.",
+        "operationId": "get_summary",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Summary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/autopilot/decisions": {
+      "get": {
+        "tags": [
+          "autopilot"
+        ],
+        "summary": "List Decisions",
+        "operationId": "list_decisions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "shadow",
+                    "applied",
+                    "escalated",
+                    "reverted",
+                    "closed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AutoDecision"
+                  },
+                  "title": "Response List Decisions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/autopilot/needs-you": {
+      "get": {
+        "tags": [
+          "autopilot"
+        ],
+        "summary": "Needs You",
+        "description": "What the autopilot could not settle with confidence, plus a few applied decisions kept\nfor a spot check. Items already settled elsewhere are dropped (and closed) here.",
+        "operationId": "needs_you",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NeedsYou"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/autopilot/decisions/{decision_id}/revert": {
+      "post": {
+        "tags": [
+          "autopilot"
+        ],
+        "summary": "Revert Decision",
+        "description": "Undo an applied decision. It counts as a wrong decision in calibration.",
+        "operationId": "revert_decision",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "decision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Decision Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoDecision"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/autopilot/decisions/{decision_id}/accept": {
+      "post": {
+        "tags": [
+          "autopilot"
+        ],
+        "summary": "Accept Recommendation",
+        "description": "Apply the autopilot's recommendation on an item it escalated.",
+        "operationId": "accept_recommendation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "decision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Decision Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoDecision"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/autopilot/decisions/{decision_id}/review": {
+      "post": {
+        "tags": [
+          "autopilot"
+        ],
+        "summary": "Review Decision",
+        "description": "The owner's verdict on a spot-checked decision. Calibration counts it.",
+        "operationId": "review_decision",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "decision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Decision Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoDecision"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/holdings/{ticker}/segments": {
       "get": {
         "tags": [
@@ -33518,6 +33843,384 @@
         ],
         "title": "AuditSummary"
       },
+      "AutoDecision": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "subject_ref": {
+            "type": "string",
+            "title": "Subject Ref"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "decision": {
+            "type": "string",
+            "title": "Decision"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "decided_by": {
+            "type": "string",
+            "title": "Decided By"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Evidence"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "shadow",
+              "applied",
+              "escalated",
+              "reverted",
+              "closed"
+            ],
+            "title": "Status"
+          },
+          "revert_payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revert Payload"
+          },
+          "sampled": {
+            "type": "boolean",
+            "title": "Sampled"
+          },
+          "review": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ok",
+                  "wrong"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Decided At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "subject_ref",
+          "ticker",
+          "decision",
+          "confidence",
+          "decided_by",
+          "summary",
+          "evidence",
+          "status",
+          "revert_payload",
+          "sampled",
+          "review",
+          "reviewed_by",
+          "reviewed_at",
+          "decided_at"
+        ],
+        "title": "AutoDecision"
+      },
+      "AutopilotKindPolicy": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "shadow",
+              "auto"
+            ],
+            "title": "Mode",
+            "description": "off: not run. shadow: decide and log, apply nothing (the owner's own calls and a stronger model's audit are compared with it). auto: apply decisions at or above `min_confidence`. Calibration promotes and demotes between shadow and auto.",
+            "default": "shadow"
+          },
+          "min_confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.5,
+            "title": "Min Confidence",
+            "description": "Below this the item is escalated, not decided.",
+            "default": 0.9
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+                "examples": [
+                  "gpt-6.1-sol",
+                  "gpt-6-luna",
+                  "gemini-3.8-flash"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "The judge; empty uses the autopilot default model."
+          },
+          "escalate_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+                "examples": [
+                  "gpt-6.1-sol",
+                  "gpt-6-luna",
+                  "gemini-3.8-flash"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escalate Model",
+            "description": "A stronger second opinion for an item the first model is unsure of; empty uses the autopilot default escalation model."
+          },
+          "sample_rate": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Sample Rate",
+            "description": "Share of applied decisions kept for a spot check.",
+            "default": 0.05
+          },
+          "ttl_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Ttl Days",
+            "description": "An escalated item nobody settled for this long is closed by the kind's expiry rule (where it has one), so no queue grows without bound.",
+            "default": 14
+          },
+          "daily_cap": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Daily Cap",
+            "description": "Most decisions of this kind in 24 hours.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AutopilotKindPolicy",
+        "description": "How one kind of automatic decision (a fact review, a graph edge, ...) runs."
+      },
+      "AutopilotSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "model": {
+            "type": "string",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "description": "The default judge.",
+            "default": "gpt-6-luna",
+            "examples": [
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
+            ]
+          },
+          "escalate_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+                "examples": [
+                  "gpt-6.1-sol",
+                  "gpt-6-luna",
+                  "gemini-3.8-flash"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escalate Model",
+            "description": "The default second opinion; empty for none.",
+            "default": "gpt-6.1-sol"
+          },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort",
+            "description": "Unset: effort is not sent and the model's default applies."
+          },
+          "max_calls_per_run": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Max Calls Per Run",
+            "default": 60
+          },
+          "rejudge_days": {
+            "type": "integer",
+            "maximum": 90.0,
+            "minimum": 1.0,
+            "title": "Rejudge Days",
+            "description": "An escalated item is judged again after this long.",
+            "default": 7
+          },
+          "default": {
+            "$ref": "#/components/schemas/AutopilotKindPolicy"
+          },
+          "kinds": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AutopilotKindPolicy"
+            },
+            "type": "object",
+            "title": "Kinds",
+            "description": "Per-kind overrides of `default`, by kind name."
+          },
+          "auto_calibrate": {
+            "type": "boolean",
+            "title": "Auto Calibrate",
+            "description": "Weekly, promote a shadow kind to auto when its reviewed decisions are right often enough, and demote an auto kind that falls below the floor.",
+            "default": true
+          },
+          "promote_precision": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.5,
+            "title": "Promote Precision",
+            "default": 0.95
+          },
+          "promote_min_reviewed": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 5.0,
+            "title": "Promote Min Reviewed",
+            "default": 50
+          },
+          "demote_precision": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Demote Precision",
+            "default": 0.9
+          },
+          "research_stale": {
+            "type": "boolean",
+            "title": "Research Stale",
+            "description": "Queue a research run for a held thesis whose review date has passed, so the owner does not have to ask. The report's thesis proposal still waits for you.",
+            "default": true
+          },
+          "research_min_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Research Min Days",
+            "description": "No new run for a holding this soon after a report.",
+            "default": 30
+          },
+          "research_max_per_run": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Research Max Per Run",
+            "description": "Most research runs one autopilot run may queue.",
+            "default": 1
+          },
+          "audit_per_run": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 0.0,
+            "title": "Audit Per Run",
+            "description": "Decisions with no review that the calibration job has the stronger model re-judge independently each run (agreement counts as a correct decision).",
+            "default": 25
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AutopilotSettings",
+        "description": "The autopilot: the app settles its own review queues, logs every decision with its\nevidence, and asks the owner only for what it cannot settle with confidence."
+      },
       "AwardDetailOut": {
         "properties": {
           "notice_number": {
@@ -36048,6 +36751,8 @@
                 "edinet_filings",
                 "twelve_data_corporate_actions",
                 "ai_approvals",
+                "autopilot",
+                "autopilot_calibration",
                 "ir_discovery",
                 "news_ai_search",
                 "news_triage",
@@ -36130,6 +36835,8 @@
                 "edinet_filings",
                 "twelve_data_corporate_actions",
                 "ai_approvals",
+                "autopilot",
+                "autopilot_calibration",
                 "ir_discovery",
                 "news_ai_search",
                 "news_triage",
@@ -36225,6 +36932,8 @@
                 "edinet_filings",
                 "twelve_data_corporate_actions",
                 "ai_approvals",
+                "autopilot",
+                "autopilot_calibration",
                 "ir_discovery",
                 "news_ai_search",
                 "news_triage",
@@ -38087,6 +38796,30 @@
             "title": "Max Searches",
             "description": "Web searches per answer.",
             "default": 15
+          },
+          "search_via_api": {
+            "type": "boolean",
+            "title": "Search Via Api",
+            "description": "Cost lever H2: search the news through a plain search API (needs BRAVE_API_KEY) instead of the model provider's built-in search, and keep identical searches for a few days. The model gets titles and snippets only, from the outlet tiers allowed above. Falls back to the provider's search when no key is set.",
+            "default": false
+          },
+          "search_cache_days": {
+            "type": "integer",
+            "maximum": 14.0,
+            "minimum": 0.0,
+            "title": "Search Cache Days",
+            "description": "Days an identical API search is answered from memory.",
+            "default": 3
+          },
+          "cache_retention": {
+            "type": "string",
+            "enum": [
+              "off",
+              "24h"
+            ],
+            "title": "Cache Retention",
+            "description": "Cost lever H1: ask OpenAI to keep the chat prompt prefix cached for 24 hours instead of minutes, so the second question of the day reads the system prompt and tool list at the cached rate. Unverified for every model; leave off until a test call is accepted and the bill shows no cache-write charge that outweighs it.",
+            "default": "off"
           },
           "history_messages": {
             "type": "integer",
@@ -48465,6 +49198,14 @@
             "title": "Locate Effort",
             "description": "Unset: effort is not sent and the model's default applies."
           },
+          "result_cache_days": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "Result Cache Days",
+            "description": "Cost lever: when above 0, an identical request (the same release search, the same document read) within this many days is answered from memory instead of being searched and paid for again. A season's re-checks of one issuer then cost nothing; 0 keeps every check fresh.",
+            "default": 0
+          },
           "max_steps": {
             "type": "integer",
             "maximum": 200.0,
@@ -52608,6 +53349,20 @@
             "title": "Map Products",
             "description": "Map reported product lines to HS trade codes (always marked estimated).",
             "default": true
+          },
+          "use_batch": {
+            "type": "boolean",
+            "title": "Use Batch",
+            "description": "Read the run's annual reports through the provider's batch endpoint (half price, the run waits up to the time below). The answers are stored first and the usual step then finds them, so nothing else changes; a report the batch does not answer is read directly.",
+            "default": false
+          },
+          "batch_wait_minutes": {
+            "type": "integer",
+            "maximum": 240.0,
+            "minimum": 5.0,
+            "title": "Batch Wait Minutes",
+            "description": "How long a batch of annual reports is waited for.",
+            "default": 60
           }
         },
         "additionalProperties": false,
@@ -67687,6 +68442,14 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Splits new filings, reports, theses, notes and news into passages and embeds them for document search. Default: daily 03:20."
           },
+          "autopilot": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "The autopilot: settles the review queues (held facts, graph edges, disclosure reviews, ...) with rules and models, logs every decision and escalates what it cannot settle. Default: every six hours at :20."
+          },
+          "autopilot_calibration": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Compares the autopilot's decisions with the owner's calls and a stronger model's audit, then promotes or demotes each kind. Default: Sundays 07:40."
+          },
           "inbox_scan": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Looks for new escalation notes and thesis-breach alerts and queues an agent run for each, which leaves an inbox item. Default: hourly at :10."
@@ -67734,6 +68497,9 @@
           },
           "inbox_settings": {
             "$ref": "#/components/schemas/InboxSettings"
+          },
+          "autopilot_settings": {
+            "$ref": "#/components/schemas/AutopilotSettings"
           },
           "ir_discovery_settings": {
             "$ref": "#/components/schemas/IrDiscoverySettings"
@@ -68441,6 +69207,101 @@
           "formula"
         ],
         "title": "KeyFigure"
+      },
+      "KindSummary": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "href": {
+            "type": "string",
+            "title": "Href"
+          },
+          "configured_mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "shadow",
+              "auto"
+            ],
+            "title": "Configured Mode"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "shadow",
+              "auto"
+            ],
+            "title": "Mode"
+          },
+          "decided": {
+            "type": "integer",
+            "title": "Decided"
+          },
+          "applied": {
+            "type": "integer",
+            "title": "Applied"
+          },
+          "shadow": {
+            "type": "integer",
+            "title": "Shadow"
+          },
+          "escalated": {
+            "type": "integer",
+            "title": "Escalated"
+          },
+          "reverted": {
+            "type": "integer",
+            "title": "Reverted"
+          },
+          "reviewed": {
+            "type": "integer",
+            "title": "Reviewed"
+          },
+          "right": {
+            "type": "integer",
+            "title": "Right"
+          },
+          "precision": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Precision"
+          },
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "label",
+          "href",
+          "configured_mode",
+          "mode",
+          "decided",
+          "applied",
+          "shadow",
+          "escalated",
+          "reverted",
+          "reviewed",
+          "right",
+          "precision",
+          "waiting"
+        ],
+        "title": "KindSummary"
       },
       "KpiRow": {
         "properties": {
@@ -73830,6 +74691,108 @@
         ],
         "title": "NavView"
       },
+      "NeedsYou": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NeedsYouItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "items"
+        ],
+        "title": "NeedsYou"
+      },
+      "NeedsYouItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "href": {
+            "type": "string",
+            "title": "Href"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "kind_of_item": {
+            "type": "string",
+            "enum": [
+              "escalation",
+              "spot_check"
+            ],
+            "title": "Kind Of Item"
+          },
+          "recommendation": {
+            "type": "string",
+            "title": "Recommendation"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "reasons": {
+            "type": "string",
+            "title": "Reasons"
+          },
+          "age_days": {
+            "type": "integer",
+            "title": "Age Days"
+          },
+          "can_accept": {
+            "type": "boolean",
+            "title": "Can Accept"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "href",
+          "ticker",
+          "kind_of_item",
+          "recommendation",
+          "confidence",
+          "reasons",
+          "age_days",
+          "can_accept"
+        ],
+        "title": "NeedsYouItem"
+      },
       "NetDiscretionary": {
         "properties": {
           "since": {
@@ -75061,6 +76024,18 @@
             "type": "boolean",
             "title": "Batch Extraction",
             "description": "Send extraction through the provider's batch endpoint (half price, but a run waits up to an hour for the results).",
+            "default": false
+          },
+          "batch_analysis": {
+            "type": "boolean",
+            "title": "Batch Analysis",
+            "description": "Send the model stages of the analysis (impact notes, framing, sentiment, thesis link) of stories below severity 3 through the provider's batch endpoint (half price, a run waits up to an hour). Severe stories are analysed directly, at once.",
+            "default": false
+          },
+          "reuse_repeat_analysis": {
+            "type": "boolean",
+            "title": "Reuse Repeat Analysis",
+            "description": "A story the novelty step marks as a repeat of an earlier one with the same holding takes that story's framing, sentiment and impact notes instead of asking the model again. Severe stories are always analysed afresh.",
             "default": false
           },
           "sector_benchmarks": {
@@ -91251,6 +92226,23 @@
         ],
         "title": "ReviewDue"
       },
+      "ReviewIn": {
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "wrong"
+            ],
+            "title": "Verdict"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verdict"
+        ],
+        "title": "ReviewIn"
+      },
       "ReviewItem": {
         "properties": {
           "ticker": {
@@ -102312,6 +103304,32 @@
           "warnings"
         ],
         "title": "StyleView"
+      },
+      "Summary": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "kinds": {
+            "items": {
+              "$ref": "#/components/schemas/KindSummary"
+            },
+            "type": "array",
+            "title": "Kinds"
+          },
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "kinds",
+          "waiting"
+        ],
+        "title": "Summary"
       },
       "SupplyChain": {
         "properties": {

@@ -7,6 +7,7 @@ queue. Both look the handler up here.
 from typing import Literal
 
 from steward.approvals.ai import ai_approvals_handler
+from steward.autopilot.job import autopilot_calibration_handler, autopilot_handler
 from steward.changes.alerts import change_alerts_handler
 from steward.chat.assistant import chat_handler
 from steward.disclosure.jobs import (
@@ -134,6 +135,8 @@ JobType = Literal[
     "edinet_filings",
     "twelve_data_corporate_actions",
     "ai_approvals",
+    "autopilot",
+    "autopilot_calibration",
     "ir_discovery",
     "news_ai_search",
     "news_triage",
@@ -207,6 +210,8 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "edinet_filings": edinet_filings_handler,
     "twelve_data_corporate_actions": twelve_data_corporate_actions_handler,
     "ai_approvals": ai_approvals_handler,
+    "autopilot": autopilot_handler,
+    "autopilot_calibration": autopilot_calibration_handler,
     "ir_discovery": ir_discovery_handler,
     "news_ai_search": news_ai_search_handler,
     "news_triage": news_triage_handler,

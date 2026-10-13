@@ -3,7 +3,7 @@ commodity inputs and customer / supplier disclosures from the annual report. Eac
 once (`filing_extraction`); a failure on one holding never stops the others."""
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any
 
 import asyncpg
@@ -38,7 +38,7 @@ from steward.graph.dependencies import (
 )
 from steward.graph.jobs import load_graph_holdings
 from steward.jobs.runner import JobContext
-from steward.llm.routing import RoutingClient
+from steward.llm.routing import RoutingClient, batch_collector
 from steward.llm.types import LLMError
 from steward.sources.edgar import EdgarClient, EdgarError
 from steward.storage import EvidenceStore
@@ -79,7 +79,59 @@ async def _record(
     )
 
 
+Memo = dict[tuple[str, str], "FilingText | str | None"]
+
+
+async def prefetch_batch(
+    client: RoutingClient,
+    wait_minutes: float,
+    asks: Sequence[Callable[[RoutingClient], Awaitable[Any]]],
+) -> int:
+    """Cost lever E2/G2: send the model reads of a run to the provider's batch endpoint together
+    (half price). Each answer lands in the client's result cache, so the step that follows,
+    unchanged, finds it there and asks nothing; a read the batch does not answer is asked
+    directly by the collector. An error here is left for that step to meet in its own way.
+    Without a result cache or with one read there is nothing to gain: returns 0."""
+    if client.cache is None or len(asks) < 2:
+        return 0
+    batch_client = RoutingClient(client.llm, client.cache)
+
+    async def one(ask: Callable[[RoutingClient], Awaitable[Any]]) -> None:
+        try:
+            await ask(batch_client)
+        except BudgetExceeded:
+            raise
+        except Exception:  # noqa: S110 - the step that follows meets the same error itself
+            pass
+
+    with batch_collector(batch_client, client.llm, wait_minutes) as collector:
+        results = await collector.run([one(ask) for ask in asks])
+    for result in results:
+        if isinstance(result, BudgetExceeded):
+            raise result
+    return len(asks)
+
+
 async def _source(
+    ctx: JobContext,
+    edgar: EdgarClient | None,
+    storage: EvidenceStore | None,
+    ticker: str,
+    profile: HoldingProfile | None,
+    kind: str,
+    memo: Memo | None = None,
+) -> FilingText | str | None:
+    """`_read_source`, remembering the answer in `memo` so a batched run fetches each filing
+    once for its prefetch and its step."""
+    if memo is not None and (ticker, kind) in memo:
+        return memo[(ticker, kind)]
+    found = await _read_source(ctx, edgar, storage, ticker, profile, kind)
+    if memo is not None:
+        memo[(ticker, kind)] = found
+    return found
+
+
+async def _read_source(
     ctx: JobContext,
     edgar: EdgarClient | None,
     storage: EvidenceStore | None,
@@ -121,6 +173,31 @@ async def run_products(
     """HS rows (estimated) from each holding's newest annual product lines."""
     results: dict[str, Any] = {}
     done = 0
+    system = prompts.text("exposure_hs_mapping", HS_SYSTEM)
+    if cfg.use_batch:
+        asks: list[Callable[[RoutingClient], Awaitable[Any]]] = []
+        for row in holdings:
+            if len(asks) >= cfg.filings_per_run:
+                break
+            if row["issuer_id"] is None:
+                continue
+            todo = await product_lines(ctx.pool, row["ticker"])
+            if todo is None or await _extracted(
+                ctx.pool, row["ticker"], todo[0]["accession"], "hs_mapping"
+            ):
+                continue
+            name = await ctx.pool.fetchval(
+                "select name from public.instrument where t212_ticker = $1", row["ticker"]
+            )
+            labels = [label for label, _ in todo[1]]
+
+            def ask_products(
+                c: RoutingClient, n: str = str(name or row["ticker"]), ls: list[str] = labels
+            ) -> Awaitable[Any]:
+                return ask_hs(c, cfg.model, cfg.effort, n, ls, usage, system)
+
+            asks.append(ask_products)
+        await prefetch_batch(client, cfg.batch_wait_minutes, asks)
     for row in holdings:
         if done >= cfg.filings_per_run:
             break
@@ -144,7 +221,7 @@ async def run_products(
                 str(name or ticker),
                 [label for label, _ in lines],
                 usage,
-                prompts.text("exposure_hs_mapping", HS_SYSTEM),
+                system,
             )
         except BudgetExceeded:
             results["stopped"] = "the monthly AI budget is reached"
@@ -196,6 +273,24 @@ async def run_inputs(
     results document)."""
     results: dict[str, Any] = {}
     done = 0
+    memo: Memo = {}
+    system = prompts.text("exposure_inputs", INPUTS_SYSTEM)
+    if cfg.use_batch:
+        asks: list[Callable[[RoutingClient], Awaitable[Any]]] = []
+        for row in holdings:
+            if len(asks) >= cfg.filings_per_run:
+                break
+            profile = profiles.for_ticker(row["ticker"])
+            if profile is None:
+                continue
+            text = await _source(ctx, edgar, storage, row["ticker"], profile, "exposure", memo)
+            if isinstance(text, FilingText):
+
+                def ask_inputs(c: RoutingClient, f: FilingText = text) -> Awaitable[Any]:
+                    return extract_inputs(c, cfg.model, cfg.effort, f, usage, system)
+
+                asks.append(ask_inputs)
+        await prefetch_batch(client, cfg.batch_wait_minutes, asks)
     for row in holdings:
         if done >= cfg.filings_per_run:
             break
@@ -203,7 +298,7 @@ async def run_inputs(
         profile = profiles.for_ticker(ticker)
         if profile is None:
             continue
-        filing = await _source(ctx, edgar, storage, ticker, profile, "exposure")
+        filing = await _source(ctx, edgar, storage, ticker, profile, "exposure", memo)
         if isinstance(filing, str):
             results[ticker] = filing
             continue
@@ -216,7 +311,7 @@ async def run_inputs(
                 cfg.effort,
                 filing,
                 usage,
-                prompts.text("exposure_inputs", INPUTS_SYSTEM),
+                system,
             )
         except BudgetExceeded:
             results["stopped"] = "the monthly AI budget is reached"
@@ -308,12 +403,37 @@ async def run_dependencies(
         reported = await store_reported(ctx.pool, row["ticker"])
         if reported["stored"]:
             results[f"{row['ticker']} (xbrl)"] = reported
+    memo: Memo = {}
+    system = prompts.text("dependency_extract", DEPENDENCY_SYSTEM)
+    if cfg.use_batch:
+        # Only the long read is batched; the short approval that follows it depends on the
+        # read's checked findings and is asked directly.
+        asks: list[Callable[[RoutingClient], Awaitable[Any]]] = []
+        for row in holdings:
+            if len(asks) >= cfg.filings_per_run:
+                break
+            text = await _source(
+                ctx,
+                edgar,
+                storage,
+                row["ticker"],
+                profiles.for_ticker(row["ticker"]),
+                "dependency",
+                memo,
+            )
+            if isinstance(text, FilingText):
+
+                def ask_dependencies(c: RoutingClient, f: FilingText = text) -> Awaitable[Any]:
+                    return extract_dependencies(c, cfg.model, cfg.effort, f, usage, system)
+
+                asks.append(ask_dependencies)
+        await prefetch_batch(client, cfg.batch_wait_minutes, asks)
     for row in holdings:
         if done >= cfg.filings_per_run:
             break
         ticker = row["ticker"]
         profile = profiles.for_ticker(ticker)
-        filing = await _source(ctx, edgar, storage, ticker, profile, "dependency")
+        filing = await _source(ctx, edgar, storage, ticker, profile, "dependency", memo)
         if isinstance(filing, str):
             results[ticker] = filing
             continue
@@ -332,7 +452,7 @@ async def run_dependencies(
                 cfg.effort,
                 filing,
                 usage,
-                prompts.text("dependency_extract", DEPENDENCY_SYSTEM),
+                system,
             )
             if not sections:
                 results[ticker] = "no readable customer or supplier sections (retried in a month)"

@@ -82,6 +82,8 @@ def openai_body(req: Request) -> dict[str, Any]:
         body["reasoning"] = {"effort": req.effort}
     if req.cache_key:
         body["prompt_cache_key"] = req.cache_key
+        if req.cache_retention:
+            body["prompt_cache_retention"] = req.cache_retention
     if req.priority == "flex":
         body["service_tier"] = "flex"
     if req.schema is not None:

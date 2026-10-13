@@ -267,6 +267,28 @@ Rules for all of them: explicit `effort` instead of `null` (the provider default
 **N3 + N5 + E3 + G3 (1–2 weeks, before 1 January 2027):** model moves and repeat reuse, each behind its job's gate.
 **H1–H3 and V1–V3 (with C1d and D2).**
 
+**Status, 13 October 2026.** Code for the switches is in; every switch defaults to the old behaviour, nothing is turned on in the live config, and none has run against a provider yet.
+
+| Item | State |
+| --- | --- |
+| N1 | Done behind `news.batch_analysis`: stories below severity 3 run their model stages through one batch (`AnalysisRun.analyse_batched`), severe stories run directly. Tested with fakes; the batch endpoint itself is untested live. |
+| N2 | Not built, on purpose: each technique has its own system prompt, so there is no shared prefix to cache. The result cache already stops identical repeats. |
+| N3, N4 | Not done. They change the model or effort, so they need a side-by-side on the news golden sets (and a first real run for a baseline). No harness written yet. |
+| N5 | Done behind `news.reuse_repeat_analysis`: a minor story marked a repeat copies the earlier story's impact, framing and sentiment (same ticker), stored under a hash of the source so a rerun asks nothing. Tested with fakes. |
+| E1, G1 | Already in place: `filing_extraction` records each annual report per ticker, accession and kind, so a filing is read once (an empty read is retried after 30 days). Exposure AI calls now also use the `exposure_ai` result cache. |
+| E2, G2, E4 | Done behind `exposure_build_settings.use_batch` (`prefetch_batch`): product, input and dependency reads of a run go to one batch and land in the result cache, then the unchanged step finds them. The HS mapping is cached by the same result cache. |
+| E3, G3 | Not done: need the exposure and graph review samples run on luna. |
+| H1 | Built behind `chat.cache_retention` (`off` or `24h`, sent as `prompt_cache_retention` with the chat cache key; a rejecting model is asked again without it). Not probed live: whether luna accepts it, and whether cache writes are billed, is unverified. |
+| H2 | Built behind `chat.search_via_api` (needs `BRAVE_API_KEY`): a `web_search` function tool (`chat/search_tool.py`) returns url, title and snippet from the allowed outlet tiers only, replaces the provider's search for that answer, and identical searches are kept `search_cache_days` days. Brave's news endpoint is the only index, so results are news, not general web; its terms and price are unverified. |
+| H3 | Tested: the tool list is the same on every call, the date is in the last user message only, and the API search tool is appended last. History is not compacted. |
+| V1 | Not changed: `escalation.effort` already exists and stays `null` until the severe-event cases show a lower effort holds; no such comparison has been run. |
+| V2 | Not built: the scout split for escalation changes who reads the search results on a time-sensitive path; wait for the research scout results. |
+| V3 | Already in place: escalation uses a one-day search cache. |
+| Earnings locate | Built behind `earnings_check.result_cache_days` (0 = off): identical locate searches and document reads within that many days are answered from memory. Batching on a non-release day is not built (each issuer is a sequential search then fetch, and the job is small). |
+| Planner, monthly caps | Planner is already effectively luna. Monthly caps wait for measured run costs (N0). |
+
+Still needing live runs before they can be closed: N3/N4 (analysis model and effort on the news golden sets), E3/G3 (luna on the exposure and graph samples), V1, the H1 probe, flex and batch on a real provider, and the C0/N0 per-job measurement. None of these has a harness that compares two models side by side yet; the existing golden sets fix a model's answer and test the code around it, so they cannot choose between models.
+
 ### Rules for the agent phases (so they do not multiply cost)
 
 - **Budget per route before building the route:** AG0 records the cost of 15 chat questions and 5 research runs on current tools (this is the unmeasured part); set per-run and monthly caps at about 2× the median, as decision 4 already says, and set a non-null `monthly_cap_usd` (it defaults to null, so nothing is capped today).

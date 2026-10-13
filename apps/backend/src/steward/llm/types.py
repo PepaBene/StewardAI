@@ -98,6 +98,9 @@ class Request:
     # refused when capacity is short; the client then repeats the call at standard). Ignored
     # by Google, which has no tier this app uses.
     priority: Literal["standard", "flex"] = "standard"
+    # "24h" asks OpenAI to keep the prompt prefix cached for a day (`prompt_cache_retention`).
+    # Ignored by Google.
+    cache_retention: Literal["24h"] | None = None
 
 
 @dataclass(frozen=True)
