@@ -17,6 +17,7 @@ from steward.autopilot.thesis_upkeep import (
 )
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
+from steward.engine import audit as engine_audit
 from steward.jobs.runner import JobContext
 from steward.llm.cache import ResultCache
 from steward.llm.client import create_llm
@@ -119,6 +120,8 @@ async def autopilot_calibration_handler(ctx: JobContext) -> None:
     async with ctx.step("learn") as step:
         configured = {name: cfg.policy(name).min_confidence for name in kinds}
         step.detail["floors"] = await relearn(ctx.pool, kinds, configured, now)
+    async with ctx.step("reward_audit") as step:
+        step.detail["flagged"] = await engine_audit.audit(ctx.pool, list(kinds), now)
     if cfg.auto_calibrate:
         async with ctx.step("calibrate") as step:
             step.detail["moves"] = await calibrate(ctx.pool, kinds, cfg, now)
