@@ -410,6 +410,11 @@ class OpsSettings(ConfigModel):
         "switch-log row for a sell and buy pair) marked as automatic. They hold no reasons "
         "and are left out of the scorecard and process review.",
     )
+    anticipate_earnings: bool = Field(
+        default=True,
+        description="Once a day, put a line in Needs you for each held company that reports "
+        "within three days, with when its research was last refreshed.",
+    )
     draft_case_items: bool = Field(
         default=True,
         description="Once a day, add your thesis wording to a held company's case items as "
