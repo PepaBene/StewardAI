@@ -2190,6 +2190,155 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/thesis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Thesis
+         * @description Research the stock with every record the app holds plus web search, then write its
+         *     thesis: stance, executive summary, detailed memo, KPIs, exit conditions, scenarios and
+         *     targets. Runs on its own once started.
+         */
+        post: operations["run_thesis"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/portfolio-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Portfolio Review
+         * @description Review what to sell, trim and buy. Flags holdings, finds gaps against your strategy,
+         *     researches buy candidates in depth and judges each against your return hurdle and
+         *     asymmetry gate.
+         */
+        post: operations["run_portfolio_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/thesis/memos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Memos */
+        get: operations["list_memos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/thesis/memos/{memo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Memo */
+        get: operations["get_memo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/thesis/memos/{memo_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Buy Memo
+         * @description You decided to buy: save the memo's thesis as the stock's thesis.
+         */
+        post: operations["accept_buy_memo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/thesis/memos/{memo_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss Memo */
+        post: operations["dismiss_memo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/thesis/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reviews */
+        get: operations["list_reviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/thesis/reviews/{review_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Review */
+        get: operations["get_review"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/escalations/stats": {
         parameters: {
             query?: never;
@@ -3948,6 +4097,27 @@ export interface paths {
         get: operations["needs_you"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/engagement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Engagement
+         * @description Note that the owner opened something. The app uses it to send less of what is never
+         *     read; it stores the kind and id only.
+         */
+        post: operations["record_engagement"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9284,6 +9454,15 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AcceptOut */
+        AcceptOut: {
+            /** Memo Id */
+            memo_id: number;
+            /** Ticker */
+            ticker: string;
+            /** Saved Version Id */
+            saved_version_id: number;
+        };
         /** AcceptedOut */
         AcceptedOut: {
             /** Accepted */
@@ -11095,7 +11274,7 @@ export interface components {
             /**
              * Draft Theses
              * @description Queue a deep-thesis research run for a held, non-core holding that has no thesis, and tell you once when the draft is ready. Nothing is saved until you accept.
-             * @default true
+             * @default false
              */
             draft_theses: boolean;
             /**
@@ -11110,38 +11289,6 @@ export interface components {
              * @default 60
              */
             draft_min_days: number;
-            /**
-             * Author Theses
-             * @description Write the whole thesis (stance, why owned or why not, KPIs, exit conditions, scenarios, targets) for a held, non-core holding that has none, from its deep-thesis report and your strategy, and save it as an AI-authored config version you can roll back. A trim or exit stance is listed under Needs you.
-             * @default true
-             */
-            author_theses: boolean;
-            /**
-             * Author Model
-             * @description Writes the thesis.
-             * @default gpt-6.1-sol
-             * @example gpt-6.1-sol
-             * @example gpt-6-luna
-             * @example gemini-3.8-flash
-             */
-            author_model: string;
-            /**
-             * Author Effort
-             * @description Unset: effort is not sent and the model's default applies.
-             */
-            author_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
-            /**
-             * Author Max Per Run
-             * @description Most theses one autopilot run writes.
-             * @default 3
-             */
-            author_max_per_run: number;
-            /**
-             * Author Report Max Days
-             * @description Oldest deep-thesis report a thesis is written from.
-             * @default 90
-             */
-            author_report_max_days: number;
             /**
              * Refresh Review Dates
              * @description Move a thesis's review date forward when every KPI passes and the latest research proposes no change. A normal config version you can roll back.
@@ -11993,7 +12140,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "autopilot" | "autopilot_calibration" | "watchdog" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "document_index" | "inbox_scan" | "inbox_agent" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "autopilot" | "autopilot_calibration" | "watchdog" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "document_index" | "inbox_scan" | "inbox_agent" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts" | "thesis" | "portfolio_review")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -16439,6 +16586,18 @@ export interface components {
              * @default false
              */
             policy_rate: boolean;
+        };
+        /** EngagementIn */
+        EngagementIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "news_story" | "report" | "notice" | "escalation" | "thesis" | "company" | "fund";
+            /** Ref */
+            ref: string;
+            /** Ticker */
+            ticker?: string | null;
         };
         /** EntityMatchOut */
         EntityMatchOut: {
@@ -23148,6 +23307,7 @@ export interface components {
             document_index_settings?: components["schemas"]["DocumentIndexSettings"];
             inbox_settings?: components["schemas"]["InboxSettings"];
             autopilot_settings?: components["schemas"]["AutopilotSettings"];
+            thesis_settings?: components["schemas"]["ThesisSettings"];
             ops_settings?: components["schemas"]["OpsSettings"];
             /**
              * Fund Documents
@@ -24887,6 +25047,58 @@ export interface components {
             change: number | string | null;
             /** Definition Note */
             definition_note?: string | null;
+        };
+        /** MemoOut */
+        MemoOut: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string;
+            /** Mode */
+            mode: string;
+            /** Stance */
+            stance: string;
+            /** Status */
+            status: string;
+            /** Executive Summary */
+            executive_summary: string;
+            /** Research Report Id */
+            research_report_id: number | null;
+            /** Review Id */
+            review_id: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Body */
+            body: {
+                [key: string]: unknown;
+            };
+        };
+        /** MemoSummary */
+        MemoSummary: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string;
+            /** Mode */
+            mode: string;
+            /** Stance */
+            stance: string;
+            /** Status */
+            status: string;
+            /** Executive Summary */
+            executive_summary: string;
+            /** Research Report Id */
+            research_report_id: number | null;
+            /** Review Id */
+            review_id: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * MergerEntry
@@ -30338,6 +30550,14 @@ export interface components {
             /** Table Name */
             table_name: string | null;
         };
+        /** Recorded */
+        Recorded: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+        };
         /** RecordedExchangeSessionResponse */
         RecordedExchangeSessionResponse: {
             /**
@@ -31897,6 +32117,26 @@ export interface components {
             /** Reconciliation */
             reconciliation: components["schemas"]["ReconciliationOut"][];
         };
+        /** ReviewOut */
+        ReviewOut: {
+            /** Id */
+            id: number;
+            /** Status */
+            status: string;
+            /** Summary */
+            summary: string;
+            /** Body */
+            body: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finished At */
+            finished_at: string | null;
+        };
         /** ReviewQueueResponse */
         ReviewQueueResponse: {
             /** Filing Hits */
@@ -31922,6 +32162,14 @@ export interface components {
             body: components["schemas"]["ReviewBody"];
             /** Body Md */
             body_md: string;
+        };
+        /** ReviewRequest */
+        ReviewRequest: {
+            /**
+             * Tickers
+             * @description Stocks you want researched as buy candidates, besides those the review finds.
+             */
+            tickers?: string[];
         };
         /** ReviewRow */
         ReviewRow: {
@@ -36896,6 +37144,18 @@ export interface components {
             /** Applied */
             applied: ("why_owned" | "exit_conditions" | "pre_mortem")[];
         };
+        /** ThesisRequest */
+        ThesisRequest: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Mode
+             * @description held: a position you own (the thesis is saved when it is written). buy: a stock you might buy (the thesis waits until you accept it).
+             * @default held
+             * @enum {string}
+             */
+            mode: "held" | "buy";
+        };
         /** ThesisReview */
         ThesisReview: {
             /** Ticker */
@@ -36947,6 +37207,55 @@ export interface components {
              * @default 0.25
              */
             p_bull: number;
+        };
+        /**
+         * ThesisSettings
+         * @description The thesis job: started by the owner for one holding or one candidate, it researches
+         *     with every record the app holds plus web search, writes the thesis and, for a holding,
+         *     saves it. The portfolio review does the same for the stocks it finds.
+         */
+        ThesisSettings: {
+            /**
+             * Model
+             * @description Writes the thesis and memo.
+             * @default gpt-6.1-sol
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            model: string;
+            /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies.
+             */
+            effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Research Profile
+             * @description The research profile the thesis is built on.
+             * @default deep-thesis
+             */
+            research_profile: string;
+            /**
+             * Review Max Candidates
+             * @description Most stocks a portfolio review researches in depth (each costs a full research run). The ones you name come first.
+             * @default 3
+             */
+            review_max_candidates: number;
+            /**
+             * Review Discovery
+             * @description Let the portfolio review search the web for stocks that fill the gaps in your strategy, besides the ones you name.
+             * @default true
+             */
+            review_discovery: boolean;
+            /**
+             * Review Discovery Model
+             * @description Searches the web for candidate stocks.
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            review_discovery_model: string;
         };
         /**
          * ThesisVariantPerception
@@ -43038,6 +43347,250 @@ export interface operations {
             };
         };
     };
+    run_thesis: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThesisRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_portfolio_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_memos: {
+        parameters: {
+            query?: {
+                ticker?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_memo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memo_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_buy_memo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memo_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_memo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memo_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reviews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewOut"][];
+                };
+            };
+        };
+    };
+    get_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_escalation_stats: {
         parameters: {
             query?: {
@@ -45952,6 +46505,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NeedsYou"];
+                };
+            };
+        };
+    };
+    record_engagement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EngagementIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recorded"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

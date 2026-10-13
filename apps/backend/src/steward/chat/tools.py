@@ -433,6 +433,31 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "thesis_memos",
+        "description": "The detailed theses the app wrote for the owner: each has a stance "
+        "(keep, add, trim, exit for a holding; buy or pass for a stock considered), an "
+        "executive summary and, with full=true for one ticker, the whole memo (business, "
+        "financials, valuation and scenarios, fit with the strategy, risks and pre-mortem, KPIs, "
+        "catalysts, next steps) with the KPIs, exit conditions and targets. Use it for 'why do I "
+        "own X', 'what does my thesis for X say', 'should I sell X' and 'what was the case for "
+        "buying X'. Newest first; say when none exists and offer to start one.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string", "description": "e.g. TSM_US_EQ"},
+                "full": {"type": "boolean", "description": "Include the whole memo (one ticker)."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "portfolio_review",
+        "description": "The latest portfolio review the owner asked for: holdings to trim or "
+        "exit with the reasons, strategy gaps, and the stocks researched as buys or passes with "
+        "expected return and upside against loss. Read-only; say when no review exists.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
         "name": "event_feed",
         "description": "Recent classified news stories about companies that reach the "
         "portfolio along supply-chain links, most serious first: headline, outlet, whether it "
@@ -985,6 +1010,76 @@ class ChatTools:
             "tool": "agent_notes",
             "notes": notes,
             "note": None if notes else "The owner has written no notes for this scope.",
+        }
+
+    async def _tool_thesis_memos(
+        self, ticker: str | None = None, full: bool = False
+    ) -> dict[str, Any]:
+        rows = await self.pool.fetch(
+            "select id, ticker, mode, stance, status, executive_summary, body, created_at"
+            " from public.thesis_memo where ($1::text is null or ticker = $1)"
+            " order by id desc limit $2",
+            ticker,
+            3 if (full and ticker) else 8,
+        )
+        memos: list[dict[str, Any]] = []
+        for r in rows:
+            body = json.loads(r["body"]) if isinstance(r["body"], str) else r["body"]
+            sid = self.registry.add(
+                "thesis",
+                f"thesis_memo:{r['id']}",
+                f"Thesis memo for {r['ticker']} ({r['stance']})",
+                app_path=f"/thesis/memos/{r['id']}",
+                tier=1,
+                snippet=r["executive_summary"],
+                as_of=str(r["created_at"].date()),
+            )
+            item: dict[str, Any] = {
+                "source_id": sid,
+                "ticker": r["ticker"],
+                "mode": r["mode"],
+                "stance": r["stance"],
+                "status": r["status"],
+                "written": str(r["created_at"].date()),
+                "executive_summary": r["executive_summary"],
+                "stance_reason": body.get("stance_reason"),
+            }
+            if full and ticker:
+                item["memo"] = body.get("memo")
+                item["thesis"] = body.get("thesis")
+            memos.append(item)
+        return {
+            "tool": "thesis_memos",
+            "memos": memos,
+            "note": None if memos else "No thesis memo has been written for this scope.",
+        }
+
+    async def _tool_portfolio_review(self) -> dict[str, Any]:
+        row = await self.pool.fetchrow(
+            "select id, status, summary, body, created_at from public.portfolio_review"
+            " order by id desc limit 1"
+        )
+        if row is None:
+            return {"tool": "portfolio_review", "note": "No portfolio review has been run."}
+        body = json.loads(row["body"]) if isinstance(row["body"], str) else row["body"]
+        sid = self.registry.add(
+            "observation",
+            f"portfolio_review:{row['id']}",
+            "Portfolio review",
+            app_path=f"/thesis/reviews/{row['id']}",
+            tier=1,
+            snippet=row["summary"],
+            as_of=str(row["created_at"].date()),
+        )
+        return {
+            "tool": "portfolio_review",
+            "source_id": sid,
+            "status": row["status"],
+            "summary": row["summary"],
+            "holdings": body.get("holdings"),
+            "gaps": body.get("gaps"),
+            "buys": body.get("buys"),
+            "passes": body.get("passes"),
         }
 
     async def _tool_event_feed(

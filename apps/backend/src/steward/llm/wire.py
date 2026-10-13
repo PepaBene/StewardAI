@@ -111,6 +111,9 @@ def openai_body(req: Request) -> dict[str, Any]:
             tool["filters"] = {"allowed_domains": list(req.search.allowed_domains[:100])}
         tools.append(tool)
         body["max_tool_calls"] = req.search.max_uses
+        # The pages each search returned, so an answer written as JSON (no prose to annotate)
+        # can still be checked against them.
+        body["include"] = ["web_search_call.action.sources"]
     if tools:
         body["tools"] = tools
     return body
@@ -133,6 +136,7 @@ def _openai_input(messages: Sequence[Message]) -> list[Any]:
 def openai_completion(req: Request, data: dict[str, Any]) -> Completion:
     text_parts: list[str] = []
     citations: list[Citation] = []
+    sources: list[Citation] = []
     calls: list[ToolCall] = []
     searches = 0
     refused = False
@@ -140,6 +144,9 @@ def openai_completion(req: Request, data: dict[str, Any]) -> Completion:
         kind = item.get("type")
         if kind == "web_search_call":
             searches += 1
+            for found in (item.get("action") or {}).get("sources") or []:
+                if isinstance(found, dict) and found.get("url"):
+                    sources.append(Citation(str(found["url"]), ""))
         elif kind == "function_call":
             try:
                 args = json.loads(item.get("arguments") or "{}")
@@ -192,6 +199,7 @@ def openai_completion(req: Request, data: dict[str, Any]) -> Completion:
             searches=searches,
         ),
         citations=_dedupe(citations),
+        sources=_dedupe(sources),
         tool_calls=calls,
         raw=list(data.get("output") or []) if calls else None,
     )

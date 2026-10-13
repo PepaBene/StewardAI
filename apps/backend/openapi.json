@@ -6246,6 +6246,402 @@
         ]
       }
     },
+    "/jobs/thesis": {
+      "post": {
+        "tags": [
+          "thesis"
+        ],
+        "summary": "Run Thesis",
+        "description": "Research the stock with every record the app holds plus web search, then write its\nthesis: stance, executive summary, detailed memo, KPIs, exit conditions, scenarios and\ntargets. Runs on its own once started.",
+        "operationId": "run_thesis",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThesisRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/jobs/portfolio-review": {
+      "post": {
+        "tags": [
+          "thesis"
+        ],
+        "summary": "Run Portfolio Review",
+        "description": "Review what to sell, trim and buy. Flags holdings, finds gaps against your strategy,\nresearches buy candidates in depth and judges each against your return hurdle and\nasymmetry gate.",
+        "operationId": "run_portfolio_review",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/thesis/memos": {
+      "get": {
+        "tags": [
+          "thesis"
+        ],
+        "summary": "List Memos",
+        "operationId": "list_memos",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]{1,32}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 30,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemoSummary"
+                  },
+                  "title": "Response List Memos"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/thesis/memos/{memo_id}": {
+      "get": {
+        "tags": [
+          "thesis"
+        ],
+        "summary": "Get Memo",
+        "operationId": "get_memo",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "memo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Memo Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/thesis/memos/{memo_id}/accept": {
+      "post": {
+        "tags": [
+          "thesis"
+        ],
+        "summary": "Accept Buy Memo",
+        "description": "You decided to buy: save the memo's thesis as the stock's thesis.",
+        "operationId": "accept_buy_memo",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "memo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Memo Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/thesis/memos/{memo_id}/dismiss": {
+      "post": {
+        "tags": [
+          "thesis"
+        ],
+        "summary": "Dismiss Memo",
+        "operationId": "dismiss_memo",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "memo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Memo Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Dismiss Memo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/thesis/reviews": {
+      "get": {
+        "tags": [
+          "thesis"
+        ],
+        "summary": "List Reviews",
+        "operationId": "list_reviews",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReviewOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Reviews"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/thesis/reviews/{review_id}": {
+      "get": {
+        "tags": [
+          "thesis"
+        ],
+        "summary": "Get Review",
+        "operationId": "get_review",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "review_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Review Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/escalations/stats": {
       "get": {
         "tags": [
@@ -11632,6 +12028,53 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NeedsYou"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/engagement": {
+      "post": {
+        "tags": [
+          "autopilot"
+        ],
+        "summary": "Record Engagement",
+        "description": "Note that the owner opened something. The app uses it to send less of what is never\nread; it stores the kind and id only.",
+        "operationId": "record_engagement",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EngagementIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recorded"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -29144,6 +29587,29 @@
   },
   "components": {
     "schemas": {
+      "AcceptOut": {
+        "properties": {
+          "memo_id": {
+            "type": "integer",
+            "title": "Memo Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "saved_version_id": {
+            "type": "integer",
+            "title": "Saved Version Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "memo_id",
+          "ticker",
+          "saved_version_id"
+        ],
+        "title": "AcceptOut"
+      },
       "AcceptedOut": {
         "properties": {
           "accepted": {
@@ -34261,7 +34727,7 @@
             "type": "boolean",
             "title": "Draft Theses",
             "description": "Queue a deep-thesis research run for a held, non-core holding that has no thesis, and tell you once when the draft is ready. Nothing is saved until you accept.",
-            "default": true
+            "default": false
           },
           "draft_max_per_run": {
             "type": "integer",
@@ -34278,59 +34744,6 @@
             "title": "Draft Min Days",
             "description": "No new draft for a holding this soon after a report.",
             "default": 60
-          },
-          "author_theses": {
-            "type": "boolean",
-            "title": "Author Theses",
-            "description": "Write the whole thesis (stance, why owned or why not, KPIs, exit conditions, scenarios, targets) for a held, non-core holding that has none, from its deep-thesis report and your strategy, and save it as an AI-authored config version you can roll back. A trim or exit stance is listed under Needs you.",
-            "default": true
-          },
-          "author_model": {
-            "type": "string",
-            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
-            "title": "Author Model",
-            "description": "Writes the thesis.",
-            "default": "gpt-6.1-sol",
-            "examples": [
-              "gpt-6.1-sol",
-              "gpt-6-luna",
-              "gemini-3.8-flash"
-            ]
-          },
-          "author_effort": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "xhigh",
-                  "max"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Author Effort",
-            "description": "Unset: effort is not sent and the model's default applies."
-          },
-          "author_max_per_run": {
-            "type": "integer",
-            "maximum": 10.0,
-            "minimum": 1.0,
-            "title": "Author Max Per Run",
-            "description": "Most theses one autopilot run writes.",
-            "default": 3
-          },
-          "author_report_max_days": {
-            "type": "integer",
-            "maximum": 365.0,
-            "minimum": 1.0,
-            "title": "Author Report Max Days",
-            "description": "Oldest deep-thesis report a thesis is written from.",
-            "default": 90
           },
           "refresh_review_dates": {
             "type": "boolean",
@@ -36910,7 +37323,9 @@
                 "disclosure_deals",
                 "disclosure_esef",
                 "disclosure_estimates",
-                "disclosure_alerts"
+                "disclosure_alerts",
+                "thesis",
+                "portfolio_review"
               ]
             },
             "type": "array",
@@ -36995,7 +37410,9 @@
                 "disclosure_deals",
                 "disclosure_esef",
                 "disclosure_estimates",
-                "disclosure_alerts"
+                "disclosure_alerts",
+                "thesis",
+                "portfolio_review"
               ]
             },
             "type": "object",
@@ -37093,7 +37510,9 @@
                 "disclosure_deals",
                 "disclosure_esef",
                 "disclosure_estimates",
-                "disclosure_alerts"
+                "disclosure_alerts",
+                "thesis",
+                "portfolio_review"
               ]
             },
             "type": "object",
@@ -49483,6 +49902,47 @@
           "flow_key"
         ],
         "title": "EcbSeries"
+      },
+      "EngagementIn": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "news_story",
+              "report",
+              "notice",
+              "escalation",
+              "thesis",
+              "company",
+              "fund"
+            ],
+            "title": "Kind"
+          },
+          "ref": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Ref"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "ref"
+        ],
+        "title": "EngagementIn"
       },
       "EntityMatchOut": {
         "properties": {
@@ -68685,6 +69145,9 @@
           "autopilot_settings": {
             "$ref": "#/components/schemas/AutopilotSettings"
           },
+          "thesis_settings": {
+            "$ref": "#/components/schemas/ThesisSettings"
+          },
           "ops_settings": {
             "$ref": "#/components/schemas/OpsSettings"
           },
@@ -73769,6 +74232,148 @@
           "change"
         ],
         "title": "MemberLine"
+      },
+      "MemoOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "stance": {
+            "type": "string",
+            "title": "Stance"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "executive_summary": {
+            "type": "string",
+            "title": "Executive Summary"
+          },
+          "research_report_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Research Report Id"
+          },
+          "review_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "body": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Body"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "mode",
+          "stance",
+          "status",
+          "executive_summary",
+          "research_report_id",
+          "review_id",
+          "created_at",
+          "body"
+        ],
+        "title": "MemoOut"
+      },
+      "MemoSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "stance": {
+            "type": "string",
+            "title": "Stance"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "executive_summary": {
+            "type": "string",
+            "title": "Executive Summary"
+          },
+          "research_report_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Research Report Id"
+          },
+          "review_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "mode",
+          "stance",
+          "status",
+          "executive_summary",
+          "research_report_id",
+          "review_id",
+          "created_at"
+        ],
+        "title": "MemoSummary"
       },
       "MergerEntry": {
         "properties": {
@@ -88732,6 +89337,17 @@
         ],
         "title": "RecordEvidenceOut"
       },
+      "Recorded": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "Recorded"
+      },
       "RecordedExchangeSessionResponse": {
         "properties": {
           "session_date": {
@@ -92621,6 +93237,54 @@
         ],
         "title": "ReviewItem"
       },
+      "ReviewOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "body": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Body"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "summary",
+          "body",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "ReviewOut"
+      },
       "ReviewQueueResponse": {
         "properties": {
           "filing_hits": {
@@ -92697,6 +93361,22 @@
           "body_md"
         ],
         "title": "ReviewReportOut"
+      },
+      "ReviewRequest": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Tickers",
+            "description": "Stocks you want researched as buy candidates, besides those the review finds."
+          }
+        },
+        "type": "object",
+        "title": "ReviewRequest"
       },
       "ReviewRow": {
         "properties": {
@@ -106287,6 +106967,30 @@
         ],
         "title": "ThesisProposalApplied"
       },
+      "ThesisRequest": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{1,32}$",
+            "title": "Ticker"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "held",
+              "buy"
+            ],
+            "title": "Mode",
+            "description": "held: a position you own (the thesis is saved when it is written). buy: a stock you might buy (the thesis waits until you accept it).",
+            "default": "held"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker"
+        ],
+        "title": "ThesisRequest"
+      },
       "ThesisReview": {
         "properties": {
           "ticker": {
@@ -106398,6 +107102,77 @@
         ],
         "title": "ThesisScenarios",
         "description": "Bear, base and bull value per share with the owner's probabilities (principle 5).\nThe expected return, the upside against the loss and the risk-adjusted ranking read them."
+      },
+      "ThesisSettings": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Model",
+            "description": "Writes the thesis and memo.",
+            "default": "gpt-6.1-sol",
+            "examples": [
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
+            ]
+          },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort",
+            "description": "Unset: effort is not sent and the model's default applies."
+          },
+          "research_profile": {
+            "type": "string",
+            "title": "Research Profile",
+            "description": "The research profile the thesis is built on.",
+            "default": "deep-thesis"
+          },
+          "review_max_candidates": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 0.0,
+            "title": "Review Max Candidates",
+            "description": "Most stocks a portfolio review researches in depth (each costs a full research run). The ones you name come first.",
+            "default": 3
+          },
+          "review_discovery": {
+            "type": "boolean",
+            "title": "Review Discovery",
+            "description": "Let the portfolio review search the web for stocks that fill the gaps in your strategy, besides the ones you name.",
+            "default": true
+          },
+          "review_discovery_model": {
+            "type": "string",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Review Discovery Model",
+            "description": "Searches the web for candidate stocks.",
+            "default": "gpt-6-luna",
+            "examples": [
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ThesisSettings",
+        "description": "The thesis job: started by the owner for one holding or one candidate, it researches\nwith every record the app holds plus web search, writes the thesis and, for a holding,\nsaves it. The portfolio review does the same for the stocks it finds."
       },
       "ThesisVariantPerception": {
         "properties": {

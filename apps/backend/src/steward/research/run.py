@@ -78,6 +78,7 @@ from steward.research.read_tools import (
     ToolCallRecord,
     comparison,
     evidence_for,
+    full_data_calls,
     run_read_tools,
 )
 from steward.research.rules import load_compliance
@@ -395,6 +396,7 @@ async def retry_transient(
     return output
 
 
+FULL_DATA_MAX_CALLS = 48
 PAGE_MAX_BYTES = 12_000_000  # a cited filing page; larger documents are not read for evidence
 NO_BUDGET_NOTE = "not written: the profile's step budget is used up"
 # Notes of a section no follow-up could fill; any other "not written" is a failed call.
@@ -601,8 +603,22 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
 
     async def do_read_tools() -> dict[str, Any]:
         async with ctx.step("read_tools") as step:
-            tools = ChatTools(pool, reg, None, None)
-            outcome = await run_read_tools(tools.call, reg, plan, ticker)
+            if ctx.params.get("full_data"):
+                # A thesis the owner asked for: every stored record about the company and the
+                # owner's own position, notes, history and risk, not only the plan's tools.
+                tools = ChatTools(pool, reg, None, None, owner_id=await owner_of(pool))
+                outcome = await run_read_tools(
+                    tools.call,
+                    reg,
+                    plan,
+                    ticker,
+                    owner=True,
+                    extra=full_data_calls(ticker, gathered.name),
+                    max_calls=FULL_DATA_MAX_CALLS,
+                )
+            else:
+                tools = ChatTools(pool, reg, None, None)
+                outcome = await run_read_tools(tools.call, reg, plan, ticker)
             step.detail.update(
                 calls=len(outcome.records),
                 by_status=comparison(outcome.records),
@@ -1572,6 +1588,11 @@ def render_md(body: ResearchBody, view: View | None = None) -> str:
 
 
 async def research_handler(ctx: JobContext) -> None:
+    await run_research_job(ctx)
+
+
+async def run_research_job(ctx: JobContext) -> int:
+    """The research job; returns the stored report's id (the thesis job reads it next)."""
     settings = get_settings()
     prompts = await load_prompts(ctx.pool)
     research = await load_active(ctx.pool, "research_profiles", ResearchProfilesConfig)
@@ -1656,7 +1677,7 @@ async def research_handler(ctx: JobContext) -> None:
             except FetchError:
                 return None
 
-        await run_research(
+        return await run_research(
             ctx,
             ResearchDeps(
                 writer=writer,

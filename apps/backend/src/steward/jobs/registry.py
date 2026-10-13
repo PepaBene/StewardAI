@@ -75,6 +75,8 @@ from steward.sources.provider_jobs import (
     fmp_company_handler,
     twelve_data_corporate_actions_handler,
 )
+from steward.thesis.job import thesis_handler
+from steward.thesis.review import review_handler
 from steward.valuation.collect import valuation_refresh_handler
 from steward.verify_sources.jobs import (
     raw_retention_handler,
@@ -156,6 +158,9 @@ JobType = Literal[
     "disclosure_esef",
     "disclosure_estimates",
     "disclosure_alerts",
+    "watchdog",
+    "thesis",
+    "portfolio_review",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -232,4 +237,6 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "disclosure_esef": disclosure_esef_handler,
     "disclosure_estimates": disclosure_estimates_handler,
     "disclosure_alerts": disclosure_alerts_handler,
+    "thesis": thesis_handler,
+    "portfolio_review": review_handler,
 }

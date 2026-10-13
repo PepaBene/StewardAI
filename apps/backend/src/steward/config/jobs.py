@@ -461,6 +461,33 @@ class AutopilotKindPolicy(ConfigModel):
     )
 
 
+class ThesisSettings(ConfigModel):
+    """The thesis job: started by the owner for one holding or one candidate, it researches
+    with every record the app holds plus web search, writes the thesis and, for a holding,
+    saves it. The portfolio review does the same for the stocks it finds."""
+
+    model: ModelId = Field(default="gpt-6.1-sol", description="Writes the thesis and memo.")
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    research_profile: str = Field(
+        default="deep-thesis", description="The research profile the thesis is built on."
+    )
+    review_max_candidates: int = Field(
+        default=3,
+        ge=0,
+        le=8,
+        description="Most stocks a portfolio review researches in depth (each costs a full "
+        "research run). The ones you name come first.",
+    )
+    review_discovery: bool = Field(
+        default=True,
+        description="Let the portfolio review search the web for stocks that fill the gaps in "
+        "your strategy, besides the ones you name.",
+    )
+    review_discovery_model: ModelId = Field(
+        default="gpt-6-luna", description="Searches the web for candidate stocks."
+    )
+
+
 class AutopilotSettings(ConfigModel):
     """The autopilot: the app settles its own review queues, logs every decision with its
     evidence, and asks the owner only for what it cannot settle with confidence."""
@@ -499,7 +526,7 @@ class AutopilotSettings(ConfigModel):
         default=1, ge=1, le=10, description="Most research runs one autopilot run may queue."
     )
     draft_theses: bool = Field(
-        default=True,
+        default=False,
         description="Queue a deep-thesis research run for a held, non-core holding that has no "
         "thesis, and tell you once when the draft is ready. Nothing is saved until you accept.",
     )
@@ -508,21 +535,6 @@ class AutopilotSettings(ConfigModel):
     )
     draft_min_days: int = Field(
         default=60, ge=1, le=365, description="No new draft for a holding this soon after a report."
-    )
-    author_theses: bool = Field(
-        default=True,
-        description="Write the whole thesis (stance, why owned or why not, KPIs, exit "
-        "conditions, scenarios, targets) for a held, non-core holding that has none, from its "
-        "deep-thesis report and your strategy, and save it as an AI-authored config version "
-        "you can roll back. A trim or exit stance is listed under Needs you.",
-    )
-    author_model: ModelId = Field(default="gpt-6.1-sol", description="Writes the thesis.")
-    author_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
-    author_max_per_run: int = Field(
-        default=3, ge=1, le=10, description="Most theses one autopilot run writes."
-    )
-    author_report_max_days: int = Field(
-        default=90, ge=1, le=365, description="Oldest deep-thesis report a thesis is written from."
     )
     refresh_review_dates: bool = Field(
         default=True,
@@ -2684,6 +2696,7 @@ class JobsConfig(ConfigModel):
     document_index_settings: DocumentIndexSettings = Field(default_factory=DocumentIndexSettings)
     inbox_settings: InboxSettings = Field(default_factory=InboxSettings)
     autopilot_settings: AutopilotSettings = Field(default_factory=AutopilotSettings)
+    thesis_settings: ThesisSettings = Field(default_factory=ThesisSettings)
     ops_settings: OpsSettings = Field(default_factory=OpsSettings)
     fund_documents: list[FundDocument] = Field(
         default_factory=list,

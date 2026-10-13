@@ -92,6 +92,8 @@ BudgetJobType = Literal[
     "disclosure_esef",
     "disclosure_estimates",
     "disclosure_alerts",
+    "thesis",
+    "portfolio_review",
 ]
 
 AtCap = Literal["alert_only", "pause_noncritical", "downgrade_noncritical"]

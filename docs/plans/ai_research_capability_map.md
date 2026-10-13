@@ -32,7 +32,7 @@ and `retrieved_at`. Tools added in phase 1 also report each figure in the shared
 | Macro and commodity series; country context | `macro_observation`, `macro_series` | `macro_series`, `country_context` | per series release | none |
 | Sector, country and industry context for a company | `issuer`, `security`, `listing` | `company_context`, `country_context`, `corporate_actions`, `peers` | on change | none |
 | The owner's strategy: goals, targets, hard limits, rules, risk limits | `config_version` | `strategy_rules`, `portfolio_overview` | owner edits | none |
-| Per-holding theses, KPIs, verdicts and the reports written about them | `config_version`, `verdict`, `report` | `thesis_and_reports`, `holding`, `search_reports` | owner edits; verdicts on each earnings check | none |
+| Per-holding theses, KPIs, verdicts and the reports written about them | `config_version`, `verdict`, `report`, `thesis_memo`, `portfolio_review` | `thesis_and_reports`, `holding`, `search_reports`, `thesis_memos`, `portfolio_review` | owner edits; verdicts on each earnings check | none |
 | Ex-ante risk, factor tilts, stress tests, past episodes and their history | `risk_report_snapshot`, `factor_return`, `risk_scenario` | `risk_forecast`, `stress_test`, `past_episodes`, `factor_tilts`, `model_check`, `position_risk`, `risk_whatif`, `risk_history`, `idea_factor_fit` | daily | none |
 | Sizing, deposits, rotation and switch effects | `switch_log` | `start_size`, `deposit_allocation`, `rotation_candidates`, `switch_effect` | computed on request | none |
 | Fund holdings, look-through and overlap | `etf_holding`, `etf_snapshot`, `nport_holding` | `fund_overlap`, `etf_breakdown`, `fund_nav` | per fund filing | none |
@@ -67,6 +67,8 @@ and `retrieved_at`. Tools added in phase 1 also report each figure in the shared
 | `event_paths` | filed_evidence | `analytics_tools.event_reach` | bounded graph walk | owner | edge ids |
 | `search_documents` | documents | `retrieval.search.search (full text + embeddings, RRF)` | 20 passages, 2 per document | owner | passage text with source URL or app page and date |
 | `agent_notes` | agent_notes | `SQL on agent_note` | 20 active notes | owner | note id and edit date |
+| `thesis_memos` | theses | `SQL on thesis_memo` | 8 memos, or 3 in full for one ticker | owner | memo id and date |
+| `portfolio_review` | theses | `SQL on portfolio_review` | the latest review | owner | review id and date |
 | `event_feed` | filed_evidence, news | `events.feed.build` | 25 items, 90 days | owner | story URL and outlet tier per item |
 | `fund_overlap` | funds | `analytics_tools.fund_overlap` | one ticker | owner | fund snapshot |
 | `performance_explain` | transactions | `analytics_tools.performance_explain` | up to a year | owner | snapshot dates |

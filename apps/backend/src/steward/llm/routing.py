@@ -62,26 +62,41 @@ def _search_blocks(urls: list[Any]) -> list[Any]:
     """The search-result block call sites read, rebuilt from cached (url, title) pairs."""
     if not urls:
         return []
-    return [
-        SimpleNamespace(
-            type="web_search_tool_result",
-            content=[SimpleNamespace(url=u[0], title=u[1]) for u in urls],
+    cited = [u for u in urls if len(u) < 3]
+    returned = [u for u in urls if len(u) >= 3]
+    blocks: list[Any] = []
+    if cited:
+        blocks.append(
+            SimpleNamespace(
+                type="web_search_tool_result",
+                content=[SimpleNamespace(url=u[0], title=u[1]) for u in cited],
+            )
         )
-    ]
+    if returned:
+        blocks.append(
+            SimpleNamespace(
+                type="web_search_sources", content=[SimpleNamespace(url=u[0]) for u in returned]
+            )
+        )
+    return blocks
 
 
 def _result_urls(content: Any) -> list[list[str]]:
-    """(url, title) of every page in the response's search-result blocks."""
+    """(url, title) of every page in the response's search-result blocks; pages the search
+    returned without being cited carry a third marker element."""
     out: list[list[str]] = []
     for block in content or []:
-        if getattr(block, "type", "") != "web_search_tool_result":
+        kind = getattr(block, "type", "")
+        if kind not in ("web_search_tool_result", "web_search_sources"):
             continue
         results = getattr(block, "content", None)
         if not isinstance(results, list):
             continue
         for r in results:
             url = getattr(r, "url", None)
-            if url:
+            if url and kind == "web_search_sources":
+                out.append([str(url), "", "returned"])
+            elif url:
                 out.append([str(url), str(getattr(r, "title", "") or "")])
     return out
 
@@ -184,6 +199,15 @@ class _Messages:
                 SimpleNamespace(
                     type="web_search_tool_result",
                     content=[SimpleNamespace(url=c.url, title=c.title) for c in done.citations],
+                )
+            )
+        if done.sources:
+            # Every page the search returned, cited or not, for a caller that must check a URL
+            # the model wrote in a structured answer against what the search really found.
+            content.append(
+                SimpleNamespace(
+                    type="web_search_sources",
+                    content=[SimpleNamespace(url=c.url) for c in done.sources],
                 )
             )
         return SimpleNamespace(

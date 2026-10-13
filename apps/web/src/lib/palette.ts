@@ -63,6 +63,7 @@ const PRIMARY_PAGES = [
   { href: "/funds/research", label: "Fund research", keywords: "etf fund compare saved comparison holdings style performance bond checklist nav premium benchmark" },
   { href: "/macro", label: "Macro series", keywords: "inflation gdp rates indicators revisions vintage country small multiples" },
   { href: "/research", label: "Research", keywords: "reports research this ticker" },
+  { href: "/thesis", label: "Thesis workup", keywords: "thesis memo executive summary buy sell trim exit portfolio review candidates gaps" },
   { href: "/reports", label: "Reports", keywords: "digest archive monthly reviews impact notes full text" },
   { href: "/activity", label: "Activity", keywords: "job log coverage gaps cost budget" },
   { href: "/data-sources", label: "Data sources", keywords: "providers coverage quota access free api keys paid denied" },

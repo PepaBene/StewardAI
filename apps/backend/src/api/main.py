@@ -60,6 +60,7 @@ from api.research_routes import router as research_router
 from api.routes import router
 from api.screen_routes import router as screen_router
 from api.source_routes import router as source_router
+from api.thesis_routes import router as thesis_router
 from api.valuation_routes import router as valuation_router
 from api.verify_routes import router as verify_router
 from api.watchlist_routes import router as watchlist_router
@@ -261,6 +262,7 @@ def create_app() -> FastAPI:
     app.include_router(prompts_router)
     app.include_router(budget_router)
     app.include_router(research_router)  # before news: /reports/search vs /reports/{id}
+    app.include_router(thesis_router)
     app.include_router(escalation_router)  # before news: /escalations/stats vs /{id}
     app.include_router(news_router)
     app.include_router(reference_router)

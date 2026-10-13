@@ -120,6 +120,18 @@ class LLMScout:
         outcome = normalise_results(response.content)
         titles = {h.url: h.title for h in outcome.hits}
         draft = response.parsed_output
+        if draft is not None:
+            # A JSON answer has no cited prose, so the pages the search returned are the check:
+            # an extract's URL must be one of them (its title is the extract's own label).
+            returned = {
+                str(getattr(r, "url", ""))
+                for block in response.content
+                if getattr(block, "type", "") == "web_search_sources"
+                for r in getattr(block, "content", None) or []
+            }
+            for e in draft.extracts:
+                if e.url in returned and e.url not in titles and e.title.strip():
+                    titles[e.url] = e.title.strip()[:300]
         if response.stop_reason == "refusal" or draft is None:
             return ScoutResult(
                 [],
