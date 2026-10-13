@@ -42,6 +42,7 @@ OPENAI_FILES = "https://api.openai.com/v1/files"
 OPENAI_BATCHES = "https://api.openai.com/v1/batches"
 RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504}
 DEADLINE_MARGIN = 30.0
+FLEX_TIMEOUT = 600.0  # seconds per attempt: flex answers queue behind standard traffic
 # Search calls a batch request makes directly (Gemini batch mode does not ground) at once.
 DIRECT_SEARCH_CONCURRENCY = 4
 
@@ -82,6 +83,18 @@ class LLM:
     # ------------------------------------------------------------------ OpenAI, Google
 
     async def _openai(self, req: Request) -> Completion:
+        if req.priority == "flex":
+            # Flex is slower and can be refused when capacity is short: wait longer for it, and
+            # on a refusal or timeout ask again at the standard tier instead of failing the step.
+            try:
+                return await self._openai_once(dataclasses.replace(req, timeout=FLEX_TIMEOUT))
+            except LLMError:
+                # Any refusal (busy, or a model without the tier) is answered at standard.
+                pass
+            req = dataclasses.replace(req, priority="standard")
+        return await self._openai_once(req)
+
+    async def _openai_once(self, req: Request) -> Completion:
         data = await self._post(
             "openai",
             OPENAI_URL,

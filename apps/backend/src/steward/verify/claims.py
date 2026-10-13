@@ -31,7 +31,7 @@ from steward.ai import Usage
 from steward.config.jobs import effort_kwargs
 from steward.config.verification import ClaimVerifierSettings
 from steward.llm.cache import ResultCache
-from steward.llm.routing import RoutingClient
+from steward.llm.routing import RoutingClient, parse_many
 from steward.llm.types import LLMError
 
 CheckStatus = Literal["supported", "unsupported", "unchecked"]
@@ -257,10 +257,14 @@ class LLMClaimVerifier:
         system: str = SYSTEM,
         effort: str | None = None,
         cache: ResultCache | None = None,
+        use_batch: bool = False,
+        wait_minutes: float = 60.0,
     ) -> None:
         self._client = client
         self._model = model
         self._effort = effort
+        self._use_batch = use_batch
+        self._wait_minutes = wait_minutes
         # Per-claim verdicts (cost lever C8): re-running a report whose sentence and snippets
         # are unchanged does not ask again. The key holds the model, the system prompt, the
         # effort, the sentence and its snippets, so any change of those asks again. The date
@@ -298,15 +302,28 @@ class LLMClaimVerifier:
                 except KeyError:
                     pass
                 pending.append(claim)
-        for start in range(0, len(pending), BATCH):
-            batch = pending[start : start + BATCH]
-            response = await self._client.messages.parse(
-                model=self._model,
-                system=self._system,
-                messages=[{"role": "user", "content": claims_prompt(batch, today)}],
-                output_format=ClaimVerdicts,
-                **effort_kwargs(self._model, self._effort, 4000),
-            )
+        chunks = [pending[start : start + BATCH] for start in range(0, len(pending), BATCH)]
+        # The chunks are independent, so with `use_batch` they go to the provider's batch API
+        # as one batch (half price, answered within minutes to hours; a chunk it does not
+        # answer is asked directly).
+        responses = await parse_many(
+            self._client,
+            [
+                {
+                    "model": self._model,
+                    "system": self._system,
+                    "messages": [{"role": "user", "content": claims_prompt(chunk, today)}],
+                    "output_format": ClaimVerdicts,
+                    **effort_kwargs(self._model, self._effort, 4000),
+                }
+                for chunk in chunks
+            ],
+            batch=self._use_batch,
+            wait_minutes=self._wait_minutes,
+        )
+        for batch, response in zip(chunks, responses, strict=True):
+            if isinstance(response, BaseException):
+                raise response
             usage.add(response.usage)
             parsed: Any = response.parsed_output
             if parsed is not None:

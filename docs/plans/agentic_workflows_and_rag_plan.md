@@ -219,6 +219,19 @@ So a run is up to about 15 sol calls at high effort with up to 60 searches. Thre
 
 Savings overlap (D2 and D3 act on the same tokens, D5 halves whatever remains), so they do not add: a combined **−50–70% of a deep run** is plausible if D2 and D3 pass their gates, **−30–45%** if only D1, D4, D5 and D7 do. Order: D1, D4, D5, D7 first (no quality question or an easily checked one), then D2, then D3 and D6.
 
+**D1–D8 status (13 October 2026).** All are in code behind research-profile settings whose defaults keep today's behaviour; none is switched on, because each needs the benchmark below first. No deep run has been made, so no saving is measured.
+
+| # | Setting (research profile) | State |
+| --- | --- | --- |
+| D1 | none (always on) | Done under C3: one `research:<job_id>` cache key on every writer call. Cache-read share still to be read from the trace. |
+| D2 | `search_mode: "scouts"`, `scout_model`, `scout_effort` | `research/scouts.py`. A scout runs the section's searches (same cap), its extracts join the registry as tier-checked `search` sources, the writer then has no search tool. A failed scout falls back to the writer searching itself. Scouts run one after another, not in parallel (latency, not cost). |
+| D3 | `cheap_sections`, `cheap_model`, `cheap_effort` | Listed sections are written cheap first; a draft with fewer cited sentences than `min_sentences`, or a failed call, is rewritten by the profile's model inside the step budget, with both attempts' cost and trace kept. The verifier-flag signal is not used (claims are checked after writing). |
+| D4 | `write_order: "summary_last"` | Executive summary, thesis KPIs and open questions are written last from the sentences already written and the sources they cite. Display order and checkpoint keys are unchanged. |
+| D5 | `priority: "flex" \| "batch"` | OpenAI `service_tier: "flex"` with a 600 s timeout and a fall back to standard on any refusal; `batch` adds the batch API for the claim checks. Not verified live: neither the flex tier on `gpt-6.1-sol` / `gpt-6-luna` nor Google has been called. The cost accounting prices flex calls at the standard rate, so the reported cost is an overestimate. Section writing itself is sequential and cannot be batched. |
+| D6 | `follow_up_cheap` | Follow-ups use `cheap_model`; one that adds no sentence is tried once by the profile's model. |
+| D7 | none | Whole-request cache (material, prompt, model, effort) for sections, 1 day; scout extracts 3 days (no date in the scout prompt). Resume after failure already reused checkpoints. |
+| D8 | `priority: "batch"` | Claim-check chunks go out as one batch; the per-claim cache already existed. The thesis draft stays on the profile's model. |
+
 **Quality gate for every deep-research change (define before building).** A fixed benchmark of 5 holdings the owner knows (a mix of US and non-US, one with thin coverage, one with a known controversy). For each change, run the current configuration and the candidate on the same stored inputs (same gathered material, same snapshot via `research/snapshot.py`) and compare: claim-verifier unsupported-sentence rate (must not rise); sentences kept per section (must not fall); distinct cited sources and share from tiers 1–2 (must not fall); evidence recall against the baseline's cited URLs; counter-case coverage (does it still surface the known controversy); and a pairwise judgement per section by a strong model with a fixed rubric, run in both orders to cancel position bias, plus the owner's blind read of at least 3 reports. Accept only if every metric is within an agreed noise margin or better. Reuse the existing research regression gate (`research/gate.py`, verify what it covers) rather than a new harness. The benchmark runs cost real money (about 10 runs per comparison): budget it.
 
 **Phases**

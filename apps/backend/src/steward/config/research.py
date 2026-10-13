@@ -203,8 +203,50 @@ class ResearchProfile(ConfigModel):
         default=2, ge=1, le=2, description="Workers running at the same time (cost control)."
     )
 
+    # Cost levers D2 to D6 (docs/plans/agentic_workflows_and_rag_plan.md). Every default keeps
+    # today's behaviour; none of them lowers a search, step, section or sentence cap. Switch one
+    # on only after the benchmark comparison passes.
+    write_order: Literal["template", "summary_last"] = Field(
+        default="template",
+        description="template: sections are written in template order. summary_last: the "
+        "executive summary, thesis KPIs and open questions are written after the evidence "
+        "sections, from the sentences already written and the sources they cite instead of the "
+        "whole material (far fewer input tokens). Display order is unchanged.",
+    )
+    cheap_sections: list[Section] = Field(
+        default_factory=list,
+        description="Sections written by `cheap_model` first. A cheap draft with fewer cited "
+        "sentences than `min_sentences` (or a failed call) is written again by the profile's "
+        "model, so a weak draft never reaches the report.",
+    )
+    cheap_model: ModelId = "gpt-6-luna"
+    cheap_effort: Literal["low", "medium", "high"] = "medium"
+    follow_up_cheap: bool = Field(
+        default=False,
+        description="Follow-up rounds (a second source, a contradiction) are written by "
+        "`cheap_model`; a follow-up that adds nothing is tried once by the profile's model.",
+    )
+    search_mode: Literal["model", "scouts"] = Field(
+        default="model",
+        description="model: the writing model runs the web searches inside each section. "
+        "scouts: `scout_model` runs the same searches and returns compact extracts, which join "
+        "the source registry as ordinary search sources; the writing model then writes without "
+        "a search tool. Search caps and tier rules are unchanged.",
+    )
+    scout_model: ModelId = "gpt-6-luna"
+    scout_effort: Literal["low", "medium", "high"] = "low"
+    priority: Literal["standard", "flex", "batch"] = Field(
+        default="standard",
+        description="flex: the writing, scouting and planning calls ask for the provider's "
+        "discounted, slower tier and fall back to standard when it is busy. batch: flex, and "
+        "the claim checks (independent of each other) go to the provider's batch API, which "
+        "answers within minutes to hours. For runs nobody is waiting on.",
+    )
+
     @model_validator(mode="after")
     def _unique_sections(self) -> Self:
+        if len(set(self.cheap_sections)) != len(self.cheap_sections):
+            raise ValueError("a cheap section is listed twice")
         if len(set(self.lenses)) != len(self.lenses):
             raise ValueError("a lens is listed twice")
         if len(set(self.sections)) != len(self.sections):

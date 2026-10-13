@@ -94,6 +94,10 @@ class Request:
     # Static first, varying last; a stable key per job type lets OpenAI land related requests
     # on the same prefix cache. Ignored by the other providers.
     cache_key: str | None = None
+    # "flex" asks OpenAI for its discounted, slower tier (answers may take minutes and are
+    # refused when capacity is short; the client then repeats the call at standard). Ignored
+    # by Google, which has no tier this app uses.
+    priority: Literal["standard", "flex"] = "standard"
 
 
 @dataclass(frozen=True)

@@ -50,6 +50,50 @@ export const WORKER_EFFORTS: readonly { value: WorkerEffort; label: string }[] =
     { value: "medium", label: "medium" },
     { value: "high", label: "high" },
   ];
+export type WriteOrder = NonNullable<ResearchProfile["write_order"]>;
+export type SearchMode = NonNullable<ResearchProfile["search_mode"]>;
+export type Priority = NonNullable<ResearchProfile["priority"]>;
+export type CheapSection = NonNullable<
+  ResearchProfile["cheap_sections"]
+>[number];
+
+export const WRITE_ORDERS: readonly { value: WriteOrder; label: string }[] = [
+  { value: "template", label: "Template order" },
+  {
+    value: "summary_last",
+    label: "Summary, KPIs and open questions last, from what was written",
+  },
+];
+
+export const SEARCH_MODES: readonly { value: SearchMode; label: string }[] = [
+  { value: "model", label: "The writing model searches inside each section" },
+  {
+    value: "scouts",
+    label: "A cheaper model searches; the writing model reads its extracts",
+  },
+];
+
+export const PRIORITIES: readonly { value: Priority; label: string }[] = [
+  { value: "standard", label: "Standard: answers as fast as possible" },
+  { value: "flex", label: "Flex: cheaper, slower model calls" },
+  { value: "batch", label: "Batch: flex, and claim checks as one batch" },
+];
+
+/** Sections a model writes, the ones a cheaper model can write first. */
+export const MODEL_SECTION_OPTIONS: readonly {
+  value: CheapSection;
+  label: string;
+}[] = [
+  { value: "executive_summary", label: "Executive summary" },
+  { value: "business", label: "Business" },
+  { value: "moat_risks", label: "Moat and risks" },
+  { value: "scenarios", label: "Bull, base and bear cases" },
+  { value: "catalysts", label: "Catalysts" },
+  { value: "counter_case", label: "The case against" },
+  { value: "strategy_fit", label: "Fit with the strategy" },
+  { value: "thesis_kpis", label: "Thesis KPIs and exit conditions" },
+  { value: "open_questions", label: "Open questions" },
+];
 export type DefaultView =
   components["schemas"]["ReportTemplate"]["default_view"];
 export type Tier = 1 | 2 | 3;
@@ -173,6 +217,15 @@ export const PROFILE_DEFAULTS = {
   worker_max_steps: 12,
   worker_max_searches: 8,
   parallel_workers: 2,
+  write_order: "template",
+  cheap_sections: [] as CheapSection[],
+  cheap_model: "gpt-6-luna",
+  cheap_effort: "medium",
+  follow_up_cheap: false,
+  search_mode: "model",
+  scout_model: "gpt-6-luna",
+  scout_effort: "low",
+  priority: "standard",
 } as const;
 
 /** The backend's defaults, for when nothing is saved yet (a 404). */
@@ -403,6 +456,16 @@ export type ProfileForm = {
   worker_max_steps: string;
   worker_max_searches: string;
   parallel_workers: string;
+  /** Cost levers: how the sections are written (see the research cost plan). */
+  write_order: WriteOrder;
+  cheap_sections: CheapSection[];
+  cheap_model: string;
+  cheap_effort: WorkerEffort;
+  follow_up_cheap: boolean;
+  search_mode: SearchMode;
+  scout_model: string;
+  scout_effort: WorkerEffort;
+  priority: Priority;
   rest: Record<string, unknown>;
 };
 
@@ -487,6 +550,15 @@ export function newProfile(existingIds: readonly string[] = []): ProfileForm {
     worker_max_steps: String(PROFILE_DEFAULTS.worker_max_steps),
     worker_max_searches: String(PROFILE_DEFAULTS.worker_max_searches),
     parallel_workers: String(PROFILE_DEFAULTS.parallel_workers),
+    write_order: PROFILE_DEFAULTS.write_order,
+    cheap_sections: [...PROFILE_DEFAULTS.cheap_sections],
+    cheap_model: PROFILE_DEFAULTS.cheap_model,
+    cheap_effort: PROFILE_DEFAULTS.cheap_effort,
+    follow_up_cheap: PROFILE_DEFAULTS.follow_up_cheap,
+    search_mode: PROFILE_DEFAULTS.search_mode,
+    scout_model: PROFILE_DEFAULTS.scout_model,
+    scout_effort: PROFILE_DEFAULTS.scout_effort,
+    priority: PROFILE_DEFAULTS.priority,
     rest: {},
   };
 }
@@ -532,6 +604,7 @@ export function duplicateProfile(
     name: `${profile.name} (copy)`.slice(0, BOUNDS.name.max),
     sections: [...profile.sections],
     lenses: [...profile.lenses],
+    cheap_sections: [...profile.cheap_sections],
     source_tiers: [...profile.source_tiers],
     valuation_methods: [...profile.valuation_methods],
     stale_days: { ...profile.stale_days },
@@ -574,6 +647,15 @@ function profileFromBody(p: ResearchProfile): ProfileForm {
     worker_max_steps,
     worker_max_searches,
     parallel_workers,
+    write_order,
+    cheap_sections,
+    cheap_model,
+    cheap_effort,
+    follow_up_cheap,
+    search_mode,
+    scout_model,
+    scout_effort,
+    priority,
     ...rest
   } = p;
   return {
@@ -626,6 +708,15 @@ function profileFromBody(p: ResearchProfile): ProfileForm {
     parallel_workers: String(
       parallel_workers ?? PROFILE_DEFAULTS.parallel_workers,
     ),
+    write_order: write_order ?? PROFILE_DEFAULTS.write_order,
+    cheap_sections: [...(cheap_sections ?? PROFILE_DEFAULTS.cheap_sections)],
+    cheap_model: cheap_model ?? PROFILE_DEFAULTS.cheap_model,
+    cheap_effort: cheap_effort ?? PROFILE_DEFAULTS.cheap_effort,
+    follow_up_cheap: follow_up_cheap ?? PROFILE_DEFAULTS.follow_up_cheap,
+    search_mode: search_mode ?? PROFILE_DEFAULTS.search_mode,
+    scout_model: scout_model ?? PROFILE_DEFAULTS.scout_model,
+    scout_effort: scout_effort ?? PROFILE_DEFAULTS.scout_effort,
+    priority: priority ?? PROFILE_DEFAULTS.priority,
     rest,
   };
 }
@@ -701,6 +792,15 @@ function profileToBody(p: ProfileForm): ResearchProfile {
     worker_max_steps: intOrText(p.worker_max_steps) as number,
     worker_max_searches: intOrText(p.worker_max_searches) as number,
     parallel_workers: intOrText(p.parallel_workers) as number,
+    write_order: p.write_order,
+    cheap_sections: [...p.cheap_sections],
+    cheap_model: p.cheap_model.trim(),
+    cheap_effort: p.cheap_effort,
+    follow_up_cheap: p.follow_up_cheap,
+    search_mode: p.search_mode,
+    scout_model: p.scout_model.trim(),
+    scout_effort: p.scout_effort,
+    priority: p.priority,
     ...(p.date_horizon_days.trim()
       ? { date_horizon_days: intOrText(p.date_horizon_days) as number }
       : {}),
@@ -1024,6 +1124,19 @@ export function validateResearchProfiles(
         if (e) add(`profiles.${i}.${key}`, e);
       }
     }
+    const modelId = /^(gpt|gemini)-[a-z0-9.-]{1,64}$/;
+    if (p.cheap_sections.length > 0 || p.follow_up_cheap) {
+      if (!modelId.test(p.cheap_model.trim()))
+        add(
+          `profiles.${i}.cheap_model`,
+          "A gpt- or gemini- model id, e.g. gpt-6-luna.",
+        );
+    }
+    if (p.search_mode === "scouts" && !modelId.test(p.scout_model.trim()))
+      add(
+        `profiles.${i}.scout_model`,
+        "A gpt- or gemini- model id, e.g. gpt-6-luna.",
+      );
     validateProfilePolicy(p, i, form.templates, add);
   });
   if (!form.profiles.some((p) => p.id.trim() === form.default_profile.trim())) {

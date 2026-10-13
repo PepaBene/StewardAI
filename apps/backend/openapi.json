@@ -90216,6 +90216,110 @@
             "title": "Parallel Workers",
             "description": "Workers running at the same time (cost control).",
             "default": 2
+          },
+          "write_order": {
+            "type": "string",
+            "enum": [
+              "template",
+              "summary_last"
+            ],
+            "title": "Write Order",
+            "description": "template: sections are written in template order. summary_last: the executive summary, thesis KPIs and open questions are written after the evidence sections, from the sentences already written and the sources they cite instead of the whole material (far fewer input tokens). Display order is unchanged.",
+            "default": "template"
+          },
+          "cheap_sections": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "executive_summary",
+                "business",
+                "financial_trend",
+                "moat_risks",
+                "valuation",
+                "scenarios",
+                "catalysts",
+                "counter_case",
+                "strategy_fit",
+                "thesis_kpis",
+                "ownership",
+                "relationships",
+                "risk",
+                "liquidity",
+                "open_questions"
+              ]
+            },
+            "type": "array",
+            "title": "Cheap Sections",
+            "description": "Sections written by `cheap_model` first. A cheap draft with fewer cited sentences than `min_sentences` (or a failed call) is written again by the profile's model, so a weak draft never reaches the report."
+          },
+          "cheap_model": {
+            "type": "string",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Cheap Model",
+            "default": "gpt-6-luna",
+            "examples": [
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
+            ]
+          },
+          "cheap_effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Cheap Effort",
+            "default": "medium"
+          },
+          "follow_up_cheap": {
+            "type": "boolean",
+            "title": "Follow Up Cheap",
+            "description": "Follow-up rounds (a second source, a contradiction) are written by `cheap_model`; a follow-up that adds nothing is tried once by the profile's model.",
+            "default": false
+          },
+          "search_mode": {
+            "type": "string",
+            "enum": [
+              "model",
+              "scouts"
+            ],
+            "title": "Search Mode",
+            "description": "model: the writing model runs the web searches inside each section. scouts: `scout_model` runs the same searches and returns compact extracts, which join the source registry as ordinary search sources; the writing model then writes without a search tool. Search caps and tier rules are unchanged.",
+            "default": "model"
+          },
+          "scout_model": {
+            "type": "string",
+            "pattern": "^(gpt|gemini)-[a-z0-9.-]{1,64}$",
+            "title": "Scout Model",
+            "default": "gpt-6-luna",
+            "examples": [
+              "gpt-6.1-sol",
+              "gpt-6-luna",
+              "gemini-3.8-flash"
+            ]
+          },
+          "scout_effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Scout Effort",
+            "default": "low"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "flex",
+              "batch"
+            ],
+            "title": "Priority",
+            "description": "flex: the writing, scouting and planning calls ask for the provider's discounted, slower tier and fall back to standard when it is busy. batch: flex, and the claim checks (independent of each other) go to the provider's batch API, which answers within minutes to hours. For runs nobody is waiting on.",
+            "default": "standard"
           }
         },
         "additionalProperties": false,

@@ -39,18 +39,22 @@ import {
   ENGINES,
   LANGUAGES,
   LENSES,
+  MODEL_SECTION_OPTIONS,
   MODES,
   moveInList,
   newProfile,
   newTemplate,
+  PRIORITIES,
   researchProfilesFromBody,
   researchProfilesToBody,
+  SEARCH_MODES,
   STALE_KINDS,
   TIER_OPTIONS,
   toggleInList,
   validateResearchProfiles,
   WEB_EMPHASES,
   WORKER_EFFORTS,
+  WRITE_ORDERS,
   type ProfileForm,
   type ResearchProfilesForm,
   type TemplateForm,
@@ -812,6 +816,97 @@ function ProfileCard({
             hint="Findings without a checkable source are dropped before the writer sees them."
           />
         ) : null}
+      </fieldset>
+
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-medium">Cost of a run</legend>
+        <p className="text-xs text-text-muted">
+          None of these lowers a search, step, section or sentence limit. Turn
+          one on only after comparing a report written with and without it.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <SelectField
+            label="Order sections are written in"
+            path={`${path}.write_order`}
+            errors={errors}
+            value={p.write_order}
+            options={WRITE_ORDERS}
+            onChange={(v) => onChange({ write_order: v })}
+            hint="The report reads the same either way. Writing the summary last lets it read the finished sections instead of every source."
+          />
+          <SelectField
+            label="Who runs the web searches"
+            path={`${path}.search_mode`}
+            errors={errors}
+            value={p.search_mode}
+            options={SEARCH_MODES}
+            onChange={(v) => onChange({ search_mode: v })}
+            hint="The number of searches and the allowed outlets stay as set above. A failed scout leaves the writing model to search itself."
+          />
+          <SelectField
+            label="Speed against price"
+            path={`${path}.priority`}
+            errors={errors}
+            value={p.priority}
+            options={PRIORITIES}
+            onChange={(v) => onChange({ priority: v })}
+            hint="For runs nobody is waiting on. A busy cheaper tier falls back to the standard one."
+          />
+          {p.search_mode === "scouts" ? (
+            <>
+              <TextField
+                label="Scout model"
+                path={`${path}.scout_model`}
+                errors={errors}
+                value={p.scout_model}
+                list={listId}
+                spellCheck={false}
+                onChange={(v) => onChange({ scout_model: v })}
+              />
+              <SelectField
+                label="Scout effort"
+                path={`${path}.scout_effort`}
+                errors={errors}
+                value={p.scout_effort}
+                options={WORKER_EFFORTS}
+                onChange={(v) => onChange({ scout_effort: v })}
+              />
+            </>
+          ) : null}
+          <TextField
+            label="Cheaper model"
+            path={`${path}.cheap_model`}
+            errors={errors}
+            value={p.cheap_model}
+            list={listId}
+            spellCheck={false}
+            onChange={(v) => onChange({ cheap_model: v })}
+            hint="Writes the sections ticked below and, if chosen, the follow-ups."
+          />
+          <SelectField
+            label="Cheaper model effort"
+            path={`${path}.cheap_effort`}
+            errors={errors}
+            value={p.cheap_effort}
+            options={WORKER_EFFORTS}
+            onChange={(v) => onChange({ cheap_effort: v })}
+          />
+          <CheckboxField
+            label="Follow-ups by the cheaper model"
+            checked={p.follow_up_cheap}
+            onChange={(v) => onChange({ follow_up_cheap: v })}
+            hint="A follow-up that adds nothing is tried once more by the main model."
+          />
+        </div>
+        <CheckboxGroup
+          label="Sections the cheaper model writes first"
+          path={`${path}.cheap_sections`}
+          errors={errors}
+          values={p.cheap_sections}
+          options={MODEL_SECTION_OPTIONS}
+          onChange={(v) => onChange({ cheap_sections: v })}
+          hint="A draft with fewer cited sentences than the minimum above is rewritten by the main model."
+        />
       </fieldset>
 
       <fieldset className="space-y-3">

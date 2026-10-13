@@ -44,7 +44,7 @@ from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import VerificationConfig
 from steward.jobs.runner import JobContext, JobFailed
-from steward.llm.cache import SEARCH_CACHE_DAYS_FRESH, ResultCache
+from steward.llm.cache import SEARCH_CACHE_DAYS, SEARCH_CACHE_DAYS_FRESH, ResultCache
 from steward.llm.client import create_llm
 from steward.llm.routing import routing_client
 from steward.news.normalize import host_of
@@ -77,6 +77,15 @@ from steward.research.read_tools import (
     run_read_tools,
 )
 from steward.research.rules import load_compliance
+from steward.research.scouts import SYSTEM as SCOUT_SYSTEM
+from steward.research.scouts import (
+    LLMScout,
+    Scout,
+    ScoutRequest,
+    ScoutResult,
+    question_for,
+    snippet_of,
+)
 from steward.research.snapshot import RunSnapshot, take_snapshot
 from steward.research.source_policy import (
     PRIORITY_TEXT,
@@ -237,6 +246,7 @@ class ResearchDeps:
     prompts: dict[str, str] = field(default_factory=dict)  # the system texts, for the snapshot
     planner: ResearchPlanner | None = None  # the model planning step; None = code plan
     worker: Worker | None = None  # the agentic engine's lens worker; None = fixed pipeline
+    scout: Scout | None = None  # search_mode "scouts": the cheap model that runs the searches
 
 
 def _source_line(s: Source) -> str:
@@ -282,6 +292,64 @@ def search_domains(
         return registry.domain_tier(host)
 
     return tuple(dict.fromkeys(domains)), tier_of
+
+
+# D4: written after the evidence sections when `write_order` is "summary_last".
+LATE_SECTIONS = ("executive_summary", "thesis_kpis", "open_questions")
+
+
+def write_order(specs: list[SectionSpec], order: str) -> list[SectionSpec]:
+    """The order model sections are written in. Display order is the layout's and never
+    changes; only the late sections move to the end, keeping their relative order."""
+    if order != "summary_last":
+        return list(specs)
+    return [s for s in specs if s.id not in LATE_SECTIONS] + [
+        s for s in specs if s.id in LATE_SECTIONS
+    ]
+
+
+def late_material(g: Gathered, reg: Registry, written: dict[str, dict[str, Any]]) -> str:
+    """The material for a late section: the company context, the sentences already written
+    (from stored records and by the evidence sections) and only the sources they cite. Empty
+    when no evidence section wrote anything, so the section falls back to the whole material."""
+    model_lines = [
+        (s["text"], list(s.get("source_ids", [])))
+        for out in written.values()
+        for s in out.get("sentences", [])
+    ]
+    if not model_lines:
+        return ""
+    code_lines = [
+        (sentence.text, list(sentence.source_ids))
+        for section in g.sections.values()
+        for sentence in section.sentences
+    ]
+    cited = {i for _, ids in (*code_lines, *model_lines) for i in ids}
+    lines = [f"Company context: {g.context}", "", "Sources cited by the sentences below:"]
+    lines += [_source_line(s) for s in reg.sources if s.id in cited]
+    lines += ["", "Already written from stored records (cite the same ids if you use them):"]
+    lines += [f"- {neutralise(t)} [{', '.join(ids)}]" for t, ids in code_lines]
+    lines += ["", "Already written by the other sections (cite the same ids if you use them):"]
+    lines += [f"- {neutralise(t)} [{', '.join(ids)}]" for t, ids in model_lines]
+    return "\n".join(lines)
+
+
+def merge_attempts(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
+    """Two writes of one section (cheap, then the profile's model): the second one's text,
+    with both attempts' cost, sources and trace kept."""
+    out = dict(second)
+    for key in ("steps", "searches", "dropped", "links_removed"):
+        out[key] = int(first.get(key, 0)) + int(second.get(key, 0))
+    out["new_sources"] = [*first.get("new_sources", []), *second.get("new_sources", [])]
+    out["discovered"] = [*first.get("discovered", []), *second.get("discovered", [])]
+    out["search_errors"] = [*first.get("search_errors", []), *second.get("search_errors", [])]
+    out["scout_urls"] = [*first.get("scout_urls", []), *second.get("scout_urls", [])]
+    out["extra_traces"] = [
+        *first.get("extra_traces", []),
+        *([first["trace"]] if first.get("trace") else []),
+        *second.get("extra_traces", []),
+    ]
+    return out
 
 
 class _FailedCall(Exception):
@@ -528,6 +596,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             "research_planner": PLANNER_SYSTEM,
             "section_tasks": json.dumps(SECTION_TASKS, sort_keys=True, ensure_ascii=False),
             "source_priority": PRIORITY_TEXT,
+            **({"research_scout": SCOUT_SYSTEM} if profile.search_mode == "scouts" else {}),
         },
         versions={
             "strategy": strategy_v.id if strategy_v else None,
@@ -642,6 +711,89 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         material += f"\n\n{block}"
     gathered_count = len(reg.sources)
 
+    async def run_scout(
+        spec: SectionSpec,
+        *,
+        round_no: int,
+        searches: int,
+        focus: str,
+        step_name: str,
+        out: dict[str, Any],
+    ) -> ScoutResult | None:
+        """D2: a scout runs the section's searches; its extracts join the registry as ordinary
+        search sources, tier-checked like any result. None when the scout failed, so the
+        writer searches itself (a failed scout never costs the section its web evidence)."""
+        assert deps.scout is not None
+        async with ctx.step(f"scout:{step_name}") as step:
+            started = time.monotonic()
+            result = await deps.scout.scout(
+                ScoutRequest(
+                    name=gathered.name,
+                    ticker=ticker,
+                    question=question_for(
+                        spec.title,
+                        spec.task or SECTION_TASKS.get(spec.id, ""),
+                        focus,
+                        counter=spec.id == "counter_case",
+                    ),
+                    domains=domains,
+                    max_searches=searches,
+                )
+            )
+            step.usage = result.usage.step_usage()
+            out["steps"] += 1 + result.usage.searches
+            out["searches"] += result.usage.searches
+            failed = result.note is not None and not result.extracts
+            out.setdefault("extra_traces", []).append(
+                {
+                    "model": ModelCallTrace(
+                        step=f"scout:{step_name}",
+                        section=spec.id,
+                        round=round_no,
+                        model=result.usage.model,
+                        input_tokens=result.usage.input_tokens,
+                        output_tokens=result.usage.output_tokens,
+                        cache_read_tokens=result.usage.cache_read_tokens,
+                        searches=result.usage.searches,
+                        cost_usd=cost_of(result.usage),
+                        ms=round((time.monotonic() - started) * 1000),
+                        outcome="ok" if not failed else "failed",
+                        note=clip(result.note or "", 160) or None,
+                    ).model_dump()
+                }
+            )
+            if failed:
+                step.detail.update(extracts=0, note=result.note)
+                return None
+            kept = 0
+            for extract in result.extracts:
+                title = result.titles.get(extract.url)
+                snippet = snippet_of(extract)
+                if title is None or not snippet:
+                    continue  # not a page the search returned, or nothing to read
+                decision = policy.decide(host_of(extract.url))
+                if not decision.allowed:
+                    continue
+                before = len(reg.sources)
+                reg.add(
+                    "search",
+                    extract.url,
+                    title,
+                    url=extract.url,
+                    tier=decision.tier,
+                    snippet=snippet,
+                    role=decision.role,
+                    caveat=decision.reason,
+                    retrieved_at=deps.now.isoformat(timespec="seconds"),
+                )
+                kept += 1
+                out.setdefault("scout_urls", []).append(extract.url)
+                if len(reg.sources) > before:
+                    flag_sources(reg.sources[before:])
+                    out["new_sources"].append(reg.sources[-1].model_dump())
+            step.detail.update(extracts=kept, returned=len(result.extracts), round=round_no)
+        return result
+
     async def write_section(
         spec: SectionSpec,
         *,
@@ -651,11 +803,28 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         focus: str,
         existing: str,
         step_name: str,
+        model: str | None = None,
+        effort: str | None = None,
+        material_override: str | None = None,
     ) -> dict[str, Any]:
         out: dict[str, Any] = {"sentences": [], "new_sources": [], "steps": 0, "searches": 0}
         if deps.writer is None:
             out["note"] = NO_KEY_NOTE
             return out
+        scouted: ScoutResult | None = None
+        writer_searches = searches
+        if profile.search_mode == "scouts" and searches > 0 and deps.scout is not None:
+            scouted = await run_scout(
+                spec,
+                round_no=round_no,
+                searches=searches,
+                focus=focus,
+                step_name=step_name,
+                out=out,
+            )
+            if scouted is not None:
+                writer_searches = 0
+        scout_urls = set(out.get("scout_urls", []))
         async with ctx.step(step_name) as step:
             offered = len(reg.sources)
             started = time.monotonic()
@@ -664,30 +833,36 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                     section=spec.id,
                     name=gathered.name,
                     ticker=ticker,
-                    material=material,
+                    material=material_override or material,
                     added_material=added_material_text(reg, gathered_count),
                     language=profile.language,
                     max_sentences=max_sentences,
                     domains=domains,
-                    max_searches=searches,
+                    max_searches=writer_searches,
                     peers=gathered.peers,
                     today=deps.now.date(),
                     title=spec.title,
                     task=spec.task,
                     focus=focus,
-                    policy=PRIORITY_TEXT if searches else "",
+                    policy=PRIORITY_TEXT if writer_searches else "",
                     existing=existing,
                     horizon_days=profile.date_horizon_days,
                     tool_evidence=evidence_for(
                         tool_run, spec.id, first=spec.id == model_specs[0].id
                     ),
+                    model=model,
+                    effort=effort,
                 )
             )
             ms = round((time.monotonic() - started) * 1000)
             step.usage = result.usage.step_usage()
-            out["steps"] = 1 + result.usage.searches
-            out["searches"] = result.usage.searches
+            out["steps"] += 1 + result.usage.searches
+            out["searches"] += result.usage.searches
             hits = result.hits or [SearchHit(u, t) for u, t in result.titles.items()]
+            if scouted is not None:
+                hits = [*scouted.hits, *hits]
+                result.queries = [*scouted.queries, *result.queries]
+                result.search_errors = [*scouted.search_errors, *result.search_errors]
             if result.search_errors:
                 out["search_errors"] = result.search_errors
             call_outcome = (
@@ -756,6 +931,13 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                         out["new_sources"].append(reg.sources[-1].model_dump())
                     cited_urls.add(url)
                     ids.append(sid)
+                if scout_urls:
+                    # Cited by registry id: the page a scout found and the section used.
+                    cited_urls |= {
+                        r.url
+                        for i in ids
+                        if (r := reg.get(i)) is not None and r.url and r.url in scout_urls
+                    }
                 text, removed = strip_outbound(d.text, {s.url for s in reg.sources if s.url})
                 out["links_removed"] = int(out.get("links_removed", 0)) + removed
                 if not text or not ids:
@@ -791,6 +973,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         return out
 
     def absorb(output: dict[str, Any]) -> None:
+        trace_parts.extend(output.get("extra_traces", []))
         if output.get("trace"):
             trace_parts.append(output["trace"])
         for src in output.get("new_sources", []):
@@ -824,7 +1007,38 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         except _FailedCall:
             return dict(failed["out"])
 
-    for index, spec in enumerate(model_specs):
+    ordered_specs = write_order(model_specs, profile.write_order)
+
+    async def write_with_fallback(
+        spec: SectionSpec,
+        *,
+        cheap: bool,
+        enough: Callable[[dict[str, Any]], bool],
+        steps_room: int,
+        **kw: Any,
+    ) -> dict[str, Any]:
+        """D3/D6: the cheap model writes first; a draft that is not `enough` (too few cited
+        sentences, or a failed call) is written again by the profile's model, inside the same
+        step budget. The final answer is always the stronger model's when the cheap one fell
+        short, so a weak draft never reaches the report."""
+        if not cheap:
+            return await write_section(spec, **kw)
+        first = await write_section(
+            spec, model=profile.cheap_model, effort=profile.cheap_effort, **kw
+        )
+        if enough(first) or str(first.get("note", "")).startswith(PERMANENT_NOTES):
+            return first
+        room = steps_room - int(first.get("steps", 0))
+        if room < 1:
+            return first
+        again = {
+            **kw,
+            "step_name": f"{kw['step_name']}:escalated",
+            "searches": max(0, min(kw["searches"] - int(first.get("searches", 0)), room - 1)),
+        }
+        return merge_attempts(first, await write_section(spec, **again))
+
+    for index, spec in enumerate(ordered_specs):
 
         async def do_section(spec: SectionSpec = spec, index: int = index) -> dict[str, Any]:
             left = first_steps - budget["steps"]
@@ -845,16 +1059,32 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                 ),
             )
             focus = focus_for(plan, spec.id)
-            if index == 0 and plan.questions and plan.questions[0].id == "mode":
+            if spec.id == model_specs[0].id and plan.questions and plan.questions[0].id == "mode":
                 focus = f"- {plan.questions[0].question}\n{focus}".strip()
-            return await write_section(
+            cap = spec.max_sentences or SENTENCES_BY_DEPTH[profile.depth]
+            need = min(profile.min_sentences, cap)
+            # D4: a late section reads what the evidence sections wrote, not the whole pile.
+            compact = (
+                late_material(gathered, reg, written)
+                if profile.write_order == "summary_last" and spec.id in LATE_SECTIONS
+                else ""
+            )
+
+            def enough(o: dict[str, Any], need: int = need) -> bool:
+                return len(o["sentences"]) >= need
+
+            return await write_with_fallback(
                 spec,
+                cheap=spec.id in profile.cheap_sections,
+                enough=enough,
+                steps_room=left,
                 round_no=0,
                 searches=searches,
-                max_sentences=spec.max_sentences or SENTENCES_BY_DEPTH[profile.depth],
+                max_sentences=cap,
                 focus=focus,
                 existing="",
                 step_name=f"section:{spec.id}",
+                material_override=compact or None,
             )
 
         output = await checkpoint_written(f"section:{spec.id}", do_section)
@@ -922,9 +1152,13 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                     lines: list[str] = lines,
                     existing: str = existing,
                     room: int = room,
+                    steps_left: int = steps_left,
                 ) -> dict[str, Any]:
-                    return await write_section(
+                    return await write_with_fallback(
                         spec,
+                        cheap=profile.follow_up_cheap,
+                        enough=lambda o: bool(o["sentences"]),
+                        steps_room=steps_left,
                         round_no=round_no,
                         searches=searches,
                         max_sentences=min(FOLLOW_UP_SENTENCES, room),
@@ -1302,6 +1536,7 @@ async def research_handler(ctx: JobContext) -> None:
     writer_system = prompts.text("research_writer", WRITER_SYSTEM)
     verifier_system = prompts.text("claim_verifier", VERIFIER_SYSTEM)
     worker: Worker | None = None
+    scout: Scout | None = None
     try:
         llm = create_llm(settings)
         # Cost lever C8: a section whose material, prompt, model and effort are unchanged is
@@ -1318,6 +1553,9 @@ async def research_handler(ctx: JobContext) -> None:
         cheap = (verification.body if verification else VerificationConfig()).claim_verifier.model
         if profile and profile.planning == "model":
             planner = LLMResearchPlanner(client, profile.planner_model or cheap)
+        # D5: a run nobody waits on may take the discounted tier (flex), and its independent
+        # claim checks the batch API.
+        tier = "flex" if profile and profile.priority in ("flex", "batch") else "standard"
         writer = (
             LLMResearchWriter(
                 client,
@@ -1325,10 +1563,27 @@ async def research_handler(ctx: JobContext) -> None:
                 profile.effort,
                 writer_system,
                 cache_key=f"research:{ctx.job_id}",
+                priority=tier,
             )
             if profile
             else None
         )
+        if profile and profile.search_mode == "scouts":
+            # Scout extracts are kept for the 3-day search window (D7): the same question
+            # about the same company is not searched again. The prompt carries no date.
+            scout_client = routing_client(
+                llm,
+                None
+                if ctx.params.get("fresh")
+                else ResultCache(ctx.pool, "research_scout", search_ttl_days=SEARCH_CACHE_DAYS),
+            )
+            scout = LLMScout(
+                scout_client,
+                profile.scout_model,
+                profile.scout_effort,
+                cache_key=f"research-scout:{ctx.job_id}",
+                priority=tier,
+            )
         claim_settings = (
             verification.body if verification else VerificationConfig()
         ).claim_verifier
@@ -1338,6 +1593,7 @@ async def research_handler(ctx: JobContext) -> None:
             verifier_system,
             effort=claim_settings.effort,
             cache=ResultCache(ctx.pool, "claim_verifier"),
+            use_batch=bool(profile and profile.priority == "batch"),
         )
     await run_research(
         ctx,
@@ -1349,5 +1605,6 @@ async def research_handler(ctx: JobContext) -> None:
             prompts={"research_writer": writer_system, "claim_verifier": verifier_system},
             planner=planner,
             worker=worker,
+            scout=scout,
         ),
     )

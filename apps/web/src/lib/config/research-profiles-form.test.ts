@@ -438,6 +438,16 @@ describe("web default profiles and templates match the backend defaults", () => 
       worker_max_steps: 12,
       worker_max_searches: 8,
       parallel_workers: 2,
+      // Cost levers: every default keeps the behaviour from before they existed.
+      write_order: "template",
+      cheap_sections: [],
+      cheap_model: "gpt-6-luna",
+      cheap_effort: "medium",
+      follow_up_cheap: false,
+      search_mode: "model",
+      scout_model: "gpt-6-luna",
+      scout_effort: "low",
+      priority: "standard",
     });
     const pick = (p: ReturnType<typeof profile>) => ({
       mode: p.mode,

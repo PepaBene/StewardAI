@@ -30793,6 +30793,66 @@ export interface components {
              * @default 2
              */
             parallel_workers: number;
+            /**
+             * Write Order
+             * @description template: sections are written in template order. summary_last: the executive summary, thesis KPIs and open questions are written after the evidence sections, from the sentences already written and the sources they cite instead of the whole material (far fewer input tokens). Display order is unchanged.
+             * @default template
+             * @enum {string}
+             */
+            write_order: "template" | "summary_last";
+            /**
+             * Cheap Sections
+             * @description Sections written by `cheap_model` first. A cheap draft with fewer cited sentences than `min_sentences` (or a failed call) is written again by the profile's model, so a weak draft never reaches the report.
+             */
+            cheap_sections?: ("executive_summary" | "business" | "financial_trend" | "moat_risks" | "valuation" | "scenarios" | "catalysts" | "counter_case" | "strategy_fit" | "thesis_kpis" | "ownership" | "relationships" | "risk" | "liquidity" | "open_questions")[];
+            /**
+             * Cheap Model
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            cheap_model: string;
+            /**
+             * Cheap Effort
+             * @default medium
+             * @enum {string}
+             */
+            cheap_effort: "low" | "medium" | "high";
+            /**
+             * Follow Up Cheap
+             * @description Follow-up rounds (a second source, a contradiction) are written by `cheap_model`; a follow-up that adds nothing is tried once by the profile's model.
+             * @default false
+             */
+            follow_up_cheap: boolean;
+            /**
+             * Search Mode
+             * @description model: the writing model runs the web searches inside each section. scouts: `scout_model` runs the same searches and returns compact extracts, which join the source registry as ordinary search sources; the writing model then writes without a search tool. Search caps and tier rules are unchanged.
+             * @default model
+             * @enum {string}
+             */
+            search_mode: "model" | "scouts";
+            /**
+             * Scout Model
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            scout_model: string;
+            /**
+             * Scout Effort
+             * @default low
+             * @enum {string}
+             */
+            scout_effort: "low" | "medium" | "high";
+            /**
+             * Priority
+             * @description flex: the writing, scouting and planning calls ask for the provider's discounted, slower tier and fall back to standard when it is busy. batch: flex, and the claim checks (independent of each other) go to the provider's batch API, which answers within minutes to hours. For runs nobody is waiting on.
+             * @default standard
+             * @enum {string}
+             */
+            priority: "standard" | "flex" | "batch";
         };
         /**
          * ResearchProfilesConfig
