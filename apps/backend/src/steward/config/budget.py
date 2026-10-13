@@ -73,6 +73,7 @@ BudgetJobType = Literal[
     "ai_approvals",
     "autopilot",
     "autopilot_calibration",
+    "watchdog",
     "ir_discovery",
     "news_ai_search",
     "news_triage",

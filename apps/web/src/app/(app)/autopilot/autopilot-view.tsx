@@ -192,7 +192,11 @@ function NeedsYouPanel({
   return (
     <ul className="m-0 list-none p-0">
       {load.data.items.map((item) => (
-        <NeedsYouRow key={item.id} item={item} onChanged={onChanged} />
+        <NeedsYouRow
+          key={`${item.kind_of_item}-${item.id}`}
+          item={item}
+          onChanged={onChanged}
+        />
       ))}
     </ul>
   );
@@ -210,6 +214,7 @@ function NeedsYouRow({
   const api = getBrowserApiClient();
   const path = { decision_id: item.id };
   const spot = item.kind_of_item === "spot_check";
+  const notice = item.kind_of_item === "notice";
 
   async function run(
     name: string,
@@ -230,6 +235,47 @@ function NeedsYouRow({
     } finally {
       setPending(null);
     }
+  }
+
+  if (notice) {
+    return (
+      <li className="border-b border-border-soft px-5 py-4 last:border-0">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <p className="text-[15px] font-medium">{item.label}</p>
+          <span className="text-xs text-text-muted">
+            Open {waitingLabel(item.age_days)}
+          </span>
+        </div>
+        <p className="mt-1.5 max-w-prose text-sm">{item.reasons}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Link
+            href={item.href}
+            className="text-sm text-accent-ink hover:underline"
+          >
+            {item.href.startsWith("http") ? "Get the key" : "Open it"}
+          </Link>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pending !== null}
+            onClick={() =>
+              run("dismiss", () =>
+                api.POST("/autopilot/notices/{task_id}/dismiss", {
+                  params: { path: { task_id: item.id } },
+                }),
+              )
+            }
+          >
+            {pending === "dismiss" ? "Dismissing…" : "Dismiss"}
+          </Button>
+        </div>
+        {error ? (
+          <p role="alert" className="mt-2 text-sm text-loss">
+            {error}
+          </p>
+        ) : null}
+      </li>
+    );
   }
 
   return (

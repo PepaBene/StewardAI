@@ -323,6 +323,12 @@ export const SCHEDULES: Record<
       "Checks the autopilot's decisions against your own calls and a stronger model's audit, then lets a queue act on its own once it is right often enough, or pulls it back when it is not.",
     cron: "40 7 * * 0",
   },
+  watchdog: {
+    label: "Watchdog",
+    description:
+      "Retries a failed collector, re-runs the refresh behind a data-quality issue, lifts old provider blocks, and tells you which API key is missing or when the AI budget will run out. What it cannot fix goes to Needs you.",
+    cron: "10 * * * *",
+  },
   ir_discovery: {
     label: "Investor page discovery",
     description:

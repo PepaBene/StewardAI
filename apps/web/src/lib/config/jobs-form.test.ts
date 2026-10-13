@@ -68,6 +68,7 @@ const FULL: JobsConfig = {
   ai_approvals: { enabled: true, cron: "10 7 * * *", timezone: "UTC" },
   autopilot: { enabled: true, cron: "20 */6 * * *", timezone: "UTC" },
   autopilot_calibration: { enabled: true, cron: "40 7 * * 0", timezone: "UTC" },
+  watchdog: { enabled: true, cron: "10 * * * *", timezone: "UTC" },
   ir_discovery: { enabled: true, cron: "30 7 * * 1", timezone: "UTC" },
   news_ai_search: { enabled: false, cron: "20 6 * * *", timezone: "UTC" },
   news_triage: { enabled: false, cron: "10 * * * *", timezone: "UTC" },

@@ -328,6 +328,55 @@ class InboxSettings(ConfigModel):
     )
 
 
+class OpsSettings(ConfigModel):
+    """The ops watchdog: fixes what it safely can (retry a failed job, re-run a refresh, lift
+    an old provider block), and puts one line in "Needs you" for what it could not."""
+
+    enabled: bool = True
+    repair: bool = Field(
+        default=True,
+        description="Re-run the refresh job behind a data-quality issue and retry a failed "
+        "collector. Off: issues are only listed.",
+    )
+    retry_hours: int = Field(
+        default=12, ge=1, le=168, description="Wait this long between two repair attempts."
+    )
+    max_attempts: int = Field(
+        default=2,
+        ge=1,
+        le=5,
+        description="An issue that survives this many repair attempts goes to Needs you.",
+    )
+    block_reset_days: int = Field(
+        default=7,
+        ge=0,
+        le=90,
+        description="Lift a provider block this old so the next call probes it again "
+        "(0: never). A block that returns after the probe goes to Needs you.",
+    )
+    refresh_derived: bool = Field(
+        default=True,
+        description="Rebuild the benchmark index weights and the fund coverage ledger from the "
+        "stored fund holdings, so they follow every look-through refresh without a button.",
+    )
+    suggest_rebalance: bool = Field(
+        default=True,
+        description="Once a day, when positions have drifted outside their bands, put the "
+        "rebalance trades (what, how much, why) in Needs you. Nothing is sent to the broker.",
+    )
+    suggest_hour_utc: int = Field(
+        default=6, ge=0, le=23, description="The hour (UTC) the daily suggestion is worked out."
+    )
+    key_notices: bool = Field(
+        default=True,
+        description="Name each API key that is missing for a job that is switched on.",
+    )
+    budget_forecast: bool = Field(
+        default=True,
+        description="Warn once a month when the AI spend is on course to pass the monthly cap.",
+    )
+
+
 class AutopilotKindPolicy(ConfigModel):
     """How one kind of automatic decision (a fact review, a graph edge, ...) runs."""
 
@@ -402,6 +451,25 @@ class AutopilotSettings(ConfigModel):
     )
     research_max_per_run: int = Field(
         default=1, ge=1, le=10, description="Most research runs one autopilot run may queue."
+    )
+    draft_theses: bool = Field(
+        default=True,
+        description="Queue a deep-thesis research run for a held, non-core holding that has no "
+        "thesis, and tell you once when the draft is ready. Nothing is saved until you accept.",
+    )
+    draft_max_per_run: int = Field(
+        default=1, ge=1, le=5, description="Most thesis drafts one autopilot run may queue."
+    )
+    draft_min_days: int = Field(
+        default=60, ge=1, le=365, description="No new draft for a holding this soon after a report."
+    )
+    refresh_review_dates: bool = Field(
+        default=True,
+        description="Move a thesis's review date forward when every KPI passes and the latest "
+        "research proposes no change. A normal config version you can roll back.",
+    )
+    review_extend_days: int = Field(
+        default=90, ge=7, le=365, description="How far the review date moves."
     )
     audit_per_run: int = Field(
         default=25,
@@ -2491,6 +2559,12 @@ class JobsConfig(ConfigModel):
         "disclosure reviews, ...) with rules and models, logs every decision and escalates "
         "what it cannot settle. Default: every six hours at :20.",
     )
+    watchdog: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="10 * * * *"),
+        description="The ops watchdog: retries failed collectors, re-runs the refresh behind a "
+        "data-quality issue, lifts old provider blocks, and tells you which API key is missing "
+        "or when the AI budget will run out. Default: hourly at :10.",
+    )
     autopilot_calibration: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="40 7 * * 0"),
         description="Compares the autopilot's decisions with the owner's calls and a stronger "
@@ -2549,6 +2623,7 @@ class JobsConfig(ConfigModel):
     document_index_settings: DocumentIndexSettings = Field(default_factory=DocumentIndexSettings)
     inbox_settings: InboxSettings = Field(default_factory=InboxSettings)
     autopilot_settings: AutopilotSettings = Field(default_factory=AutopilotSettings)
+    ops_settings: OpsSettings = Field(default_factory=OpsSettings)
     ir_discovery_settings: IrDiscoverySettings = Field(default_factory=IrDiscoverySettings)
     gap_research_settings: GapResearchSettings = Field(default_factory=GapResearchSettings)
     ai_approval: AiApprovalSettings = Field(default_factory=AiApprovalSettings)
@@ -2627,6 +2702,7 @@ class JobsConfig(ConfigModel):
             "inbox_scan": self.inbox_scan,
             "autopilot": self.autopilot,
             "autopilot_calibration": self.autopilot_calibration,
+            "watchdog": self.watchdog,
             "factor_returns": self.factor_returns,
             "disclosure_sources": self.disclosure_sources,
             "disclosure_ingest": self.disclosure_ingest,

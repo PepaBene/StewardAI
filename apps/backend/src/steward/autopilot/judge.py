@@ -128,11 +128,11 @@ def plan_step(
 
 
 def build_call(
-    kind: JudgeKind, cand: Candidate, model: str, settings: AutopilotSettings
+    kind: JudgeKind, cand: Candidate, model: str, settings: AutopilotSettings, lessons: str = ""
 ) -> dict[str, Any]:
     return {
         "model": model,
-        "system": kind.system,
+        "system": f"{kind.system}\n\n{lessons}" if lessons else kind.system,
         "messages": [{"role": "user", "content": cand.prompt}],
         "output_format": kind.output_model,
         **effort_kwargs(model, settings.effort, kind.max_tokens),
@@ -163,11 +163,18 @@ async def run_kind(
     budget: dict[str, int],
     now: dt.datetime | None = None,
     rng: random.Random | None = None,
+    lessons: str = "",
+    learned_floor: float | None = None,
 ) -> dict[str, Any]:
-    """Judge the open items of one kind. Returns counts and the usage for the job step."""
+    """Judge the open items of one kind. Returns counts and the usage for the job step.
+
+    `lessons` is the kind's wrong cases for its prompt and `learned_floor` the confidence it
+    learned to ask for; the floor can only raise the policy's `min_confidence`."""
     now = now or dt.datetime.now(dt.UTC)
     rng = rng or random.Random()  # noqa: S311 - sampling, not security
     policy = settings.policy(kind.name)
+    if learned_floor is not None and learned_floor > policy.min_confidence:
+        policy = policy.model_copy(update={"min_confidence": learned_floor})
     out: dict[str, Any] = {"mode": mode, "judged": 0, "applied": 0, "shadow": 0, "escalated": 0}
     usage = Usage(model=policy.model or settings.model)
     out["usage"] = usage
@@ -202,7 +209,7 @@ async def run_kind(
             out["stopped"] = "max_calls_per_run reached"
         budget["calls"] -= len(affordable)
         answers = await parse_many(
-            client, [build_call(kind, c, first_model, settings) for c in affordable]
+            client, [build_call(kind, c, first_model, settings, lessons) for c in affordable]
         )
         firsts = {
             c.ref: read_response(a, first_model, usage)
@@ -223,7 +230,7 @@ async def run_kind(
         seconds: dict[str, Settled | None] = {}
         if retry and second_model:
             answers2 = await parse_many(
-                client, [build_call(kind, c, second_model, settings) for c in retry]
+                client, [build_call(kind, c, second_model, settings, lessons) for c in retry]
             )
             usage2 = Usage(model=second_model)
             seconds = {

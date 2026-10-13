@@ -227,6 +227,46 @@ async def holding_weights(pool: asyncpg.Pool) -> dict[str, float]:
     return {r["ticker"]: float(r["weight"]) for r in rows}
 
 
+async def wrong_decisions(
+    pool: asyncpg.Pool, kind: str, since: dt.datetime, limit: int
+) -> list[AutoDecision]:
+    """Decisions of `kind` judged wrong (by the owner or the audit) since `since`, newest first."""
+    rows = await pool.fetch(
+        SELECT + " where kind = $1 and review = 'wrong' and decided_at >= $2"
+        " and status in ('shadow', 'applied', 'reverted')"
+        " order by reviewed_at desc nulls last, id desc limit $3",
+        kind,
+        since,
+        limit,
+    )
+    return [from_row(r) for r in rows]
+
+
+async def learned_thresholds(pool: asyncpg.Pool) -> dict[str, float]:
+    """Per kind, the confidence the autopilot learned to ask for after being wrong."""
+    rows = await pool.fetch("select kind, min_confidence from public.autopilot_learned")
+    return {r["kind"]: float(r["min_confidence"]) for r in rows}
+
+
+async def set_learned(
+    pool: asyncpg.Pool, kind: str, min_confidence: float | None, based_on: int, reason: str
+) -> None:
+    """Store (or, with None, clear) the learned confidence floor of a kind."""
+    if min_confidence is None:
+        await pool.execute("delete from public.autopilot_learned where kind = $1", kind)
+        return
+    await pool.execute(
+        "insert into public.autopilot_learned (kind, min_confidence, based_on, reason)"
+        " values ($1, $2, $3, $4) on conflict (kind) do update set"
+        " min_confidence = excluded.min_confidence, based_on = excluded.based_on,"
+        " reason = excluded.reason, updated_at = now()",
+        kind,
+        min_confidence,
+        based_on,
+        reason,
+    )
+
+
 async def mode_overrides(pool: asyncpg.Pool) -> dict[str, str]:
     rows = await pool.fetch("select kind, mode from public.autopilot_kind_state")
     return {r["kind"]: r["mode"] for r in rows}

@@ -14,6 +14,7 @@ from steward.autopilot.judge import ApplyError, accept, effective_mode, revert
 from steward.autopilot.kinds import all_kinds
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
+from steward.ops import tasks as ops_tasks
 
 router = APIRouter(tags=["autopilot"])
 
@@ -49,7 +50,9 @@ class NeedsYouItem(BaseModel):
     label: str
     href: str
     ticker: str | None
-    kind_of_item: Literal["escalation", "spot_check"]
+    # A notice is a problem the ops watchdog could not fix itself (a missing key, a failing
+    # collector); its `id` is an ops task id, not an autopilot decision id.
+    kind_of_item: Literal["escalation", "spot_check", "notice"]
     recommendation: str
     confidence: float | None
     reasons: str
@@ -159,6 +162,23 @@ async def needs_you(pool: Pool, _owner: Owner) -> NeedsYou:
     weights = await ledger.holding_weights(pool)
     # Biggest holdings first, then the oldest; items without a ticker or not held come last.
     items.sort(key=lambda i: (-weights.get(i.ticker or "", 0.0), -i.age_days))
+    notices = [
+        NeedsYouItem(
+            id=task.id,
+            kind=task.kind,
+            label=task.title,
+            href=task.href or "/status",
+            ticker=None,
+            kind_of_item="notice",
+            recommendation="",
+            confidence=None,
+            reasons=task.detail,
+            age_days=(now - task.first_seen).days,
+            can_accept=False,
+        )
+        for task in await ops_tasks.needs_owner(pool)
+    ]
+    items = [*notices, *items]
     for row in await ledger.spot_checks(pool):
         judge = kinds.get(row.kind)
         if judge is None:
@@ -179,6 +199,19 @@ async def needs_you(pool: Pool, _owner: Owner) -> NeedsYou:
             )
         )
     return NeedsYou(count=len(items), items=items)
+
+
+class Dismissed(BaseModel):
+    task_id: int
+
+
+@router.post("/autopilot/notices/{task_id}/dismiss")
+async def dismiss_notice(task_id: IdPath, pool: Pool, _owner: Owner) -> Dismissed:
+    """Set aside a watchdog notice (for example a key you do not want). A problem that is
+    still there on a later run opens a new notice; a missing key stays dismissed."""
+    if not await ops_tasks.dismiss(pool, task_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No open notice {task_id}")
+    return Dismissed(task_id=task_id)
 
 
 @router.post("/autopilot/decisions/{decision_id}/revert")

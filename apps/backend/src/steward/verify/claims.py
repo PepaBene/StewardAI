@@ -21,7 +21,7 @@ import hashlib
 import json
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import Any, Literal, Protocol
 
@@ -74,6 +74,16 @@ class Number:
     text: str
     value: Decimal
     decimals: int
+
+
+_MD_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+_BARE_URL = re.compile(r"https?://\S+")
+
+
+def strip_links(text: str) -> str:
+    """The sentence without its links: `[sec.gov](https://sec.gov/…/000165204426000071/…)` keeps
+    its label and loses the address, whose digits are not figures the sentence states."""
+    return " ".join(_BARE_URL.sub("", _MD_LINK.sub(r"\1", text)).split())
 
 
 def numbers_in(text: str) -> list[Number]:
@@ -387,6 +397,9 @@ async def check_claims(
     """Check every claim: numbers in code first, then the model for the rest."""
     results: dict[int, ClaimResult] = {}
     to_model: list[Claim] = []
+    # Links inside a sentence are citations, not claims: their digits (accession numbers, CIKs)
+    # must not be tested as figures, and the model does not need to read them.
+    claims = [replace(c, text=strip_links(c.text)) for c in claims]
     for claim in claims:
         if not claim.evidence:
             # E.g. a sentence resting only on a web-search result: the model read the page,

@@ -21,6 +21,7 @@ over the model sections, less a reserve for follow-up rounds; a section the budg
 reach says so.
 """
 
+import asyncio
 import datetime as dt
 import json
 import math
@@ -30,6 +31,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
 from pydantic import BaseModel, Field
 
 from steward.ai import AINotConfigured, Usage
@@ -43,6 +45,7 @@ from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import VerificationConfig
+from steward.documents.fetch import FetchError, default_headers, fetch_document
 from steward.jobs.runner import JobContext, JobFailed
 from steward.llm.cache import SEARCH_CACHE_DAYS, SEARCH_CACHE_DAYS_FRESH, ResultCache
 from steward.llm.client import create_llm
@@ -68,6 +71,7 @@ from steward.research.model_plan import (
     make_plan,
     same_layout,
 )
+from steward.research.page_evidence import FetchPage, attach_page_text
 from steward.research.plan import ResearchPlan, build_plan, effective_searches, focus_for
 from steward.research.read_tools import (
     ReadToolRun,
@@ -247,6 +251,9 @@ class ResearchDeps:
     planner: ResearchPlanner | None = None  # the model planning step; None = code plan
     worker: Worker | None = None  # the agentic engine's lens worker; None = fixed pipeline
     scout: Scout | None = None  # search_mode "scouts": the cheap model that runs the searches
+    # The text of a cited web page (None when it cannot be read), so the claim checker has
+    # the page's words and not only its title. None = titles only.
+    fetch_page: FetchPage | None = None
 
 
 def _source_line(s: Source) -> str:
@@ -357,6 +364,38 @@ class _FailedCall(Exception):
 
 
 NO_KEY_NOTE = "not written: no AI provider key is set"
+TRANSIENT_NOTES = ("HTTP 5", "HTTP 429", "HTTP 408", "Timeout", "no answer within")
+TRANSIENT_WAITS = (15.0, 45.0)  # seconds before the 2nd and 3rd try of an overloaded provider
+
+
+def transient_failure(output: dict[str, Any]) -> bool:
+    """A section the provider failed to answer (overloaded, timed out), not one the model
+    declined or the budget stopped: asking again later can succeed."""
+    note = str(output.get("note") or "")
+    return (
+        not output.get("sentences")
+        and "the call failed" in note
+        and any(marker in note for marker in TRANSIENT_NOTES)
+    )
+
+
+async def retry_transient(
+    attempt: Callable[[], Awaitable[dict[str, Any]]],
+    waits: tuple[float, ...] = TRANSIENT_WAITS,
+) -> dict[str, Any]:
+    """`attempt()`, repeated after a pause while the provider's failure looks temporary. A failed
+    call produced no sentences, so a retry cannot duplicate any; the steps of the failed tries
+    stay counted."""
+    output = await attempt()
+    for wait in waits:
+        if not transient_failure(output):
+            break
+        await asyncio.sleep(wait)
+        output = merge_attempts(output, await attempt())
+    return output
+
+
+PAGE_MAX_BYTES = 12_000_000  # a cited filing page; larger documents are not read for evidence
 NO_BUDGET_NOTE = "not written: the profile's step budget is used up"
 # Notes of a section no follow-up could fill; any other "not written" is a failed call.
 PERMANENT_NOTES = (NO_KEY_NOTE, NO_BUDGET_NOTE)
@@ -1073,19 +1112,22 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             def enough(o: dict[str, Any], need: int = need) -> bool:
                 return len(o["sentences"]) >= need
 
-            return await write_with_fallback(
-                spec,
-                cheap=spec.id in profile.cheap_sections,
-                enough=enough,
-                steps_room=left,
-                round_no=0,
-                searches=searches,
-                max_sentences=cap,
-                focus=focus,
-                existing="",
-                step_name=f"section:{spec.id}",
-                material_override=compact or None,
-            )
+            async def attempt() -> dict[str, Any]:
+                return await write_with_fallback(
+                    spec,
+                    cheap=spec.id in profile.cheap_sections,
+                    enough=enough,
+                    steps_room=left,
+                    round_no=0,
+                    searches=searches,
+                    max_sentences=cap,
+                    focus=focus,
+                    existing="",
+                    step_name=f"section:{spec.id}",
+                    material_override=compact or None,
+                )
+
+            return await retry_transient(attempt)
 
         output = await checkpoint_written(f"section:{spec.id}", do_section)
         absorb(output)
@@ -1235,6 +1277,13 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         if not model_sentences or not claim_settings.enabled:
             return {"results": {}, "summary": None}
         async with ctx.step("verify_claims") as step:
+            if deps.fetch_page is not None:
+                # A web citation is a URL and a title; the checker needs the page's own words.
+                cited_by: dict[str, list[str]] = {}
+                for _, _, s in model_sentences:
+                    for sid in s.source_ids:
+                        cited_by.setdefault(sid, []).append(s.text)
+                step.detail["pages_read"] = await attach_page_text(reg, cited_by, deps.fetch_page)
             claims = [
                 Claim(n, s.text, reg.evidence(s.source_ids))
                 for n, (_, _, s) in enumerate(model_sentences)
@@ -1595,16 +1644,29 @@ async def research_handler(ctx: JobContext) -> None:
             cache=ResultCache(ctx.pool, "claim_verifier"),
             use_batch=bool(profile and profile.priority == "batch"),
         )
-    await run_research(
-        ctx,
-        ResearchDeps(
-            writer=writer,
-            verifier=verifier,
-            now=dt.datetime.now(dt.UTC),
-            app_url=settings.app_url,
-            prompts={"research_writer": writer_system, "claim_verifier": verifier_system},
-            planner=planner,
-            worker=worker,
-            scout=scout,
-        ),
-    )
+    async with httpx.AsyncClient(timeout=30.0) as http:
+
+        async def fetch_page(url: str) -> str | None:
+            headers = default_headers(settings.sec_user_agent if "sec.gov" in url else None)
+            try:
+                document = await fetch_document(
+                    http, url, max_bytes=PAGE_MAX_BYTES, headers=headers
+                )
+                return await document.text_async()
+            except FetchError:
+                return None
+
+        await run_research(
+            ctx,
+            ResearchDeps(
+                writer=writer,
+                verifier=verifier,
+                now=dt.datetime.now(dt.UTC),
+                app_url=settings.app_url,
+                prompts={"research_writer": writer_system, "claim_verifier": verifier_system},
+                planner=planner,
+                worker=worker,
+                scout=scout,
+                fetch_page=fetch_page,
+            ),
+        )

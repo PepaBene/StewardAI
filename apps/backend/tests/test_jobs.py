@@ -274,6 +274,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "source_audit",
         "twelve_data_corporate_actions",
         "valuation_refresh",
+        "watchdog",
         "weekly_digest",
         "zero_cost_gate",
     ]

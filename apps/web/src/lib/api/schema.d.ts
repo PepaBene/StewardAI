@@ -3954,6 +3954,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/autopilot/notices/{task_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss Notice
+         * @description Set aside a watchdog notice (for example a key you do not want). A problem that is
+         *     still there on a later run opens a new notice; a missing key stays dismissed.
+         */
+        post: operations["dismiss_notice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/autopilot/decisions/{decision_id}/revert": {
         parameters: {
             query?: never;
@@ -11072,6 +11093,36 @@ export interface components {
              */
             research_max_per_run: number;
             /**
+             * Draft Theses
+             * @description Queue a deep-thesis research run for a held, non-core holding that has no thesis, and tell you once when the draft is ready. Nothing is saved until you accept.
+             * @default true
+             */
+            draft_theses: boolean;
+            /**
+             * Draft Max Per Run
+             * @description Most thesis drafts one autopilot run may queue.
+             * @default 1
+             */
+            draft_max_per_run: number;
+            /**
+             * Draft Min Days
+             * @description No new draft for a holding this soon after a report.
+             * @default 60
+             */
+            draft_min_days: number;
+            /**
+             * Refresh Review Dates
+             * @description Move a thesis's review date forward when every KPI passes and the latest research proposes no change. A normal config version you can roll back.
+             * @default true
+             */
+            refresh_review_dates: boolean;
+            /**
+             * Review Extend Days
+             * @description How far the review date moves.
+             * @default 90
+             */
+            review_extend_days: number;
+            /**
              * Audit Per Run
              * @description Decisions with no review that the calibration job has the stronger model re-judge independently each run (agreement counts as a correct decision).
              * @default 25
@@ -11910,7 +11961,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "autopilot" | "autopilot_calibration" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "document_index" | "inbox_scan" | "inbox_agent" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "autopilot" | "autopilot_calibration" | "watchdog" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "document_index" | "inbox_scan" | "inbox_agent" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -15838,6 +15889,11 @@ export interface components {
             warnings: string[];
             /** Caveats */
             caveats: string[];
+        };
+        /** Dismissed */
+        Dismissed: {
+            /** Task Id */
+            task_id: number;
         };
         /** DisputedStory */
         DisputedStory: {
@@ -23014,6 +23070,8 @@ export interface components {
             document_index?: components["schemas"]["JobSchedule"];
             /** @description The autopilot: settles the review queues (held facts, graph edges, disclosure reviews, ...) with rules and models, logs every decision and escalates what it cannot settle. Default: every six hours at :20. */
             autopilot?: components["schemas"]["JobSchedule"];
+            /** @description The ops watchdog: retries failed collectors, re-runs the refresh behind a data-quality issue, lifts old provider blocks, and tells you which API key is missing or when the AI budget will run out. Default: hourly at :10. */
+            watchdog?: components["schemas"]["JobSchedule"];
             /** @description Compares the autopilot's decisions with the owner's calls and a stronger model's audit, then promotes or demotes each kind. Default: Sundays 07:40. */
             autopilot_calibration?: components["schemas"]["JobSchedule"];
             /** @description Looks for new escalation notes and thesis-breach alerts and queues an agent run for each, which leaves an inbox item. Default: hourly at :10. */
@@ -23039,6 +23097,7 @@ export interface components {
             document_index_settings?: components["schemas"]["DocumentIndexSettings"];
             inbox_settings?: components["schemas"]["InboxSettings"];
             autopilot_settings?: components["schemas"]["AutopilotSettings"];
+            ops_settings?: components["schemas"]["OpsSettings"];
             ir_discovery_settings?: components["schemas"]["IrDiscoverySettings"];
             gap_research_settings?: components["schemas"]["GapResearchSettings"];
             ai_approval?: components["schemas"]["AiApprovalSettings"];
@@ -25227,7 +25286,7 @@ export interface components {
              * Kind Of Item
              * @enum {string}
              */
-            kind_of_item: "escalation" | "spot_check";
+            kind_of_item: "escalation" | "spot_check" | "notice";
             /** Recommendation */
             recommendation: string;
             /** Confidence */
@@ -26399,6 +26458,72 @@ export interface components {
             /** Incidents */
             incidents: components["schemas"]["Incident"][];
             ai_search: components["schemas"]["AiSearchCost"];
+        };
+        /**
+         * OpsSettings
+         * @description The ops watchdog: fixes what it safely can (retry a failed job, re-run a refresh, lift
+         *     an old provider block), and puts one line in "Needs you" for what it could not.
+         */
+        OpsSettings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Repair
+             * @description Re-run the refresh job behind a data-quality issue and retry a failed collector. Off: issues are only listed.
+             * @default true
+             */
+            repair: boolean;
+            /**
+             * Retry Hours
+             * @description Wait this long between two repair attempts.
+             * @default 12
+             */
+            retry_hours: number;
+            /**
+             * Max Attempts
+             * @description An issue that survives this many repair attempts goes to Needs you.
+             * @default 2
+             */
+            max_attempts: number;
+            /**
+             * Block Reset Days
+             * @description Lift a provider block this old so the next call probes it again (0: never). A block that returns after the probe goes to Needs you.
+             * @default 7
+             */
+            block_reset_days: number;
+            /**
+             * Refresh Derived
+             * @description Rebuild the benchmark index weights and the fund coverage ledger from the stored fund holdings, so they follow every look-through refresh without a button.
+             * @default true
+             */
+            refresh_derived: boolean;
+            /**
+             * Suggest Rebalance
+             * @description Once a day, when positions have drifted outside their bands, put the rebalance trades (what, how much, why) in Needs you. Nothing is sent to the broker.
+             * @default true
+             */
+            suggest_rebalance: boolean;
+            /**
+             * Suggest Hour Utc
+             * @description The hour (UTC) the daily suggestion is worked out.
+             * @default 6
+             */
+            suggest_hour_utc: number;
+            /**
+             * Key Notices
+             * @description Name each API key that is missing for a job that is switched on.
+             * @default true
+             */
+            key_notices: boolean;
+            /**
+             * Budget Forecast
+             * @description Warn once a month when the AI spend is on course to pass the monthly cap.
+             * @default true
+             */
+            budget_forecast: boolean;
         };
         /** OutletFraming */
         OutletFraming: {
@@ -45729,6 +45854,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NeedsYou"];
+                };
+            };
+        };
+    };
+    dismiss_notice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dismissed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

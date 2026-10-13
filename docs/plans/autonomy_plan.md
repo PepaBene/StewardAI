@@ -5,7 +5,37 @@ Written 2026-10-13. Source: a sweep of the backend routers, `config/jobs.py`, `a
 config, not every handler body, so each `file:line` below is a starting point to verify before
 implementing. Nothing in this plan is implemented yet.
 
-## Status (2026-11-09): phases A and B implemented
+## Status (2026-11-10): phases C, D and E implemented in part
+
+Built:
+
+- **Ops watchdog** (`steward/ops/`, job `watchdog`, hourly at :10, migration
+  `20261110100000_ops_task.sql`): retries failed collectors, queues the refresh job behind a
+  data-quality issue (stale price, unresolved identity, fund weights, source conflict), lifts
+  provider blocks after `block_reset_days`, and rebuilds benchmark index weights and the fund
+  coverage ledger. A problem is retried every `retry_hours` up to `max_attempts`, then shown
+  in Needs-you as a notice. Also missing-key notices (14-key catalogue, dismissible) and a
+  budget forecast notice (D1, D2, D3, D5, D7, C2).
+- **Thesis upkeep** (C5): drafts for the heaviest held stocks without a thesis, an announcement
+  notice when the draft lands, and review dates pushed out only when every KPI passes and the
+  latest research proposes no change. Each move is a `theses` config version.
+- **Lessons** (E1): wrong decisions are shown to the judge as data, and two confident mistakes
+  in 90 days raise that kind's confidence floor (`autopilot_learned`, migration
+  `20261110110000_autopilot_learned.sql`). The floor only ever raises the configured value.
+- **Rebalance suggestion** (E3, in part): when positions leave their bands, a daily notice
+  with the planner's trades. Nothing is sent to a broker.
+
+Not built, on purpose or for lack of input:
+
+- C1 fund KID/factsheet extractor; C3 company-input fillers beyond the existing jobs.
+- C4 auto-journal/switch log: the owner's record stays the owner's.
+- D6 release-gate automation; provider failover chains.
+- E2 self-tuning config: there is no engagement signal to tune against.
+- E3 thesis-break and opportunity suggestions.
+- D5 is a forecast notice only (it does not throttle spend). D4 needed no code: the scheduler is
+  complete and `weekly_digest` succeeds. C6 and C7 were already covered by existing jobs.
+
+## Earlier status (2026-11-09): phases A and B implemented
 
 Built: the ledger (`auto_decision`, migration `20261109100000_autopilot.sql`), the judge loop and
 calibration (`steward/autopilot/`), the `autopilot` (every 6 hours) and `autopilot_calibration`

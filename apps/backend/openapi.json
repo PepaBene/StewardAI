@@ -11644,6 +11644,56 @@
         ]
       }
     },
+    "/autopilot/notices/{task_id}/dismiss": {
+      "post": {
+        "tags": [
+          "autopilot"
+        ],
+        "summary": "Dismiss Notice",
+        "description": "Set aside a watchdog notice (for example a key you do not want). A problem that is\nstill there on a later run opens a new notice; a missing key stays dismissed.",
+        "operationId": "dismiss_notice",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dismissed"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/autopilot/decisions/{decision_id}/revert": {
       "post": {
         "tags": [
@@ -34207,6 +34257,42 @@
             "description": "Most research runs one autopilot run may queue.",
             "default": 1
           },
+          "draft_theses": {
+            "type": "boolean",
+            "title": "Draft Theses",
+            "description": "Queue a deep-thesis research run for a held, non-core holding that has no thesis, and tell you once when the draft is ready. Nothing is saved until you accept.",
+            "default": true
+          },
+          "draft_max_per_run": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Draft Max Per Run",
+            "description": "Most thesis drafts one autopilot run may queue.",
+            "default": 1
+          },
+          "draft_min_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Draft Min Days",
+            "description": "No new draft for a holding this soon after a report.",
+            "default": 60
+          },
+          "refresh_review_dates": {
+            "type": "boolean",
+            "title": "Refresh Review Dates",
+            "description": "Move a thesis's review date forward when every KPI passes and the latest research proposes no change. A normal config version you can roll back.",
+            "default": true
+          },
+          "review_extend_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 7.0,
+            "title": "Review Extend Days",
+            "description": "How far the review date moves.",
+            "default": 90
+          },
           "audit_per_run": {
             "type": "integer",
             "maximum": 200.0,
@@ -36753,6 +36839,7 @@
                 "ai_approvals",
                 "autopilot",
                 "autopilot_calibration",
+                "watchdog",
                 "ir_discovery",
                 "news_ai_search",
                 "news_triage",
@@ -36837,6 +36924,7 @@
                 "ai_approvals",
                 "autopilot",
                 "autopilot_calibration",
+                "watchdog",
                 "ir_discovery",
                 "news_ai_search",
                 "news_triage",
@@ -36934,6 +37022,7 @@
                 "ai_approvals",
                 "autopilot",
                 "autopilot_calibration",
+                "watchdog",
                 "ir_discovery",
                 "news_ai_search",
                 "news_triage",
@@ -48149,6 +48238,19 @@
           "caveats"
         ],
         "title": "DiscoveryResult"
+      },
+      "Dismissed": {
+        "properties": {
+          "task_id": {
+            "type": "integer",
+            "title": "Task Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id"
+        ],
+        "title": "Dismissed"
       },
       "DisputedStory": {
         "properties": {
@@ -68446,6 +68548,10 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "The autopilot: settles the review queues (held facts, graph edges, disclosure reviews, ...) with rules and models, logs every decision and escalates what it cannot settle. Default: every six hours at :20."
           },
+          "watchdog": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "The ops watchdog: retries failed collectors, re-runs the refresh behind a data-quality issue, lifts old provider blocks, and tells you which API key is missing or when the AI budget will run out. Default: hourly at :10."
+          },
           "autopilot_calibration": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Compares the autopilot's decisions with the owner's calls and a stronger model's audit, then promotes or demotes each kind. Default: Sundays 07:40."
@@ -68500,6 +68606,9 @@
           },
           "autopilot_settings": {
             "$ref": "#/components/schemas/AutopilotSettings"
+          },
+          "ops_settings": {
+            "$ref": "#/components/schemas/OpsSettings"
           },
           "ir_discovery_settings": {
             "$ref": "#/components/schemas/IrDiscoverySettings"
@@ -74745,7 +74854,8 @@
             "type": "string",
             "enum": [
               "escalation",
-              "spot_check"
+              "spot_check",
+              "notice"
             ],
             "title": "Kind Of Item"
           },
@@ -77544,6 +77654,81 @@
           "ai_search"
         ],
         "title": "OpsReport"
+      },
+      "OpsSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "repair": {
+            "type": "boolean",
+            "title": "Repair",
+            "description": "Re-run the refresh job behind a data-quality issue and retry a failed collector. Off: issues are only listed.",
+            "default": true
+          },
+          "retry_hours": {
+            "type": "integer",
+            "maximum": 168.0,
+            "minimum": 1.0,
+            "title": "Retry Hours",
+            "description": "Wait this long between two repair attempts.",
+            "default": 12
+          },
+          "max_attempts": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Max Attempts",
+            "description": "An issue that survives this many repair attempts goes to Needs you.",
+            "default": 2
+          },
+          "block_reset_days": {
+            "type": "integer",
+            "maximum": 90.0,
+            "minimum": 0.0,
+            "title": "Block Reset Days",
+            "description": "Lift a provider block this old so the next call probes it again (0: never). A block that returns after the probe goes to Needs you.",
+            "default": 7
+          },
+          "refresh_derived": {
+            "type": "boolean",
+            "title": "Refresh Derived",
+            "description": "Rebuild the benchmark index weights and the fund coverage ledger from the stored fund holdings, so they follow every look-through refresh without a button.",
+            "default": true
+          },
+          "suggest_rebalance": {
+            "type": "boolean",
+            "title": "Suggest Rebalance",
+            "description": "Once a day, when positions have drifted outside their bands, put the rebalance trades (what, how much, why) in Needs you. Nothing is sent to the broker.",
+            "default": true
+          },
+          "suggest_hour_utc": {
+            "type": "integer",
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Suggest Hour Utc",
+            "description": "The hour (UTC) the daily suggestion is worked out.",
+            "default": 6
+          },
+          "key_notices": {
+            "type": "boolean",
+            "title": "Key Notices",
+            "description": "Name each API key that is missing for a job that is switched on.",
+            "default": true
+          },
+          "budget_forecast": {
+            "type": "boolean",
+            "title": "Budget Forecast",
+            "description": "Warn once a month when the AI spend is on course to pass the monthly cap.",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OpsSettings",
+        "description": "The ops watchdog: fixes what it safely can (retry a failed job, re-run a refresh, lift\nan old provider block), and puts one line in \"Needs you\" for what it could not."
       },
       "OutletFraming": {
         "properties": {

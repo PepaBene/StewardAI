@@ -8,7 +8,13 @@ from steward.autopilot import ledger
 from steward.autopilot.calibration import audit, calibrate, review_from_outcomes
 from steward.autopilot.judge import effective_mode, expire_stale, run_kind
 from steward.autopilot.kinds import all_kinds
+from steward.autopilot.lessons import lessons_for, relearn
 from steward.autopilot.research_trigger import queue_stale_research
+from steward.autopilot.thesis_upkeep import (
+    announce_drafts,
+    queue_thesis_drafts,
+    refresh_review_dates,
+)
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.jobs.runner import JobContext
@@ -39,6 +45,7 @@ async def autopilot_handler(ctx: JobContext) -> None:
     if not cfg.enabled:
         return
     overrides = await ledger.mode_overrides(ctx.pool)
+    learned = await ledger.learned_thresholds(ctx.pool)
     client = _client(ctx)
     budget = {"calls": cfg.max_calls_per_run}
     for name, kind in all_kinds().items():
@@ -51,7 +58,16 @@ async def autopilot_handler(ctx: JobContext) -> None:
             for ref in refs:
                 if ref not in open_now:
                     await ledger.close_escalation(ctx.pool, name, ref)
-            done = await run_kind(ctx.pool, client, kind, cfg, mode, budget)
+            done = await run_kind(
+                ctx.pool,
+                client,
+                kind,
+                cfg,
+                mode,
+                budget,
+                lessons=await lessons_for(ctx.pool, kind),
+                learned_floor=learned.get(name),
+            )
             step.usage = done.pop("usage").step_usage()
             done.pop("usage_second", None)
             done["expired"] = await expire_stale(ctx.pool, kind, policy, mode)
@@ -65,6 +81,17 @@ async def autopilot_handler(ctx: JobContext) -> None:
                     max_per_run=cfg.research_max_per_run,
                 )
             )
+    if cfg.draft_theses:
+        async with ctx.step("thesis_drafts") as step:
+            step.detail.update(
+                await queue_thesis_drafts(
+                    ctx.pool, max_per_run=cfg.draft_max_per_run, min_days=cfg.draft_min_days
+                )
+            )
+            step.detail["announced"] = await announce_drafts(ctx.pool)
+    if cfg.refresh_review_dates:
+        async with ctx.step("review_dates") as step:
+            step.detail.update(await refresh_review_dates(ctx.pool, days=cfg.review_extend_days))
 
 
 async def autopilot_calibration_handler(ctx: JobContext) -> None:
@@ -81,6 +108,9 @@ async def autopilot_calibration_handler(ctx: JobContext) -> None:
             done = await audit(ctx.pool, client, kinds, cfg, now)
             step.usage = done.pop("usage").step_usage()
             step.detail.update(done)
+    async with ctx.step("learn") as step:
+        configured = {name: cfg.policy(name).min_confidence for name in kinds}
+        step.detail["floors"] = await relearn(ctx.pool, kinds, configured, now)
     if cfg.auto_calibrate:
         async with ctx.step("calibrate") as step:
             step.detail["moves"] = await calibrate(ctx.pool, kinds, cfg, now)
