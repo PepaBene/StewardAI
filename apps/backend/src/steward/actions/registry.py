@@ -23,6 +23,7 @@ from steward.autopilot import ledger
 from steward.autopilot.judge import ApplyError, accept, revert
 from steward.autopilot.kinds import all_kinds
 from steward.ops import tasks as ops_tasks
+from steward.training import labels
 
 Risk = Literal["low", "medium", "high"]
 Via = Literal["screen", "chat"]
@@ -118,6 +119,16 @@ async def _run_accept(pool: asyncpg.Pool, a: DecisionArgs) -> dict[str, Any]:
         await accept(pool, kind, row)
     except ApplyError as exc:
         raise ActionError(str(exc)) from exc
+    await labels.record(
+        pool,
+        source="owner_accept",
+        subject_kind=row.kind,
+        subject_ref=row.subject_ref,
+        label="right",
+        by_owner=True,
+        decision_id=row.id,
+        detail={"decision": row.decision, "confidence": row.confidence},
+    )
     return {"decision_id": row.id, "kind": row.kind, "decision": row.decision}
 
 

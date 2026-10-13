@@ -9647,9 +9647,9 @@ export interface components {
             message_id: number | null;
             /**
              * Kind
-             * @enum {string}
+             * @description A job to start, or an owner action (dismiss_notice, ...).
              */
-            kind: "earnings_check" | "research" | "portfolio_sync";
+            kind: string;
             /** Params */
             params: {
                 [key: string]: unknown;
@@ -12982,6 +12982,11 @@ export interface components {
              * @description Proposed actions waiting for confirmation.
              */
             actions: number[];
+            /**
+             * Visuals
+             * @description Charts drawn by the app from stored records.
+             */
+            visuals?: components["schemas"]["Block"][];
             /** Model */
             model: string | null;
             /** Note */
@@ -27003,6 +27008,12 @@ export interface components {
              * @default true
              */
             autolog_trades: boolean;
+            /**
+             * Anticipate Earnings
+             * @description Once a day, put a line in Needs you for each held company that reports within three days, with when its research was last refreshed.
+             * @default true
+             */
+            anticipate_earnings: boolean;
             /**
              * Draft Case Items
              * @description Once a day, add your thesis wording to a held company's case items as drafts (why owned, pre-mortem, exit conditions). Never confirmed, never added twice.

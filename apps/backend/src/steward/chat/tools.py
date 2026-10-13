@@ -20,8 +20,11 @@ import httpx
 from steward.chat import analytics_tools, data_tools, legacy_envelope, research_tools
 from steward.chat.analytics_tools import SELECTOR_KINDS
 from steward.chat.data_tool_defs import DATA_TOOL_DEFINITIONS
-from steward.chat.envelope import neutralise_tree, stamp
+from steward.chat.envelope import clamp_limit, neutralise_tree, stamp
 from steward.chat.research_tools import EVIDENCE_SECTIONS, RISK_KINDS
+from steward.chat.visuals import KINDS as VISUAL_KINDS
+from steward.chat.visuals import Block
+from steward.chat.visuals import build as build_visual
 from steward.config.research import ResearchProfilesConfig
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
@@ -40,7 +43,17 @@ from steward.research.sources import Registry, SourceKind
 from steward.retrieval import search as retrieval_search
 from steward.retrieval.search import Filters
 
-ACTION_KINDS = ("earnings_check", "research", "portfolio_sync")
+JOB_KINDS = ("earnings_check", "research", "portfolio_sync")
+# The owner actions of `steward.actions.registry` that chat may propose; a test holds this list
+# equal to the registry. None of them places or prepares a trade.
+CHANGE_KINDS = (
+    "dismiss_notice",
+    "revert_decision",
+    "accept_recommendation",
+    "review_decision",
+    "set_autopilot_mode",
+)
+ACTION_KINDS = (*JOB_KINDS, *CHANGE_KINDS)
 DOCUMENT_KINDS = ("filing", "report", "thesis", "note", "news", "disclosure", "agent_note")
 DOCUMENT_SOURCE_KIND: dict[str, SourceKind] = {
     "filing": "observation",
@@ -677,16 +690,50 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
     *DATA_TOOL_DEFINITIONS,
     {
+        "name": "show_visual",
+        "description": "Show the owner a chart in the chat, drawn by the app from stored "
+        f"records: {', '.join(VISUAL_KINDS)}. You only choose which; you never supply the "
+        "numbers. Say in a sentence what it shows, citing the returned source id.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"kind": {"type": "string", "enum": list(VISUAL_KINDS)}},
+            "required": ["kind"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "engine_activity",
+        "description": "What the automatic engine needs from the owner and what it did: the "
+        "notices and escalations waiting in Needs you, each with the id and the propose_job "
+        "kind that settles it, and the latest automatic decisions with counts per kind. Use "
+        "it before proposing a change, and to answer 'what needs me' or 'what did the app "
+        "do this week'.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"limit": {"type": "integer", "description": "Items per list."}},
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "propose_job",
-        "description": "Propose starting a job: re-run a holding's earnings check, start a "
-        "research report, or run the portfolio sync. Nothing starts until the owner "
-        "confirms it in the chat; say that you proposed it.",
+        "description": "Propose a job (re-run a holding's earnings check, start a research "
+        "report, run the portfolio sync) or a change to what the engine did (dismiss a "
+        "notice, undo an automatic decision, accept its recommendation, mark a decision "
+        "right or wrong, set an autopilot kind off/shadow/auto). Find the ids with "
+        "engine_activity. Nothing happens until the owner confirms it in the chat; say what "
+        "you proposed. This never places or prepares a trade.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "kind": {"type": "string", "enum": list(ACTION_KINDS)},
                 "ticker": {"type": "string"},
                 "profile": {"type": "string", "description": "Research profile id."},
+                "args": {
+                    "type": "object",
+                    "description": "For a change: task_id (dismiss_notice), decision_id "
+                    "(the others), verdict ok|wrong (review_decision), kind and mode "
+                    "(set_autopilot_mode).",
+                },
                 "reason": {"type": "string"},
             },
             "required": ["kind", "reason"],
@@ -753,6 +800,8 @@ class ChatTools:
         self.doc_embedder = doc_embedder
         self.used: list[str] = []
         self.actions: list[int] = []
+        # Charts the model asked to show; the panel draws them from these blocks.
+        self.visuals: list[Block] = []
         # One entry per call, for the job's step detail: what was asked, how long it took,
         # whether it returned data or an error, and how many citable records it added.
         self.trace: list[dict[str, Any]] = []
@@ -1583,16 +1632,120 @@ class ChatTools:
         context = await company_context(self.pool, ticker, cutoff)
         return self._register_context(context, f"/holdings/{ticker}")
 
+    async def _tool_show_visual(self, kind: str) -> dict[str, Any]:
+        if kind not in VISUAL_KINDS:
+            return {"error": f"kind must be one of {', '.join(VISUAL_KINDS)}"}
+        block = await build_visual(self.pool, kind, dt.datetime.now(dt.UTC))
+        if block.chart == "none":
+            return {"tool": "show_visual", "shown": False, "reason": block.summary}
+        sid = self.registry.add(
+            "observation",
+            f"visual:{kind}",
+            block.title,
+            app_path="/",
+            tier=1,
+            snippet=block.summary,
+            as_of=block.as_of,
+        )
+        self.visuals.append(block)
+        return {
+            "tool": "show_visual",
+            "shown": True,
+            "source_id": sid,
+            "title": block.title,
+            "summary": block.summary,
+            "as_of": block.as_of,
+        }
+
+    async def _tool_engine_activity(self, limit: int = 15) -> dict[str, Any]:
+        from steward.autopilot import ledger
+        from steward.ops import tasks as ops_tasks
+
+        cap = clamp_limit(limit, default=15, maximum=30)
+        notices = []
+        for t in (await ops_tasks.needs_owner(self.pool))[:cap]:
+            sid = self.registry.add(
+                "observation",
+                f"ops_task:{t.id}",
+                t.title,
+                app_path=t.href or "/autopilot",
+                tier=1,
+                snippet=t.detail,
+                as_of=str(t.last_seen.date()),
+            )
+            notices.append(
+                {
+                    "source_id": sid,
+                    "task_id": t.id,
+                    "title": t.title,
+                    "detail": t.detail,
+                    "settle_with": {"kind": "dismiss_notice", "args": {"task_id": t.id}},
+                }
+            )
+        waiting = []
+        for d in (await ledger.escalations(self.pool, cap))[:cap]:
+            sid = self.registry.add(
+                "observation",
+                f"auto_decision:{d.id}",
+                f"{d.kind}: {d.summary[:80]}",
+                app_path="/autopilot",
+                tier=1,
+                snippet=d.summary,
+                as_of=str(d.decided_at.date()),
+            )
+            waiting.append(
+                {
+                    "source_id": sid,
+                    "decision_id": d.id,
+                    "autopilot_kind": d.kind,
+                    "recommendation": d.decision,
+                    "confidence": d.confidence,
+                    "summary": d.summary,
+                    "settle_with": {
+                        "kind": "accept_recommendation",
+                        "args": {"decision_id": d.id},
+                    },
+                }
+            )
+        week = await ledger.stats(self.pool, dt.datetime.now(dt.UTC) - dt.timedelta(days=7))
+        return {
+            "tool": "engine_activity",
+            "notices": notices,
+            "waiting_for_the_owner": waiting,
+            "last_7_days": [
+                {
+                    "autopilot_kind": s.kind,
+                    "decided": s.decided,
+                    "applied": s.applied,
+                    "undone_by_owner": s.reverted,
+                    "waiting": s.escalated,
+                }
+                for s in week
+            ],
+        }
+
     async def _tool_propose_job(
         self,
         kind: str,
         reason: str,
         ticker: str | None = None,
         profile: str | None = None,
+        args: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if kind not in ACTION_KINDS:
             return {"error": f"kind must be one of {', '.join(ACTION_KINDS)}"}
         params: dict[str, Any] = {}
+        if kind in CHANGE_KINDS:
+            from steward.actions import registry
+
+            try:
+                proposal = await registry.propose(
+                    self.pool, kind, args or {}, via="chat", reason=reason[:500]
+                )
+            except registry.ActionError as exc:
+                return {"error": str(exc)}
+            params = {"owner_action_id": proposal.id, "args": proposal.args}
+            reason = f"{proposal.summary}. {reason}"[:500]
         if kind in ("earnings_check", "research"):
             if not ticker:
                 return {"error": f"{kind} needs a ticker"}

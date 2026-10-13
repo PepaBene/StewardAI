@@ -130,3 +130,66 @@ async def test_the_week_in_review_visual_reads_the_ledger(backend_pool: asyncpg.
     assert block.chart == "bar" and block.values == [1.0] and block.table[0]["kind"] == "facts"
     with pytest.raises(ValueError, match="Unknown visual"):
         await visuals.build(backend_pool, "everything", NOW)
+
+
+def test_chat_may_propose_exactly_the_registered_changes() -> None:
+    from steward.chat.tools import CHANGE_KINDS
+
+    assert set(CHANGE_KINDS) == set(registry.ACTIONS)
+
+
+@pytest.mark.db
+async def test_a_change_proposed_in_chat_waits_and_engine_activity_lists_what_needs_the_owner(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    from steward.chat.tools import ChatTools
+    from steward.research.sources import Registry
+
+    task_id = await notice(backend_pool)
+    conversation = await backend_pool.fetchval(
+        "insert into public.chat_conversation default values returning id"
+    )
+    tools = ChatTools(backend_pool, Registry(), conversation, None)
+
+    seen = await tools.call("engine_activity", {})
+    assert seen["notices"][0]["task_id"] == task_id
+    assert seen["notices"][0]["settle_with"] == {
+        "kind": "dismiss_notice",
+        "args": {"task_id": task_id},
+    }
+
+    proposed = await tools.call(
+        "propose_job",
+        {"kind": "dismiss_notice", "args": {"task_id": task_id}, "reason": "Owner asked."},
+    )
+    assert "error" not in proposed and tools.actions
+    status = await backend_pool.fetchval(
+        "select status from public.ops_task where id = $1", task_id
+    )
+    assert status == "needs_owner"  # nothing changed yet
+    row = await backend_pool.fetchrow("select kind, params from public.chat_action")
+    assert row["kind"] == "dismiss_notice" and "owner_action_id" in row["params"]
+
+    bad = await tools.call("propose_job", {"kind": "dismiss_notice", "args": {}, "reason": "x"})
+    assert "error" in bad
+
+
+@pytest.mark.db
+async def test_a_chart_shown_in_chat_is_built_from_records_not_from_the_model(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    from steward.chat.tools import ChatTools
+    from steward.research.sources import Registry
+
+    tools = ChatTools(backend_pool, Registry(), None, None)
+    empty = await tools.call("show_visual", {"kind": "allocation"})
+    assert empty["shown"] is False and tools.visuals == []  # no snapshot, no chart
+
+    await backend_pool.execute(
+        "insert into public.auto_decision (kind, subject_ref, decision, decided_by, summary,"
+        " evidence, status) values ('fact', 'v1', 'accept', 'rule:x', 's', '{}'::jsonb, 'applied')"
+    )
+    shown = await tools.call("show_visual", {"kind": "engine_week"})
+    assert shown["shown"] is True and shown["source_id"]
+    assert tools.visuals[0].values == [1.0]
+    assert "error" in await tools.call("show_visual", {"kind": "everything"})

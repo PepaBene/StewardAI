@@ -14,7 +14,9 @@ from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import IdPath, Pool
+from steward.actions import registry
 from steward.chat.assistant import ChatAnswer
+from steward.chat.tools import CHANGE_KINDS
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 
@@ -48,7 +50,7 @@ class MessageOut(BaseModel):
 class ActionOut(BaseModel):
     id: int
     message_id: int | None
-    kind: Literal["earnings_check", "research", "portfolio_sync"]
+    kind: str = Field(description="A job to start, or an owner action (dismiss_notice, ...).")
     params: dict[str, Any]
     reason: str | None
     status: Literal["proposed", "confirmed", "cancelled"]
@@ -194,10 +196,21 @@ async def confirm_action(action_id: IdPath, pool: Pool, owner: Owner) -> ActionO
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"No action {action_id}")
         if row["status"] != "proposed":
             raise HTTPException(status.HTTP_409_CONFLICT, f"Action {action_id} is {row['status']}")
-        job_type = ACTION_JOB_TYPES[row["kind"]]
         params = json.loads(row["params"])
-        job_id = await create_job(conn, job_type, "chat", requested_by=owner.user_id, params=params)
-        await queue.enqueue(conn, job_id, job_type)
+        job_id: int | None = None
+        if row["kind"] in CHANGE_KINDS:
+            # A change to what the engine did runs now, through the same registry the screens
+            # use; the card's button is the owner's confirmation.
+            try:
+                await registry.confirm(pool, int(params["owner_action_id"]), second=True)
+            except (registry.ActionError, KeyError) as exc:
+                raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+        else:
+            job_type = ACTION_JOB_TYPES[row["kind"]]
+            job_id = await create_job(
+                conn, job_type, "chat", requested_by=owner.user_id, params=params
+            )
+            await queue.enqueue(conn, job_id, job_type)
         updated = await conn.fetchrow(
             "update public.chat_action set status = 'confirmed', job_id = $2, decided_at = now(),"
             " decided_by = $3::uuid where id = $1 returning id, message_id, kind, params, reason,"
@@ -225,4 +238,7 @@ async def cancel_action(action_id: IdPath, pool: Pool, owner: Owner) -> ActionOu
         if current is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"No action {action_id}")
         raise HTTPException(status.HTTP_409_CONFLICT, f"Action {action_id} is {current}")
+    if row["kind"] in CHANGE_KINDS:
+        params = json.loads(row["params"])
+        await registry.cancel(pool, int(params.get("owner_action_id", 0)))
     return _action(row)

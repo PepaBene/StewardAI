@@ -43,6 +43,7 @@ import {
   SUGGESTED_PROMPTS,
   validateMessage,
 } from "@/lib/chat/chat";
+import { ChatVisual } from "@/components/chat/chat-visual";
 import { formatDateTime } from "@/lib/format";
 import { jobHref } from "@/lib/jobs/job-detail";
 import { sourceKindLabel, sourcePreview } from "@/lib/sources/sources";
@@ -426,6 +427,9 @@ function Message({
           ) : null}
         </p>
       ) : null}
+      {m.answer?.visuals?.map((v, i) => (
+        <ChatVisual key={i} block={v} />
+      ))}
       {m.answer && m.answer.shape !== "low_evidence" && m.answer.sources.length > 0 ? <SourceChips sources={m.answer.sources} /> : null}
       <p className="flex flex-wrap gap-x-2 text-[11px] text-text-faint">
         <time dateTime={m.created_at} className="num">

@@ -14,6 +14,8 @@ from typing import Any, Literal
 import asyncpg
 from pydantic import BaseModel
 
+from steward.training import labels
+
 Status = Literal["shadow", "applied", "escalated", "reverted", "closed"]
 Review = Literal["ok", "wrong"]
 
@@ -154,14 +156,27 @@ async def set_status(
 async def set_review(
     pool: asyncpg.Pool, decision_id: int, review: Review, reviewed_by: str
 ) -> bool:
-    result = await pool.execute(
+    row = await pool.fetchrow(
         "update public.auto_decision set review = $2, reviewed_by = $3, reviewed_at = now()"
-        " where id = $1",
+        " where id = $1 returning kind, subject_ref, decision, status",
         decision_id,
         review,
         reviewed_by,
     )
-    return bool(result.endswith(" 1"))
+    if row is None:
+        return False
+    source, by_owner = labels.source_for(reviewed_by, row["status"])
+    await labels.record(
+        pool,
+        source=source,
+        subject_kind=row["kind"],
+        subject_ref=row["subject_ref"],
+        label="right" if review == "ok" else "wrong",
+        by_owner=by_owner,
+        decision_id=decision_id,
+        detail={"decision": row["decision"], "reviewed_by": reviewed_by},
+    )
+    return True
 
 
 async def decided_refs(

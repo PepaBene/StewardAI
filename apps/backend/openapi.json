@@ -30055,12 +30055,8 @@
           },
           "kind": {
             "type": "string",
-            "enum": [
-              "earnings_check",
-              "research",
-              "portfolio_sync"
-            ],
-            "title": "Kind"
+            "title": "Kind",
+            "description": "A job to start, or an owner action (dismiss_notice, ...)."
           },
           "params": {
             "additionalProperties": true,
@@ -39698,6 +39694,14 @@
             "type": "array",
             "title": "Actions",
             "description": "Proposed actions waiting for confirmation."
+          },
+          "visuals": {
+            "items": {
+              "$ref": "#/components/schemas/Block"
+            },
+            "type": "array",
+            "title": "Visuals",
+            "description": "Charts drawn by the app from stored records."
           },
           "model": {
             "anyOf": [
@@ -78948,6 +78952,12 @@
             "type": "boolean",
             "title": "Autolog Trades",
             "description": "Put each detected trade on the journal timeline (a journal entry, or a switch-log row for a sell and buy pair) marked as automatic. They hold no reasons and are left out of the scorecard and process review.",
+            "default": true
+          },
+          "anticipate_earnings": {
+            "type": "boolean",
+            "title": "Anticipate Earnings",
+            "description": "Once a day, put a line in Needs you for each held company that reports within three days, with when its research was last refreshed.",
             "default": true
           },
           "draft_case_items": {
