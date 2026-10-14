@@ -20,6 +20,7 @@ import { JobStatusBadge } from "@/components/jobs/job-status-badge";
 import { CitationLink } from "@/components/news/citation";
 import { SourceLinksLine } from "@/components/sources/source-list";
 import { BlueprintCorners } from "@/components/ui/blueprint";
+import { pageSelection } from "@/lib/chat/page-selection";
 import { Button } from "@/components/ui/button";
 import {
   getBrowserApiClient,
@@ -171,7 +172,10 @@ export function ChatThread({
     }
     const { data, response } = await api.POST("/chat/conversations/{conversation_id}/messages", {
       params: { path: { conversation_id: id } },
-      body: { content: content.trim(), page: { path: pathname } },
+      body: {
+        content: content.trim(),
+        page: { path: pathname, selection: pageSelection(pathname, window.location.search) },
+      },
     });
     if (!data) return `Not sent (HTTP ${response.status}).`;
     setStopped(null);

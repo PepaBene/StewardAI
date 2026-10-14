@@ -167,4 +167,36 @@ async def check_rollbacks(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int
                 f"The {c.target.removeprefix('autopilot:')} confidence floor was put back",
                 "It went worse after the change: " + "; ".join(reasons) + ".",
             )
-    return {"rolled_back": rolled}
+    return {"rolled_back": rolled, "unchecked": await _tell_unchecked(pool, now)}
+
+
+async def _tell_unchecked(pool: asyncpg.Pool, now: dt.datetime) -> int:
+    """A promoted floor leaves its watch window on some day. If too few of the decisions made
+    since were reviewed to say whether it helped, the owner is told once, so a quiet kind is not
+    silently left unchecked."""
+    rows = await pool.fetch(
+        "select " + change.COLUMNS + ", decided_at from public.engine_change"  # noqa: S608
+        " where status = 'promoted' and change_kind = 'threshold' and decided_at <= $1"
+        " and decided_at > $2",
+        now - dt.timedelta(days=ROLLBACK_UNTIL_DAYS),
+        now - dt.timedelta(days=ROLLBACK_UNTIL_DAYS + 1),
+    )
+    told = 0
+    for rec in rows:
+        c = change.from_row(rec)
+        if not _is_floor_change(c):
+            continue
+        kind = c.target.removeprefix("autopilot:")
+        decided, escalated = await _window(pool, kind, rec["decided_at"], now)
+        seen = _metrics(decided, escalated)
+        if seen.reviewed >= FLOOR_GATES.min_reviewed:
+            continue
+        told += 1
+        await _tell(
+            pool,
+            c,
+            f"The {kind} confidence floor could not be checked",
+            f"Only {seen.reviewed} decisions since it began were reviewed, too few to say whether "
+            "it helped. Review some decisions of this kind, or undo the floor from the ledger.",
+        )
+    return told

@@ -208,7 +208,7 @@ async def test_a_promoted_floor_that_goes_worse_is_rolled_back(
     # The weeks since went badly: a third of the reviewed decisions were wrong.
     await add_decisions(backend_pool, "fact", 15, 0.95, wrong=5, days_ago=5)
     done = await challenger.check_rollbacks(backend_pool, NOW)
-    assert done == {"rolled_back": 1}
+    assert done == {"rolled_back": 1, "unchecked": 0}
     assert await backend_pool.fetchval("select status from public.engine_change") == "rolled_back"
     assert await ledger.learned_thresholds(backend_pool) == {}
 
@@ -225,7 +225,7 @@ async def test_a_promoted_floor_that_holds_up_stays(backend_pool: asyncpg.Pool) 
         NOW - dt.timedelta(days=20),
     )
     await add_decisions(backend_pool, "fact", 15, 0.95, wrong=0, days_ago=5)
-    assert await challenger.check_rollbacks(backend_pool, NOW) == {"rolled_back": 0}
+    assert await challenger.check_rollbacks(backend_pool, NOW) == {"rolled_back": 0, "unchecked": 0}
     assert await ledger.learned_thresholds(backend_pool) == {"fact": 0.9}
 
 
@@ -248,3 +248,27 @@ async def test_the_reliability_report_reads_reviewed_decisions(backend_pool: asy
     (fact,) = await reliability.report(backend_pool, NOW)
     assert fact.kind == "fact" and fact.reviewed == 25
     assert fact.verdict.startswith("Overconfident") and fact.ece is not None and fact.ece > 0.3
+
+
+@pytest.mark.db
+async def test_a_floor_that_leaves_its_watch_window_unreviewed_is_reported_once(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    await add_decisions(backend_pool, "fact", 30, 0.95, wrong=0, days_ago=60)
+    await add_decisions(backend_pool, "fact", 20, 0.8, wrong=10, days_ago=60)
+    proposal = await propose_floor(backend_pool, 0.7, 0.9)
+    await challenger.settle_floors(backend_pool, NOW - dt.timedelta(days=45))
+    await backend_pool.execute(
+        "update public.engine_change set decided_at = $2 where id = $1",
+        proposal.id,
+        NOW - dt.timedelta(days=challenger.ROLLBACK_UNTIL_DAYS, hours=2),
+    )
+    done = await challenger.check_rollbacks(backend_pool, NOW)
+    assert done == {"rolled_back": 0, "unchecked": 1}
+    await challenger.check_rollbacks(backend_pool, NOW)
+    notices = await backend_pool.fetch(
+        "select title from public.ops_task where kind = $1", challenger.KIND
+    )
+    assert len(notices) == 1
+    assert "could not be checked" in notices[0]["title"]
+    assert await ledger.learned_thresholds(backend_pool) == {"fact": 0.9}  # nothing is undone

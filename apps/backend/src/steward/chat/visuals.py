@@ -18,8 +18,14 @@ from pydantic import BaseModel
 
 from steward.autopilot import ledger
 
-Kind = Literal["allocation", "engine_week", "owner_overrides", "autopilot_precision"]
-KINDS: tuple[str, ...] = ("allocation", "engine_week", "owner_overrides", "autopilot_precision")
+Kind = Literal["allocation", "engine_week", "owner_overrides", "autopilot_precision", "needs_you"]
+KINDS: tuple[str, ...] = (
+    "allocation",
+    "engine_week",
+    "owner_overrides",
+    "autopilot_precision",
+    "needs_you",
+)
 ChartType = Literal["bar", "donut", "none"]
 MAX_POINTS = 30
 
@@ -204,6 +210,35 @@ async def autopilot_precision(pool: asyncpg.Pool, now: dt.datetime) -> Block:
     )
 
 
+async def needs_you(pool: asyncpg.Pool, now: dt.datetime) -> Block:
+    """What is waiting for the owner, by kind of notice."""
+    rows = await pool.fetch(
+        "select kind, count(*) as n from public.ops_task where status = 'needs_owner'"
+        " group by kind order by n desc, kind"
+    )
+    if not rows:
+        return empty("needs_you", "Waiting for you", "Nothing is waiting for you.")
+    labels = [r["kind"] for r in rows]
+    values = [float(r["n"]) for r in rows]
+    return check_block(
+        Block(
+            kind="needs_you",
+            chart="bar",
+            title="What is waiting for you, by kind",
+            unit="notices",
+            labels=labels,
+            values=values,
+            source="ops_task",
+            as_of=now.date().isoformat(),
+            summary=(
+                f"{int(sum(values))} notices wait for you; most are {labels[0]} ({int(values[0])})."
+            ),
+            table=[{"kind": k, "notices": int(v)} for k, v in zip(labels, values, strict=True)],
+            value_field="notices",
+        )
+    )
+
+
 async def build(pool: asyncpg.Pool, kind: str, now: dt.datetime) -> Block:
     if kind == "allocation":
         return await allocation(pool)
@@ -213,4 +248,6 @@ async def build(pool: asyncpg.Pool, kind: str, now: dt.datetime) -> Block:
         return await owner_overrides(pool, now)
     if kind == "autopilot_precision":
         return await autopilot_precision(pool, now)
+    if kind == "needs_you":
+        return await needs_you(pool, now)
     raise ValueError(f"Unknown visual {kind!r}; choose one of {', '.join(KINDS)}")

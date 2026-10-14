@@ -95,3 +95,28 @@ export function waitingLabel(ageDays: number): string {
   if (ageDays <= 0) return "today";
   return ageDays === 1 ? "1 day" : `${ageDays} days`;
 }
+
+export type ReliabilityPoint = { x: number; y: number; r: number; n: number };
+
+/**
+ * Where each bin of a calibration table sits in a square chart of `size` pixels: how sure it was
+ * along the bottom, how often it was right up the side (a point on the diagonal is honest, one
+ * below it is over-confident). The radius grows with the number of checked decisions.
+ */
+export function reliabilityPoints(
+  bins: { mean_confidence: number; share_right: number; n: number }[],
+  size: number,
+  pad = 12,
+): ReliabilityPoint[] {
+  const span = size - pad * 2;
+  const most = Math.max(1, ...bins.map((b) => b.n));
+  const unit = (v: number) => Math.min(1, Math.max(0, v));
+  return bins
+    .filter((b) => b.n > 0)
+    .map((b) => ({
+      x: pad + unit(b.mean_confidence) * span,
+      y: pad + (1 - unit(b.share_right)) * span,
+      r: 3 + 4 * Math.sqrt(b.n / most),
+      n: b.n,
+    }));
+}

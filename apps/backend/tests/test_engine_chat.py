@@ -169,3 +169,14 @@ async def test_engine_activity_lists_the_standing_instructions(
     assert seen["standing_instructions"] == [
         {"ref": ref, "area": "digest", "text": "Keep the digest under ten lines."}
     ]
+
+
+async def test_the_needs_you_chart_counts_open_notices_by_kind(backend_pool: asyncpg.Pool) -> None:
+    from steward.ops import tasks
+
+    assert (await visuals.build(backend_pool, "needs_you", NOW)).chart == "none"
+    for kind, subject in (("delivery", "a"), ("delivery", "b"), ("engine_audit", "c")):
+        await tasks.see(backend_pool, kind, subject, title="t", detail="d", status="needs_owner")
+    block = await visuals.build(backend_pool, "needs_you", NOW)
+    assert block.labels == ["delivery", "engine_audit"]
+    assert block.values == [2.0, 1.0]

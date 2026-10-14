@@ -22,6 +22,7 @@ import {
   modeLabel,
   parseTab,
   precisionLabel,
+  reliabilityPoints,
   statusLabel,
   TAB_LABELS,
   waitingLabel,
@@ -580,6 +581,61 @@ function DecisionRow({
   );
 }
 
+/** Sure against right as a picture: a dot on the dashed line is honest, a dot under it is
+ * over-confident. The table below it has the same numbers. */
+function ReliabilityChart({
+  kind,
+  bins,
+}: {
+  kind: string;
+  bins: KindCalibration["bins"];
+}) {
+  const size = 160;
+  const points = reliabilityPoints(bins, size);
+  if (points.length === 0) return null;
+  return (
+    <figure className="mt-2">
+      <svg
+        role="img"
+        aria-label={`How sure the ${kind} queue said it was, against how often it was right`}
+        viewBox={`0 0 ${size} ${size}`}
+        className="h-40 w-40 text-text-muted"
+      >
+        <rect
+          x={12}
+          y={12}
+          width={size - 24}
+          height={size - 24}
+          fill="none"
+          className="stroke-border"
+        />
+        <line
+          x1={12}
+          y1={size - 12}
+          x2={size - 12}
+          y2={12}
+          strokeDasharray="3 3"
+          className="stroke-border"
+        />
+        {points.map((p) => (
+          <circle
+            key={`${p.x}-${p.y}`}
+            cx={p.x}
+            cy={p.y}
+            r={p.r}
+            className="fill-accent-ink/70"
+          >
+            <title>{`${p.n} checked`}</title>
+          </circle>
+        ))}
+      </svg>
+      <figcaption className="text-xs text-text-muted">
+        Along: how sure it said it was. Up: how often it was right.
+      </figcaption>
+    </figure>
+  );
+}
+
 /** When a queue says it is 90% sure, how often is it right? One small table per queue. */
 function CalibrationPanel({ load }: { load: Load<KindCalibration[]> }) {
   if (load.kind === "loading") return <Loading what="the calibration" />;
@@ -621,6 +677,7 @@ function CalibrationPanel({ load }: { load: Load<KindCalibration[]> }) {
           <p className="mt-1 max-w-prose text-sm text-text-muted">
             {k.verdict}
           </p>
+          <ReliabilityChart kind={k.kind} bins={k.bins} />
           <table className="mt-2 w-full max-w-md text-left text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-text-muted">

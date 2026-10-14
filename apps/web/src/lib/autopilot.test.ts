@@ -7,6 +7,7 @@ import {
   modeLabel,
   parseTab,
   precisionLabel,
+  reliabilityPoints,
   statusLabel,
   waitingLabel,
 } from "./autopilot";
@@ -57,5 +58,26 @@ describe("autopilot helpers", () => {
     expect(waitingLabel(0)).toBe("today");
     expect(waitingLabel(1)).toBe("1 day");
     expect(waitingLabel(6)).toBe("6 days");
+  });
+});
+
+describe("reliabilityPoints", () => {
+  it("puts a perfectly calibrated bin on the diagonal", () => {
+    const [p] = reliabilityPoints([{ mean_confidence: 0.5, share_right: 0.5, n: 10 }], 100, 10);
+    expect(p.x).toBeCloseTo(50);
+    expect(p.y).toBeCloseTo(50);
+  });
+
+  it("puts an over-confident bin below the diagonal and skips empty bins", () => {
+    const pts = reliabilityPoints(
+      [
+        { mean_confidence: 0.9, share_right: 0.6, n: 20 },
+        { mean_confidence: 0.3, share_right: 0.3, n: 0 },
+      ],
+      100,
+      10,
+    );
+    expect(pts).toHaveLength(1);
+    expect(pts[0].y).toBeCloseTo(10 + 0.4 * 80);
   });
 });

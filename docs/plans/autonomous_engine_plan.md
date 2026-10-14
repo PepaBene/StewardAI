@@ -349,12 +349,15 @@ Closed:
 Still open:
 - A standing instruction does not change a rule or config: it only reaches model prompts. Turning one into
   a proposed config or rule change with a replay (2b.4, 2.3) is not built.
-- The page context carries the path only; screens do not yet send a selected item.
+- Closed afterwards: the chat now sends the item picked on the page (`company ASML`, `decision 12`),
+  read from the address only (`lib/chat/page-selection.ts`) and re-checked server-side. The needs-you
+  summary has a chart too (`needs_you`: open notices by kind).
+- Screens that keep a selection in state, not in the address, still send the path only.
 - Snooze now exists (`snooze_notice`: a week on the Autopilot page, any 1-90 days from chat; a snooze
   is not a dismissal and the notice stays closed until its date). There is still no chat action for
   facts or news stories beyond reviewing and undoing autopilot decisions.
 - The benchmark cases run only with a model: no run of them is in the test suite, only their labels.
-- The needs-you digest is `engine_activity` text, not a chart.
+- The needs-you digest in chat is still `engine_activity` text next to the new chart.
 
 **Phase 3 - self-change control (delivered 2026-10-14, gaps below).**
 
@@ -379,8 +382,11 @@ Still open:
 - The replay can only drop decisions below the floor. It cannot tell what the owner would have decided
   on the escalated ones, so the gain is measured on decisions that were reviewed anyway.
 - The gates are constants in code, not an owner-editable config the engine cannot write.
-- Rollback needs enough reviewed decisions in the window after the change; a quiet kind is not checked.
-- The calibration tab shows tables, not a reliability chart.
+- Rollback needs enough reviewed decisions in the window after the change. Closed afterwards: a floor that
+  leaves its 28-day watch with too few reviews now opens one notice saying it could not be checked
+  (nothing is undone by it).
+- Closed afterwards: the calibration tab draws a reliability chart per kind (sure against right, dot size
+  = decisions checked) above the same table.
 
 **Phase 4 - proactive engine (delivered 2026-10-14, gaps below).** Migration
 `20261120100000_engine_trigger` adds `engine_trigger`.
