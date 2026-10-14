@@ -2340,6 +2340,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/webhooks/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend Event
+         * @description A delivery event from Resend (delivered, bounced, complained...). Refused without a valid
+         *     signature, and always refused while `RESEND_WEBHOOK_SECRET` is not set.
+         */
+        post: operations["resend_event"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/escalations/stats": {
         parameters: {
             query?: never;
@@ -4161,6 +4182,27 @@ export interface paths {
          *     still there on a later run opens a new notice; a missing key stays dismissed.
          */
         post: operations["dismiss_notice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/notices/{task_id}/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Snooze Notice
+         * @description Set a notice aside for some days. It does not come back before then, and unlike a
+         *     dismissal it does not count against the notice.
+         */
+        post: operations["snooze_notice"];
         delete?: never;
         options?: never;
         head?: never;
@@ -35077,26 +35119,6 @@ export interface components {
              */
             unrealised: number;
         };
-        /** SnoozeIn */
-        SnoozeIn: {
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap" | "engine_verification";
-            /** Subject */
-            subject: string;
-            /**
-             * Action
-             * @default snooze
-             * @enum {string}
-             */
-            action: "snooze" | "clear";
-            /** Until */
-            until?: string | null;
-            /** Note */
-            note?: string | null;
-        };
         /** SnoozeRow */
         SnoozeRow: {
             /** Id */
@@ -40240,6 +40262,14 @@ export interface components {
              */
             ok: boolean;
         };
+        /** SnoozeIn */
+        api__autopilot_routes__SnoozeIn: {
+            /**
+             * Days
+             * @default 7
+             */
+            days: number;
+        };
         /** StakeChangeOut */
         api__disclosure_routes__StakeChangeOut: {
             /** Change Type */
@@ -40439,6 +40469,26 @@ export interface components {
              * @default 0
              */
             issues: number;
+            /** Note */
+            note?: string | null;
+        };
+        /** SnoozeIn */
+        steward__quality__snooze__SnoozeIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap" | "engine_verification";
+            /** Subject */
+            subject: string;
+            /**
+             * Action
+             * @default snooze
+             * @enum {string}
+             */
+            action: "snooze" | "clear";
+            /** Until */
+            until?: string | null;
             /** Note */
             note?: string | null;
         };
@@ -44163,6 +44213,24 @@ export interface operations {
             };
         };
     };
+    resend_event: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     get_escalation_stats: {
         parameters: {
             query?: {
@@ -47146,6 +47214,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dismissed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    snooze_notice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api__autopilot_routes__SnoozeIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -53693,7 +53796,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SnoozeIn"];
+                "application/json": components["schemas"]["steward__quality__snooze__SnoozeIn"];
             };
         };
         responses: {

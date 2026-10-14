@@ -268,6 +268,19 @@ async def dismiss_notice(task_id: IdPath, pool: Pool, _owner: Owner) -> Dismisse
     return Dismissed(task_id=task_id)
 
 
+class SnoozeIn(BaseModel):
+    days: int = Field(default=7, ge=1, le=ops_tasks.SNOOZE_MAX_DAYS)
+
+
+@router.post("/autopilot/notices/{task_id}/snooze")
+async def snooze_notice(task_id: IdPath, pool: Pool, _owner: Owner, body: SnoozeIn) -> Dismissed:
+    """Set a notice aside for some days. It does not come back before then, and unlike a
+    dismissal it does not count against the notice."""
+    if not await ops_tasks.snooze(pool, task_id, body.days):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"No open notice {task_id}")
+    return Dismissed(task_id=task_id)
+
+
 @router.post("/autopilot/decisions/{decision_id}/revert")
 async def revert_decision(
     decision_id: IdPath, pool: Pool, _owner: Owner, body: WhyIn | None = None

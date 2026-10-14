@@ -219,8 +219,11 @@ async def _save_held(
     return int(saved.id)
 
 
-async def accept_memo(pool: asyncpg.Pool, memo_id: int) -> dict[str, Any]:
-    """The owner decided to buy: save the thesis of an open buy memo as the stock's thesis."""
+async def accept_memo(
+    pool: asyncpg.Pool, memo_id: int, *, created_by: str | None = None
+) -> dict[str, Any]:
+    """The owner decided to buy: save the thesis of an open buy memo as the stock's thesis. The
+    version carries the owner's id, so it is the owner's decision and not an engine write."""
     row = await pool.fetchrow(
         "select ticker, mode, status, body, stance from public.thesis_memo where id = $1", memo_id
     )
@@ -237,7 +240,7 @@ async def accept_memo(pool: asyncpg.Pool, memo_id: int) -> dict[str, Any]:
                 conn,
                 "theses",
                 replace_thesis(config, thesis),
-                created_by=None,
+                created_by=created_by,
                 note=f"{author.MARKER} buy thesis for {thesis.ticker} (memo #{memo_id})",
                 expected_active_id=stored.id if stored else None,
             )

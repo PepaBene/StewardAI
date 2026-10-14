@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useId, useState } from "react";
 
+import { ReasonChips, type OverrideReason } from "@/app/(app)/autopilot/reason-chips";
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -118,11 +119,11 @@ export function VersionHistory({
     if (rollback.kind === "confirm" || rollback.kind === "invalid" || rollback.kind === "error") setRollback({ kind: "idle" });
   }
 
-  async function confirmRollback(id: number) {
+  async function confirmRollback(id: number, reason: OverrideReason | null) {
     setRollback({ kind: "busy", id });
     try {
       const { data, error, response } = await api().POST("/config/{domain}/versions/{version_id}/rollback", {
-        params: { path: { domain, version_id: id } },
+        params: { path: { domain, version_id: id }, query: reason ? { reason_code: reason } : undefined },
       });
       if (data) {
         setRollback({ kind: "done", from: id, version: data });
@@ -231,7 +232,7 @@ export function VersionHistory({
                   id={current.id}
                   label={info.label}
                   busy={rollback.kind === "busy"}
-                  onConfirm={() => void confirmRollback(current.id)}
+                  onConfirm={(reason) => void confirmRollback(current.id, reason)}
                   onCancel={() => setRollback({ kind: "idle" })}
                 />
               ) : null}
@@ -387,7 +388,7 @@ function ConfirmRollback({
   id: number;
   label: string;
   busy: boolean;
-  onConfirm: () => void;
+  onConfirm: (reason: OverrideReason | null) => void;
   onCancel: () => void;
 }) {
   return (
@@ -399,15 +400,11 @@ function ConfirmRollback({
         Its body is saved as a new active version (history is kept, and you can roll forward the
         same way). Jobs use it from their next run.
       </p>
-      <div className="flex gap-2">
-        <Button size="sm" onClick={onConfirm} disabled={busy} autoFocus>
-          {busy ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <RotateCcwIcon aria-hidden="true" />}
-          Roll back
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onCancel} disabled={busy}>
-          Cancel
-        </Button>
-      </div>
+      <p className="flex items-center gap-1 text-sm font-medium">
+        {busy ? <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" /> : <RotateCcwIcon aria-hidden="true" className="size-4" />}
+        Roll back now. If the engine wrote the current version, tell it why:
+      </p>
+      <ReasonChips disabled={busy} onPick={onConfirm} onCancel={onCancel} />
     </div>
   );
 }

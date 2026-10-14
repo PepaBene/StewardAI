@@ -279,6 +279,21 @@ function NeedsYouRow({
           >
             {pending === "dismiss" ? "Dismissing…" : "Dismiss"}
           </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={pending !== null}
+            onClick={() =>
+              run("snooze", () =>
+                api.POST("/autopilot/notices/{task_id}/snooze", {
+                  params: { path: { task_id: item.id } },
+                  body: { days: 7 },
+                }),
+              )
+            }
+          >
+            {pending === "snooze" ? "Snoozing…" : "Snooze a week"}
+          </Button>
         </div>
         {error ? (
           <p role="alert" className="mt-2 text-sm text-loss">

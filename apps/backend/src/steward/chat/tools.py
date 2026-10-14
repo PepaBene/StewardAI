@@ -49,6 +49,7 @@ JOB_KINDS = ("earnings_check", "research", "portfolio_sync")
 # equal to the registry. None of them places or prepares a trade.
 CHANGE_KINDS = (
     "dismiss_notice",
+    "snooze_notice",
     "revert_decision",
     "accept_recommendation",
     "review_decision",
@@ -750,7 +751,8 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "profile": {"type": "string", "description": "Research profile id."},
                 "args": {
                     "type": "object",
-                    "description": "For a change: task_id (dismiss_notice), decision_id "
+                    "description": "For a change: task_id (dismiss_notice), task_id and days "
+                    "(snooze_notice), decision_id "
                     "(the others), verdict ok|wrong (review_decision), kind and mode "
                     "(set_autopilot_mode), domain and version_id (rollback_config), "
                     "change_id (roll_back_change), area theses|chat|digest|news and text "

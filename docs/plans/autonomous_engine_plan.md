@@ -306,17 +306,26 @@ Closed:
   included). The overrides come back as "lessons" in the prompts of the thesis author, the chat and the
   digest writer.
 
+Gaps closed afterwards (2026-10-14):
+- `accept_memo` now saves the version under the owner's id, so it no longer shows as engine-written.
+- The on-screen config rollback asks "why" with the same one-tap reasons as the autopilot page.
+- `POST /webhooks/resend` takes Resend delivery events (Svix signature, 5-minute tolerance), off until
+  `RESEND_WEBHOOK_SECRET` is set; a weaker later event never hides a bounce. The poll stays as fallback.
+- `engine/data_audit.py` is the second-source interface: prices (two sources disagreeing on a close,
+  a 40% one-day move), fund holdings (do not add up to the fund, one holding over half) and digests
+  (many sentences the claim verifier could not back). It runs in the autopilot job, one notice per
+  finding, resolved when the finding is gone. A new data source adds one entry to `AUDITS`.
+- Research profiles: not a gap. The engine never writes a research profile, so there is nothing of its
+  own for the owner to overrule; owner edits of other engine-written config already feed lessons.
+- The ledger's config source relies on `created_by` being empty; `test_engine_writers.py` lists every
+  module that writes that way, so a new one cannot appear unmapped.
+
 Still open:
-- Research profiles have no owner-override source, so they get no lessons.
-- No Resend webhooks (polling only). Telegram has no delivery-status API; its receipt is the API answer.
-- The on-screen config rollback and manual save do not ask "why" (the API accepts `reason_code` on
-  rollback only; a manual save records the override without a reason).
-- Prices, fund weights and digests have no autopilot verifier; there is no second-source or audit
-  interface, and the fact check only compares the printed number with the stored excerpt.
-- `accept_memo` saves with no author, so its version shows up as engine-written.
-- The ledger's config source is "no author and a parent, not an import or rollback"; a job that writes
-  config without an author for another reason would still show.
-- Telegram/email for critical failures at all hours is still open question 2.
+- Telegram has no delivery-status API; its receipt is the API answer.
+- A manual save of a config screen still records the override without a reason (only rollback asks).
+- The audits compare and sanity-check; they do not re-derive a price or a weight from an independent
+  source of truth, and the fact check only compares the printed number with the stored excerpt.
+- Telegram/email for critical failures at all hours is still open question 2 (an owner decision).
 
 **Phase 2b - chat control surface (delivered 2026-10-14, gaps below).** Migration
 `20261119100000_owner_standing_instructions` adds the `taught` and `retracted` override actions.
@@ -341,8 +350,9 @@ Still open:
 - A standing instruction does not change a rule or config: it only reaches model prompts. Turning one into
   a proposed config or rule change with a replay (2b.4, 2.3) is not built.
 - The page context carries the path only; screens do not yet send a selected item.
-- No snooze action (notices can only be dismissed), and no chat action for facts or news stories beyond
-  reviewing and undoing autopilot decisions.
+- Snooze now exists (`snooze_notice`: a week on the Autopilot page, any 1-90 days from chat; a snooze
+  is not a dismissal and the notice stays closed until its date). There is still no chat action for
+  facts or news stories beyond reviewing and undoing autopilot decisions.
 - The benchmark cases run only with a model: no run of them is in the test suite, only their labels.
 - The needs-you digest is `engine_activity` text, not a chart.
 

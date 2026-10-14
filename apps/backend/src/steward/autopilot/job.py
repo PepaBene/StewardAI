@@ -18,7 +18,7 @@ from steward.autopilot.thesis_upkeep import (
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.engine import audit as engine_audit
-from steward.engine import challenger, learning, override_watch
+from steward.engine import challenger, data_audit, learning, override_watch
 from steward.jobs.runner import JobContext
 from steward.llm.cache import ResultCache
 from steward.llm.client import create_llm
@@ -123,6 +123,8 @@ async def autopilot_calibration_handler(ctx: JobContext) -> None:
         step.detail["floors"] = await relearn(ctx.pool, kinds, configured, now)
     async with ctx.step("reward_audit") as step:
         step.detail["flagged"] = await engine_audit.audit(ctx.pool, list(kinds), now)
+    async with ctx.step("data_audit") as step:
+        step.detail.update(await data_audit.run(ctx.pool, now))
     async with ctx.step("change_rollbacks") as step:
         step.detail.update(await challenger.check_rollbacks(ctx.pool, now))
     async with ctx.step("override_patterns") as step:

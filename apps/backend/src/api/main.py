@@ -66,6 +66,7 @@ from api.valuation_routes import router as valuation_router
 from api.verify_routes import router as verify_router
 from api.watchlist_routes import router as watchlist_router
 from api.web_fact_routes import router as web_fact_router
+from api.webhook_routes import router as webhook_router
 from api.xray_routes import router as xray_router
 from steward import __version__
 from steward.config import StrategyConfig, ThesesConfig
@@ -264,6 +265,7 @@ def create_app() -> FastAPI:
     app.include_router(budget_router)
     app.include_router(research_router)  # before news: /reports/search vs /reports/{id}
     app.include_router(thesis_router)
+    app.include_router(webhook_router)
     app.include_router(escalation_router)  # before news: /escalations/stats vs /{id}
     app.include_router(news_router)
     app.include_router(reference_router)

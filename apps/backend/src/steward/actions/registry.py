@@ -52,6 +52,11 @@ class NoticeArgs(BaseModel):
     task_id: int = Field(ge=1)
 
 
+class SnoozeArgs(BaseModel):
+    task_id: int = Field(ge=1)
+    days: int = Field(default=7, ge=1, le=ops_tasks.SNOOZE_MAX_DAYS)
+
+
 class DecisionArgs(BaseModel):
     decision_id: int = Field(ge=1)
 
@@ -111,6 +116,19 @@ async def _run_dismiss(pool: asyncpg.Pool, a: NoticeArgs) -> dict[str, Any]:
     if not await ops_tasks.dismiss(pool, a.task_id):
         raise ActionError(f"Notice {a.task_id} is not open")
     return {"task_id": a.task_id}
+
+
+async def _describe_snooze(pool: asyncpg.Pool, a: SnoozeArgs) -> str:
+    title = await pool.fetchval("select title from public.ops_task where id = $1", a.task_id)
+    if title is None:
+        raise ActionError(f"No notice {a.task_id}")
+    return f"Snooze the notice for {a.days} days: {title}"
+
+
+async def _run_snooze(pool: asyncpg.Pool, a: SnoozeArgs) -> dict[str, Any]:
+    if not await ops_tasks.snooze(pool, a.task_id, a.days):
+        raise ActionError(f"Notice {a.task_id} is not open")
+    return {"task_id": a.task_id, "days": a.days}
 
 
 async def _describe_revert(pool: asyncpg.Pool, a: DecisionArgs) -> str:
@@ -310,6 +328,15 @@ ACTIONS: dict[str, Action] = {
             "A problem that is still there opens a new notice on the next watchdog run.",
             _describe_dismiss,
             _run_dismiss,
+        ),
+        Action(
+            "snooze_notice",
+            "Snooze a notice",
+            "low",
+            SnoozeArgs,
+            "It comes back by itself after the days you chose; nothing is lost.",
+            _describe_snooze,
+            _run_snooze,
         ),
         Action(
             "revert_decision",

@@ -57,6 +57,7 @@ WRITERS: dict[str, tuple[str, set[str]]] = {
             "steward/autopilot/thesis_upkeep.py",
             "steward/engine/learning.py",
             "steward/engine/triggers.py",
+            "steward/engine/data_audit.py",
         },
     ),
     "engine_change": (

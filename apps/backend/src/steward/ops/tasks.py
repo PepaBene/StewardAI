@@ -23,6 +23,12 @@ SEE = (
     " returning id, kind, subject, status, title, detail, href, weight, attempts,"
     " last_action, last_action_at, first_seen, last_seen"
 )
+SNOOZED = (
+    "select id, kind, subject, status, title, detail, href, weight, attempts, last_action,"
+    " last_action_at, first_seen, last_seen from public.ops_task where kind = $1 and subject = $2"
+    " and status = 'resolved' and snoozed_until > now() order by id desc limit 1"
+)
+SNOOZE_MAX_DAYS = 90
 NEEDS_OWNER = (
     "select id, kind, subject, status, title, detail, href, weight, attempts,"
     " last_action, last_action_at, first_seen, last_seen from public.ops_task"
@@ -78,7 +84,11 @@ async def see(
     weight: float | None = None,
     status: Status = "fixing",
 ) -> OpsTask:
-    """Record that the problem exists now; open its task or refresh the open one."""
+    """Record that the problem exists now; open its task or refresh the open one. A notice the
+    owner snoozed stays closed until its date."""
+    snoozed = await pool.fetchrow(SNOOZED, kind, subject)
+    if snoozed is not None:
+        return OpsTask.model_validate(dict(snoozed))
     row = await pool.fetchrow(
         SEE,
         kind,
@@ -115,6 +125,19 @@ async def dismiss(pool: asyncpg.Pool, task_id: int) -> bool:
         "update public.ops_task set status = 'resolved', resolved_at = now(),"
         " last_action = 'dismissed' where id = $1 and status = 'needs_owner'",
         task_id,
+    )
+    return bool(result.endswith(" 1"))
+
+
+async def snooze(pool: asyncpg.Pool, task_id: int, days: int) -> bool:
+    """Set a notice aside until `days` from now. Unlike a dismissal it says nothing against the
+    notice, so it does not count when the engine decides whether a trigger helps."""
+    result = await pool.execute(
+        "update public.ops_task set status = 'resolved', resolved_at = now(),"
+        " last_action = 'snoozed', snoozed_until = now() + make_interval(days => $2)"
+        " where id = $1 and status = 'needs_owner'",
+        task_id,
+        max(1, min(days, SNOOZE_MAX_DAYS)),
     )
     return bool(result.endswith(" 1"))
 

@@ -90,6 +90,8 @@ class Settings(BaseSettings):
     telegram_bot_token: SecretStr | None = None
     telegram_chat_id: str | None = None
     resend_api_key: SecretStr | None = None
+    # Signing secret of the Resend webhook (`whsec_...`); the webhook route is off without it.
+    resend_webhook_secret: SecretStr | None = None
     alert_email_from: str | None = None
     alert_email_to: str | None = None
     # Public URL of the web app, for links in alerts and digests.
@@ -157,6 +159,7 @@ class Settings(BaseSettings):
             self.stooq_api_key,
             self.telegram_bot_token,
             self.resend_api_key,
+            self.resend_webhook_secret,
             self.heartbeat_ping_url,
         ]
         return [s.get_secret_value() for s in secrets if s is not None and s.get_secret_value()]

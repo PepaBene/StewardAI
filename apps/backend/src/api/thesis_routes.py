@@ -119,10 +119,10 @@ class AcceptOut(BaseModel):
 
 
 @router.post("/thesis/memos/{memo_id}/accept", tags=["thesis"])
-async def accept_buy_memo(memo_id: IdPath, pool: Pool, _owner: Owner) -> AcceptOut:
+async def accept_buy_memo(memo_id: IdPath, pool: Pool, owner: Owner) -> AcceptOut:
     """You decided to buy: save the memo's thesis as the stock's thesis."""
     try:
-        done = await accept_memo(pool, memo_id)
+        done = await accept_memo(pool, memo_id, created_by=owner.user_id)
     except LookupError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except ValueError as exc:

@@ -6667,6 +6667,21 @@
         }
       }
     },
+    "/webhooks/resend": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Resend Event",
+        "description": "A delivery event from Resend (delivered, bounced, complained...). Refused without a valid\nsignature, and always refused while `RESEND_WEBHOOK_SECRET` is not set.",
+        "operationId": "resend_event",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
     "/escalations/stats": {
       "get": {
         "tags": [
@@ -12194,6 +12209,66 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dismissed"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/autopilot/notices/{task_id}/snooze": {
+      "post": {
+        "tags": [
+          "autopilot"
+        ],
+        "summary": "Snooze Notice",
+        "description": "Set a notice aside for some days. It does not come back before then, and unlike a\ndismissal it does not count against the notice.",
+        "operationId": "snooze_notice",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Task Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api__autopilot_routes__SnoozeIn"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -23898,7 +23973,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SnoozeIn"
+                "$ref": "#/components/schemas/steward__quality__snooze__SnoozeIn"
               }
             }
           },
@@ -101398,70 +101473,6 @@
         ],
         "title": "SnapshotValues"
       },
-      "SnoozeIn": {
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "stale_price",
-              "identity_unresolved",
-              "fund_weights",
-              "claim_review",
-              "source_conflict",
-              "provider_access",
-              "provider_quota",
-              "thesis_gap",
-              "engine_verification"
-            ],
-            "title": "Kind"
-          },
-          "subject": {
-            "type": "string",
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Subject"
-          },
-          "action": {
-            "type": "string",
-            "enum": [
-              "snooze",
-              "clear"
-            ],
-            "title": "Action",
-            "default": "snooze"
-          },
-          "until": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Until"
-          },
-          "note": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 500
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          }
-        },
-        "type": "object",
-        "required": [
-          "kind",
-          "subject"
-        ],
-        "title": "SnoozeIn"
-      },
       "SnoozeRow": {
         "properties": {
           "id": {
@@ -115550,6 +115561,19 @@
         "type": "object",
         "title": "Recorded"
       },
+      "api__autopilot_routes__SnoozeIn": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "maximum": 90.0,
+            "minimum": 1.0,
+            "title": "Days",
+            "default": 7
+          }
+        },
+        "type": "object",
+        "title": "SnoozeIn"
+      },
       "api__disclosure_routes__StakeChangeOut": {
         "properties": {
           "change_type": {
@@ -116192,6 +116216,70 @@
           "denominator"
         ],
         "title": "Check"
+      },
+      "steward__quality__snooze__SnoozeIn": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stale_price",
+              "identity_unresolved",
+              "fund_weights",
+              "claim_review",
+              "source_conflict",
+              "provider_access",
+              "provider_quota",
+              "thesis_gap",
+              "engine_verification"
+            ],
+            "title": "Kind"
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Subject"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "snooze",
+              "clear"
+            ],
+            "title": "Action",
+            "default": "snooze"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "subject"
+        ],
+        "title": "SnoozeIn"
       },
       "steward__research__ledger__Claim": {
         "properties": {
