@@ -276,6 +276,51 @@ Each phase ends with tests, a rollback path and a status entry in this file.
     volume once at least 6 weeks of engagement data exist.
 5.4 Remaining table rows, one area per PR.
 
+### Delivery status and known gaps
+
+**Phase 1 - delivered in part (2026-10-14).** No migration was needed. What exists: `engine/timeline.py`
+and `GET /engine/ledger` (1.1), `JudgeKind.verify` with the fact check and `recheck` (1.2),
+`ops/delivery.py` in the watchdog (1.3), `autopilot/reverify.py` in the calibration job (1.4).
+
+Gaps, to be closed before phase 1 counts as done:
+
+1.1 One list of what the engine did
+- It is a read model over five tables, not the write-through helper the plan asked for. The test only
+  checks that the five sources are listed; it does not fail when a new autonomous writer skips the list.
+- Not in the list yet: tuner changes (alerts, inbox, notices), `owner_override` rows, alert deliveries,
+  auto-logged journal rows (`origin: auto`), news-story and digest actions that do not go through
+  `auto_decision`.
+- The `config` source is "versions with no author and a parent"; that also matches versions written by
+  jobs or seeds that are not self-changes, so it can over-report.
+- `reversible` is only a flag. There is no single undo for config versions and engine changes from the list.
+- No web page for the list, no kind filter, no paging, and the OpenAPI schema and web types are not
+  regenerated for `/engine/ledger`.
+
+1.2 Verification registry
+- Only the `fact` kind has `verify`/`recheck`. Prices, identity, fund weights, news stories, digests,
+  `web_fact` and the other autopilot kinds have none.
+- The fact check is narrow: the printed number must appear in the stored excerpt. It does not compare the
+  value with a second source or the reconciliation, and a `correct_*` decision is not checked.
+- There are no `second_source` or `audit` interfaces; only the two hooks exist.
+- Nothing fails when a kind has neither a verifier nor a written waiver.
+- The quality cockpit has no check for the verifiers (area 17).
+
+1.3 Liveness and delivery receipts
+- Heartbeats cover only the autopilot and the watchdog, not every autonomous job.
+- The receipt is the `alert` row status. Provider message ids (Telegram `message_id`, Resend id) are not
+  stored and Resend delivery webhooks are not read, so "accepted by the API" is the strongest evidence.
+- Only the `alert` table is watched; the weekly report and the digest sends are not.
+- There is no dead-letter handling beyond the `failed` status.
+- The second channel is the in-app notice only. Telegram/email for critical failures is open question 2.
+
+1.4 Weekly re-verification
+- It runs on every calibration run, not weekly, and checks the last 30 days of unreviewed applied
+  decisions, at most 200 per run.
+- Only facts have a kind-specific recheck; every other kind gets only "the item is waiting again".
+- The disagreement rate (success metric) is not stored or shown.
+- A notice the owner dismissed opens again on the next run while the problem remains.
+- It does not sample decisions that were reviewed, and does not use a second source or a different model.
+
 ## 6. Success metrics (measured against the owner, not against the engine)
 
 - Owner override rate per kind, trending down; no kind promoted to `auto` with override rate over its cap.

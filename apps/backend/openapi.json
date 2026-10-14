@@ -12143,7 +12143,7 @@
           "autopilot"
         ],
         "summary": "Revert Decision",
-        "description": "Undo an applied decision. It counts as a wrong decision in calibration.",
+        "description": "Undo an applied decision. It counts as a wrong decision in calibration. The body, with\na reason chip and a note, is optional.",
         "operationId": "revert_decision",
         "security": [
           {
@@ -12163,6 +12163,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/WhyIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -12280,6 +12297,90 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AutoDecision"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/engine/ledger": {
+      "get": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Engine Ledger",
+        "description": "Everything the engine or the owner changed, newest first, from every ledger.",
+        "operationId": "engine_ledger",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "default": 7,
+              "title": "Days"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Entry"
+                  },
+                  "title": "Response Engine Ledger"
                 }
               }
             }
@@ -50516,6 +50617,50 @@
           "note"
         ],
         "title": "EntityMatchOut"
+      },
+      "Entry": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reversible": {
+            "type": "boolean",
+            "title": "Reversible"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "source",
+          "kind",
+          "ref",
+          "summary",
+          "status",
+          "reversible"
+        ],
+        "title": "Entry"
       },
       "Envelope": {
         "properties": {
@@ -93735,6 +93880,38 @@
       },
       "ReviewIn": {
         "properties": {
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "wrong_data",
+                  "wrong_source",
+                  "right_but_unimportant",
+                  "too_early",
+                  "too_late",
+                  "prefer_my_judgement",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
           "verdict": {
             "type": "string",
             "enum": [
@@ -111747,6 +111924,44 @@
           "notes"
         ],
         "title": "WhatIfResult"
+      },
+      "WhyIn": {
+        "properties": {
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "wrong_data",
+                  "wrong_source",
+                  "right_but_unimportant",
+                  "too_early",
+                  "too_late",
+                  "prefer_my_judgement",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "title": "WhyIn"
       },
       "WikidataSummary": {
         "properties": {

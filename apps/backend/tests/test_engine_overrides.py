@@ -1,13 +1,14 @@
 """Owner overrides: recorded with the reason, and only a pattern of them is acted on."""
 
 import datetime as dt
+import json
 
 import asyncpg
 import pytest
 
 from steward.actions import registry
 from steward.autopilot import ledger
-from steward.engine import overrides
+from steward.engine import override_watch, overrides
 
 NOW = dt.datetime.now(dt.UTC)
 
@@ -94,3 +95,37 @@ async def test_an_overridden_source_shows_up_as_a_pattern_only_when_it_keeps_hap
     assert [(p.kind, p.decided_by, p.overridden, p.top_reason) for p in found] == [
         ("fact", "rule:x", 4, "wrong_data")
     ]
+
+
+@pytest.mark.db
+async def test_a_pattern_opens_one_notice_and_one_proposal(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    ids = [await decision(backend_pool, f"fact:{i}") for i in range(6)]
+    for did in ids[:4]:
+        await overrides.record(
+            backend_pool,
+            area="autopilot",
+            subject_kind="fact",
+            subject_ref="x",
+            action="reverted",
+            via="screen",
+            reason_code="too_early",
+            decided_by="rule:x",
+            decision_id=did,
+        )
+    for _ in range(2):
+        done = await override_watch.act(backend_pool, {"fact": 0.9}, NOW)
+        assert done["notices"] == 1
+    assert done["proposals"] == 0  # the second run found its proposal already open
+    change = await backend_pool.fetchrow("select * from public.engine_change")
+    assert (change["target"], change["status"]) == ("autopilot:fact", "shadow")
+    assert json.loads(change["after"]) == {"min_confidence": 0.93}
+    assert await backend_pool.fetchval("select count(*) from public.engine_change") == 1
+    assert await backend_pool.fetchval("select count(*) from public.ops_task") == 1
+
+
+def test_the_notice_names_the_main_reason() -> None:
+    p = overrides.Pattern("fact", "rule:x", 4, 10, "too_early")
+    assert "40%" in override_watch.describe(p) and "too early" in override_watch.describe(p)
+    assert override_watch.proposed_floor(0.985) == 0.99

@@ -10,6 +10,8 @@ import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Blueprint } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
+
+import { type OverrideReason, ReasonChips } from "./reason-chips";
 import { getBrowserApiClient } from "@/lib/api/client";
 import {
   AUTOPILOT_TABS,
@@ -211,6 +213,7 @@ function NeedsYouRow({
 }) {
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
   const api = getBrowserApiClient();
   const path = { decision_id: item.id };
   const spot = item.kind_of_item === "spot_check";
@@ -320,13 +323,7 @@ function NeedsYouRow({
               size="sm"
               variant="outline"
               disabled={pending !== null}
-              onClick={() =>
-                run("undo", () =>
-                  api.POST("/autopilot/decisions/{decision_id}/revert", {
-                    params: { path },
-                  }),
-                )
-              }
+              onClick={() => setAsking(true)}
             >
               <Undo2Icon aria-hidden="true" />
               Wrong, undo it
@@ -354,6 +351,21 @@ function NeedsYouRow({
           Decide it myself
         </Link>
       </div>
+      {asking ? (
+        <ReasonChips
+          disabled={pending !== null}
+          onCancel={() => setAsking(false)}
+          onPick={(reason) => {
+            setAsking(false);
+            void run("undo", () =>
+              api.POST("/autopilot/decisions/{decision_id}/revert", {
+                params: { path },
+                body: reason ? { reason_code: reason } : undefined,
+              }),
+            );
+          }}
+        />
+      ) : null}
       {error ? (
         <p role="alert" className="mt-2 text-sm text-loss">
           {error}
@@ -468,14 +480,19 @@ function DecisionRow({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
 
-  async function undo() {
+  async function undo(reason: OverrideReason | null) {
+    setAsking(false);
     setPending(true);
     setError(null);
     try {
       const { response, error: body } = await getBrowserApiClient().POST(
         "/autopilot/decisions/{decision_id}/revert",
-        { params: { path: { decision_id: d.id } } },
+        {
+          params: { path: { decision_id: d.id } },
+          body: reason ? { reason_code: reason } : undefined,
+        },
       );
       if (!response.ok) {
         const detail = (body as { detail?: unknown } | undefined)?.detail;
@@ -518,11 +535,18 @@ function DecisionRow({
           variant="ghost"
           className="mt-1"
           disabled={pending}
-          onClick={undo}
+          onClick={() => setAsking(true)}
         >
           <Undo2Icon aria-hidden="true" />
           Undo
         </Button>
+      ) : null}
+      {asking ? (
+        <ReasonChips
+          disabled={pending}
+          onCancel={() => setAsking(false)}
+          onPick={(reason) => void undo(reason)}
+        />
       ) : null}
       {error ? (
         <p role="alert" className="mt-1 text-sm text-loss">

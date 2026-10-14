@@ -4156,7 +4156,8 @@ export interface paths {
         put?: never;
         /**
          * Revert Decision
-         * @description Undo an applied decision. It counts as a wrong decision in calibration.
+         * @description Undo an applied decision. It counts as a wrong decision in calibration. The body, with
+         *     a reason chip and a note, is optional.
          */
         post: operations["revert_decision"];
         delete?: never;
@@ -4199,6 +4200,26 @@ export interface paths {
          * @description The owner's verdict on a spot-checked decision. Calibration counts it.
          */
         post: operations["review_decision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/engine/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Engine Ledger
+         * @description Everything the engine or the owner changed, newest first, from every ledger.
+         */
+        get: operations["engine_ledger"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -16823,6 +16844,26 @@ export interface components {
             candidates: number[];
             /** Note */
             note: string;
+        };
+        /** Entry */
+        Entry: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Source */
+            source: string;
+            /** Kind */
+            kind: string;
+            /** Ref */
+            ref: string;
+            /** Summary */
+            summary: string;
+            /** Status */
+            status: string;
+            /** Reversible */
+            reversible: boolean;
         };
         /** Envelope */
         Envelope: {
@@ -32325,6 +32366,10 @@ export interface components {
         };
         /** ReviewIn */
         ReviewIn: {
+            /** Reason Code */
+            reason_code?: ("wrong_data" | "wrong_source" | "right_but_unimportant" | "too_early" | "too_late" | "prefer_my_judgement" | "other") | null;
+            /** Note */
+            note?: string | null;
             /**
              * Verdict
              * @enum {string}
@@ -38974,6 +39019,13 @@ export interface components {
             assumptions: string[];
             /** Notes */
             notes: string[];
+        };
+        /** WhyIn */
+        WhyIn: {
+            /** Reason Code */
+            reason_code?: ("wrong_data" | "wrong_source" | "right_but_unimportant" | "too_early" | "too_late" | "prefer_my_judgement" | "other") | null;
+            /** Note */
+            note?: string | null;
         };
         /** WikidataSummary */
         WikidataSummary: {
@@ -46842,7 +46894,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["WhyIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -46917,6 +46973,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AutoDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    engine_ledger: {
+        parameters: {
+            query?: {
+                days?: number;
+                limit?: number;
+                source?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Entry"][];
                 };
             };
             /** @description Validation Error */
