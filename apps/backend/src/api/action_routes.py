@@ -14,7 +14,7 @@ from api.db import IdPath, Pool
 from steward.actions import registry
 from steward.autopilot import reverify
 from steward.chat import visuals
-from steward.engine import overrides, timeline, triggers
+from steward.engine import gates, overrides, timeline, triggers
 
 router = APIRouter(tags=["actions"])
 
@@ -103,6 +103,28 @@ async def record_override(body: OverrideIn, pool: Pool, _owner: Owner) -> Record
         decided_by="engine",
     )
     return Recorded(recorded=True)
+
+
+class UnexplainedOut(BaseModel):
+    areas: dict[str, int]
+
+
+class ExplainIn(BaseModel):
+    area: str = Field(min_length=1, max_length=80)
+    reason_code: overrides.Reason
+
+
+@router.get("/overrides/unexplained")
+async def unexplained_overrides(pool: Pool, _owner: Owner) -> UnexplainedOut:
+    """Config edits of the last minutes that overruled the engine and have no reason yet, so a
+    screen can ask why right after the save."""
+    return UnexplainedOut(areas=await overrides.unexplained(pool))
+
+
+@router.post("/overrides/explain")
+async def explain_overrides(body: ExplainIn, pool: Pool, _owner: Owner) -> dict[str, int]:
+    """Give those edits a reason."""
+    return {"explained": await overrides.explain(pool, body.area, body.reason_code)}
 
 
 @router.get("/overrides")
@@ -221,3 +243,22 @@ async def get_visual(kind: str, pool: Pool, _owner: Owner) -> visuals.Block:
         return await visuals.build(pool, kind, dt.datetime.now(dt.UTC))
     except ValueError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+
+
+class GateOut(BaseModel):
+    min_n: int
+    min_reviewed: int
+    max_wrong_rate_increase: float
+
+
+@router.get("/engine/gates")
+async def get_gates(pool: Pool, _owner: Owner) -> GateOut:
+    """The bar a stricter confidence floor must clear before it is applied."""
+    return GateOut(**(await gates.load_settings(pool)).model_dump())
+
+
+@router.put("/engine/gates")
+async def put_gates(body: gates.FloorGateSettings, pool: Pool, owner: Owner) -> GateOut:
+    """Change that bar. Only you can; the engine cannot propose a change to it."""
+    saved = await gates.save(pool, body, owner.user_id)
+    return GateOut(**saved.model_dump())

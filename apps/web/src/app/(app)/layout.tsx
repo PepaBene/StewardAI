@@ -5,6 +5,7 @@ import { connection } from "next/server";
 
 import { AppNav } from "@/components/app-nav";
 import { ChatPanel } from "@/components/chat/chat-panel";
+import { SaveReasonPrompt } from "@/components/config/save-reason-prompt";
 import { MarketStrip } from "@/components/market-strip";
 import { ColorModeToggle } from "@/components/color-mode-toggle";
 import { CommandPalette } from "@/components/command-palette";
@@ -66,6 +67,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-2">
             <SyncIndicator />
             <ChatPanel />
+            <SaveReasonPrompt />
             <span aria-hidden="true" className="mx-1.5 hidden h-[22px] w-px bg-border lg:block" />
             {state.user?.email ? (
               <span className="hidden truncate text-[13px] text-text-muted xl:inline">

@@ -24,13 +24,16 @@ from steward.autopilot import ledger
 from steward.autopilot.judge import ApplyError, accept, revert
 from steward.autopilot.kinds import all_kinds
 from steward.config import CONFIG_MODELS
-from steward.config.store import RollbackError
+from steward.config.store import RollbackError, load_active
 from steward.config.store import rollback as config_rollback
+from steward.config.verification import VerificationConfig
 from steward.engine import change as engine_change
-from steward.engine import overrides
+from steward.engine import overrides, prompt_change
+from steward.news.read import resolve_story, set_story_closed
 from steward.ops import tasks as ops_tasks
 from steward.settings import get_settings
 from steward.training import labels
+from steward.verify.feedback import FeedbackError, FeedbackIn, record_feedback
 
 Risk = Literal["low", "medium", "high"]
 Via = Literal["screen", "chat"]
@@ -55,6 +58,23 @@ class NoticeArgs(BaseModel):
 class SnoozeArgs(BaseModel):
     task_id: int = Field(ge=1)
     days: int = Field(default=7, ge=1, le=ops_tasks.SNOOZE_MAX_DAYS)
+
+
+class FactMarkArgs(BaseModel):
+    fact_id: int = Field(ge=1)
+    rating: Literal["wrong", "irrelevant", "useful"]
+    note: str | None = Field(default=None, max_length=500)
+
+
+class StoryResolveArgs(BaseModel):
+    story_id: int = Field(ge=1)
+    resolution: Literal["confirmed", "false"]
+    note: str | None = Field(default=None, max_length=500)
+
+
+class StoryCloseArgs(BaseModel):
+    story_id: int = Field(ge=1)
+    closed: bool = True
 
 
 class DecisionArgs(BaseModel):
@@ -129,6 +149,74 @@ async def _run_snooze(pool: asyncpg.Pool, a: SnoozeArgs) -> dict[str, Any]:
     if not await ops_tasks.snooze(pool, a.task_id, a.days):
         raise ActionError(f"Notice {a.task_id} is not open")
     return {"task_id": a.task_id, "days": a.days}
+
+
+async def _describe_fact_mark(pool: asyncpg.Pool, a: FactMarkArgs) -> str:
+    row = await pool.fetchrow("select ticker, metric from public.fact where id = $1", a.fact_id)
+    if row is None:
+        raise ActionError(f"No fact {a.fact_id}")
+    what = {
+        "wrong": "wrong (it is set aside and its holding's verdicts are judged again)",
+        "irrelevant": "not relevant",
+        "useful": "useful",
+    }[a.rating]
+    return f"Mark the {row['metric']} fact of {row['ticker'] or 'the portfolio'} as {what}"
+
+
+async def _run_fact_mark(pool: asyncpg.Pool, a: FactMarkArgs) -> dict[str, Any]:
+    stored = await load_active(pool, "verification", VerificationConfig)
+    try:
+        out = await record_feedback(
+            pool,
+            FeedbackIn(target_kind="fact", target_id=a.fact_id, rating=a.rating, note=a.note),
+            stored.body if stored else VerificationConfig(),
+            None,
+        )
+    except FeedbackError as exc:
+        raise ActionError(str(exc)) from exc
+    if a.rating == "wrong":
+        await overrides.record(
+            pool,
+            area="facts",
+            subject_kind="fact",
+            subject_ref=str(a.fact_id),
+            action="marked_wrong",
+            via=current_via.get(),
+            note=a.note,
+            decided_by="engine",
+        )
+    return {"fact_id": a.fact_id, "rating": a.rating, "effects": out.effects}
+
+
+async def _describe_story_resolve(pool: asyncpg.Pool, a: StoryResolveArgs) -> str:
+    headline = await pool.fetchval(
+        "select headline from public.story_cluster where id = $1", a.story_id
+    )
+    if headline is None:
+        raise ActionError(f"No story {a.story_id}")
+    verdict = "happened" if a.resolution == "confirmed" else "did not happen"
+    return f"Settle the disputed story as {verdict}: {headline}"
+
+
+async def _run_story_resolve(pool: asyncpg.Pool, a: StoryResolveArgs) -> dict[str, Any]:
+    if not await resolve_story(pool, a.story_id, a.resolution, a.note):
+        raise ActionError(f"Story {a.story_id} is not a disputed story")
+    return {"story_id": a.story_id, "resolution": a.resolution}
+
+
+async def _describe_story_close(pool: asyncpg.Pool, a: StoryCloseArgs) -> str:
+    headline = await pool.fetchval(
+        "select headline from public.story_cluster where id = $1", a.story_id
+    )
+    if headline is None:
+        raise ActionError(f"No story {a.story_id}")
+    return f"{'Close' if a.closed else 'Reopen'} the story: {headline}"
+
+
+async def _run_story_close(pool: asyncpg.Pool, a: StoryCloseArgs) -> dict[str, Any]:
+    if not await set_story_closed(pool, a.story_id, a.closed):
+        raise ActionError(f"No story {a.story_id}")
+    return {"story_id": a.story_id, "closed": a.closed}
 
 
 async def _describe_revert(pool: asyncpg.Pool, a: DecisionArgs) -> str:
@@ -287,8 +375,18 @@ async def _run_roll_back_change(pool: asyncpg.Pool, a: ChangeArgs) -> dict[str, 
 
 
 class TeachArgs(BaseModel):
-    area: Literal["theses", "chat", "digest", "news"]
+    # theses, chat, digest and news go straight into those prompts; `autopilot:<kind>` is for one
+    # autopilot queue and is tested against your own earlier calls before it applies.
+    area: str = Field(pattern=r"^(theses|chat|digest|news|autopilot:[a-z_]{2,40})$")
     text: str = Field(min_length=5, max_length=overrides.STANDING_MAX)
+
+    @model_validator(mode="after")
+    def _known_kind(self) -> "TeachArgs":
+        if self.area.startswith("autopilot:") and self.area.removeprefix("autopilot:") not in (
+            all_kinds()
+        ):
+            raise ValueError(f"No autopilot queue called {self.area.removeprefix('autopilot:')!r}")
+        return self
 
 
 class RetractArgs(BaseModel):
@@ -296,11 +394,19 @@ class RetractArgs(BaseModel):
 
 
 async def _describe_teach(pool: asyncpg.Pool, a: TeachArgs) -> str:
+    if a.area.startswith("autopilot:"):
+        return (
+            f"Teach the {a.area.removeprefix('autopilot:')} autopilot: “{a.text}”. It is tested "
+            "on items you settled yourself first and applies only if it agrees with you at "
+            "least as often as now"
+        )
     return f"Remember for {a.area}: “{a.text}”"
 
 
 async def _run_teach(pool: asyncpg.Pool, a: TeachArgs) -> dict[str, Any]:
     ref = await overrides.teach(pool, a.area, a.text, current_via.get())
+    if a.area.startswith("autopilot:"):
+        await prompt_change.propose(pool, a.area.removeprefix("autopilot:"), a.text, ref)
     return {"ref": ref, "area": a.area}
 
 
@@ -314,6 +420,7 @@ async def _describe_retract(pool: asyncpg.Pool, a: RetractArgs) -> str:
 async def _run_retract(pool: asyncpg.Pool, a: RetractArgs) -> dict[str, Any]:
     if not await overrides.retract(pool, a.ref, current_via.get()):
         raise ActionError(f"No standing instruction {a.ref}")
+    await prompt_change.withdraw(pool, a.ref)
     return {"ref": a.ref}
 
 
@@ -337,6 +444,33 @@ ACTIONS: dict[str, Action] = {
             "It comes back by itself after the days you chose; nothing is lost.",
             _describe_snooze,
             _run_snooze,
+        ),
+        Action(
+            "mark_fact",
+            "Mark a fact wrong, irrelevant or useful",
+            "medium",
+            FactMarkArgs,
+            "Mark it useful again; a fact set aside as wrong is restored from the Review page.",
+            _describe_fact_mark,
+            _run_fact_mark,
+        ),
+        Action(
+            "resolve_story",
+            "Settle a disputed news story",
+            "medium",
+            StoryResolveArgs,
+            "Settle it again with the other answer.",
+            _describe_story_resolve,
+            _run_story_resolve,
+        ),
+        Action(
+            "close_story",
+            "Close or reopen a news story",
+            "low",
+            StoryCloseArgs,
+            "Run it again with the opposite choice.",
+            _describe_story_close,
+            _run_story_close,
         ),
         Action(
             "revert_decision",

@@ -272,3 +272,62 @@ async def test_a_floor_that_leaves_its_watch_window_unreviewed_is_reported_once(
     assert len(notices) == 1
     assert "could not be checked" in notices[0]["title"]
     assert await ledger.learned_thresholds(backend_pool) == {"fact": 0.9}  # nothing is undone
+
+
+def test_only_the_owner_route_can_write_the_gates() -> None:
+    """`gates.save` is called from api/action_routes.py and nowhere else under src."""
+    import re
+    from pathlib import Path
+
+    src = Path(__file__).resolve().parents[1] / "src"
+    callers = {
+        p.relative_to(src).as_posix()
+        for p in src.rglob("*.py")
+        if re.search(r"\bgates\.save\(", p.read_text(encoding="utf-8"))
+    }
+    assert callers == {"api/action_routes.py"}
+
+
+@pytest.mark.db
+async def test_the_owner_can_set_the_gates_and_a_new_proposal_uses_them(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    from steward.engine import gates
+
+    assert (await gates.floor_gates(backend_pool)).min_n == 30
+    await gates.save(backend_pool, gates.FloorGateSettings(min_n=50, min_reviewed=20), None)
+    loaded = await gates.floor_gates(backend_pool)
+    assert (loaded.min_n, loaded.min_reviewed) == (50, 20)
+    await backend_pool.execute(
+        "insert into public.auto_decision (kind, subject_ref, decision, confidence, decided_by,"
+        " summary, evidence, status, review) values ('fact', 'f', 'accept', 0.8, 'rule:x', 's',"
+        " '{}'::jsonb, 'applied', 'wrong')"
+    )
+    # A value that could switch the gate off is refused.
+    with pytest.raises(ValueError):
+        gates.FloorGateSettings(min_n=1)
+
+
+@pytest.mark.db
+async def test_a_decision_the_owner_made_by_accepting_is_not_replayed_as_the_engines(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    await add_decisions(backend_pool, "fact", 5, 0.8, wrong=0, days_ago=2)
+    await backend_pool.execute(
+        "insert into public.auto_decision (kind, subject_ref, decision, confidence, decided_by,"
+        " summary, evidence, status, decided_at) values ('fact', 'e1', 'accept', 0.8,"
+        " 'owner-accepted', 's', '{}'::jsonb, 'applied', $1)",
+        NOW - dt.timedelta(days=2),
+    )
+    await backend_pool.execute(
+        "insert into public.auto_decision (kind, subject_ref, decision, confidence, decided_by,"
+        " summary, evidence, status, decided_at) values ('fact', 'e1', 'accept', 0.8,"
+        " 'model:x', 's', '{}'::jsonb, 'closed', $1)",
+        NOW - dt.timedelta(days=3),
+    )
+    start = NOW - dt.timedelta(days=90)
+    decided, escalated = await challenger._window(backend_pool, "fact", start, NOW)
+    assert len(decided) == 5  # the owner's own call is not a decision a floor could move
+    assert escalated == 1  # the item it came from still counts as an escalation
+    assert await challenger.owner_acceptance(backend_pool, "fact", start, NOW) == (1, 1)
+    assert await challenger.owner_acceptance(backend_pool, "other", start, NOW) is None

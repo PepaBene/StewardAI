@@ -10,7 +10,7 @@ import datetime as dt
 
 import asyncpg
 
-from steward.engine import challenger, change, overrides
+from steward.engine import change, gates, overrides
 from steward.ops import tasks
 
 KIND = "override_pattern"
@@ -95,7 +95,7 @@ async def act(pool: asyncpg.Pool, floors: dict[str, float], now: dt.datetime) ->
             "owner override rate",
             before={"min_confidence": current},
             after={"min_confidence": proposed_floor(current)},
-            gates=challenger.FLOOR_GATES,
+            gates=await gates.floor_gates(pool),
         )
         proposals += 1
     return {"notices": notices, "proposals": proposals}

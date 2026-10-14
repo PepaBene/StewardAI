@@ -12,6 +12,8 @@ import { getBrowserApiClient } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 import { cn } from "@/lib/utils";
 
+import { GatesPanel } from "./gates-panel";
+
 type Entry = components["schemas"]["Entry-Input"];
 type Sweep = components["schemas"]["SweepOut"];
 type ActionRow = components["schemas"]["ActionRow"];
@@ -120,6 +122,8 @@ export function LedgerView() {
           , on {whenLabel(last.ran_at)}.
         </p>
       ) : null}
+
+      <GatesPanel />
 
       <Blueprint aria-labelledby="ledger-heading">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">

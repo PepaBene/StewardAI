@@ -50,6 +50,9 @@ JOB_KINDS = ("earnings_check", "research", "portfolio_sync")
 CHANGE_KINDS = (
     "dismiss_notice",
     "snooze_notice",
+    "mark_fact",
+    "resolve_story",
+    "close_story",
     "revert_decision",
     "accept_recommendation",
     "review_decision",
@@ -752,10 +755,13 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "args": {
                     "type": "object",
                     "description": "For a change: task_id (dismiss_notice), task_id and days "
-                    "(snooze_notice), decision_id "
+                    "(snooze_notice), fact_id and rating wrong|irrelevant|useful (mark_fact), "
+                    "story_id with resolution confirmed|false (resolve_story) or closed "
+                    "(close_story), decision_id "
                     "(the others), verdict ok|wrong (review_decision), kind and mode "
                     "(set_autopilot_mode), domain and version_id (rollback_config), "
-                    "change_id (roll_back_change), area theses|chat|digest|news and text "
+                    "change_id (roll_back_change), area theses|chat|digest|news or "
+                    "autopilot:<kind> (tested on your own calls first) and text "
                     "(teach), ref (retract_teaching).",
                 },
                 "reason": {"type": "string"},
@@ -1818,7 +1824,10 @@ class ChatTools:
             ),
             "teach_with": {
                 "kind": "teach",
-                "args": {"area": "<theses|chat|digest|news>", "text": "<the owner's rule>"},
+                "args": {
+                    "area": "<theses|chat|digest|news|autopilot:KIND>",
+                    "text": "<the owner's rule>",
+                },
             },
         }
 

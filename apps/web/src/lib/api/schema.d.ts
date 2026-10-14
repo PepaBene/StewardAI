@@ -4317,6 +4317,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/overrides/unexplained": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Unexplained Overrides
+         * @description Config edits of the last minutes that overruled the engine and have no reason yet, so a
+         *     screen can ask why right after the save.
+         */
+        get: operations["unexplained_overrides"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/overrides/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Explain Overrides
+         * @description Give those edits a reason.
+         */
+        post: operations["explain_overrides"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/engine/sweeps": {
         parameters: {
             query?: never;
@@ -4462,6 +4503,30 @@ export interface paths {
          */
         get: operations["get_visual"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/engine/gates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Gates
+         * @description The bar a stricter confidence floor must clear before it is applied.
+         */
+        get: operations["get_gates"];
+        /**
+         * Put Gates
+         * @description Change that bar. Only you can; the engine cannot propose a change to it.
+         */
+        put: operations["put_gates"];
         post?: never;
         delete?: never;
         options?: never;
@@ -18306,6 +18371,16 @@ export interface components {
             /** Gaps */
             gaps?: string[];
         };
+        /** ExplainIn */
+        ExplainIn: {
+            /** Area */
+            area: string;
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "wrong_data" | "wrong_source" | "right_but_unimportant" | "too_early" | "too_late" | "prefer_my_judgement" | "other";
+        };
         /** ExportRequest */
         ExportRequest: {
             /**
@@ -19543,6 +19618,27 @@ export interface components {
             /** Betas */
             betas: components["schemas"]["FactorBeta"][];
         };
+        /** FloorGateSettings */
+        FloorGateSettings: {
+            /**
+             * Min N
+             * @description Decisions needed to judge a floor.
+             * @default 30
+             */
+            min_n: number;
+            /**
+             * Min Reviewed
+             * @description Of them, reviewed decisions needed.
+             * @default 10
+             */
+            min_reviewed: number;
+            /**
+             * Max Wrong Rate Increase
+             * @description Change in the wrong share a floor must achieve; negative means fewer wrong.
+             * @default -0.01
+             */
+            max_wrong_rate_increase: number;
+        };
         /** FormulaCoverageOut */
         FormulaCoverageOut: {
             /** Present */
@@ -20631,6 +20727,15 @@ export interface components {
              * @description Never used. Domains in no list are treated as rejected.
              */
             denied_domains?: string[];
+        };
+        /** GateOut */
+        GateOut: {
+            /** Min N */
+            min_n: number;
+            /** Min Reviewed */
+            min_reviewed: number;
+            /** Max Wrong Rate Increase */
+            max_wrong_rate_increase: number;
         };
         /** GeoShare */
         GeoShare: {
@@ -38606,6 +38711,13 @@ export interface components {
             /** Benchmark Weight */
             benchmark_weight: number | null;
         };
+        /** UnexplainedOut */
+        UnexplainedOut: {
+            /** Areas */
+            areas: {
+                [key: string]: number;
+            };
+        };
         /** Unknown */
         Unknown: {
             /**
@@ -47472,6 +47584,61 @@ export interface operations {
             };
         };
     };
+    unexplained_overrides: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnexplainedOut"];
+                };
+            };
+        };
+    };
+    explain_overrides: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExplainIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     engine_sweeps: {
         parameters: {
             query?: never;
@@ -47691,6 +47858,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Block"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_gates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GateOut"];
+                };
+            };
+        };
+    };
+    put_gates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FloorGateSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GateOut"];
                 };
             };
             /** @description Validation Error */

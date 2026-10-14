@@ -12712,6 +12712,84 @@
         }
       }
     },
+    "/overrides/unexplained": {
+      "get": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Unexplained Overrides",
+        "description": "Config edits of the last minutes that overruled the engine and have no reason yet, so a\nscreen can ask why right after the save.",
+        "operationId": "unexplained_overrides",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnexplainedOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/overrides/explain": {
+      "post": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Explain Overrides",
+        "description": "Give those edits a reason.",
+        "operationId": "explain_overrides",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object",
+                  "title": "Response Explain Overrides"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/engine/sweeps": {
       "get": {
         "tags": [
@@ -13084,6 +13162,78 @@
             }
           }
         }
+      }
+    },
+    "/engine/gates": {
+      "get": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Get Gates",
+        "description": "The bar a stricter confidence floor must clear before it is applied.",
+        "operationId": "get_gates",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GateOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Put Gates",
+        "description": "Change that bar. Only you can; the engine cannot propose a change to it.",
+        "operationId": "put_gates",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FloorGateSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/holdings/{ticker}/segments": {
@@ -54848,6 +54998,35 @@
         ],
         "title": "Explain"
       },
+      "ExplainIn": {
+        "properties": {
+          "area": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Area"
+          },
+          "reason_code": {
+            "type": "string",
+            "enum": [
+              "wrong_data",
+              "wrong_source",
+              "right_but_unimportant",
+              "too_early",
+              "too_late",
+              "prefer_my_judgement",
+              "other"
+            ],
+            "title": "Reason Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "area",
+          "reason_code"
+        ],
+        "title": "ExplainIn"
+      },
       "ExportRequest": {
         "properties": {
           "kind": {
@@ -58283,6 +58462,36 @@
         ],
         "title": "FitOut"
       },
+      "FloorGateSettings": {
+        "properties": {
+          "min_n": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 5.0,
+            "title": "Min N",
+            "description": "Decisions needed to judge a floor.",
+            "default": 30
+          },
+          "min_reviewed": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 3.0,
+            "title": "Min Reviewed",
+            "description": "Of them, reviewed decisions needed.",
+            "default": 10
+          },
+          "max_wrong_rate_increase": {
+            "type": "number",
+            "maximum": 0.1,
+            "minimum": -0.5,
+            "title": "Max Wrong Rate Increase",
+            "description": "Change in the wrong share a floor must achieve; negative means fewer wrong.",
+            "default": -0.01
+          }
+        },
+        "type": "object",
+        "title": "FloorGateSettings"
+      },
       "FormulaCoverageOut": {
         "properties": {
           "present": {
@@ -61388,6 +61597,29 @@
         "type": "object",
         "title": "GapResearchSettings",
         "description": "Filling what the structured sources left empty from reliable web pages, last resort.\nOnly empty, fillable slots off their cooldown are searched. Facts are kept apart from the\nstructured data and are approved by AI against the source tiers below."
+      },
+      "GateOut": {
+        "properties": {
+          "min_n": {
+            "type": "integer",
+            "title": "Min N"
+          },
+          "min_reviewed": {
+            "type": "integer",
+            "title": "Min Reviewed"
+          },
+          "max_wrong_rate_increase": {
+            "type": "number",
+            "title": "Max Wrong Rate Increase"
+          }
+        },
+        "type": "object",
+        "required": [
+          "min_n",
+          "min_reviewed",
+          "max_wrong_rate_increase"
+        ],
+        "title": "GateOut"
       },
       "GeoShare": {
         "properties": {
@@ -110863,6 +111095,22 @@
           "benchmark_weight"
         ],
         "title": "UnderlyingHolding"
+      },
+      "UnexplainedOut": {
+        "properties": {
+          "areas": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Areas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "areas"
+        ],
+        "title": "UnexplainedOut"
       },
       "Unknown": {
         "properties": {

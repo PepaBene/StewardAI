@@ -21,6 +21,7 @@ import { CitationLink } from "@/components/news/citation";
 import { SourceLinksLine } from "@/components/sources/source-list";
 import { BlueprintCorners } from "@/components/ui/blueprint";
 import { pageSelection } from "@/lib/chat/page-selection";
+import { getPageSelection } from "@/lib/chat/page-selection-store";
 import { Button } from "@/components/ui/button";
 import {
   getBrowserApiClient,
@@ -174,7 +175,10 @@ export function ChatThread({
       params: { path: { conversation_id: id } },
       body: {
         content: content.trim(),
-        page: { path: pathname, selection: pageSelection(pathname, window.location.search) },
+        page: {
+          path: pathname,
+          selection: getPageSelection() ?? pageSelection(pathname, window.location.search),
+        },
       },
     });
     if (!data) return `Not sent (HTTP ${response.status}).`;

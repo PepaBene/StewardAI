@@ -11,7 +11,8 @@ confidence floor for an autopilot kind, replayed over the decisions already made
 - `check_rollbacks`: a promoted change is compared with its baseline once it has run for
   `ROLLBACK_AFTER_DAYS`; a regression rolls it back. Either way the owner gets a notice.
 
-The gates are fixed here, in code the engine cannot write, and the proposal stores a copy so a
+The gates come from `engine.gates` (the owner edits them; the engine cannot), and the proposal
+stores a copy so a
 later edit of this file cannot bend the verdict on an old proposal.
 """
 
@@ -54,20 +55,46 @@ def replay(rows: list[asyncpg.Record], floor: float, escalated: int) -> tuple[Me
     return _metrics(rows, escalated), _metrics(kept, escalated + len(rows) - len(kept))
 
 
+OWNER_ACCEPTED = "owner-accepted"
+
+
 async def _window(
     pool: asyncpg.Pool, kind: str, start: dt.datetime, end: dt.datetime
 ) -> tuple[list[asyncpg.Record], int]:
+    """(the engine's own decisions in the window, how many items it escalated). A decision the
+    owner made by accepting an escalated item is not the engine's: a floor would not have
+    changed it, so it is left out of the replay; the escalated item it came from counts as an
+    escalation (its row is `closed`)."""
     rows = await pool.fetch(
-        "select confidence, status, review from public.auto_decision where kind = $1"
-        " and decided_at >= $2 and decided_at < $3",
+        "select confidence, status, review, decided_by from public.auto_decision"
+        " where kind = $1 and decided_at >= $2 and decided_at < $3",
         kind,
         start,
         end,
     )
     return (
-        [r for r in rows if r["status"] in DECIDED],
-        sum(1 for r in rows if r["status"] == "escalated"),
+        [r for r in rows if r["status"] in DECIDED and r["decided_by"] != OWNER_ACCEPTED],
+        sum(1 for r in rows if r["status"] in ("escalated", "closed")),
     )
+
+
+async def owner_acceptance(
+    pool: asyncpg.Pool, kind: str, start: dt.datetime, end: dt.datetime
+) -> tuple[int, int] | None:
+    """(items you accepted, items that reached you) among the escalations of the window, or None
+    when none was settled. It tells whether the work a stricter floor would add is work you
+    usually just approve."""
+    row = await pool.fetchrow(
+        "select count(*) filter (where status = 'closed') as accepted,"
+        " count(*) as total from public.auto_decision where kind = $1 and decided_at >= $2"
+        " and decided_at < $3 and status in ('escalated', 'closed')",
+        kind,
+        start,
+        end,
+    )
+    if row is None or row["total"] == 0:
+        return None
+    return int(row["accepted"]), int(row["total"])
 
 
 def _floor(value: Any) -> float | None:
@@ -121,14 +148,20 @@ async def settle_floors(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int]:
         settled = await change.settle(pool, c.id, golden_passed=None)
         if settled.status == "promoted":
             promoted += 1
+            usual = await owner_acceptance(pool, kind, now - dt.timedelta(days=REPLAY_DAYS), now)
+            habit = (
+                f" Of the {usual[1]} items it escalated in that time you accepted {usual[0]}."
+                if usual
+                else ""
+            )
             await _tell(
                 pool,
                 settled,
                 f"The {kind} autopilot now asks for {after:.0%} confidence",
                 f"{settled.hypothesis}. In the last {REPLAY_DAYS} days this would have left "
                 f"{candidate.escalated - baseline.escalated} more decisions for you and "
-                f"cut wrong ones from {baseline.wrong_rate:.0%} to {candidate.wrong_rate:.0%}. "
-                "If it is too strict, undo the change from the engine ledger.",
+                f"cut wrong ones from {baseline.wrong_rate:.0%} to {candidate.wrong_rate:.0%}."
+                f"{habit} If it is too strict, undo the change from the engine ledger.",
             )
         else:
             rejected += 1
@@ -189,7 +222,7 @@ async def _tell_unchecked(pool: asyncpg.Pool, now: dt.datetime) -> int:
         kind = c.target.removeprefix("autopilot:")
         decided, escalated = await _window(pool, kind, rec["decided_at"], now)
         seen = _metrics(decided, escalated)
-        if seen.reviewed >= FLOOR_GATES.min_reviewed:
+        if seen.reviewed >= c.gates.get("min_reviewed", FLOOR_GATES.min_reviewed):
             continue
         told += 1
         await _tell(

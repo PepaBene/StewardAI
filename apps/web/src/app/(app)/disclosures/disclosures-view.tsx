@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CashConversion, DebtMaturities, SegmentBridgePanel, StatementHistory, ValuationGates } from "@/components/disclosure/statements";
 import { SAMPLE_MATURITIES, sampleBridge, sampleStatements } from "@/lib/disclosure/fixtures-financials";
 import type { SegmentBridge, StatementsOut } from "@/lib/disclosure/financials";
+import { usePageSelection } from "@/lib/chat/page-selection-store";
 import { CoverageRibbon, DatesTable, EvidencePanel, FilingsTable, ReviewPanel, SourcesPanel, ValuesTable } from "@/components/disclosure/panels";
 import { IngestFilings } from "@/components/disclosure/ingest";
 import { KnownAtRail } from "@/components/disclosure/known-at-rail";
@@ -73,6 +74,7 @@ export function DisclosuresView() {
   const [until] = useState(() => Date.now());
   const [cutoff, setCutoff] = useState(until);
   const [selected, setSelected] = useState<number | null>(null);
+  usePageSelection(selected !== null ? `filing ${selected}` : null);
   const [evidence, setEvidence] = useState<Evidence | null>(null);
   const [allFilings, setAllFilings] = useState<Filing[]>([]);
   const [liveView, setLiveView] = useState<View | null>(null);

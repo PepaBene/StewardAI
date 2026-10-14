@@ -18,7 +18,7 @@ from steward.autopilot.thesis_upkeep import (
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.engine import audit as engine_audit
-from steward.engine import challenger, data_audit, learning, override_watch
+from steward.engine import challenger, data_audit, learning, override_watch, prompt_change, watchers
 from steward.jobs.runner import JobContext
 from steward.llm.cache import ResultCache
 from steward.llm.client import create_llm
@@ -150,8 +150,23 @@ async def autopilot_calibration_handler(ctx: JobContext) -> None:
                 now=now,
             )
         )
+    async with ctx.step("watchers") as step:
+        step.detail.update(await watchers.run(ctx.pool, now))
     async with ctx.step("challengers") as step:
         step.detail.update(await challenger.settle_floors(ctx.pool, now))
+    if client is not None:
+        async with ctx.step("prompt_changes") as step:
+            tested = await prompt_change.settle_one(
+                ctx.pool,
+                client,
+                kinds,
+                cfg,
+                {"calls": cfg.max_calls_per_run},
+                lambda kind: lessons_for(ctx.pool, kind),
+            )
+            if "usage" in tested:
+                step.usage = tested.pop("usage").step_usage()
+            step.detail.update(tested)
     async with ctx.step("reverify") as step:  # runs weekly; the step says "skipped" otherwise
         step.detail.update(await reverify.sweep(ctx.pool, kinds, now))
     if cfg.auto_calibrate:

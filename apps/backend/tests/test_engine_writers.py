@@ -58,11 +58,13 @@ WRITERS: dict[str, tuple[str, set[str]]] = {
             "steward/engine/learning.py",
             "steward/engine/triggers.py",
             "steward/engine/data_audit.py",
+            "steward/engine/prompt_change.py",
+            "steward/engine/watchers.py",
         },
     ),
     "engine_change": (
         r"\bchange\.propose\(|engine_change\.propose\(",
-        {"steward/engine/override_watch.py"},
+        {"steward/engine/override_watch.py", "steward/engine/prompt_change.py"},
     ),
     "trigger": (
         r"\btriggers\.(fire|log)\(",
@@ -72,6 +74,7 @@ WRITERS: dict[str, tuple[str, set[str]]] = {
             "steward/ops/anticipate.py",
             "steward/earnings/calendar.py",
             "steward/engine/learning.py",
+            "steward/engine/watchers.py",
         },
     ),
     "journal": (r'origin="auto"', {"steward/ops/journal_gaps.py"}),

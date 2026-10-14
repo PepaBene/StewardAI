@@ -3,6 +3,7 @@ import createClient, { type Client, type Middleware } from "openapi-fetch";
 import { getApiBaseUrl } from "@/lib/env";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
+import { configSavedSignal } from "./config-saved";
 import type { components, paths } from "./schema";
 
 /*
@@ -232,6 +233,7 @@ export function createApiClient(options: {
     fetch: options.fetch,
   });
   if (options.getAccessToken) client.use(bearerAuth(options.getAccessToken));
+  client.use(configSavedSignal());
   return client;
 }
 

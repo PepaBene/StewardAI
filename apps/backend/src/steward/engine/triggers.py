@@ -45,6 +45,7 @@ NOTICE_KINDS: dict[str, tuple[str, ...]] = {
     "coverage": ("thesis_draft",),
     "anticipation": ("pre_earnings",),
     "learning": ("learning_trigger",),
+    "event": ("watch_over_cap", "watch_insider", "pre_review"),
 }
 
 KIND_NAMES = {

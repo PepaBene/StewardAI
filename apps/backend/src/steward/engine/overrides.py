@@ -355,3 +355,33 @@ async def _autopilot_patterns(pool: asyncpg.Pool, since: dt.datetime) -> list[Pa
         for r in rows
         if is_pattern(r["overridden"], r["decided"])
     ]
+
+
+UNEXPLAINED_MINUTES = 10
+
+
+async def unexplained(pool: asyncpg.Pool, now: dt.datetime | None = None) -> dict[str, int]:
+    """Config edits of the last few minutes that overruled the engine and have no reason yet, by
+    config domain. A screen asks after a save so it can ask the owner why."""
+    since = (now or dt.datetime.now(dt.UTC)) - dt.timedelta(minutes=UNEXPLAINED_MINUTES)
+    rows = await pool.fetch(
+        "select area, count(*) as n from public.owner_override where subject_kind = 'config'"
+        " and action = 'edited' and reason_code is null and created_at >= $1 group by area",
+        since,
+    )
+    return {r["area"]: int(r["n"]) for r in rows}
+
+
+async def explain(
+    pool: asyncpg.Pool, area: str, reason: Reason, now: dt.datetime | None = None
+) -> int:
+    """Attach the owner's reason to those edits. Returns how many it covered."""
+    since = (now or dt.datetime.now(dt.UTC)) - dt.timedelta(minutes=UNEXPLAINED_MINUTES)
+    result = await pool.execute(
+        "update public.owner_override set reason_code = $2 where subject_kind = 'config'"
+        " and area = $1 and action = 'edited' and reason_code is null and created_at >= $3",
+        area,
+        reason,
+        since,
+    )
+    return int(result.rsplit(" ", 1)[-1])

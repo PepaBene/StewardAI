@@ -20,6 +20,8 @@ import asyncpg
 
 from steward.autopilot import ledger
 from steward.autopilot.judge import JudgeKind
+from steward.engine import prompt_change
+from steward.engine.prompt_change import active_instructions as active
 
 logger = logging.getLogger("steward.autopilot")
 
@@ -76,7 +78,11 @@ async def lessons_for(pool: asyncpg.Pool, kind: JudgeKind, now: dt.datetime | No
             continue
         right = await kind.outcome(pool, row.subject_ref) if kind.outcome else None
         cases.append((prompt, row.decision, row.confidence, right))
-    return render(cases)
+    return "\n\n".join(
+        b
+        for b in (render(cases), prompt_change.instruction_block(await active(pool, kind.name)))
+        if b
+    )
 
 
 async def relearn(

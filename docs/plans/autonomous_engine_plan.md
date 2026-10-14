@@ -409,8 +409,8 @@ Closed:
 Still open:
 - Triggers that only queue jobs (stale research, post-report checks) open no notice, so they have no
   dismissal-based pause; only cooldown, caps and the budget limit them.
-- Not built: a pre-month-end review draft, a rebalance-drift warning, large-move and insider-cluster
-  triggers, and triggers on filings, guidance or rating changes.
+- Not built (see "Design-work items delivered" below for what was added since): large-move triggers and
+  triggers on filings, guidance or rating changes (news escalation and disclosure alerts already cover them).
 - The coverage trigger covers "held but no thesis" only.
 - The daily cost cap counts every job started as `event`, not only those from the table.
 - Caps, cooldown and thresholds are constants in code.
@@ -422,6 +422,34 @@ change rules, `accept_memo` authorship; (3) self-change: only confidence floors 
 gates in code; (4) proactivity: the unbuilt triggers listed in phase 4; (5) delivery: no Resend webhooks,
 Telegram receipt is the API answer, critical alerts at all hours (open question 2); (6) presentation:
 calibration and needs-you digest as tables or text.
+
+#### Design-work items delivered
+
+- Reason after a manual config save: a prompt after the save asks why; the answer is stored on the
+  override later (`POST /overrides/explain`, `GET /overrides/unexplained`). Skipping leaves it unexplained.
+- Benchmark without a model: scripted reference runs for engine-01..05 against the real chat tools
+  (`tests/test_engine_benchmark_offline.py`).
+- Page selection from screen state, not the address (`lib/chat/page-selection-store.ts`), wired in the
+  review (facts) and disclosures (filings) screens.
+- Chat actions for facts and stories: `mark_fact`, `resolve_story`, `close_story`.
+- Gates the engine cannot write: `engine_gate_setting` for the confidence-floor gates, edited by the owner
+  only (`GET/PUT /engine/gates`, panel in the engine ledger); `gates` is on the frozen list.
+- Replay of escalations: owner-accepted items are excluded from the replayed decisions, escalations count
+  as such, and the promotion notice states how many escalated items the owner accepted.
+- Prompt changes through the challenger, for autopilot kinds: a standing instruction becomes a `prompt`
+  change, tested on items the owner settled themselves (needs 8 or more), promoted only if the judge
+  agrees with the owner at least as often, roll-backable from the ledger. One test per run.
+- Proactive watchers (`engine/watchers.py`, logged through the trigger table, notices only, no model):
+  a position above its cap, a cluster of 3 or more insiders buying in 14 days, and a heads-up in the
+  last 3 days of the month that the monthly review is due.
+
+Still open after this batch:
+- Standing instructions for theses, chat, digest and news still reach prompts untested; rule, source-weight,
+  schedule and model changes still have no pipeline; no model proposes prompt changes by itself.
+- The replay cannot know what the owner would have decided on items newly escalated by a floor.
+- No large-move, filings, guidance or rating triggers (covered by news escalation and disclosure alerts);
+  the watchers' thresholds are constants in code.
+- Screens other than review and disclosures still send path-only context.
 
 ## 6. Success metrics (measured against the owner, not against the engine)
 

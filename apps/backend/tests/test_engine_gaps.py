@@ -370,3 +370,22 @@ async def test_the_cockpit_reports_kinds_applying_without_a_check_and_a_bad_rech
     issues = await cockpit._engine_verification(backend_pool)
     subjects = {i.subject for i in issues}
     assert subjects == {"weekly re-check", "unchecked kinds"}
+
+
+async def test_a_reason_given_after_a_save_is_attached_once(backend_pool: asyncpg.Pool) -> None:
+    await overrides.record(
+        backend_pool,
+        area="theses",
+        subject_kind="config",
+        subject_ref="theses:AAA",
+        action="edited",
+        decided_by="engine",
+        via="screen",
+    )
+    assert await overrides.unexplained(backend_pool) == {"theses": 1}
+    assert await overrides.explain(backend_pool, "theses", "too_early") == 1
+    assert await overrides.unexplained(backend_pool) == {}
+    # A reason already given is not replaced.
+    assert await overrides.explain(backend_pool, "theses", "other") == 0
+    reason = await backend_pool.fetchval("select reason_code from public.owner_override")
+    assert reason == "too_early"
