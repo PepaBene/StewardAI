@@ -278,48 +278,45 @@ Each phase ends with tests, a rollback path and a status entry in this file.
 
 ### Delivery status and known gaps
 
-**Phase 1 - delivered in part (2026-10-14).** No migration was needed. What exists: `engine/timeline.py`
-and `GET /engine/ledger` (1.1), `JudgeKind.verify` with the fact check and `recheck` (1.2),
-`ops/delivery.py` in the watchdog (1.3), `autopilot/reverify.py` in the calibration job (1.4).
+**Phases 1 and 2 - delivered (2026-10-14), with the gaps below still open.** Migration
+`20261118100000_engine_receipts_and_sweeps` adds the provider receipt columns on `alert` and the
+`engine_sweep` table.
 
-Gaps, to be closed before phase 1 counts as done:
+Closed:
+- 1.1 `engine/timeline.py` and `GET /engine/ledger` list eight sources (autopilot, watchdog, owner
+  actions, engine changes, config versions the engine wrote, overrides, alert deliveries, auto-logged
+  journal rows), with kind filter, paging and an undo (`rollback_config`, `roll_back_change`, or the
+  decision revert) the list hands to chat and to the page `/engine-ledger`. A structural test
+  (`test_engine_writers.py`) fails when a module that writes on its own is not mapped to a source.
+- 1.2 Every registered autopilot kind has `verify` and `recheck` (`identity` is not registered: it makes
+  no decisions). `VERIFY_WAIVERS` is empty; `check_verifiers()` fails for a kind with neither. The quality cockpit
+  reports `engine_verification` (checks that disagree with applied decisions, and waived kinds that
+  applied anything).
+- 1.3 Provider ids are stored (Telegram `message_id`, Resend id); Resend's `last_event` is polled, and a
+  bounced or complained email opens a notice that is also told another way, once. Failed digest
+  deliveries are counted. Every scheduled job is watched for a missed run, not only the autopilot and
+  the watchdog.
+- 1.4 The re-check runs weekly, takes unreviewed applied decisions plus a sample of reviewed ones, skips
+  a decision whose notice was dismissed, and stores each run in `engine_sweep`; `GET /engine/sweeps` and
+  the ledger page show the disagreement rate.
+- 2.x The owner's edit of an engine-written config version, a rollback, a cancelled or declined
+  proposal, negative news feedback and a hand-written journal entry over an auto-logged one are all
+  recorded as overrides (`POST/GET /overrides` for the rest). A repeated override in a config domain is
+  a pattern like any other. An item the owner overruled is not re-decided (365-day pin, thesis memos
+  included). The overrides come back as "lessons" in the prompts of the thesis author, the chat and the
+  digest writer.
 
-1.1 One list of what the engine did
-- It is a read model over five tables, not the write-through helper the plan asked for. The test only
-  checks that the five sources are listed; it does not fail when a new autonomous writer skips the list.
-- Not in the list yet: tuner changes (alerts, inbox, notices), `owner_override` rows, alert deliveries,
-  auto-logged journal rows (`origin: auto`), news-story and digest actions that do not go through
-  `auto_decision`.
-- The `config` source is "versions with no author and a parent"; that also matches versions written by
-  jobs or seeds that are not self-changes, so it can over-report.
-- `reversible` is only a flag. There is no single undo for config versions and engine changes from the list.
-- No web page for the list, no kind filter, no paging, and the OpenAPI schema and web types are not
-  regenerated for `/engine/ledger`.
-
-1.2 Verification registry
-- Only the `fact` kind has `verify`/`recheck`. Prices, identity, fund weights, news stories, digests,
-  `web_fact` and the other autopilot kinds have none.
-- The fact check is narrow: the printed number must appear in the stored excerpt. It does not compare the
-  value with a second source or the reconciliation, and a `correct_*` decision is not checked.
-- There are no `second_source` or `audit` interfaces; only the two hooks exist.
-- Nothing fails when a kind has neither a verifier nor a written waiver.
-- The quality cockpit has no check for the verifiers (area 17).
-
-1.3 Liveness and delivery receipts
-- Heartbeats cover only the autopilot and the watchdog, not every autonomous job.
-- The receipt is the `alert` row status. Provider message ids (Telegram `message_id`, Resend id) are not
-  stored and Resend delivery webhooks are not read, so "accepted by the API" is the strongest evidence.
-- Only the `alert` table is watched; the weekly report and the digest sends are not.
-- There is no dead-letter handling beyond the `failed` status.
-- The second channel is the in-app notice only. Telegram/email for critical failures is open question 2.
-
-1.4 Weekly re-verification
-- It runs on every calibration run, not weekly, and checks the last 30 days of unreviewed applied
-  decisions, at most 200 per run.
-- Only facts have a kind-specific recheck; every other kind gets only "the item is waiting again".
-- The disagreement rate (success metric) is not stored or shown.
-- A notice the owner dismissed opens again on the next run while the problem remains.
-- It does not sample decisions that were reviewed, and does not use a second source or a different model.
+Still open:
+- Research profiles have no owner-override source, so they get no lessons.
+- No Resend webhooks (polling only). Telegram has no delivery-status API; its receipt is the API answer.
+- The on-screen config rollback and manual save do not ask "why" (the API accepts `reason_code` on
+  rollback only; a manual save records the override without a reason).
+- Prices, fund weights and digests have no autopilot verifier; there is no second-source or audit
+  interface, and the fact check only compares the printed number with the stored excerpt.
+- `accept_memo` saves with no author, so its version shows up as engine-written.
+- The ledger's config source is "no author and a parent, not an import or rollback"; a job that writes
+  config without an author for another reason would still show.
+- Telegram/email for critical failures at all hours is still open question 2.
 
 ## 6. Success metrics (measured against the owner, not against the engine)
 
