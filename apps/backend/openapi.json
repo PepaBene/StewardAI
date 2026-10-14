@@ -11952,6 +11952,37 @@
         ]
       }
     },
+    "/autopilot/calibration": {
+      "get": {
+        "tags": [
+          "autopilot"
+        ],
+        "summary": "Get Calibration",
+        "description": "Per kind, how sure the autopilot was against how often it was right, over reviewed\ndecisions of the last 180 days.",
+        "operationId": "get_calibration",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/KindCalibration"
+                  },
+                  "type": "array",
+                  "title": "Response Get Calibration"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/autopilot/decisions": {
       "get": {
         "tags": [
@@ -36964,6 +36995,39 @@
         ],
         "title": "BenchmarkValuation"
       },
+      "Bin": {
+        "properties": {
+          "low": {
+            "type": "number",
+            "title": "Low"
+          },
+          "high": {
+            "type": "number",
+            "title": "High"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N"
+          },
+          "mean_confidence": {
+            "type": "number",
+            "title": "Mean Confidence"
+          },
+          "share_right": {
+            "type": "number",
+            "title": "Share Right"
+          }
+        },
+        "type": "object",
+        "required": [
+          "low",
+          "high",
+          "n",
+          "mean_confidence",
+          "share_right"
+        ],
+        "title": "Bin"
+      },
       "Block": {
         "properties": {
           "kind": {
@@ -37038,6 +37102,11 @@
             },
             "type": "array",
             "title": "Table"
+          },
+          "value_field": {
+            "type": "string",
+            "title": "Value Field",
+            "default": ""
           }
         },
         "type": "object",
@@ -70869,6 +70938,49 @@
         ],
         "title": "KeyFigure"
       },
+      "KindCalibration": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "reviewed": {
+            "type": "integer",
+            "title": "Reviewed"
+          },
+          "ece": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ece"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict"
+          },
+          "bins": {
+            "items": {
+              "$ref": "#/components/schemas/Bin"
+            },
+            "type": "array",
+            "title": "Bins"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "reviewed",
+          "ece",
+          "verdict",
+          "bins"
+        ],
+        "title": "KindCalibration"
+      },
       "KindSummary": {
         "properties": {
           "kind": {
@@ -76930,6 +77042,16 @@
             "maxLength": 100000,
             "minLength": 1,
             "title": "Content"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PageContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -79671,7 +79793,9 @@
               "reverted",
               "edited",
               "rejected",
-              "marked_wrong"
+              "marked_wrong",
+              "taught",
+              "retracted"
             ],
             "title": "Action"
           },
@@ -80573,6 +80697,35 @@
         "type": "object",
         "title": "OwnershipSettings",
         "description": "Form 13F institutional ownership from the SEC's quarterly data sets."
+      },
+      "PageContext": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Path",
+            "description": "The app page, e.g. /autopilot."
+          },
+          "selection": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection",
+            "description": "The item picked on the page, e.g. decision 12."
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "PageContext",
+        "description": "What the owner is looking at when they ask; it only helps the chat resolve \"this\"."
       },
       "PairOverlap": {
         "properties": {

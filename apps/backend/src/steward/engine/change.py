@@ -15,6 +15,7 @@ the spending caps, the gates themselves, and credentials. A proposal that touche
 """
 
 import json
+import re
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
@@ -44,8 +45,9 @@ class FrozenTarget(Exception):
 
 
 def ensure_changeable(target: str) -> None:
-    head = target.lower().split(".")[0].split(":")[0]
-    if any(head.startswith(p) for p in FROZEN):
+    # Every part of the target counts, so `autopilot:budget` is as frozen as `budget`.
+    parts = re.split(r"[.:/]", target.lower())
+    if any(part.strip().startswith(p) for part in parts for p in FROZEN):
         raise FrozenTarget(f"{target!r} is frozen: only the owner can change it")
 
 
@@ -154,7 +156,7 @@ def _load(value: Any) -> Any:
     return json.loads(value) if isinstance(value, str) else value
 
 
-def _change(row: asyncpg.Record) -> Change:
+def from_row(row: asyncpg.Record) -> Change:
     data = dict(row)
     for key in ("gates", "before", "after", "baseline", "candidate"):
         data[key] = _load(data[key])
@@ -184,7 +186,7 @@ async def propose(
         json.dumps(before),
         json.dumps(after),
     )
-    return _change(row)
+    return from_row(row)
 
 
 async def record_results(
@@ -207,7 +209,7 @@ async def settle(pool: asyncpg.Pool, change_id: int, *, golden_passed: bool | No
     )
     if row is None:
         raise LookupError(f"No engine change {change_id}")
-    change = _change(row)
+    change = from_row(row)
     if change.status != "shadow" or change.baseline is None or change.candidate is None:
         raise ValueError("the change is not waiting for a verdict")
     verdict = decide(

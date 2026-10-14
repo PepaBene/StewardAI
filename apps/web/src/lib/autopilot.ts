@@ -3,14 +3,21 @@ import type { components } from "@/lib/api/schema";
 export type AutoDecision = components["schemas"]["AutoDecision"];
 export type NeedsYouItem = components["schemas"]["NeedsYouItem"];
 export type KindSummary = components["schemas"]["KindSummary"];
+export type KindCalibration = components["schemas"]["KindCalibration"];
 
-export const AUTOPILOT_TABS = ["needs-you", "decisions", "kinds"] as const;
+export const AUTOPILOT_TABS = [
+  "needs-you",
+  "decisions",
+  "kinds",
+  "calibration",
+] as const;
 export type AutopilotTab = (typeof AUTOPILOT_TABS)[number];
 
 export const TAB_LABELS: Record<AutopilotTab, string> = {
   "needs-you": "Needs you",
   decisions: "Decisions",
   kinds: "What it handles",
+  calibration: "How sure vs right",
 };
 
 /** The tab named in the URL, "needs-you" when it is missing or unknown. */

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import IdPath, Pool
-from steward.autopilot import ledger
+from steward.autopilot import ledger, reliability
 from steward.autopilot.judge import ApplyError, accept, effective_mode, revert
 from steward.autopilot.kinds import all_kinds
 from steward.config.jobs import JobsConfig
@@ -135,6 +135,13 @@ async def get_summary(pool: Pool, _owner: Owner) -> Summary:
             )
         )
     return Summary(days=STATS_DAYS, kinds=out, waiting=sum(waiting.values()))
+
+
+@router.get("/autopilot/calibration")
+async def get_calibration(pool: Pool, _owner: Owner) -> list[reliability.KindCalibration]:
+    """Per kind, how sure the autopilot was against how often it was right, over reviewed
+    decisions of the last 180 days."""
+    return await reliability.report(pool, dt.datetime.now(dt.UTC))
 
 
 @router.get("/autopilot/decisions")

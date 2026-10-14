@@ -44,6 +44,7 @@ WRITERS: dict[str, tuple[str, set[str]]] = {
             "steward/ops/watchdog.py",
             "steward/ops/anticipate.py",
             "steward/engine/audit.py",
+            "steward/engine/challenger.py",
             "steward/ops/liveness.py",
             "steward/thesis/review.py",
             "steward/thesis/job.py",

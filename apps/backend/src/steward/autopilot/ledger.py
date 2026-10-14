@@ -258,9 +258,20 @@ async def wrong_decisions(
 
 
 async def learned_thresholds(pool: asyncpg.Pool) -> dict[str, float]:
-    """Per kind, the confidence the autopilot learned to ask for after being wrong."""
+    """Per kind, the confidence the autopilot asks for: what it learned after being wrong, or the
+    floor of a promoted engine change when that is higher. Rolling a change back drops its floor."""
     rows = await pool.fetch("select kind, min_confidence from public.autopilot_learned")
-    return {r["kind"]: float(r["min_confidence"]) for r in rows}
+    floors = {r["kind"]: float(r["min_confidence"]) for r in rows}
+    promoted = await pool.fetch(
+        "select distinct on (target) target, (after ->> 'min_confidence')::float8 as floor"
+        " from public.engine_change where change_kind = 'threshold' and status = 'promoted'"
+        " and target like 'autopilot:%' and after ? 'min_confidence'"
+        " order by target, decided_at desc"
+    )
+    for r in promoted:
+        kind = r["target"].removeprefix("autopilot:")
+        floors[kind] = max(floors.get(kind, 0.0), float(r["floor"]))
+    return floors
 
 
 async def set_learned(

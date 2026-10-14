@@ -26,6 +26,7 @@ import {
   TAB_LABELS,
   waitingLabel,
   type AutoDecision,
+  type KindCalibration,
   type KindSummary,
   type NeedsYouItem,
 } from "@/lib/autopilot";
@@ -83,6 +84,10 @@ export function AutopilotView() {
 
   const needs = useLoad(() => api.GET("/autopilot/needs-you"), reloadKey);
   const summary = useLoad(() => api.GET("/autopilot/summary"), reloadKey);
+  const calibration = useLoad(
+    () => api.GET("/autopilot/calibration"),
+    reloadKey,
+  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -148,6 +153,9 @@ export function AutopilotView() {
           />
         ) : null}
         {tab === "kinds" ? <KindsPanel load={summary} /> : null}
+        {tab === "calibration" ? (
+          <CalibrationPanel load={calibration} />
+        ) : null}
       </Blueprint>
     </div>
   );
@@ -554,6 +562,83 @@ function DecisionRow({
         </p>
       ) : null}
     </li>
+  );
+}
+
+/** When a queue says it is 90% sure, how often is it right? One small table per queue. */
+function CalibrationPanel({ load }: { load: Load<KindCalibration[]> }) {
+  if (load.kind === "loading") return <Loading what="the calibration" />;
+  if (load.kind === "error")
+    return (
+      <div className="p-5">
+        <AlertMessage title="Could not load the calibration">
+          {load.message}
+        </AlertMessage>
+      </div>
+    );
+  if (load.data.length === 0)
+    return (
+      <div className="p-5">
+        <EmptyState title="Nothing checked yet">
+          Once some of its decisions have been checked against your calls or a
+          second model, each queue shows here how sure it was against how often
+          it was right.
+        </EmptyState>
+      </div>
+    );
+  return (
+    <div>
+      {load.data.map((k) => (
+        <section
+          key={k.kind}
+          aria-label={k.kind}
+          className="border-b border-border-soft px-5 py-4 last:border-0"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <h3 className="text-[15px] font-medium">{k.kind}</h3>
+            <span className="text-xs text-text-muted">
+              {k.reviewed} checked
+              {k.ece !== null
+                ? ` · average gap ${Math.round(k.ece * 100)} points`
+                : ""}
+            </span>
+          </div>
+          <p className="mt-1 max-w-prose text-sm text-text-muted">
+            {k.verdict}
+          </p>
+          <table className="mt-2 w-full max-w-md text-left text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs text-text-muted">
+                <th className="py-1 pr-3 font-medium">It said</th>
+                <th className="num py-1 pr-3 text-right font-medium">
+                  Checked
+                </th>
+                <th className="num py-1 pr-3 text-right font-medium">
+                  Average sure
+                </th>
+                <th className="num py-1 text-right font-medium">Was right</th>
+              </tr>
+            </thead>
+            <tbody>
+              {k.bins.map((b) => (
+                <tr key={b.low} className="border-b border-border-soft">
+                  <td className="num py-1 pr-3">
+                    {Math.round(b.low * 100)}–{Math.round(b.high * 100)}%
+                  </td>
+                  <td className="num py-1 pr-3 text-right">{b.n}</td>
+                  <td className="num py-1 pr-3 text-right">
+                    {Math.round(b.mean_confidence * 100)}%
+                  </td>
+                  <td className="num py-1 text-right">
+                    {Math.round(b.share_right * 100)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ))}
+    </div>
   );
 }
 

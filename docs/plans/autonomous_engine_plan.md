@@ -318,6 +318,60 @@ Still open:
   config without an author for another reason would still show.
 - Telegram/email for critical failures at all hours is still open question 2.
 
+**Phase 2b - chat control surface (delivered 2026-10-14, gaps below).** Migration
+`20261119100000_owner_standing_instructions` adds the `taught` and `retracted` override actions.
+
+Closed:
+- 2b.1/2b.2 The registry holds the owner actions chat may propose, each with an undo note and a test that
+  none can place or prepare a trade; `teach` and `retract_teaching` were added. Chat only proposes; the
+  owner confirms on the card, and `set_autopilot_mode` needs a second confirmation.
+- 2b.3 The web app sends the page path with each message (`page_note` keeps only a plain path and a
+  plain label). The new tool `explain_decision` answers "why did you do that?" with the evidence, who
+  decided, the review and overrides, and the way to undo it or teach the engine.
+- 2b.4 A standing instruction in words (`teach`) is stored as an override row of action `taught`, shown
+  in `engine_activity`, and quoted as the owner's data in the prompts of the thesis author, the chat and
+  the digest writer, until `retract_teaching` withdraws it.
+- 2b.5/2b.6 Charts: `allocation`, `engine_week`, `owner_overrides` and `autopilot_precision`, each with a
+  table, source and date, and a check that the plotted values equal the table column they come from.
+- 2b.7 Five action cases in `evals/research_cases.json` (why a decision, an overrides chart, refusing a
+  trade, ignoring an instruction inside an article, a standing instruction); the scorer files a
+  `propose_job` call in a case that does not expect one as an unexpected action.
+
+Still open:
+- A standing instruction does not change a rule or config: it only reaches model prompts. Turning one into
+  a proposed config or rule change with a replay (2b.4, 2.3) is not built.
+- The page context carries the path only; screens do not yet send a selected item.
+- No snooze action (notices can only be dismissed), and no chat action for facts or news stories beyond
+  reviewing and undoing autopilot decisions.
+- The benchmark cases run only with a model: no run of them is in the test suite, only their labels.
+- The needs-you digest is `engine_activity` text, not a chart.
+
+**Phase 3 - self-change control (delivered 2026-10-14, gaps below).**
+
+Closed:
+- 3.1 `engine/challenger.py` runs the pipeline for one kind of change, a stricter confidence floor for an
+  autopilot kind (the change `override_watch` proposes): it replays the last 90 days of that kind's
+  decisions with and without the floor, stores both sets of numbers, applies gates fixed in code
+  (`FLOOR_GATES`: enough decisions and reviews, wrong decisions lower by a point, no cost rise), and
+  promotes or rejects. A promoted floor enters `ledger.learned_thresholds`; a floor that makes the
+  autopilot less strict is never applied by the engine. A rejected proposal is not made again for 30 days.
+- 3.2 A promoted floor is compared with its baseline after 14 days and rolled back if wrong decisions
+  rose; the owner gets a notice both ways. The freeze list now checks every part of a target
+  (`autopilot:budget` is as frozen as `budget`) and is checked again when a stored change is settled.
+- 3.3 The reward-hacking audit (`engine/audit.py`) was already built and runs in the calibration job.
+- 3.4 `GET /autopilot/calibration` and a "How sure vs right" tab on the Autopilot page: per kind, the
+  confidence the autopilot stated against how often it was right, with the average gap.
+
+Still open:
+- Only confidence floors run through the pipeline. Prompts, rules, source weights, schedules and models
+  can be proposed but nothing replays or promotes them; prompt and model changes also need a golden-set
+  run, which does not exist for the autopilot kinds.
+- The replay can only drop decisions below the floor. It cannot tell what the owner would have decided
+  on the escalated ones, so the gain is measured on decisions that were reviewed anyway.
+- The gates are constants in code, not an owner-editable config the engine cannot write.
+- Rollback needs enough reviewed decisions in the window after the change; a quiet kind is not checked.
+- The calibration tab shows tables, not a reliability chart.
+
 ## 6. Success metrics (measured against the owner, not against the engine)
 
 - Owner override rate per kind, trending down; no kind promoted to `auto` with override rate over its cap.

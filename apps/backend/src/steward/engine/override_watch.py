@@ -10,7 +10,7 @@ import datetime as dt
 
 import asyncpg
 
-from steward.engine import change, overrides
+from steward.engine import challenger, change, overrides
 from steward.ops import tasks
 
 KIND = "override_pattern"
@@ -46,13 +46,20 @@ def proposed_floor(current: float) -> float:
     return round(min(FLOOR_MAX, current + FLOOR_STEP), 4)
 
 
+RETRY_AFTER_DAYS = 30
+
+
 async def _has_open_proposal(pool: asyncpg.Pool, target: str, hypothesis: str) -> bool:
+    """A proposal is waiting, or the same one was decided recently: a rejected floor is not
+    proposed again every run."""
     return bool(
         await pool.fetchval(
             "select exists (select 1 from public.engine_change where target = $1"
-            " and hypothesis = $2 and status = 'shadow')",
+            " and hypothesis = $2 and (status = 'shadow'"
+            " or created_at >= now() - make_interval(days => $3)))",
             target,
             hypothesis,
+            RETRY_AFTER_DAYS,
         )
     )
 
@@ -88,6 +95,7 @@ async def act(pool: asyncpg.Pool, floors: dict[str, float], now: dt.datetime) ->
             "owner override rate",
             before={"min_confidence": current},
             after={"min_confidence": proposed_floor(current)},
+            gates=challenger.FLOOR_GATES,
         )
         proposals += 1
     return {"notices": notices, "proposals": proposals}

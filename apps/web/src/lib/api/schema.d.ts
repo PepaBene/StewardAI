@@ -4066,6 +4066,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/autopilot/calibration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Calibration
+         * @description Per kind, how sure the autopilot was against how often it was right, over reviewed
+         *     decisions of the last 180 days.
+         */
+        get: operations["get_calibration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/autopilot/decisions": {
         parameters: {
             query?: never;
@@ -12001,6 +12022,19 @@ export interface components {
             /** Stale */
             stale: boolean;
         };
+        /** Bin */
+        Bin: {
+            /** Low */
+            low: number;
+            /** High */
+            high: number;
+            /** N */
+            n: number;
+            /** Mean Confidence */
+            mean_confidence: number;
+            /** Share Right */
+            share_right: number;
+        };
         /** Block */
         Block: {
             /** Kind */
@@ -12030,6 +12064,11 @@ export interface components {
             table: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Value Field
+             * @default
+             */
+            value_field: string;
         };
         /** BoardKpi */
         BoardKpi: {
@@ -23863,6 +23902,19 @@ export interface components {
             /** Formula */
             formula: string;
         };
+        /** KindCalibration */
+        KindCalibration: {
+            /** Kind */
+            kind: string;
+            /** Reviewed */
+            reviewed: number;
+            /** Ece */
+            ece: number | null;
+            /** Verdict */
+            verdict: string;
+            /** Bins */
+            bins: components["schemas"]["Bin"][];
+        };
         /** KindSummary */
         KindSummary: {
             /** Kind */
@@ -26005,6 +26057,7 @@ export interface components {
         NewMessage: {
             /** Content */
             content: string;
+            page?: components["schemas"]["PageContext"] | null;
         };
         /** NewsFeed */
         NewsFeed: {
@@ -27243,7 +27296,7 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "reverted" | "edited" | "rejected" | "marked_wrong";
+            action: "reverted" | "edited" | "rejected" | "marked_wrong" | "taught" | "retracted";
             /** Reason Code */
             reason_code?: ("wrong_data" | "wrong_source" | "right_but_unimportant" | "too_early" | "too_late" | "prefer_my_judgement" | "other") | null;
             /** Note */
@@ -27531,6 +27584,22 @@ export interface components {
              * @default 10
              */
             top_holders: number;
+        };
+        /**
+         * PageContext
+         * @description What the owner is looking at when they ask; it only helps the chat resolve "this".
+         */
+        PageContext: {
+            /**
+             * Path
+             * @description The app page, e.g. /autopilot.
+             */
+            path: string;
+            /**
+             * Selection
+             * @description The item picked on the page, e.g. decision 12.
+             */
+            selection?: string | null;
         };
         /** PairOverlap */
         PairOverlap: {
@@ -46912,6 +46981,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Summary"];
+                };
+            };
+        };
+    };
+    get_calibration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KindCalibration"][];
                 };
             };
         };
