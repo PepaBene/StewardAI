@@ -77,6 +77,7 @@ export const CLUSTERS: readonly Cluster[] = [
     href: "/reports",
     pages: [
       { href: "/autopilot", label: "Autopilot" },
+      { href: "/engine-ledger", label: "What the engine did" },
       { href: "/inbox", label: "Inbox" },
       { href: "/escalations", label: "Escalations" },
       { href: "/reports", label: "Reports" },

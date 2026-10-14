@@ -199,4 +199,5 @@ export const ISSUE_LABEL:Record<QualityIssue["kind"], string> = {
   provider_access: "Provider access",
   provider_quota: "Provider quota",
   thesis_gap: "Thesis",
+  engine_verification: "Autopilot checks",
 };

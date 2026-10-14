@@ -157,7 +157,8 @@ export interface paths {
          * Rollback Config
          * @description Make an old version current again by saving its body as a new active version. The
          *     next run of every job uses it. 409 if the old body no longer passes validation, or if
-         *     `base_version_id` is given and is no longer the active version.
+         *     `base_version_id` is given and is no longer the active version. When the version being
+         *     replaced was written by the engine, `reason_code` says why it was undone.
          */
         post: operations["rollback_config"];
         delete?: never;
@@ -4215,9 +4216,57 @@ export interface paths {
         };
         /**
          * Engine Ledger
-         * @description Everything the engine or the owner changed, newest first, from every ledger.
+         * @description Everything the engine or the owner changed, newest first, from every ledger. An entry
+         *     with `undo_action` can be undone through `/actions/propose` with `undo_args`.
          */
         get: operations["engine_ledger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/overrides": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Overrides
+         * @description How you have overruled the engine, newest first.
+         */
+        get: operations["list_overrides"];
+        put?: never;
+        /**
+         * Record Override
+         * @description Say that you overruled something the engine did, and why. Screens use this for areas
+         *     that have no dedicated undo (a story, a graph edge, an identity); the engine does not redo
+         *     an item you overruled and learns from the reasons.
+         */
+        post: operations["record_override"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/engine/sweeps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Engine Sweeps
+         * @description The weekly re-check of applied decisions: how many it looked at and how many no longer
+         *     held, newest first. The share that no longer held is the disagreement rate.
+         */
+        get: operations["engine_sweeps"];
         put?: never;
         post?: never;
         delete?: never;
@@ -16846,7 +16895,7 @@ export interface components {
             note: string;
         };
         /** Entry */
-        Entry: {
+        "Entry-Input": {
             /**
              * At
              * Format: date-time
@@ -16862,8 +16911,38 @@ export interface components {
             summary: string;
             /** Status */
             status: string;
+            /** Undo Action */
+            undo_action?: string | null;
+            /** Undo Args */
+            undo_args?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Entry */
+        "Entry-Output": {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Source */
+            source: string;
+            /** Kind */
+            kind: string;
+            /** Ref */
+            ref: string;
+            /** Summary */
+            summary: string;
+            /** Status */
+            status: string;
+            /** Undo Action */
+            undo_action?: string | null;
+            /** Undo Args */
+            undo_args?: {
+                [key: string]: unknown;
+            } | null;
             /** Reversible */
-            reversible: boolean;
+            readonly reversible: boolean;
         };
         /** Envelope */
         Envelope: {
@@ -27152,6 +27231,54 @@ export interface components {
             /** Advice */
             advice: string;
         };
+        /** OverrideIn */
+        OverrideIn: {
+            /** Area */
+            area: string;
+            /** Subject Kind */
+            subject_kind: string;
+            /** Subject Ref */
+            subject_ref: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "reverted" | "edited" | "rejected" | "marked_wrong";
+            /** Reason Code */
+            reason_code?: ("wrong_data" | "wrong_source" | "right_but_unimportant" | "too_early" | "too_late" | "prefer_my_judgement" | "other") | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Via
+             * @default screen
+             * @enum {string}
+             */
+            via: "screen" | "chat";
+        };
+        /** OverrideOut */
+        OverrideOut: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Area */
+            area: string;
+            /** Subject Kind */
+            subject_kind: string;
+            /** Subject Ref */
+            subject_ref: string;
+            /** Action */
+            action: string;
+            /** Reason Code */
+            reason_code: string | null;
+            /** Note */
+            note: string | null;
+            /** Via */
+            via: string;
+        };
         /** Overview */
         Overview: {
             /** Ticker */
@@ -30147,7 +30274,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap" | "engine_verification";
             /**
              * Subject
              * @description Ticker, fund or provider the issue is about.
@@ -30826,14 +30953,6 @@ export interface components {
             page: string | null;
             /** Table Name */
             table_name: string | null;
-        };
-        /** Recorded */
-        Recorded: {
-            /**
-             * Ok
-             * @default true
-             */
-            ok: boolean;
         };
         /** RecordedExchangeSessionResponse */
         RecordedExchangeSessionResponse: {
@@ -34875,7 +34994,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap" | "engine_verification";
             /** Subject */
             subject: string;
             /**
@@ -34897,7 +35016,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap" | "engine_verification";
             /** Subject */
             subject: string;
             /**
@@ -36519,6 +36638,20 @@ export interface components {
             surprise: string;
             /** Version */
             version: string;
+        };
+        /** SweepOut */
+        SweepOut: {
+            /**
+             * Ran At
+             * Format: date-time
+             */
+            ran_at: string;
+            /** Checked */
+            checked: number;
+            /** Flagged */
+            flagged: number;
+            /** Disagreement Rate */
+            disagreement_rate: number | null;
         };
         /** SwitchEntry */
         SwitchEntry: {
@@ -39981,6 +40114,19 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /** Recorded */
+        api__action_routes__Recorded: {
+            /** Recorded */
+            recorded: boolean;
+        };
+        /** Recorded */
+        api__autopilot_routes__Recorded: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+        };
         /** StakeChangeOut */
         api__disclosure_routes__StakeChangeOut: {
             /** Change Type */
@@ -40168,7 +40314,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap" | "engine_verification";
             /** Title */
             title: string;
             /** Ran */
@@ -40491,6 +40637,7 @@ export interface operations {
             query?: {
                 /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
                 base_version_id?: number | null;
+                reason_code?: ("wrong_data" | "wrong_source" | "right_but_unimportant" | "too_early" | "too_late" | "prefer_my_judgement" | "other") | null;
             };
             header?: never;
             path: {
@@ -46215,7 +46362,9 @@ export interface operations {
     };
     cancel_action: {
         parameters: {
-            query?: never;
+            query?: {
+                reason_code?: ("wrong_data" | "wrong_source" | "right_but_unimportant" | "too_early" | "too_late" | "prefer_my_judgement" | "other") | null;
+            };
             header?: never;
             path: {
                 action_id: number;
@@ -46840,7 +46989,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Recorded"];
+                    "application/json": components["schemas"]["api__autopilot_routes__Recorded"];
                 };
             };
             /** @description Validation Error */
@@ -46992,6 +47141,8 @@ export interface operations {
                 days?: number;
                 limit?: number;
                 source?: string | null;
+                kind?: string | null;
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -47005,7 +47156,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Entry"][];
+                    "application/json": components["schemas"]["Entry-Input"][];
                 };
             };
             /** @description Validation Error */
@@ -47015,6 +47166,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_overrides: {
+        parameters: {
+            query?: {
+                days?: number;
+                area?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverrideOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_override: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverrideIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api__action_routes__Recorded"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    engine_sweeps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SweepOut"][];
                 };
             };
         };
