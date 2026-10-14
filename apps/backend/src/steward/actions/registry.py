@@ -268,6 +268,37 @@ async def _run_roll_back_change(pool: asyncpg.Pool, a: ChangeArgs) -> dict[str, 
     return {"change_id": a.change_id}
 
 
+class TeachArgs(BaseModel):
+    area: Literal["theses", "chat", "digest", "news"]
+    text: str = Field(min_length=5, max_length=overrides.STANDING_MAX)
+
+
+class RetractArgs(BaseModel):
+    ref: str = Field(pattern=r"^teaching:[0-9a-f]{12}$")
+
+
+async def _describe_teach(pool: asyncpg.Pool, a: TeachArgs) -> str:
+    return f"Remember for {a.area}: “{a.text}”"
+
+
+async def _run_teach(pool: asyncpg.Pool, a: TeachArgs) -> dict[str, Any]:
+    ref = await overrides.teach(pool, a.area, a.text, current_via.get())
+    return {"ref": ref, "area": a.area}
+
+
+async def _describe_retract(pool: asyncpg.Pool, a: RetractArgs) -> str:
+    found = [s for s in await overrides.standing_instructions(pool) if s.ref == a.ref]
+    if not found:
+        raise ActionError(f"No standing instruction {a.ref}")
+    return f"Forget the standing instruction for {found[0].area}: “{found[0].text}”"
+
+
+async def _run_retract(pool: asyncpg.Pool, a: RetractArgs) -> dict[str, Any]:
+    if not await overrides.retract(pool, a.ref, current_via.get()):
+        raise ActionError(f"No standing instruction {a.ref}")
+    return {"ref": a.ref}
+
+
 ACTIONS: dict[str, Action] = {
     a.name: a
     for a in (
@@ -325,6 +356,24 @@ ACTIONS: dict[str, Action] = {
             "after new evidence.",
             _describe_roll_back_change,
             _run_roll_back_change,
+        ),
+        Action(
+            "teach",
+            "Give the engine a standing instruction",
+            "low",
+            TeachArgs,
+            "Forget it with the retract_teaching action.",
+            _describe_teach,
+            _run_teach,
+        ),
+        Action(
+            "retract_teaching",
+            "Forget a standing instruction",
+            "low",
+            RetractArgs,
+            "Give the same instruction again with the teach action.",
+            _describe_retract,
+            _run_retract,
         ),
         Action(
             "set_autopilot_mode",

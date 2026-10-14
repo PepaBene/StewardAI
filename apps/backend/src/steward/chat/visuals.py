@@ -18,8 +18,8 @@ from pydantic import BaseModel
 
 from steward.autopilot import ledger
 
-Kind = Literal["allocation", "engine_week"]
-KINDS: tuple[str, ...] = ("allocation", "engine_week")
+Kind = Literal["allocation", "engine_week", "owner_overrides", "autopilot_precision"]
+KINDS: tuple[str, ...] = ("allocation", "engine_week", "owner_overrides", "autopilot_precision")
 ChartType = Literal["bar", "donut", "none"]
 MAX_POINTS = 30
 
@@ -36,6 +36,8 @@ class Block(BaseModel):
     summary: str
     caption: str | None = None
     table: list[dict[str, Any]]
+    # The table column the plotted values come from; when set, the plot must equal it.
+    value_field: str = ""
 
 
 def empty(kind: str, title: str, why: str) -> Block:
@@ -66,6 +68,8 @@ def check_block(block: Block) -> Block:
         return empty(block.kind, block.title, "The data for this chart has no source or date.")
     if len(block.table) != len(block.labels):
         return empty(block.kind, block.title, "The chart and its table did not match.")
+    if block.value_field and [row.get(block.value_field) for row in block.table] != block.values:
+        return empty(block.kind, block.title, "The chart did not match the numbers in its table.")
     return block
 
 
@@ -98,6 +102,7 @@ async def allocation(pool: asyncpg.Pool) -> Block:
             as_of=day.isoformat(),
             summary=f"{len(rows)} holdings; the largest is {labels[0]} at {values[0]}%.",
             table=[{"holding": k, "weight_pct": v} for k, v in zip(labels, values, strict=True)],
+            value_field="weight_pct",
         )
     )
 
@@ -135,6 +140,66 @@ async def engine_week(pool: asyncpg.Pool, now: dt.datetime) -> Block:
                 }
                 for s in stats
             ],
+            value_field="decided",
+        )
+    )
+
+
+async def owner_overrides(pool: asyncpg.Pool, now: dt.datetime) -> Block:
+    """How often the owner overruled the engine in the last 30 days, by area."""
+    rows = await pool.fetch(
+        "select area, count(*) as n from public.owner_override where created_at >= $1"
+        " and action not in ('taught', 'retracted') group by area order by n desc, area",
+        now - dt.timedelta(days=30),
+    )
+    if not rows:
+        return empty("owner_overrides", "Your corrections", "You overruled nothing in 30 days.")
+    labels = [r["area"] for r in rows]
+    values = [float(r["n"]) for r in rows]
+    return check_block(
+        Block(
+            kind="owner_overrides",
+            chart="bar",
+            title="Where you overruled the engine in the last 30 days",
+            unit="overrides",
+            labels=labels,
+            values=values,
+            source="owner_override",
+            as_of=now.date().isoformat(),
+            summary=f"{int(sum(values))} overrides; most in {labels[0]} ({int(values[0])}).",
+            table=[{"area": k, "overrides": int(v)} for k, v in zip(labels, values, strict=True)],
+            value_field="overrides",
+        )
+    )
+
+
+async def autopilot_precision(pool: asyncpg.Pool, now: dt.datetime) -> Block:
+    """Share of reviewed decisions that were right, per autopilot kind, over 90 days."""
+    stats = [s for s in await ledger.stats(pool, now - dt.timedelta(days=90)) if s.reviewed]
+    if not stats:
+        return empty(
+            "autopilot_precision", "How often the autopilot is right", "Nothing has been reviewed."
+        )
+    labels = [s.kind for s in stats]
+    values = [round(100 * s.right / s.reviewed, 1) for s in stats]
+    return check_block(
+        Block(
+            kind="autopilot_precision",
+            chart="bar",
+            title="Share of reviewed decisions that were right (90 days)",
+            unit="% right",
+            labels=labels,
+            values=values,
+            source="auto_decision",
+            as_of=now.date().isoformat(),
+            summary=(
+                f"{sum(s.reviewed for s in stats)} reviewed decisions across {len(stats)} kinds."
+            ),
+            table=[
+                {"kind": s.kind, "reviewed": s.reviewed, "right": s.right, "pct_right": v}
+                for s, v in zip(stats, values, strict=True)
+            ],
+            value_field="pct_right",
         )
     )
 
@@ -144,4 +209,8 @@ async def build(pool: asyncpg.Pool, kind: str, now: dt.datetime) -> Block:
         return await allocation(pool)
     if kind == "engine_week":
         return await engine_week(pool, now)
+    if kind == "owner_overrides":
+        return await owner_overrides(pool, now)
+    if kind == "autopilot_precision":
+        return await autopilot_precision(pool, now)
     raise ValueError(f"Unknown visual {kind!r}; choose one of {', '.join(KINDS)}")

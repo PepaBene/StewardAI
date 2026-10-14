@@ -36,6 +36,7 @@ from steward.data_context.research import (
     country_context,
 )
 from steward.earnings.read import holding_detail
+from steward.engine import overrides
 from steward.news.embeddings import Embedder, EmbeddingError, GeminiEmbedder, cosine
 from steward.news.read_analysis import like_pattern
 from steward.portfolio.read import portfolio_overview
@@ -54,6 +55,8 @@ CHANGE_KINDS = (
     "set_autopilot_mode",
     "rollback_config",
     "roll_back_change",
+    "teach",
+    "retract_teaching",
 )
 ACTION_KINDS = (*JOB_KINDS, *CHANGE_KINDS)
 DOCUMENT_KINDS = ("filing", "report", "thesis", "note", "news", "disclosure", "agent_note")
@@ -717,13 +720,28 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "explain_decision",
+        "description": "Why the engine did something: one automatic decision with what it "
+        "decided, who or what decided it, its confidence, the evidence it used, whether the "
+        "owner reviewed or overruled it, and how to undo it or teach the engine. Use it for "
+        "'why did you do that?'. Find the decision id with engine_activity or from the page "
+        "the owner is viewing.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"decision_id": {"type": "integer"}},
+            "required": ["decision_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "propose_job",
         "description": "Propose a job (re-run a holding's earnings check, start a research "
         "report, run the portfolio sync) or a change to what the engine did (dismiss a "
         "notice, undo an automatic decision, accept its recommendation, mark a decision "
-        "right or wrong, set an autopilot kind off/shadow/auto). Find the ids with "
-        "engine_activity. Nothing happens until the owner confirms it in the chat; say what "
-        "you proposed. This never places or prepares a trade.",
+        "right or wrong, set an autopilot kind off/shadow/auto, put a setting back, give "
+        "the engine a standing instruction with teach, forget one with retract_teaching). "
+        "Find the ids with engine_activity. Nothing happens until the owner confirms it in "
+        "the chat; say what you proposed. This never places or prepares a trade.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -734,7 +752,9 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     "type": "object",
                     "description": "For a change: task_id (dismiss_notice), decision_id "
                     "(the others), verdict ok|wrong (review_decision), kind and mode "
-                    "(set_autopilot_mode).",
+                    "(set_autopilot_mode), domain and version_id (rollback_config), "
+                    "change_id (roll_back_change), area theses|chat|digest|news and text "
+                    "(teach), ref (retract_teaching).",
                 },
                 "reason": {"type": "string"},
             },
@@ -802,6 +822,7 @@ class ChatTools:
         self.doc_embedder = doc_embedder
         self.used: list[str] = []
         self.actions: list[int] = []
+        self.page = ""  # what the owner is looking at, set by the chat job
         # Charts the model asked to show; the panel draws them from these blocks.
         self.visuals: list[Block] = []
         # One entry per call, for the job's step detail: what was asked, how long it took,
@@ -1732,6 +1753,10 @@ class ChatTools:
                 for e in done
             ],
             "notices": notices,
+            "standing_instructions": [
+                {"ref": s.ref, "area": s.area, "text": s.text}
+                for s in await overrides.standing_instructions(self.pool)
+            ],
             "waiting_for_the_owner": waiting,
             "last_7_days": [
                 {
@@ -1743,6 +1768,56 @@ class ChatTools:
                 }
                 for s in week
             ],
+        }
+
+    async def _tool_explain_decision(self, decision_id: int) -> dict[str, Any]:
+        from steward.autopilot import ledger
+        from steward.autopilot.kinds import all_kinds
+
+        d = await ledger.get(self.pool, decision_id)
+        if d is None:
+            return {"error": f"no automatic decision {decision_id}"}
+        overruled = await self.pool.fetch(
+            "select action, reason_code, note, created_at from public.owner_override"
+            " where decision_id = $1 order by created_at",
+            decision_id,
+        )
+        sid = self.registry.add(
+            "observation",
+            f"auto_decision:{d.id}",
+            f"{d.kind}: {d.summary[:80]}",
+            app_path="/autopilot",
+            tier=1,
+            snippet=d.summary,
+            as_of=str(d.decided_at.date()),
+        )
+        kind = all_kinds().get(d.kind)
+        return {
+            "tool": "explain_decision",
+            "source_id": sid,
+            "autopilot_kind": d.kind,
+            "what": d.summary,
+            "decision": d.decision,
+            "decided_by": d.decided_by,
+            "confidence": d.confidence,
+            "status": d.status,
+            "decided_at": d.decided_at.isoformat(timespec="minutes"),
+            "evidence": json.dumps(d.evidence, default=str)[:1500],
+            "owner_review": d.review,
+            "owner_overrides": [
+                {"action": o["action"], "reason": o["reason_code"], "note": o["note"]}
+                for o in overruled
+            ],
+            "checked_before_applying": kind is not None and kind.verify is not None,
+            "undo_with": (
+                {"kind": "revert_decision", "args": {"decision_id": d.id}}
+                if d.status == "applied" and d.revert_payload is not None
+                else None
+            ),
+            "teach_with": {
+                "kind": "teach",
+                "args": {"area": "<theses|chat|digest|news>", "text": "<the owner's rule>"},
+            },
         }
 
     async def _tool_propose_job(

@@ -12,6 +12,7 @@ unsupported.
 
 import datetime as dt
 import json
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
@@ -192,11 +193,13 @@ class LLMChatAssistant:
         corrections = (
             await overrides.lessons(pool, "chat", "proposals the chat made") if pool else ""
         )
+        page = getattr(tools, "page", "")
         messages: list[Message] = [
             *(Message(m["role"], m["content"]) for m in history),  # type: ignore[arg-type]
             Message(
                 "user",
                 f"Today is {today.isoformat()}.\n\n"
+                + (f"{page}\n\n" if page else "")
                 + (f"{corrections}\n\n" if corrections else "")
                 + question,
             ),
@@ -339,6 +342,24 @@ def needs_escalation(result: AssistantResult) -> bool:
     return not any(s.source_ids or s.urls for s in draft.sentences)
 
 
+_PAGE_PATH = re.compile(r"^/[A-Za-z0-9/_\-]{0,150}$")
+_PAGE_SELECTION = re.compile(r"^[A-Za-z0-9 _:#.\-]{1,100}$")
+
+
+def page_note(raw: Any) -> str:
+    """One line saying what the owner is looking at, from the page the web app sent. Anything
+    that is not a plain path or label is dropped, so the page cannot carry text to the model."""
+    if not isinstance(raw, dict):
+        return ""
+    path, selection = raw.get("path"), raw.get("selection")
+    if not isinstance(path, str) or not _PAGE_PATH.match(path):
+        return ""
+    note = f"The owner is looking at the app page {path}"
+    if isinstance(selection, str) and _PAGE_SELECTION.match(selection):
+        note += f", with {selection} selected"
+    return note + ". Use it only to work out what 'this' refers to."
+
+
 @dataclass
 class ChatDeps:
     assistant: ChatAssistant | None
@@ -417,6 +438,7 @@ async def run_chat(ctx: JobContext, deps: ChatDeps) -> int:
     tools = ChatTools(
         pool, registry, conversation_id, message_id, embedder, doc_embedder=doc_embedder
     )
+    tools.page = page_note(ctx.params.get("page"))
     cascade: AssistantResult | None = None
     if deps.assistant is not None and deps.escalation is not None:
         # The cascade: the cheaper model tries first, in a step of its own so its cost is

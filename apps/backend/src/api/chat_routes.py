@@ -70,8 +70,18 @@ class NewConversation(BaseModel):
     title: str | None = Field(default=None, max_length=200)
 
 
+class PageContext(BaseModel):
+    """What the owner is looking at when they ask; it only helps the chat resolve "this"."""
+
+    path: str = Field(max_length=200, description="The app page, e.g. /autopilot.")
+    selection: str | None = Field(
+        default=None, max_length=100, description="The item picked on the page, e.g. decision 12."
+    )
+
+
 class NewMessage(BaseModel):
     content: str = Field(min_length=1, max_length=100_000)
+    page: PageContext | None = None
 
 
 class PostedMessage(BaseModel):
@@ -171,7 +181,11 @@ async def post_message(
             "chat",
             "chat",
             requested_by=owner.user_id,
-            params={"conversation_id": conversation_id, "message_id": row["id"]},
+            params={
+                "conversation_id": conversation_id,
+                "message_id": row["id"],
+                **({"page": body.page.model_dump()} if body.page else {}),
+            },
         )
         await conn.execute(
             "update public.chat_message set job_id = $2 where id = $1", row["id"], job_id

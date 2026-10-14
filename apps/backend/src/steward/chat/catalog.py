@@ -206,7 +206,7 @@ DATASETS: tuple[Dataset, ...] = (
         "engine",
         "What the automatic engine did and what waits for the owner",
         ("auto_decision", "ops_task"),
-        ("engine_activity", "show_visual"),
+        ("engine_activity", "show_visual", "explain_decision"),
         "live",
     ),
 )
@@ -245,7 +245,8 @@ TOOLS: dict[str, ToolInfo] = {
     "decision_scorecard": ToolInfo(("transactions",), "analytics_tools.decision_scorecard", "last year", "owner", "journal ids"),
     "propose_job": ToolInfo(("actions",), "chat_action insert, owner_action insert", "one proposal", "owner", "action id", writes=True),
     "show_visual": ToolInfo(("engine",), "SQL on position_snapshot and auto_decision", "30 bars; one chart", "owner", "source id with the snapshot date"),
-    "engine_activity": ToolInfo(("engine",), "SQL on ops_task and auto_decision", "30 items per list; 7 days of counts", "owner", "task or decision id"),
+    "engine_activity": ToolInfo(("engine",), "SQL on ops_task, auto_decision and owner_override", "30 items per list; 7 days of counts", "owner", "task or decision id"),
+    "explain_decision": ToolInfo(("engine",), "SQL on auto_decision and owner_override", "one decision, evidence clipped to 1500 characters", "owner", "decision id"),
     "filing_evidence": ToolInfo(("filed_evidence",), "data_context.evidence", "10 items by default, 25 at most, as-of cutoff", "global", "source URL, passage and known-at per item"),
     "fundamentals": ToolInfo(("fundamentals",), "company.ratios.build_ratios", "80 ratios, or 300 points with periods", "global", "ratio group source with filed periods"),
     "valuation_scenarios": ToolInfo(("valuation",), "company.valuation.build_valuation", "5 scenarios: the owner's newest saved set, else defaults", "owner", "method version, price date and whether the assumptions are saved or default"),

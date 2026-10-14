@@ -12,6 +12,7 @@ import {
   XIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
@@ -77,6 +78,7 @@ export function ChatThread({
   onChanged?: () => void;
   className?: string;
 }) {
+  const pathname = usePathname();
   const [load, setLoad] = useState<Load | null>(null);
   const [jobStatus, setJobStatus] = useState<{ id: number; status: JobStatus; error: string | null } | null>(null);
   const [stopped, setStopped] = useState<string | null>(null);
@@ -169,7 +171,7 @@ export function ChatThread({
     }
     const { data, response } = await api.POST("/chat/conversations/{conversation_id}/messages", {
       params: { path: { conversation_id: id } },
-      body: { content: content.trim() },
+      body: { content: content.trim(), page: { path: pathname } },
     });
     if (!data) return `Not sent (HTTP ${response.status}).`;
     setStopped(null);
