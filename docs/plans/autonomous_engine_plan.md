@@ -372,6 +372,41 @@ Still open:
 - Rollback needs enough reviewed decisions in the window after the change; a quiet kind is not checked.
 - The calibration tab shows tables, not a reliability chart.
 
+**Phase 4 - proactive engine (delivered 2026-10-14, gaps below).** Migration
+`20261120100000_engine_trigger` adds `engine_trigger`.
+
+Closed:
+- 4.1 Every proactive start goes through `engine/triggers.py` (`fire` for work that costs, `log` for a
+  notice) and leaves a row with the reason, the action, and whether it started or was held back and why.
+  Held back by: a 7-day cooldown per subject, 3 starts a day per kind and 6 in all, $3 a day of
+  engine-started jobs, 90% of the monthly AI budget, or the owner dismissing the kind's last notices. The
+  check after a company reports is `essential` and ignores cooldown and caps. `GET /engine/triggers`, and
+  the ledger gets a ninth source "Proactive runs".
+- 4.2 Stale research, held-without-thesis coverage drafts, post-report checks and the pre-report heads-up
+  all go through the table. The heads-up is logged once per report date.
+- 4.3 `engine/learning.py`, run in the calibration job: a kind acting on its own that is overruled in a
+  pattern is put back to watching, with a notice; a watching kind that is accurate enough but that only
+  the owner may promote gets one notice. The engine never promotes by this route.
+- 4.4 The notice tuner is general: three dismissed notices of a trigger kind with none acted on pause the
+  kind for 30 days, with one notice saying so.
+
+Still open:
+- Triggers that only queue jobs (stale research, post-report checks) open no notice, so they have no
+  dismissal-based pause; only cooldown, caps and the budget limit them.
+- Not built: a pre-month-end review draft, a rebalance-drift warning, large-move and insider-cluster
+  triggers, and triggers on filings, guidance or rating changes.
+- The coverage trigger covers "held but no thesis" only.
+- The daily cost cap counts every job started as `event`, not only those from the table.
+- Caps, cooldown and thresholds are constants in code.
+- Learning triggers only lower autonomy or ask the owner; they never promote.
+
+**Gap register.** Open items by theme, each listed above: (1) verification coverage: prices, fund weights,
+digests, research profiles; (2) owner feedback: "why" on config saves, snooze, standing instructions that
+change rules, `accept_memo` authorship; (3) self-change: only confidence floors replayed, no golden set,
+gates in code; (4) proactivity: the unbuilt triggers listed in phase 4; (5) delivery: no Resend webhooks,
+Telegram receipt is the API answer, critical alerts at all hours (open question 2); (6) presentation:
+calibration and needs-you digest as tables or text.
+
 ## 6. Success metrics (measured against the owner, not against the engine)
 
 - Owner override rate per kind, trending down; no kind promoted to `auto` with override rate over its cap.

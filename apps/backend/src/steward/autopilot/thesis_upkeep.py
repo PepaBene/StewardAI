@@ -25,6 +25,7 @@ from steward.config.research import ResearchProfilesConfig
 from steward.config.store import ConfigConflictError, load_active, save_config
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig, ThesisConfig
+from steward.engine import triggers
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 from steward.ops import tasks
@@ -112,12 +113,26 @@ async def queue_thesis_drafts(
     chosen = drafts_due(weights, have, await _core_tickers(pool), recent, active, max_per_run)
     queued: list[dict[str, Any]] = []
     for ticker in chosen:
-        async with pool.acquire() as conn, conn.transaction():
-            job_id = await create_job(
-                conn, "research", "event", params={"ticker": ticker, "profile": DRAFT_PROFILE}
-            )
-            await queue.enqueue(conn, job_id, "research")
-        queued.append({"ticker": ticker, "job_id": job_id})
+
+        async def start(ticker: str = ticker) -> int | None:
+            async with pool.acquire() as conn, conn.transaction():
+                job_id = await create_job(
+                    conn, "research", "event", params={"ticker": ticker, "profile": DRAFT_PROFILE}
+                )
+                await queue.enqueue(conn, job_id, "research")
+            return job_id
+
+        outcome = await triggers.fire(
+            pool,
+            "coverage",
+            ticker,
+            f"{ticker} is held ({weights.get(ticker, 0):.1%} of the portfolio) and has no thesis.",
+            "start a research run that drafts a thesis",
+            start,
+            now=now,
+        )
+        if outcome.fired:
+            queued.append({"ticker": ticker, "job_id": outcome.job_id})
     return {"queued": queued}
 
 

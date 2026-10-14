@@ -12668,6 +12668,61 @@
         ]
       }
     },
+    "/engine/triggers": {
+      "get": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Engine Triggers",
+        "description": "Work the engine started on its own, with the reason, and what it held back and why.",
+        "operationId": "engine_triggers",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TriggerOut"
+                  },
+                  "title": "Response Engine Triggers"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/actions/kinds": {
       "get": {
         "tags": [
@@ -110486,6 +110541,74 @@
           "cur"
         ],
         "title": "TrendOut"
+      },
+      "TriggerOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "skip_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skip Reason"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "kind",
+          "subject",
+          "reason",
+          "action",
+          "status",
+          "skip_reason",
+          "job_id"
+        ],
+        "title": "TriggerOut"
       },
       "TriggerSummary": {
         "properties": {

@@ -42,6 +42,7 @@ def test_the_ledger_view_reads_every_place_the_engine_leaves_a_trace() -> None:
         "config",
         "override",
         "delivery",
+        "trigger",
         "journal",
     }
 

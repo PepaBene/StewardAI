@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import asyncpg
 
 from steward.autopilot import ledger
+from steward.engine import triggers
 from steward.ops import tasks
 
 KIND = "pre_earnings"
@@ -69,8 +70,31 @@ async def upcoming(pool: asyncpg.Pool, today: dt.date) -> list[Upcoming]:
 
 async def announce(pool: asyncpg.Pool, today: dt.date) -> dict[str, int]:
     items = await upcoming(pool, today)
+    if items and await triggers.suppressed(pool, "anticipation"):
+        # You dismissed the last few of these without acting: stop for now, say so once.
+        await tasks.see(
+            pool,
+            triggers.STOPPED_NOTICE,
+            "anticipation",
+            title="Heads-ups before a report are paused",
+            detail=f"You dismissed the last {triggers.SUPPRESS_AFTER} without acting on any, so "
+            f"they stop for {triggers.SUPPRESS_DAYS} days.",
+            href="/engine-ledger",
+            weight=0.1,
+            status="needs_owner",
+        )
+        return {"announced": 0, "resolved": 0}
     for item in items:
         title, detail = describe(item, today)
+        await triggers.log(
+            pool,
+            "anticipation",
+            f"{item.ticker}:{item.report_date.isoformat()}",
+            f"{item.name} reports on {item.report_date:%d %b}, and it is "
+            f"{item.weight:.1%} of the portfolio.",
+            "tell the owner before the report",
+            cooldown_days=30,
+        )
         await tasks.see(
             pool,
             KIND,

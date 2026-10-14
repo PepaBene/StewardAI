@@ -18,6 +18,7 @@ import asyncpg
 from steward.config.research import ResearchProfilesConfig
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig, ThesisConfig
+from steward.engine import triggers
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 
@@ -73,12 +74,31 @@ async def queue_stale_research(
         )
     }
     chosen = due_tickers(stored.body.theses, now.date(), recent, active, max_per_run)
+    review_dates = {t.ticker: t.review_date for t in stored.body.theses}
     queued: list[dict[str, Any]] = []
+    held: dict[str, str] = {}
     for ticker in chosen:
-        async with pool.acquire() as conn, conn.transaction():
-            job_id = await create_job(
-                conn, "research", "event", params={"ticker": ticker, "profile": profile}
-            )
-            await queue.enqueue(conn, job_id, "research")
-        queued.append({"ticker": ticker, "job_id": job_id})
-    return {"queued": queued, "profile": profile}
+
+        async def start(ticker: str = ticker) -> int | None:
+            async with pool.acquire() as conn, conn.transaction():
+                job_id = await create_job(
+                    conn, "research", "event", params={"ticker": ticker, "profile": profile}
+                )
+                await queue.enqueue(conn, job_id, "research")
+            return job_id
+
+        outcome = await triggers.fire(
+            pool,
+            "staleness",
+            ticker,
+            f"The thesis review date {review_dates[ticker]} has passed and there has been no "
+            f"research report in {min_days} days.",
+            "start a research run",
+            start,
+            now=now,
+        )
+        if outcome.fired:
+            queued.append({"ticker": ticker, "job_id": outcome.job_id})
+        elif outcome.skipped != "cooldown":
+            held[ticker] = outcome.skipped or ""
+    return {"queued": queued, "profile": profile, **({"held_back": held} if held else {})}

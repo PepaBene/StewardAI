@@ -4296,6 +4296,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/engine/triggers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Engine Triggers
+         * @description Work the engine started on its own, with the reason, and what it held back and why.
+         */
+        get: operations["engine_triggers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/actions/kinds": {
         parameters: {
             query?: never;
@@ -38449,6 +38469,30 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** TriggerOut */
+        TriggerOut: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Kind */
+            kind: string;
+            /** Subject */
+            subject: string;
+            /** Reason */
+            reason: string;
+            /** Action */
+            action: string;
+            /** Status */
+            status: string;
+            /** Skip Reason */
+            skip_reason: string | null;
+            /** Job Id */
+            job_id: number | null;
+        };
         /** TriggerSummary */
         TriggerSummary: {
             /** Losing Theses */
@@ -47341,6 +47385,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SweepOut"][];
+                };
+            };
+        };
+    };
+    engine_triggers: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

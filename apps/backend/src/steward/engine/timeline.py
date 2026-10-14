@@ -74,6 +74,12 @@ SOURCES: dict[str, str] = {
         " from public.alert where coalesce(sent_at, created_at) >= $1"
         " and status in ('sent', 'failed')"
     ),
+    "trigger": (
+        "select created_at as at, 'trigger' as source, kind, 'engine_trigger:' || id as ref,"
+        " action || ': ' || reason || coalesce(' (held back: ' || skip_reason || ')', '')"
+        " as summary, status, null::text as undo_action, null::jsonb as undo_args"
+        " from public.engine_trigger where created_at >= $1"
+    ),
     "journal": (
         "select created_at as at, 'journal' as source, 'trade entry' as kind,"
         " 'decision_journal:' || id as ref,"

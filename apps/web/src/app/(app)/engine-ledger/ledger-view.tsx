@@ -26,6 +26,7 @@ const SOURCE_LABELS: Record<string, string> = {
   config: "Settings it saved",
   override: "Your corrections",
   delivery: "Alert delivery",
+  trigger: "Proactive runs",
   journal: "Journal",
 };
 

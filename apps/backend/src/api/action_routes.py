@@ -14,7 +14,7 @@ from api.db import IdPath, Pool
 from steward.actions import registry
 from steward.autopilot import reverify
 from steward.chat import visuals
-from steward.engine import overrides, timeline
+from steward.engine import overrides, timeline, triggers
 
 router = APIRouter(tags=["actions"])
 
@@ -146,6 +146,26 @@ async def engine_sweeps(pool: Pool, _owner: Owner) -> list[SweepOut]:
         )
         for s in await reverify.history(pool)
     ]
+
+
+class TriggerOut(BaseModel):
+    id: int
+    created_at: dt.datetime
+    kind: str
+    subject: str
+    reason: str
+    action: str
+    status: str
+    skip_reason: str | None
+    job_id: int | None
+
+
+@router.get("/engine/triggers")
+async def engine_triggers(
+    pool: Pool, _owner: Owner, limit: Annotated[int, Query(ge=1, le=200)] = 50
+) -> list[TriggerOut]:
+    """Work the engine started on its own, with the reason, and what it held back and why."""
+    return [TriggerOut(**dict(r)) for r in await triggers.recent(pool, limit)]
 
 
 @router.get("/actions/kinds")

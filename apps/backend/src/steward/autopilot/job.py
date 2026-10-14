@@ -18,7 +18,7 @@ from steward.autopilot.thesis_upkeep import (
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.engine import audit as engine_audit
-from steward.engine import challenger, override_watch
+from steward.engine import challenger, learning, override_watch
 from steward.jobs.runner import JobContext
 from steward.llm.cache import ResultCache
 from steward.llm.client import create_llm
@@ -131,6 +131,23 @@ async def autopilot_calibration_handler(ctx: JobContext) -> None:
             name: max(cfg.policy(name).min_confidence, in_force.get(name, 0.0)) for name in kinds
         }
         step.detail.update(await override_watch.act(ctx.pool, floors, now))
+    async with ctx.step("learning_triggers") as step:
+        stored_modes = await ledger.mode_overrides(ctx.pool)
+        step.detail.update(
+            await learning.run(
+                ctx.pool,
+                {
+                    name: effective_mode(cfg.policy(name).mode, stored_modes.get(name))
+                    for name in kinds
+                },
+                promote_min_reviewed=cfg.promote_min_reviewed,
+                promote_precision=cfg.promote_precision,
+                owner_decides={
+                    name for name, k in kinds.items() if k.revert is None or not k.promotable
+                },
+                now=now,
+            )
+        )
     async with ctx.step("challengers") as step:
         step.detail.update(await challenger.settle_floors(ctx.pool, now))
     async with ctx.step("reverify") as step:  # runs weekly; the step says "skipped" otherwise

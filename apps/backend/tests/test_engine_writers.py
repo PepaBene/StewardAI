@@ -33,6 +33,7 @@ WRITERS: dict[str, tuple[str, set[str]]] = {
             "steward/actions/registry.py",
             "steward/autopilot/judge.py",
             "steward/autopilot/calibration.py",
+            "steward/engine/learning.py",
         },
     ),
     "watchdog": (
@@ -54,11 +55,23 @@ WRITERS: dict[str, tuple[str, set[str]]] = {
             "steward/ops/opportunities.py",
             "steward/ops/suggestions.py",
             "steward/autopilot/thesis_upkeep.py",
+            "steward/engine/learning.py",
+            "steward/engine/triggers.py",
         },
     ),
     "engine_change": (
         r"\bchange\.propose\(|engine_change\.propose\(",
         {"steward/engine/override_watch.py"},
+    ),
+    "trigger": (
+        r"\btriggers\.(fire|log)\(",
+        {
+            "steward/autopilot/research_trigger.py",
+            "steward/autopilot/thesis_upkeep.py",
+            "steward/ops/anticipate.py",
+            "steward/earnings/calendar.py",
+            "steward/engine/learning.py",
+        },
     ),
     "journal": (r'origin="auto"', {"steward/ops/journal_gaps.py"}),
     "override": (
