@@ -36,6 +36,12 @@ def describe(p: overrides.Pattern) -> str:
     )
 
 
+def _title(p: overrides.Pattern) -> str:
+    if p.kind.startswith("config:"):
+        return f"You keep changing what the engine writes into {p.kind.removeprefix('config:')}"
+    return f"You keep overruling {p.decided_by} on {p.kind}"
+
+
 def proposed_floor(current: float) -> float:
     return round(min(FLOOR_MAX, current + FLOOR_STEP), 4)
 
@@ -60,7 +66,7 @@ async def act(pool: asyncpg.Pool, floors: dict[str, float], now: dt.datetime) ->
             pool,
             KIND,
             f"{p.kind}:{p.decided_by}",
-            title=f"You keep overruling {p.decided_by} on {p.kind}",
+            title=_title(p),
             detail=describe(p),
             href="/autopilot",
             weight=0.6,

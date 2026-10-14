@@ -18,13 +18,17 @@ and pair reviews are append-only), so none has a `revert` or an `expire_decision
 
 import datetime as dt
 import json
+import re
+from collections.abc import Sequence
 from dataclasses import fields
 from typing import Any, Literal
 
 import asyncpg
 
+from steward.autopilot import ledger
 from steward.autopilot.judge import ApplyError, Candidate, JudgeKind, RuleResult, Verdict
 from steward.disclosure import deal_parties
+from steward.disclosure import entities as ent
 from steward.disclosure import estimate_read as er
 from steward.disclosure import estimates as est
 from steward.disclosure.identifier_decision import IdentifierDecisionError, decide_suggestion
@@ -302,6 +306,129 @@ async def _identifier_is_open(pool: asyncpg.Pool, refs: list[str]) -> set[str]:
     return {ids[r["id"]] for r in rows}
 
 
+def lei_valid(lei: str) -> bool:
+    """A LEI is 18 letters or digits and two check digits (ISO 17442, mod 97 equals 1)."""
+    text = lei.strip().upper()
+    if not re.fullmatch(r"[A-Z0-9]{18}[0-9]{2}", text):
+        return False
+    return int("".join(str(int(c, 36)) for c in text)) % 97 == 1
+
+
+def figi_valid(figi: str) -> bool:
+    """A FIGI is twelve characters: two of its own, a `G`, eight more and a check digit."""
+    return bool(re.fullmatch(r"[A-Z0-9]{2}G[A-Z0-9]{8}[0-9]", figi.strip().upper()))
+
+
+def identifier_problems(
+    decision: str,
+    kind: str,
+    identifier: str,
+    evidence: dict[str, Any],
+    entity: tuple[int | None, int | None],
+    confirmed: list[dict[str, Any]],
+) -> list[str]:
+    """What the stored records say against confirming an identifier: its own format (checked
+    here, not trusted from the provider), the entity status the provider stored, and the other
+    confirmed identifiers of the same type (`confirmed`: identifier, issuer_id, security_id).
+    A rejection is the safe side."""
+    if decision != "confirm":
+        return []
+    found = []
+    well_formed = lei_valid(identifier) if kind == "lei" else figi_valid(identifier)
+    if not well_formed:
+        found.append(f"the {kind.upper()} is not a well-formed identifier")
+    status = evidence.get("status")
+    if kind == "lei" and status and str(status).upper() != "ACTIVE":
+        found.append(f"the LEI's entity is {status} at GLEIF")
+    taken = any(
+        o["identifier"] == identifier and (o["issuer_id"], o["security_id"]) != entity
+        for o in confirmed
+    )
+    if taken:
+        found.append("the identifier is already confirmed for another record")
+    if any(
+        o["identifier"] != identifier and (o["issuer_id"], o["security_id"]) == entity
+        for o in confirmed
+    ):
+        found.append(f"the record already has a different confirmed {kind.upper()}")
+    return found
+
+
+def identifier_state_problems(
+    decision: str, match_status: str, kind: str, identifier: str, held: str | None
+) -> list[str]:
+    """Whether an applied identifier decision still stands (`held`: what the registry record
+    stores in that field now)."""
+    want = {"confirm": "confirmed", "reject": "rejected"}.get(decision)
+    found = []
+    if want is not None and match_status != want:
+        found.append(f"the suggestion is now {match_status}")
+    if decision == "confirm" and held is not None and held != identifier:
+        found.append(f"the registry now holds a different {kind.upper()}")
+    return found
+
+
+_IDENTIFIER_FACTS_SQL = (
+    "select p.identifier_type, p.identifier, p.issuer_id, p.security_id, p.match_status,"
+    " p.evidence, case when p.identifier_type = 'lei' then (select lei from public.issuer"
+    " where id = p.issuer_id) else (select figi from public.security where id = p.security_id)"
+    " end as held from public.provider_identifier p where p.id = $1"
+)
+
+
+async def _identifier_problem_list(
+    pool: asyncpg.Pool, suggestion_id: int, decision: str
+) -> tuple[Any, list[str]]:
+    """(facts row or None, problems of a confirmation read from the stored rows)."""
+    facts = await pool.fetchrow(_IDENTIFIER_FACTS_SQL, suggestion_id)
+    if facts is None:
+        return None, ["the suggestion no longer exists"]
+    entity = (facts["issuer_id"], facts["security_id"])
+    rivals = await pool.fetch(
+        "select identifier, issuer_id, security_id from public.provider_identifier"
+        " where identifier_type = $1 and match_status = 'confirmed' and id <> $2"
+        " and (identifier = $3 or (issuer_id is not distinct from $4"
+        " and security_id is not distinct from $5))",
+        facts["identifier_type"],
+        suggestion_id,
+        facts["identifier"],
+        *entity,
+    )
+    found = identifier_problems(
+        decision,
+        facts["identifier_type"],
+        facts["identifier"],
+        _evidence(facts["evidence"]),
+        entity,
+        [dict(r) for r in rivals],
+    )
+    return facts, found
+
+
+async def _identifier_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    if decision != "confirm":
+        return []
+    (suggestion_id,) = split_ref(cand.ref, "identifier", 1)
+    return list((await _identifier_problem_list(pool, suggestion_id, decision))[1])
+
+
+async def _identifier_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    (suggestion_id,) = split_ref(row.subject_ref, "identifier", 1)
+    facts, found = await _identifier_problem_list(pool, suggestion_id, row.decision)
+    if facts is None:
+        return list(found)
+    return [
+        *identifier_state_problems(
+            row.decision,
+            facts["match_status"],
+            facts["identifier_type"],
+            facts["identifier"],
+            facts["held"],
+        ),
+        *found,
+    ]
+
+
 identifier = JudgeKind(
     name="identifier",
     label="LEI / FIGI suggestions",
@@ -316,6 +443,8 @@ identifier = JudgeKind(
     outcome=_identifier_outcome,
     rule=identifier_rule,
     expire_decision=None,
+    verify=_identifier_verify,
+    recheck=_identifier_recheck,
 )
 
 # ----------------------------------------------------------------------------- deal parties
@@ -546,6 +675,108 @@ async def _party_is_open(pool: asyncpg.Pool, refs: list[str]) -> set[str]:
     }
 
 
+def party_problems(
+    decision: str,
+    party_name: str,
+    day: dt.date,
+    issuer: ent.IssuerRef | None,
+    aliases: Sequence[ent.Alias],
+    same_deal_match: bool,
+) -> list[str]:
+    """What the stored records say against confirming a deal party. The name is matched again
+    against the issuer's registered name and its aliases dated to the deal (the way the app
+    proposed it, on today's rows), and no other party of the same deal may already be this
+    issuer: an acquirer and its own target are not one company. A rejection is the safe side."""
+    if decision != "confirm":
+        return []
+    if issuer is None:
+        return ["the issuer no longer exists"]
+    found = []
+    if issuer.issuer_id not in ent.resolve(party_name, [issuer], aliases, day).issuer_ids:
+        found.append("the party's name no longer matches the issuer's name or a dated alias")
+    if same_deal_match:
+        found.append("another party of the same deal is already matched to this issuer")
+    return found
+
+
+def party_state_problems(
+    decision: str, pair_decision: str | None, matched_issuer: int | None, issuer_id: int
+) -> list[str]:
+    """Whether an applied party decision still stands (`pair_decision`: the stored decision for
+    this participant and issuer; `matched_issuer`: the issuer the participant is matched to)."""
+    want = {"confirm": "confirmed", "reject": "rejected"}.get(decision)
+    found = []
+    if want is not None and pair_decision != want:
+        found.append(f"the pair is now {pair_decision or 'undecided'}")
+    if decision == "confirm" and matched_issuer != issuer_id:
+        found.append("the party is matched to another issuer, or to none")
+    if decision == "reject" and matched_issuer == issuer_id:
+        found.append("the party is matched to the issuer it was rejected for")
+    return found
+
+
+async def _party_problem_list(
+    pool: asyncpg.Pool, decision: str, participant_id: int, issuer_id: int
+) -> list[str]:
+    if decision != "confirm":
+        return []
+    party = await pool.fetchrow(
+        f"""select p.name, p.known_at,
+                   exists (select 1 from ({deal_parties.effective_match_sql("now()")}) m
+                             join public.deal_participant q on q.id = m.participant_id
+                            where m.decision = 'confirmed' and m.issuer_id = $2
+                              and q.deal_id = p.deal_id and q.id <> p.id) as same_deal
+              from public.deal_participant p where p.id = $1""",  # noqa: S608
+        participant_id,
+        issuer_id,
+    )
+    if party is None:
+        return ["the party no longer exists"]
+    issuer_row = await pool.fetchrow(
+        "select id, legal_name, cik, lei from public.issuer where id = $1", issuer_id
+    )
+    issuer = (
+        None
+        if issuer_row is None
+        else ent.IssuerRef(
+            issuer_row["id"], issuer_row["legal_name"], issuer_row["cik"], issuer_row["lei"]
+        )
+    )
+    aliases = [
+        ent.Alias(a["issuer_id"], a["name"], a["kind"], a["valid_from"], a["valid_to"])
+        for a in await pool.fetch(
+            "select issuer_id, name, kind, valid_from, valid_to from public.issuer_alias"
+            " where issuer_id = $1",
+            issuer_id,
+        )
+    ]
+    return party_problems(
+        decision, party["name"], party["known_at"].date(), issuer, aliases, party["same_deal"]
+    )
+
+
+async def _party_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    participant_id, issuer_id = split_ref(cand.ref, "deal_party", 2)
+    return await _party_problem_list(pool, decision, participant_id, issuer_id)
+
+
+async def _party_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    participant_id, issuer_id = split_ref(row.subject_ref, "deal_party", 2)
+    pair_decision = await pool.fetchval(
+        "select decision from public.deal_participant_decision"
+        " where participant_id = $1 and issuer_id = $2",
+        participant_id,
+        issuer_id,
+    )
+    matched = await pool.fetchval(
+        f"""select m.issuer_id from ({deal_parties.effective_match_sql("now()")}) m
+             where m.participant_id = $1 and m.decision = 'confirmed'""",  # noqa: S608
+        participant_id,
+    )
+    found = party_state_problems(row.decision, pair_decision, matched, issuer_id)
+    return found + await _party_problem_list(pool, row.decision, participant_id, issuer_id)
+
+
 deal_party = JudgeKind(
     name="deal_party",
     label="Deal-party matches",
@@ -560,6 +791,8 @@ deal_party = JudgeKind(
     outcome=_party_outcome,
     rule=None,
     expire_decision=None,
+    verify=_party_verify,
+    recheck=_party_recheck,
 )
 
 # ------------------------------------------------------------------------------ estimate pairs
@@ -763,6 +996,91 @@ async def _pair_is_open(pool: asyncpg.Pool, refs: list[str]) -> set[str]:
     return {ref for pair, ref in pairs.items() if pair not in done}
 
 
+def pair_problems(
+    decision: str,
+    pair: est.Pair | None,
+    seen_comparable: Any,
+    seen_reasons: Sequence[str],
+) -> list[str]:
+    """The pair re-derived from the stored estimate lines (`est.revision_pairs`, as the revision
+    view builds it) set against what the judge was shown: the pair must still exist, the app's
+    reading of it (comparable, or refused and why) must be the one judged, and labelling a pair
+    "correct" needs a revision the app actually reported or a refusal it named."""
+    if pair is None:
+        return ["the pair is no longer a revision pair on the stored lines"]
+    found = []
+    if seen_comparable is not None and pair.comparable != bool(seen_comparable):
+        found.append("the app now reads the pair differently than when it was judged")
+    elif sorted(pair.reasons) != sorted(seen_reasons):
+        found.append("the app's reasons for refusing the pair changed since it was judged")
+    if decision == "correct" and pair.comparable and pair.statistic is None:
+        found.append("the app reported no revision for this pair, so there is nothing to confirm")
+    return found
+
+
+def pair_label_problems(
+    decision: str, autopilot_correct: bool | None, owner_correct: bool | None
+) -> list[str]:
+    """Whether an applied pair label still stands: the autopilot's label is on file and the
+    owner's latest label, when there is one, says the same."""
+    want = decision == "correct"
+    found = []
+    if autopilot_correct is None:
+        found.append("the autopilot's label is no longer on file")
+    elif autopilot_correct != want:
+        found.append("the stored label differs from the decision")
+    if owner_correct is not None and owner_correct != want:
+        found.append(f"the owner labelled the pair {'correct' if owner_correct else 'incorrect'}")
+    return found
+
+
+async def _pair_state(pool: asyncpg.Pool, earlier_id: int, later_id: int) -> est.Pair | None:
+    """The revision pair for these two lines as the revision view builds it now, or None."""
+    issuer_id = await pool.fetchval(
+        "select s.issuer_id from public.estimate_value v"
+        " join public.public_estimate_snapshot s on s.id = v.snapshot_id where v.id = $1",
+        earlier_id,
+    )
+    if issuer_id is None:
+        return None
+    now = dt.datetime.now(dt.UTC)
+    values = [er.to_value(r) for r in await pool.fetch(er.VALUE_SQL, issuer_id, now)]
+    for p in est.revision_pairs(est.visible(values, now)):
+        if (p.earlier_id, p.later_id) == (earlier_id, later_id):
+            return p
+    return None
+
+
+async def _pair_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    earlier_id, later_id = split_ref(cand.ref, "estimate_pair", 2)
+    pair = await _pair_state(pool, earlier_id, later_id)
+    return pair_problems(
+        decision,
+        pair,
+        cand.evidence.get("comparable"),
+        cand.evidence.get("break_reasons") or [],
+    )
+
+
+async def _pair_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    earlier_id, later_id = split_ref(row.subject_ref, "estimate_pair", 2)
+    labels = await pool.fetch(
+        "select correct, reviewer from public.estimate_pair_review"
+        " where earlier_value_id = $1 and later_value_id = $2 order by id desc",
+        earlier_id,
+        later_id,
+    )
+    autopilot = next((r["correct"] for r in labels if r["reviewer"] == AUTOPILOT), None)
+    owner = next((r["correct"] for r in labels if _owner_made(r["reviewer"])), None)
+    pair = await _pair_state(pool, earlier_id, later_id)
+    return pair_label_problems(row.decision, autopilot, owner) + pair_problems(
+        row.decision,
+        pair,
+        row.evidence.get("comparable"),
+        row.evidence.get("break_reasons") or [],
+    )
+
+
 estimate_pair = JudgeKind(
     name="estimate_pair",
     label="Estimate pair reviews",
@@ -778,6 +1096,8 @@ estimate_pair = JudgeKind(
     rule=None,
     expire_decision=None,
     max_tokens=2000,
+    verify=_pair_verify,
+    recheck=_pair_recheck,
 )
 
 KINDS = [identifier, deal_party, estimate_pair]

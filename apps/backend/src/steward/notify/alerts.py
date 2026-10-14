@@ -192,11 +192,11 @@ async def dispatch_due(
                 subject = subject_of(row["message"])
                 if isinstance(channel, EmailChannel):
                     # A retry after a timeout must not send the email twice.
-                    await channel.send(
+                    provider_id = await channel.send(
                         subject, row["message"], idempotency_key=f"steward-alert-{row['id']}"
                     )
                 else:
-                    await channel.send(subject, row["message"])
+                    provider_id = await channel.send(subject, row["message"])
             except ChannelError as exc:
                 final = attempts >= MAX_ATTEMPTS
                 await conn.execute(
@@ -213,9 +213,10 @@ async def dispatch_due(
                 continue
             await conn.execute(
                 "update public.alert set status = 'sent', sent_at = clock_timestamp(),"
-                " attempts = $2, error = null where id = $1",
+                " attempts = $2, error = null, provider_id = $3 where id = $1",
                 row["id"],
                 attempts,
+                provider_id,
             )
             result.sent.append(row["id"])
     return result

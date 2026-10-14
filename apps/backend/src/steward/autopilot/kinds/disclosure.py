@@ -31,8 +31,10 @@ from typing import Any, Literal
 
 import asyncpg
 
+from steward.autopilot import ledger
 from steward.autopilot.judge import ApplyError, Candidate, JudgeKind, Verdict
 from steward.disclosure import adjudication, review
+from steward.disclosure import entities as ent
 from steward.disclosure.insider_analysis import OverrideError, record_override
 from steward.disclosure.insiders import ECONOMIC_CLASSES
 
@@ -393,6 +395,159 @@ async def review_is_open(pool: asyncpg.Pool, refs: list[str]) -> set[str]:
     return {f"review:{r['id']}" for r in rows}
 
 
+def printed_value_in_quote(written: str | None, quote: str | None) -> bool:
+    """The number as printed appears (digits only) in the stored source passage."""
+    digits = re.sub(r"\D", "", written or "")
+    return bool(digits) and digits in re.sub(r"\D", "", quote or "")
+
+
+def claim_problems(decision: str, claim: Mapping[str, Any]) -> list[str]:
+    """What the stored claim row says against the decision. `claim` holds polarity, quote,
+    subject_issuer_id, object_issuer_id, object_label, object_anonymous, direction and `newer`
+    (a later claim names this one as the one it replaces). Rejecting is the safe side."""
+    found = []
+    if decision == "approved":
+        if claim["polarity"] != "asserted":
+            found.append(f"the claim's polarity is {claim['polarity']}, not asserted")
+        if not (claim["quote"] or "").strip():
+            found.append("no source passage is stored for the claim")
+        if claim["subject_issuer_id"] and claim["subject_issuer_id"] == claim["object_issuer_id"]:
+            found.append("the claim relates a company to itself")
+        counterparty = (
+            claim["object_issuer_id"] or claim["object_label"] or claim["object_anonymous"]
+        )
+        if claim["direction"] not in (None, "none") and not counterparty:
+            found.append("the claim has a direction but no counterparty")
+        if claim["newer"]:
+            found.append("a newer claim already replaces it")
+    elif decision == "superseded" and not claim["newer"]:
+        found.append("no newer claim replaces it")
+    return found
+
+
+def observation_problems(decision: str, obs: Mapping[str, Any]) -> list[str]:
+    """The same for a stored observation: `quote`, `original_string`, `value_state`, `newer`."""
+    found = []
+    if decision == "approved":
+        quote = (obs["quote"] or "").strip()
+        if not quote:
+            found.append("no source passage is stored for the observation")
+        elif (
+            obs["value_state"] == "reported"
+            and (obs["original_string"] or "").strip()
+            and not printed_value_in_quote(obs["original_string"], quote)
+        ):
+            found.append("the printed value is not in the stored source passage")
+        if obs["newer"]:
+            found.append("a newer observation already replaces it")
+    elif decision == "superseded" and not obs["newer"]:
+        found.append("no newer observation replaces it")
+    return found
+
+
+def mapping_problems(decision: str, mapping: Mapping[str, Any]) -> list[str]:
+    """The same for an entity mapping: `mention`, `match_basis`, `issuer_id`, `security_id`,
+    `matched` (the stored name of the matched company or security)."""
+    if decision != "approved":
+        return []
+    if not mapping["issuer_id"] and not mapping["security_id"]:
+        return ["the mapping names no company or security"]
+    if mapping["match_basis"] == "name":
+        mention = set(ent.norm(mapping["mention"] or "").split())
+        if mention.isdisjoint(ent.norm(mapping["matched"] or "").split()):
+            return ["the mention shares no word with the name of the matched company"]
+    return []
+
+
+def review_state_problems(
+    decision: str, review_status: str, subject_type: str, subject_state: str | None
+) -> list[str]:
+    """Whether an applied review decision still stands: the review keeps its status and the
+    subject is in the state a decision of that kind gives it."""
+    expected = "confirmed" if subject_type == "identity_mapping" else "verified"
+    expected = {"approved": expected, "rejected": "rejected", "superseded": "superseded"}[decision]
+    found = []
+    if review_status != decision:
+        found.append(f"the review is now {review_status}")
+    if subject_state != expected:
+        found.append(f"the subject is now {subject_state or 'gone'}")
+    return found
+
+
+_CLAIM_FACTS_SQL = (
+    "select c.polarity, c.subject_issuer_id, c.object_issuer_id, c.object_label,"
+    " c.object_anonymous, c.direction, e.quote, exists (select 1 from public.extracted_claim n"
+    " where n.supersedes_claim_id = c.id) as newer from public.extracted_claim c"
+    " left join public.source_evidence e on e.id = c.evidence_id where c.id = $1"
+)
+_OBSERVATION_FACTS_SQL = (
+    "select o.value_state, o.original_string, e.quote, exists (select 1"
+    " from public.disclosure_observation n where n.id <> o.id and (n.supersedes_id = o.id or"
+    " (n.issuer_id = o.issuer_id and n.metric = o.metric"
+    " and coalesce(n.segment, '') = coalesce(o.segment, '') and n.period_end = o.period_end"
+    " and n.dimensions = o.dimensions and n.known_at > o.known_at"
+    " and n.review_state not in ('rejected', 'superseded')))) as newer"
+    " from public.disclosure_observation o"
+    " left join public.source_evidence e on e.id = o.evidence_id where o.id = $1"
+)
+_MAPPING_FACTS_SQL = (
+    "select m.mention, m.match_basis, m.issuer_id, m.security_id,"
+    " coalesce(i.legal_name, s.name) as matched from public.disclosure_entity_mapping m"
+    " left join public.issuer i on i.id = m.issuer_id"
+    " left join public.security s on s.id = m.security_id where m.id = $1"
+)
+
+
+async def _review_subject_problems(
+    pool: asyncpg.Pool, subject_type: str, subject_id: int, decision: str
+) -> list[str]:
+    """The subject's own stored rows read against the decision (nothing the judge was shown)."""
+    if decision == "rejected":
+        return []
+    sql, check = {
+        "claim": (_CLAIM_FACTS_SQL, claim_problems),
+        "observation": (_OBSERVATION_FACTS_SQL, observation_problems),
+        "identity_mapping": (_MAPPING_FACTS_SQL, mapping_problems),
+    }[subject_type]
+    row = await pool.fetchrow(sql, subject_id)
+    if row is None:
+        return [f"the {subject_type.replace('_', ' ')} no longer exists"]
+    return check(decision, dict(row))
+
+
+async def review_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    item = await pool.fetchrow(
+        "select subject_type, subject_id from public.quality_review where id = $1",
+        int(cand.evidence["review_id"]),
+    )
+    if item is None:
+        return ["the review no longer exists"]
+    if item["subject_type"] not in REVIEW_SUBJECTS:
+        return []  # `review_apply` refuses it
+    return await _review_subject_problems(pool, item["subject_type"], item["subject_id"], decision)
+
+
+async def review_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    item = await pool.fetchrow(
+        "select status, subject_type, subject_id from public.quality_review where id = $1",
+        _id_of(row.subject_ref),
+    )
+    if item is None:
+        return ["the review no longer exists"]
+    if row.decision not in REVIEW_ACTIONABLE or item["subject_type"] not in REVIEW_SUBJECTS:
+        return []
+    state = await _subject_state(pool, item["subject_type"], item["subject_id"])
+    found = review_state_problems(
+        row.decision,
+        item["status"],
+        item["subject_type"],
+        None if state is None else state["review_state"],
+    )
+    return found + await _review_subject_problems(
+        pool, item["subject_type"], item["subject_id"], row.decision
+    )
+
+
 DISCLOSURE_REVIEW = JudgeKind(
     name="disclosure_review",
     label="Disclosure quality review",
@@ -411,6 +566,8 @@ DISCLOSURE_REVIEW = JudgeKind(
     # the owner.
     expire_decision=None,
     max_tokens=1000,
+    verify=review_verify,
+    recheck=review_recheck,
 )
 
 
@@ -672,6 +829,133 @@ async def adjudication_is_open(pool: asyncpg.Pool, refs: list[str]) -> set[str]:
     return {f"adjudication:{r['id']}" for r in rows}
 
 
+# The direction a Form 4 line must have (A acquired, D disposed) for an economic class to fit it.
+CLASS_DIRECTION = {
+    "open_market_buy": "A",
+    "open_market_sell": "D",
+    "grant_award": "A",
+    "tax_withholding": "D",
+}
+
+
+def direction_problem(label: str, acquired_disposed: str | None) -> list[str]:
+    """A label that names a direction must agree with the line's acquired/disposed flag."""
+    want = CLASS_DIRECTION.get(label)
+    if want is None or not acquired_disposed or acquired_disposed == want:
+        return []
+    side = "an acquisition" if acquired_disposed == "A" else "a disposal"
+    return [f"{label} does not fit the line, which the filing reports as {side}"]
+
+
+def adjudication_problems(
+    decision: str,
+    dataset: str,
+    stored_machine: str | None,
+    live: tuple[bool, str | None, str | None],
+) -> list[str]:
+    """The label read against the live records behind the sampled item. `live` is (checked,
+    the pipeline's value now, acquired/disposed flag): `checked` is False for a dataset with no
+    cheap live read. The stored suggestion is a copy; the sample item can have moved since."""
+    checked, value, direction = live
+    found = []
+    if checked and value is None:
+        found.append("the sampled item no longer exists")
+    elif checked and value != stored_machine:
+        found.append(f"the pipeline now says {value}, not {stored_machine}, for the item")
+    if dataset == "insider_class":
+        found += direction_problem(decision, direction)
+    return found
+
+
+def adjudication_label_problems(
+    decision: str, autopilot_value: str | None, person_value: str | None
+) -> list[str]:
+    """Whether an applied label still stands: it is on file, and a person's later label, when
+    there is one, says the same."""
+    found = []
+    if autopilot_value is None:
+        found.append("the autopilot's label is no longer on file")
+    elif autopilot_value != decision:
+        found.append(f"the stored label is {autopilot_value}, not {decision}")
+    if person_value is not None and person_value != decision:
+        found.append(f"the owner labelled it {person_value}")
+    return found
+
+
+async def _live_machine(
+    pool: asyncpg.Pool, dataset: str, item_ref: str
+) -> tuple[bool, str | None, str | None]:
+    """(checked, the pipeline's value now, acquired/disposed flag) from the live tables."""
+    kind, _, ident = item_ref.partition(":")
+    if dataset == "relationship_claim" and kind == "claim" and ident.isdigit():
+        status = await pool.fetchval(
+            "select status from public.relationship_disclosure where id = $1", int(ident)
+        )
+        value = (
+            None
+            if status is None
+            else ("true_relationship" if status == "confirmed" else "suggested")
+        )
+        return True, value, None
+    if dataset == "insider_class":
+        accession, _, index = item_ref.rpartition(":")
+        if index.isdigit():
+            line = await pool.fetchrow(
+                "select economic_class, acquired_disposed from public.insider_transaction"
+                " where accession = $1 and row_index = $2",
+                accession,
+                int(index),
+            )
+            if line is None:
+                return True, None, None
+            return True, line["economic_class"], line["acquired_disposed"]
+    return False, None, None
+
+
+async def adjudication_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    row = await pool.fetchrow(
+        "select dataset, item_ref, machine_value from public.disclosure_adjudication_suggestion"
+        " where id = $1",
+        int(cand.evidence["suggestion_id"]),
+    )
+    if row is None:
+        return ["the suggestion no longer exists"]
+    live = await _live_machine(pool, row["dataset"], row["item_ref"])
+    return adjudication_problems(decision, row["dataset"], row["machine_value"], live)
+
+
+async def adjudication_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    item = await pool.fetchrow(
+        "select dataset, sample_key, item_ref, machine_value"
+        " from public.disclosure_adjudication_suggestion where id = $1",
+        _id_of(row.subject_ref),
+    )
+    if item is None:
+        return ["the suggestion no longer exists"]
+    labels = await pool.fetch(
+        "select human_value, adjudicated_by, adjudicator_kind from public.disclosure_adjudication"
+        " where dataset = $1 and sample_key = $2 and item_ref = $3 order by id desc",
+        item["dataset"],
+        item["sample_key"],
+        item["item_ref"],
+    )
+    mine = next(
+        (r["human_value"] for r in labels if r["adjudicated_by"] == AUTOPILOT_DECIDER), None
+    )
+    person = next(
+        (
+            r["human_value"]
+            for r in labels
+            if r["adjudicator_kind"] == "person" and r["adjudicated_by"].startswith("owner:")
+        ),
+        None,
+    )
+    live = await _live_machine(pool, item["dataset"], item["item_ref"])
+    return adjudication_label_problems(row.decision, mine, person) + adjudication_problems(
+        row.decision, item["dataset"], item["machine_value"], live
+    )
+
+
 ADJUDICATION = JudgeKind(
     name="adjudication",
     label="Adjudication samples",
@@ -688,6 +972,8 @@ ADJUDICATION = JudgeKind(
     # nothing while it waits.
     expire_decision=None,
     max_tokens=800,
+    verify=adjudication_verify,
+    recheck=adjudication_recheck,
 )
 
 
@@ -897,6 +1183,87 @@ async def insider_is_open(pool: asyncpg.Pool, refs: list[str]) -> set[str]:
     return out
 
 
+_BUY_WORDS = re.compile(r"purchas|bought|\bbuy|open[- ]market|broker", re.IGNORECASE)
+_SELL_WORDS = re.compile(r"\bsold\b|\bsales?\b|\bsell|open[- ]market|broker", re.IGNORECASE)
+_TAX_WORDS = re.compile(r"\btax|withh|to cover", re.IGNORECASE)
+
+
+def insider_problems(decision: str, line: Mapping[str, Any]) -> list[str]:
+    """What the stored Form 4 line says against the class. `line` holds acquired_disposed,
+    derivative, price_per_share, footnote_text and `superseded` (an amendment replaced the
+    filing). Direction must fit for the classes that have one; an open-market trade needs a
+    price, a non-derivative line and a footnote that speaks of a purchase or sale and not of
+    tax withholding. Classes other than open-market are not checked beyond direction."""
+    found = []
+    if line["superseded"]:
+        found.append("an amendment replaced the filing")
+    found += direction_problem(decision, line["acquired_disposed"])
+    if decision in ("open_market_buy", "open_market_sell"):
+        words = _BUY_WORDS if decision == "open_market_buy" else _SELL_WORDS
+        footnote = line["footnote_text"] or ""
+        if not words.search(footnote):
+            found.append("the footnote does not speak of a purchase or sale")
+        if _TAX_WORDS.search(footnote):
+            found.append("the footnote also speaks of tax withholding")
+        if line["derivative"]:
+            found.append("an open-market trade is not a derivative line")
+        price = line["price_per_share"]
+        if price is None or price <= 0:
+            found.append("the line states no price")
+    return found
+
+
+def insider_state_problems(
+    decision: str, latest: Mapping[str, Any] | None, override_id: Any
+) -> list[str]:
+    """Whether an applied override is still the latest word on the line (`latest`: id, new_class,
+    decided_by of the newest override row)."""
+    if latest is None:
+        return ["the override is no longer on file"]
+    if override_id is not None and latest["id"] != override_id:
+        return [f"the line was overridden since by {latest['decided_by']} to {latest['new_class']}"]
+    if latest["new_class"] != decision:
+        return [f"the stored override says {latest['new_class']}, not {decision}"]
+    return []
+
+
+_INSIDER_LINE_SQL = (
+    "select t.acquired_disposed, t.derivative, t.price_per_share, t.footnote_text,"
+    " f.superseded_by_accession is not null as superseded from public.insider_transaction t"
+    " join public.insider_filing f on f.accession = t.accession"
+    " where t.accession = $1 and t.row_index = $2"
+)
+
+
+async def _insider_line_problems(
+    pool: asyncpg.Pool, accession: str, index: int, decision: str
+) -> list[str]:
+    line = await pool.fetchrow(_INSIDER_LINE_SQL, accession, index)
+    if line is None:
+        return ["the transaction line no longer exists"]
+    return insider_problems(decision, dict(line))
+
+
+async def insider_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    return await _insider_line_problems(
+        pool, str(cand.evidence["accession"]), int(cand.evidence["row_index"]), decision
+    )
+
+
+async def insider_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    accession, index = _insider_key(row.subject_ref)
+    latest = await pool.fetchrow(
+        "select id, new_class, decided_by from public.insider_classification_override"
+        " where accession = $1 and row_index = $2 order by id desc limit 1",
+        accession,
+        index,
+    )
+    found = insider_state_problems(
+        row.decision, latest, (row.revert_payload or {}).get("override_id")
+    )
+    return found + await _insider_line_problems(pool, accession, index, row.decision)
+
+
 INSIDER_OVERRIDE = JudgeKind(
     name="insider_override",
     label="Unclear insider transactions",
@@ -913,6 +1280,8 @@ INSIDER_OVERRIDE = JudgeKind(
     # settled, so there is nothing safer to fall back to.
     expire_decision=None,
     max_tokens=800,
+    verify=insider_verify,
+    recheck=insider_recheck,
 )
 
 KINDS = [DISCLOSURE_REVIEW, ADJUDICATION, INSIDER_OVERRIDE]

@@ -25,6 +25,7 @@ from steward.config.jobs import JobsConfig, ThesisSettings, effort_kwargs
 from steward.config.store import ConfigConflictError, load_active, save_config
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig, ThesisConfig
+from steward.engine import overrides
 from steward.jobs.runner import JobContext, JobFailed
 from steward.llm.client import create_llm
 from steward.llm.routing import routing_client
@@ -117,11 +118,12 @@ async def author_from_report(
     except AINotConfigured as exc:
         raise JobFailed(str(exc)) from exc
     usage = Usage(model=cfg.model)
+    corrections = await overrides.lessons(pool, "theses", "theses the engine wrote")
     async with ctx.step("author_thesis") as step:
         try:
             response = await client.messages.parse(
                 model=cfg.model,
-                system=author.system_for(mode),
+                system=author.system_for(mode) + ("\n\n" + corrections if corrections else ""),
                 messages=[{"role": "user", "content": prompt}],
                 output_format=author.ThesisDraft,
                 **effort_kwargs(cfg.model, cfg.effort, MAX_OUTPUT_TOKENS),
@@ -192,7 +194,11 @@ async def author_from_report(
 
 async def _save_held(
     pool: asyncpg.Pool, thesis: ThesisConfig, draft: author.ThesisDraft, report_id: int
-) -> int:
+) -> int | None:
+    """Save the drafted thesis as the stock's thesis, unless the owner has changed what the
+    engine wrote for this stock: then the memo stays open for the owner to accept."""
+    if await overrides.was_overruled(pool, "config", f"theses:{thesis.ticker}"):
+        return None
     stored = await load_active(pool, "theses", ThesesConfig)
     config = stored.body if stored else ThesesConfig()
     try:

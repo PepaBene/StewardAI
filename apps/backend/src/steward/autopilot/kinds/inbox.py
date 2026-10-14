@@ -13,11 +13,17 @@ A suggested note becomes an ordinary agent note when accepted, through `decide_s
 
 import json
 import logging
+import re
+from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
 import asyncpg
 
+from steward.autopilot import ledger
 from steward.autopilot.judge import ApplyError, Candidate, JudgeKind, RuleResult, Verdict
+from steward.config.research import ResearchProfilesConfig
+from steward.config.store import load_active
+from steward.config.thesis import ThesesConfig
 from steward.inbox import service
 
 logger = logging.getLogger("steward.autopilot")
@@ -170,6 +176,103 @@ async def _action_outcome(pool: asyncpg.Pool, ref: str) -> str | None:
     return {"confirmed": "confirm", "declined": "decline"}.get(state or "")
 
 
+TICKER_JOBS = frozenset({"earnings_check", "research"})  # jobs about one company
+
+
+def action_problems(
+    item: Mapping[str, Any],
+    action: Mapping[str, Any] | None,
+    *,
+    known_company: bool,
+    profile_known: bool = True,
+) -> list[str]:
+    """Problems with confirming a proposed job, read from the stored item. The job must be one
+    the service allows, name the company the item is about (a company the owner holds or has a
+    thesis on), use a research profile that exists, and rest on at least one stated fact."""
+    found: list[str] = []
+    if item.get("status") == "dismissed":
+        found.append("the item was dismissed")
+    if action is None:
+        return [*found, "the item proposes no action"]
+    kind = str(action.get("kind", ""))
+    params = action.get("params") or {}
+    if kind not in service.ACTION_JOB_TYPES:
+        found.append(f"{kind or 'an empty kind'} is not a job the autopilot may start")
+    if kind in TICKER_JOBS:
+        if params.get("ticker") != item.get("ticker"):
+            found.append("the job names another company than the item is about")
+        if not known_company:
+            found.append("the company is neither held nor in a thesis")
+    if kind == "research" and not profile_known:
+        found.append(f"there is no research profile {params.get('profile')!r}")
+    body = _json(item.get("body")) or {}
+    statements = body.get("statements") or []
+    if not any(_clip(s.get("text") if isinstance(s, dict) else s, 10) for s in statements):
+        found.append("no stated fact supports the proposal")
+    return found
+
+
+async def _known_company(pool: asyncpg.Pool, ticker: str | None) -> bool:
+    if not ticker:
+        return False
+    if await pool.fetchval(
+        "select exists (select 1 from public.instrument where t212_ticker = $1)", ticker
+    ):
+        return True
+    stored = await load_active(pool, "theses", ThesesConfig)
+    return any(t.ticker == ticker for t in (stored.body.theses if stored else []))
+
+
+async def action_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    """Only confirming starts anything (and costs money); a decline needs no second look."""
+    if decision != "confirm":
+        return []
+    item = await pool.fetchrow(
+        "select ticker, status, body, proposed_action from public.inbox_item where id = $1",
+        int(cand.evidence["item_id"]),
+    )
+    if item is None:
+        return ["the inbox item no longer exists"]
+    action = _json(item["proposed_action"])
+    known = await _known_company(pool, item["ticker"])
+    profile_known = True
+    if action and action.get("kind") == "research":
+        stored = await load_active(pool, "research_profiles", ResearchProfilesConfig)
+        profiles = stored.body if stored else ResearchProfilesConfig()
+        profile_known = profiles.get((action.get("params") or {}).get("profile")) is not None
+    return action_problems(dict(item), action, known_company=known, profile_known=profile_known)
+
+
+def action_recheck_problems(
+    decision: str, action_status: str | None, job: Mapping[str, Any] | None
+) -> list[str]:
+    """What no longer holds for an applied action decision: a confirmed one has a job that did
+    not fail, a declined one is still declined (not re-proposed or confirmed by hand)."""
+    if decision == "confirm":
+        if action_status != "confirmed":
+            return [f"the action is now {action_status or 'gone'}"]
+        if job is None:
+            return ["the job it started is gone"]
+        if job["status"] == "failed":
+            return [f"the job it started failed: {_clip(job['error'], 200) or 'no error recorded'}"]
+        return []
+    if decision == "decline" and action_status != "declined":
+        return [f"the action is now {action_status or 'gone'}"]
+    return []
+
+
+async def action_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    item = await pool.fetchrow(
+        "select i.action_status, j.status, j.error, j.id job_id from public.inbox_item i"
+        " left join public.job j on j.id = i.action_job_id where i.id = $1",
+        _id(row.subject_ref),
+    )
+    if item is None:
+        return ["the inbox item no longer exists"]
+    job = {"status": item["status"], "error": item["error"]} if item["job_id"] else None
+    return action_recheck_problems(row.decision, item["action_status"], job)
+
+
 INBOX_ACTION = JudgeKind(
     name="inbox_action",
     label="Inbox: proposed jobs",
@@ -184,6 +287,8 @@ INBOX_ACTION = JudgeKind(
     outcome=_action_outcome,
     rule=_action_rule,
     expire_decision="decline",
+    verify=action_verify,
+    recheck=action_recheck,
 )
 
 
@@ -300,6 +405,90 @@ async def _note_outcome(pool: asyncpg.Pool, ref: str) -> str | None:
     return {"accepted": "accept", "declined": "decline"}.get(status or "")
 
 
+NOTE_MAX = 2000  # what an agent note may hold; `decide_suggested_note` cuts a longer one
+COVERED_MIN = 20  # a shorter existing note is too generic to say a suggestion repeats it
+
+
+def _squash(text: str) -> str:
+    return " ".join(re.findall(r"\w+", text.casefold()))
+
+
+def note_problems(
+    decision: str, suggestion: str | None, existing: Sequence[str], *, known_company: bool
+) -> list[str]:
+    """Problems with accepting a suggested note, judged against the stored notes rather than
+    the ones the judge was shown: it says something, fits a note, is for a company the owner
+    follows, and repeats no active note (the same words, or one inside the other)."""
+    if decision != "accept":
+        return []
+    text = (suggestion or "").strip()
+    if not text:
+        return ["the suggested note is empty"]
+    found: list[str] = []
+    if len(text) > NOTE_MAX:
+        found.append(f"the note is longer than the {NOTE_MAX} characters a note may hold")
+    if not known_company:
+        found.append("the note is for a company that is neither held nor in a thesis")
+    mine = _squash(text)
+    for old in existing:
+        theirs = _squash(old)
+        shorter, longer = sorted((mine, theirs), key=len)
+        if shorter and (shorter == longer or (len(shorter) >= COVERED_MIN and shorter in longer)):
+            found.append("an existing note already says this")
+            break
+    return found
+
+
+async def note_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    if decision != "accept":
+        return []
+    item = await pool.fetchrow(
+        "select ticker, body from public.inbox_item where id = $1", int(cand.evidence["item_id"])
+    )
+    if item is None:
+        return ["the inbox item no longer exists"]
+    body = _json(item["body"]) or {}
+    # A general note (no company) has nothing to be unknown about.
+    known = item["ticker"] is None or await _known_company(pool, item["ticker"])
+    existing = await pool.fetch(
+        "select text from public.agent_note where active and (ticker is null or ticker = $1)",
+        item["ticker"],
+    )
+    return note_problems(
+        decision, body.get("suggested_note"), [r["text"] for r in existing], known_company=known
+    )
+
+
+def note_recheck_problems(
+    decision: str, note_status: str | None, note: Mapping[str, Any] | None, *, expects_note: bool
+) -> list[str]:
+    """What no longer holds for an applied note decision: the suggestion keeps the status the
+    autopilot gave it and an accepted note still exists and is switched on."""
+    wanted = "accepted" if decision == "accept" else "declined"
+    found = [] if note_status == wanted else [f"the suggestion is now {note_status or 'gone'}"]
+    if decision == "accept" and expects_note:
+        if note is None:
+            found.append("the note it created was deleted")
+        elif not note["active"]:
+            found.append("the note it created was switched off")
+    return found
+
+
+async def note_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    status = await pool.fetchval(
+        "select body->>'note_status' from public.inbox_item where id = $1", _id(row.subject_ref)
+    )
+    if status is None and not await pool.fetchval(
+        "select exists (select 1 from public.inbox_item where id = $1)", _id(row.subject_ref)
+    ):
+        return ["the inbox item no longer exists"]
+    note_id = (row.revert_payload or {}).get("note_id")
+    note = None
+    if row.decision == "accept" and note_id is not None:
+        note = await pool.fetchrow("select active from public.agent_note where id = $1", note_id)
+    return note_recheck_problems(row.decision, status, note, expects_note=note_id is not None)
+
+
 AGENT_NOTE = JudgeKind(
     name="agent_note",
     label="Inbox: suggested notes",
@@ -313,6 +502,8 @@ AGENT_NOTE = JudgeKind(
     revert=_revert_note,
     outcome=_note_outcome,
     expire_decision="decline",
+    verify=note_verify,
+    recheck=note_recheck,
 )
 
 KINDS = [INBOX_ACTION, AGENT_NOTE]

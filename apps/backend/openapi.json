@@ -397,7 +397,7 @@
           "config"
         ],
         "summary": "Rollback Config",
-        "description": "Make an old version current again by saving its body as a new active version. The\nnext run of every job uses it. 409 if the old body no longer passes validation, or if\n`base_version_id` is given and is no longer the active version.",
+        "description": "Make an old version current again by saving its body as a new active version. The\nnext run of every job uses it. 409 if the old body no longer passes validation, or if\n`base_version_id` is given and is no longer the active version. When the version being\nreplaced was written by the engine, `reason_code` says why it was undone.",
         "operationId": "rollback_config",
         "security": [
           {
@@ -460,6 +460,31 @@
               "title": "Base Version Id"
             },
             "description": "The version the edit started from. If another save has happened since, nothing is saved and the answer is 409."
+          },
+          {
+            "name": "reason_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "wrong_data",
+                    "wrong_source",
+                    "right_but_unimportant",
+                    "too_early",
+                    "too_late",
+                    "prefer_my_judgement",
+                    "other"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason Code"
+            }
           }
         ],
         "responses": {
@@ -10997,6 +11022,31 @@
               "minimum": 1,
               "title": "Action Id"
             }
+          },
+          {
+            "name": "reason_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "wrong_data",
+                    "wrong_source",
+                    "right_but_unimportant",
+                    "too_early",
+                    "too_late",
+                    "prefer_my_judgement",
+                    "other"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason Code"
+            }
           }
         ],
         "responses": {
@@ -12064,7 +12114,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Recorded"
+                  "$ref": "#/components/schemas/api__autopilot_routes__Recorded"
                 }
               }
             }
@@ -12320,7 +12370,7 @@
           "actions"
         ],
         "summary": "Engine Ledger",
-        "description": "Everything the engine or the owner changed, newest first, from every ledger.",
+        "description": "Everything the engine or the owner changed, newest first, from every ledger. An entry\nwith `undo_action` can be undone through `/actions/propose` with `undo_args`.",
         "operationId": "engine_ledger",
         "security": [
           {
@@ -12368,6 +12418,35 @@
               ],
               "title": "Source"
             }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
           }
         ],
         "responses": {
@@ -12378,7 +12457,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Entry"
+                    "$ref": "#/components/schemas/Entry-Input"
                   },
                   "title": "Response Engine Ledger"
                 }
@@ -12396,6 +12475,166 @@
             }
           }
         }
+      }
+    },
+    "/overrides": {
+      "post": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Record Override",
+        "description": "Say that you overruled something the engine did, and why. Screens use this for areas\nthat have no dedicated undo (a story, a graph edge, an identity); the engine does not redo\nan item you overruled and learns from the reasons.",
+        "operationId": "record_override",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverrideIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api__action_routes__Recorded"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "List Overrides",
+        "description": "How you have overruled the engine, newest first.",
+        "operationId": "list_overrides",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 30,
+              "title": "Days"
+            }
+          },
+          {
+            "name": "area",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Area"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OverrideOut"
+                  },
+                  "title": "Response List Overrides"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/engine/sweeps": {
+      "get": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Engine Sweeps",
+        "description": "The weekly re-check of applied decisions: how many it looked at and how many no longer\nheld, newest first. The share that no longer held is the disagreement rate.",
+        "operationId": "engine_sweeps",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SweepOut"
+                  },
+                  "type": "array",
+                  "title": "Response Engine Sweeps"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/actions/kinds": {
@@ -50618,7 +50857,7 @@
         ],
         "title": "EntityMatchOut"
       },
-      "Entry": {
+      "Entry-Input": {
         "properties": {
           "at": {
             "type": "string",
@@ -50645,9 +50884,95 @@
             "type": "string",
             "title": "Status"
           },
+          "undo_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undo Action"
+          },
+          "undo_args": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undo Args"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "source",
+          "kind",
+          "ref",
+          "summary",
+          "status"
+        ],
+        "title": "Entry"
+      },
+      "Entry-Output": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "undo_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undo Action"
+          },
+          "undo_args": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undo Args"
+          },
           "reversible": {
             "type": "boolean",
-            "title": "Reversible"
+            "title": "Reversible",
+            "readOnly": true
           }
         },
         "type": "object",
@@ -79320,6 +79645,155 @@
         ],
         "title": "OverCap"
       },
+      "OverrideIn": {
+        "properties": {
+          "area": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Area"
+          },
+          "subject_kind": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Subject Kind"
+          },
+          "subject_ref": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Subject Ref"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "reverted",
+              "edited",
+              "rejected",
+              "marked_wrong"
+            ],
+            "title": "Action"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "wrong_data",
+                  "wrong_source",
+                  "right_but_unimportant",
+                  "too_early",
+                  "too_late",
+                  "prefer_my_judgement",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "via": {
+            "type": "string",
+            "enum": [
+              "screen",
+              "chat"
+            ],
+            "title": "Via",
+            "default": "screen"
+          }
+        },
+        "type": "object",
+        "required": [
+          "area",
+          "subject_kind",
+          "subject_ref",
+          "action"
+        ],
+        "title": "OverrideIn"
+      },
+      "OverrideOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "area": {
+            "type": "string",
+            "title": "Area"
+          },
+          "subject_kind": {
+            "type": "string",
+            "title": "Subject Kind"
+          },
+          "subject_ref": {
+            "type": "string",
+            "title": "Subject Ref"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "via": {
+            "type": "string",
+            "title": "Via"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "area",
+          "subject_kind",
+          "subject_ref",
+          "action",
+          "reason_code",
+          "note",
+          "via"
+        ],
+        "title": "OverrideOut"
+      },
       "Overview": {
         "properties": {
           "ticker": {
@@ -87923,7 +88397,8 @@
               "source_conflict",
               "provider_access",
               "provider_quota",
-              "thesis_gap"
+              "thesis_gap",
+              "engine_verification"
             ],
             "title": "Kind"
           },
@@ -90058,17 +90533,6 @@
           "table_name"
         ],
         "title": "RecordEvidenceOut"
-      },
-      "Recorded": {
-        "properties": {
-          "ok": {
-            "type": "boolean",
-            "title": "Ok",
-            "default": true
-          }
-        },
-        "type": "object",
-        "title": "Recorded"
       },
       "RecordedExchangeSessionResponse": {
         "properties": {
@@ -100738,7 +101202,8 @@
               "source_conflict",
               "provider_access",
               "provider_quota",
-              "thesis_gap"
+              "thesis_gap",
+              "engine_verification"
             ],
             "title": "Kind"
           },
@@ -100805,7 +101270,8 @@
               "source_conflict",
               "provider_access",
               "provider_quota",
-              "thesis_gap"
+              "thesis_gap",
+              "engine_verification"
             ],
             "title": "Kind"
           },
@@ -105339,6 +105805,42 @@
           "version"
         ],
         "title": "SurpriseFormulaOut"
+      },
+      "SweepOut": {
+        "properties": {
+          "ran_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ran At"
+          },
+          "checked": {
+            "type": "integer",
+            "title": "Checked"
+          },
+          "flagged": {
+            "type": "integer",
+            "title": "Flagged"
+          },
+          "disagreement_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disagreement Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ran_at",
+          "checked",
+          "flagged",
+          "disagreement_rate"
+        ],
+        "title": "SweepOut"
       },
       "SwitchEntry": {
         "properties": {
@@ -114748,6 +115250,30 @@
         ],
         "title": "XrayView"
       },
+      "api__action_routes__Recorded": {
+        "properties": {
+          "recorded": {
+            "type": "boolean",
+            "title": "Recorded"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recorded"
+        ],
+        "title": "Recorded"
+      },
+      "api__autopilot_routes__Recorded": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "Recorded"
+      },
       "api__disclosure_routes__StakeChangeOut": {
         "properties": {
           "change_type": {
@@ -115348,7 +115874,8 @@
               "source_conflict",
               "provider_access",
               "provider_quota",
-              "thesis_gap"
+              "thesis_gap",
+              "engine_verification"
             ],
             "title": "Kind"
           },

@@ -126,7 +126,7 @@ async def autopilot_calibration_handler(ctx: JobContext) -> None:
     async with ctx.step("override_patterns") as step:
         floors = {name: cfg.policy(name).min_confidence for name in kinds}
         step.detail.update(await override_watch.act(ctx.pool, floors, now))
-    async with ctx.step("reverify") as step:
+    async with ctx.step("reverify") as step:  # runs weekly; the step says "skipped" otherwise
         step.detail.update(await reverify.sweep(ctx.pool, kinds, now))
     if cfg.auto_calibrate:
         async with ctx.step("calibrate") as step:

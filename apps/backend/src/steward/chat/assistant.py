@@ -29,6 +29,7 @@ from steward.config.news_sources import NewsSourcesConfig
 from steward.config.prompts import load_prompts
 from steward.config.store import load_active
 from steward.config.verification import ClaimVerifierSettings
+from steward.engine import overrides
 from steward.jobs.runner import JobContext, JobFailed
 from steward.llm.cache import ResultCache
 from steward.llm.client import LLM, create_llm
@@ -185,9 +186,20 @@ class LLMChatAssistant:
             specs = (*specs, WEB_SPEC)
             web.left = self._settings.max_searches
         searches_left = self._settings.max_searches if self._domains and web is None else 0
+        # What the owner keeps declining goes in the turn, not the system prompt, so the cached
+        # prefix stays the same between questions.
+        pool = getattr(tools, "pool", None)
+        corrections = (
+            await overrides.lessons(pool, "chat", "proposals the chat made") if pool else ""
+        )
         messages: list[Message] = [
             *(Message(m["role"], m["content"]) for m in history),  # type: ignore[arg-type]
-            Message("user", f"Today is {today.isoformat()}.\n\n{question}"),
+            Message(
+                "user",
+                f"Today is {today.isoformat()}.\n\n"
+                + (f"{corrections}\n\n" if corrections else "")
+                + question,
+            ),
         ]
         titles: dict[str, str] = {}
         for _ in range(self._settings.max_steps):

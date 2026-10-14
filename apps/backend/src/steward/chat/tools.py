@@ -52,6 +52,8 @@ CHANGE_KINDS = (
     "accept_recommendation",
     "review_decision",
     "set_autopilot_mode",
+    "rollback_config",
+    "roll_back_change",
 )
 ACTION_KINDS = (*JOB_KINDS, *CHANGE_KINDS)
 DOCUMENT_KINDS = ("filing", "report", "thesis", "note", "news", "disclosure", "agent_note")
@@ -1723,7 +1725,9 @@ class ChatTools:
                     "kind": e.kind,
                     "summary": e.summary,
                     "status": e.status,
-                    "can_undo": e.reversible,
+                    "undo_with": (
+                        {"kind": e.undo_action, "args": e.undo_args} if e.undo_action else None
+                    ),
                 }
                 for e in done
             ],

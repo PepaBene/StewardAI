@@ -23,8 +23,13 @@ from pydantic import BaseModel, Field, model_validator
 from steward.autopilot import ledger
 from steward.autopilot.judge import ApplyError, accept, revert
 from steward.autopilot.kinds import all_kinds
+from steward.config import CONFIG_MODELS
+from steward.config.store import RollbackError
+from steward.config.store import rollback as config_rollback
+from steward.engine import change as engine_change
 from steward.engine import overrides
 from steward.ops import tasks as ops_tasks
+from steward.settings import get_settings
 from steward.training import labels
 
 Risk = Literal["low", "medium", "high"]
@@ -204,6 +209,65 @@ async def _run_mode(pool: asyncpg.Pool, a: ModeArgs) -> dict[str, Any]:
     return {"kind": a.kind, "mode": a.mode}
 
 
+class ConfigRollbackArgs(BaseModel):
+    domain: str
+    version_id: int = Field(ge=1)
+
+
+class ChangeArgs(BaseModel):
+    change_id: int = Field(ge=1)
+
+
+async def _describe_config_rollback(pool: asyncpg.Pool, a: ConfigRollbackArgs) -> str:
+    if a.domain not in CONFIG_MODELS:
+        raise ActionError(f"Unknown configuration {a.domain}")
+    if not await pool.fetchval(
+        "select exists (select 1 from public.config_version where id = $1 and domain = $2)",
+        a.version_id,
+        a.domain,
+    ):
+        raise ActionError(f"No {a.domain} version {a.version_id}")
+    return f"Put the {a.domain} settings back to version #{a.version_id}"
+
+
+async def _run_config_rollback(pool: asyncpg.Pool, a: ConfigRollbackArgs) -> dict[str, Any]:
+    owner = get_settings().owner_user_id
+    previous = await overrides.active_version(pool, a.domain)
+    try:
+        async with pool.acquire() as conn:
+            saved = await config_rollback(conn, a.domain, a.version_id, created_by=owner)
+    except RollbackError as exc:
+        raise ActionError(str(exc)) from exc
+    if saved is None:
+        raise ActionError(f"No {a.domain} version {a.version_id}")
+    await overrides.record_config_edit(
+        pool,
+        a.domain,
+        previous,
+        saved.body.model_dump(mode="json"),
+        action="reverted",
+        via=current_via.get(),
+    )
+    return {"domain": a.domain, "restored": a.version_id, "new_version": saved.id}
+
+
+async def _describe_roll_back_change(pool: asyncpg.Pool, a: ChangeArgs) -> str:
+    row = await pool.fetchrow(
+        "select hypothesis, status from public.engine_change where id = $1", a.change_id
+    )
+    if row is None:
+        raise ActionError(f"No engine change {a.change_id}")
+    if row["status"] != "promoted":
+        raise ActionError(f"Engine change {a.change_id} is {row['status']}, not live")
+    return f"Undo the engine's own change: {row['hypothesis']}"
+
+
+async def _run_roll_back_change(pool: asyncpg.Pool, a: ChangeArgs) -> dict[str, Any]:
+    if not await engine_change.roll_back(pool, a.change_id, ["rolled back by the owner"]):
+        raise ActionError(f"Engine change {a.change_id} is not live")
+    return {"change_id": a.change_id}
+
+
 ACTIONS: dict[str, Action] = {
     a.name: a
     for a in (
@@ -242,6 +306,25 @@ ACTIONS: dict[str, Action] = {
             "Mark it again with the other verdict.",
             _describe_review,
             _run_review,
+        ),
+        Action(
+            "rollback_config",
+            "Put a setting back to an earlier version",
+            "medium",
+            ConfigRollbackArgs,
+            "Roll back again to the version that was active before.",
+            _describe_config_rollback,
+            _run_config_rollback,
+        ),
+        Action(
+            "roll_back_change",
+            "Undo a change the engine made to itself",
+            "medium",
+            ChangeArgs,
+            "The change stays recorded as rolled back; the engine proposes it again only "
+            "after new evidence.",
+            _describe_roll_back_change,
+            _run_roll_back_change,
         ),
         Action(
             "set_autopilot_mode",
@@ -364,13 +447,30 @@ async def confirm(pool: asyncpg.Pool, action_id: int, *, second: bool = False) -
     return row.model_copy(update={"status": "done", "result": result})
 
 
-async def cancel(pool: asyncpg.Pool, action_id: int) -> bool:
-    result = await pool.execute(
+async def cancel(
+    pool: asyncpg.Pool, action_id: int, reason_code: overrides.Reason | None = None
+) -> bool:
+    """Turn a proposal down. A proposal the engine or the chat made and the owner declined is an
+    override: the chat learns from what the owner keeps declining."""
+    rec = await pool.fetchrow(
         "update public.owner_action set status = 'cancelled', decided_at = now()"
-        " where id = $1 and status = 'proposed'",
+        " where id = $1 and status = 'proposed' returning action, via, summary",
         action_id,
     )
-    return bool(result.endswith(" 1"))
+    if rec is None:
+        return False
+    await overrides.record(
+        pool,
+        area="chat" if rec["via"] == "chat" else "screen_actions",
+        subject_kind="owner_action",
+        subject_ref=f"{rec['action']}:{action_id}",
+        action="rejected",
+        via=rec["via"],
+        reason_code=reason_code,
+        decided_by="chat" if rec["via"] == "chat" else "engine",
+        before={"summary": rec["summary"]},
+    )
+    return True
 
 
 async def execute(

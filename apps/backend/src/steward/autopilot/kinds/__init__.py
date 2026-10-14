@@ -22,6 +22,20 @@ KIND_MODULES: tuple[str, ...] = (
 )
 
 
+# A kind with no `verify` must be listed here with the reason (autonomous engine plan 1.2);
+# `check_verifiers` fails for a kind that is in neither place, and for a waiver left behind after
+# the kind got a check.
+VERIFY_WAIVERS: dict[str, str] = {}
+
+
+def check_verifiers(kinds: dict[str, JudgeKind] | None = None) -> None:
+    for name, kind in (kinds or all_kinds()).items():
+        if kind.verify is None and name not in VERIFY_WAIVERS:
+            raise ValueError(f"autopilot kind {name!r} has no verify hook and no waiver")
+        if kind.verify is not None and name in VERIFY_WAIVERS:
+            raise ValueError(f"autopilot kind {name!r} has a verify hook; remove its waiver")
+
+
 @cache
 def all_kinds() -> dict[str, JudgeKind]:
     kinds: dict[str, JudgeKind] = {}

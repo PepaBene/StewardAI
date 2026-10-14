@@ -7,13 +7,14 @@ import datetime as dt
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import IdPath, Pool
 from steward.actions import registry
+from steward.autopilot import reverify
 from steward.chat import visuals
-from steward.engine import timeline
+from steward.engine import overrides, timeline
 
 router = APIRouter(tags=["actions"])
 
@@ -47,13 +48,104 @@ async def engine_ledger(
     days: Annotated[int, Query(ge=1, le=90)] = 7,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     source: Annotated[str | None, Query(max_length=40)] = None,
+    kind: Annotated[str | None, Query(max_length=80)] = None,
+    offset: Annotated[int, Query(ge=0, le=100_000)] = 0,
 ) -> list[timeline.Entry]:
-    """Everything the engine or the owner changed, newest first, from every ledger."""
+    """Everything the engine or the owner changed, newest first, from every ledger. An entry
+    with `undo_action` can be undone through `/actions/propose` with `undo_args`."""
     since = dt.datetime.now(dt.UTC) - dt.timedelta(days=days)
     try:
-        return await timeline.recent(pool, timeline.Query(since, limit, source))
+        return await timeline.recent(pool, timeline.Query(since, limit, source, kind, offset))
     except ValueError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+
+
+class OverrideIn(BaseModel):
+    area: str = Field(min_length=1, max_length=80)
+    subject_kind: str = Field(min_length=1, max_length=80)
+    subject_ref: str = Field(min_length=1, max_length=200)
+    action: overrides.Action
+    reason_code: overrides.Reason | None = None
+    note: str | None = Field(default=None, max_length=1000)
+    via: overrides.Via = "screen"
+
+
+class OverrideOut(BaseModel):
+    id: int
+    created_at: dt.datetime
+    area: str
+    subject_kind: str
+    subject_ref: str
+    action: str
+    reason_code: str | None
+    note: str | None
+    via: str
+
+
+class Recorded(BaseModel):
+    recorded: bool
+
+
+@router.post("/overrides", status_code=status.HTTP_201_CREATED)
+async def record_override(body: OverrideIn, pool: Pool, _owner: Owner) -> Recorded:
+    """Say that you overruled something the engine did, and why. Screens use this for areas
+    that have no dedicated undo (a story, a graph edge, an identity); the engine does not redo
+    an item you overruled and learns from the reasons."""
+    await overrides.record(
+        pool,
+        area=body.area,
+        subject_kind=body.subject_kind,
+        subject_ref=body.subject_ref,
+        action=body.action,
+        via=body.via,
+        reason_code=body.reason_code,
+        note=body.note,
+        decided_by="engine",
+    )
+    return Recorded(recorded=True)
+
+
+@router.get("/overrides")
+async def list_overrides(
+    pool: Pool,
+    _owner: Owner,
+    days: Annotated[int, Query(ge=1, le=365)] = 30,
+    area: Annotated[str | None, Query(max_length=80)] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[OverrideOut]:
+    """How you have overruled the engine, newest first."""
+    since = dt.datetime.now(dt.UTC) - dt.timedelta(days=days)
+    rows = await pool.fetch(
+        "select id, created_at, area, subject_kind, subject_ref, action, reason_code, note, via"
+        " from public.owner_override where created_at >= $1 and ($2::text is null or area = $2)"
+        " order by created_at desc limit $3",
+        since,
+        area,
+        limit,
+    )
+    return [OverrideOut(**dict(r)) for r in rows]
+
+
+class SweepOut(BaseModel):
+    ran_at: dt.datetime
+    checked: int
+    flagged: int
+    disagreement_rate: float | None
+
+
+@router.get("/engine/sweeps")
+async def engine_sweeps(pool: Pool, _owner: Owner) -> list[SweepOut]:
+    """The weekly re-check of applied decisions: how many it looked at and how many no longer
+    held, newest first. The share that no longer held is the disagreement rate."""
+    return [
+        SweepOut(
+            ran_at=s.ran_at,
+            checked=s.checked,
+            flagged=s.flagged,
+            disagreement_rate=s.disagreement_rate,
+        )
+        for s in await reverify.history(pool)
+    ]
 
 
 @router.get("/actions/kinds")

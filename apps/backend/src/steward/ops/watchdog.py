@@ -28,6 +28,7 @@ from decimal import Decimal
 from typing import Any
 
 import asyncpg
+import httpx
 
 from steward.autopilot import ledger
 from steward.budget_guard import month_of, month_spend
@@ -42,6 +43,7 @@ from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
 from steward.lookthrough.coverage import refresh_ledger
 from steward.lookthrough.read import load_portfolio
+from steward.notify.channels import channels_from_settings
 from steward.ops import anticipate, delivery, journal_gaps, keys, liveness, tasks
 from steward.ops import budget as budget_forecast
 from steward.ops.opportunities import check_opportunities
@@ -325,7 +327,12 @@ async def watchdog_handler(ctx: JobContext) -> None:
                 ctx.pool, liveness.AUTOPILOT, now
             )
     async with ctx.step("delivery") as step:
-        step.detail["undelivered"] = await delivery.check(ctx.pool, now)
+        async with httpx.AsyncClient(timeout=20.0) as http:
+            step.detail["undelivered"] = await delivery.check(
+                ctx.pool, now, channels_from_settings(http, get_settings())
+            )
+    async with ctx.step("job_liveness") as step:
+        step.detail["overdue"] = await liveness.check_all(ctx.pool, jobs, now)
     if cfg.refresh_derived:
         async with ctx.step("derived_inputs") as step:
             step.detail.update(await refresh_derived(ctx.pool, jobs))

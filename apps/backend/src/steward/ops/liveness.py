@@ -7,10 +7,12 @@ other way round); the notice resolves itself when the job runs again.
 """
 
 import datetime as dt
+import math
 from dataclasses import dataclass
 
 import asyncpg
 
+from steward.config.jobs import JobSchedule, JobsConfig
 from steward.ops import tasks
 
 KIND = "liveness"
@@ -42,6 +44,42 @@ def overdue_hours(
         return None
     hours = (now - since).total_seconds() / 3600
     return hours if hours > watched.cadence_hours * GRACE else None
+
+
+def cadence_hours(schedule: JobSchedule, now: dt.datetime) -> int | None:
+    """Hours between two runs of a scheduled job, rounded up; None when it cannot be told."""
+    trigger = schedule.trigger()
+    first = trigger.get_next_fire_time(None, now)
+    if first is None:
+        return None
+    second = trigger.get_next_fire_time(first, first)
+    if second is None:
+        return None
+    return int(max(1, math.ceil((second - first).total_seconds() / 3600)))
+
+
+async def check_all(pool: asyncpg.Pool, jobs: JobsConfig, now: dt.datetime) -> dict[str, float]:
+    """Every scheduled job is watched, not only the two that watch each other. A job whose
+    schedule is switched off is no longer watched and its notice resolves."""
+    late: dict[str, float] = {}
+    watched_types = {AUTOPILOT.job_type, WATCHDOG.job_type}
+    for job_type, schedule in jobs.worker_schedules().items():
+        if not schedule.enabled or job_type in watched_types:
+            continue
+        hours = cadence_hours(schedule, now)
+        if hours is None:
+            continue
+        watched_types.add(job_type)
+        overdue = await check(pool, Watched(job_type, hours, f"The {job_type} job"), now)
+        if overdue is not None:
+            late[job_type] = overdue
+    await pool.execute(
+        "update public.ops_task set status = 'resolved', resolved_at = now()"
+        " where kind = $1 and status <> 'resolved' and subject <> all($2::text[])",
+        KIND,
+        sorted(watched_types),
+    )
+    return late
 
 
 async def check(pool: asyncpg.Pool, watched: Watched, now: dt.datetime) -> float | None:

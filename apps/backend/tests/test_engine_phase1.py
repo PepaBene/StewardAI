@@ -40,6 +40,9 @@ def test_the_ledger_view_reads_every_place_the_engine_leaves_a_trace() -> None:
         "owner_action",
         "engine_change",
         "config",
+        "override",
+        "delivery",
+        "journal",
     }
 
 
@@ -47,6 +50,7 @@ def test_delivery_problems_are_described_only_when_there_are_some() -> None:
     assert delivery.problem(0, 0) is None
     assert delivery.problem(2, 0) == "2 failed to send"
     assert delivery.problem(1, 3) == "1 failed to send and 3 still waiting long after their time"
+    assert delivery.problem(0, 0, 2) == "2 bounced or were marked as spam"
 
 
 @pytest.mark.db
@@ -97,7 +101,11 @@ async def test_the_sweep_flags_an_applied_decision_that_no_longer_holds(
 
     await seed_fact(backend_pool, status="verified", restates=fact_id, fp="Q4")
     assert await fact_recheck(backend_pool, row) == ["a later filing restated it"]
-    assert await reverify.sweep(backend_pool, all_kinds(), NOW) == {"checked": 1, "flagged": 1}
+    assert await reverify.sweep(backend_pool, all_kinds(), NOW) == {"skipped": 1}  # not due yet
+    assert await reverify.sweep(backend_pool, all_kinds(), NOW, force=True) == {
+        "checked": 1,
+        "flagged": 1,
+    }
     notice = await backend_pool.fetchrow(
         "select status, subject from public.ops_task where kind = 'reverify'"
     )

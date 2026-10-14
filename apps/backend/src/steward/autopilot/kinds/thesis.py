@@ -15,10 +15,12 @@ fenced in three ways:
 """
 
 import json
+from collections.abc import Collection, Sequence
 from typing import Any, Literal
 
 import asyncpg
 
+from steward.autopilot import ledger
 from steward.autopilot.judge import ApplyError, Candidate, JudgeKind, Verdict
 from steward.config.store import ConfigConflictError, load_active, rollback, save_config
 from steward.config.thesis import ThesesConfig
@@ -231,6 +233,103 @@ async def thesis_is_open(pool: asyncpg.Pool, refs: list[str]) -> set[str]:
     return out
 
 
+PRE_MORTEM_MAX = 3  # the thesis schema holds at most three pre-mortem reasons
+PROPOSAL_MODES = frozenset({"draft_thesis", "propose_update"})
+
+
+def proposal_problems(
+    report_ticker: str | None,
+    proposal: ThesisProposal,
+    fields: Sequence[ProposalField],
+    source_ids: Collection[str],
+) -> list[str]:
+    """Problems with saving these fields of a report's proposal, judged on the stored report:
+    it is the report of the thesis being edited, the proposal came from a mode that proposes,
+    every line to save is non-blank, within the schema's limits and cites sources the report
+    really holds."""
+    found: list[str] = []
+    if report_ticker != proposal.ticker:
+        found.append(
+            f"the report is about {report_ticker} but the proposal edits {proposal.ticker}"
+        )
+    if proposal.mode not in PROPOSAL_MODES:
+        found.append(f"a {proposal.mode} report does not propose thesis changes")
+    for change in proposal.changes:
+        if change.field not in fields:
+            continue
+        texts = [line.text.strip() for line in change.after]
+        if not texts or not all(texts):
+            found.append(f"{change.field}: a proposed line is blank")
+        if len(set(texts)) != len(texts):
+            found.append(f"{change.field}: a line is proposed twice")
+        if change.field == "pre_mortem" and len(texts) > PRE_MORTEM_MAX:
+            found.append(f"pre_mortem: {len(texts)} reasons, the thesis holds {PRE_MORTEM_MAX}")
+        for line in change.after:
+            if not line.evidence_ids:
+                found.append(f"{change.field}: a line cites no source")
+            elif unknown := [i for i in line.evidence_ids if i not in source_ids]:
+                found.append(f"{change.field}: cites {', '.join(unknown)}, not in the report")
+    return found
+
+
+async def thesis_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    if decision != "accept":
+        return []
+    row = await pool.fetchrow(
+        "select ticker, body from public.report where id = $1 and type = 'research'",
+        int(cand.evidence["report_id"]),
+    )
+    if row is None:
+        return ["the research report no longer exists"]
+    body = json.loads(row["body"]) if isinstance(row["body"], str) else row["body"]
+    proposal = _proposal(body)
+    if proposal is None:
+        return ["the report no longer carries a thesis proposal"]
+    source_ids = {str(s.get("id")) for s in body.get("sources") or [] if isinstance(s, dict)}
+    fields: list[ProposalField] = list(cand.evidence.get("fields") or AUTOFIELDS)
+    return proposal_problems(row["ticker"], proposal, fields, source_ids)
+
+
+def thesis_drift(
+    saved_version_id: int | None, active_version_id: int | None, explained_saves_since: int
+) -> list[str]:
+    """The version the autopilot saved should still be the active one. A later save by the
+    owner (or a later accepted proposal) explains the difference; any other change does not."""
+    if saved_version_id is None or saved_version_id == active_version_id:
+        return []
+    if explained_saves_since:
+        return []
+    return [
+        f"the theses version it saved (#{saved_version_id}) is no longer active"
+        f" (now #{active_version_id}) and no owner edit explains it"
+    ]
+
+
+async def thesis_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    if row.decision != "accept":
+        return []
+    found: list[str] = []
+    report_id = _report_id(row.subject_ref)
+    report_ticker = await pool.fetchval(
+        "select ticker from public.report where id = $1 and type = 'research'", report_id
+    )
+    if report_ticker is None:
+        found.append("the research report it came from no longer exists")
+    saved = (row.revert_payload or {}).get("saved_version_id")
+    _, active = await _stored(pool)
+    since = (
+        await pool.fetchval(
+            "select count(*) from public.config_version where domain = 'theses' and id > $1"
+            " and (created_by is not null or note like $2)",
+            int(saved),
+            f"{NOTE_PREFIX}%",
+        )
+        if saved is not None
+        else 0
+    )
+    return found + thesis_drift(None if saved is None else int(saved), active, int(since))
+
+
 KIND = JudgeKind(
     name="thesis_proposal",
     label="Thesis proposals",
@@ -246,4 +345,6 @@ KIND = JudgeKind(
     expire_decision=None,
     promotable=False,
     max_tokens=800,
+    verify=thesis_verify,
+    recheck=thesis_recheck,
 )

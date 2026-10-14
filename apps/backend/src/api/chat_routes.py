@@ -17,6 +17,7 @@ from api.db import IdPath, Pool
 from steward.actions import registry
 from steward.chat.assistant import ChatAnswer
 from steward.chat.tools import CHANGE_KINDS
+from steward.engine import overrides
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 
@@ -223,7 +224,9 @@ async def confirm_action(action_id: IdPath, pool: Pool, owner: Owner) -> ActionO
 
 
 @router.post("/chat/actions/{action_id}/cancel")
-async def cancel_action(action_id: IdPath, pool: Pool, owner: Owner) -> ActionOut:
+async def cancel_action(
+    action_id: IdPath, pool: Pool, owner: Owner, reason_code: overrides.Reason | None = None
+) -> ActionOut:
     row = await pool.fetchrow(
         "update public.chat_action set status = 'cancelled', decided_at = now(), decided_by ="
         " $2::uuid where id = $1 and status = 'proposed' returning id, message_id, kind, params,"
@@ -240,5 +243,16 @@ async def cancel_action(action_id: IdPath, pool: Pool, owner: Owner) -> ActionOu
         raise HTTPException(status.HTTP_409_CONFLICT, f"Action {action_id} is {current}")
     if row["kind"] in CHANGE_KINDS:
         params = json.loads(row["params"])
-        await registry.cancel(pool, int(params.get("owner_action_id", 0)))
+        await registry.cancel(pool, int(params.get("owner_action_id", 0)), reason_code)
+    else:
+        await overrides.record(
+            pool,
+            area="chat",
+            subject_kind="chat_action",
+            subject_ref=f"{row['kind']}:{action_id}",
+            action="rejected",
+            via="chat",
+            reason_code=reason_code,
+            decided_by="chat",
+        )
     return _action(row)

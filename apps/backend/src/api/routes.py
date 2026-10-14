@@ -44,6 +44,7 @@ from steward.earnings.read import (
 from steward.earnings.review import ReviewError, ReviewItem, review_queue
 from steward.earnings.review import review_fact as review_fact_in_db
 from steward.earnings.review_stats import ReviewStats, review_stats
+from steward.engine import overrides
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 from steward.portfolio.concentration import ConcentrationReport, concentration_report
@@ -836,9 +837,10 @@ async def save_versioned[M: BaseModel](
 ) -> StoredConfig[M]:
     """save_config for a PUT route: 409 when the active version is no longer
     `base_version_id` (or a concurrent save collided)."""
+    previous = await overrides.active_version(pool, domain)
     try:
         async with pool.acquire() as conn:
-            return await save_config(
+            saved = await save_config(
                 conn,
                 domain,
                 body,
@@ -848,6 +850,8 @@ async def save_versioned[M: BaseModel](
             )
     except (ConfigConflictError, asyncpg.UniqueViolationError) as exc:
         raise config_conflict(exc) from exc
+    await overrides.record_config_edit(pool, domain, previous, body.model_dump(mode="json"))
+    return saved
 
 
 def _not_found(domain: str) -> HTTPException:

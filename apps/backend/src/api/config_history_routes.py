@@ -30,6 +30,7 @@ from steward.config.store import (
     list_versions,
     rollback,
 )
+from steward.engine import overrides
 
 router = APIRouter(tags=["config"])
 
@@ -142,11 +143,14 @@ async def rollback_config(
     pool: Pool,
     owner: Owner,
     base_version_id: BaseVersionParam = None,
+    reason_code: overrides.Reason | None = None,
 ) -> ConfigVersionBody:
     """Make an old version current again by saving its body as a new active version. The
     next run of every job uses it. 409 if the old body no longer passes validation, or if
-    `base_version_id` is given and is no longer the active version."""
+    `base_version_id` is given and is no longer the active version. When the version being
+    replaced was written by the engine, `reason_code` says why it was undone."""
     name = DOMAIN_BY_SLUG[domain]
+    previous = await overrides.active_version(pool, name)
     try:
         async with pool.acquire() as conn:
             stored = await rollback(
@@ -164,6 +168,9 @@ async def rollback_config(
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"No {domain} version {version_id}")
     found = await get_version(pool, name, stored.id)
     assert found is not None
+    await overrides.record_config_edit(
+        pool, name, previous, found[1], action="reverted", reason_code=reason_code
+    )
     return ConfigVersionBody(**found[0].__dict__, body=found[1])
 
 

@@ -46,6 +46,7 @@ from steward.approvals.ai import (
     sec_tickers,
     sic_of,
 )
+from steward.autopilot import ledger
 from steward.autopilot.judge import ApplyError, Candidate, JudgeKind, RuleResult, Verdict
 from steward.config.holding_profiles import HoldingProfile, HoldingProfilesConfig
 from steward.config.jobs import JobsConfig
@@ -306,6 +307,77 @@ async def _listing_is_open(pool: asyncpg.Pool, refs: list[str]) -> set[str]:
     return {tickers[r["ticker"]] for r in rows}
 
 
+_LISTING_STATUS = {"confirm": "confirmed", "reject": "rejected"}
+
+
+def listing_problems(
+    decision: str,
+    evidence: dict[str, Any],
+    instrument_isin: str | None,
+    security_isin: str | None,
+) -> list[str]:
+    """What the stored derivation says against confirming a listing. Read from the link row the
+    derive job wrote (its ESMA lookup and currency comparison) and from the security the link
+    points at, not from the prompt the judge saw. Only a confirmation needs it: a rejection is
+    the safe side."""
+    if decision != "confirm":
+        return []
+    found = []
+    if evidence.get("isin_has_firds_record_on_home_mic") is False:
+        found.append("the ISIN has no ESMA record on the home exchange")
+    currency = evidence.get("currency")
+    if isinstance(currency, dict) and currency.get("agrees") is False:
+        found.append("the listing currency disagrees with the instrument's")
+    if instrument_isin and security_isin and instrument_isin.upper() != security_isin.upper():
+        found.append("the derived security carries a different ISIN than the instrument")
+    return found
+
+
+def listing_state_problems(
+    decision: str, status: str, listing_id: int | None, decided_listing_id: Any
+) -> list[str]:
+    """Whether an applied listing decision still stands on the link row."""
+    want = _LISTING_STATUS.get(decision)
+    found = []
+    if want is not None and status != want:
+        found.append(f"the listing is now {status}")
+    if decided_listing_id is not None and listing_id != decided_listing_id:
+        found.append("the derived listing changed after the decision")
+    return found
+
+
+_LISTING_LINK_SQL = (
+    "select l.status, l.listing_id, l.evidence, i.isin as instrument_isin,"
+    " s.isin as security_isin from public.instrument_security_link l"
+    " left join public.instrument i on i.t212_ticker = l.ticker"
+    " left join public.security s on s.id = l.security_id where l.ticker = $1"
+)
+
+
+async def _listing_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    if decision != "confirm":
+        return []
+    row = await pool.fetchrow(_LISTING_LINK_SQL, split_ref(cand.ref, "listing"))
+    if row is None:
+        return ["the listing no longer exists"]
+    return listing_problems(
+        decision, _obj(row["evidence"]), row["instrument_isin"], row["security_isin"]
+    )
+
+
+async def _listing_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    link = await pool.fetchrow(_LISTING_LINK_SQL, split_ref(row.subject_ref, "listing"))
+    if link is None:
+        return ["the listing no longer exists"]
+    payload = row.revert_payload or {}
+    found = listing_state_problems(
+        row.decision, link["status"], link["listing_id"], payload.get("listing_id")
+    )
+    return found + listing_problems(
+        row.decision, _obj(link["evidence"]), link["instrument_isin"], link["security_isin"]
+    )
+
+
 listing = JudgeKind(
     name="listing",
     label="Suggested listings",
@@ -320,6 +392,8 @@ listing = JudgeKind(
     outcome=_listing_outcome,
     rule=listing_kind_rule,
     expire_decision=None,  # see the module docstring: no way back to the owner's queue
+    verify=_listing_verify,
+    recheck=_listing_recheck,
 )
 
 # ----------------------------------------------------------------------------------- peers
@@ -565,6 +639,85 @@ async def _peer_is_open(pool: asyncpg.Pool, refs: list[str]) -> set[str]:
     return {ids[r["id"]] for r in rows}
 
 
+def base_symbol(ticker: str) -> str:
+    """`ACME_US_EQ` -> `ACME`: the exchange symbol inside a Trading 212 ticker (a plain symbol
+    comes back upper-cased)."""
+    return ticker.split("_", 1)[0].strip().upper()
+
+
+def peer_problems(
+    decision: str,
+    holding: str,
+    peer_ticker: str,
+    same_registry_issuer: bool,
+    rejected_elsewhere: bool,
+) -> list[str]:
+    """What the stored records say against confirming a peer. The model saw the SEC's view; this
+    is the registry's: the holding's own symbol, the CIK of the instruments the app already
+    holds, and a rejection of the same pair under another source. Rejecting is the safe side."""
+    if decision != "confirm":
+        return []
+    found = []
+    if base_symbol(holding) == peer_ticker.strip().upper():
+        found.append("the peer is the holding itself")
+    if same_registry_issuer:
+        found.append("the registry shows the peer and the holding are one issuer")
+    if rejected_elsewhere:
+        found.append("the same peer was rejected under another source")
+    return found
+
+
+def peer_state_problems(decision: str, status: str, last_reason: str | None) -> list[str]:
+    """Whether an applied peer decision still stands on the row."""
+    want = _LISTING_STATUS.get(decision)
+    if want is None or status == want:
+        return []
+    # A history step with no reason is the owner's: every automatic step writes one.
+    by = (
+        ""
+        if last_reason and last_reason.strip().startswith(AUTOPILOT_REASONS)
+        else " (by the owner)"
+    )
+    return [f"the peer is now {status}{by}"]
+
+
+_PEER_FACTS_SQL = """
+select p.ticker, p.peer_ticker, p.status, p.status_history->-1->>'reason' as last_reason,
+       exists (select 1 from public.instrument h
+                 join public.instrument o on o.cik = h.cik
+                where h.t212_ticker = p.ticker and h.cik is not null
+                  and split_part(o.t212_ticker, '_', 1) = upper(p.peer_ticker)) as same_issuer,
+       exists (select 1 from public.peer_set r
+                where r.ticker = p.ticker and upper(r.peer_ticker) = upper(p.peer_ticker)
+                  and r.id <> p.id and r.status = 'rejected') as rejected_elsewhere
+from public.peer_set p where p.id = $1"""
+
+
+async def _peer_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    if decision != "confirm":
+        return []
+    row = await pool.fetchrow(_PEER_FACTS_SQL, split_id(cand.ref, "peer"))
+    if row is None:
+        return ["the peer no longer exists"]
+    return peer_problems(
+        decision, row["ticker"], row["peer_ticker"], row["same_issuer"], row["rejected_elsewhere"]
+    )
+
+
+async def _peer_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    facts = await pool.fetchrow(_PEER_FACTS_SQL, split_id(row.subject_ref, "peer"))
+    if facts is None:
+        return ["the peer no longer exists"]
+    found = peer_state_problems(row.decision, facts["status"], facts["last_reason"])
+    return found + peer_problems(
+        row.decision,
+        facts["ticker"],
+        facts["peer_ticker"],
+        facts["same_issuer"],
+        facts["rejected_elsewhere"],
+    )
+
+
 peer = JudgeKind(
     name="peer",
     label="Suggested peers",
@@ -579,6 +732,8 @@ peer = JudgeKind(
     outcome=_peer_outcome,
     rule=peer_rule,
     expire_decision="reject",  # reversible: the owner can set it back to suggested or confirmed
+    verify=_peer_verify,
+    recheck=_peer_recheck,
 )
 
 # -------------------------------------------------------------------------------- identity
@@ -622,6 +777,8 @@ identity = JudgeKind(
     outcome=None,
     rule=None,
     expire_decision=None,
+    # No verify or recheck: it loads nothing and `apply` always refuses, so no decision is ever
+    # taken or applied and there is no stored mapping to read a second time.
 )
 
 # `identity` is defined but not registered: with no stored candidate mappings it can decide

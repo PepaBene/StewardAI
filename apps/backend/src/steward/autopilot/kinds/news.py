@@ -19,6 +19,7 @@ from typing import Any, Literal
 
 import asyncpg
 
+from steward.autopilot import ledger
 from steward.autopilot.judge import ApplyError, Candidate, JudgeKind, RuleResult, Verdict
 from steward.news.escalation_lifecycle import set_escalation_status
 from steward.news.read import DisputedStory, disputed_stories, list_escalations, resolve_story
@@ -170,6 +171,45 @@ async def _story_outcome(pool: asyncpg.Pool, ref: str) -> str | None:
     return str(row["resolution"])
 
 
+def story_problems(story: DisputedStory, decision: str) -> list[str]:
+    """The story's own rules (see STORY_SYSTEM), checked on the stored sources rather than on
+    what the judge said: confirming needs two independent tier-1/2 outlets and nothing of equal
+    or higher tier against it; calling it false needs a tier-1/2 source against it."""
+    best = min((s.tier for s in story.contradicting), default=None)
+    strong_for = {s.outlet or s.url for s in [*story.claim, *story.supporting] if s.tier <= 2}
+    if decision == "confirmed":
+        found = []
+        if len(strong_for) < 2:
+            found.append("fewer than two independent tier-1 or tier-2 sources support it")
+        if best is not None and best <= 2:
+            found.append("a tier-1 or tier-2 source disputes it")
+        return found
+    if decision == "false" and (best is None or best > 2):
+        return ["no tier-1 or tier-2 source contradicts it"]
+    return []
+
+
+async def _story_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    story_id = int(cand.evidence["story_id"])
+    story = next((s for s in await disputed_stories(pool, False) if s.id == story_id), None)
+    if story is None:
+        return ["the story is no longer disputed"]
+    return story_problems(story, decision)
+
+
+async def _story_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    """A resolved story holds while its resolution is unchanged and no newer item re-opened it
+    (the item is then waiting again, which the sweep reports on its own)."""
+    resolution = await pool.fetchval(
+        "select resolution from public.story_cluster where id = $1", _id(row.subject_ref)
+    )
+    if resolution is None:
+        return ["the story has no resolution any more"]
+    if resolution != row.decision:
+        return [f"the story is now marked {resolution}"]
+    return []
+
+
 NEWS_STORY = JudgeKind(
     name="news_story",
     label="News: disputed stories",
@@ -182,6 +222,8 @@ NEWS_STORY = JudgeKind(
     is_open=_story_open,
     revert=_revert_story,
     outcome=_story_outcome,
+    verify=_story_verify,
+    recheck=_story_recheck,
 )
 
 
@@ -311,6 +353,30 @@ async def _escalation_outcome(pool: asyncpg.Pool, ref: str) -> str | None:
     return {"acknowledged": "acknowledge", "resolved": "resolve"}.get(status or "")
 
 
+async def _escalation_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    """Acknowledging needs a finished check on the holding after the note; resolving needs that
+    or a newer note on the same matter. Read again from the stored rows."""
+    report_id = int(cand.evidence["report_id"])
+    follow = await _followup(
+        pool,
+        report_id,
+        cand.ticker,
+    )
+    if decision == "acknowledge" and not follow["checks"]:
+        return ["no check on the holding has finished since the note"]
+    if decision == "resolve" and not (follow["checks"] or follow["newer"]):
+        return ["nothing newer supersedes the note and no check has finished"]
+    return []
+
+
+async def _escalation_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    status = await pool.fetchval(
+        "select escalation_status from public.report where id = $1", _id(row.subject_ref)
+    )
+    want = {"acknowledge": "acknowledged", "resolve": "resolved"}.get(row.decision)
+    return [] if status == want else [f"the note is now {status or 'gone'}"]
+
+
 ESCALATION = JudgeKind(
     name="escalation",
     label="News: escalation notes",
@@ -325,6 +391,8 @@ ESCALATION = JudgeKind(
     outcome=_escalation_outcome,
     rule=_escalation_rule,
     expire_decision="acknowledge",
+    verify=_escalation_verify,
+    recheck=_escalation_recheck,
 )
 
 KINDS = [NEWS_STORY, ESCALATION]

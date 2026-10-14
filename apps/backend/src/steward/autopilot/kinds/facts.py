@@ -518,6 +518,22 @@ async def fact_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> lis
     if decision == "accept":
         if not value_in_excerpt(held["value_as_written"], held["snippet"]):
             found.append("the printed value is not in the stored source excerpt")
+        held_value = _dec(held["value_units"])
+        allowed = tolerance(held["value_as_written"], held["scale"])
+        for op in cand.evidence.get("opinions", []):
+            other = _dec(op.get("value_units"))
+            if (
+                op.get("source") == "xbrl"
+                and held_value is not None
+                and other is not None
+                and abs(other - held_value) > allowed
+            ):
+                found.append("the filing's structured data reports a different value")
+                break
+    elif decision.startswith("correct_"):
+        key = decision.removeprefix("correct_")
+        if not any(o.get("key") == key for o in cand.evidence.get("opinions", [])):
+            found.append(f"no competing value named {key}")
     return found
 
 
@@ -835,6 +851,64 @@ async def web_is_open(pool: asyncpg.Pool, refs: list[str]) -> set[str]:
     return {f"web_fact:{r['id']}" for r in rows}
 
 
+def web_problems(
+    tier: str, slot_key: str, agreeing: Sequence[Any], conflicting: Sequence[Any]
+) -> list[str]:
+    """Accepting a web value needs the tier rule met and no other source printing a different
+    value, judged on the rows stored now (a second source, not the judge's reading)."""
+    slot = SLOTS.get(slot_key)
+    found = []
+    if slot is None or slot.unavailable:
+        found.append("the slot cannot be filled from the web")
+        return found
+    if conflicting:
+        found.append("another source reports a different value")
+    if tier == "T3" and not slot.allow_t3:
+        found.append("a tier-3 source cannot fill this slot")
+    if tier == "T2" and not slot.t2_alone and not agreeing:
+        found.append("a tier-2 source needs one independent source to agree")
+    return found
+
+
+async def _web_peers(pool: asyncpg.Pool, row: Mapping[str, Any]) -> tuple[list[Any], list[Any]]:
+    peers = await pool.fetch(
+        "select id, host, tier, value_text from public.web_fact where ticker = $1"
+        " and slot = $2 and id <> $3 and status in ('approved', 'needs_review')",
+        row["ticker"],
+        row["slot"],
+        row["id"],
+    )
+    return web_corroboration(row["host"], row["value_text"], peers)
+
+
+async def web_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> list[str]:
+    if decision != "accept":
+        return []
+    row = await pool.fetchrow(
+        "select id, ticker, slot, value_text, host, tier from public.web_fact where id = $1",
+        int(cand.evidence["web_fact_id"]),
+    )
+    if row is None:
+        return ["the web fact no longer exists"]
+    agreeing, conflicting = await _web_peers(pool, row)
+    return web_problems(row["tier"], row["slot"], agreeing, conflicting)
+
+
+async def web_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str]:
+    if row.decision != "accept":
+        return []
+    fact = await pool.fetchrow(
+        "select id, ticker, slot, value_text, host, tier, status from public.web_fact"
+        " where id = $1",
+        _web_id(row.subject_ref),
+    )
+    if fact is None:
+        return ["the web fact no longer exists"]
+    found = [] if fact["status"] == "approved" else [f"the web fact is now {fact['status']}"]
+    agreeing, conflicting = await _web_peers(pool, fact)
+    return found + web_problems(fact["tier"], fact["slot"], agreeing, conflicting)
+
+
 WEB_FACT = JudgeKind(
     name="web_fact",
     label="Web facts to confirm",
@@ -852,6 +926,8 @@ WEB_FACT = JudgeKind(
     # owner's approve button, which works on any status.
     expire_decision="reject",
     max_tokens=1000,
+    verify=web_verify,
+    recheck=web_recheck,
 )
 
 KINDS = [FACT, WEB_FACT]
