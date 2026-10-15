@@ -100,8 +100,9 @@ Checked against the live database on 2026-10-15:
 - pgmq: replaced by the `public.job_queue` table (migration `20261126100000`,
   `jobs/queue.py` rewritten with the same four functions). Done in code; pending messages are
   copied over after the deploy (see the migration comment).
-- `auth.users`: no foreign keys from `public` tables to it; one function uses `auth.uid()` and
-  24 of 474 policies mention `auth.`. Restore with stub `auth.uid()` / `auth.jwt()` functions and
+- `auth.users`: 23 `public` tables have `owner_id` foreign keys to it (cascade); the copy keeps
+  them valid with a one-row `auth.users` stub holding the owner. One function uses `auth.uid()`
+  and 24 of 474 policies mention `auth.`; 207 policies call `private.is_owner()`. Restore with stub `auth.uid()` / `auth.jwt()` functions and
   the roles `anon`, `authenticated`, `service_role`, or drop those policies: the backend checks
   the owner itself (`OWNER_USER_ID`) and connects as `app_backend`.
 - 234 tables in `public`, roles granted: `anon`, `app_backend`, `authenticated`, `postgres`,
@@ -116,12 +117,22 @@ Progress (2026-10-15):
 - Done in code: live sync status now polls `GET /jobs` / `GET /jobs/{id}` (no Supabase table
   reads or Realtime in `sync-status-provider.tsx`); the retention job also runs from the worker
   scheduler (`Worker.run_retention`, 03:17 daily), so the pg_cron job is not needed.
-- Provisioning staged but not applied: service `Postgres` (image `pgvector/pgvector:pg17`, the
-  upstream pgvector image rather than an unverified marketplace template), 3 GB volume in
-  europe-west4, generated password, start command with the tuning below. `accept-deploy` was
-  denied by the permission classifier: commit the staged change in the Railway dashboard or
-  allow `mcp__railway__accept-deploy`.
-- Not started: restore rehearsal, cutover, backups.
+- Provisioned: service `Postgres` (image `pgvector/pgvector:pg17`, the upstream pgvector image
+  rather than an unverified marketplace template), 3 GB volume in europe-west4-drams3a,
+  Railway-generated passwords, tuning flags below. A Railway image service ignores its start
+  command for one-off jobs (a throwaway `db-restore` service exited at once with no output), so
+  the copy runs from a workstation: `deploy/db-move/run-local.sh` (docker, `postgres:17`) over a
+  temporary TCP proxy.
+- Restore rehearsal done 2026-10-15: public schema copied in about 13 minutes; row counts of
+  the big tables identical; 630 MB on Railway against 741 MB on Supabase (no bloat). Smoke test
+  (`deploy/db-move/smoke.sql`, as `app_backend`): vector data, queue read/delete, sequences,
+  the append-only guard and the owner foreign key all behave. It found that `app_backend` had no
+  USAGE on schema `private` (so the worker retention job would have failed on Supabase too);
+  fixed by migration `20261129100000`.
+- What the copy needs that `pg_dump` cannot give `app_backend`: `private` schema (applied from
+  `private_schema.sql`), sequence values (reset from the data), and a temporary
+  `grant select on all sequences in schema public to app_backend` on Supabase (revoke after).
+- Not started: cutover, backups, removing the TCP proxy and the `db-restore` service.
 
 Steps:
 1. Provision Postgres (pgvector) in project `dependable-vitality`, same environment, private

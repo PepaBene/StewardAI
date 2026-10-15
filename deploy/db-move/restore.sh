@@ -44,17 +44,54 @@ create or replace function auth.jwt() returns jsonb language sql stable as
   $f$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $f$;
 create or replace function auth.role() returns text language sql stable as
   $f$ select nullif(current_setting('request.jwt.claim.role', true), '') $f$;
+-- 23 public tables have owner_id references auth.users(id): keep them valid with a stub that
+-- holds the single owner (Auth itself stays on Supabase).
+create table if not exists auth.users (id uuid primary key);
+insert into auth.users (id) values ('14d3aa1a-624e-4be4-95b5-5aad6f6fe688') on conflict do nothing;
 grant usage on schema auth, extensions to anon, authenticated, service_role, app_backend;
 grant usage on schema public to anon, authenticated, service_role, app_backend;
 SQL
 psql_dst -c "alter database steward set search_path = public, extensions"
 
+echo "== private schema"
+# app_backend cannot read `private`, so it is applied from a hand-made file (see its header).
+psql_dst -v ON_ERROR_STOP=1 -f "$(dirname "$0")/private_schema.sql" || exit 1
+
 echo "== dump | restore"
 START=$(date +%s)
-pg_dump "$SRC_URL" --format=custom --no-owner --schema=public --schema=private \
-  | pg_restore --dbname="$DST_URL" --no-owner 2>/tmp/restore.err
+# Three passes so sequence values can be left out of the data pass (app_backend may not read
+# them): definitions, then rows without any `*_seq` object, then indexes and constraints.
+: >/tmp/restore.err
+for pass in pre-data data post-data; do
+  skip=""
+  # app_backend cannot bypass row-level security: read through its own policies (backend_all).
+  [ "$pass" = "data" ] && skip="--exclude-table=*_seq --enable-row-security"
+  pg_dump "$SRC_URL" --format=custom --no-owner --schema=public --section=$pass $skip \
+    | pg_restore --dbname="$DST_URL" --no-owner 2>>/tmp/restore.err
+  echo "pass $pass done after $(( $(date +%s) - START )) s"
+done
 echo "restore finished in $(( $(date +%s) - START )) s; pg_restore wrote $(wc -l </tmp/restore.err) lines to stderr"
 grep -v "already exists" /tmp/restore.err | head -40
+
+echo "== sequences"
+# app_backend may not read sequences, so their values are not copied: set each one past the
+# largest value in the column it feeds.
+psql_dst -v ON_ERROR_STOP=1 <<'SQL'
+do $f$
+declare r record; m bigint;
+begin
+  for r in
+    select s.oid::regclass as seq, d.refobjid::regclass as tbl, a.attname as col
+    from pg_class s
+    join pg_depend d on d.objid = s.oid and d.classid = 'pg_class'::regclass and d.deptype in ('a', 'i')
+    join pg_attribute a on a.attrelid = d.refobjid and a.attnum = d.refobjsubid
+    where s.relkind = 'S' and s.relnamespace = 'public'::regnamespace
+  loop
+    execute format('select coalesce(max(%I), 0) from %s', r.col, r.tbl) into m;
+    perform setval(r.seq, m + 1, false);
+  end loop;
+end $f$;
+SQL
 
 echo "== analyze"
 psql_dst -c "analyze"
