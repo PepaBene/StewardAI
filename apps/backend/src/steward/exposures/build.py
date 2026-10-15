@@ -333,7 +333,10 @@ async def _ai_steps(ctx: JobContext, rows: list[dict[str, Any]]) -> None:
         edgar = EdgarClient(http, settings.sec_user_agent) if settings.sec_user_agent else None
         storage = (
             SupabaseStorage(
-                http, settings.supabase_url, settings.supabase_secret_key.get_secret_value()
+                http,
+                settings.supabase_url,
+                settings.supabase_secret_key.get_secret_value(),
+                public_api_url=settings.public_api_url,
             )
             if settings.supabase_url and settings.supabase_secret_key
             else None

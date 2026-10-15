@@ -119,7 +119,10 @@ def evidence_store(settings: Settings, http: httpx.AsyncClient) -> EvidenceStore
     from steward.storage import SupabaseStorage
 
     return SupabaseStorage(
-        http, settings.supabase_url, settings.supabase_secret_key.get_secret_value()
+        http,
+        settings.supabase_url,
+        settings.supabase_secret_key.get_secret_value(),
+        public_api_url=settings.public_api_url,
     )
 
 

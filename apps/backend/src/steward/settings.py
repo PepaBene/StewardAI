@@ -96,6 +96,10 @@ class Settings(BaseSettings):
     alert_email_to: str | None = None
     # Public URL of the web app, for links in alerts and digests.
     app_url: str | None = None
+    # Public base URL of this API (e.g. https://api.example.com). When set, archived text is
+    # stored gzipped and evidence links point at /evidence/blob here; when unset, nothing is
+    # compressed and links are Supabase signed URLs.
+    public_api_url: str | None = None
     # Dead-man's switch: the worker GETs this URL every minute (e.g. a healthchecks.io check),
     # so a stopped or stuck worker raises an alert outside this host.
     heartbeat_ping_url: SecretStr | None = None

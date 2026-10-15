@@ -216,20 +216,8 @@ async def store_dataset(
                 for p in data.positions
             ],
         )
-        await conn.executemany(
-            """insert into public.source_record_evidence
-                 (domain_table,record_key,document_version_id,known_at)
-               values('institutional_holding',$1,$2,$3) on conflict do nothing""",
-            [
-                (
-                    f"{position.accession}:{position.infotable_sk}",
-                    version_by_accession[position.accession],
-                    known_at,
-                )
-                for position in data.positions
-                if position.accession in version_by_accession
-            ],
-        )
+    # No link row per position (443K rows, a third of the database): positions inherit the
+    # filing's link, which `record_evidence_as_of` resolves from the accession.
     return len(data.filings), len(data.positions)
 
 

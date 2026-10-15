@@ -134,7 +134,10 @@ async def earnings_check_handler(ctx: JobContext) -> None:
         deps = EarningsDeps(
             http=http,
             storage=SupabaseStorage(
-                http, settings.supabase_url, settings.supabase_secret_key.get_secret_value()
+                http,
+                settings.supabase_url,
+                settings.supabase_secret_key.get_secret_value(),
+                public_api_url=settings.public_api_url,
             ),
             extractor=LLMExtractor(
                 client,

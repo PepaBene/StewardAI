@@ -3,13 +3,14 @@ versioned config."""
 
 import datetime as dt
 import json
+import mimetypes
 from collections.abc import AsyncIterator
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 import asyncpg
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from pydantic import BaseModel, Field
 
 from api.auth import Owner
@@ -94,7 +95,7 @@ from steward.portfolio.transactions import (
 )
 from steward.portfolio.validation import ModelValidation, model_validation
 from steward.settings import get_settings
-from steward.storage import EvidenceStore, StorageError, SupabaseStorage
+from steward.storage import EvidenceStore, StorageError, SupabaseStorage, verify_blob
 
 router = APIRouter()
 
@@ -612,11 +613,41 @@ async def get_storage() -> AsyncIterator[EvidenceStore]:
         )
     async with httpx.AsyncClient(timeout=30.0) as http:
         yield SupabaseStorage(
-            http, settings.supabase_url, settings.supabase_secret_key.get_secret_value()
+            http,
+            settings.supabase_url,
+            settings.supabase_secret_key.get_secret_value(),
+            public_api_url=settings.public_api_url,
         )
 
 
 Storage = Annotated[EvidenceStore, Depends(get_storage)]
+
+# Archived pages are third-party HTML: served from this origin they must not run scripts or
+# reach the app, so the response is sandboxed and cannot load anything.
+_BLOB_HEADERS = {
+    "Content-Security-Policy": (
+        "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:"
+    ),
+    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": "private, max-age=300",
+}
+
+
+@router.get("/evidence/blob", include_in_schema=False)
+async def evidence_blob(path: str, exp: int, sig: str, storage: Storage) -> Response:
+    """An archived object, decompressed, for a link made by `SupabaseStorage.signed_url`. The
+    signature and expiry are the authorisation: a browser link carries no bearer token."""
+    settings = get_settings()
+    if settings.supabase_secret_key is None or not verify_blob(
+        settings.supabase_secret_key.get_secret_value(), path, exp, sig
+    ):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Link expired or invalid")
+    try:
+        data = await storage.get(path)
+    except StorageError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such archived object") from exc
+    media_type = mimetypes.guess_type(path)[0] or "application/octet-stream"
+    return Response(data, media_type=media_type, headers=_BLOB_HEADERS)
 
 
 @router.get("/theses/board", tags=["holdings"])

@@ -116,7 +116,7 @@ class Vec:
     """An item's vector with what grouping needs to know about it."""
 
     article_id: int
-    vector: tuple[float, ...]
+    vector: Sequence[float]  # a tuple, or an array('f') when read from the database (~8x smaller)
     published_ts: float  # seconds since epoch
     group_id: int | None = None
 
