@@ -132,7 +132,17 @@ Progress (2026-10-15):
 - What the copy needs that `pg_dump` cannot give `app_backend`: `private` schema (applied from
   `private_schema.sql`), sequence values (reset from the data), and a temporary
   `grant select on all sequences in schema public to app_backend` on Supabase (revoke after).
-- Not started: cutover, backups, removing the TCP proxy and the `db-restore` service.
+- Cutover done 2026-10-15 (about 17:20 UTC): backend stopped, final copy verified (236 tables,
+  1,702,534 rows, identical fingerprint with `deploy/db-move/fingerprint.sql`), `DATABASE_URL` set
+  to the Railway private address, first scheduled jobs (ids 2425, 2426) ran on Railway. Lessons
+  from the first two final-copy attempts: the Supabase pooler can drop a long dump (copy is now
+  per table with retries) and `drop schema cascade` runs out of locks on the small Postgres
+  (wipe now drops tables one by one). The TCP proxy, the env file and the temporary sequence
+  grant are removed.
+- Still to do: scheduled backups of the Railway database (Railway does not back it up), and
+  after a few days of clean runs, empty the `public` tables on Supabase so its database drops
+  under the 0.5 GB free limit (Auth lives in the same database, and an over-limit project can go
+  read-only). Until then Supabase holds the data as of 16:15 UTC on 2026-10-15 as the fallback.
 
 Steps:
 1. Provision Postgres (pgvector) in project `dependable-vitality`, same environment, private
