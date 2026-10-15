@@ -475,21 +475,57 @@ calibration and needs-you digest as tables or text.
   the chat and thesis models (chat is tested on the owner's past questions, thesis on stored research
   reports); a chat change has no automatic put-back because chat is not a job with a health signal.
 - Page selection is sent from the deals, thesis board, discover (active screen), holding KPI and valuation
-  scenario screens, as well as review and disclosures.
+  scenario screens, as well as review and disclosures; now also the backtest period and the risk
+  correlation focus (the other screens have no selected-item state to send).
+- Daily-time tuner (`tuners.tune_daily_times`): `portfolio_sync` and `daily_digest` move earlier (never
+  before 06:30, at least 15 minutes) when they finished after the owner's first visit on enough of the last
+  21 days; gated like other schedule changes, rolled back by the job-health check on that job type.
+- Floor replay gap: the notice says what cannot be replayed, and `check_rollbacks` now also puts a floor
+  back when the owner accepted 90% or more of at least 10 items it sent to them.
 
 Still open:
 - All new tests use fakes for the models; nothing here has been run against a live model, and the judge's
   counts feed code gates, so a weak judge weakens the gate.
 - Rule and source changes have no automatic rollback (the owner rolls them back from the ledger; there is
   no signal that measures a harm from a lowered alert or a switched-off feed); the schedule tuner touches
-  the news ingest only, because lateness is only measurable there; model tuning covers news
+  the news ingest and the two daily jobs, because lateness is only measurable there; model tuning covers news
   classification, digest, thesis and chat, and not the autopilot model.
 - No guidance or rating-change triggers (no data source stores them); filings stay with the disclosure alerts.
-- The replay cannot know what the owner would have decided on items newly escalated by a floor.
-- Screens not listed above (for example risk, news stories, escalations, inbox) still send path-only context.
+- The replay still cannot know what the owner would have decided on items newly escalated by a floor; it is
+  measured after the fact (acceptance rate) instead.
 - Telegram offers no delivery status; owner decisions still open: critical alerts at all hours (question 2),
-  the `news_feedback` "never train" wording, training licences and route, retention.
-- 5.4: the remaining rows of the section 4 table were not worked one by one; only the items above exist.
+  the training route and retention of raw prompts (see `finetuning_data_plan.md`).
+- 5.4, row not worked: 18 (automatic throttling of low-value jobs: the budget is outside what the
+  engine may change, by design; the forecast and the cap already exist).
+- The new model-based checks (`engine/second_look.py`) are tested with fakes only; they are advisory
+  notices, so a weak checking model produces noise, not changes.
+
+#### Fine-tuning capture and 5.4 delivered
+
+- Training data: the owner cleared news feedback and chat for training and holds the licences, so the
+  licence guards were dropped (they existed only in the plan). Chat calls are now recorded like every other
+  job's; recording stops at a storage limit (`training_capture.max_storage_mb`, default 150). Labels are
+  written from news feedback, fact review, inbox decisions and chat action confirm/cancel, besides
+  autopilot reviews. The engine ledger shows what is kept (`GET /engine/training`).
+- 5.4 rows done: 1 (the latest sync's positions, cash and total must add up, no zero quantity or price,
+  sync not stale), 2 (a held stock with no recent price), 8 (exists), 13/19 (above), 17 (every audit
+  finding opens a notice), 18 (a field whose engine changes were rolled back twice in 180 days is no
+  longer proposed), 20 (alerts that failed or stayed unsent are reported).
+- 5.4 rows done later: 3 (balance sheet identity and restated figures, `data_audit.statements`), 7 (the
+  rubric is recomputed from its published table on every build; a mismatch is written on the page,
+  `rubric.recompute_problems`), 11 (exists: `disclosure/adjudication_assist.py`), 12 (confirmed links to
+  self or both partner and competitor, `data_audit.graph_edges`; single-source links are not flagged,
+  because the owner's confirmation is itself a decision), 15 (numbers are checked against their sources by
+  the claim verifier already; questions answered with no evidence roll up into one notice,
+  `data_audit.chat_gaps`), 16 (`inbox.regress --from-ratings` replays every rating stored, no export),
+  20 (a critical alert that its channel gave up on is sent once by the other configured channel,
+  `alerts.send_by_other_channel`; receipts exist as provider ids), 21 (every scheduled job, the
+  calibration job included, is already watched by `ops.liveness.check_all`), 5 (`second_look`: the
+  figures of the newest research report are checked against their cited text by a model other than the
+  writer, and the report against the previous one on the same stock for contradictions), 6 (`second_look`:
+  a held stock's thesis against the last month of stories and KPI results, once a month per thesis),
+  9 (an opportunity notice now carries a point-in-time, cost-aware three-year backtest of the screen, once
+  a month per screen, `opportunities.api_backtester`).
 
 ## 6. Success metrics (measured against the owner, not against the engine)
 

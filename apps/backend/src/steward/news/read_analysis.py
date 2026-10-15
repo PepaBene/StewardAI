@@ -17,6 +17,7 @@ from steward.news.impact import ImpactResult
 from steward.news.market import MarketContext, StudyRow, event_study
 from steward.news.sentiment import SentimentResult
 from steward.news.thesis_link import LinkedAssumption
+from steward.training import labels
 
 
 def _doc(raw: Any) -> Any:
@@ -397,6 +398,16 @@ async def add_feedback(pool: asyncpg.Pool, body: NewsFeedbackIn) -> NewsFeedback
             note=body.note,
             decided_by="engine",
         )
+    # The owner's mark is also a training label on what the news engine produced.
+    await labels.record(
+        pool,
+        source="owner_review",
+        subject_kind=f"news_{body.target}",
+        subject_ref=f"{body.target}:{body.target_id}",
+        label="right" if body.kind in ("useful", "confirmed") else "wrong",
+        by_owner=True,
+        detail={"kind": body.kind, **({"note": body.note} if body.note else {})},
+    )
     return NewsFeedbackOut(**dict(row))
 
 

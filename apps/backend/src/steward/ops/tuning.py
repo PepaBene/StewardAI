@@ -236,6 +236,8 @@ async def tune_alerts(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, Any]:
         return {"lowered": None}
     if chosen.event_type not in config.severities:
         return {"lowered": None}
+    if await config_change.blocked(pool, f"config:event_rules:severities.{chosen.event_type}", now):
+        return {"lowered": None, "blocked": chosen.event_type}
     # The change goes through the engine's pipeline: its numbers are stored, its gates are fixed
     # beforehand, and it shows in the engine ledger. An alert you needed and would have missed
     # counts as three ignored ones.

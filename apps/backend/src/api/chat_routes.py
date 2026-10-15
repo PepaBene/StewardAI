@@ -20,6 +20,7 @@ from steward.chat.tools import CHANGE_KINDS
 from steward.engine import overrides
 from steward.jobs import queue
 from steward.jobs.runner import create_job
+from steward.training import labels
 
 router = APIRouter(tags=["chat"])
 
@@ -234,6 +235,16 @@ async def confirm_action(action_id: IdPath, pool: Pool, owner: Owner) -> ActionO
             job_id,
             owner.user_id,
         )
+    # Confirming what the assistant proposed is the owner agreeing with that answer.
+    await labels.record(
+        pool,
+        source="owner_accept",
+        subject_kind="chat_action",
+        subject_ref=str(action_id),
+        label="right",
+        by_owner=True,
+        detail={"kind": row["kind"]},
+    )
     return _action(updated)
 
 
@@ -269,4 +280,14 @@ async def cancel_action(
             reason_code=reason_code,
             decided_by="chat",
         )
+    # Cancelling a proposal is the owner disagreeing with that answer.
+    await labels.record(
+        pool,
+        source="owner_review",
+        subject_kind="chat_action",
+        subject_ref=str(action_id),
+        label="wrong",
+        by_owner=True,
+        detail={"kind": row["kind"], **({"reason": reason_code} if reason_code else {})},
+    )
     return _action(row)

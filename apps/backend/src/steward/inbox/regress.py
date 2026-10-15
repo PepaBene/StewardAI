@@ -80,15 +80,27 @@ async def regress(
     }
 
 
-async def _main(path: Path) -> dict[str, Any]:
+async def regress_from_ratings(
+    pool: asyncpg.Pool, agent: InboxAgent | None, limit: int = 500
+) -> dict[str, Any]:
+    """Regress against every item the owner has rated so far: the set grows by itself with each
+    rating, so no export step is needed before a change to the agent is checked."""
+    from steward.inbox.feedback import export_cases
+
+    return await regress(pool, agent, await export_cases(pool, limit))
+
+
+async def _main(path: Path | None) -> dict[str, Any]:
     from steward.ai import AINotConfigured
     from steward.db import create_pool
     from steward.inbox.agent import LLMInboxAgent
     from steward.llm.client import create_llm
     from steward.settings import get_settings
 
-    text = await asyncio.to_thread(path.read_text, encoding="utf-8")
-    cases = json.loads(text).get("cases", [])
+    cases: list[dict[str, Any]] = []
+    if path is not None:
+        text = await asyncio.to_thread(path.read_text, encoding="utf-8")
+        cases = json.loads(text).get("cases", [])
     settings = get_settings()
     pool = await create_pool(settings)
     try:
@@ -97,6 +109,8 @@ async def _main(path: Path) -> dict[str, Any]:
             agent = LLMInboxAgent(create_llm(settings))
         except AINotConfigured:
             agent = None
+        if path is None:
+            return await regress_from_ratings(pool, agent)
         return await regress(pool, agent, cases)
     finally:
         await pool.close()
@@ -105,8 +119,11 @@ async def _main(path: Path) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cases", type=Path, default=Path("evals/inbox_feedback_cases.json"))
+    parser.add_argument(
+        "--from-ratings", action="store_true", help="use every rating stored now, not a file"
+    )
     args = parser.parse_args(argv)
-    result = asyncio.run(_main(args.cases))
+    result = asyncio.run(_main(None if args.from_ratings else args.cases))
     print(json.dumps(result, indent=2))
     return 0 if result["failed"] == 0 else 1
 

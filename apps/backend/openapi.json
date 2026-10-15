@@ -8580,7 +8580,7 @@
           "news"
         ],
         "summary": "Post News Feedback",
-        "description": "Mark an item, story, claim or brief line (wrong entity, duplicate, misread, missing\nsource, useful, not useful). Feedback feeds the benchmark, never model training.",
+        "description": "Mark an item, story, claim or brief line (wrong entity, duplicate, misread, missing\nsource, useful, not useful). Feedback feeds the benchmark and is kept as a training label.",
         "operationId": "post_news_feedback",
         "security": [
           {
@@ -13224,6 +13224,33 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/engine/training": {
+      "get": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Get Training",
+        "description": "What is being collected for fine-tuning: recorded AI calls and labels, by kind.",
+        "operationId": "get_training",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingSummary"
                 }
               }
             }
@@ -38944,6 +38971,29 @@
           "realised_volatility"
         ],
         "title": "CalibrationOut"
+      },
+      "CallCount": {
+        "properties": {
+          "job_type": {
+            "type": "string",
+            "title": "Job Type"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "last_30_days": {
+            "type": "integer",
+            "title": "Last 30 Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_type",
+          "calls",
+          "last_30_days"
+        ],
+        "title": "CallCount"
       },
       "Cancelled": {
         "properties": {
@@ -71612,6 +71662,34 @@
           "history"
         ],
         "title": "KpiStatus"
+      },
+      "LabelCount": {
+        "properties": {
+          "subject_kind": {
+            "type": "string",
+            "title": "Subject Kind"
+          },
+          "right": {
+            "type": "integer",
+            "title": "Right"
+          },
+          "wrong": {
+            "type": "integer",
+            "title": "Wrong"
+          },
+          "corrected": {
+            "type": "integer",
+            "title": "Corrected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject_kind",
+          "right",
+          "wrong",
+          "corrected"
+        ],
+        "title": "LabelCount"
       },
       "LabelIn": {
         "properties": {
@@ -110559,7 +110637,15 @@
             "type": "array",
             "maxItems": 100,
             "title": "Exclude Job Types",
-            "description": "Job types whose calls are not recorded. Chat is left out until you opt in."
+            "description": "Job types whose calls are not recorded. Empty: every job type is recorded, chat included."
+          },
+          "max_storage_mb": {
+            "type": "integer",
+            "maximum": 20000.0,
+            "minimum": 10.0,
+            "title": "Max Storage Mb",
+            "description": "Stop recording when the stored calls take this much space; nothing already recorded is deleted.",
+            "default": 150
           },
           "max_chars": {
             "type": "integer",
@@ -110574,6 +110660,55 @@
         "type": "object",
         "title": "TrainingCaptureSettings",
         "description": "Keep a redacted copy of each AI call (prompt, answer, usage) so models can later be\nfine-tuned on this app's own work. Nothing is trained or sent anywhere by this."
+      },
+      "TrainingSummary": {
+        "properties": {
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "last_30_days": {
+            "type": "integer",
+            "title": "Last 30 Days"
+          },
+          "size_mb": {
+            "type": "number",
+            "title": "Size Mb"
+          },
+          "by_job_type": {
+            "items": {
+              "$ref": "#/components/schemas/CallCount"
+            },
+            "type": "array",
+            "title": "By Job Type"
+          },
+          "labels": {
+            "type": "integer",
+            "title": "Labels"
+          },
+          "owner_labels": {
+            "type": "integer",
+            "title": "Owner Labels"
+          },
+          "by_subject": {
+            "items": {
+              "$ref": "#/components/schemas/LabelCount"
+            },
+            "type": "array",
+            "title": "By Subject"
+          }
+        },
+        "type": "object",
+        "required": [
+          "calls",
+          "last_30_days",
+          "size_mb",
+          "by_job_type",
+          "labels",
+          "owner_labels",
+          "by_subject"
+        ],
+        "title": "TrainingSummary"
       },
       "TransactionFeeOut": {
         "properties": {

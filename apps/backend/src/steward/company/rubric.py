@@ -434,7 +434,7 @@ def build_rubric(
             why = "Not enough evidence for a combined figure."
     else:
         overall = sum((c.weight * (c.score or D(0)) for c in scored), D(0)) / scored_w
-    return Rubric(
+    rubric = Rubric(
         ticker=ticker,
         as_of=today,
         version=RUBRIC_VERSION,
@@ -472,6 +472,71 @@ def build_rubric(
             }
         ),
     )
+    problems = recompute_problems(rubric)
+    if problems:
+        # The figure does not follow from its own table: say so on the page rather than show it.
+        rubric.caveats.insert(
+            0,
+            "Recomputing this score from the table above gave a different answer ("
+            + "; ".join(problems[:3])
+            + "). Do not rely on it until this is fixed.",
+        )
+    return rubric
+
+
+def recompute_problems(r: Rubric) -> list[str]:
+    """Check the score again from the published table alone (indicator values, thresholds and
+    weights as shown), by a second route that shares no code with `build_rubric`. Returns what
+    differs; an empty list means the figures on screen follow from the table on screen."""
+    problems: list[str] = []
+    tol = Decimal("0.0001")
+    scores: dict[str, Decimal] = {}
+    for c in r.components:
+        points: list[tuple[Decimal, Decimal]] = []
+        for i in c.indicators:
+            if i.value is None:
+                if i.points is not None or i.band != "missing":
+                    problems.append(f"{i.id}: has points without a value")
+                continue
+            v = abs(i.value) if i.direction == "abs_lower" else i.value
+            if i.direction == "higher":
+                expected = GOOD if v >= i.good else OK if v >= i.ok else WEAK
+            else:
+                expected = GOOD if v <= i.good else OK if v <= i.ok else WEAK
+            if i.points is None or abs(i.points - expected) > tol:
+                problems.append(
+                    f"{i.id}: points {i.points} but its value {i.value} earns {expected}"
+                )
+            else:
+                points.append((i.weight, i.points))
+        weight_all = sum((i.weight for i in c.indicators), D(0))
+        weight_known = sum((w for w, _ in points), D(0))
+        coverage = weight_known / weight_all if weight_all else D(0)
+        if abs(coverage - c.coverage) > Decimal("0.001"):
+            problems.append(f"{c.id}: coverage {c.coverage} but the table gives {coverage:.3f}")
+        if coverage < MIN_COMPONENT_COVERAGE:
+            if c.score is not None:
+                problems.append(f"{c.id}: has a score although coverage is too low")
+            continue
+        expected_score = sum((w * p for w, p in points), D(0)) / weight_known
+        expected_score -= PENALTY_POINTS * (D(1) - coverage)
+        if c.score is None or abs(c.score - expected_score) > Decimal("0.001"):
+            problems.append(f"{c.id}: score {c.score} but the table gives {expected_score:.3f}")
+        else:
+            scores[c.id] = c.score
+    total = sum((c.weight for c in r.components if c.id in scores), D(0))
+    if r.overall is not None:
+        if total == 0:
+            problems.append("overall: has a figure although no component has a score")
+        else:
+            expected_overall = (
+                sum((c.weight * scores[c.id] for c in r.components if c.id in scores), D(0)) / total
+            )
+            if abs(r.overall - expected_overall) > Decimal("0.001"):
+                problems.append(
+                    f"overall: {r.overall} but the components give {expected_overall:.3f}"
+                )
+    return problems
 
 
 def sequence_len(items: Sequence[object]) -> int:

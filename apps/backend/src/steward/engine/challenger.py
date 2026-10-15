@@ -29,6 +29,8 @@ KIND = "engine_change"
 REPLAY_DAYS = 90
 ROLLBACK_AFTER_DAYS = 14
 ROLLBACK_UNTIL_DAYS = 28
+ACCEPT_MIN_ITEMS = 10
+ACCEPT_ROLLBACK_AT = 0.9
 DECIDED = ("applied", "shadow", "reverted")
 
 # A stricter floor must show fewer wrong decisions (by a point), not only no more of them. A
@@ -161,7 +163,9 @@ async def settle_floors(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int]:
                 f"{settled.hypothesis}. In the last {REPLAY_DAYS} days this would have left "
                 f"{candidate.escalated - baseline.escalated} more decisions for you and "
                 f"cut wrong ones from {baseline.wrong_rate:.0%} to {candidate.wrong_rate:.0%}."
-                f"{habit} If it is too strict, undo the change from the engine ledger.",
+                f"{habit} What you would have decided on those extra items cannot be replayed; "
+                "if you accept nearly all of them once they reach you, the change is rolled back. "
+                "You can also undo it from the engine ledger.",
             )
         else:
             rejected += 1
@@ -190,6 +194,13 @@ async def check_rollbacks(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int
         # Promotion asked for an improvement; undoing it only needs a worsening.
         gates = Gates(**{**c.gates, "max_wrong_rate_increase": 0.0})
         reasons = change.rollback_due(Metrics(**c.baseline), after, gates)
+        # The replay could not know what you would decide on the items the stricter floor sent
+        # to you; now it can. If you wave nearly all of them through, the floor only added work.
+        habit = await owner_acceptance(
+            pool, c.target.removeprefix("autopilot:"), rec["decided_at"], now
+        )
+        if habit and habit[1] >= ACCEPT_MIN_ITEMS and habit[0] / habit[1] >= ACCEPT_ROLLBACK_AT:
+            reasons.append(f"you accepted {habit[0]} of the {habit[1]} items it sent to you")
         if not reasons:
             continue
         if await change.roll_back(pool, c.id, reasons):

@@ -27,6 +27,7 @@ from steward.engine import (
     override_watch,
     prompt_change,
     proposer,
+    second_look,
     tuners,
     watchers,
 )
@@ -178,6 +179,8 @@ async def autopilot_calibration_handler(ctx: JobContext) -> None:
         step.detail.update(await tuners.tune_sources(ctx.pool, now))
     async with ctx.step("schedule_tuning") as step:
         step.detail.update(await tuners.tune_schedule(ctx.pool, now))
+    async with ctx.step("daily_times") as step:
+        step.detail.update(await tuners.tune_daily_times(ctx.pool, now))
     async with ctx.step("config_rollbacks") as step:
         step.detail.update(await tuners.check_rollbacks(ctx.pool, now))
     async with ctx.step("challengers") as step:
@@ -191,6 +194,10 @@ async def autopilot_calibration_handler(ctx: JobContext) -> None:
             if "usage" in drafted:
                 step.usage = drafted.pop("usage").step_usage()
             step.detail.update(drafted)
+        async with ctx.step("second_look") as step:
+            looked = await second_look.run(ctx.pool, client, cfg, calls, now)
+            step.usage = looked.pop("usage").step_usage()
+            step.detail.update(looked)
         async with ctx.step("prompt_changes") as step:
             tested = await prompt_change.settle_one(
                 ctx.pool, client, kinds, cfg, calls, lambda kind: lessons_for(ctx.pool, kind)

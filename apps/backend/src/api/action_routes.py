@@ -15,6 +15,8 @@ from steward.actions import registry
 from steward.autopilot import reverify
 from steward.chat import visuals
 from steward.engine import gates, overrides, timeline, triggers
+from steward.training.summary import TrainingSummary
+from steward.training.summary import summary as training_summary
 
 router = APIRouter(tags=["actions"])
 
@@ -262,6 +264,12 @@ async def put_gates(body: gates.FloorGateSettings, pool: Pool, owner: Owner) -> 
     """Change that bar. Only you can; the engine cannot propose a change to it."""
     saved = await gates.save(pool, body, owner.user_id)
     return GateOut(**saved.model_dump())
+
+
+@router.get("/engine/training")
+async def get_training(pool: Pool, _owner: Owner) -> TrainingSummary:
+    """What is being collected for fine-tuning: recorded AI calls and labels, by kind."""
+    return await training_summary(pool)
 
 
 @router.get("/engine/watchers")

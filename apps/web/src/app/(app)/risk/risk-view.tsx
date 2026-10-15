@@ -8,6 +8,7 @@ import { LineChart } from "@/components/charts/line-chart";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { usePageSelection } from "@/lib/chat/page-selection-store";
 import { formatDate, formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { isRatio, STAT_GROUPS, statLabel, type AnalyticsFigure, type RiskReport } from "@/lib/risk/risk";
@@ -143,6 +144,7 @@ function cell(v: number | null): React.CSSProperties | undefined {
 function Matrix({ report }: { report: RiskReport }) {
   const m = report.correlation;
   const [focus, setFocus] = useState<string>("");
+  usePageSelection(focus.trim() ? `holding ${focus.trim()}` : null);
   // Broker tickers are mixed-case (CSPXl_EQ), so the highlight ignores case.
   const isFocus = (t: string) => focus.trim() !== "" && t.toUpperCase() === focus.trim().toUpperCase();
   if (m.tickers.length < 2) {

@@ -56,15 +56,34 @@ async def test_a_call_is_stored_redacted_and_the_switch_stops_it(
     assert "a@b.co" not in str(row["request"]) and "<EMAIL>" in str(row["request"])
     assert row["redaction"] == capture.REDACTION_VERSION
 
-    await capture.record(backend_pool, 2, "chat", request("hello"), completion())  # excluded
-    assert await backend_pool.fetchval("select count(*) from public.llm_call") == 1
+    await capture.record(backend_pool, 2, "chat", request("hello"), completion())  # chat counts
+    assert await backend_pool.fetchval("select count(*) from public.llm_call") == 2
+
+    body = JobsConfig(training_capture=TrainingCaptureSettings(exclude_job_types=["chat"]))
+    async with backend_pool.acquire() as conn:
+        await save_config(conn, "jobs", body, created_by=None, note="chat out")
+    capture.reset_cache()
+    await capture.record(backend_pool, 3, "chat", request("hello"), completion())
+    assert await backend_pool.fetchval("select count(*) from public.llm_call") == 2
 
     body = JobsConfig(training_capture=TrainingCaptureSettings(enabled=False))
     async with backend_pool.acquire() as conn:
         await save_config(conn, "jobs", body, created_by=None, note="off")
     capture.reset_cache()
-    await capture.record(backend_pool, 3, "news_story", request("again"), completion())
-    assert await backend_pool.fetchval("select count(*) from public.llm_call") == 1
+    await capture.record(backend_pool, 4, "news_story", request("again"), completion())
+    assert await backend_pool.fetchval("select count(*) from public.llm_call") == 2
+    capture.reset_cache()
+
+
+@pytest.mark.db
+async def test_capture_stops_when_the_stored_calls_fill_their_share(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    capture.reset_cache()
+    assert await capture.has_room(backend_pool, 10)
+    capture.reset_cache()
+    # A table already over the cap (here a cap of 0 MB cannot be set, so test the helper directly).
+    assert not await capture.has_room(backend_pool, 0)
     capture.reset_cache()
 
 

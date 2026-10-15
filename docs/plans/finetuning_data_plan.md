@@ -32,9 +32,9 @@ The owner alone reads the app and trades. Collected data never leads to an engin
   accept/reject, graph decisions, identity decisions, adjudication labels, `engagement_event` (opens).
 - Eval infrastructure exists (news 100-item set, research gate, earnings golden, retrieval eval, chat
   benchmark) and can seed the golden sets.
-- Policy conflict: `news_feedback` carries a comment that it is never used for training. This must be
-  explicitly revisited by the owner before any use (open question 1).
-- Licensing: full news text and paid-provider data may not be reusable for training. Unresolved.
+- Resolved by the owner: `news_feedback` and chat history may be used for training (the "never train"
+  wording is removed), and the owner holds the licences and permissions for the sources used. There is no
+  licence table or `training_ok` filter; nothing in capture or export checks licences.
 
 ## 3. Capture layer: `llm_call` (append-only)
 
@@ -81,14 +81,13 @@ Reason chips from the engine plan (section L3) become structured label detail.
   replaced at capture with stable placeholders (`<POSITION_PCT>`, `<ACCT>`), keeping weights as buckets or
   percent when the task needs them. A ruleset version is stored; a nightly scan flags any raw account
   pattern in `messages`. Exports to any external trainer use the redacted copy only.
-- **Third-party content**: store references and short quoted spans (fair-use sized) rather than full news
-  articles or paid-provider payloads. Per source, record `training_ok` (yes / no / unknown) in a table
-  maintained by the owner; unknown is treated as no. Filings and other public-domain regulator documents
-  (SEC EDGAR, ESMA) are generally fine; paid vendors, news publishers and X/social content need review.
+- **Third-party content**: the owner has stated that they hold the licences and permissions needed, so no
+  per-source licence guard exists. Prompts are still stored with the text the model saw, cut at
+  `max_chars`.
 - **Secrets**: API keys and auth headers are never in `messages` (verified by a scan test).
 - **Retention**: raw prompts 18 months, labelled curated sets indefinitely, with a delete-by-subject path.
-- **Owner consent switch**: one config flag `capture_training_data` with per-task overrides; default off for
-  `chat` until the owner opts in.
+- **Owner consent switch**: config `training_capture` (on/off, job types to leave out, longest text kept,
+  storage limit). Chat is recorded (the owner opted in); the default leaves no job type out.
 
 ## 6. Datasets per task
 
@@ -135,22 +134,27 @@ Automated gates before a dataset version is marked usable:
 3. Class balance report; no single ticker or source over 20% of a set.
 4. Duplicate/near-duplicate removal.
 5. Disagreement review: a sample where the owner label disagrees with outcome is listed for owner check.
-6. Licence filter applied (`training_ok`).
+6. (Licence filter removed: the owner holds the licences.)
 
 ## 10. Phased delivery
 
 **Phase 1 - Capture (start now; cheap, irreversible if skipped)**
 1.1 `llm_call` table, central client hook, redaction ruleset v1, per-task switch, size cap, RLS, tests that
     secrets and account ids never land in `messages`.
-1.2 `source_licence` table and owner screen; default `unknown`.
-1.3 Config flag and a "What is collected" page in the app (counts per task, size, last 30 days, off switch).
+1.2 (Dropped: no licence table; the owner holds the licences.)
+1.3 Config `training_capture` and a "What is kept for fine-tuning" panel in the engine ledger (calls per
+    job type, size, labels per kind; `GET /engine/training`). Built; capture stops at a storage limit
+    (default 150 MB) because the database is small.
 
 **Phase 2 - Label linkage**
 2.1 `llm_label` table and hooks on: auto_decision review, fact review, news feedback/story confirm,
     inbox decisions, escalation ack, thesis proposals, graph/identity decisions, adjudication.
 2.2 Reason chips (engine plan L3) stored as label detail.
 2.3 Outcome jobs: re-score recommendations and alerts at 30/90/180 days; fact confirmed-by-filing check.
-2.4 Resolve the `news_feedback` "never train" comment with the owner; update code comment and docs.
+2.4 Done: the "never train" wording is removed (route, table comment). Hooks now write `training_label`
+    for news feedback, fact review (accept / correct / reject), inbox confirm / decline / useful, chat
+    action confirm / cancel and autopilot reviews. Not yet hooked: escalation acknowledgements, thesis
+    proposals, graph and identity decisions, adjudication labels, outcome re-scoring jobs (2.3).
 
 **Phase 3 - Datasets and golden sets**
 3.1 Materialised dataset builders per task (start: news classification, extraction/data filling, judges).
@@ -178,7 +182,7 @@ Monthly dataset refresh, golden set review, drift report, licence review, retent
 
 ## 12. Risks
 
-- **Licence breach** (news/paid data): mitigated by `training_ok` default-unknown, references over copies.
+- **Licence breach** (news/paid data): accepted by the owner, who states they hold the licences.
 - **PII leak**: redaction at capture, scans, owner-only RLS, exports from redacted copy only.
 - **Training on engine errors**: engine-only rows are never labels; golden set comes from owner-confirmed data.
 - **Label sparsity**: the owner overrides rarely by design (good engine), so labels accrue slowly; the plan
@@ -190,8 +194,11 @@ Monthly dataset refresh, golden set review, drift report, licence review, retent
 
 ## 13. Open questions for the owner
 
-1. May `news_feedback` and chat history be used for training (current comment says never)?
-2. Which news and data sources have licences that allow training use?
+Answered: 1 yes (news feedback and chat), 2 the owner holds the licences, 5 start capture now including
+chat. Still open: 3 and 4.
+
+1. (answered) May `news_feedback` and chat history be used for training?
+2. (answered) Which sources have licences that allow training use?
 3. Preferred training route: hosted provider fine-tune, or open-weights you host (affects format and PII
    stance)?
 4. Retention period for raw prompts (suggested 18 months)?

@@ -10,6 +10,7 @@ The engine may only touch the fields in `ALLOWED`; budget, credentials, strategy
 outside it twice over (`engine.change.FROZEN` and this list).
 """
 
+import datetime as dt
 import json
 import re
 from dataclasses import dataclass
@@ -183,6 +184,22 @@ def _kind(c: change.Change) -> Kind:
     if c.change_kind not in ALLOWED:
         raise NotAllowed(f"{c.change_kind} is not a config change")
     return c.change_kind
+
+
+BLOCK_AFTER = 2  # rollbacks of one target before the engine stops proposing it
+BLOCK_DAYS = 180
+
+
+async def blocked(pool: asyncpg.Pool, target: str, now: dt.datetime) -> bool:
+    """A field whose changes were rolled back twice recently is left to the owner: the engine has
+    shown it does not judge that one well."""
+    n = await pool.fetchval(
+        "select count(*) from public.engine_change where target = $1 and status = 'rolled_back'"
+        " and decided_at >= $2",
+        target,
+        now - dt.timedelta(days=BLOCK_DAYS),
+    )
+    return int(n or 0) >= BLOCK_AFTER
 
 
 async def propose(

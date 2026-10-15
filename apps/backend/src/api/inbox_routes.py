@@ -13,6 +13,7 @@ from steward.config.store import load_active
 from steward.inbox import run, service, triggers
 from steward.inbox.route_stats import RouteStat, route_stats
 from steward.inbox.service import AgentNote, InboxItem, NoteIn, NotePatch, NoteVersion
+from steward.training import labels
 
 router = APIRouter(tags=["inbox"])
 
@@ -145,25 +146,43 @@ async def give_feedback(
     item_id: IdPath, body: InboxFeedbackIn, pool: Pool, _owner: Owner
 ) -> InboxItem:
     """Say whether the item was useful. Feeds the candidate evaluation cases."""
-    return _missing(await service.set_feedback(pool, item_id, body.feedback, body.note), item_id)
+    item = _missing(await service.set_feedback(pool, item_id, body.feedback, body.note), item_id)
+    await _label(pool, item_id, "owner_review", "right" if body.feedback == "useful" else "wrong")
+    return item
 
 
 @router.post("/inbox/{item_id}/confirm")
 async def confirm_inbox_action(item_id: IdPath, pool: Pool, owner: Owner) -> InboxItem:
     """Start the job the agent proposed. Only this call starts anything."""
     try:
-        return await service.confirm_action(pool, item_id, owner.user_id)
+        item = await service.confirm_action(pool, item_id, owner.user_id)
     except service.ActionError as exc:
         code = status.HTTP_409_CONFLICT if exc.conflict else status.HTTP_404_NOT_FOUND
         raise HTTPException(code, str(exc)) from exc
+    await _label(pool, item_id, "owner_accept", "right")
+    return item
 
 
 @router.post("/inbox/{item_id}/decline")
 async def decline_inbox_action(item_id: IdPath, pool: Pool, _owner: Owner) -> InboxItem:
     try:
-        return await service.decline_action(pool, item_id)
+        item = await service.decline_action(pool, item_id)
     except service.ActionError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    await _label(pool, item_id, "owner_review", "wrong")
+    return item
+
+
+async def _label(pool: Pool, item_id: int, source: labels.Source, label: labels.Label) -> None:
+    """What the owner said about an agent's inbox item is a label on that agent's work."""
+    await labels.record(
+        pool,
+        source=source,
+        subject_kind="inbox_item",
+        subject_ref=str(item_id),
+        label=label,
+        by_owner=True,
+    )
 
 
 @router.post("/inbox/{item_id}/note/accept")

@@ -96,6 +96,7 @@ from steward.portfolio.transactions import (
 from steward.portfolio.validation import ModelValidation, model_validation
 from steward.settings import get_settings
 from steward.storage import EvidenceStore, StorageError, SupabaseStorage, verify_blob
+from steward.training import labels
 
 router = APIRouter()
 
@@ -751,6 +752,19 @@ async def review_fact(
         code = status.HTTP_404_NOT_FOUND if exc.not_found else status.HTTP_409_CONFLICT
         raise HTTPException(code, str(exc)) from exc
     job = await _enqueue(pool, "thesis_verdicts", owner.user_id, {"ticker": outcome.ticker})
+    # The owner's decision on an extracted fact is a label on the extraction.
+    await labels.record(
+        pool,
+        source="owner_accept" if body.action == "accept" else "owner_review",
+        subject_kind="fact",
+        subject_ref=str(fact_id),
+        label={"accept": "right", "correct": "corrected", "reject": "wrong"}[body.action],  # type: ignore[arg-type]
+        by_owner=True,
+        detail={
+            "reason": body.reason,
+            **({"value": str(body.value)} if body.value is not None else {}),
+        },
+    )
     return FactReviewResult(
         fact_id=fact_id,
         status="verified" if outcome.status == "verified" else "rejected",

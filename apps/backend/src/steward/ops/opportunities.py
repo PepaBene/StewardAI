@@ -10,9 +10,11 @@ The screen runner lives in the API layer (`api.discover_routes`), which is impor
 the step runs.
 """
 
+import datetime as dt
 import json
 import logging
 from collections.abc import Awaitable, Callable
+from decimal import Decimal
 from typing import Any
 
 import asyncpg
@@ -39,6 +41,91 @@ async def api_runner(
     return [r.key for r in result.rows], {r.key: r.name or r.key for r in result.rows}
 
 
+# (owner id, saved definition) -> one line saying how the screen did in the past
+Backtester = Callable[[asyncpg.Pool, Any, dict[str, Any]], Awaitable[str]]
+BACKTEST_YEARS = 3
+
+
+def backtest_line(
+    net: Decimal | None,
+    drag: Decimal | None,
+    benchmark: Decimal | None,
+    rebalances: int,
+    warnings: list[str],
+) -> str:
+    """One plain sentence about a screen's past, or why there is none."""
+    if net is None or rebalances < 2:
+        why = warnings[0] if warnings else "too little price history"
+        return f"Not backtested: {why}."
+    parts = [f"{float(net):+.0%} after costs"]
+    if drag is not None:
+        parts.append(f"costs took {float(drag):.1%}")
+    if benchmark is not None:
+        parts.append(f"benchmark {float(benchmark):+.0%}")
+    return (
+        f"Backtest of this screen over {rebalances} yearly rebalances (equal weight, point in "
+        f"time, 10 bps cost): {', '.join(parts)}. A description of the past, not a forecast."
+    )
+
+
+async def api_backtester(pool: asyncpg.Pool, owner_id: Any, definition: dict[str, Any]) -> str:
+    from types import SimpleNamespace
+
+    from api.discover_routes import BacktestRequest, backtest_screen
+
+    today = dt.date.today()
+    request = BacktestRequest.model_validate(
+        {
+            "filters": definition.get("filters", []),
+            "sort_by": definition.get("sort_by"),
+            "descending": definition.get("descending"),
+            "missing": definition.get("missing", "exclude"),
+            "start": today - dt.timedelta(days=365 * BACKTEST_YEARS),
+            "end": today,
+            "frequency": "annual",
+            "max_names": 10,
+            "cost_bps": 10,
+        }
+    )
+    result = await backtest_screen(request, pool, SimpleNamespace(user_id=owner_id))  # type: ignore[arg-type]
+    return backtest_line(
+        result.cumulative_net,
+        result.cost_drag,
+        result.benchmark_cumulative,
+        len(result.periods),
+        result.warnings,
+    )
+
+
+async def backtest_once_a_month(
+    pool: asyncpg.Pool,
+    owner_id: Any,
+    screen_id: int,
+    definition: dict[str, Any],
+    backtest: Backtester,
+    now: dt.datetime,
+) -> str:
+    """The screen's backtest line, computed at most once a month per screen."""
+    key = f"opportunity_backtest:{screen_id}"
+    month = now.strftime("%Y-%m")
+    raw = await pool.fetchval("select value from public.sync_state where key = $1", key)
+    stored = json.loads(raw) if isinstance(raw, str) else raw or {}
+    if stored.get("month") == month and isinstance(stored.get("text"), str):
+        return str(stored["text"])
+    try:
+        text = await backtest(pool, owner_id, definition)
+    except Exception as exc:  # a screen that cannot run over history is reported, not fatal
+        text = f"Not backtested: {type(exc).__name__}."
+        logger.warning("backtest of screen %s failed: %s", screen_id, exc)
+    await pool.execute(
+        "insert into public.sync_state (key, value) values ($1, $2::jsonb)"
+        " on conflict (key) do update set value = excluded.value",
+        key,
+        json.dumps({"month": month, "text": text}),
+    )
+    return text
+
+
 def new_matches(now: list[str], before: list[str] | None, held: set[str]) -> list[str]:
     """Tickers to announce: matched now, not at the last look, not held. The first look
     (`before` is None) announces nothing."""
@@ -57,7 +144,11 @@ def describe(screen: str, found: list[str], names: dict[str, str]) -> tuple[str,
 
 
 async def check_opportunities(
-    pool: asyncpg.Pool, owner_id: Any, run: Runner = api_runner
+    pool: asyncpg.Pool,
+    owner_id: Any,
+    run: Runner = api_runner,
+    backtest: Backtester | None = api_backtester,
+    now: dt.datetime | None = None,
 ) -> dict[str, Any]:
     screens = await pool.fetch(
         "select s.id, s.name, v.definition from public.screen_definition s"
@@ -85,6 +176,16 @@ async def check_opportunities(
         found = new_matches(matched, before, held)
         if found:
             title, detail = describe(s["name"], found, names)
+            if backtest is not None:
+                past = await backtest_once_a_month(
+                    pool,
+                    owner_id,
+                    s["id"],
+                    definition,
+                    backtest,
+                    now or dt.datetime.now(dt.UTC),
+                )
+                detail = f"{detail} {past}"
             await tasks.see(
                 pool,
                 KIND,

@@ -43,6 +43,9 @@ PRAGUE = ZoneInfo("Europe/Prague")
 
 
 async def _recent_change(pool: asyncpg.Pool, target: str, now: dt.datetime) -> bool:
+    """True while the field is cooling down after a change, or is blocked after two roll-backs."""
+    if await config_change.blocked(pool, target, now):
+        return True
     return bool(
         await pool.fetchval(
             "select exists (select 1 from public.engine_change where target = $1"
@@ -273,6 +276,139 @@ async def tune_schedule(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, Any]:
     return {"schedule": settled.status, "hours": target}
 
 
+# ------------------------------------------------------------------------------- daily times
+# A job that runs once a day should have finished before the owner's first visit. Config name ->
+# job type; the digest may not move before the first news ingest of the day.
+DAILY_JOBS = {"portfolio_sync": "portfolio_sync", "daily_digest": "daily_digest"}
+DAILY_EARLIEST = 6 * 60 + 30  # minutes after midnight, Prague
+DAILY_DAYS = 21
+DAILY_MIN_DAYS = 8
+DAILY_LEAD = 45  # minutes the job should be done before the median first visit
+DAILY_MIN_SHIFT = 15
+DAILY_GATES = Gates(
+    min_n=DAILY_MIN_DAYS,
+    min_reviewed=DAILY_MIN_DAYS,
+    max_wrong_rate_increase=-0.1,  # at least a tenth of the days must stop being late
+    max_cost_increase=1.0,
+    max_escalation_drop=1.0,
+    require_golden=False,
+)
+_DAILY = re.compile(r"^(\d{1,2}) (\d{1,2}) (\* \* (?:\*|[0-6](?:-[0-6])?))$")
+
+
+def parse_daily(cron: str) -> tuple[int, str] | None:
+    """(minute of day, the day-of-month/month/weekday part) of a once-a-day cron, else None."""
+    m = _DAILY.match(cron.strip())
+    if m is None or int(m.group(1)) > 59 or int(m.group(2)) > 23:
+        return None
+    return int(m.group(2)) * 60 + int(m.group(1)), m.group(3)
+
+
+def daily_cron(minute_of_day: int, tail: str) -> str:
+    return f"{minute_of_day % 60} {minute_of_day // 60} {tail}"
+
+
+def median_of(values: list[int]) -> float:
+    ordered = sorted(values)
+    half = len(ordered) // 2
+    return float(ordered[half]) if len(ordered) % 2 else (ordered[half - 1] + ordered[half]) / 2
+
+
+def better_minute(first_opens: list[int], duration: int, current: int) -> int | None:
+    """When to start so the job is done `DAILY_LEAD` minutes before the median first visit; None
+    when that is not at least `DAILY_MIN_SHIFT` minutes earlier than now."""
+    target = int(median_of(first_opens)) - DAILY_LEAD - duration
+    target = max(DAILY_EARLIEST, target - target % 5)
+    return target if target <= current - DAILY_MIN_SHIFT else None
+
+
+def late_days(first_opens: dict[dt.date, int], finishes: dict[dt.date, int]) -> int:
+    """Days on which the job finished after the owner's first visit."""
+    return sum(1 for d, opened in first_opens.items() if d in finishes and finishes[d] > opened)
+
+
+def _minute(ts: dt.datetime) -> int:
+    local = ts.astimezone(PRAGUE)
+    return local.hour * 60 + local.minute
+
+
+async def tune_daily_times(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, Any]:
+    """Move a daily job earlier when it keeps finishing after the owner has already looked."""
+    since = now - dt.timedelta(days=DAILY_DAYS)
+    opens: dict[dt.date, int] = {}
+    for r in await pool.fetch(
+        "select occurred_at from public.usage_event where occurred_at >= $1 order by occurred_at",
+        since,
+    ):
+        local = r["occurred_at"].astimezone(PRAGUE)
+        opens.setdefault(local.date(), local.hour * 60 + local.minute)
+    if len(opens) < DAILY_MIN_DAYS:
+        return {"daily": f"only {len(opens)} days of use to go on"}
+    for name, job_type in DAILY_JOBS.items():
+        edit = config_change.Edit("jobs", f"{name}.cron")
+        if await _recent_change(pool, edit.target, now):
+            continue
+        current = str(await config_change.current(pool, edit))
+        parsed = parse_daily(current)
+        if parsed is None:
+            continue
+        minute, tail = parsed
+        finishes: dict[dt.date, int] = {}
+        durations: list[int] = []
+        for r in await pool.fetch(
+            "select started_at, finished_at from public.job where job_type = $1"
+            " and status = 'succeeded' and finished_at >= $2 and started_at is not null"
+            " order by finished_at",
+            job_type,
+            since,
+        ):
+            day = r["finished_at"].astimezone(PRAGUE).date()
+            finishes.setdefault(day, _minute(r["finished_at"]))
+            durations.append(
+                max(1, round((r["finished_at"] - r["started_at"]).total_seconds() / 60))
+            )
+        days = [d for d in opens if d in finishes]
+        if len(days) < DAILY_MIN_DAYS:
+            continue
+        new_minute = better_minute([opens[d] for d in days], int(median_of(durations)), minute)
+        if new_minute is None:
+            continue
+        shift = minute - new_minute
+        # What the finish times would have been had the job started `shift` minutes earlier.
+        moved = {d: finishes[d] - shift for d in days}
+        before = late_days({d: opens[d] for d in days}, finishes)
+        after = late_days({d: opens[d] for d in days}, moved)
+        c = await config_change.propose(
+            pool,
+            "schedule",
+            edit,
+            daily_cron(new_minute, tail),
+            f"Run {name.replace('_', ' ')} at {new_minute // 60:02d}:{new_minute % 60:02d} instead "
+            f"of {minute // 60:02d}:{minute % 60:02d}: it finished after your first visit on "
+            f"{before} of {len(days)} days",
+            "days on which the job finished before your first visit",
+            DAILY_GATES,
+        )
+        await change.record_results(
+            pool,
+            c.id,
+            Metrics(len(days), len(days), before, 0, 0, 0.0),
+            Metrics(len(days), len(days), after, 0, 0, 0.0),
+        )
+        settled = await config_change.promote(pool, c, golden_passed=None)
+        if settled.status == "promoted":
+            await _tell(
+                pool,
+                settled,
+                f"{name.replace('_', ' ').capitalize()} now runs earlier",
+                f"{settled.hypothesis}. It is rolled back by itself if runs start failing; you "
+                "can also undo it from the engine ledger.",
+                "/engine-ledger",
+            )
+        return {"daily": name, "status": settled.status}
+    return {"daily": None}
+
+
 # -------------------------------------------------------------------------------------- models
 
 MODEL_FIELDS: dict[str, tuple[str, ...]] = {
@@ -450,7 +586,11 @@ async def check_rollbacks(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int
     for rec in rows:
         c = change.from_row(rec)
         edit = config_change.parse_target(c.target)
-        jobs = (NEWS_JOB,) if c.change_kind == "schedule" else MODEL_FIELDS.get(edit.path, ())
+        jobs = (
+            (edit.path.split(".")[0],)
+            if c.change_kind == "schedule"
+            else MODEL_FIELDS.get(edit.path, ())
+        )
         if not jobs:
             continue
         decided = rec["decided_at"]

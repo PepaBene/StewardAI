@@ -2979,7 +2979,7 @@ export interface paths {
         /**
          * Post News Feedback
          * @description Mark an item, story, claim or brief line (wrong entity, duplicate, misread, missing
-         *     source, useful, not useful). Feedback feeds the benchmark, never model training.
+         *     source, useful, not useful). Feedback feeds the benchmark and is kept as a training label.
          */
         post: operations["post_news_feedback"];
         delete?: never;
@@ -4527,6 +4527,26 @@ export interface paths {
          * @description Change that bar. Only you can; the engine cannot propose a change to it.
          */
         put: operations["put_gates"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/engine/training": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Training
+         * @description What is being collected for fine-tuning: recorded AI calls and labels, by kind.
+         */
+        get: operations["get_training"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -12674,6 +12694,15 @@ export interface components {
              * @description Annualised, the same weeks.
              */
             realised_volatility: number | null;
+        };
+        /** CallCount */
+        CallCount: {
+            /** Job Type */
+            job_type: string;
+            /** Calls */
+            calls: number;
+            /** Last 30 Days */
+            last_30_days: number;
         };
         /** Cancelled */
         Cancelled: {
@@ -24178,6 +24207,17 @@ export interface components {
              * @description Latest verdict per period, newest first.
              */
             history: components["schemas"]["VerdictOut"][];
+        };
+        /** LabelCount */
+        LabelCount: {
+            /** Subject Kind */
+            subject_kind: string;
+            /** Right */
+            right: number;
+            /** Wrong */
+            wrong: number;
+            /** Corrected */
+            corrected: number;
         };
         /** LabelIn */
         LabelIn: {
@@ -38488,15 +38528,38 @@ export interface components {
             enabled: boolean;
             /**
              * Exclude Job Types
-             * @description Job types whose calls are not recorded. Chat is left out until you opt in.
+             * @description Job types whose calls are not recorded. Empty: every job type is recorded, chat included.
              */
             exclude_job_types?: string[];
+            /**
+             * Max Storage Mb
+             * @description Stop recording when the stored calls take this much space; nothing already recorded is deleted.
+             * @default 150
+             */
+            max_storage_mb: number;
             /**
              * Max Chars
              * @description Longest prompt or answer text kept per call; the rest is cut.
              * @default 60000
              */
             max_chars: number;
+        };
+        /** TrainingSummary */
+        TrainingSummary: {
+            /** Calls */
+            calls: number;
+            /** Last 30 Days */
+            last_30_days: number;
+            /** Size Mb */
+            size_mb: number;
+            /** By Job Type */
+            by_job_type: components["schemas"]["CallCount"][];
+            /** Labels */
+            labels: number;
+            /** Owner Labels */
+            owner_labels: number;
+            /** By Subject */
+            by_subject: components["schemas"]["LabelCount"][];
         };
         /** TransactionFeeOut */
         TransactionFeeOut: {
@@ -47980,6 +48043,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_training: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainingSummary"];
                 };
             };
         };

@@ -14,8 +14,12 @@ KIND = "data_audit"  # engine.data_audit.KIND
 FEATURES_BY_PREFIX: dict[str, tuple[str, ...]] = {
     "price": ("company", "performance", "risk"),
     "jump": ("company", "performance", "risk"),
+    "stale": ("company", "performance", "risk"),
+    "portfolio": ("performance", "risk", "xray", "journal"),
     "fund": ("funds", "xray"),
     "macro": ("macro",),
+    "statement": ("company",),
+    "graph": ("ownership",),
 }
 
 

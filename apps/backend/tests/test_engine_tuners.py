@@ -125,6 +125,29 @@ async def test_a_promoted_rule_change_is_a_config_version_and_its_undo_restores_
 
 
 @pytest.mark.db
+async def test_a_field_whose_changes_were_rolled_back_twice_is_left_to_the_owner(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    await seed_rules(backend_pool)
+    edit = config_change.Edit("event_rules", "severities.m_and_a")
+    gates = Gates(min_n=1, min_reviewed=1, require_golden=False)
+    assert not await config_change.blocked(backend_pool, edit.target, NOW)
+    for _ in range(2):
+        before = await config_change.current(backend_pool, edit)
+        c = await config_change.propose(backend_pool, "rule", edit, before - 1, "h", "m", gates)
+        await change.record_results(
+            backend_pool, c.id, Metrics(5, 5, 4, 0, 0, 0.0), Metrics(5, 5, 1, 0, 0, 0.0)
+        )
+        settled = await config_change.promote(backend_pool, c, golden_passed=None)
+        assert await config_change.undo(backend_pool, settled, ["worse"])
+        if _ == 0:
+            assert not await config_change.blocked(
+                backend_pool, edit.target, NOW + dt.timedelta(days=1)
+            )
+    assert await config_change.blocked(backend_pool, edit.target, dt.datetime.now(dt.UTC))
+
+
+@pytest.mark.db
 async def test_an_undo_leaves_a_value_the_owner_changed_since(backend_pool: asyncpg.Pool) -> None:
     await seed_rules(backend_pool)
     edit = config_change.Edit("event_rules", "severities.m_and_a")
@@ -288,3 +311,26 @@ async def test_a_feed_nobody_used_is_switched_off_and_one_that_was_used_is_kept(
     }
     # Nothing more to switch off, and the cooldown keeps the same feed from being touched again.
     assert (await tuners.tune_sources(backend_pool, NOW))["switched_off"] is None
+
+
+def test_a_daily_cron_is_read_and_written_back_and_other_shapes_are_left_alone() -> None:
+    assert tuners.parse_daily("30 7 * * *") == (450, "* * *")
+    assert tuners.parse_daily("0 6 * * 1-5") == (360, "* * 1-5")
+    assert tuners.parse_daily("*/15 * * * *") is None
+    assert tuners.parse_daily("0 6,18 * * *") is None
+    assert tuners.daily_cron(405, "* * 1-5") == "45 6 * * 1-5"
+
+
+def test_the_daily_job_moves_only_when_it_is_well_after_the_wanted_time() -> None:
+    # Owner opens at 07:00; a 10 minute job should start by 06:05, but never before 06:30.
+    assert tuners.better_minute([420] * 9, 10, 480) == 390
+    assert tuners.better_minute([420] * 9, 10, 400) is None  # less than 15 minutes to gain
+    assert tuners.better_minute([420] * 9, 10, 390) is None  # already at the floor
+    assert tuners.better_minute([600] * 9, 10, 700) == 545  # 10:00 - 45 - 10 = 09:05
+
+
+def test_days_the_job_finished_after_the_first_visit_are_counted() -> None:
+    d1, d2, d3 = (dt.date(2026, 10, n) for n in (1, 2, 3))
+    opens = {d1: 420, d2: 420, d3: 420}
+    assert tuners.late_days(opens, {d1: 430, d2: 400, d3: 421}) == 2
+    assert tuners.late_days(opens, {d1: 370, d2: 340, d3: 361}) == 0

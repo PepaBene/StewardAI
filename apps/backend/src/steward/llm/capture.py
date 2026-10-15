@@ -102,6 +102,23 @@ async def settings(pool: asyncpg.Pool) -> Any:
 
 def reset_cache() -> None:
     _cache.update(at=0.0, value=None)
+    _size.update(at=-STORAGE_TTL, bytes=0.0)
+
+
+STORAGE_TTL = 600.0  # seconds a measurement of the table's size is reused
+_size: dict[str, float] = {"at": -STORAGE_TTL, "bytes": 0.0}
+
+
+async def has_room(pool: asyncpg.Pool, max_mb: int) -> bool:
+    """False once the stored calls take `max_mb`: the database is small, so capture stops at the
+    cap instead of filling it."""
+    now = time.monotonic()
+    if now - _size["at"] >= STORAGE_TTL:
+        _size.update(
+            at=now,
+            bytes=float(await pool.fetchval("select pg_total_relation_size('public.llm_call')")),
+        )
+    return _size["bytes"] < max_mb * 1024 * 1024
 
 
 async def record(
@@ -111,6 +128,8 @@ async def record(
     try:
         conf = await settings(pool)
         if not conf.enabled or job_type in conf.exclude_job_types:
+            return
+        if not await has_room(pool, conf.max_storage_mb):
             return
         usage = done.usage
         await pool.execute(

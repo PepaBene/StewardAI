@@ -345,9 +345,17 @@ class TrainingCaptureSettings(ConfigModel):
         default=True, description="Record each AI call. Off: nothing further is recorded."
     )
     exclude_job_types: list[str] = Field(
-        default_factory=lambda: ["chat"],
+        default_factory=list,
         max_length=100,
-        description="Job types whose calls are not recorded. Chat is left out until you opt in.",
+        description="Job types whose calls are not recorded. Empty: every job type is recorded, "
+        "chat included.",
+    )
+    max_storage_mb: int = Field(
+        default=150,
+        ge=10,
+        le=20000,
+        description="Stop recording when the stored calls take this much space; nothing already "
+        "recorded is deleted.",
     )
     max_chars: int = Field(
         default=60000,

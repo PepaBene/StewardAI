@@ -39,6 +39,73 @@ def test_a_digest_is_flagged_only_when_enough_sentences_are_unbacked() -> None:
     assert audit.digest_problem(1, "Daily", 5, 3, 0) is not None
 
 
+def test_portfolio_totals_must_add_up_and_the_sync_must_be_recent() -> None:
+    today = dt.date(2026, 10, 14)
+    fine = audit.portfolio_problems(today, 1000.0, 1004.0, 96.0, 1100.0, 0, today)
+    assert fine == []
+    wrong_sum = audit.portfolio_problems(today, 800.0, 1000.0, 100.0, 1100.0, 0, today)
+    assert [f.subject.split(":")[1] for f in wrong_sum] == ["positions"]
+    wrong_total = audit.portfolio_problems(today, 1000.0, 1000.0, 100.0, 1500.0, 0, today)
+    assert [f.subject.split(":")[1] for f in wrong_total] == ["total"]
+    bad = audit.portfolio_problems(today, 1000.0, 1000.0, 100.0, 1100.0, 2, today)
+    assert [f.subject.split(":")[1] for f in bad] == ["rows"]
+    old = audit.portfolio_problems(
+        today, 1000.0, 1000.0, 100.0, 1100.0, 0, today + dt.timedelta(days=5)
+    )
+    assert [f.subject for f in old] == ["portfolio:stale"]
+
+
+def test_alerts_that_fail_or_stay_unsent_are_reported() -> None:
+    assert audit.undelivered_problem("telegram", 0, 0) is None
+    one = audit.undelivered_problem("telegram", 2, 0)
+    assert one is not None and "2 failed" in one.detail
+    two = audit.undelivered_problem("email", 0, 3)
+    assert two is not None and "3 are still waiting" in two.detail
+
+
+def test_a_balance_sheet_must_balance_and_a_big_restatement_is_reported() -> None:
+    day = dt.date(2026, 6, 30)
+    assert audit.statement_problem("AAA", day, 1000.0, 1002.0) is None
+    off = audit.statement_problem("AAA", day, 1000.0, 1100.0)
+    assert off is not None and off.subject == "statement:balance:AAA:2026-06-30"
+    assert audit.restatement_problem("AAA", "us-gaap:Revenues", day, 100.0, 102.0) is None
+    moved = audit.restatement_problem("AAA", "us-gaap:Revenues", day, 100.0, 120.0)
+    assert moved is not None and "Revenues" in moved.title
+
+
+def test_chat_gaps_are_reported_only_when_there_are_several() -> None:
+    assert audit.chat_gap_problem(["a", "b"]) is None
+    found = audit.chat_gap_problem(["What is X?", "Why Y?", "Z?"])
+    assert found is not None and found.subject == "chat:gaps" and "3 chat questions" in found.title
+
+
+async def test_graph_links_to_self_or_both_partner_and_competitor_are_flagged(
+    migrated_db: MigratedDatabase, backend_pool: asyncpg.Pool
+) -> None:
+    admin = await asyncpg.connect(migrated_db.admin_url)
+
+    async def edge(subject: str, obj: str, kind: str, url: str) -> None:
+        await admin.execute(
+            "insert into public.company_graph_edge (subject_key, object_key, object_name,"
+            " edge_type, direction, status, evidence_tier, source, source_url)"
+            " values ($1, $2, $2, $3, 'outgoing', 'confirmed', 'a', 's', $4)",
+            subject,
+            obj,
+            kind,
+            url,
+        )
+
+    try:
+        await edge("AAA", "AAA", "partner", "http://x/1")
+        await edge("BBB", "CCC", "partner", "http://x/2")
+        await edge("BBB", "CCC", "competitor", "http://x/3")
+        await edge("DDD", "EEE", "partner", "http://x/4")
+        found = await audit.graph_edges(backend_pool, NOW)
+    finally:
+        await admin.close()
+    assert sorted(f.subject.split(":")[1] for f in found) == ["opposed", "self"]
+
+
 async def test_macro_values_known_before_release_or_out_of_order_or_disputed_are_flagged(
     migrated_db: MigratedDatabase, backend_pool: asyncpg.Pool
 ) -> None:
