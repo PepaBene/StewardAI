@@ -360,7 +360,11 @@ async def test_digest_claim_verifier_gets_the_override(monkeypatch: pytest.Monke
     async def fake_run(_ctx: Any, _kind: str, **kwargs: Any) -> None:
         seen.update(kwargs)
 
+    async def no_lessons(*_args: Any, **_kwargs: Any) -> str:
+        return ""
+
     monkeypatch.setattr(digest_module, "run_digest", fake_run)
+    monkeypatch.setattr(digest_module.overrides, "lessons", no_lessons)
     await digest_module._handler("daily")(SimpleNamespace(pool=None))  # type: ignore[arg-type]
     verifier = seen["claim_verifier"]
     assert verifier._system == OVERRIDE and verifier._effort == "low"

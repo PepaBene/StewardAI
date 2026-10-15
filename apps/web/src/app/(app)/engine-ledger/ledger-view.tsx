@@ -16,7 +16,7 @@ import { GatesPanel, WatchersPanel } from "./gates-panel";
 import { ScorecardPanel } from "./scorecard-panel";
 import { TrainingPanel } from "./training-panel";
 
-type Entry = components["schemas"]["Entry-Input"];
+type Entry = components["schemas"]["LedgerEntry"];
 type Sweep = components["schemas"]["SweepOut"];
 type ActionRow = components["schemas"]["ActionRow"];
 
@@ -60,6 +60,8 @@ export function LedgerView() {
 
   useEffect(() => {
     let cancelled = false;
+    // Show the loading state again whenever the page, source or reload key changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEntries(null);
     api
       .GET("/engine/ledger", {

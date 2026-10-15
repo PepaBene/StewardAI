@@ -6593,8 +6593,8 @@
         "tags": [
           "thesis"
         ],
-        "summary": "List Reviews",
-        "operationId": "list_reviews",
+        "summary": "List Thesis Reviews",
+        "operationId": "list_thesis_reviews",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -6605,7 +6605,7 @@
                     "$ref": "#/components/schemas/ReviewOut"
                   },
                   "type": "array",
-                  "title": "Response List Reviews"
+                  "title": "Response List Thesis Reviews"
                 }
               }
             }
@@ -6623,8 +6623,8 @@
         "tags": [
           "thesis"
         ],
-        "summary": "Get Review",
-        "operationId": "get_review",
+        "summary": "Get Thesis Review",
+        "operationId": "get_thesis_review",
         "security": [
           {
             "HTTPBearer": []
@@ -12563,7 +12563,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Entry-Input"
+                    "$ref": "#/components/schemas/LedgerEntry"
                   },
                   "title": "Response Engine Ledger"
                 }
@@ -51513,136 +51513,6 @@
         ],
         "title": "EntityMatchOut"
       },
-      "Entry-Input": {
-        "properties": {
-          "at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "At"
-          },
-          "source": {
-            "type": "string",
-            "title": "Source"
-          },
-          "kind": {
-            "type": "string",
-            "title": "Kind"
-          },
-          "ref": {
-            "type": "string",
-            "title": "Ref"
-          },
-          "summary": {
-            "type": "string",
-            "title": "Summary"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "undo_action": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Undo Action"
-          },
-          "undo_args": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Undo Args"
-          }
-        },
-        "type": "object",
-        "required": [
-          "at",
-          "source",
-          "kind",
-          "ref",
-          "summary",
-          "status"
-        ],
-        "title": "Entry"
-      },
-      "Entry-Output": {
-        "properties": {
-          "at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "At"
-          },
-          "source": {
-            "type": "string",
-            "title": "Source"
-          },
-          "kind": {
-            "type": "string",
-            "title": "Kind"
-          },
-          "ref": {
-            "type": "string",
-            "title": "Ref"
-          },
-          "summary": {
-            "type": "string",
-            "title": "Summary"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "undo_action": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Undo Action"
-          },
-          "undo_args": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Undo Args"
-          },
-          "reversible": {
-            "type": "boolean",
-            "title": "Reversible",
-            "readOnly": true
-          }
-        },
-        "type": "object",
-        "required": [
-          "at",
-          "source",
-          "kind",
-          "ref",
-          "summary",
-          "status",
-          "reversible"
-        ],
-        "title": "Entry"
-      },
       "Envelope": {
         "properties": {
           "source": {
@@ -72269,6 +72139,74 @@
           "message"
         ],
         "title": "LedgerCheck"
+      },
+      "LedgerEntry": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "undo_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undo Action"
+          },
+          "undo_args": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undo Args"
+          },
+          "reversible": {
+            "type": "boolean",
+            "title": "Reversible",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "source",
+          "kind",
+          "ref",
+          "summary",
+          "status",
+          "reversible"
+        ],
+        "title": "LedgerEntry"
       },
       "LedgerEntryInput": {
         "properties": {

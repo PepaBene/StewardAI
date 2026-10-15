@@ -678,17 +678,24 @@ function CalibrationPanel({ load }: { load: Load<KindCalibration[]> }) {
             {k.verdict}
           </p>
           <ReliabilityChart kind={k.kind} bins={k.bins} />
-          <table className="mt-2 w-full max-w-md text-left text-sm">
+          <table
+            aria-label="How often it was right, by how sure it said it was"
+            className="mt-2 w-full max-w-md text-left text-sm"
+          >
             <thead>
               <tr className="border-b border-border text-xs text-text-muted">
-                <th className="py-1 pr-3 font-medium">It said</th>
-                <th className="num py-1 pr-3 text-right font-medium">
+                <th scope="col" className="py-1 pr-3 font-medium">
+                  It said
+                </th>
+                <th scope="col" className="num py-1 pr-3 text-right font-medium">
                   Checked
                 </th>
-                <th className="num py-1 pr-3 text-right font-medium">
+                <th scope="col" className="num py-1 pr-3 text-right font-medium">
                   Average sure
                 </th>
-                <th className="num py-1 text-right font-medium">Was right</th>
+                <th scope="col" className="num py-1 text-right font-medium">
+                  Was right
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -742,13 +749,13 @@ function KindsPanel({ load }: { load: Load<{ days: number; kinds: KindSummary[] 
         </caption>
         <thead>
           <tr className="border-y border-border text-xs text-text-muted">
-            <th className="px-5 py-2 font-medium">Queue</th>
-            <th className="px-3 py-2 font-medium">Mode</th>
-            <th className="num px-3 py-2 text-right font-medium">Decided</th>
-            <th className="num px-3 py-2 text-right font-medium">Applied</th>
-            <th className="num px-3 py-2 text-right font-medium">Waiting</th>
-            <th className="num px-3 py-2 text-right font-medium">Undone</th>
-            <th className="px-5 py-2 font-medium">Accuracy</th>
+            <th scope="col" className="px-5 py-2 font-medium">Queue</th>
+            <th scope="col" className="px-3 py-2 font-medium">Mode</th>
+            <th scope="col" className="num px-3 py-2 text-right font-medium">Decided</th>
+            <th scope="col" className="num px-3 py-2 text-right font-medium">Applied</th>
+            <th scope="col" className="num px-3 py-2 text-right font-medium">Waiting</th>
+            <th scope="col" className="num px-3 py-2 text-right font-medium">Undone</th>
+            <th scope="col" className="px-5 py-2 font-medium">Accuracy</th>
           </tr>
         </thead>
         <tbody>

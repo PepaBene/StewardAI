@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import asyncpg
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, ConfigDict, computed_field
 
 # source -> the SQL branch. Every branch yields: at, source, kind, ref, summary, status,
 # undo_action, undo_args (both null when the owner cannot undo it from the app).
@@ -96,7 +96,10 @@ SOURCES: dict[str, str] = {
 }
 
 
-class Entry(BaseModel):
+class LedgerEntry(BaseModel):
+    # Only ever returned, so one schema (with `reversible`) serves as input and output.
+    model_config = ConfigDict(json_schema_mode_override="serialization")
+
     at: dt.datetime
     source: str
     kind: str
@@ -121,7 +124,7 @@ class Query:
     offset: int = 0
 
 
-async def recent(pool: asyncpg.Pool, q: Query) -> list[Entry]:
+async def recent(pool: asyncpg.Pool, q: Query) -> list[LedgerEntry]:
     names = [q.source] if q.source else list(SOURCES)
     unknown = [n for n in names if n not in SOURCES]
     if unknown:
@@ -140,5 +143,5 @@ async def recent(pool: asyncpg.Pool, q: Query) -> list[Entry]:
         data = dict(r)
         if isinstance(data["undo_args"], str):
             data["undo_args"] = json.loads(data["undo_args"])
-        out.append(Entry(**data))
+        out.append(LedgerEntry(**data))
     return out

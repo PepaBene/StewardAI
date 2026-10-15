@@ -42,7 +42,10 @@ export function ChatVisual({ block }: { block: VisualBlock }) {
       {hasData ? (
         <details className="mt-2 text-sm">
           <summary className="cursor-pointer text-text-muted">Show the numbers</summary>
-          <table className="mt-2 w-full border-collapse text-left tabular-nums">
+          <table
+            aria-label={block.summary}
+            className="mt-2 w-full border-collapse text-left tabular-nums"
+          >
             <thead>
               <tr>
                 {columns.map((c) => (

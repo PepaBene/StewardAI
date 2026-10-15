@@ -66,6 +66,8 @@ const PRIMARY_PAGES = [
   { href: "/thesis", label: "Thesis workup", keywords: "thesis memo executive summary buy sell trim exit portfolio review candidates gaps" },
   { href: "/reports", label: "Reports", keywords: "digest archive monthly reviews impact notes full text" },
   { href: "/activity", label: "Activity", keywords: "job log coverage gaps cost budget" },
+  { href: "/autopilot", label: "Autopilot", keywords: "needs you judged queues calibration approvals autonomy shadow decisions pause" },
+  { href: "/engine-ledger", label: "What the engine did", keywords: "engine ledger changes undo rollback scorecard triggers tuner training watchers gates" },
   { href: "/data-sources", label: "Data sources", keywords: "providers coverage quota access free api keys paid denied" },
   { href: "/ai-decisions", label: "AI decisions", keywords: "ai approved decisions listings peers investor pages web facts overturn reject summary" },
   { href: "/verification", label: "Source gates", keywords: "source gates signals coverage shadow report zero cost domain reconciliation publish audit precision" },

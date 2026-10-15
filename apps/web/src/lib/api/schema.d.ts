@@ -2313,8 +2313,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Reviews */
-        get: operations["list_reviews"];
+        /** List Thesis Reviews */
+        get: operations["list_thesis_reviews"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2330,8 +2330,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Review */
-        get: operations["get_review"];
+        /** Get Thesis Review */
+        get: operations["get_thesis_review"];
         put?: never;
         post?: never;
         delete?: never;
@@ -17178,56 +17178,6 @@ export interface components {
             /** Note */
             note: string;
         };
-        /** Entry */
-        "Entry-Input": {
-            /**
-             * At
-             * Format: date-time
-             */
-            at: string;
-            /** Source */
-            source: string;
-            /** Kind */
-            kind: string;
-            /** Ref */
-            ref: string;
-            /** Summary */
-            summary: string;
-            /** Status */
-            status: string;
-            /** Undo Action */
-            undo_action?: string | null;
-            /** Undo Args */
-            undo_args?: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /** Entry */
-        "Entry-Output": {
-            /**
-             * At
-             * Format: date-time
-             */
-            at: string;
-            /** Source */
-            source: string;
-            /** Kind */
-            kind: string;
-            /** Ref */
-            ref: string;
-            /** Summary */
-            summary: string;
-            /** Status */
-            status: string;
-            /** Undo Action */
-            undo_action?: string | null;
-            /** Undo Args */
-            undo_args?: {
-                [key: string]: unknown;
-            } | null;
-            /** Reversible */
-            readonly reversible: boolean;
-        };
         /** Envelope */
         Envelope: {
             /** Source */
@@ -24400,6 +24350,32 @@ export interface components {
             message: string;
             /** Claims */
             claims?: string[];
+        };
+        /** LedgerEntry */
+        LedgerEntry: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Source */
+            source: string;
+            /** Kind */
+            kind: string;
+            /** Ref */
+            ref: string;
+            /** Summary */
+            summary: string;
+            /** Status */
+            status: string;
+            /** Undo Action */
+            undo_action?: string | null;
+            /** Undo Args */
+            undo_args?: {
+                [key: string]: unknown;
+            } | null;
+            /** Reversible */
+            readonly reversible: boolean;
         };
         /** LedgerEntryInput */
         LedgerEntryInput: {
@@ -44477,7 +44453,7 @@ export interface operations {
             };
         };
     };
-    list_reviews: {
+    list_thesis_reviews: {
         parameters: {
             query?: never;
             header?: never;
@@ -44497,7 +44473,7 @@ export interface operations {
             };
         };
     };
-    get_review: {
+    get_thesis_review: {
         parameters: {
             query?: never;
             header?: never;
@@ -47707,7 +47683,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Entry-Input"][];
+                    "application/json": components["schemas"]["LedgerEntry"][];
                 };
             };
             /** @description Validation Error */

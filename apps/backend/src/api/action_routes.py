@@ -54,7 +54,7 @@ async def engine_ledger(
     source: Annotated[str | None, Query(max_length=40)] = None,
     kind: Annotated[str | None, Query(max_length=80)] = None,
     offset: Annotated[int, Query(ge=0, le=100_000)] = 0,
-) -> list[timeline.Entry]:
+) -> list[timeline.LedgerEntry]:
     """Everything the engine or the owner changed, newest first, from every ledger. An entry
     with `undo_action` can be undone through `/actions/propose` with `undo_args`."""
     since = dt.datetime.now(dt.UTC) - dt.timedelta(days=days)

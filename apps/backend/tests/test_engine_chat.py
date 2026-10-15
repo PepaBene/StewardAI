@@ -10,7 +10,7 @@ from steward.actions import registry
 from steward.chat import benchmark, visuals
 from steward.chat.assistant import page_note
 from steward.chat.tools import ChatTools
-from steward.engine import overrides
+from steward.engine import instructions, overrides
 from steward.research.sources import Registry
 
 NOW = dt.datetime.now(dt.UTC)
@@ -74,6 +74,13 @@ async def test_a_standing_instruction_reaches_the_prompts_until_it_is_forgotten(
     assert await overrides.standing_instructions(backend_pool) == []  # not until confirmed
 
     await registry.confirm(backend_pool, proposal.id)
+    # It is tested before use, so it waits until it passes or the owner applies it themselves.
+    assert await overrides.standing_instructions(backend_pool, "chat") == []
+    (waiting,) = await overrides.standing_instructions(backend_pool, "chat", include_waiting=True)
+    change_id = await backend_pool.fetchval(
+        "select id from public.engine_change where after->>'ref' = $1", waiting.ref
+    )
+    assert await instructions.owner_apply(backend_pool, change_id)
     (rule,) = await overrides.standing_instructions(backend_pool, "chat")
     text = await overrides.lessons(backend_pool, "chat", "proposals the chat made")
     assert "owner_standing_instructions" in text and "Friday" in text

@@ -151,7 +151,7 @@ class ReviewOut(BaseModel):
 
 
 @router.get("/thesis/reviews", tags=["thesis"])
-async def list_reviews(pool: Pool, _owner: Owner) -> list[ReviewOut]:
+async def list_thesis_reviews(pool: Pool, _owner: Owner) -> list[ReviewOut]:
     rows = await pool.fetch(
         "select id, status, summary, body, created_at, finished_at from public.portfolio_review"
         " order by id desc limit 20"
@@ -160,7 +160,7 @@ async def list_reviews(pool: Pool, _owner: Owner) -> list[ReviewOut]:
 
 
 @router.get("/thesis/reviews/{review_id}", tags=["thesis"])
-async def get_review(review_id: IdPath, pool: Pool, _owner: Owner) -> ReviewOut:
+async def get_thesis_review(review_id: IdPath, pool: Pool, _owner: Owner) -> ReviewOut:
     row = await pool.fetchrow(
         "select id, status, summary, body, created_at, finished_at from public.portfolio_review"
         " where id = $1",
