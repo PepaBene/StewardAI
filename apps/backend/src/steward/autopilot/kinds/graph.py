@@ -324,11 +324,26 @@ def _graph_apply(
             raise ApplyError("the item belongs to another holding")
         if not await _still_cited(pool, kind, row_id):
             raise ApplyError("the item has no cited passage")
+        # Rejecting a disclosure resolves the contradictions open on it; remember which, so
+        # reverting can open them again.
+        contradictions: list[int] = []
+        if kind == "graph_disclosure" and decision == "reject":
+            contradictions = [
+                r["id"]
+                for r in await pool.fetch(
+                    "select id from public.relationship_contradiction where status='open'"
+                    " and (disclosure_id=$1 or other_disclosure_id=$1)",
+                    row_id,
+                )
+            ]
         try:
             await spec.decide(pool, row_id, decision, reason)
         except GraphDecisionError as exc:
             raise ApplyError(str(exc)) from exc
-        return {"id": row_id, "kind": kind, "decision": decision}
+        payload: dict[str, Any] = {"id": row_id, "kind": kind, "decision": decision}
+        if contradictions:
+            payload["contradictions"] = contradictions
+        return payload
 
     return apply
 
@@ -371,6 +386,12 @@ def _graph_revert() -> Callable[[asyncpg.Pool, dict[str, Any]], Awaitable[None]]
             await spec.decide(pool, row_id, decision, "Autopilot revert: the owner overruled it")
         except GraphDecisionError as exc:
             raise ApplyError(str(exc)) from exc
+        if payload.get("contradictions"):
+            await pool.execute(
+                "update public.relationship_contradiction set status='open', resolution=null,"
+                " resolved_at=null where id = any($1::bigint[]) and status='resolved'",
+                [int(i) for i in payload["contradictions"]],
+            )
 
     return revert
 
@@ -864,12 +885,24 @@ async def _relationship_revert(pool: asyncpg.Pool, payload: dict[str, Any]) -> N
         )
         if row is None or row["status"] != applied or row["decided_by"] is not None:
             raise ApplyError("the relationship was changed since; leave it to the owner")
-        await conn.execute(
+        if applied == "rejected":
+            # The rejection was written to the shared store, which forces the row back to
+            # rejected; lift it as reopening an edge does.
+            await conn.execute(
+                "delete from public.graph_rejection g using public.entity_relationship r"
+                " where r.id=$1 and g.subject_key=r.ticker"
+                " and g.object_key_norm=public.graph_norm_object_key(r.object_key)"
+                " and g.edge_type=public.graph_canon_edge_type(r.type)",
+                rel_id,
+            )
+        status = await conn.fetchval(
             "update public.entity_relationship set status='suggested', decided_at=null,"
-            " decided_by=null, sources=$2::text[] where id=$1",
+            " decided_by=null, sources=$2::text[] where id=$1 returning status",
             rel_id,
             payload["sources"],
         )
+        if status != "suggested":
+            raise ApplyError("the relationship could not be reopened; leave it to the owner")
         profile = payload.get("profile")
         if profile:
             stored = await load_active(conn, "holding_profiles", HoldingProfilesConfig)

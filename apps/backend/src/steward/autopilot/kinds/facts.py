@@ -301,7 +301,8 @@ async def _gather(
         " and basis = $3 and fiscal_year = $4 and fiscal_period = $5 and id <> $6"
         " and id is distinct from $7 and origin = 'extraction' and status in ('verified',"
         " 'unverified') and restates_fact_id is distinct from $6 and evidence_sha256 <> $8"
-        " and unit = $9 and currency is not distinct from $10 order by id limit 6",
+        " and unit = $9 and currency is not distinct from $10"
+        " and coalesce(status_reason, '') not like 'autopilot correction:%' order by id limit 6",
         held["ticker"],
         held["metric"],
         held["basis"],
@@ -421,7 +422,7 @@ async def fact_apply(
         raise ApplyError(f"{decision} is not something to apply")
     try:
         outcome = await review_fact(
-            pool, fact_id, action, note[:500], owner_id=None, corrected_value=value
+            pool, fact_id, action, note[:500], owner_id=None, corrected_value=value, by="autopilot"
         )
     except ReviewError as exc:
         raise ApplyError(str(exc)) from exc
@@ -532,8 +533,16 @@ async def fact_verify(pool: asyncpg.Pool, cand: Candidate, decision: str) -> lis
                 break
     elif decision.startswith("correct_"):
         key = decision.removeprefix("correct_")
-        if not any(o.get("key") == key for o in cand.evidence.get("opinions", [])):
+        option = next((o for o in cand.evidence.get("opinions", []) if o.get("key") == key), None)
+        if option is None:
             found.append(f"no competing value named {key}")
+        elif option.get("source") != "xbrl":
+            # The value comes from another stored fact: read its status now, not as judged.
+            source_status = await pool.fetchval(
+                "select status from public.fact where id = $1", option["ref"]["fact_id"]
+            )
+            if source_status != "verified":
+                found.append(f"the fact holding the competing value is {source_status or 'gone'}")
     return found
 
 
@@ -545,12 +554,17 @@ async def fact_recheck(pool: asyncpg.Pool, row: ledger.AutoDecision) -> list[str
     if status is None:
         return ["the fact no longer exists"]
     found = []
-    if row.decision == "accept" and status != "verified":
+    # Accepting leaves the fact verified; rejecting or correcting it leaves it rejected.
+    expected = "verified" if row.decision == "accept" else "rejected"
+    if status != expected:
         found.append(f"the fact is now {status}")
+    # A correction the decision itself created restates the held fact: that is not a new filing.
+    own_correction = (row.revert_payload or {}).get("corrected_fact_id")
     if await pool.fetchval(
         "select exists (select 1 from public.fact where restates_fact_id = $1"
-        " and status in ('verified', 'unverified'))",
+        " and status in ('verified', 'unverified') and id is distinct from $2)",
         fact_id,
+        own_correction,
     ):
         found.append("a later filing restated it")
     return found

@@ -311,15 +311,25 @@ async def test_disclosure_guard_refuses_and_reject_reverts(backend_pool: asyncpg
     assert await pool.fetchval("select status from relationship_disclosure where id=$1", vague) == (
         "suggested"
     )
+    contradiction = await pool.fetchval(
+        "insert into relationship_contradiction (ticker, relationship, kind, disclosure_id,"
+        " other_disclosure_id) values ($1, 'customer', 'direction_conflict', $2, $3) returning id",
+        TICKER,
+        complete,
+        vague,
+    )
     payload = await graph.graph_disclosure.apply(
         pool, cands[f"graph_disclosure:{complete}"], "reject", NOTE
     )
     assert payload is not None and graph.graph_disclosure.revert is not None
+    status = "select status from relationship_contradiction where id=$1"
+    assert await pool.fetchval(status, contradiction) == "resolved"
     await graph.graph_disclosure.revert(pool, payload)
     assert (
         await pool.fetchval("select status from relationship_disclosure where id=$1", complete)
         == "suggested"
     )
+    assert await pool.fetchval(status, contradiction) == "open"  # the reject's side effect undone
 
 
 async def suggestion(pool: asyncpg.Pool, type_: str, name: str, ref: str | None) -> int:
@@ -382,6 +392,23 @@ async def test_relationship_confirm_writes_one_profile_version_and_reverts_it(
     )
     with pytest.raises(ApplyError):  # already reverted
         await graph.relationship.revert(pool, payload)
+
+
+@pytest.mark.db
+async def test_relationship_reject_is_reopened_by_revert(backend_pool: asyncpg.Pool) -> None:
+    pool = backend_pool
+    rel_id = await suggestion(pool, "competitor", "Rival Corp", "https://wikidata.example/Q1")
+    cand = next(c for c in await graph.relationship.load(pool, 50))
+    payload = await graph.relationship.apply(pool, cand, "reject", NOTE)
+    assert payload is not None and graph.relationship.revert is not None
+    assert await pool.fetchval("select count(*) from graph_rejection") == 1
+
+    await graph.relationship.revert(pool, payload)
+    row = await pool.fetchrow(
+        "select status, decided_at from entity_relationship where id=$1", rel_id
+    )
+    assert row["status"] == "suggested" and row["decided_at"] is None
+    assert await pool.fetchval("select count(*) from graph_rejection") == 0
 
 
 @pytest.mark.db

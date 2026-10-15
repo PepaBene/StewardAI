@@ -109,10 +109,13 @@ async def load(pool: asyncpg.Pool, kind: str, now: dt.datetime) -> Load:
         kind,
         day,
     )
+    # Only jobs this table started: other event-triggered jobs (news escalation, watchdog retries,
+    # fact refreshes) have their own budgets and must not use up the engine's day.
     usd = await pool.fetchval(
-        "select coalesce(sum(s.cost_usd), 0) from public.job_step s join public.job j"
-        " on j.id = s.job_id where j.trigger = 'event' and s.cost_usd is not null"
-        " and s.started_at >= $1",
+        "select coalesce(sum(s.cost_usd), 0) from public.job_step s"
+        " where s.cost_usd is not null and s.started_at >= $1 and s.job_id in ("
+        "  select t.job_id from public.engine_trigger t"
+        "  where t.status = 'fired' and t.job_id is not null)",
         day,
     )
     stored = await load_active(pool, "budget", BudgetConfig)

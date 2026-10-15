@@ -1,6 +1,7 @@
 """Learning from wrong decisions: the lessons block, the learned floor, and its storage."""
 
 import datetime as dt
+import struct
 
 import asyncpg
 import pytest
@@ -19,6 +20,12 @@ def test_floor_rises_only_after_repeated_confident_mistakes() -> None:
     assert lessons.learned_floor([0.95, 0.93], 0.9) == 0.96
     assert lessons.learned_floor([0.995, 0.99], 0.9) == 0.99  # capped
     assert lessons.learned_floor([], 0.9) is None
+
+
+def test_a_wrong_answer_exactly_at_the_floor_counts_despite_float4_storage() -> None:
+    stored = float(struct.unpack("f", struct.pack("f", 0.9))[0])  # 0.8999999762
+    assert stored < 0.9
+    assert lessons.learned_floor([stored, stored], 0.9) == 0.91
 
 
 def test_lessons_are_data_and_name_the_owners_choice() -> None:
@@ -80,3 +87,63 @@ async def test_wrong_decisions_set_and_clear_the_floor(backend_pool: asyncpg.Poo
     later = dt.datetime.now(dt.UTC) + dt.timedelta(days=lessons.LOOKBACK_DAYS + 1)
     assert await lessons.relearn(backend_pool, kinds, {"fact": 0.9}, later) == {}
     assert await ledger.learned_thresholds(backend_pool) == {}
+
+
+@pytest.mark.db
+async def test_the_highest_floor_can_be_stored(backend_pool: asyncpg.Pool) -> None:
+    await ledger.set_learned(backend_pool, "fact", 0.99, 2, "two wrong")
+    assert await ledger.learned_thresholds(backend_pool) == {"fact": 0.99}
+
+
+async def _put(pool: asyncpg.Pool, ref: str, status: str, by: str = "model:m") -> int:
+    return await ledger.record(
+        pool,
+        kind="fact",
+        subject_ref=ref,
+        ticker=None,
+        decision="accept",
+        confidence=0.9,
+        decided_by=by,
+        summary="s",
+        evidence={"prompt": ref},
+        status=status,  # type: ignore[arg-type]
+    )
+
+
+@pytest.mark.db
+async def test_re_escalating_keeps_the_expiry_clock_but_resets_the_rejudge_clock(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    row_id = await _put(backend_pool, "fact:1", "escalated")
+    old = dt.datetime.now(dt.UTC) - dt.timedelta(days=10)
+    await backend_pool.execute(
+        "update public.auto_decision set decided_at = $2, last_judged_at = $2 where id = $1",
+        row_id,
+        old,
+    )
+    week = dt.datetime.now(dt.UTC) - dt.timedelta(days=7)
+    assert await ledger.decided_refs(backend_pool, "fact", ("escalated",), week) == set()
+    assert await _put(backend_pool, "fact:1", "escalated") == row_id
+    (row,) = await ledger.escalations(backend_pool)
+    assert row.decided_at == old  # the expiry rule still sees the first escalation
+    assert await ledger.decided_refs(backend_pool, "fact", ("escalated",), week) == {"fact:1"}
+
+
+@pytest.mark.db
+async def test_closed_escalations_still_count_and_owner_accepted_rows_are_not_reviewed(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    since = dt.datetime.now(dt.UTC) - dt.timedelta(days=1)
+    await _put(backend_pool, "fact:1", "escalated")
+    await ledger.close_escalation(backend_pool, "fact", "fact:1")
+    await _put(backend_pool, "fact:2", "escalated")
+    (stat,) = await ledger.stats(backend_pool, since)
+    assert (stat.escalated, stat.raised) == (1, 2)
+
+    mine = await _put(backend_pool, "fact:3", "applied")
+    theirs = await _put(backend_pool, "fact:4", "applied", by="owner-accepted")
+    for row_id in (mine, theirs):
+        await ledger.set_review(backend_pool, row_id, "wrong", "audit:m")
+    assert await ledger.review_tally(backend_pool, "fact", since) == (1, 0)
+    assert [w.id for w in await ledger.wrong_decisions(backend_pool, "fact", since, 10)] == [mine]
+    assert await ledger.unreviewed(backend_pool, since, 10) == []

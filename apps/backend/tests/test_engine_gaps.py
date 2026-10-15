@@ -335,11 +335,18 @@ async def test_every_scheduled_job_is_watched_not_only_the_autopilot_and_the_wat
     backend_pool: asyncpg.Pool,
 ) -> None:
     jobs = SimpleNamespace(
-        worker_schedules=lambda: {
+        schedules=lambda: {
             "hourly_thing": JobSchedule(cron="0 * * * *"),
             "off_thing": JobSchedule(cron="0 * * * *", enabled=False),
             "watchdog": JobSchedule(cron="0 * * * *"),
-        }
+        },
+        # The intraday poll pauses outside market hours: never watched, however old.
+        interval_schedules=lambda: {"intraday_prices": JobSchedule(cron="0 6-21 * * 1-5")},
+    )
+    await backend_pool.execute(
+        "insert into public.job (job_type, trigger, status, created_at, finished_at)"
+        " values ('intraday_prices', 'schedule', 'succeeded', $1, $1)",
+        hours_ago(30),
     )
     await backend_pool.execute(
         "insert into public.job (job_type, trigger, status, created_at, finished_at)"
@@ -350,7 +357,7 @@ async def test_every_scheduled_job_is_watched_not_only_the_autopilot_and_the_wat
     assert set(late) == {"hourly_thing"}
     notice = (await tasks.needs_owner(backend_pool))[0]
     assert notice.subject == "hourly_thing" and "hourly_thing" in notice.title
-    jobs.worker_schedules = lambda: {}  # type: ignore[method-assign]
+    jobs.schedules = lambda: {}  # type: ignore[method-assign]
     assert await liveness.check_all(backend_pool, jobs, NOW) == {}  # type: ignore[arg-type]
     assert await tasks.needs_owner(backend_pool) == []
 

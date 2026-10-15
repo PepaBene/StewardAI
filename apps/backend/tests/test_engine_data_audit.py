@@ -4,6 +4,7 @@ import datetime as dt
 import json
 
 import asyncpg
+import pytest
 
 from steward.engine import data_audit as audit
 from tests.conftest import MigratedDatabase
@@ -157,6 +158,81 @@ async def open_notices(pool: asyncpg.Pool) -> int:
             audit.KIND,
         )
     )
+
+
+def test_a_zero_against_a_real_figure_is_a_full_disagreement() -> None:
+    assert audit.relative_gap(0.0, 0.0) == 0.0
+    assert audit.relative_gap(0.0, 5.0) == 1.0
+    assert audit.relative_gap(5.0, 0.0) == 1.0
+    assert audit.relative_gap(100.0, 90.0) == pytest.approx(0.1)
+    assert audit.price_disagreement("AAA", DAY, {"stooq": 0.0, "eodhd": 10.0}) is not None
+    day = dt.date(2026, 6, 30)
+    assert audit.statement_problem("AAA", day, 0.0, 500.0) is not None
+
+
+async def test_a_real_split_in_raw_bars_is_not_called_a_missing_split(
+    migrated_db: MigratedDatabase, backend_pool: asyncpg.Pool
+) -> None:
+    admin = await asyncpg.connect(migrated_db.admin_url)
+    try:
+        for days_ago, raw, adjusted in ((3, 400.0, 100.0), (2, 100.0, 100.0)):
+            for bar_type, close in (("raw", raw), ("adjusted", adjusted)):
+                await admin.execute(
+                    "insert into public.price_bar (symbol, date, close, source, bar_type)"
+                    " values ('AAA', $1, $2, 'stooq', $3)",
+                    NOW.date() - dt.timedelta(days=days_ago),
+                    close,
+                    bar_type,
+                )
+    finally:
+        await admin.close()
+    assert [f for f in await audit.prices(backend_pool, NOW) if f.subject.startswith("jump:")] == []
+
+
+async def test_cash_in_pies_and_reserved_count_toward_the_account_total(
+    migrated_db: MigratedDatabase, backend_pool: asyncpg.Pool
+) -> None:
+    admin = await asyncpg.connect(migrated_db.admin_url)
+    try:
+        job_id = await admin.fetchval(
+            "insert into public.job (job_type, trigger, status) values ('portfolio_sync',"
+            " 'schedule', 'succeeded') returning id"
+        )
+        await admin.execute(
+            "insert into public.account_snapshot (snapshot_date, job_id, captured_at,"
+            " t212_account_id, account_currency, total_value, cash_available, cash_in_pies,"
+            " cash_reserved, invested_value, invested_cost, unrealized_ppl, realized_ppl,"
+            " base_currency, fx_source, fx_rate, cash_base, invested_base, total_base,"
+            " weight_basis) values ($1, $2, $3, 1, 'EUR', 1100, 50, 30, 20, 1000, 1000, 0, 0,"
+            " 'EUR', 'ecb', 1, 100, 1000, 1100, 'total')",
+            NOW.date(),
+            job_id,
+            NOW,
+        )
+    finally:
+        await admin.close()
+    found = await audit.portfolio(backend_pool, NOW)
+    assert "total" not in [f.subject.split(":")[1] for f in found]
+
+
+async def test_a_failing_audit_does_not_stop_the_rest_or_resolve_anything(
+    backend_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def finds(pool: asyncpg.Pool, now: dt.datetime) -> list[audit.Finding]:
+        return [audit.Finding("x:1", "Something is off", "detail")]
+
+    async def breaks(pool: asyncpg.Pool, now: dt.datetime) -> list[audit.Finding]:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(audit, "AUDITS", {"breaks": breaks, "finds": finds})
+    await backend_pool.execute(
+        "insert into public.ops_task (kind, subject, title, detail, status) values ($1, 'old:1',"
+        " 't', 'd', 'needs_owner')",
+        audit.KIND,
+    )
+    counts = await audit.run(backend_pool, NOW)
+    assert counts == {"breaks_failed": 1, "finds": 1}
+    assert await open_notices(backend_pool) == 2  # the new one, and the old one left alone
 
 
 async def test_the_run_opens_one_notice_per_finding_and_closes_it_when_fixed(

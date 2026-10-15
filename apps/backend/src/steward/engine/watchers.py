@@ -9,6 +9,8 @@ them. Their sensitivity is the owner's (`gates.WatcherSettings`).
 
 import calendar
 import datetime as dt
+import logging
+from collections.abc import Awaitable, Callable
 
 import asyncpg
 
@@ -19,6 +21,10 @@ from steward.engine import triggers
 from steward.engine.gates import WatcherSettings, load_watchers
 from steward.ops import tasks
 from steward.portfolio.concentration import concentration_report
+
+logger = logging.getLogger("steward.engine")
+
+Watcher = Callable[[asyncpg.Pool, dt.datetime, WatcherSettings], Awaitable[int]]
 
 OVER_CAP = "watch_over_cap"
 INSIDERS = "watch_insider"
@@ -138,10 +144,13 @@ async def pre_review(pool: asyncpg.Pool, now: dt.datetime, s: WatcherSettings | 
         await tasks.settle(pool, PRE_REVIEW, set())
         return 0
     month = today.strftime("%Y-%m")
+    # The scheduled review runs on the first weekday of the next month, so one made earlier this
+    # month does not count; only one made since the notice window opened is the one coming up.
+    window_start = month_end(today) - dt.timedelta(days=s.review_lead_days - 1)
     already = await pool.fetchval(
         "select exists (select 1 from public.report where type = 'review' and period = 'monthly'"
-        " and created_at >= date_trunc('month', $1::date))",
-        today,
+        " and created_at >= $1::date)",
+        window_start,
     )
     if already:
         return 0
@@ -236,17 +245,19 @@ async def guidance_changes(
     rows = await pool.fetch(
         "select ticker, metric, fiscal_period, midpoint, prev, known_at from ("
         " select n.t212_ticker as ticker, v.metric, v.fiscal_period,"
-        "  coalesce(v.mean, v.median, (v.low + v.high) / 2) as midpoint,"
-        "  lag(coalesce(v.mean, v.median, (v.low + v.high) / 2)) over w as prev, p.known_at"
+        "  coalesce(v.mean, v.median, (v.low + v.high) / 2, v.low, v.high) as midpoint,"
+        "  lag(coalesce(v.mean, v.median, (v.low + v.high) / 2, v.low, v.high)) over w as prev,"
+        "  p.known_at"
         " from public.estimate_value v"
         " join public.public_estimate_snapshot p on p.id = v.snapshot_id"
         " join public.issuer i on i.id = p.issuer_id"
         " join public.instrument n on n.cik = i.cik"
         " where p.series = 'company_guidance' and n.t212_ticker = any($1::text[])"
         "  and v.segment is null and p.corrected_by_id is null"
-        " window w as (partition by n.t212_ticker, v.metric, v.period_end, v.basis"
-        "  order by p.known_at, v.id)) x"
-        " where prev is not null and known_at >= $2 order by known_at desc",
+        " window w as (partition by n.t212_ticker, v.metric, v.period_end, v.basis,"
+        "  v.unit, v.scale, v.currency order by p.known_at, v.id)) x"
+        " where midpoint is not null and prev is not null and known_at >= $2"
+        " order by known_at desc",
         held,
         now - dt.timedelta(days=GUIDANCE_DAYS),
     )
@@ -293,10 +304,19 @@ async def run(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int]:
         )
         return {"paused": 1}
     s = await load_watchers(pool)
-    return {
-        "over_cap": await over_cap(pool, now, s),
-        "insider_clusters": await insider_clusters(pool, now, s),
-        "large_moves": await large_moves(pool, now, s),
-        "guidance_changes": await guidance_changes(pool, now, s),
-        "pre_review": await pre_review(pool, now, s),
+    watchers: dict[str, Watcher] = {
+        "over_cap": over_cap,
+        "insider_clusters": insider_clusters,
+        "large_moves": large_moves,
+        "guidance_changes": guidance_changes,
+        "pre_review": pre_review,
     }
+    told: dict[str, int] = {}
+    for name, watch in watchers.items():
+        # One failing watcher must not silence the rest; it settles nothing, so its notices stay.
+        try:
+            told[name] = await watch(pool, now, s)
+        except Exception:
+            logger.exception("watcher %s failed", name)
+            told[f"{name}_failed"] = 1
+    return told

@@ -38,8 +38,9 @@ def learned_floor(wrong_confidences: list[float], configured: float) -> float | 
     already covers them (or there are too few to act on)."""
     if len(wrong_confidences) < MIN_WRONG:
         return None
-    # A wrong answer at or above the configured floor was one the judge accepted.
-    accepted = [c for c in wrong_confidences if c >= configured]
+    # A wrong answer at or above the configured floor was one the judge accepted. The ledger's
+    # confidence is a float4 (0.9 reads back as 0.8999999762), so compare to four decimals.
+    accepted = [c for c in wrong_confidences if round(c, 4) >= round(configured, 4)]
     if len(accepted) < MIN_WRONG:
         return None
     return round(min(MAX_FLOOR, max(accepted) + STEP), 2)

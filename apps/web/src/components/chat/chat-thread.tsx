@@ -190,15 +190,23 @@ export function ChatThread({
     return null;
   }
 
-  async function decide(action: ActionOut, verb: "confirm" | "cancel"): Promise<string | null> {
+  async function decide(action: ActionOut, verb: Verb): Promise<Decided> {
     const api = getBrowserApiClient();
     const result =
-      verb === "confirm"
-        ? await api.POST("/chat/actions/{action_id}/confirm", { params: { path: { action_id: action.id } } })
-        : await api.POST("/chat/actions/{action_id}/cancel", { params: { path: { action_id: action.id } } });
+      verb === "cancel"
+        ? await api.POST("/chat/actions/{action_id}/cancel", { params: { path: { action_id: action.id } } })
+        : await api.POST("/chat/actions/{action_id}/confirm", {
+            params: { path: { action_id: action.id } },
+            body: { second: verb === "confirm_again" },
+          });
+    // A high-risk change is not run on the first press: the card asks once more.
+    if (result.response.status === 428) return { error: null, needsSecond: true };
     await fetchDetail();
-    if (result.data) return null;
-    return result.response.status === 409 ? "Already decided (the list is refreshed)." : `The API answered HTTP ${result.response.status}.`;
+    if (result.data) return { error: null };
+    return {
+      error:
+        result.response.status === 409 ? "Already decided (the list is refreshed)." : `The API answered HTTP ${result.response.status}.`,
+    };
   }
 
 
@@ -396,7 +404,7 @@ function Message({
 }: {
   message: MessageOut;
   actions: ActionOut[];
-  onDecide: (action: ActionOut, verb: "confirm" | "cancel") => Promise<string | null>;
+  onDecide: OnDecide;
 }) {
   const numbering = useMemo(() => sourceNumbering(m.answer?.sources ?? []), [m.answer]);
   if (m.role === "user") {
@@ -595,14 +603,21 @@ const ACTION_ICONS: Partial<Record<ActionOut["kind"], typeof PlayIcon>> = {
   portfolio_sync: RefreshCwIcon,
 };
 
-function ActionCard({ action: a, onDecide }: { action: ActionOut; onDecide: (action: ActionOut, verb: "confirm" | "cancel") => Promise<string | null> }) {
-  const [busy, setBusy] = useState<"confirm" | "cancel" | null>(null);
+type Verb = "confirm" | "confirm_again" | "cancel";
+type Decided = { error: string | null; needsSecond?: boolean };
+type OnDecide = (action: ActionOut, verb: Verb) => Promise<Decided>;
+
+function ActionCard({ action: a, onDecide }: { action: ActionOut; onDecide: OnDecide }) {
+  const [busy, setBusy] = useState<Verb | null>(null);
   const [error, setError] = useState<string | null>(null);
-  async function run(verb: "confirm" | "cancel") {
+  const [needsSecond, setNeedsSecond] = useState(false);
+  async function run(verb: Verb) {
     setBusy(verb);
     setError(null);
     try {
-      setError(await onDecide(a, verb));
+      const decided = await onDecide(a, verb);
+      setError(decided.error);
+      setNeedsSecond(Boolean(decided.needsSecond));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -635,11 +650,23 @@ function ActionCard({ action: a, onDecide }: { action: ActionOut; onDecide: (act
             <XIcon aria-hidden="true" />
             Cancel
           </Button>
-          <Button size="sm" onClick={() => void run("confirm")} disabled={busy !== null}>
-            {busy === "confirm" ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <CheckIcon aria-hidden="true" />}
-            Confirm and start
-          </Button>
+          {needsSecond ? (
+            <Button size="sm" onClick={() => void run("confirm_again")} disabled={busy !== null}>
+              {busy === "confirm_again" ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <CheckIcon aria-hidden="true" />}
+              Yes, change it
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => void run("confirm")} disabled={busy !== null}>
+              {busy === "confirm" ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <CheckIcon aria-hidden="true" />}
+              Confirm and start
+            </Button>
+          )}
         </div>
+      ) : null}
+      {proposed && needsSecond ? (
+        <p className="text-xs text-text" role="alert">
+          This changes how the engine runs. Confirm a second time to apply it.
+        </p>
       ) : null}
       {a.status === "confirmed" && a.job_id !== null ? <ConfirmedJob jobId={a.job_id} /> : null}
       {error ? <p className="text-xs text-text">{error}</p> : null}

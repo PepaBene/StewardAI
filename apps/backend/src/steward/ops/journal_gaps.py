@@ -171,6 +171,7 @@ async def check_journal_gaps(
             href=g.href,
             weight=g.weight,
             status="needs_owner",
+            keep_dismissed=True,
         )
     logged = await autolog(pool, str(owner_id), gaps) if owner_id else None
     return {

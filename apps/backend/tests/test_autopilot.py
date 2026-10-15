@@ -577,3 +577,40 @@ async def test_accept_refuses_a_defer_recommendation(fake_ledger: FakeLedger) ->
     await run(store, client, settings())
     with pytest.raises(ApplyError, match="not something to apply"):
         await judge.accept(None, toy_kind(store), fake_ledger.rows[0])  # type: ignore[arg-type]
+
+
+async def test_a_failed_revert_leaves_the_decision_applied(fake_ledger: FakeLedger) -> None:
+    store = Store(open={"sure": None})
+    await run(store, ScriptedClient({}), settings())
+    row = fake_ledger.rows[0]
+
+    async def broken(pool: Any, payload: dict[str, Any]) -> None:
+        raise ApplyError("the item changed")
+
+    with pytest.raises(ApplyError, match="the item changed"):
+        await judge.revert(None, toy_kind(store, revert=broken), row)  # type: ignore[arg-type]
+    assert (row.status, row.review) == ("applied", None)
+
+
+async def test_a_failed_judge_call_is_retried_next_run_not_escalated(
+    fake_ledger: FakeLedger,
+) -> None:
+    store = Store(open={"a": None})
+    out = await run(store, ScriptedClient({}), settings())  # every call raises
+    assert out["errors"] == 1 and out["judged"] == 0 and out["escalated"] == 0
+    assert fake_ledger.rows == []
+    await run(store, ScriptedClient({("gpt-small", "a"): ("accept", 0.95)}), settings())
+    assert store.open["a"] == "accept"
+
+
+async def test_waiting_escalations_do_not_crowd_newer_items_out_of_a_run(
+    fake_ledger: FakeLedger,
+) -> None:
+    store = Store(open={"old1": None, "old2": None, "new": None})
+    for i, ref in enumerate(("old1", "old2"), start=1):
+        fake_ledger.rows.append(
+            Row(i, "toy", ref, None, "defer", 0.5, "model:x", "s", {}, "escalated")
+        )
+    client = ScriptedClient({("gpt-small", "new"): ("accept", 0.95)})
+    await run(store, client, settings(daily_cap=1))
+    assert store.open["new"] == "accept"

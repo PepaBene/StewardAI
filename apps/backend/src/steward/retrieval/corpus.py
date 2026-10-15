@@ -15,7 +15,7 @@ from steward.chat.tools import REPORT_PATHS
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig, ThesisConfig
 from steward.fundamentals.ir import IrError, document_lines
-from steward.retrieval.index import SourceDoc
+from steward.retrieval.index import SourceDoc, not_skipped, skip
 from steward.storage import EvidenceStore, StorageError
 
 MIN_FILING_CHARS = 1500  # a shorter extract is a stub, not a document worth passages
@@ -163,9 +163,11 @@ async def disclosure_docs(pool: asyncpg.Pool, alert_days: int) -> list[SourceDoc
 async def report_docs(pool: asyncpg.Pool, limit: int) -> list[SourceDoc]:
     """Reports not indexed yet (a report never changes once written), newest first."""
     rows = await pool.fetch(
-        "select r.id, r.type, r.ticker, r.title, r.body_md, r.created_at from public.report r"
+        "select r.id, r.type, r.ticker, r.title, r.body_md, r.created_at from public.report r"  # noqa: S608 - constant fragments
         " where not exists (select 1 from public.document_chunk c"
-        " where c.kind = 'report' and c.ref = r.id::text) order by r.created_at desc limit $1",
+        " where c.kind = 'report' and c.ref = r.id::text) and "
+        + not_skipped("report", "r.id::text")
+        + " order by r.created_at desc limit $1",
         limit,
     )
     return [
@@ -188,10 +190,10 @@ async def news_docs(pool: asyncpg.Pool, days: int, limit: int) -> list[SourceDoc
     headline and summary (the article body is not stored for long)."""
     since = dt.datetime.now(dt.UTC) - dt.timedelta(days=days)
     rows = await pool.fetch(
-        "select i.id, i.url, i.headline, i.summary, i.tier, i.tickers, i.published_at"
+        "select i.id, i.url, i.headline, i.summary, i.tier, i.tickers, i.published_at"  # noqa: S608 - constant fragments
         " from public.news_item i where i.published_at >= $1 and not exists"
         " (select 1 from public.document_chunk c where c.kind = 'news' and c.ref = i.id::text)"
-        " order by i.published_at desc limit $2",
+        " and " + not_skipped("news", "i.id::text") + " order by i.published_at desc limit $2",
         since,
         limit,
     )
@@ -218,12 +220,13 @@ async def filing_docs(
     are not indexed yet, newest period first. Returns the documents and the reasons any could
     not be read."""
     rows = await pool.fetch(
-        "select e.sha256, e.storage_path, e.source_url, e.content_type, e.title,"
+        "select e.sha256, e.storage_path, e.source_url, e.content_type, e.title,"  # noqa: S608 - constant fragments
         " array_agg(distinct f.ticker) as tickers, max(f.period_end) as period_end"
         " from public.evidence e join public.fact f on f.evidence_sha256 = e.sha256"
         " where not exists (select 1 from public.document_chunk c"
-        " where c.kind = 'filing' and c.ref = e.sha256)"
-        " group by e.sha256, e.storage_path, e.source_url, e.content_type, e.title"
+        " where c.kind = 'filing' and c.ref = e.sha256) and "
+        + not_skipped("filing", "e.sha256")
+        + " group by e.sha256, e.storage_path, e.source_url, e.content_type, e.title"
         " order by max(f.period_end) desc nulls last limit $1",
         limit,
     )
@@ -235,9 +238,11 @@ async def filing_docs(
             text = "\n".join(document_lines(data, r["content_type"] or ""))
         except (StorageError, IrError) as exc:
             problems.append(f"{r['sha256'][:12]}: {str(exc)[:80]}")
+            await skip(pool, "filing", r["sha256"], f"could not be read: {exc}")
             continue
         if len(text) < MIN_FILING_CHARS:
             problems.append(f"{r['sha256'][:12]}: text too short ({len(text)} characters)")
+            await skip(pool, "filing", r["sha256"], f"text too short ({len(text)} characters)")
             continue
         tickers = tuple(sorted(t for t in r["tickers"] if t))
         docs.append(

@@ -347,6 +347,7 @@ DAILY_DAYS = 21
 DAILY_MIN_DAYS = 8
 DAILY_LEAD = 45  # minutes the job should be done before the median first visit
 DAILY_MIN_SHIFT = 15
+DAILY_NEXT_DAY_AFTER = 12 * 60  # a run this long after the first visit is for the next day's
 DAILY_GATES = Gates(
     min_n=DAILY_MIN_DAYS,
     min_reviewed=DAILY_MIN_DAYS,
@@ -382,6 +383,13 @@ def better_minute(first_opens: list[int], duration: int, current: int) -> int | 
     target = int(median_of(first_opens)) - DAILY_LEAD - duration
     target = max(DAILY_EARLIEST, target - target % 5)
     return target if target <= current - DAILY_MIN_SHIFT else None
+
+
+def serves_same_day_visit(first_opens: list[int], minute: int) -> bool:
+    """Whether a run at `minute` is meant for the first visit of the same day. A run scheduled
+    many hours after the usual first visit (a nightly 22:30 sync) is for the next morning's
+    visit, and comparing it with that day's visit would call it late every time."""
+    return minute - median_of(first_opens) <= DAILY_NEXT_DAY_AFTER
 
 
 def late_days(first_opens: dict[dt.date, int], finishes: dict[dt.date, int]) -> int:
@@ -431,6 +439,8 @@ async def tune_daily_times(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, An
             )
         days = [d for d in opens if d in finishes]
         if len(days) < DAILY_MIN_DAYS:
+            continue
+        if not serves_same_day_visit([opens[d] for d in days], minute):
             continue
         new_minute = better_minute([opens[d] for d in days], int(median_of(durations)), minute)
         if new_minute is None:
@@ -761,8 +771,8 @@ async def check_rollbacks(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int
         decided = rec["decided_at"]
         if c.change_kind in ("rule", "source_weight"):
             reasons = await _content_reasons(pool, c, decided, now)
-            if not reasons or not await config_change.undo(pool, c, reasons):
-                continue
+            if not reasons or await config_change.undo(pool, c, reasons) != "restored":
+                continue  # not live, or the owner's value stands: no "put back" notice
             rolled += 1
             await _tell(
                 pool,
@@ -784,7 +794,7 @@ async def check_rollbacks(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int
         after = await health(pool, jobs, decided, now)
         gates = Gates(**{**c.gates, "max_wrong_rate_increase": 0.0, "min_reviewed": 3})
         reasons = change.rollback_due(before, after, gates)
-        if not reasons or not await config_change.undo(pool, c, reasons):
+        if not reasons or await config_change.undo(pool, c, reasons) != "restored":
             continue
         rolled += 1
         await _tell(

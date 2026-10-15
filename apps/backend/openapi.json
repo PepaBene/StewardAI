@@ -10970,7 +10970,7 @@
           "chat"
         ],
         "summary": "Confirm Action",
-        "description": "Start a job the assistant proposed. It appears in the job log with trigger `chat`.",
+        "description": "Start a job the assistant proposed. It appears in the job log with trigger `chat`. A\nhigh-risk change answers 428 until it is confirmed a second time (`second: true`).",
         "operationId": "confirm_action",
         "security": [
           {
@@ -10990,6 +10990,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ConfirmIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",

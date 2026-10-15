@@ -28,6 +28,11 @@ SNOOZED = (
     " last_action_at, first_seen, last_seen from public.ops_task where kind = $1 and subject = $2"
     " and status = 'resolved' and snoozed_until > now() order by id desc limit 1"
 )
+DISMISSED = (
+    "select id, kind, subject, status, title, detail, href, weight, attempts, last_action,"
+    " last_action_at, first_seen, last_seen from public.ops_task where kind = $1 and subject = $2"
+    " and status = 'resolved' and last_action = 'dismissed' order by id desc limit 1"
+)
 SNOOZE_MAX_DAYS = 90
 NEEDS_OWNER = (
     "select id, kind, subject, status, title, detail, href, weight, attempts,"
@@ -83,12 +88,18 @@ async def see(
     href: str | None = None,
     weight: float | None = None,
     status: Status = "fixing",
+    keep_dismissed: bool = False,
 ) -> OpsTask:
     """Record that the problem exists now; open its task or refresh the open one. A notice the
-    owner snoozed stays closed until its date."""
+    owner snoozed stays closed until its date; with `keep_dismissed`, one the owner dismissed
+    stays closed for good (for subjects that name one occurrence, such as a month or a trade)."""
     snoozed = await pool.fetchrow(SNOOZED, kind, subject)
     if snoozed is not None:
         return OpsTask.model_validate(dict(snoozed))
+    if keep_dismissed:
+        dismissed = await pool.fetchrow(DISMISSED, kind, subject)
+        if dismissed is not None:
+            return OpsTask.model_validate(dict(dismissed))
     row = await pool.fetchrow(
         SEE,
         kind,
@@ -100,6 +111,38 @@ async def see(
         weight,
     )
     return OpsTask.model_validate(dict(row))
+
+
+async def carry_attempts(pool: asyncpg.Pool, task: OpsTask, within: dt.timedelta) -> OpsTask:
+    """A problem that comes back after its repair seemed to work continues where the last task
+    stopped: a fresh task takes over the attempts of the one resolved within `within`, so the
+    retry policy still runs out and hands it to the owner instead of starting again from zero."""
+    if task.attempts > 0 or task.status != "fixing":
+        return task
+    row = await pool.fetchrow(
+        "update public.ops_task t set attempts = p.attempts, last_action = p.last_action,"
+        " last_action_at = p.last_action_at from (select attempts, last_action, last_action_at"
+        "  from public.ops_task where kind = $2 and subject = $3 and status = 'resolved'"
+        "  and id <> $1 and attempts > 0 and resolved_at >= now() - $4::interval"
+        "  and coalesce(last_action, '') not in ('dismissed', 'snoozed')"
+        "  order by id desc limit 1) p"
+        " where t.id = $1 returning t.id, t.kind, t.subject, t.status, t.title, t.detail,"
+        " t.href, t.weight, t.attempts, t.last_action, t.last_action_at, t.first_seen,"
+        " t.last_seen",
+        task.id,
+        task.kind,
+        task.subject,
+        within,
+    )
+    return task if row is None else OpsTask.model_validate(dict(row))
+
+
+async def resolve(pool: asyncpg.Pool, task_id: int) -> None:
+    await pool.execute(
+        "update public.ops_task set status = 'resolved', resolved_at = now()"
+        " where id = $1 and status <> 'resolved'",
+        task_id,
+    )
 
 
 async def acted(pool: asyncpg.Pool, task_id: int, action: str) -> None:
