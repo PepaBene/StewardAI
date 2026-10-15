@@ -28,6 +28,11 @@ SQL
 
 if [ "${WIPE:-0}" = "1" ]; then
   echo "== wipe"
+  # One table per statement: dropping the whole schema at once needs more locks than
+  # max_locks_per_transaction allows on this small server.
+  for t in $(psql_dst -At -c "select tablename from pg_tables where schemaname = 'public'"); do
+    psql_dst -v ON_ERROR_STOP=1 -c "drop table if exists public.\"$t\" cascade" || exit 1
+  done
   psql_dst -v ON_ERROR_STOP=1 -c "drop schema if exists public cascade; drop schema if exists private cascade; create schema public;"
 fi
 
@@ -59,17 +64,37 @@ psql_dst -v ON_ERROR_STOP=1 -f "$(dirname "$0")/private_schema.sql" || exit 1
 
 echo "== dump | restore"
 START=$(date +%s)
-# Three passes so sequence values can be left out of the data pass (app_backend may not read
-# them): definitions, then rows without any `*_seq` object, then indexes and constraints.
+# Definitions, then the rows of one table at a time (a dropped connection to the pooler loses
+# one table, which is retried, not the whole copy), then indexes and constraints.
 : >/tmp/restore.err
-for pass in pre-data data post-data; do
-  skip=""
+pass() {
+  pg_dump "$SRC_URL" --format=custom --no-owner --schema=public --section="$1" -f /tmp/pass.dump \
+    && pg_restore --dbname="$DST_URL" --no-owner /tmp/pass.dump 2>>/tmp/restore.err
+  rm -f /tmp/pass.dump
+}
+copy_table() {
+  rm -f /tmp/table.dump
   # app_backend cannot bypass row-level security: read through its own policies (backend_all).
-  [ "$pass" = "data" ] && skip="--exclude-table=*_seq --enable-row-security"
-  pg_dump "$SRC_URL" --format=custom --no-owner --schema=public --section=$pass $skip \
-    | pg_restore --dbname="$DST_URL" --no-owner 2>>/tmp/restore.err
-  echo "pass $pass done after $(( $(date +%s) - START )) s"
+  pg_dump "$SRC_URL" --format=custom --no-owner --section=data --enable-row-security \
+    -t "public.\"$1\"" -f /tmp/table.dump 2>>/tmp/restore.err || return 1
+  pg_restore --dbname="$DST_URL" --no-owner --data-only /tmp/table.dump 2>>/tmp/restore.err \
+    || { psql_dst -c "truncate public.\"$1\"" 2>/dev/null; return 1; }
+}
+pass pre-data || exit 1
+echo "pre-data done after $(( $(date +%s) - START )) s"
+failed_tables=""
+for t in $(psql "$SRC_URL" -X -At -c "select tablename from pg_tables where schemaname='public' order by tablename"); do
+  n=0
+  until copy_table "$t"; do
+    n=$((n + 1))
+    if [ "$n" -ge 4 ]; then failed_tables="$failed_tables $t"; echo "GAVE UP on $t"; break; fi
+    echo "retrying $t (attempt $((n + 1)))"; sleep 5
+  done
 done
+rm -f /tmp/table.dump
+echo "data done after $(( $(date +%s) - START )) s; failed tables:${failed_tables:- none}"
+pass post-data || exit 1
+echo "post-data done after $(( $(date +%s) - START )) s"
 echo "restore finished in $(( $(date +%s) - START )) s; pg_restore wrote $(wc -l </tmp/restore.err) lines to stderr"
 grep -v "already exists" /tmp/restore.err | head -40
 
