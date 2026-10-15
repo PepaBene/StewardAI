@@ -635,11 +635,121 @@ async def health(
     return Metrics(row["n"], row["n"], 0, 0, row["failed"], 0.0)
 
 
+WANTED_MARKS = 2  # stories you marked useful that a lowered alert level no longer sends at once
+MISSING_MARKS = 2  # "a source is missing" marks after a feed was switched off or demoted
+ENGAGEMENT_DROP = 0.5  # stories you opened or marked useful, after against before
+ENGAGEMENT_MIN = 6  # ...and only judged when there were at least this many before
+
+
+def rule_harm(wanted: int) -> list[str]:
+    """Why a lowered alert level should go back: you marked stories of that type useful that it
+    no longer sends at once."""
+    if wanted < WANTED_MARKS:
+        return []
+    return [f"you marked {wanted} stories of this type useful since it stopped being instant"]
+
+
+def source_harm(missing: int, unique_before: int, used_before: int, used_after: int) -> list[str]:
+    """Why a switched-off or demoted feed should come back: you reported a missing source, or
+    the feed carried stories nobody else did and what you open or mark useful fell by half."""
+    reasons = []
+    if missing >= MISSING_MARKS:
+        reasons.append(f"you reported a missing source {missing} times since the change")
+    if (
+        unique_before > 0
+        and used_before >= ENGAGEMENT_MIN
+        and used_after <= used_before * ENGAGEMENT_DROP
+    ):
+        reasons.append(
+            f"it carried {unique_before} stories no other feed did, and the stories you opened "
+            f"or marked useful fell from {used_before} to {used_after}"
+        )
+    return reasons
+
+
+async def _wanted_stories(
+    pool: asyncpg.Pool, event_type: str, level: int, since: dt.datetime
+) -> int:
+    """Stories of one event type now at the lowered level that you marked useful."""
+    return int(
+        await pool.fetchval(
+            "select count(distinct c.id) from public.story_cluster c"
+            " join public.news_feedback f on f.target = 'story' and f.target_id = c.id::text"
+            " and f.kind = 'useful' where c.event_type = $1 and c.severity = $2"
+            " and c.first_seen >= $3 and f.created_at >= $3",
+            event_type,
+            level,
+            since,
+        )
+        or 0
+    )
+
+
+async def _used_stories(pool: asyncpg.Pool, start: dt.datetime, end: dt.datetime) -> int:
+    """Stories you opened or marked useful in the window."""
+    used = await pool.fetchval(
+        "select count(*) from (select e.ref from public.engagement_event e"
+        " where e.kind = 'news_story' and e.created_at >= $1 and e.created_at < $2"
+        " union select f.target_id from public.news_feedback f where f.target = 'story'"
+        " and f.kind = 'useful' and f.created_at >= $1 and f.created_at < $2) u",
+        start,
+        end,
+    )
+    return int(used or 0)
+
+
+async def _unique_stories(
+    pool: asyncpg.Pool, source_id: str, start: dt.datetime, end: dt.datetime
+) -> int:
+    return int(
+        await pool.fetchval(
+            "select count(distinct i.cluster_id) from public.news_item i"
+            " where i.source_id = $1 and i.first_seen_at >= $2 and i.first_seen_at < $3"
+            " and not exists (select 1 from public.news_item o"
+            "  where o.cluster_id = i.cluster_id and o.source_id <> i.source_id)",
+            source_id,
+            start,
+            end,
+        )
+        or 0
+    )
+
+
+async def _content_reasons(
+    pool: asyncpg.Pool, c: change.Change, decided: dt.datetime, now: dt.datetime
+) -> list[str]:
+    """The harm signal for a rule or source change: what you did with the news afterwards."""
+    edit = config_change.parse_target(c.target)
+    if c.change_kind == "rule":
+        event_type = edit.path.split(".", 1)[-1]
+        old = c.before.get("value") if isinstance(c.before, dict) else None
+        new = c.after.get("value") if isinstance(c.after, dict) else None
+        if not isinstance(old, int) or not isinstance(new, int) or new >= old:
+            return []
+        return rule_harm(await _wanted_stories(pool, event_type, new, decided))
+    match = re.fullmatch(r"sources\[id=([^\]]+)\]\.(enabled|tier)", edit.path)
+    if match is None:
+        return []
+    window = dt.timedelta(days=ROLLBACK_AFTER_DAYS)
+    missing = await pool.fetchval(
+        "select count(*) from public.news_feedback where kind = 'missing_source'"
+        " and created_at >= $1",
+        decided,
+    )
+    used_before = await _used_stories(pool, decided - window, decided)
+    used_after = await _used_stories(pool, decided, now)
+    unique = await _unique_stories(pool, match.group(1), decided - window, decided)
+    return source_harm(int(missing or 0), unique, used_before, used_after)
+
+
 async def check_rollbacks(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int]:
-    """Undo a schedule or model change whose first two weeks ran worse than the two before."""
+    """Undo a promoted change that did harm in its first two weeks: a schedule or model change
+    whose jobs ran worse than the two weeks before, a lowered alert level for a type of story
+    you then marked useful, a feed switched off or demoted that you then missed."""
     rows = await pool.fetch(
         "select " + change.COLUMNS + ", decided_at from public.engine_change"  # noqa: S608
-        " where status = 'promoted' and change_kind in ('schedule', 'model')"
+        " where status = 'promoted'"
+        " and change_kind in ('schedule', 'model', 'rule', 'source_weight')"
         " and target like 'config:%' and decided_at <= $1 and decided_at > $2",
         now - dt.timedelta(days=ROLLBACK_AFTER_DAYS),
         now - dt.timedelta(days=ROLLBACK_UNTIL_DAYS),
@@ -648,6 +758,20 @@ async def check_rollbacks(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int
     for rec in rows:
         c = change.from_row(rec)
         edit = config_change.parse_target(c.target)
+        decided = rec["decided_at"]
+        if c.change_kind in ("rule", "source_weight"):
+            reasons = await _content_reasons(pool, c, decided, now)
+            if not reasons or not await config_change.undo(pool, c, reasons):
+                continue
+            rolled += 1
+            await _tell(
+                pool,
+                c.model_copy(update={"status": "rolled_back"}),
+                "A change the engine made to itself was put back",
+                f"{c.hypothesis}. " + "; ".join(reasons) + ".",
+                "/engine-ledger",
+            )
+            continue
         jobs = (
             (edit.path.split(".")[0],)
             if c.change_kind == "schedule"
@@ -655,7 +779,6 @@ async def check_rollbacks(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int
         )
         if not jobs:
             continue
-        decided = rec["decided_at"]
         window = dt.timedelta(days=ROLLBACK_AFTER_DAYS)
         before = await health(pool, jobs, decided - window, decided)
         after = await health(pool, jobs, decided, now)

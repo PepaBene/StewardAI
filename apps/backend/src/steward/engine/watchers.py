@@ -24,6 +24,9 @@ OVER_CAP = "watch_over_cap"
 INSIDERS = "watch_insider"
 PRE_REVIEW = "pre_review"
 LARGE_MOVE = "watch_large_move"
+GUIDANCE = "watch_guidance"
+GUIDANCE_DAYS = 30  # a change counts for this long after it became known
+GUIDANCE_MIN_MOVE = 0.02  # and only when the guided figure moved by at least this share
 REVIEW_LEAD_DAYS = 3
 COOLDOWN_DAYS = 14
 MOVE_BARS_DAYS = 6  # a move counts while the latest bar is at most this old
@@ -212,6 +215,68 @@ async def large_moves(
     return told
 
 
+def guidance_move(prev: float, latest: float) -> float | None:
+    """The relative change of a guided figure, or None when it cannot be compared."""
+    if prev == 0:
+        return None
+    return (latest - prev) / abs(prev)
+
+
+async def guidance_changes(
+    pool: asyncpg.Pool, now: dt.datetime, s: WatcherSettings | None = None
+) -> int:
+    """A held company that raised or cut its own guidance: the newest company-guidance figure
+    for a metric and period against the one before it. Filings that carry it stay with the
+    disclosure alerts; this covers the figure itself. Analyst-rating changes are not here: no
+    source the app stores carries them (consensus revisions have their own disclosure alert)."""
+    s = s or WatcherSettings()
+    held = list(await ledger.holding_weights(pool))
+    if not held:
+        return 0
+    rows = await pool.fetch(
+        "select ticker, metric, fiscal_period, midpoint, prev, known_at from ("
+        " select n.t212_ticker as ticker, v.metric, v.fiscal_period,"
+        "  coalesce(v.mean, v.median, (v.low + v.high) / 2) as midpoint,"
+        "  lag(coalesce(v.mean, v.median, (v.low + v.high) / 2)) over w as prev, p.known_at"
+        " from public.estimate_value v"
+        " join public.public_estimate_snapshot p on p.id = v.snapshot_id"
+        " join public.issuer i on i.id = p.issuer_id"
+        " join public.instrument n on n.cik = i.cik"
+        " where p.series = 'company_guidance' and n.t212_ticker = any($1::text[])"
+        "  and v.segment is null and p.corrected_by_id is null"
+        " window w as (partition by n.t212_ticker, v.metric, v.period_end, v.basis"
+        "  order by p.known_at, v.id)) x"
+        " where prev is not null and known_at >= $2 order by known_at desc",
+        held,
+        now - dt.timedelta(days=GUIDANCE_DAYS),
+    )
+    told = 0
+    present: set[str] = set()
+    for r in rows:
+        move = guidance_move(float(r["prev"]), float(r["midpoint"]))
+        if move is None or abs(move) < GUIDANCE_MIN_MOVE:
+            continue
+        subject = f"{r['ticker']}:{r['metric']}:{r['fiscal_period']}"
+        present.add(subject)
+        word = "raised" if move > 0 else "cut"
+        told += await _notice(
+            pool,
+            GUIDANCE,
+            subject,
+            f"{r['ticker']} {word} its {r['metric']} guidance for {r['fiscal_period']} by "
+            f"{abs(move):.1%} ({r['known_at']:%d %b})",
+            "tell the owner about the guidance change",
+            f"{r['ticker']} {word} its {r['metric']} guidance by {abs(move):.1%}",
+            f"The company's own figure for {r['fiscal_period']} moved from {float(r['prev']):g} "
+            f"to {float(r['midpoint']):g}. Read the release before drawing a conclusion.",
+            f"/holdings/{r['ticker']}",
+            now,
+            s.cooldown_days,
+        )
+    await tasks.settle(pool, GUIDANCE, present)
+    return told
+
+
 async def run(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int]:
     """Every watcher, unless the owner has been dismissing these notices without acting."""
     if await triggers.suppressed(pool, "event", now):
@@ -232,5 +297,6 @@ async def run(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int]:
         "over_cap": await over_cap(pool, now, s),
         "insider_clusters": await insider_clusters(pool, now, s),
         "large_moves": await large_moves(pool, now, s),
+        "guidance_changes": await guidance_changes(pool, now, s),
         "pre_review": await pre_review(pool, now, s),
     }

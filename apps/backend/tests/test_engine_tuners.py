@@ -336,6 +336,111 @@ async def test_a_feed_used_rarely_moves_to_tier_three_and_one_used_often_stays(
     assert (await tuners.tune_source_tiers(backend_pool, NOW))["demoted"] is None
 
 
+def test_a_lowered_alert_level_goes_back_only_when_you_wanted_what_it_stopped_sending() -> None:
+    assert tuners.rule_harm(0) == []
+    assert tuners.rule_harm(1) == []
+    assert tuners.rule_harm(2)
+
+
+def test_a_feed_comes_back_when_you_report_it_missing_or_what_you_read_halves() -> None:
+    assert tuners.source_harm(0, 5, 10, 8) == []
+    assert tuners.source_harm(1, 5, 10, 8) == []
+    assert tuners.source_harm(2, 0, 0, 0)
+    assert tuners.source_harm(0, 5, 10, 5)
+    assert tuners.source_harm(0, 0, 10, 2) == []  # it carried nothing the others did not
+    assert tuners.source_harm(0, 5, 4, 0) == []  # too little reading to judge
+
+
+async def promote_and_age(
+    pool: asyncpg.Pool, kind: Any, edit: config_change.Edit, value: Any
+) -> change.Change:
+    c = await config_change.propose(
+        pool,
+        kind,
+        edit,
+        value,
+        "a change",
+        "a metric",
+        Gates(min_n=1, min_reviewed=1, require_golden=False),
+    )
+    await change.record_results(
+        pool, c.id, Metrics(20, 20, 18, 0, 0, 0.0), Metrics(20, 20, 6, 0, 0, 0.0)
+    )
+    settled = await config_change.promote(pool, c, golden_passed=None)
+    assert settled.status == "promoted"
+    await pool.execute(
+        "update public.engine_change set decided_at = now() - interval '15 days' where id = $1",
+        c.id,
+    )
+    return settled
+
+
+@pytest.mark.db
+async def test_a_lowered_alert_level_is_put_back_when_you_mark_such_stories_useful(
+    backend_pool: asyncpg.Pool, migrated_db: MigratedDatabase
+) -> None:
+    await seed_rules(backend_pool)
+    edit = config_change.Edit("event_rules", "severities.m_and_a")
+    before = await config_change.current(backend_pool, edit)
+    await promote_and_age(backend_pool, "rule", edit, before - 1)
+    admin = await asyncpg.connect(migrated_db.admin_url)
+    try:
+        for i in range(2):
+            cluster = await admin.fetchval(
+                "insert into public.story_cluster (headline, headline_key, best_tier, event_type,"
+                " severity) values ('h', $1, 2, 'm_and_a', $2) returning id",
+                f"deal{i}",
+                before - 1,
+            )
+            await admin.execute(
+                "insert into public.news_feedback (target, target_id, kind)"
+                " values ('story', $1, 'useful')",
+                str(cluster),
+            )
+    finally:
+        await admin.close()
+    now = dt.datetime.now(dt.UTC) + dt.timedelta(days=1)
+    assert await tuners.check_rollbacks(backend_pool, now) == {"rolled_back": 1}
+    assert await config_change.current(backend_pool, edit) == before
+
+
+@pytest.mark.db
+async def test_a_lowered_alert_level_you_did_not_miss_stays(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    await seed_rules(backend_pool)
+    edit = config_change.Edit("event_rules", "severities.m_and_a")
+    before = await config_change.current(backend_pool, edit)
+    await promote_and_age(backend_pool, "rule", edit, before - 1)
+    now = dt.datetime.now(dt.UTC) + dt.timedelta(days=1)
+    assert await tuners.check_rollbacks(backend_pool, now) == {"rolled_back": 0}
+    assert await config_change.current(backend_pool, edit) == before - 1
+
+
+@pytest.mark.db
+async def test_a_switched_off_feed_is_turned_on_again_when_you_report_a_missing_source(
+    backend_pool: asyncpg.Pool, migrated_db: MigratedDatabase
+) -> None:
+    await store_sources(backend_pool, ["gone-feed"])
+    edit = config_change.Edit("news_sources", "sources[id=gone-feed].enabled")
+    await promote_and_age(backend_pool, "source_weight", edit, False)
+    admin = await asyncpg.connect(migrated_db.admin_url)
+    try:
+        for i in range(2):
+            await admin.execute(
+                "insert into public.news_feedback (target, target_id, kind)"
+                " values ('story', $1, 'missing_source')",
+                str(i),
+            )
+    finally:
+        await admin.close()
+    now = dt.datetime.now(dt.UTC) + dt.timedelta(days=1)
+    assert await tuners.check_rollbacks(backend_pool, now) == {"rolled_back": 1}
+    stored = await load_active(backend_pool, "news_sources", NewsSourcesConfig)
+    assert stored is not None
+    assert stored.body.sources[0].enabled is True
+
+
 def test_a_daily_cron_is_read_and_written_back_and_other_shapes_are_left_alone() -> None:
     assert tuners.parse_daily("30 7 * * *") == (450, "* * *")
     assert tuners.parse_daily("0 6 * * 1-5") == (360, "* * 1-5")

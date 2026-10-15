@@ -410,7 +410,8 @@ Still open:
 - Triggers that only queue jobs (stale research, post-report checks) open no notice, so they have no
   dismissal-based pause; only cooldown, caps and the budget limit them.
 - Not built (see "Design-work items delivered" below for what was added since): large-move triggers and
-  triggers on filings, guidance or rating changes (news escalation and disclosure alerts already cover them).
+  triggers on filings or rating changes (news escalation and disclosure alerts already cover them); guidance
+  changes now have a watcher, rating changes have no data source.
 - The coverage trigger covers "held but no thesis" only.
 - The daily cost cap counts every job started as `event`, not only those from the table.
 - Caps, cooldown and thresholds are constants in code.
@@ -486,11 +487,18 @@ calibration and needs-you digest as tables or text.
 Still open:
 - All new tests use fakes for the models; nothing here has been run against a live model, and the judge's
   counts feed code gates, so a weak judge weakens the gate.
-- Rule and source changes have no automatic rollback (the owner rolls them back from the ledger; there is
-  no signal that measures a harm from a lowered alert or a switched-off feed); the schedule tuner touches
-  the news ingest and the two daily jobs, because lateness is only measurable there; model tuning covers news
-  classification, digest, thesis and chat, and not the autopilot model.
-- No guidance or rating-change triggers (no data source stores them); filings stay with the disclosure alerts.
+- Rule and source changes roll back by themselves (`tuners.check_rollbacks`, 14 to 28 days after promotion)
+  on two signals: a lowered alert level for a type of story is put back when you marked 2 or more stories
+  of that type useful after it stopped being instant; a switched-off or demoted feed comes back when you
+  reported a missing source twice, or when it carried stories no other feed did and the stories you opened
+  or marked useful fell by half. The signals are coarse (the second cannot tell the feed from other
+  causes); a field rolled back twice is left to the owner. The schedule tuner touches the news ingest and
+  the two daily jobs, because lateness is only measurable there; model tuning covers news classification,
+  digest, thesis and chat, and not the autopilot model.
+- Guidance changes have a watcher (`watchers.guidance_changes`: a held company's own guided figure moved by
+  2% or more between its last two stored versions). Analyst-rating changes have none: no source the app
+  stores carries ratings (only consensus estimate values, whose revisions already alert); filings stay with
+  the disclosure alerts.
 - The replay still cannot know what the owner would have decided on items newly escalated by a floor; it is
   measured after the fact (acceptance rate) instead.
 - Telegram offers no delivery status; owner decisions still open: critical alerts at all hours (question 2),
