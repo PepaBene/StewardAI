@@ -87,7 +87,7 @@ The risk is overlap: the worker runs up to 4 jobs at once in one process
 | 8 | `valuation/read.py:509-515` | `fx_rate` already filtered by source and date; only the currency is not | small | none: the table needs the base currency too, so a currency filter risks wrong conversions | checked, left |
 | 9 | `quant/french_store.py:51-60` | `load_factors` takes `since` and its only caller (`portfolio/factors.py:392`) passes it | small | none | checked, left |
 | 10 | `engine/data_audit.py:110-130` | two unbounded `price_bar` fetches (~20K rows) | small | compare in SQL | open |
-| 11-12 | `portfolio/exante.py` `_BOOK_CACHE`, `xray/service.py` `_cache` | caches evict by TTL only | low | hard size cap | open |
+| 11-12 | `portfolio/exante.py` `_BOOK_CACHE`, `xray/service.py` `_cache` | `_BOOK_CACHE` keeps one entry (cleared on insert); `_cache` drops expired entries on every insert | low | none | checked, left |
 | 14 | `news/pipeline.py:1813-1906` | all collected items plus 72 h of recent members | modest | process per source | open |
 | - | `worker/__main__.py:59` | 4 jobs at once in one process | multiplies the above | 4 to 2 only with a separate lane for short jobs: `news_ingest` (up to 37 min) and `price_history` (up to 2 h) could otherwise starve the 15-minute `monitor` and `intraday_prices` | open |
 
@@ -111,6 +111,17 @@ Checked against the live database on 2026-10-15:
 - Live sync status: serve `job` and `job_step` from a backend endpoint (poll or SSE) and remove
   the direct Supabase reads and the Realtime channel from `sync-status-provider.tsx`.
 - pg_cron: move the retention job to the backend scheduler (worker already uses APScheduler).
+
+Progress (2026-10-15):
+- Done in code: live sync status now polls `GET /jobs` / `GET /jobs/{id}` (no Supabase table
+  reads or Realtime in `sync-status-provider.tsx`); the retention job also runs from the worker
+  scheduler (`Worker.run_retention`, 03:17 daily), so the pg_cron job is not needed.
+- Provisioning staged but not applied: service `Postgres` (image `pgvector/pgvector:pg17`, the
+  upstream pgvector image rather than an unverified marketplace template), 3 GB volume in
+  europe-west4, generated password, start command with the tuning below. `accept-deploy` was
+  denied by the permission classifier: commit the staged change in the Railway dashboard or
+  allow `mcp__railway__accept-deploy`.
+- Not started: restore rehearsal, cutover, backups.
 
 Steps:
 1. Provision Postgres (pgvector) in project `dependable-vitality`, same environment, private

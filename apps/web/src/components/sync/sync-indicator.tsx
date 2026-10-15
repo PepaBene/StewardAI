@@ -18,7 +18,7 @@ const PHASE_LABELS = { queued: "Sync queued", waiting: "Waiting for previous syn
 
 /** Header indicator: the portfolio sync's live state, plus a "Sync now" button. */
 export function SyncIndicator() {
-  const { view, realtime, startSync, starting, startError } = useSyncStatus();
+  const { view, startSync, starting, startError } = useSyncStatus();
   const now = useNow();
 
   let icon = <CircleDashedIcon aria-hidden="true" className="size-4" />;
@@ -53,8 +53,6 @@ export function SyncIndicator() {
   // Not disabled while the status is still loading: a duplicate request only queues a
   // second run, which waits for the first (the backend serialises runs per job type).
   const busy = starting || view.kind === "active";
-  const liveNote =
-    realtime === "live" ? "live updates on" : realtime === "offline" ? "live updates off (polling)" : "connecting";
 
   return (
     <div className="flex items-center gap-2">
@@ -67,7 +65,6 @@ export function SyncIndicator() {
         {icon}
         <span className="hidden md:inline num">{text}</span>
         <span className="sr-only md:hidden">{text}</span>
-        <span className="sr-only">({liveNote})</span>
       </p>
       <Button
         variant="outline"
