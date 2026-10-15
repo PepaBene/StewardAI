@@ -150,16 +150,39 @@ Steps:
    test a restore once.
 6. Remove `public` tables from Supabase after the fallback window so only Auth remains.
 
-## Phase 4: other Railway cost cuts
+## Phase 4: other Railway cost cuts (done 2026-10-15: measured, decisions recorded)
 
-- Egress to Supabase falls to near zero once the DB is private-network.
-- Keep one replica in one region (already so). CPU and RAM limits do not change the bill;
-  usage does.
-- Review the schedule: `monitor` runs 672 times a week and `intraday_prices` 320; check
-  whether either needs to run outside market hours.
-- `price_history` and `news_ingest` are the long jobs; shortening them lowers peak RAM time.
-- Do not use a second service for the worker unless Chromium is enabled: two always-on
-  services double the baseline RAM.
+Measured over 7 days: jobs ran about 34 hours of 168; memory is flat at 0.485 GB average
+(0.50 before `MALLOC_ARENA_MAX=2`); CPU about 0.004 vCPU. Railway bills the always-on baseline,
+not the job minutes, so:
+- Schedules: left as they are. `monitor` is 672 runs of about 1 s (16 minutes a week) and
+  `intraday_prices` 320 runs of 18 s (98 minutes); moving either off-hours saves nothing on the
+  bill and would delay alerts. `news_ingest` (923 min) and `price_history` (314 min, mostly
+  pacing sleeps) are the long jobs; they only matter for peaks, which the bounded-memory audit
+  already covers.
+- One replica in one region (already so); limits do not change the bill, usage does.
+- No second service for the worker unless Chromium is enabled: two always-on services double
+  the baseline.
+- Egress to Supabase falls to near zero once the database is on the private network (cutover).
+- Left to measure after the cutover: the Postgres service's real RAM against the 150-250 MB
+  expectation, then tune `shared_buffers`.
+
+### Re-creating the Postgres service (the rehearsal copy was deleted)
+
+The rehearsal service was removed so no idle copy or exposed password stays around. Recreate it
+the same way, with fresh generated passwords, just before the cutover:
+- Service `Postgres`, image `pgvector/pgvector:pg17`, region `europe-west4-drams3a`, a 3 GB
+  volume at `/var/lib/postgresql/data` in the same region.
+- Variables: `POSTGRES_USER=postgres`, `POSTGRES_DB=steward`,
+  `PGDATA=/var/lib/postgresql/data/pgdata`, and `POSTGRES_PASSWORD` / `APP_BACKEND_PASSWORD`
+  as `${{secret(40)}}`.
+- Start command: `docker-entrypoint.sh postgres -c max_connections=30 -c shared_buffers=128MB
+  -c effective_cache_size=384MB -c work_mem=4MB -c maintenance_work_mem=64MB -c
+  autovacuum_max_workers=2 -c max_wal_size=512MB -c listen_addresses=*`.
+- Then, with a temporary TCP proxy and the three values in `~/db-move.env`:
+  `sh deploy/db-move/run-local.sh` (about 13 minutes), `deploy/db-move/smoke.sql` as
+  `app_backend`, remove the proxy and the env file. For the cutover itself, stop the worker
+  first and repeat the copy so it is current.
 
 ## Expected cost (Hobby, usage-based; verify against Railway's current price list)
 
