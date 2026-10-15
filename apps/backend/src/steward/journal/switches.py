@@ -57,6 +57,11 @@ class SwitchIn(BaseModel):
         return value.strip()
 
 
+def switch_by_owner(entry: SwitchEntry) -> bool:
+    """False for a switch the app logged from detected trades; it is not scored."""
+    return bool(entry.snapshot.get("origin", "owner") == "owner")
+
+
 class SwitchEntry(BaseModel):
     id: int
     switched_on: dt.date
@@ -83,7 +88,9 @@ def _entry(row: asyncpg.Record) -> SwitchEntry:
     return SwitchEntry(**data)
 
 
-async def record(pool: asyncpg.Pool, owner_id: str, body: SwitchIn) -> SwitchEntry:
+async def record(
+    pool: asyncpg.Pool, owner_id: str, body: SwitchIn, origin: str = "owner"
+) -> SwitchEntry:
     if body.sold_ticker == body.bought_ticker:
         raise JournalError("A switch needs two different stocks.")
     today = local_today()
@@ -97,6 +104,8 @@ async def record(pool: asyncpg.Pool, owner_id: str, body: SwitchIn) -> SwitchEnt
     sold_price = body.sold_price if body.sold_price is not None else sold_found
     bought_price = body.bought_price if body.bought_price is not None else bought_found
     snapshot: dict[str, Any] = {"line": body.line} if body.line else {}
+    if origin != "owner":
+        snapshot["origin"] = origin
     try:
         from steward.decision import ranking_service
 

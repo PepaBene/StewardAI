@@ -165,7 +165,8 @@ async def approve_listings(
         " from public.instrument_security_link l"
         " join public.instrument i on i.t212_ticker = l.ticker"
         " join public.security_listing sl on sl.id = l.listing_id"
-        " where l.status = 'suggested' and l.decided_by is null order by l.ticker"
+        " where l.status = 'suggested' and l.decided_by is null"
+        " and not (l.evidence ? 'autopilot_reverted') order by l.ticker"
     )
     usage = Usage(model=cfg.model)
     out: dict[str, Any] = {"suggested": len(rows), "decisions": []}

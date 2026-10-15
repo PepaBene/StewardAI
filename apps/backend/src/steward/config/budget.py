@@ -71,6 +71,9 @@ BudgetJobType = Literal[
     "edinet_filings",
     "twelve_data_corporate_actions",
     "ai_approvals",
+    "autopilot",
+    "autopilot_calibration",
+    "watchdog",
     "ir_discovery",
     "news_ai_search",
     "news_triage",
@@ -78,6 +81,9 @@ BudgetJobType = Literal[
     "news_brief",
     "gap_research",
     "exposure_build",
+    "document_index",
+    "inbox_scan",
+    "inbox_agent",
     "factor_returns",
     "disclosure_sources",
     "disclosure_ingest",
@@ -86,6 +92,8 @@ BudgetJobType = Literal[
     "disclosure_esef",
     "disclosure_estimates",
     "disclosure_alerts",
+    "thesis",
+    "portfolio_review",
 ]
 
 AtCap = Literal["alert_only", "pause_noncritical", "downgrade_noncritical"]

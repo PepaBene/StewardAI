@@ -102,7 +102,6 @@ export function WireView() {
     const search = wireFiltersToSearch(filters);
     if (search === pushed.current) return;
     pushed.current = search;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft(textDraft(filters));
   }, [filters]);
 

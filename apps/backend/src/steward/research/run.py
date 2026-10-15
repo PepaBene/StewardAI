@@ -21,17 +21,21 @@ over the model sections, less a reserve for follow-up rounds; a section the budg
 reach says so.
 """
 
+import asyncio
 import datetime as dt
 import json
 import math
 import time
+from collections import Counter
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
 from pydantic import BaseModel, Field
 
 from steward.ai import AINotConfigured, Usage
+from steward.chat.owner import owner_of
 from steward.chat.tools import ChatTools
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.news_sources import NewsSourcesConfig
@@ -41,10 +45,20 @@ from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import VerificationConfig
+from steward.documents.fetch import FetchError, default_headers, fetch_document
 from steward.jobs.runner import JobContext, JobFailed
+from steward.llm.cache import SEARCH_CACHE_DAYS, SEARCH_CACHE_DAYS_FRESH, ResultCache
 from steward.llm.client import create_llm
 from steward.llm.routing import routing_client
 from steward.news.normalize import host_of
+from steward.research.agents import (
+    AgentRun,
+    LLMWorker,
+    Worker,
+    WorkerRecord,
+    findings_text,
+    run_agents,
+)
 from steward.research.gather import Gathered, Valuation, gather
 from steward.research.layout import SectionSpec, investigation_profile, resolve_layout
 from steward.research.ledger import ClaimLedger, SectionInput, build_ledger
@@ -57,15 +71,26 @@ from steward.research.model_plan import (
     make_plan,
     same_layout,
 )
+from steward.research.page_evidence import FetchPage, attach_page_text
 from steward.research.plan import ResearchPlan, build_plan, effective_searches, focus_for
 from steward.research.read_tools import (
     ReadToolRun,
     ToolCallRecord,
     comparison,
     evidence_for,
+    full_data_calls,
     run_read_tools,
 )
 from steward.research.rules import load_compliance
+from steward.research.scouts import SYSTEM as SCOUT_SYSTEM
+from steward.research.scouts import (
+    LLMScout,
+    Scout,
+    ScoutRequest,
+    ScoutResult,
+    question_for,
+    snippet_of,
+)
 from steward.research.snapshot import RunSnapshot, take_snapshot
 from steward.research.source_policy import (
     PRIORITY_TEXT,
@@ -193,9 +218,28 @@ class ResearchBody(BaseModel):
     # The plan's stored-data tools as the run called them (the same tools chat uses), one
     # compact record per call, so research and chat can be compared. Older reports have none.
     tool_calls: list[ToolCallRecord] = Field(default_factory=list)
+    # The engine that ran and, for the agentic one, what each worker did (metadata only).
+    engine: str = "fixed"
+    agents: list[WorkerRecord] = Field(default_factory=list)
     # Per-call trace of the run (model calls, searches, retrieval, output validation): metadata
     # only, removed by the purge and the retention job. Older reports have none.
     trace: ResearchTrace | None = None
+
+
+def agent_model_trace(record: WorkerRecord) -> ModelCallTrace:
+    outcome = {"ok": "ok", "no_findings": "ok", "refused": "refused", "not_run": "skipped"}
+    return ModelCallTrace(
+        step=f"worker:{record.lens}",
+        model=record.model,
+        input_tokens=record.input_tokens,
+        output_tokens=record.output_tokens,
+        cache_read_tokens=record.cache_read_tokens,
+        searches=record.searches,
+        cost_usd=record.cost_usd,
+        ms=record.ms,
+        outcome=outcome.get(record.outcome, "failed"),
+        note=clip(record.note or "", 160) or None,
+    )
 
 
 @dataclass
@@ -206,6 +250,11 @@ class ResearchDeps:
     app_url: str | None = None
     prompts: dict[str, str] = field(default_factory=dict)  # the system texts, for the snapshot
     planner: ResearchPlanner | None = None  # the model planning step; None = code plan
+    worker: Worker | None = None  # the agentic engine's lens worker; None = fixed pipeline
+    scout: Scout | None = None  # search_mode "scouts": the cheap model that runs the searches
+    # The text of a cited web page (None when it cannot be read), so the claim checker has
+    # the page's words and not only its title. None = titles only.
+    fetch_page: FetchPage | None = None
 
 
 def _source_line(s: Source) -> str:
@@ -253,11 +302,102 @@ def search_domains(
     return tuple(dict.fromkeys(domains)), tier_of
 
 
+# D4: written after the evidence sections when `write_order` is "summary_last".
+LATE_SECTIONS = ("executive_summary", "thesis_kpis", "open_questions")
+
+
+def write_order(specs: list[SectionSpec], order: str) -> list[SectionSpec]:
+    """The order model sections are written in. Display order is the layout's and never
+    changes; only the late sections move to the end, keeping their relative order."""
+    if order != "summary_last":
+        return list(specs)
+    return [s for s in specs if s.id not in LATE_SECTIONS] + [
+        s for s in specs if s.id in LATE_SECTIONS
+    ]
+
+
+def late_material(g: Gathered, reg: Registry, written: dict[str, dict[str, Any]]) -> str:
+    """The material for a late section: the company context, the sentences already written
+    (from stored records and by the evidence sections) and only the sources they cite. Empty
+    when no evidence section wrote anything, so the section falls back to the whole material."""
+    model_lines = [
+        (s["text"], list(s.get("source_ids", [])))
+        for out in written.values()
+        for s in out.get("sentences", [])
+    ]
+    if not model_lines:
+        return ""
+    code_lines = [
+        (sentence.text, list(sentence.source_ids))
+        for section in g.sections.values()
+        for sentence in section.sentences
+    ]
+    cited = {i for _, ids in (*code_lines, *model_lines) for i in ids}
+    lines = [f"Company context: {g.context}", "", "Sources cited by the sentences below:"]
+    lines += [_source_line(s) for s in reg.sources if s.id in cited]
+    lines += ["", "Already written from stored records (cite the same ids if you use them):"]
+    lines += [f"- {neutralise(t)} [{', '.join(ids)}]" for t, ids in code_lines]
+    lines += ["", "Already written by the other sections (cite the same ids if you use them):"]
+    lines += [f"- {neutralise(t)} [{', '.join(ids)}]" for t, ids in model_lines]
+    return "\n".join(lines)
+
+
+def merge_attempts(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
+    """Two writes of one section (cheap, then the profile's model): the second one's text,
+    with both attempts' cost, sources and trace kept."""
+    out = dict(second)
+    for key in ("steps", "searches", "dropped", "links_removed"):
+        out[key] = int(first.get(key, 0)) + int(second.get(key, 0))
+    out["new_sources"] = [*first.get("new_sources", []), *second.get("new_sources", [])]
+    out["discovered"] = [*first.get("discovered", []), *second.get("discovered", [])]
+    out["search_errors"] = [*first.get("search_errors", []), *second.get("search_errors", [])]
+    out["scout_urls"] = [*first.get("scout_urls", []), *second.get("scout_urls", [])]
+    out["extra_traces"] = [
+        *first.get("extra_traces", []),
+        *([first["trace"]] if first.get("trace") else []),
+        *second.get("extra_traces", []),
+    ]
+    return out
+
+
 class _FailedCall(Exception):
     """A model call that wrote nothing: its result must not become a checkpoint."""
 
 
 NO_KEY_NOTE = "not written: no AI provider key is set"
+TRANSIENT_NOTES = ("HTTP 5", "HTTP 429", "HTTP 408", "Timeout", "no answer within")
+TRANSIENT_WAITS = (15.0, 45.0)  # seconds before the 2nd and 3rd try of an overloaded provider
+
+
+def transient_failure(output: dict[str, Any]) -> bool:
+    """A section the provider failed to answer (overloaded, timed out), not one the model
+    declined or the budget stopped: asking again later can succeed."""
+    note = str(output.get("note") or "")
+    return (
+        not output.get("sentences")
+        and "the call failed" in note
+        and any(marker in note for marker in TRANSIENT_NOTES)
+    )
+
+
+async def retry_transient(
+    attempt: Callable[[], Awaitable[dict[str, Any]]],
+    waits: tuple[float, ...] = TRANSIENT_WAITS,
+) -> dict[str, Any]:
+    """`attempt()`, repeated after a pause while the provider's failure looks temporary. A failed
+    call produced no sentences, so a retry cannot duplicate any; the steps of the failed tries
+    stay counted."""
+    output = await attempt()
+    for wait in waits:
+        if not transient_failure(output):
+            break
+        await asyncio.sleep(wait)
+        output = merge_attempts(output, await attempt())
+    return output
+
+
+FULL_DATA_MAX_CALLS = 48
+PAGE_MAX_BYTES = 12_000_000  # a cited filing page; larger documents are not read for evidence
 NO_BUDGET_NOTE = "not written: the profile's step budget is used up"
 # Notes of a section no follow-up could fill; any other "not written" is a failed call.
 PERMANENT_NOTES = (NO_KEY_NOTE, NO_BUDGET_NOTE)
@@ -463,8 +603,22 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
 
     async def do_read_tools() -> dict[str, Any]:
         async with ctx.step("read_tools") as step:
-            tools = ChatTools(pool, reg, None, None)
-            outcome = await run_read_tools(tools.call, reg, plan, ticker)
+            if ctx.params.get("full_data"):
+                # A thesis the owner asked for: every stored record about the company and the
+                # owner's own position, notes, history and risk, not only the plan's tools.
+                tools = ChatTools(pool, reg, None, None, owner_id=await owner_of(pool))
+                outcome = await run_read_tools(
+                    tools.call,
+                    reg,
+                    plan,
+                    ticker,
+                    owner=True,
+                    extra=full_data_calls(ticker, gathered.name),
+                    max_calls=FULL_DATA_MAX_CALLS,
+                )
+            else:
+                tools = ChatTools(pool, reg, None, None)
+                outcome = await run_read_tools(tools.call, reg, plan, ticker)
             step.detail.update(
                 calls=len(outcome.records),
                 by_status=comparison(outcome.records),
@@ -497,6 +651,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             "research_planner": PLANNER_SYSTEM,
             "section_tasks": json.dumps(SECTION_TASKS, sort_keys=True, ensure_ascii=False),
             "source_priority": PRIORITY_TEXT,
+            **({"research_scout": SCOUT_SYSTEM} if profile.search_mode == "scouts" else {}),
         },
         versions={
             "strategy": strategy_v.id if strategy_v else None,
@@ -526,10 +681,173 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
     per_section_searches = math.ceil(first_searches / len(model_specs)) if model_specs else 0
     budget = {"steps": 0, "searches": 0}
     written: dict[str, dict[str, Any]] = {}
+
+    agent_run: AgentRun | None = None
+    agent_notes: list[str] = []
+    if profile.engine == "agentic" and model_specs and deps.worker is not None:
+        # Workers spend from the same profile budget: leave one step per section for the
+        # writer, divide the rest between the lenses, and cap their searches by the first-pass
+        # share. The writer then searches nothing in the first pass: the workers did.
+        step_room = first_steps - len(model_specs)
+        worker_steps = min(profile.worker_max_steps, step_room // len(profile.lenses))
+
+        async def do_agents() -> dict[str, Any]:
+            async with ctx.step("agents") as step:
+                run_out = await run_agents(
+                    deps.worker,  # type: ignore[arg-type]
+                    lenses=list(profile.lenses),
+                    name=gathered.name,
+                    ticker=ticker,
+                    today=deps.now.date().isoformat(),
+                    model=profile.worker_model,
+                    effort=profile.worker_effort,
+                    max_steps=profile.worker_max_steps,
+                    total_steps=step_room,
+                    worker_searches=profile.worker_max_searches,
+                    total_searches=first_searches,
+                    parallel=profile.parallel_workers,
+                    domains=domains,
+                    caller=ChatTools(pool, reg, None, None, owner_id=await owner_of(pool)).call,
+                    registry=reg,
+                    tier_of=tier_of,
+                    cost_of=lambda u: cost_of(u),
+                )
+                total = Usage(model=profile.worker_model)
+                for rec in run_out.records:
+                    total.input_tokens += rec.input_tokens
+                    total.output_tokens += rec.output_tokens
+                    total.cache_read_tokens += rec.cache_read_tokens
+                    total.searches += rec.searches
+                step.usage = total.step_usage()
+                step.detail.update(
+                    workers=len(run_out.records),
+                    findings=len(run_out.findings),
+                    sources_added=run_out.sources_added,
+                    searches=run_out.searches_used,
+                    by_outcome=dict(Counter(r.outcome for r in run_out.records)),
+                )
+                return {
+                    "run": run_out.model_dump(mode="json"),
+                    "sources": [s.model_dump(mode="json") for s in reg.sources[known_sources:]],
+                }
+
+        if worker_steps >= 2:
+            known_sources = len(reg.sources)
+            stored = await ctx.checkpoint("agents", do_agents)
+            agent_run = AgentRun.model_validate(stored["run"])
+            for src in (Source.model_validate(s) for s in stored["sources"]):
+                # Resumed: the workers did not run again, so put their sources back, in order.
+                reg.add(
+                    src.kind,
+                    src.ref,
+                    src.title,
+                    **src.model_dump(exclude={"id", "kind", "ref", "title"}),
+                )
+            flag_sources(reg.sources[known_sources:])
+            budget["steps"] += sum(r.steps for r in agent_run.records)
+            budget["searches"] += agent_run.searches_used
+            trace_parts.extend(
+                {"model": agent_model_trace(r).model_dump()} for r in agent_run.records
+            )
+        else:
+            agent_notes.append(
+                "Agentic engine skipped: the profile's step budget leaves too little for workers."
+            )
+    if profile.engine == "agentic" and model_specs and deps.worker is None:
+        agent_notes.append(
+            "Agentic engine not used: no AI provider key is set, so the fixed pipeline ran."
+        )
+    if agent_run is not None:
+        per_section_searches = 0
     # The gathered material is identical for every section (the writer caches it); sources
     # added by search go in a separate, per-section part.
     material = material_text(gathered, reg)
+    if agent_run is not None and (block := findings_text(agent_run)):
+        material += f"\n\n{block}"
     gathered_count = len(reg.sources)
+
+    async def run_scout(
+        spec: SectionSpec,
+        *,
+        round_no: int,
+        searches: int,
+        focus: str,
+        step_name: str,
+        out: dict[str, Any],
+    ) -> ScoutResult | None:
+        """D2: a scout runs the section's searches; its extracts join the registry as ordinary
+        search sources, tier-checked like any result. None when the scout failed, so the
+        writer searches itself (a failed scout never costs the section its web evidence)."""
+        assert deps.scout is not None
+        async with ctx.step(f"scout:{step_name}") as step:
+            started = time.monotonic()
+            result = await deps.scout.scout(
+                ScoutRequest(
+                    name=gathered.name,
+                    ticker=ticker,
+                    question=question_for(
+                        spec.title,
+                        spec.task or SECTION_TASKS.get(spec.id, ""),
+                        focus,
+                        counter=spec.id == "counter_case",
+                    ),
+                    domains=domains,
+                    max_searches=searches,
+                )
+            )
+            step.usage = result.usage.step_usage()
+            out["steps"] += 1 + result.usage.searches
+            out["searches"] += result.usage.searches
+            failed = result.note is not None and not result.extracts
+            out.setdefault("extra_traces", []).append(
+                {
+                    "model": ModelCallTrace(
+                        step=f"scout:{step_name}",
+                        section=spec.id,
+                        round=round_no,
+                        model=result.usage.model,
+                        input_tokens=result.usage.input_tokens,
+                        output_tokens=result.usage.output_tokens,
+                        cache_read_tokens=result.usage.cache_read_tokens,
+                        searches=result.usage.searches,
+                        cost_usd=cost_of(result.usage),
+                        ms=round((time.monotonic() - started) * 1000),
+                        outcome="ok" if not failed else "failed",
+                        note=clip(result.note or "", 160) or None,
+                    ).model_dump()
+                }
+            )
+            if failed:
+                step.detail.update(extracts=0, note=result.note)
+                return None
+            kept = 0
+            for extract in result.extracts:
+                title = result.titles.get(extract.url)
+                snippet = snippet_of(extract)
+                if title is None or not snippet:
+                    continue  # not a page the search returned, or nothing to read
+                decision = policy.decide(host_of(extract.url))
+                if not decision.allowed:
+                    continue
+                before = len(reg.sources)
+                reg.add(
+                    "search",
+                    extract.url,
+                    title,
+                    url=extract.url,
+                    tier=decision.tier,
+                    snippet=snippet,
+                    role=decision.role,
+                    caveat=decision.reason,
+                    retrieved_at=deps.now.isoformat(timespec="seconds"),
+                )
+                kept += 1
+                out.setdefault("scout_urls", []).append(extract.url)
+                if len(reg.sources) > before:
+                    flag_sources(reg.sources[before:])
+                    out["new_sources"].append(reg.sources[-1].model_dump())
+            step.detail.update(extracts=kept, returned=len(result.extracts), round=round_no)
+        return result
 
     async def write_section(
         spec: SectionSpec,
@@ -540,11 +858,28 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         focus: str,
         existing: str,
         step_name: str,
+        model: str | None = None,
+        effort: str | None = None,
+        material_override: str | None = None,
     ) -> dict[str, Any]:
         out: dict[str, Any] = {"sentences": [], "new_sources": [], "steps": 0, "searches": 0}
         if deps.writer is None:
             out["note"] = NO_KEY_NOTE
             return out
+        scouted: ScoutResult | None = None
+        writer_searches = searches
+        if profile.search_mode == "scouts" and searches > 0 and deps.scout is not None:
+            scouted = await run_scout(
+                spec,
+                round_no=round_no,
+                searches=searches,
+                focus=focus,
+                step_name=step_name,
+                out=out,
+            )
+            if scouted is not None:
+                writer_searches = 0
+        scout_urls = set(out.get("scout_urls", []))
         async with ctx.step(step_name) as step:
             offered = len(reg.sources)
             started = time.monotonic()
@@ -553,30 +888,36 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                     section=spec.id,
                     name=gathered.name,
                     ticker=ticker,
-                    material=material,
+                    material=material_override or material,
                     added_material=added_material_text(reg, gathered_count),
                     language=profile.language,
                     max_sentences=max_sentences,
                     domains=domains,
-                    max_searches=searches,
+                    max_searches=writer_searches,
                     peers=gathered.peers,
                     today=deps.now.date(),
                     title=spec.title,
                     task=spec.task,
                     focus=focus,
-                    policy=PRIORITY_TEXT if searches else "",
+                    policy=PRIORITY_TEXT if writer_searches else "",
                     existing=existing,
                     horizon_days=profile.date_horizon_days,
                     tool_evidence=evidence_for(
                         tool_run, spec.id, first=spec.id == model_specs[0].id
                     ),
+                    model=model,
+                    effort=effort,
                 )
             )
             ms = round((time.monotonic() - started) * 1000)
             step.usage = result.usage.step_usage()
-            out["steps"] = 1 + result.usage.searches
-            out["searches"] = result.usage.searches
+            out["steps"] += 1 + result.usage.searches
+            out["searches"] += result.usage.searches
             hits = result.hits or [SearchHit(u, t) for u, t in result.titles.items()]
+            if scouted is not None:
+                hits = [*scouted.hits, *hits]
+                result.queries = [*scouted.queries, *result.queries]
+                result.search_errors = [*scouted.search_errors, *result.search_errors]
             if result.search_errors:
                 out["search_errors"] = result.search_errors
             call_outcome = (
@@ -645,6 +986,13 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                         out["new_sources"].append(reg.sources[-1].model_dump())
                     cited_urls.add(url)
                     ids.append(sid)
+                if scout_urls:
+                    # Cited by registry id: the page a scout found and the section used.
+                    cited_urls |= {
+                        r.url
+                        for i in ids
+                        if (r := reg.get(i)) is not None and r.url and r.url in scout_urls
+                    }
                 text, removed = strip_outbound(d.text, {s.url for s in reg.sources if s.url})
                 out["links_removed"] = int(out.get("links_removed", 0)) + removed
                 if not text or not ids:
@@ -680,6 +1028,7 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         return out
 
     def absorb(output: dict[str, Any]) -> None:
+        trace_parts.extend(output.get("extra_traces", []))
         if output.get("trace"):
             trace_parts.append(output["trace"])
         for src in output.get("new_sources", []):
@@ -713,7 +1062,38 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         except _FailedCall:
             return dict(failed["out"])
 
-    for index, spec in enumerate(model_specs):
+    ordered_specs = write_order(model_specs, profile.write_order)
+
+    async def write_with_fallback(
+        spec: SectionSpec,
+        *,
+        cheap: bool,
+        enough: Callable[[dict[str, Any]], bool],
+        steps_room: int,
+        **kw: Any,
+    ) -> dict[str, Any]:
+        """D3/D6: the cheap model writes first; a draft that is not `enough` (too few cited
+        sentences, or a failed call) is written again by the profile's model, inside the same
+        step budget. The final answer is always the stronger model's when the cheap one fell
+        short, so a weak draft never reaches the report."""
+        if not cheap:
+            return await write_section(spec, **kw)
+        first = await write_section(
+            spec, model=profile.cheap_model, effort=profile.cheap_effort, **kw
+        )
+        if enough(first) or str(first.get("note", "")).startswith(PERMANENT_NOTES):
+            return first
+        room = steps_room - int(first.get("steps", 0))
+        if room < 1:
+            return first
+        again = {
+            **kw,
+            "step_name": f"{kw['step_name']}:escalated",
+            "searches": max(0, min(kw["searches"] - int(first.get("searches", 0)), room - 1)),
+        }
+        return merge_attempts(first, await write_section(spec, **again))
+
+    for index, spec in enumerate(ordered_specs):
 
         async def do_section(spec: SectionSpec = spec, index: int = index) -> dict[str, Any]:
             left = first_steps - budget["steps"]
@@ -734,17 +1114,36 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                 ),
             )
             focus = focus_for(plan, spec.id)
-            if index == 0 and plan.questions and plan.questions[0].id == "mode":
+            if spec.id == model_specs[0].id and plan.questions and plan.questions[0].id == "mode":
                 focus = f"- {plan.questions[0].question}\n{focus}".strip()
-            return await write_section(
-                spec,
-                round_no=0,
-                searches=searches,
-                max_sentences=spec.max_sentences or SENTENCES_BY_DEPTH[profile.depth],
-                focus=focus,
-                existing="",
-                step_name=f"section:{spec.id}",
+            cap = spec.max_sentences or SENTENCES_BY_DEPTH[profile.depth]
+            need = min(profile.min_sentences, cap)
+            # D4: a late section reads what the evidence sections wrote, not the whole pile.
+            compact = (
+                late_material(gathered, reg, written)
+                if profile.write_order == "summary_last" and spec.id in LATE_SECTIONS
+                else ""
             )
+
+            def enough(o: dict[str, Any], need: int = need) -> bool:
+                return len(o["sentences"]) >= need
+
+            async def attempt() -> dict[str, Any]:
+                return await write_with_fallback(
+                    spec,
+                    cheap=spec.id in profile.cheap_sections,
+                    enough=enough,
+                    steps_room=left,
+                    round_no=0,
+                    searches=searches,
+                    max_sentences=cap,
+                    focus=focus,
+                    existing="",
+                    step_name=f"section:{spec.id}",
+                    material_override=compact or None,
+                )
+
+            return await retry_transient(attempt)
 
         output = await checkpoint_written(f"section:{spec.id}", do_section)
         absorb(output)
@@ -811,9 +1210,13 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
                     lines: list[str] = lines,
                     existing: str = existing,
                     room: int = room,
+                    steps_left: int = steps_left,
                 ) -> dict[str, Any]:
-                    return await write_section(
+                    return await write_with_fallback(
                         spec,
+                        cheap=profile.follow_up_cheap,
+                        enough=lambda o: bool(o["sentences"]),
+                        steps_room=steps_left,
                         round_no=round_no,
                         searches=searches,
                         max_sentences=min(FOLLOW_UP_SENTENCES, room),
@@ -890,6 +1293,13 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         if not model_sentences or not claim_settings.enabled:
             return {"results": {}, "summary": None}
         async with ctx.step("verify_claims") as step:
+            if deps.fetch_page is not None:
+                # A web citation is a URL and a title; the checker needs the page's own words.
+                cited_by: dict[str, list[str]] = {}
+                for _, _, s in model_sentences:
+                    for sid in s.source_ids:
+                        cited_by.setdefault(sid, []).append(s.text)
+                step.detail["pages_read"] = await attach_page_text(reg, cited_by, deps.fetch_page)
             claims = [
                 Claim(n, s.text, reg.evidence(s.source_ids))
                 for n, (_, _, s) in enumerate(model_sentences)
@@ -963,6 +1373,9 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
         if profile.language == "cs":
             notes.append("Sections written from stored records are in English.")
         notes.extend(tool_run.notices)
+        notes.extend(agent_notes)
+        if agent_run is not None:
+            notes.extend(agent_run.notices)
         proposal = build_proposal(
             profile.authoring,
             ticker,
@@ -1076,6 +1489,8 @@ async def run_research(ctx: JobContext, deps: ResearchDeps) -> int:
             flagged_sources=flagged,
             links_removed=links_removed,
             tool_calls=tool_run.records,
+            engine=profile.engine,
+            agents=agent_run.records if agent_run else [],
             trace=trace,
         )
         report_id: int = await pool.fetchval(
@@ -1173,6 +1588,11 @@ def render_md(body: ResearchBody, view: View | None = None) -> str:
 
 
 async def research_handler(ctx: JobContext) -> None:
+    await run_research_job(ctx)
+
+
+async def run_research_job(ctx: JobContext) -> int:
+    """The research job; returns the stored report's id (the thesis job reads it next)."""
     settings = get_settings()
     prompts = await load_prompts(ctx.pool)
     research = await load_active(ctx.pool, "research_profiles", ResearchProfilesConfig)
@@ -1185,19 +1605,55 @@ async def research_handler(ctx: JobContext) -> None:
     planner: ResearchPlanner | None = None
     writer_system = prompts.text("research_writer", WRITER_SYSTEM)
     verifier_system = prompts.text("claim_verifier", VERIFIER_SYSTEM)
+    worker: Worker | None = None
+    scout: Scout | None = None
     try:
-        client = routing_client(create_llm(settings))
+        llm = create_llm(settings)
+        # Cost lever C8: a section whose material, prompt, model and effort are unchanged is
+        # not written (or searched) again, so a re-run after a small data change pays only for
+        # the sections that changed. The prompt carries today's date, so a hit is a same-day
+        # re-run. `fresh` in the job params bypasses it (benchmarks, a deliberate second take).
+        reuse = ResultCache(ctx.pool, "research_section", search_ttl_days=SEARCH_CACHE_DAYS_FRESH)
+        client = routing_client(llm, None if ctx.params.get("fresh") else reuse)
     except AINotConfigured:
         writer = verifier = None
     else:
+        if profile and profile.engine == "agentic":
+            worker = LLMWorker(llm)
         cheap = (verification.body if verification else VerificationConfig()).claim_verifier.model
         if profile and profile.planning == "model":
             planner = LLMResearchPlanner(client, profile.planner_model or cheap)
+        # D5: a run nobody waits on may take the discounted tier (flex), and its independent
+        # claim checks the batch API.
+        tier = "flex" if profile and profile.priority in ("flex", "batch") else "standard"
         writer = (
-            LLMResearchWriter(client, profile.model, profile.effort, writer_system)
+            LLMResearchWriter(
+                client,
+                profile.model,
+                profile.effort,
+                writer_system,
+                cache_key=f"research:{ctx.job_id}",
+                priority=tier,
+            )
             if profile
             else None
         )
+        if profile and profile.search_mode == "scouts":
+            # Scout extracts are kept for the 3-day search window (D7): the same question
+            # about the same company is not searched again. The prompt carries no date.
+            scout_client = routing_client(
+                llm,
+                None
+                if ctx.params.get("fresh")
+                else ResultCache(ctx.pool, "research_scout", search_ttl_days=SEARCH_CACHE_DAYS),
+            )
+            scout = LLMScout(
+                scout_client,
+                profile.scout_model,
+                profile.scout_effort,
+                cache_key=f"research-scout:{ctx.job_id}",
+                priority=tier,
+            )
         claim_settings = (
             verification.body if verification else VerificationConfig()
         ).claim_verifier
@@ -1206,15 +1662,32 @@ async def research_handler(ctx: JobContext) -> None:
             claim_settings.model,
             verifier_system,
             effort=claim_settings.effort,
+            cache=ResultCache(ctx.pool, "claim_verifier"),
+            use_batch=bool(profile and profile.priority == "batch"),
         )
-    await run_research(
-        ctx,
-        ResearchDeps(
-            writer=writer,
-            verifier=verifier,
-            now=dt.datetime.now(dt.UTC),
-            app_url=settings.app_url,
-            prompts={"research_writer": writer_system, "claim_verifier": verifier_system},
-            planner=planner,
-        ),
-    )
+    async with httpx.AsyncClient(timeout=30.0) as http:
+
+        async def fetch_page(url: str) -> str | None:
+            headers = default_headers(settings.sec_user_agent if "sec.gov" in url else None)
+            try:
+                document = await fetch_document(
+                    http, url, max_bytes=PAGE_MAX_BYTES, headers=headers
+                )
+                return await document.text_async()
+            except FetchError:
+                return None
+
+        return await run_research(
+            ctx,
+            ResearchDeps(
+                writer=writer,
+                verifier=verifier,
+                now=dt.datetime.now(dt.UTC),
+                app_url=settings.app_url,
+                prompts={"research_writer": writer_system, "claim_verifier": verifier_system},
+                planner=planner,
+                worker=worker,
+                scout=scout,
+                fetch_page=fetch_page,
+            ),
+        )

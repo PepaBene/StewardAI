@@ -3,13 +3,14 @@ versioned config."""
 
 import datetime as dt
 import json
+import mimetypes
 from collections.abc import AsyncIterator
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 import asyncpg
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from pydantic import BaseModel, Field
 
 from api.auth import Owner
@@ -44,6 +45,7 @@ from steward.earnings.read import (
 from steward.earnings.review import ReviewError, ReviewItem, review_queue
 from steward.earnings.review import review_fact as review_fact_in_db
 from steward.earnings.review_stats import ReviewStats, review_stats
+from steward.engine import overrides
 from steward.jobs import queue
 from steward.jobs.runner import create_job
 from steward.portfolio.concentration import ConcentrationReport, concentration_report
@@ -93,7 +95,8 @@ from steward.portfolio.transactions import (
 )
 from steward.portfolio.validation import ModelValidation, model_validation
 from steward.settings import get_settings
-from steward.storage import EvidenceStore, StorageError, SupabaseStorage
+from steward.storage import EvidenceStore, StorageError, SupabaseStorage, verify_blob
+from steward.training import labels
 
 router = APIRouter()
 
@@ -611,11 +614,41 @@ async def get_storage() -> AsyncIterator[EvidenceStore]:
         )
     async with httpx.AsyncClient(timeout=30.0) as http:
         yield SupabaseStorage(
-            http, settings.supabase_url, settings.supabase_secret_key.get_secret_value()
+            http,
+            settings.supabase_url,
+            settings.supabase_secret_key.get_secret_value(),
+            public_api_url=settings.public_api_url,
         )
 
 
 Storage = Annotated[EvidenceStore, Depends(get_storage)]
+
+# Archived pages are third-party HTML: served from this origin they must not run scripts or
+# reach the app, so the response is sandboxed and cannot load anything.
+_BLOB_HEADERS = {
+    "Content-Security-Policy": (
+        "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:"
+    ),
+    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": "private, max-age=300",
+}
+
+
+@router.get("/evidence/blob", include_in_schema=False)
+async def evidence_blob(path: str, exp: int, sig: str, storage: Storage) -> Response:
+    """An archived object, decompressed, for a link made by `SupabaseStorage.signed_url`. The
+    signature and expiry are the authorisation: a browser link carries no bearer token."""
+    settings = get_settings()
+    if settings.supabase_secret_key is None or not verify_blob(
+        settings.supabase_secret_key.get_secret_value(), path, exp, sig
+    ):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Link expired or invalid")
+    try:
+        data = await storage.get(path)
+    except StorageError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such archived object") from exc
+    media_type = mimetypes.guess_type(path)[0] or "application/octet-stream"
+    return Response(data, media_type=media_type, headers=_BLOB_HEADERS)
 
 
 @router.get("/theses/board", tags=["holdings"])
@@ -719,6 +752,19 @@ async def review_fact(
         code = status.HTTP_404_NOT_FOUND if exc.not_found else status.HTTP_409_CONFLICT
         raise HTTPException(code, str(exc)) from exc
     job = await _enqueue(pool, "thesis_verdicts", owner.user_id, {"ticker": outcome.ticker})
+    # The owner's decision on an extracted fact is a label on the extraction.
+    await labels.record(
+        pool,
+        source="owner_accept" if body.action == "accept" else "owner_review",
+        subject_kind="fact",
+        subject_ref=str(fact_id),
+        label={"accept": "right", "correct": "corrected", "reject": "wrong"}[body.action],  # type: ignore[arg-type]
+        by_owner=True,
+        detail={
+            "reason": body.reason,
+            **({"value": str(body.value)} if body.value is not None else {}),
+        },
+    )
     return FactReviewResult(
         fact_id=fact_id,
         status="verified" if outcome.status == "verified" else "rejected",
@@ -836,9 +882,10 @@ async def save_versioned[M: BaseModel](
 ) -> StoredConfig[M]:
     """save_config for a PUT route: 409 when the active version is no longer
     `base_version_id` (or a concurrent save collided)."""
+    previous = await overrides.active_version(pool, domain)
     try:
         async with pool.acquire() as conn:
-            return await save_config(
+            saved = await save_config(
                 conn,
                 domain,
                 body,
@@ -848,6 +895,8 @@ async def save_versioned[M: BaseModel](
             )
     except (ConfigConflictError, asyncpg.UniqueViolationError) as exc:
         raise config_conflict(exc) from exc
+    await overrides.record_config_edit(pool, domain, previous, body.model_dump(mode="json"))
+    return saved
 
 
 def _not_found(domain: str) -> HTTPException:

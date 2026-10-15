@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { usePageSelection } from "@/lib/chat/page-selection-store";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { toNumber } from "@/lib/company/company";
 import { buildFilters, type BacktestPeriod, type BacktestResponse, type CatalogueResponse, type FilterDraft } from "@/lib/discover/discover";
@@ -234,6 +235,7 @@ function Figure({ label, value, hint }: { label: string; value: string | null; h
 
 function Result({ r }: { r: BacktestResponse }) {
   const [open, setOpen] = useState<string | null>(null);
+  usePageSelection(open ? `period ${open}` : null);
   const net = growth(r.periods, (p) => p.net_return);
   const benchPeriods = r.periods.some((p) => p.benchmark_return !== null && p.benchmark_return !== undefined);
   const bench = benchPeriods ? growth(r.periods, (p) => p.benchmark_return) : [];

@@ -131,9 +131,44 @@ def _args_for(tool: str, ticker: str, section: str | None) -> list[dict[str, Any
     return [{}]
 
 
-def plan_calls(plan: ResearchPlan, ticker: str) -> list[PlannedCall]:
+def full_data_calls(ticker: str, name: str) -> list[PlannedCall]:
+    """The extra reads of a thesis run: everything the app holds about the company and the
+    owner's own position, history, notes and risk, read once for the whole report."""
+    wide = [MODE_WIDE]
+    spec: list[tuple[str, dict[str, Any]]] = [
+        ("agent_notes", {"ticker": ticker}),
+        ("transactions", {"ticker": ticker, "days": 3650, "limit": 25}),
+        ("search_documents", {"query": f"{name} strategy risks outlook", "ticker": ticker}),
+        ("search_documents", {"query": f"{name} what the owner wrote about it", "ticker": ticker}),
+        ("search_reports", {"query": name}),
+        ("search_wire", {"query": name, "ticker": ticker, "days": 90}),
+        ("event_feed", {"ticker": ticker, "days": 30, "limit": 10}),
+        ("peers", {"ticker": ticker}),
+        ("segment_revenue", {"ticker": ticker}),
+        ("statement_lines", {"ticker": ticker}),
+        ("share_counts", {"ticker": ticker}),
+        ("corporate_actions", {"ticker": ticker}),
+        ("listing_liquidity", {"ticker": ticker}),
+        ("latest_quote", {"ticker": ticker}),
+        ("start_size", {"ticker": ticker}),
+        ("risk_history", {}),
+        ("stress_test", {}),
+        ("performance_explain", {}),
+        ("decision_scorecard", {}),
+    ]
+    return [PlannedCall(tool=t, args=a, sections=list(wide)) for t, a in spec]
+
+
+def plan_calls(
+    plan: ResearchPlan,
+    ticker: str,
+    *,
+    owner: bool = False,
+    extra: list[PlannedCall] | None = None,
+) -> list[PlannedCall]:
     """Each distinct (tool, arguments) the plan's questions need, with the sections that asked
-    for it. A tool that cannot be called is kept, with the reason, so the report says so."""
+    for it. A tool that cannot be called is kept, with the reason, so the report says so.
+    With `owner` (a run the owner asked for) the owner's tools are called too."""
     allowed = read_only_tools()
     calls: dict[str, PlannedCall] = {}
     for question in plan.questions:
@@ -144,7 +179,7 @@ def plan_calls(plan: ResearchPlan, ticker: str) -> list[PlannedCall]:
                 skip = "not a read-only catalog tool"
             elif tool in NEEDS_INPUT:
                 skip = NEEDS_INPUT[tool]
-            elif tool in OWNER_TOOLS:
+            elif tool in OWNER_TOOLS and not owner:
                 skip = "answers for the owner; a research run has no owner"
             variants = [{}] if skip else _args_for(tool, ticker, question.section)
             for args in variants:
@@ -152,6 +187,10 @@ def plan_calls(plan: ResearchPlan, ticker: str) -> list[PlannedCall]:
                 call = calls.setdefault(key, PlannedCall(tool=tool, args=args, skip=skip))
                 if section not in call.sections:
                     call.sections.append(section)
+    for call in extra or []:
+        key = f"{call.tool}:{json.dumps(call.args, sort_keys=True)}"
+        if key not in calls and call.tool in allowed:
+            calls[key] = call
     return list(calls.values())
 
 
@@ -215,21 +254,29 @@ def _render(record: ToolCallRecord, result: dict[str, Any] | None) -> str:
 
 
 async def run_read_tools(
-    caller: Caller, registry: Registry, plan: ResearchPlan, ticker: str
+    caller: Caller,
+    registry: Registry,
+    plan: ResearchPlan,
+    ticker: str,
+    *,
+    owner: bool = False,
+    extra: list[PlannedCall] | None = None,
+    max_calls: int | None = None,
 ) -> ReadToolRun:
     """Call the plan's tools in order. `caller` is `ChatTools.call` (or a fake in tests) and
     `registry` the run's source registry, which the tools add to."""
     out = ReadToolRun()
     lines: dict[str, list[str]] = {}
     start = len(registry.sources)
-    planned = plan_calls(plan, ticker)
+    planned = plan_calls(plan, ticker, owner=owner, extra=extra)
+    limit = max_calls if max_calls is not None else MAX_CALLS
     for n, call in enumerate(planned):
         record = ToolCallRecord(
             tool=call.tool, args=call.args, status="skipped", sections=call.sections
         )
         result: dict[str, Any] | None = None
-        if call.skip or n >= MAX_CALLS:
-            record.note = call.skip or f"over the limit of {MAX_CALLS} calls per run"
+        if call.skip or n >= limit:
+            record.note = call.skip or f"over the limit of {limit} calls per run"
         else:
             known = len(registry.sources)
             started = time.monotonic()

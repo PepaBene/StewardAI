@@ -48,6 +48,7 @@ from steward.earnings.validate import ValidationContext, validate
 from steward.earnings.verdicts import run_verdicts
 from steward.earnings.xbrl_figures import figures_from_facts, filing_of
 from steward.jobs.runner import JobContext, JobFailed
+from steward.llm.cache import ResultCache
 from steward.llm.client import create_llm
 from steward.llm.routing import routing_client
 from steward.notify.breach import alert_breaches
@@ -118,6 +119,13 @@ async def earnings_check_handler(ctx: JobContext) -> None:
         raise JobFailed(str(exc)) from exc
     stored_jobs = await load_active(ctx.pool, "jobs", JobsConfig)
     cfg = (stored_jobs.body if stored_jobs else JobsConfig()).earnings_check
+    if cfg.result_cache_days > 0:
+        client.cache = ResultCache(
+            ctx.pool,
+            "earnings_check",
+            ttl_days=cfg.result_cache_days,
+            search_ttl_days=cfg.result_cache_days,
+        )
     prompts = await load_prompts(ctx.pool)
     async with httpx.AsyncClient(
         timeout=60.0, headers={"User-Agent": f"StewardAI/{__version__}"}
@@ -126,7 +134,10 @@ async def earnings_check_handler(ctx: JobContext) -> None:
         deps = EarningsDeps(
             http=http,
             storage=SupabaseStorage(
-                http, settings.supabase_url, settings.supabase_secret_key.get_secret_value()
+                http,
+                settings.supabase_url,
+                settings.supabase_secret_key.get_secret_value(),
+                public_api_url=settings.public_api_url,
             ),
             extractor=LLMExtractor(
                 client,

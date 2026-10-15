@@ -472,7 +472,7 @@ async def get_mark_candidates(
 @router.post("/news/feedback", tags=["news"], status_code=status.HTTP_201_CREATED)
 async def post_news_feedback(body: NewsFeedbackIn, pool: Pool, _owner: Owner) -> NewsFeedbackOut:
     """Mark an item, story, claim or brief line (wrong entity, duplicate, misread, missing
-    source, useful, not useful). Feedback feeds the benchmark, never model training."""
+    source, useful, not useful). Feedback feeds the benchmark and is kept as a training label."""
     return await add_feedback(pool, body)
 
 

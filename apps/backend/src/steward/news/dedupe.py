@@ -13,6 +13,7 @@ Stage 1 of dedupe (canonical URL) happens when an item is stored. Here, per run:
 """
 
 import datetime as dt
+from array import array
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
@@ -113,8 +114,11 @@ async def recent_vectors(
         since,
         limit,
     )
+    # array('f') holds 4 bytes a value where a tuple of floats holds ~32; the column is float4, so
+    # nothing is lost. Up to 5000 vectors would otherwise cost ~120 MB on every ingest.
     return [
-        Vec(r["id"], tuple(r["vector"]), r["published_at"].timestamp(), r["group_id"]) for r in rows
+        Vec(r["id"], array("f", r["vector"]), r["published_at"].timestamp(), r["group_id"])
+        for r in rows
     ]
 
 

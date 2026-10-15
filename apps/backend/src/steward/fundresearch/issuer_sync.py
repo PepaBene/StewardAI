@@ -31,6 +31,8 @@ import asyncpg
 import httpx
 
 from steward import __version__
+from steward.config.jobs import JobsConfig
+from steward.config.store import load_active
 from steward.jobs.runner import JobContext, JobFailed
 from steward.settings import get_settings
 from steward.sources.etf_issuers import IssuerError, fetch_ishares_component
@@ -746,3 +748,20 @@ async def fund_issuer_facts_handler(ctx: JobContext) -> None:
         step.detail["checked_at"] = dt.datetime.now(dt.UTC).isoformat()
         if failed == len(sources):
             raise JobFailed("no fund could be read from its issuer")
+    stored = await load_active(ctx.pool, "jobs", JobsConfig)
+    jobs = stored.body if stored else JobsConfig()
+    if jobs.fund_documents:
+        from steward.fundresearch import kid_facts
+
+        async with ctx.step("fund_documents") as step:
+            raw_owner = get_settings().owner_user_id
+            if raw_owner:
+                step.detail.update(
+                    await kid_facts.read_documents(
+                        ctx.pool,
+                        kid_facts.make_client(ctx.pool),
+                        jobs.autopilot_settings,
+                        jobs.fund_documents,
+                        uuid.UUID(raw_owner),
+                    )
+                )

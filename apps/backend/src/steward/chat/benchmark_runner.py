@@ -546,6 +546,7 @@ async def _live_run(args: argparse.Namespace) -> RunRecord:
             reason: str,
             ticker: str | None = None,
             profile: str | None = None,
+            args: dict[str, Any] | None = None,
         ) -> dict[str, Any]:
             if kind not in ACTION_KINDS:
                 return {"error": f"kind must be one of {', '.join(ACTION_KINDS)}"}

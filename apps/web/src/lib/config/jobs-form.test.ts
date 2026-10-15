@@ -66,6 +66,9 @@ const FULL: JobsConfig = {
   edinet_filings: { enabled: false, cron: "30 10 * * *", timezone: "UTC" },
   twelve_data_corporate_actions: { enabled: false, cron: "50 10 * * 6", timezone: "UTC" },
   ai_approvals: { enabled: true, cron: "10 7 * * *", timezone: "UTC" },
+  autopilot: { enabled: true, cron: "20 */6 * * *", timezone: "UTC" },
+  autopilot_calibration: { enabled: true, cron: "40 7 * * 0", timezone: "UTC" },
+  watchdog: { enabled: true, cron: "10 * * * *", timezone: "UTC" },
   ir_discovery: { enabled: true, cron: "30 7 * * 1", timezone: "UTC" },
   news_ai_search: { enabled: false, cron: "20 6 * * *", timezone: "UTC" },
   news_triage: { enabled: false, cron: "10 * * * *", timezone: "UTC" },
@@ -73,6 +76,8 @@ const FULL: JobsConfig = {
   news_brief: { enabled: false, cron: "30 6 * * *", timezone: "UTC" },
   gap_research: { enabled: true, cron: "0 8 * * 3", timezone: "UTC" },
   exposure_build: { enabled: true, cron: "50 5 * * 2", timezone: "UTC" },
+  document_index: { enabled: true, cron: "20 3 * * *", timezone: "UTC" },
+  inbox_scan: { enabled: true, cron: "10 * * * *", timezone: "UTC" },
   factor_returns: { enabled: true, cron: "30 5 * * 1", timezone: "UTC" },
   disclosure_sources: { enabled: true, cron: "0 6 * * *", timezone: "UTC" },
   disclosure_ingest: { enabled: true, cron: "40 6 * * 1-5", timezone: "UTC" },
@@ -87,6 +92,7 @@ const FULL: JobsConfig = {
     locate_model: "gpt-6.1-sol",
     effort: "xhigh",
     locate_effort: "medium",
+    result_cache_days: 0,
     max_steps: 12,
     max_searches: 0,
     check_days_after_report: [0, 1, 3, 7],
@@ -96,7 +102,9 @@ const FULL: JobsConfig = {
   },
   earnings_calendar_settings: { model: "gpt-6-luna", effort: null, lookahead_days: 90, refresh_within_days: 21, use_batch: true, batch_wait_minutes: 60 },
   ai_approval: { model: "gpt-6.1-sol", effort: null, listings: true, peers: true, refresh_peers: true, peer_refresh_days: 30, peer_refresh_per_run: 8, min_confidence: 0.8, max_confirmed_peers: 8, max_calls_per_run: 40, use_sic: true, rules_first: true, use_batch: true, batch_wait_minutes: 60 },
-  exposure_build_settings: { model: "gpt-6.1-sol", effort: null, filings_per_run: 6, extract_inputs: true, extract_dependencies: true, map_products: true },
+  exposure_build_settings: { model: "gpt-6.1-sol", effort: null, filings_per_run: 6, extract_inputs: true, extract_dependencies: true, map_products: true, use_batch: false, batch_wait_minutes: 60 },
+  document_index_settings: { embedding_model: "gemini-embedding-2", embedding_dimensions: 768, embed_per_run: 1500, filings_per_run: 20, reports_per_run: 200, index_disclosures: true, disclosure_alert_days: 365, index_agent_notes: true, news_per_run: 600, news_days: 365 },
+  inbox_settings: { enabled: true, model: "gpt-6-luna", effort: "low", max_steps: 8, lookback_days: 7, max_per_scan: 5, min_severity: 2 },
   gap_research_settings: { model: "gpt-6.1-sol", effort: null, slots: ["next_report_date"], max_searches: 3, slots_per_run: 8, use_batch: true, batch_wait_minutes: 60, browser_fallback: false, cooldown_days: 30, min_confidence: 0.8, t1_domains: ["sec.gov"], t2_domains: ["reuters.com"], t3_domains: ["wikipedia.org"], denied_domains: ["reddit.com"] },
   ir_discovery_settings: { model: "gpt-6.1-sol", effort: null, max_searches: 4, holdings_per_run: 6, use_batch: true, batch_wait_minutes: 60, probe_first: true, browser_fallback: false, cooldown_days: 30, min_confidence: 0.8, denied_domains: ["wikipedia.org"], robots_exempt_domains: [] },
   news: {
@@ -105,6 +113,7 @@ const FULL: JobsConfig = {
     classification_batch_size: 25,
     classification_use_batch: true,
     classification_batch_wait_minutes: 30,
+    rules_first_classification: true,
     corroboration_model: "gpt-6.1-sol",
     corroboration_effort: "low",
     corroboration_max_searches: 5,
@@ -117,6 +126,7 @@ const FULL: JobsConfig = {
     translation_per_run: 300,
     search_lead_model: "gpt-6-luna",
     search_lead_effort: null,
+    ai_search_provider: "model",
     ai_search_max_searches: 3,
     ai_search_max_holdings: 10,
     ai_search_thin_below: 3,
@@ -145,6 +155,8 @@ const FULL: JobsConfig = {
     triage_per_run: 200,
     triage_fulltext_relevance: 2,
     batch_extraction: false,
+    batch_analysis: false,
+    reuse_repeat_analysis: false,
     sector_benchmarks: {},
     auto_resolve_days: 14,
     sentiment_weight: 0.25,
@@ -213,7 +225,7 @@ const FULL: JobsConfig = {
       { mic: "XETR", date: "2026-12-24", name: "Christmas Eve" },
     ],
   },
-  chat: { model: "gpt-6-luna", effort: null, max_steps: 9, max_searches: 0, history_messages: 20, source_tiers: [1, 2, 3], rules_first: true },
+  chat: { model: "gpt-6-luna", effort: null, escalation_model: null, escalation_effort: null, max_steps: 9, max_searches: 0, search_via_api: false, search_cache_days: 3, cache_retention: "off", history_messages: 20, source_tiers: [1, 2, 3], rules_first: true },
   review: {
     model: "gpt-6.1-sol",
     effort: "max",
@@ -545,6 +557,23 @@ describe("jobs form: market strip", () => {
       { symbol: "^dax", label: "DAX 40", yahoo_symbol: "^GDAXI" },
       { symbol: "^px", label: "^px" },
     ]);
+  });
+});
+
+describe("jobs form: cost switches", () => {
+  it("keeps the cascade and the search API off by default and writes them back", () => {
+    const form = jobsFromBody(null);
+    expect(form.settings.chat.values.escalation_model).toBe("");
+    expect(form.settings.news.values.ai_search_provider).toBe("model");
+    const off = jobsToBody(form);
+    expect(off.chat).toMatchObject({ escalation_model: null, escalation_effort: null });
+    expect(off.news).toMatchObject({ ai_search_provider: "model" });
+    form.settings.chat.values.escalation_model = " gpt-6.1-sol ";
+    form.settings.chat.values.escalation_effort = "high";
+    form.settings.news.values.ai_search_provider = "brave";
+    const on = jobsToBody(form);
+    expect(on.chat).toMatchObject({ escalation_model: "gpt-6.1-sol", escalation_effort: "high" });
+    expect(on.news).toMatchObject({ ai_search_provider: "brave" });
   });
 });
 

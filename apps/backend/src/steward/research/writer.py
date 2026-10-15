@@ -149,6 +149,9 @@ class SectionRequest:
     # What the plan's stored-data tools returned for this section (see research.read_tools):
     # after the cached material, before the task.
     tool_evidence: str = ""
+    # Cost levers D3/D6: a cheaper model for this call (None = the writer's own).
+    model: str | None = None
+    effort: str | None = None
 
 
 @dataclass
@@ -219,28 +222,42 @@ def section_content(request: SectionRequest) -> str:
 
 class LLMResearchWriter:
     def __init__(
-        self, client: RoutingClient, model: str, effort: str, system: str = SYSTEM
+        self,
+        client: RoutingClient,
+        model: str,
+        effort: str,
+        system: str = SYSTEM,
+        cache_key: str | None = None,
+        priority: str = "standard",
     ) -> None:
         self._client = client
         self._model = model
         self._effort = effort
         self._system = system
+        self._priority = priority
+        # One key per run: every section re-sends the same material, so OpenAI should land
+        # them on the same prefix cache (the routing client sends it as prompt_cache_key).
+        self._cache_key = cache_key
 
     async def write(self, request: SectionRequest) -> SectionResult:
-        usage = Usage(model=self._model)
+        model = request.model or self._model
+        effort = request.effort or self._effort
+        usage = Usage(model=model)
         tools: list[Any] = []
         if request.max_searches > 0 and request.domains:
-            tools = [web_search_tool(self._model, request.max_searches, request.domains)]
+            tools = [web_search_tool(model, request.max_searches, request.domains)]
         titles: dict[str, str] = {}
         extra: dict[str, Any] = {"tools": tools} if tools else {}
         try:
             response = await self._client.messages.parse(
-                model=self._model,
+                model=model,
                 system=self._system,
                 messages=[{"role": "user", "content": section_content(request)}],
                 output_format=SectionDraft,
+                cache_key=self._cache_key,
+                priority=self._priority,
                 **extra,
-                **effort_kwargs(self._model, self._effort, 16000),
+                **effort_kwargs(model, effort, 16000),
             )
         except LLMError as exc:
             return SectionResult(

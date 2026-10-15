@@ -37,6 +37,7 @@ from steward.config.thesis import ThesesConfig, ThesisConfig
 from steward.config.verification import ClaimVerifierSettings, VerificationConfig
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, JobFailed, create_job
+from steward.llm.cache import SEARCH_CACHE_DAYS_FRESH, ResultCache
 from steward.llm.client import create_llm
 from steward.llm.routing import RoutingClient, routing_client
 from steward.llm.types import LLMError
@@ -634,7 +635,10 @@ async def event_escalation_handler(ctx: JobContext) -> None:
     writer: LLMEscalator | None
     verifier: ClaimVerifier | None
     try:
-        client = routing_client(create_llm(settings))
+        client = routing_client(
+            create_llm(settings),
+            ResultCache(ctx.pool, "event_escalation", search_ttl_days=SEARCH_CACHE_DAYS_FRESH),
+        )
     except AINotConfigured:
         writer = verifier = None
     else:
@@ -645,6 +649,7 @@ async def event_escalation_handler(ctx: JobContext) -> None:
             claim_settings.model,
             prompts.text("claim_verifier", CLAIM_SYSTEM),
             effort=claim_settings.effort,
+            cache=ResultCache(ctx.pool, "claim_verifier"),
         )
     await run_escalation(
         ctx,

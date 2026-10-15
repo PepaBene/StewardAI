@@ -129,8 +129,6 @@ async def _noop(ctx: JobContext) -> None:
 async def test_queue_consumer_runs_enqueued_jobs(
     backend_pool: asyncpg.Pool, migrated_db: MigratedDatabase, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    if not any("pgmq" in name for name in migrated_db.applied):
-        pytest.skip("pgmq extension not available on this server")
     ran: list[int] = []
 
     async def fake_sync(ctx: JobContext) -> None:
@@ -156,9 +154,8 @@ async def test_queue_consumer_runs_enqueued_jobs(
     assert ran == [job_id]
     job = await _job(backend_pool, job_id)
     assert job["trigger"] == "manual"
-    # Handled messages are archived, not left to reappear.
-    assert await backend_pool.fetchval("select count(*) from pgmq.q_jobs") == 0
-    assert await backend_pool.fetchval("select count(*) from pgmq.a_jobs") == 1
+    # Handled messages are removed, not left to reappear.
+    assert await backend_pool.fetchval("select count(*) from public.job_queue") == 0
 
 
 async def test_config_versions_chain_with_diffs(backend_pool: asyncpg.Pool) -> None:
@@ -216,6 +213,8 @@ async def test_schedule_follows_the_jobs_config() -> None:
     assert apply_jobs_config(scheduler, JobsConfig(), run) == [
         "ai_approvals",
         "alpha_vantage_statements",
+        "autopilot",
+        "autopilot_calibration",
         "change_alerts",
         "companies_house_filings",
         "control_stakes",
@@ -227,6 +226,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "disclosure_identifiers",
         "disclosure_ingest",
         "disclosure_sources",
+        "document_index",
         "earnings_calendar",
         "earnings_calendar_full",
         "earnings_due",
@@ -245,6 +245,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "gap_research",
         "graph_review",
         "holiday_refresh",
+        "inbox_scan",
         "insider_trades",
         "intraday_prices",
         "ir_discovery",
@@ -270,6 +271,7 @@ async def test_schedule_follows_the_jobs_config() -> None:
         "source_audit",
         "twelve_data_corporate_actions",
         "valuation_refresh",
+        "watchdog",
         "weekly_digest",
         "zero_cost_gate",
     ]

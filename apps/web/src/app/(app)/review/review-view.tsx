@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { getBrowserApiClient, type HoldingDetail, type ReviewItem } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
+import { usePageSelection } from "@/lib/chat/page-selection-store";
 import { formatNumber } from "@/lib/charts/format";
 import { shortTicker } from "@/lib/evidence/board";
 import { formatFactValue, formatTarget, humanizeMetric } from "@/lib/evidence/confidence";
@@ -77,6 +78,7 @@ export function ReviewView() {
   const items = useMemo(() => pending.filter((i) => matchesTier(i, tier)), [pending, tier]);
   const ids = useMemo(() => items.map((i) => i.fact.id), [items]);
   const selected = items.find((i) => i.fact.id === selectedId) ?? items[0] ?? null;
+  usePageSelection(selected ? `fact ${selected.fact.id}` : null);
 
   const setQuery = (next: { ticker?: string | null; tier?: TierFilter }) => {
     const q = new URLSearchParams();

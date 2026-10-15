@@ -4,7 +4,7 @@ import datetime as dt
 from decimal import Decimal
 
 from steward.company.ratios import RatioGroup, RatioPoint, RatioRow, RatiosView
-from steward.company.rubric import build_rubric
+from steward.company.rubric import build_rubric, recompute_problems
 from steward.company.statements import Column, StatementCheck, StatementsView
 
 D = Decimal
@@ -72,6 +72,14 @@ def test_scores_reproduce_by_hand() -> None:
     # overall: .35x74 + .25x66 + .20x71.142857 + .20x63 = 69.228571
     assert r.overall == D("69.228571") and not r.abstained
     assert r.calibration.status == "uncalibrated"
+    # The independent recompute from the published table agrees, and catches a changed figure.
+    assert recompute_problems(r) == []
+    assert not any("Recomputing" in cv for cv in r.caveats)
+    tampered = r.model_copy(update={"overall": D("80")})
+    assert any(p.startswith("overall") for p in recompute_problems(tampered))
+    edited = r.model_copy(deep=True)
+    edited.components[0].indicators[0].points = D("20")
+    assert any("points" in p for p in recompute_problems(edited))
 
 
 def test_component_with_too_little_coverage_abstains_and_overall_follows() -> None:

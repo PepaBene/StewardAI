@@ -94,6 +94,13 @@ class Request:
     # Static first, varying last; a stable key per job type lets OpenAI land related requests
     # on the same prefix cache. Ignored by the other providers.
     cache_key: str | None = None
+    # "flex" asks OpenAI for its discounted, slower tier (answers may take minutes and are
+    # refused when capacity is short; the client then repeats the call at standard). Ignored
+    # by Google, which has no tier this app uses.
+    priority: Literal["standard", "flex"] = "standard"
+    # "24h" asks OpenAI to keep the prompt prefix cached for a day (`prompt_cache_retention`).
+    # Ignored by Google.
+    cache_retention: Literal["24h"] | None = None
 
 
 @dataclass(frozen=True)
@@ -135,6 +142,9 @@ class Completion:
     # Google cannot restrict a search to a domain list: citations outside it are removed here
     # and counted, so a job with source tiers can reject an answer that leaned on them.
     off_list_citations: list[Citation] = field(default_factory=list)
+    # Pages a search returned, cited or not (OpenAI lists them on the search call; a structured
+    # answer carries no `url_citation` annotations). Titles are empty: only the URL is known.
+    sources: list[Citation] = field(default_factory=list)
     # Set when the model asks for the app's tools (stop_reason "tool_use"); `raw` is what to
     # send back as the assistant turn.
     tool_calls: list[ToolCall] = field(default_factory=list)

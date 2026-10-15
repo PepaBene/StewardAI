@@ -12,6 +12,7 @@ import {
   XIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
@@ -19,6 +20,8 @@ import { JobStatusBadge } from "@/components/jobs/job-status-badge";
 import { CitationLink } from "@/components/news/citation";
 import { SourceLinksLine } from "@/components/sources/source-list";
 import { BlueprintCorners } from "@/components/ui/blueprint";
+import { pageSelection } from "@/lib/chat/page-selection";
+import { getPageSelection } from "@/lib/chat/page-selection-store";
 import { Button } from "@/components/ui/button";
 import {
   getBrowserApiClient,
@@ -43,6 +46,7 @@ import {
   SUGGESTED_PROMPTS,
   validateMessage,
 } from "@/lib/chat/chat";
+import { ChatVisual } from "@/components/chat/chat-visual";
 import { formatDateTime } from "@/lib/format";
 import { jobHref } from "@/lib/jobs/job-detail";
 import { sourceKindLabel, sourcePreview } from "@/lib/sources/sources";
@@ -76,6 +80,7 @@ export function ChatThread({
   onChanged?: () => void;
   className?: string;
 }) {
+  const pathname = usePathname();
   const [load, setLoad] = useState<Load | null>(null);
   const [jobStatus, setJobStatus] = useState<{ id: number; status: JobStatus; error: string | null } | null>(null);
   const [stopped, setStopped] = useState<string | null>(null);
@@ -168,7 +173,13 @@ export function ChatThread({
     }
     const { data, response } = await api.POST("/chat/conversations/{conversation_id}/messages", {
       params: { path: { conversation_id: id } },
-      body: { content: content.trim() },
+      body: {
+        content: content.trim(),
+        page: {
+          path: pathname,
+          selection: getPageSelection() ?? pageSelection(pathname, window.location.search),
+        },
+      },
     });
     if (!data) return `Not sent (HTTP ${response.status}).`;
     setStopped(null);
@@ -426,6 +437,9 @@ function Message({
           ) : null}
         </p>
       ) : null}
+      {m.answer?.visuals?.map((v, i) => (
+        <ChatVisual key={i} block={v} />
+      ))}
       {m.answer && m.answer.shape !== "low_evidence" && m.answer.sources.length > 0 ? <SourceChips sources={m.answer.sources} /> : null}
       <p className="flex flex-wrap gap-x-2 text-[11px] text-text-faint">
         <time dateTime={m.created_at} className="num">

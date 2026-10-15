@@ -157,7 +157,8 @@ export interface paths {
          * Rollback Config
          * @description Make an old version current again by saving its body as a new active version. The
          *     next run of every job uses it. 409 if the old body no longer passes validation, or if
-         *     `base_version_id` is given and is no longer the active version.
+         *     `base_version_id` is given and is no longer the active version. When the version being
+         *     replaced was written by the engine, `reason_code` says why it was undone.
          */
         post: operations["rollback_config"];
         delete?: never;
@@ -2190,6 +2191,176 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/thesis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Thesis
+         * @description Research the stock with every record the app holds plus web search, then write its
+         *     thesis: stance, executive summary, detailed memo, KPIs, exit conditions, scenarios and
+         *     targets. Runs on its own once started.
+         */
+        post: operations["run_thesis"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/portfolio-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Portfolio Review
+         * @description Review what to sell, trim and buy. Flags holdings, finds gaps against your strategy,
+         *     researches buy candidates in depth and judges each against your return hurdle and
+         *     asymmetry gate.
+         */
+        post: operations["run_portfolio_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/thesis/memos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Memos */
+        get: operations["list_memos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/thesis/memos/{memo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Memo */
+        get: operations["get_memo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/thesis/memos/{memo_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Buy Memo
+         * @description You decided to buy: save the memo's thesis as the stock's thesis.
+         */
+        post: operations["accept_buy_memo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/thesis/memos/{memo_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss Memo */
+        post: operations["dismiss_memo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/thesis/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Thesis Reviews */
+        get: operations["list_thesis_reviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/thesis/reviews/{review_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Thesis Review */
+        get: operations["get_thesis_review"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhooks/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend Event
+         * @description A delivery event from Resend (delivered, bounced, complained...). Refused without a valid
+         *     signature, and always refused while `RESEND_WEBHOOK_SECRET` is not set.
+         */
+        post: operations["resend_event"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/escalations/stats": {
         parameters: {
             query?: never;
@@ -2808,7 +2979,7 @@ export interface paths {
         /**
          * Post News Feedback
          * @description Mark an item, story, claim or brief line (wrong entity, duplicate, misread, missing
-         *     source, useful, not useful). Feedback feeds the benchmark, never model training.
+         *     source, useful, not useful). Feedback feeds the benchmark and is kept as a training label.
          */
         post: operations["post_news_feedback"];
         delete?: never;
@@ -3634,6 +3805,793 @@ export interface paths {
         put?: never;
         /** Cancel Action */
         post: operations["cancel_action"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Inbox
+         * @description Items the event agents left, newest first. `unread` counts items still new; `missed`
+         *     counts older events (up to 60 days) the scan never ran on.
+         */
+        get: operations["list_inbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/missed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Missed
+         * @description Open events older than the scan window (up to 60 days) that no run has looked into.
+         */
+        get: operations["list_missed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/missed/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Missed
+         * @description Queue an agent run for each chosen missed event. Only events still open are queued.
+         */
+        post: operations["run_missed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Inbox Item */
+        get: operations["get_inbox_item"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Inbox Status
+         * @description Mark an item read or dismiss it. Dismissing declines an open proposed action.
+         */
+        patch: operations["set_inbox_status"];
+        trace?: never;
+    };
+    "/inbox/{item_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give Feedback
+         * @description Say whether the item was useful. Feeds the candidate evaluation cases.
+         */
+        post: operations["give_feedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/{item_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Inbox Action
+         * @description Start the job the agent proposed. Only this call starts anything.
+         */
+        post: operations["confirm_inbox_action"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/{item_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline Inbox Action */
+        post: operations["decline_inbox_action"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/{item_id}/note/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Suggested Note
+         * @description Keep the working note an agent run suggested; creates an ordinary agent note.
+         */
+        post: operations["accept_suggested_note"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inbox/{item_id}/note/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline Suggested Note */
+        post: operations["decline_suggested_note"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent-notes/{note_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Agent Note History
+         * @description Every state a note has had, newest first; kept after the note is deleted.
+         */
+        get: operations["agent_note_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Agent Notes
+         * @description The owner's working notes the agent reads. The agent never writes them.
+         */
+        get: operations["list_agent_notes"];
+        put?: never;
+        /** Add Agent Note */
+        post: operations["add_agent_note"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent-notes/{note_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Agent Note */
+        delete: operations["delete_agent_note"];
+        options?: never;
+        head?: never;
+        /** Edit Agent Note */
+        patch: operations["edit_agent_note"];
+        trace?: never;
+    };
+    "/ops/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Route Stats
+         * @description Runs, failures, cost and latency (median and 95th percentile) per kind of work.
+         */
+        get: operations["get_route_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Summary
+         * @description Per kind: its mode, what it decided in the last 30 days and how often reviewed
+         *     decisions were right.
+         */
+        get: operations["get_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/calibration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Calibration
+         * @description Per kind, how sure the autopilot was against how often it was right, over reviewed
+         *     decisions of the last 180 days.
+         */
+        get: operations["get_calibration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Decisions */
+        get: operations["list_decisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/needs-you": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Needs You
+         * @description What the autopilot could not settle with confidence, plus a few applied decisions kept
+         *     for a spot check. Items already settled elsewhere are dropped (and closed) here.
+         */
+        get: operations["needs_you"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/engagement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Engagement
+         * @description Note that the owner opened something. The app uses it to send less of what is never
+         *     read; it stores the kind and id only.
+         */
+        post: operations["record_engagement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/notices/{task_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss Notice
+         * @description Set aside a watchdog notice (for example a key you do not want). A problem that is
+         *     still there on a later run opens a new notice; a missing key stays dismissed.
+         */
+        post: operations["dismiss_notice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/notices/{task_id}/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Snooze Notice
+         * @description Set a notice aside for some days. It does not come back before then, and unlike a
+         *     dismissal it does not count against the notice.
+         */
+        post: operations["snooze_notice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/decisions/{decision_id}/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revert Decision
+         * @description Undo an applied decision. It counts as a wrong decision in calibration. The body, with
+         *     a reason chip and a note, is optional.
+         */
+        post: operations["revert_decision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/decisions/{decision_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Recommendation
+         * @description Apply the autopilot's recommendation on an item it escalated.
+         */
+        post: operations["accept_recommendation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/autopilot/decisions/{decision_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Decision
+         * @description The owner's verdict on a spot-checked decision. Calibration counts it.
+         */
+        post: operations["review_decision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/engine/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Engine Ledger
+         * @description Everything the engine or the owner changed, newest first, from every ledger. An entry
+         *     with `undo_action` can be undone through `/actions/propose` with `undo_args`.
+         */
+        get: operations["engine_ledger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/overrides": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Overrides
+         * @description How you have overruled the engine, newest first.
+         */
+        get: operations["list_overrides"];
+        put?: never;
+        /**
+         * Record Override
+         * @description Say that you overruled something the engine did, and why. Screens use this for areas
+         *     that have no dedicated undo (a story, a graph edge, an identity); the engine does not redo
+         *     an item you overruled and learns from the reasons.
+         */
+        post: operations["record_override"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/overrides/unexplained": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Unexplained Overrides
+         * @description Config edits of the last minutes that overruled the engine and have no reason yet, so a
+         *     screen can ask why right after the save.
+         */
+        get: operations["unexplained_overrides"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/overrides/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Explain Overrides
+         * @description Give those edits a reason.
+         */
+        post: operations["explain_overrides"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/engine/sweeps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Engine Sweeps
+         * @description The weekly re-check of applied decisions: how many it looked at and how many no longer
+         *     held, newest first. The share that no longer held is the disagreement rate.
+         */
+        get: operations["engine_sweeps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/engine/triggers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Engine Triggers
+         * @description Work the engine started on its own, with the reason, and what it held back and why.
+         */
+        get: operations["engine_triggers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/actions/kinds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Kinds
+         * @description What the owner can change from a screen or from chat.
+         */
+        get: operations["list_kinds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent Actions */
+        get: operations["recent_actions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/actions/propose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose
+         * @description Check an action and say what it would do. Nothing changes until it is confirmed.
+         */
+        post: operations["propose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/actions/{action_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm */
+        post: operations["confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/actions/{action_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel */
+        post: operations["cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/visuals/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Visual
+         * @description A chart block built from stored records, with its source, date, summary and table.
+         */
+        get: operations["get_visual"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/engine/gates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Gates
+         * @description The bar a stricter confidence floor must clear before it is applied.
+         */
+        get: operations["get_gates"];
+        /**
+         * Put Gates
+         * @description Change that bar. Only you can; the engine cannot propose a change to it.
+         */
+        put: operations["put_gates"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/engine/training": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Training
+         * @description What is being collected for fine-tuning: recorded AI calls and labels, by kind.
+         */
+        get: operations["get_training"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/engine/scorecard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Autonomy Scorecard
+         * @description The autonomy plan's success metrics, measured now, each with its target.
+         */
+        get: operations["get_autonomy_scorecard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/engine/watchers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Watchers
+         * @description How sensitive the heads-up watchers are.
+         */
+        get: operations["get_watchers"];
+        /**
+         * Put Watchers
+         * @description Change that sensitivity. Only you can; the engine cannot propose a change to it.
+         */
+        put: operations["put_watchers"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -8889,6 +9847,15 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AcceptOut */
+        AcceptOut: {
+            /** Memo Id */
+            memo_id: number;
+            /** Ticker */
+            ticker: string;
+            /** Saved Version Id */
+            saved_version_id: number;
+        };
         /** AcceptedOut */
         AcceptedOut: {
             /** Accepted */
@@ -8940,6 +9907,20 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** ActionKind */
+        ActionKind: {
+            /** Name */
+            name: string;
+            /** Title */
+            title: string;
+            /**
+             * Risk
+             * @enum {string}
+             */
+            risk: "low" | "medium" | "high";
+            /** Undo */
+            undo: string;
+        };
         /** ActionOut */
         ActionOut: {
             /** Id */
@@ -8948,9 +9929,9 @@ export interface components {
             message_id: number | null;
             /**
              * Kind
-             * @enum {string}
+             * @description A job to start, or an owner action (dismiss_notice, ...).
              */
-            kind: "earnings_check" | "research" | "portfolio_sync";
+            kind: string;
             /** Params */
             params: {
                 [key: string]: unknown;
@@ -8971,6 +9952,42 @@ export interface components {
             created_at: string;
             /** Decided At */
             decided_at: string | null;
+        };
+        /** ActionRow */
+        ActionRow: {
+            /** Id */
+            id: number;
+            /** Action */
+            action: string;
+            /** Args */
+            args: {
+                [key: string]: unknown;
+            };
+            /** Summary */
+            summary: string;
+            /**
+             * Risk
+             * @enum {string}
+             */
+            risk: "low" | "medium" | "high";
+            /** Undo */
+            undo: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "proposed" | "done" | "cancelled" | "failed";
+            /**
+             * Via
+             * @enum {string}
+             */
+            via: "screen" | "chat";
+            /** Reason */
+            reason: string | null;
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            } | null;
         };
         /** Activation */
         Activation: {
@@ -9118,6 +10135,21 @@ export interface components {
              * @enum {string}
              */
             confidence: "low" | "medium" | "high";
+        };
+        /** AgentNote */
+        AgentNote: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Text */
+            text: string;
+            /** Active */
+            active: boolean;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
         };
         /** AggregateReport */
         AggregateReport: {
@@ -10501,6 +11533,269 @@ export interface components {
             /** Open Mismatches */
             open_mismatches: components["schemas"]["AuditRow"][];
         };
+        /** AutoDecision */
+        AutoDecision: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Subject Ref */
+            subject_ref: string;
+            /** Ticker */
+            ticker: string | null;
+            /** Decision */
+            decision: string;
+            /** Confidence */
+            confidence: number | null;
+            /** Decided By */
+            decided_by: string;
+            /** Summary */
+            summary: string;
+            /** Evidence */
+            evidence: {
+                [key: string]: unknown;
+            };
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "shadow" | "applied" | "escalated" | "reverted" | "closed";
+            /** Revert Payload */
+            revert_payload: {
+                [key: string]: unknown;
+            } | null;
+            /** Sampled */
+            sampled: boolean;
+            /** Review */
+            review: ("ok" | "wrong") | null;
+            /** Reviewed By */
+            reviewed_by: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /**
+             * Decided At
+             * Format: date-time
+             */
+            decided_at: string;
+        };
+        /** AutonomyScorecard */
+        AutonomyScorecard: {
+            /** Window Days */
+            window_days: number;
+            /** Items Per Week */
+            items_per_week: number;
+            /** Items Per Week Target */
+            items_per_week_target: number;
+            /** Items Open Now */
+            items_open_now: number;
+            /** Items Met */
+            items_met: boolean;
+            /** Decisions Automatic */
+            decisions_automatic: number;
+            /** Decisions Shadow */
+            decisions_shadow: number;
+            /** Decisions Escalated */
+            decisions_escalated: number;
+            /** Automatic Share */
+            automatic_share: number | null;
+            /** Automatic Share Target */
+            automatic_share_target: number;
+            /** Automatic Met */
+            automatic_met: boolean | null;
+            /** Precision */
+            precision: components["schemas"]["KindPrecision"][];
+            /** Precision Target */
+            precision_target: number;
+            /** Oldest Open Days */
+            oldest_open_days: number | null;
+            /** Oldest Open Days Target */
+            oldest_open_days_target: number;
+            /** Oldest Met */
+            oldest_met: boolean | null;
+            /** Late Jobs */
+            late_jobs: number;
+            /** Missing Keys */
+            missing_keys: number;
+            /** Spend Month */
+            spend_month: number;
+            /** Spend Cap */
+            spend_cap: number | null;
+            /** Spend Met */
+            spend_met: boolean | null;
+        };
+        /**
+         * AutopilotKindPolicy
+         * @description How one kind of automatic decision (a fact review, a graph edge, ...) runs.
+         */
+        AutopilotKindPolicy: {
+            /**
+             * Mode
+             * @description off: not run. shadow: decide and log, apply nothing (the owner's own calls and a stronger model's audit are compared with it). auto: apply decisions at or above `min_confidence`. Calibration promotes and demotes between shadow and auto.
+             * @default shadow
+             * @enum {string}
+             */
+            mode: "off" | "shadow" | "auto";
+            /**
+             * Min Confidence
+             * @description Below this the item is escalated, not decided.
+             * @default 0.9
+             */
+            min_confidence: number;
+            /**
+             * Model
+             * @description The judge; empty uses the autopilot default model.
+             */
+            model?: string | null;
+            /**
+             * Escalate Model
+             * @description A stronger second opinion for an item the first model is unsure of; empty uses the autopilot default escalation model.
+             */
+            escalate_model?: string | null;
+            /**
+             * Sample Rate
+             * @description Share of applied decisions kept for a spot check.
+             * @default 0.05
+             */
+            sample_rate: number;
+            /**
+             * Ttl Days
+             * @description An escalated item nobody settled for this long is closed by the kind's expiry rule (where it has one), so no queue grows without bound.
+             * @default 14
+             */
+            ttl_days: number;
+            /**
+             * Daily Cap
+             * @description Most decisions of this kind in 24 hours.
+             * @default 50
+             */
+            daily_cap: number;
+        };
+        /**
+         * AutopilotSettings
+         * @description The autopilot: the app settles its own review queues, logs every decision with its
+         *     evidence, and asks the owner only for what it cannot settle with confidence.
+         */
+        AutopilotSettings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Model
+             * @description The default judge.
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            model: string;
+            /**
+             * Escalate Model
+             * @description The default second opinion; empty for none.
+             * @default gpt-6.1-sol
+             */
+            escalate_model: string | null;
+            /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies.
+             */
+            effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Max Calls Per Run
+             * @default 60
+             */
+            max_calls_per_run: number;
+            /**
+             * Rejudge Days
+             * @description An escalated item is judged again after this long.
+             * @default 7
+             */
+            rejudge_days: number;
+            default?: components["schemas"]["AutopilotKindPolicy"];
+            /**
+             * Kinds
+             * @description Per-kind overrides of `default`, by kind name.
+             */
+            kinds?: {
+                [key: string]: components["schemas"]["AutopilotKindPolicy"];
+            };
+            /**
+             * Auto Calibrate
+             * @description Weekly, promote a shadow kind to auto when its reviewed decisions are right often enough, and demote an auto kind that falls below the floor.
+             * @default true
+             */
+            auto_calibrate: boolean;
+            /**
+             * Promote Precision
+             * @default 0.95
+             */
+            promote_precision: number;
+            /**
+             * Promote Min Reviewed
+             * @default 50
+             */
+            promote_min_reviewed: number;
+            /**
+             * Demote Precision
+             * @default 0.9
+             */
+            demote_precision: number;
+            /**
+             * Research Stale
+             * @description Queue a research run for a held thesis whose review date has passed, so the owner does not have to ask. The report's thesis proposal still waits for you.
+             * @default true
+             */
+            research_stale: boolean;
+            /**
+             * Research Min Days
+             * @description No new run for a holding this soon after a report.
+             * @default 30
+             */
+            research_min_days: number;
+            /**
+             * Research Max Per Run
+             * @description Most research runs one autopilot run may queue.
+             * @default 1
+             */
+            research_max_per_run: number;
+            /**
+             * Draft Theses
+             * @description Queue a deep-thesis research run for a held, non-core holding that has no thesis, and tell you once when the draft is ready. Nothing is saved until you accept.
+             * @default false
+             */
+            draft_theses: boolean;
+            /**
+             * Draft Max Per Run
+             * @description Most thesis drafts one autopilot run may queue.
+             * @default 1
+             */
+            draft_max_per_run: number;
+            /**
+             * Draft Min Days
+             * @description No new draft for a holding this soon after a report.
+             * @default 60
+             */
+            draft_min_days: number;
+            /**
+             * Refresh Review Dates
+             * @description Move a thesis's review date forward when every KPI passes and the latest research proposes no change. A normal config version you can roll back.
+             * @default true
+             */
+            refresh_review_dates: boolean;
+            /**
+             * Review Extend Days
+             * @description How far the review date moves.
+             * @default 90
+             */
+            review_extend_days: number;
+            /**
+             * Audit Per Run
+             * @description Decisions with no review that the calibration job has the stronger model re-judge independently each run (agreement counts as a correct decision).
+             * @default 25
+             */
+            audit_per_run: number;
+        };
         /** AwardDetailOut */
         AwardDetailOut: {
             /** Notice Number */
@@ -10963,6 +12258,54 @@ export interface components {
             /** Stale */
             stale: boolean;
         };
+        /** Bin */
+        Bin: {
+            /** Low */
+            low: number;
+            /** High */
+            high: number;
+            /** N */
+            n: number;
+            /** Mean Confidence */
+            mean_confidence: number;
+            /** Share Right */
+            share_right: number;
+        };
+        /** Block */
+        Block: {
+            /** Kind */
+            kind: string;
+            /**
+             * Chart
+             * @enum {string}
+             */
+            chart: "bar" | "donut" | "none";
+            /** Title */
+            title: string;
+            /** Unit */
+            unit: string;
+            /** Labels */
+            labels: string[];
+            /** Values */
+            values: number[];
+            /** Source */
+            source: string;
+            /** As Of */
+            as_of: string | null;
+            /** Summary */
+            summary: string;
+            /** Caption */
+            caption?: string | null;
+            /** Table */
+            table: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Value Field
+             * @default
+             */
+            value_field: string;
+        };
         /** BoardKpi */
         BoardKpi: {
             kpi: components["schemas"]["ThesisKPI"];
@@ -11333,7 +12676,7 @@ export interface components {
              * Critical Job Types
              * @description Job types that run normally at the monthly cap.
              */
-            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts")[];
+            critical_job_types?: ("portfolio_sync" | "earnings_check" | "thesis_verdicts" | "earnings_calendar" | "earnings_calendar_full" | "earnings_due" | "fact_reconcile" | "reference_data" | "price_history" | "intraday_prices" | "holiday_refresh" | "macro_collect" | "public_data_collect" | "source_audit" | "event_escalation" | "monitor" | "news_ingest" | "daily_digest" | "weekly_digest" | "research" | "ownership_13f" | "insider_trades" | "etf_look_through" | "monthly_review" | "chat" | "sec_xbrl" | "valuation_refresh" | "control_stakes" | "nport_holdings" | "fund_probes" | "fund_characteristics_audit" | "fund_issuer_facts" | "free_source_alerts" | "change_alerts" | "shadow_snapshot" | "shadow_report" | "raw_retention" | "research_trace_retention" | "zero_cost_gate" | "returns_refresh" | "exchange_probes" | "ir_releases" | "sec_fsds_backfill" | "pdmr_uk" | "graph_review" | "fmp_company" | "alpha_vantage_statements" | "epo_patents" | "companies_house_filings" | "edinet_filings" | "twelve_data_corporate_actions" | "ai_approvals" | "autopilot" | "autopilot_calibration" | "watchdog" | "ir_discovery" | "news_ai_search" | "news_triage" | "news_analysis" | "news_brief" | "gap_research" | "exposure_build" | "document_index" | "inbox_scan" | "inbox_agent" | "factor_returns" | "disclosure_sources" | "disclosure_ingest" | "disclosure_identifiers" | "disclosure_deals" | "disclosure_esef" | "disclosure_estimates" | "disclosure_alerts" | "thesis" | "portfolio_review")[];
             /**
              * Per Job Cap Usd
              * @description Most AI spend of one run of a job type, in USD. A run over it fails.
@@ -11416,6 +12759,20 @@ export interface components {
              * @description Annualised, the same weeks.
              */
             realised_volatility: number | null;
+        };
+        /** CallCount */
+        CallCount: {
+            /** Job Type */
+            job_type: string;
+            /** Calls */
+            calls: number;
+            /** Last 30 Days */
+            last_30_days: number;
+        };
+        /** Cancelled */
+        Cancelled: {
+            /** Action Id */
+            action_id: number;
         };
         /** CandidateCase */
         CandidateCase: {
@@ -11979,6 +13336,11 @@ export interface components {
              * @description Proposed actions waiting for confirmation.
              */
             actions: number[];
+            /**
+             * Visuals
+             * @description Charts drawn by the app from stored records.
+             */
+            visuals?: components["schemas"]["Block"][];
             /** Model */
             model: string | null;
             /** Note */
@@ -12027,6 +13389,16 @@ export interface components {
              */
             effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
+             * Escalation Model
+             * @description Cascade (cost lever C6): when set, a question the model above could not answer (no parseable answer, a refusal, the step cap, or an answer that says it has too little evidence or cites nothing) is asked again on this stronger model. Leave empty until the chat question set shows the cheaper model above holds quality; the first attempt is still paid for.
+             */
+            escalation_model?: string | null;
+            /**
+             * Escalation Effort
+             * @description Unset: effort is not sent and the model's default applies.
+             */
+            escalation_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
              * Rules First
              * @description Answer a short, closed question about the portfolio's value or cash from the database with a template (no model call); everything else goes to the assistant.
              * @default true
@@ -12044,6 +13416,25 @@ export interface components {
              * @default 15
              */
             max_searches: number;
+            /**
+             * Search Via Api
+             * @description Cost lever H2: search the news through a plain search API (needs BRAVE_API_KEY) instead of the model provider's built-in search, and keep identical searches for a few days. The model gets titles and snippets only, from the outlet tiers allowed above. Falls back to the provider's search when no key is set.
+             * @default false
+             */
+            search_via_api: boolean;
+            /**
+             * Search Cache Days
+             * @description Days an identical API search is answered from memory.
+             * @default 3
+             */
+            search_cache_days: number;
+            /**
+             * Cache Retention
+             * @description Cost lever H1: ask OpenAI to keep the chat prompt prefix cached for 24 hours instead of minutes, so the second question of the day reads the system prompt and tool list at the cached rate. Unverified for every model; leave off until a test call is accepted and the bill shows no cache-write charge that outweighs it.
+             * @default off
+             * @enum {string}
+             */
+            cache_retention: "off" | "24h";
             /**
              * History Messages
              * @description Earlier messages of the conversation sent along.
@@ -13134,6 +14525,14 @@ export interface components {
              * @description Number of changed paths against the previous version; null for the first.
              */
             changes: number | null;
+        };
+        /** ConfirmIn */
+        ConfirmIn: {
+            /**
+             * Second
+             * @default false
+             */
+            second: boolean;
         };
         /** ConfirmedListingResponse */
         ConfirmedListingResponse: {
@@ -15233,6 +16632,11 @@ export interface components {
             /** Caveats */
             caveats: string[];
         };
+        /** Dismissed */
+        Dismissed: {
+            /** Task Id */
+            task_id: number;
+        };
         /** DisputedStory */
         DisputedStory: {
             /** Id */
@@ -15295,6 +16699,79 @@ export interface components {
             regions: string[];
             /** Summary */
             summary: string;
+        };
+        /**
+         * DocumentIndexSettings
+         * @description The passage index that `search_documents` reads: filings and results releases, your
+         *     reports, theses and notes, and news, split into passages and embedded. Text is indexed
+         *     first (keyword search works at once); embedding is capped per run, newest first, so one run
+         *     costs a bounded amount. A changed document is re-indexed; an unchanged one is never
+         *     embedded twice.
+         */
+        DocumentIndexSettings: {
+            /**
+             * Embedding Model
+             * @description Embeds the passages and the search queries. Changing it re-embeds every passage over the following runs.
+             * @default gemini-embedding-2
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            embedding_model: string;
+            /**
+             * Embedding Dimensions
+             * @description 768 is the dimension the vector index is built for; others are stored and searched without the index.
+             * @default 768
+             */
+            embedding_dimensions: number;
+            /**
+             * Embed Per Run
+             * @description Passages embedded per run (0: none).
+             * @default 1500
+             */
+            embed_per_run: number;
+            /**
+             * Filings Per Run
+             * @description Archived documents read and split per run.
+             * @default 20
+             */
+            filings_per_run: number;
+            /**
+             * Reports Per Run
+             * @description Reports indexed per run.
+             * @default 200
+             */
+            reports_per_run: number;
+            /**
+             * Index Disclosures
+             * @description Index the disclosure register's prose: relationship passages and alerts.
+             * @default true
+             */
+            index_disclosures: boolean;
+            /**
+             * Disclosure Alert Days
+             * @description Disclosure alerts of this many days are indexed.
+             * @default 365
+             */
+            disclosure_alert_days: number;
+            /**
+             * Index Agent Notes
+             * @description Index your working notes for the agent.
+             * @default true
+             */
+            index_agent_notes: boolean;
+            /**
+             * News Per Run
+             * @description News items indexed per run.
+             * @default 600
+             */
+            news_per_run: number;
+            /**
+             * News Days
+             * @description News older than this is not added to the index (full-text search over the stored news is unaffected).
+             * @default 365
+             */
+            news_days: number;
         };
         /** DocumentVersionOut */
         DocumentVersionOut: {
@@ -15592,6 +17069,12 @@ export interface components {
              */
             locate_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
             /**
+             * Result Cache Days
+             * @description Cost lever: when above 0, an identical request (the same release search, the same document read) within this many days is answered from memory instead of being searched and paid for again. A season's re-checks of one issuer then cost nothing; 0 keeps every check fresh.
+             * @default 0
+             */
+            result_cache_days: number;
+            /**
              * Max Steps
              * @description Model calls plus document fetches per run.
              * @default 40
@@ -15666,6 +17149,18 @@ export interface components {
              * @default false
              */
             policy_rate: boolean;
+        };
+        /** EngagementIn */
+        EngagementIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "news_story" | "report" | "notice" | "escalation" | "thesis" | "company" | "fund";
+            /** Ref */
+            ref: string;
+            /** Ticker */
+            ticker?: string | null;
         };
         /** EntityMatchOut */
         EntityMatchOut: {
@@ -16944,6 +18439,16 @@ export interface components {
             /** Gaps */
             gaps?: string[];
         };
+        /** ExplainIn */
+        ExplainIn: {
+            /** Area */
+            area: string;
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "wrong_data" | "wrong_source" | "right_but_unimportant" | "too_early" | "too_late" | "prefer_my_judgement" | "other";
+        };
         /** ExportRequest */
         ExportRequest: {
             /**
@@ -17088,6 +18593,18 @@ export interface components {
              * @default true
              */
             map_products: boolean;
+            /**
+             * Use Batch
+             * @description Read the run's annual reports through the provider's batch endpoint (half price, the run waits up to the time below). The answers are stored first and the usual step then finds them, so nothing else changes; a report the batch does not answer is read directly.
+             * @default false
+             */
+            use_batch: boolean;
+            /**
+             * Batch Wait Minutes
+             * @description How long a batch of annual reports is waited for.
+             * @default 60
+             */
+            batch_wait_minutes: number;
         };
         /**
          * ExposureContextResponse
@@ -18169,6 +19686,27 @@ export interface components {
             /** Betas */
             betas: components["schemas"]["FactorBeta"][];
         };
+        /** FloorGateSettings */
+        FloorGateSettings: {
+            /**
+             * Min N
+             * @description Decisions needed to judge a floor.
+             * @default 30
+             */
+            min_n: number;
+            /**
+             * Min Reviewed
+             * @description Of them, reviewed decisions needed.
+             * @default 10
+             */
+            min_reviewed: number;
+            /**
+             * Max Wrong Rate Increase
+             * @description Change in the wrong share a floor must achieve; negative means fewer wrong.
+             * @default -0.01
+             */
+            max_wrong_rate_increase: number;
+        };
         /** FormulaCoverageOut */
         FormulaCoverageOut: {
             /** Present */
@@ -18563,6 +20101,25 @@ export interface components {
             top10_share: number | null;
             /** Issuers */
             issuers: number;
+        };
+        /**
+         * FundDocument
+         * @description A fund's KID, factsheet or prospectus, read for the fund's text facts (replication,
+         *     securities lending, UCITS, inception, domicile, index). Listed once; read again whenever
+         *     the document changes.
+         */
+        FundDocument: {
+            /**
+             * Isin
+             * @description The fund's ISIN.
+             */
+            isin: string;
+            /**
+             * Url
+             * Format: uri
+             * @description Where the issuer publishes the PDF or page.
+             */
+            url: string;
         };
         /** FundHolding */
         FundHolding: {
@@ -19238,6 +20795,15 @@ export interface components {
              * @description Never used. Domains in no list are treated as rejected.
              */
             denied_domains?: string[];
+        };
+        /** GateOut */
+        GateOut: {
+            /** Min N */
+            min_n: number;
+            /** Min Reviewed */
+            min_reviewed: number;
+            /** Max Wrong Rate Increase */
+            max_wrong_rate_increase: number;
         };
         /** GeoShare */
         GeoShare: {
@@ -20763,6 +22329,125 @@ export interface components {
              */
             unchanged: string[];
         };
+        /** InboxFeedbackIn */
+        InboxFeedbackIn: {
+            /**
+             * Feedback
+             * @enum {string}
+             */
+            feedback: "useful" | "not_useful";
+            /** Note */
+            note?: string | null;
+        };
+        /** InboxItem */
+        InboxItem: {
+            /** Id */
+            id: number;
+            /** Trigger Key */
+            trigger_key: string;
+            /** Trigger Kind */
+            trigger_kind: string;
+            /** Trigger Ref */
+            trigger_ref: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Severity */
+            severity: number | null;
+            /** Headline */
+            headline: string;
+            /** Body */
+            body: {
+                [key: string]: unknown;
+            };
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "new" | "read" | "actioned" | "dismissed";
+            /** Proposed Action */
+            proposed_action: {
+                [key: string]: unknown;
+            } | null;
+            /** Action Status */
+            action_status: ("proposed" | "confirmed" | "declined") | null;
+            /** Action Job Id */
+            action_job_id: number | null;
+            /** Feedback */
+            feedback: ("useful" | "not_useful") | null;
+            /** Feedback Note */
+            feedback_note: string | null;
+            /** Job Id */
+            job_id: number | null;
+            /** Created At */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+        };
+        /** InboxList */
+        InboxList: {
+            /** Items */
+            items: components["schemas"]["InboxItem"][];
+            /** Unread */
+            unread: number;
+            /**
+             * Missed
+             * @default 0
+             */
+            missed: number;
+        };
+        /**
+         * InboxSettings
+         * @description Event-driven agents: each new escalation note or thesis-breach alert starts one bounded
+         *     run that reads the app's records and leaves an inbox item with the evidence and at most
+         *     one proposed action. A run never trades, never edits a thesis and never starts a job: the
+         *     owner confirms a proposed action in the inbox.
+         */
+        InboxSettings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Model
+             * @description The model of the agent run.
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            model: string;
+            /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies.
+             * @default low
+             */
+            effort: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Max Steps
+             * @description Model calls per run.
+             * @default 8
+             */
+            max_steps: number;
+            /**
+             * Lookback Days
+             * @description Triggers older than this are not picked up.
+             * @default 7
+             */
+            lookback_days: number;
+            /**
+             * Max Per Scan
+             * @description Runs one scan may queue, newest trigger first.
+             * @default 5
+             */
+            max_per_scan: number;
+            /**
+             * Min Severity
+             * @description Alerts below this severity start no run.
+             * @default 2
+             */
+            min_severity: number;
+        };
         /**
          * Incident
          * @description A story the owner may need to look at: a severe one nobody was alerted to, or an alert
@@ -22194,6 +23879,16 @@ export interface components {
             gap_research?: components["schemas"]["JobSchedule"];
             /** @description Builds each holding's revenue-by-country exposure from its latest annual SEC XBRL filing (reported basis). Your own exposure entries are never changed. Default: Tuesdays 05:50. */
             exposure_build?: components["schemas"]["JobSchedule"];
+            /** @description Splits new filings, reports, theses, notes and news into passages and embeds them for document search. Default: daily 03:20. */
+            document_index?: components["schemas"]["JobSchedule"];
+            /** @description The autopilot: settles the review queues (held facts, graph edges, disclosure reviews, ...) with rules and models, logs every decision and escalates what it cannot settle. Default: every six hours at :20. */
+            autopilot?: components["schemas"]["JobSchedule"];
+            /** @description The ops watchdog: retries failed collectors, re-runs the refresh behind a data-quality issue, lifts old provider blocks, and tells you which API key is missing or when the AI budget will run out. Default: hourly at :10. */
+            watchdog?: components["schemas"]["JobSchedule"];
+            /** @description Compares the autopilot's decisions with the owner's calls and a stronger model's audit, then promotes or demotes each kind. Default: Sundays 07:40. */
+            autopilot_calibration?: components["schemas"]["JobSchedule"];
+            /** @description Looks for new escalation notes and thesis-breach alerts and queues an agent run for each, which leaves an inbox item. Default: hourly at :10. */
+            inbox_scan?: components["schemas"]["JobSchedule"];
             /** @description Downloads the Ken French Data Library daily factor returns (market, size, value, profitability, investment, momentum) for the Developed, Europe and US markets, which the factor exposures use. The library adds a month at a time. Default: Mondays 05:30. */
             factor_returns?: components["schemas"]["JobSchedule"];
             /** @description Re-test every disclosure source, store the result, switch a failing one off and the SEC sources on when they pass. Default: daily 06:00. */
@@ -22212,6 +23907,17 @@ export interface components {
             disclosure_alerts?: components["schemas"]["JobSchedule"];
             earnings_check?: components["schemas"]["EarningsCheckSettings"];
             exposure_build_settings?: components["schemas"]["ExposureBuildSettings"];
+            document_index_settings?: components["schemas"]["DocumentIndexSettings"];
+            inbox_settings?: components["schemas"]["InboxSettings"];
+            autopilot_settings?: components["schemas"]["AutopilotSettings"];
+            thesis_settings?: components["schemas"]["ThesisSettings"];
+            ops_settings?: components["schemas"]["OpsSettings"];
+            training_capture?: components["schemas"]["TrainingCaptureSettings"];
+            /**
+             * Fund Documents
+             * @description Fund documents to read for facts the issuer readers do not cover (any issuer except iShares and WisdomTree). The daily fund facts job reads the new or changed ones; every fact must quote the document word for word.
+             */
+            fund_documents?: components["schemas"]["FundDocument"][];
             ir_discovery_settings?: components["schemas"]["IrDiscoverySettings"];
             gap_research_settings?: components["schemas"]["GapResearchSettings"];
             ai_approval?: components["schemas"]["AiApprovalSettings"];
@@ -22431,6 +24137,71 @@ export interface components {
             /** Formula */
             formula: string;
         };
+        /** KindCalibration */
+        KindCalibration: {
+            /** Kind */
+            kind: string;
+            /** Reviewed */
+            reviewed: number;
+            /** Ece */
+            ece: number | null;
+            /** Verdict */
+            verdict: string;
+            /** Bins */
+            bins: components["schemas"]["Bin"][];
+        };
+        /** KindPrecision */
+        KindPrecision: {
+            /** Kind */
+            kind: string;
+            /** Reviewed */
+            reviewed: number;
+            /** Right */
+            right: number;
+            /** Precision */
+            precision: number | null;
+            /** Enough Evidence */
+            enough_evidence: boolean;
+            /** Met */
+            met: boolean | null;
+        };
+        /** KindSummary */
+        KindSummary: {
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Href */
+            href: string;
+            /**
+             * Configured Mode
+             * @enum {string}
+             */
+            configured_mode: "off" | "shadow" | "auto";
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "off" | "shadow" | "auto";
+            /** Decided */
+            decided: number;
+            /** Applied */
+            applied: number;
+            /** Shadow */
+            shadow: number;
+            /** Escalated */
+            escalated: number;
+            /** Reverted */
+            reverted: number;
+            /** Reviewed */
+            reviewed: number;
+            /** Right */
+            right: number;
+            /** Precision */
+            precision: number | null;
+            /** Waiting */
+            waiting: number;
+        };
         /** KpiRow */
         KpiRow: {
             /** Ticker */
@@ -22466,6 +24237,17 @@ export interface components {
              * @description Latest verdict per period, newest first.
              */
             history: components["schemas"]["VerdictOut"][];
+        };
+        /** LabelCount */
+        LabelCount: {
+            /** Subject Kind */
+            subject_kind: string;
+            /** Right */
+            right: number;
+            /** Wrong */
+            wrong: number;
+            /** Corrected */
+            corrected: number;
         };
         /** LabelIn */
         LabelIn: {
@@ -22568,6 +24350,32 @@ export interface components {
             message: string;
             /** Claims */
             claims?: string[];
+        };
+        /** LedgerEntry */
+        LedgerEntry: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Source */
+            source: string;
+            /** Kind */
+            kind: string;
+            /** Ref */
+            ref: string;
+            /** Summary */
+            summary: string;
+            /** Status */
+            status: string;
+            /** Undo Action */
+            undo_action?: string | null;
+            /** Undo Args */
+            undo_args?: {
+                [key: string]: unknown;
+            } | null;
+            /** Reversible */
+            readonly reversible: boolean;
         };
         /** LedgerEntryInput */
         LedgerEntryInput: {
@@ -23909,6 +25717,58 @@ export interface components {
             /** Definition Note */
             definition_note?: string | null;
         };
+        /** MemoOut */
+        MemoOut: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string;
+            /** Mode */
+            mode: string;
+            /** Stance */
+            stance: string;
+            /** Status */
+            status: string;
+            /** Executive Summary */
+            executive_summary: string;
+            /** Research Report Id */
+            research_report_id: number | null;
+            /** Review Id */
+            review_id: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Body */
+            body: {
+                [key: string]: unknown;
+            };
+        };
+        /** MemoSummary */
+        MemoSummary: {
+            /** Id */
+            id: number;
+            /** Ticker */
+            ticker: string;
+            /** Mode */
+            mode: string;
+            /** Stance */
+            stance: string;
+            /** Status */
+            status: string;
+            /** Executive Summary */
+            executive_summary: string;
+            /** Research Report Id */
+            research_report_id: number | null;
+            /** Review Id */
+            review_id: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /**
          * MergerEntry
          * @description A share-exchange merger you entered: each old share became `ratio` new shares. Earlier
@@ -24031,6 +25891,35 @@ export interface components {
             version_id: number;
             /** Facts Mirrored */
             facts_mirrored: number;
+        };
+        /** MissedEvent */
+        MissedEvent: {
+            /** Key */
+            key: string;
+            /** Kind */
+            kind: string;
+            /** Ref */
+            ref: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Severity */
+            severity: number | null;
+            /** Headline */
+            headline: string;
+            /** Created At */
+            created_at: string;
+        };
+        /** MissedRunIn */
+        MissedRunIn: {
+            /** Keys */
+            keys: string[];
+        };
+        /** MissedRunOut */
+        MissedRunOut: {
+            /** Queued */
+            queued: string[];
+            /** Skipped */
+            skipped: string[];
         };
         /** MissingActions */
         MissingActions: {
@@ -24311,6 +26200,41 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /** NeedsYou */
+        NeedsYou: {
+            /** Count */
+            count: number;
+            /** Items */
+            items: components["schemas"]["NeedsYouItem"][];
+        };
+        /** NeedsYouItem */
+        NeedsYouItem: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Href */
+            href: string;
+            /** Ticker */
+            ticker: string | null;
+            /**
+             * Kind Of Item
+             * @enum {string}
+             */
+            kind_of_item: "escalation" | "spot_check" | "notice";
+            /** Recommendation */
+            recommendation: string;
+            /** Confidence */
+            confidence: number | null;
+            /** Reasons */
+            reasons: string;
+            /** Age Days */
+            age_days: number;
+            /** Can Accept */
+            can_accept: boolean;
+        };
         /** NetDiscretionary */
         NetDiscretionary: {
             /**
@@ -24420,6 +26344,7 @@ export interface components {
         NewMessage: {
             /** Content */
             content: string;
+            page?: components["schemas"]["PageContext"] | null;
         };
         /** NewsFeed */
         NewsFeed: {
@@ -24567,6 +26492,12 @@ export interface components {
              */
             classification_batch_size: number;
             /**
+             * Rules First Classification
+             * @description Settle in code, without the model, a watch-topic hit linked to holdings only through the topic term (other, not relevant) and a headline that repeats an already classified one with the same candidate holdings (it takes that label). Measured on the stored wire: 598 of 598 and 87 of 87 matched the model.
+             * @default true
+             */
+            rules_first_classification: boolean;
+            /**
              * Classification Use Batch
              * @description Send a run's classification calls through the provider's batch API (half price, answers within minutes to hours) when the model is an OpenAI or Google one. A group the batch does not answer is classified directly. Off: every call is direct, so a severe item is labelled at once.
              * @default true
@@ -24655,6 +26586,13 @@ export interface components {
              * @description Unset: effort is not sent and the model's default applies.
              */
             search_lead_effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Ai Search Provider
+             * @description Who finds the leads: 'model' (the search model's built-in web search) or 'brave' (a plain search API for the links, at a fraction of the fee; needs BRAVE_API_KEY, and the model then only drops pages that are not about the company). Switch only after the lead-recall check against the model path.
+             * @default model
+             * @enum {string}
+             */
+            ai_search_provider: "model" | "brave";
             /**
              * Ai Search Max Searches
              * @description Web searches per holding per run.
@@ -24830,6 +26768,18 @@ export interface components {
              * @default false
              */
             batch_extraction: boolean;
+            /**
+             * Batch Analysis
+             * @description Send the model stages of the analysis (impact notes, framing, sentiment, thesis link) of stories below severity 3 through the provider's batch endpoint (half price, a run waits up to an hour). Severe stories are analysed directly, at once.
+             * @default false
+             */
+            batch_analysis: boolean;
+            /**
+             * Reuse Repeat Analysis
+             * @description A story the novelty step marks as a repeat of an earlier one with the same holding takes that story's framing, sentiment and impact notes instead of asking the model again. Severe stories are always analysed afresh.
+             * @default false
+             */
+            reuse_repeat_analysis: boolean;
             /**
              * Sector Benchmarks
              * @description Price symbol of the sector index to measure a holding against, by the holding's sector (for example {'Technology': 'xlk.us'}). Without an entry the country's market index is used.
@@ -25099,6 +27049,11 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** NoteDecision */
+        NoteDecision: {
+            item: components["schemas"]["InboxItem"];
+            note?: components["schemas"]["AgentNote"] | null;
+        };
         /** NoteExtractOut */
         NoteExtractOut: {
             /** Version Id */
@@ -25116,6 +27071,27 @@ export interface components {
              */
             skipped: string[];
         };
+        /** NoteIn */
+        NoteIn: {
+            /** Ticker */
+            ticker?: string | null;
+            /** Text */
+            text: string;
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean;
+        };
+        /** NotePatch */
+        NotePatch: {
+            /** Ticker */
+            ticker?: string | null;
+            /** Text */
+            text?: string | null;
+            /** Active */
+            active?: boolean | null;
+        };
         /** NoteSentence */
         NoteSentence: {
             /** Text */
@@ -25129,6 +27105,26 @@ export interface components {
             check?: ("supported" | "unsupported" | "unchecked") | null;
             /** Check Reason */
             check_reason?: string | null;
+        };
+        /** NoteVersion */
+        NoteVersion: {
+            /** Id */
+            id: number;
+            /** Note Id */
+            note_id: number;
+            /** Ticker */
+            ticker: string | null;
+            /** Text */
+            text: string;
+            /** Active */
+            active: boolean;
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "created" | "edited" | "deleted";
+            /** Changed At */
+            changed_at: string;
         };
         /** NotificationRule */
         NotificationRule: {
@@ -25401,6 +27397,120 @@ export interface components {
             incidents: components["schemas"]["Incident"][];
             ai_search: components["schemas"]["AiSearchCost"];
         };
+        /**
+         * OpsSettings
+         * @description The ops watchdog: fixes what it safely can (retry a failed job, re-run a refresh, lift
+         *     an old provider block), and puts one line in "Needs you" for what it could not.
+         */
+        OpsSettings: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Repair
+             * @description Re-run the refresh job behind a data-quality issue and retry a failed collector. Off: issues are only listed.
+             * @default true
+             */
+            repair: boolean;
+            /**
+             * Retry Hours
+             * @description Wait this long between two repair attempts.
+             * @default 12
+             */
+            retry_hours: number;
+            /**
+             * Max Attempts
+             * @description An issue that survives this many repair attempts goes to Needs you.
+             * @default 2
+             */
+            max_attempts: number;
+            /**
+             * Block Reset Days
+             * @description Lift a provider block this old so the next call probes it again (0: never). A block that returns after the probe goes to Needs you.
+             * @default 7
+             */
+            block_reset_days: number;
+            /**
+             * Refresh Derived
+             * @description Rebuild the benchmark index weights and the fund coverage ledger from the stored fund holdings, so they follow every look-through refresh without a button.
+             * @default true
+             */
+            refresh_derived: boolean;
+            /**
+             * Suggest Rebalance
+             * @description Once a day, when positions have drifted outside their bands, put the rebalance trades (what, how much, why) in Needs you. Nothing is sent to the broker.
+             * @default true
+             */
+            suggest_rebalance: boolean;
+            /**
+             * Suggest Hour Utc
+             * @description The hour (UTC) the daily suggestion is worked out.
+             * @default 6
+             */
+            suggest_hour_utc: number;
+            /**
+             * Key Notices
+             * @description Name each API key that is missing for a job that is switched on.
+             * @default true
+             */
+            key_notices: boolean;
+            /**
+             * Budget Forecast
+             * @description Warn once a month when the AI spend is on course to pass the monthly cap.
+             * @default true
+             */
+            budget_forecast: boolean;
+            /**
+             * Autolog Trades
+             * @description Put each detected trade on the journal timeline (a journal entry, or a switch-log row for a sell and buy pair) marked as automatic. They hold no reasons and are left out of the scorecard and process review.
+             * @default true
+             */
+            autolog_trades: boolean;
+            /**
+             * Anticipate Earnings
+             * @description Once a day, put a line in Needs you for each held company that reports within three days, with when its research was last refreshed.
+             * @default true
+             */
+            anticipate_earnings: boolean;
+            /**
+             * Draft Case Items
+             * @description Once a day, add your thesis wording to a held company's case items as drafts (why owned, pre-mortem, exit conditions). Never confirmed, never added twice.
+             * @default true
+             */
+            draft_case_items: boolean;
+            /**
+             * Tune Alerts
+             * @description Once a day, lower one instant alert type to a digest highlight when you acknowledged under 10% of at least 10 of them in 60 days. A new event-rules version you can roll back; never below a digest highlight.
+             * @default true
+             */
+            tune_alerts: boolean;
+            /**
+             * Suggest Opportunities
+             * @description Once a day, run your saved stock screens and tell you about a stock that newly passes one and is not held. The criteria are yours; nothing is ranked or scored.
+             * @default true
+             */
+            suggest_opportunities: boolean;
+            /**
+             * Release Gate
+             * @description Switch off a feature you turned on once it has failed the release gate for `retry_hours` (a stale input or a failed audit), and say so in Needs you.
+             * @default true
+             */
+            release_gate: boolean;
+            /**
+             * Fill Segment Map
+             * @description Once a day, map a held company's revenue members that the filing names as a country to that country. Regions and anything you removed or changed are left alone.
+             * @default true
+             */
+            fill_segment_map: boolean;
+            /**
+             * Journal Gaps
+             * @description Tell the owner about a recent trade the journal does not explain, or a sell and a buy that look like a switch. Never writes a journal or switch-log entry.
+             * @default true
+             */
+            journal_gaps: boolean;
+        };
         /** OutletFraming */
         OutletFraming: {
             /** Item Id */
@@ -25460,6 +27570,54 @@ export interface components {
             thesis_gaps?: string[];
             /** Advice */
             advice: string;
+        };
+        /** OverrideIn */
+        OverrideIn: {
+            /** Area */
+            area: string;
+            /** Subject Kind */
+            subject_kind: string;
+            /** Subject Ref */
+            subject_ref: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "reverted" | "edited" | "rejected" | "marked_wrong" | "taught" | "retracted";
+            /** Reason Code */
+            reason_code?: ("wrong_data" | "wrong_source" | "right_but_unimportant" | "too_early" | "too_late" | "prefer_my_judgement" | "other") | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Via
+             * @default screen
+             * @enum {string}
+             */
+            via: "screen" | "chat";
+        };
+        /** OverrideOut */
+        OverrideOut: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Area */
+            area: string;
+            /** Subject Kind */
+            subject_kind: string;
+            /** Subject Ref */
+            subject_ref: string;
+            /** Action */
+            action: string;
+            /** Reason Code */
+            reason_code: string | null;
+            /** Note */
+            note: string | null;
+            /** Via */
+            via: string;
         };
         /** Overview */
         Overview: {
@@ -25713,6 +27871,22 @@ export interface components {
              * @default 10
              */
             top_holders: number;
+        };
+        /**
+         * PageContext
+         * @description What the owner is looking at when they ask; it only helps the chat resolve "this".
+         */
+        PageContext: {
+            /**
+             * Path
+             * @description The app page, e.g. /autopilot.
+             */
+            path: string;
+            /**
+             * Selection
+             * @description The item picked on the page, e.g. decision 12.
+             */
+            selection?: string | null;
         };
         /** PairOverlap */
         PairOverlap: {
@@ -28097,6 +30271,26 @@ export interface components {
             note: string | null;
             body: components["schemas"]["PromptsConfig"];
         };
+        /** ProposeIn */
+        ProposeIn: {
+            /** Action */
+            action: string;
+            /**
+             * Args
+             * @default {}
+             */
+            args: {
+                [key: string]: unknown;
+            };
+            /**
+             * Via
+             * @default chat
+             * @enum {string}
+             */
+            via: "screen" | "chat";
+            /** Reason */
+            reason?: string | null;
+        };
         /** ProposedAction */
         ProposedAction: {
             /** Action */
@@ -28436,7 +30630,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap" | "engine_verification";
             /**
              * Subject
              * @description Ticker, fund or provider the issue is about.
@@ -29926,6 +32120,13 @@ export interface components {
             trace_purged_at?: string | null;
             /** Tool Calls */
             tool_calls?: components["schemas"]["ToolCallRecord"][];
+            /**
+             * Engine
+             * @default fixed
+             */
+            engine: string;
+            /** Agents */
+            agents?: components["schemas"]["WorkerRecord"][];
             trace?: components["schemas"]["ResearchTrace"] | null;
         };
         /** ResearchContext */
@@ -30175,6 +32376,111 @@ export interface components {
              * @description The model that writes the plan; unset = the claim verifier's.
              */
             planner_model?: string | null;
+            /**
+             * Engine
+             * @description fixed: one writer call per section, searching inside it. agentic: specialist workers gather findings first (cheap model, own tools, own caps), then the profile's model writes each section from them. Both keep the claim check.
+             * @default fixed
+             * @enum {string}
+             */
+            engine: "fixed" | "agentic";
+            /**
+             * Lenses
+             * @description The workers an agentic run starts, one per lens.
+             */
+            lenses?: ("financials" | "filings_events" | "news_web" | "portfolio_risk" | "counter_case")[];
+            /**
+             * Worker Model
+             * @description Model of the workers (agentic engine).
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            worker_model: string;
+            /**
+             * Worker Effort
+             * @default low
+             * @enum {string}
+             */
+            worker_effort: "low" | "medium" | "high";
+            /**
+             * Worker Max Steps
+             * @description Model calls (tool rounds) one worker may use.
+             * @default 12
+             */
+            worker_max_steps: number;
+            /**
+             * Worker Max Searches
+             * @description Web searches one worker may run; all workers together stay inside the profile's max_searches.
+             * @default 8
+             */
+            worker_max_searches: number;
+            /**
+             * Parallel Workers
+             * @description Workers running at the same time (cost control).
+             * @default 2
+             */
+            parallel_workers: number;
+            /**
+             * Write Order
+             * @description template: sections are written in template order. summary_last: the executive summary, thesis KPIs and open questions are written after the evidence sections, from the sentences already written and the sources they cite instead of the whole material (far fewer input tokens). Display order is unchanged.
+             * @default template
+             * @enum {string}
+             */
+            write_order: "template" | "summary_last";
+            /**
+             * Cheap Sections
+             * @description Sections written by `cheap_model` first. A cheap draft with fewer cited sentences than `min_sentences` (or a failed call) is written again by the profile's model, so a weak draft never reaches the report.
+             */
+            cheap_sections?: ("executive_summary" | "business" | "financial_trend" | "moat_risks" | "valuation" | "scenarios" | "catalysts" | "counter_case" | "strategy_fit" | "thesis_kpis" | "ownership" | "relationships" | "risk" | "liquidity" | "open_questions")[];
+            /**
+             * Cheap Model
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            cheap_model: string;
+            /**
+             * Cheap Effort
+             * @default medium
+             * @enum {string}
+             */
+            cheap_effort: "low" | "medium" | "high";
+            /**
+             * Follow Up Cheap
+             * @description Follow-up rounds (a second source, a contradiction) are written by `cheap_model`; a follow-up that adds nothing is tried once by the profile's model.
+             * @default false
+             */
+            follow_up_cheap: boolean;
+            /**
+             * Search Mode
+             * @description model: the writing model runs the web searches inside each section. scouts: `scout_model` runs the same searches and returns compact extracts, which join the source registry as ordinary search sources; the writing model then writes without a search tool. Search caps and tier rules are unchanged.
+             * @default model
+             * @enum {string}
+             */
+            search_mode: "model" | "scouts";
+            /**
+             * Scout Model
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            scout_model: string;
+            /**
+             * Scout Effort
+             * @default low
+             * @enum {string}
+             */
+            scout_effort: "low" | "medium" | "high";
+            /**
+             * Priority
+             * @description flex: the writing, scouting and planning calls ask for the provider's discounted, slower tier and fall back to standard when it is busy. batch: flex, and the claim checks (independent of each other) go to the provider's batch API, which answers within minutes to hours. For runs nobody is waiting on.
+             * @default standard
+             * @enum {string}
+             */
+            priority: "standard" | "flex" | "batch";
         };
         /**
          * ResearchProfilesConfig
@@ -30533,6 +32839,18 @@ export interface components {
              */
             review_date: string;
         };
+        /** ReviewIn */
+        ReviewIn: {
+            /** Reason Code */
+            reason_code?: ("wrong_data" | "wrong_source" | "right_but_unimportant" | "too_early" | "too_late" | "prefer_my_judgement" | "other") | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "ok" | "wrong";
+        };
         /** ReviewItem */
         ReviewItem: {
             /** Ticker */
@@ -30554,6 +32872,26 @@ export interface components {
             restates: components["schemas"]["FactOut"] | null;
             /** Reconciliation */
             reconciliation: components["schemas"]["ReconciliationOut"][];
+        };
+        /** ReviewOut */
+        ReviewOut: {
+            /** Id */
+            id: number;
+            /** Status */
+            status: string;
+            /** Summary */
+            summary: string;
+            /** Body */
+            body: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finished At */
+            finished_at: string | null;
         };
         /** ReviewQueueResponse */
         ReviewQueueResponse: {
@@ -30580,6 +32918,14 @@ export interface components {
             body: components["schemas"]["ReviewBody"];
             /** Body Md */
             body_md: string;
+        };
+        /** ReviewRequest */
+        ReviewRequest: {
+            /**
+             * Tickers
+             * @description Stocks you want researched as buy candidates, besides those the review finds.
+             */
+            tickers?: string[];
         };
         /** ReviewRow */
         ReviewRow: {
@@ -31184,6 +33530,35 @@ export interface components {
              * @default 0
              */
             steps: number;
+        };
+        /** RouteStat */
+        RouteStat: {
+            /** Route */
+            route: string;
+            /** Runs */
+            runs: number;
+            /** Failed */
+            failed: number;
+            /**
+             * Unpriced Runs
+             * @description Runs with steps that carry no cost.
+             */
+            unpriced_runs: number;
+            /** Cost Total Usd */
+            cost_total_usd: number;
+            /** Cost Median Usd */
+            cost_median_usd: number | null;
+            /** Cost P95 Usd */
+            cost_p95_usd: number | null;
+            /** Seconds Median */
+            seconds_median: number | null;
+            /** Seconds P95 */
+            seconds_p95: number | null;
+            /**
+             * Queue Seconds Median
+             * @description Median wait between a job being created and starting.
+             */
+            queue_seconds_median?: number | null;
         };
         /** Row */
         Row: {
@@ -32969,26 +35344,6 @@ export interface components {
              */
             unrealised: number;
         };
-        /** SnoozeIn */
-        SnoozeIn: {
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
-            /** Subject */
-            subject: string;
-            /**
-             * Action
-             * @default snooze
-             * @enum {string}
-             */
-            action: "snooze" | "clear";
-            /** Until */
-            until?: string | null;
-            /** Note */
-            note?: string | null;
-        };
         /** SnoozeRow */
         SnoozeRow: {
             /** Id */
@@ -32997,7 +35352,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap" | "engine_verification";
             /** Subject */
             subject: string;
             /**
@@ -33909,6 +36264,14 @@ export interface components {
          * @enum {string}
          */
         Status: "complete" | "partial" | "unavailable" | "paid_only" | "disputed";
+        /** StatusIn */
+        StatusIn: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "read" | "dismissed";
+        };
         /** StockRequest */
         StockRequest: {
             /**
@@ -34491,6 +36854,15 @@ export interface components {
              */
             method_version: string;
         };
+        /** Summary */
+        Summary: {
+            /** Days */
+            days: number;
+            /** Kinds */
+            kinds: components["schemas"]["KindSummary"][];
+            /** Waiting */
+            waiting: number;
+        };
         /** SupplyChain */
         SupplyChain: {
             /** Nodes */
@@ -34602,6 +36974,20 @@ export interface components {
             surprise: string;
             /** Version */
             version: string;
+        };
+        /** SweepOut */
+        SweepOut: {
+            /**
+             * Ran At
+             * Format: date-time
+             */
+            ran_at: string;
+            /** Checked */
+            checked: number;
+            /** Flagged */
+            flagged: number;
+            /** Disagreement Rate */
+            disagreement_rate: number | null;
         };
         /** SwitchEntry */
         SwitchEntry: {
@@ -35508,6 +37894,18 @@ export interface components {
             /** Applied */
             applied: ("why_owned" | "exit_conditions" | "pre_mortem")[];
         };
+        /** ThesisRequest */
+        ThesisRequest: {
+            /** Ticker */
+            ticker: string;
+            /**
+             * Mode
+             * @description held: a position you own (the thesis is saved when it is written). buy: a stock you might buy (the thesis waits until you accept it).
+             * @default held
+             * @enum {string}
+             */
+            mode: "held" | "buy";
+        };
         /** ThesisReview */
         ThesisReview: {
             /** Ticker */
@@ -35559,6 +37957,55 @@ export interface components {
              * @default 0.25
              */
             p_bull: number;
+        };
+        /**
+         * ThesisSettings
+         * @description The thesis job: started by the owner for one holding or one candidate, it researches
+         *     with every record the app holds plus web search, writes the thesis and, for a holding,
+         *     saves it. The portfolio review does the same for the stocks it finds.
+         */
+        ThesisSettings: {
+            /**
+             * Model
+             * @description Writes the thesis and memo.
+             * @default gpt-6.1-sol
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            model: string;
+            /**
+             * Effort
+             * @description Unset: effort is not sent and the model's default applies.
+             */
+            effort?: ("low" | "medium" | "high" | "xhigh" | "max") | null;
+            /**
+             * Research Profile
+             * @description The research profile the thesis is built on.
+             * @default deep-thesis
+             */
+            research_profile: string;
+            /**
+             * Review Max Candidates
+             * @description Most stocks a portfolio review researches in depth (each costs a full research run). The ones you name come first.
+             * @default 3
+             */
+            review_max_candidates: number;
+            /**
+             * Review Discovery
+             * @description Let the portfolio review search the web for stocks that fill the gaps in your strategy, besides the ones you name.
+             * @default true
+             */
+            review_discovery: boolean;
+            /**
+             * Review Discovery Model
+             * @description Searches the web for candidate stocks.
+             * @default gpt-6-luna
+             * @example gpt-6.1-sol
+             * @example gpt-6-luna
+             * @example gemini-3.8-flash
+             */
+            review_discovery_model: string;
         };
         /**
          * ThesisVariantPerception
@@ -36123,6 +38570,53 @@ export interface components {
             /** Job Id */
             job_id: number | null;
         };
+        /**
+         * TrainingCaptureSettings
+         * @description Keep a redacted copy of each AI call (prompt, answer, usage) so models can later be
+         *     fine-tuned on this app's own work. Nothing is trained or sent anywhere by this.
+         */
+        TrainingCaptureSettings: {
+            /**
+             * Enabled
+             * @description Record each AI call. Off: nothing further is recorded.
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Exclude Job Types
+             * @description Job types whose calls are not recorded. Empty: every job type is recorded, chat included.
+             */
+            exclude_job_types?: string[];
+            /**
+             * Max Storage Mb
+             * @description Stop recording when the stored calls take this much space; nothing already recorded is deleted.
+             * @default 150
+             */
+            max_storage_mb: number;
+            /**
+             * Max Chars
+             * @description Longest prompt or answer text kept per call; the rest is cut.
+             * @default 60000
+             */
+            max_chars: number;
+        };
+        /** TrainingSummary */
+        TrainingSummary: {
+            /** Calls */
+            calls: number;
+            /** Last 30 Days */
+            last_30_days: number;
+            /** Size Mb */
+            size_mb: number;
+            /** By Job Type */
+            by_job_type: components["schemas"]["CallCount"][];
+            /** Labels */
+            labels: number;
+            /** Owner Labels */
+            owner_labels: number;
+            /** By Subject */
+            by_subject: components["schemas"]["LabelCount"][];
+        };
         /** TransactionFeeOut */
         TransactionFeeOut: {
             /**
@@ -36245,6 +38739,30 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** TriggerOut */
+        TriggerOut: {
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Kind */
+            kind: string;
+            /** Subject */
+            subject: string;
+            /** Reason */
+            reason: string;
+            /** Action */
+            action: string;
+            /** Status */
+            status: string;
+            /** Skip Reason */
+            skip_reason: string | null;
+            /** Job Id */
+            job_id: number | null;
+        };
         /** TriggerSummary */
         TriggerSummary: {
             /** Losing Theses */
@@ -36335,6 +38853,13 @@ export interface components {
             via: components["schemas"]["Via"][];
             /** Benchmark Weight */
             benchmark_weight: number | null;
+        };
+        /** UnexplainedOut */
+        UnexplainedOut: {
+            /** Areas */
+            areas: {
+                [key: string]: number;
+            };
         };
         /** Unknown */
         Unknown: {
@@ -36849,6 +39374,42 @@ export interface components {
             /** Value Base */
             value_base: number;
         };
+        /**
+         * WatcherSettings
+         * @description How sensitive the heads-up watchers are. Bounded so none can be switched off by a typo.
+         */
+        WatcherSettings: {
+            /**
+             * Insider Min People
+             * @description Insiders buying together.
+             * @default 3
+             */
+            insider_min_people: number;
+            /**
+             * Insider Days
+             * @description Window for that cluster.
+             * @default 14
+             */
+            insider_days: number;
+            /**
+             * Large Move
+             * @description One-day move of a held stock worth a note.
+             * @default 0.08
+             */
+            large_move: number;
+            /**
+             * Review Lead Days
+             * @description Days of notice for review.
+             * @default 3
+             */
+            review_lead_days: number;
+            /**
+             * Cooldown Days
+             * @description Days before it repeats.
+             * @default 14
+             */
+            cooldown_days: number;
+        };
         /** WatchlistCreate */
         WatchlistCreate: {
             /** Ticker */
@@ -37018,6 +39579,13 @@ export interface components {
             /** Notes */
             notes: string[];
         };
+        /** WhyIn */
+        WhyIn: {
+            /** Reason Code */
+            reason_code?: ("wrong_data" | "wrong_source" | "right_but_unimportant" | "too_early" | "too_late" | "prefer_my_judgement" | "other") | null;
+            /** Note */
+            note?: string | null;
+        };
         /** WikidataSummary */
         WikidataSummary: {
             /** Qid */
@@ -37156,6 +39724,74 @@ export interface components {
             items: components["schemas"]["WireItem"][];
             /** Next Before Id */
             next_before_id: number | null;
+        };
+        /**
+         * WorkerRecord
+         * @description What one worker did, stored with the report (metadata only).
+         */
+        WorkerRecord: {
+            /**
+             * Lens
+             * @enum {string}
+             */
+            lens: "financials" | "filings_events" | "news_web" | "portfolio_risk" | "counter_case";
+            /**
+             * Model
+             * @default
+             */
+            model: string;
+            /**
+             * Outcome
+             * @default not_run
+             * @enum {string}
+             */
+            outcome: "ok" | "no_findings" | "failed" | "refused" | "step_cap" | "not_run";
+            /**
+             * Steps
+             * @default 0
+             */
+            steps: number;
+            /** Tool Calls */
+            tool_calls?: string[];
+            /**
+             * Searches
+             * @default 0
+             */
+            searches: number;
+            /**
+             * Findings
+             * @default 0
+             */
+            findings: number;
+            /**
+             * Dropped
+             * @default 0
+             */
+            dropped: number;
+            /**
+             * Input Tokens
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Cache Read Tokens
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /** Cost Usd */
+            cost_usd?: number | null;
+            /**
+             * Ms
+             * @default 0
+             */
+            ms: number;
+            /** Note */
+            note?: string | null;
         };
         /** WorldBankIndicator */
         WorldBankIndicator: {
@@ -37904,6 +40540,27 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /** Recorded */
+        api__action_routes__Recorded: {
+            /** Recorded */
+            recorded: boolean;
+        };
+        /** Recorded */
+        api__autopilot_routes__Recorded: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+        };
+        /** SnoozeIn */
+        api__autopilot_routes__SnoozeIn: {
+            /**
+             * Days
+             * @default 7
+             */
+            days: number;
+        };
         /** StakeChangeOut */
         api__disclosure_routes__StakeChangeOut: {
             /** Change Type */
@@ -38091,7 +40748,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap";
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap" | "engine_verification";
             /** Title */
             title: string;
             /** Ran */
@@ -38103,6 +40760,26 @@ export interface components {
              * @default 0
              */
             issues: number;
+            /** Note */
+            note?: string | null;
+        };
+        /** SnoozeIn */
+        steward__quality__snooze__SnoozeIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "stale_price" | "identity_unresolved" | "fund_weights" | "claim_review" | "source_conflict" | "provider_access" | "provider_quota" | "thesis_gap" | "engine_verification";
+            /** Subject */
+            subject: string;
+            /**
+             * Action
+             * @default snooze
+             * @enum {string}
+             */
+            action: "snooze" | "clear";
+            /** Until */
+            until?: string | null;
             /** Note */
             note?: string | null;
         };
@@ -38414,6 +41091,7 @@ export interface operations {
             query?: {
                 /** @description The version the edit started from. If another save has happened since, nothing is saved and the answer is 409. */
                 base_version_id?: number | null;
+                reason_code?: ("wrong_data" | "wrong_source" | "right_but_unimportant" | "too_early" | "too_late" | "prefer_my_judgement" | "other") | null;
             };
             header?: never;
             path: {
@@ -41582,6 +44260,268 @@ export interface operations {
             };
         };
     };
+    run_thesis: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThesisRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_portfolio_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_memos: {
+        parameters: {
+            query?: {
+                ticker?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_memo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memo_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_buy_memo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memo_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_memo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memo_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_thesis_reviews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewOut"][];
+                };
+            };
+        };
+    };
+    get_thesis_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                review_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resend_event: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     get_escalation_stats: {
         parameters: {
             query?: {
@@ -43894,7 +46834,9 @@ export interface operations {
     };
     cancel_action: {
         parameters: {
-            query?: never;
+            query?: {
+                reason_code?: ("wrong_data" | "wrong_source" | "right_but_unimportant" | "too_early" | "too_late" | "prefer_my_judgement" | "other") | null;
+            };
             header?: never;
             path: {
                 action_id: number;
@@ -43910,6 +46852,1337 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_inbox: {
+        parameters: {
+            query?: {
+                status?: ("new" | "read" | "actioned" | "dismissed") | null;
+                ticker?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_missed: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MissedEvent"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_missed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MissedRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MissedRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_inbox_item: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_inbox_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    give_feedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InboxFeedbackIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_inbox_action: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_inbox_action: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_suggested_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_suggested_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_note_history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteVersion"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_agent_notes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentNote"][];
+                };
+            };
+        };
+    };
+    add_agent_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentNote"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_agent_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_agent_note: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentNote"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_route_stats: {
+        parameters: {
+            query?: {
+                days?: number;
+                /** @description Only runs that called a model. */
+                ai_only?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteStat"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Summary"];
+                };
+            };
+        };
+    };
+    get_calibration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KindCalibration"][];
+                };
+            };
+        };
+    };
+    list_decisions: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+                status?: ("shadow" | "applied" | "escalated" | "reverted" | "closed") | null;
+                ticker?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoDecision"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    needs_you: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NeedsYou"];
+                };
+            };
+        };
+    };
+    record_engagement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EngagementIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api__autopilot_routes__Recorded"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_notice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dismissed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    snooze_notice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["api__autopilot_routes__SnoozeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dismissed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_decision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                decision_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["WhyIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_recommendation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                decision_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_decision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                decision_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoDecision"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    engine_ledger: {
+        parameters: {
+            query?: {
+                days?: number;
+                limit?: number;
+                source?: string | null;
+                kind?: string | null;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LedgerEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_overrides: {
+        parameters: {
+            query?: {
+                days?: number;
+                area?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverrideOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_override: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverrideIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["api__action_routes__Recorded"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unexplained_overrides: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnexplainedOut"];
+                };
+            };
+        };
+    };
+    explain_overrides: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExplainIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    engine_sweeps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SweepOut"][];
+                };
+            };
+        };
+    };
+    engine_triggers: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_kinds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionKind"][];
+                };
+            };
+        };
+    };
+    recent_actions: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cancelled"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_visual: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Block"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_gates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GateOut"];
+                };
+            };
+        };
+    };
+    put_gates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FloorGateSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_training: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainingSummary"];
+                };
+            };
+        };
+    };
+    get_autonomy_scorecard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutonomyScorecard"];
+                };
+            };
+        };
+    };
+    get_watchers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatcherSettings"];
+                };
+            };
+        };
+    };
+    put_watchers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatcherSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatcherSettings"];
                 };
             };
             /** @description Validation Error */
@@ -50015,7 +54288,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SnoozeIn"];
+                "application/json": components["schemas"]["steward__quality__snooze__SnoozeIn"];
             };
         };
         responses: {

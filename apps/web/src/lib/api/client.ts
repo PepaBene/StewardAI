@@ -3,6 +3,7 @@ import createClient, { type Client, type Middleware } from "openapi-fetch";
 import { getApiBaseUrl } from "@/lib/env";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
+import { configSavedSignal } from "./config-saved";
 import type { components, paths } from "./schema";
 
 /*
@@ -161,6 +162,9 @@ export type ResearchBody = Schemas["ResearchBody"];
 export type ResearchSection = Schemas["ResearchSection"];
 export type ResearchReportOut = Schemas["ResearchReportOut"];
 export type ResearchSummary = Schemas["ResearchSummary"];
+export type ThesisMemoSummary = Schemas["MemoSummary"];
+export type ThesisMemo = Schemas["MemoOut"];
+export type PortfolioReview = Schemas["ReviewOut"];
 export type Valuation = Schemas["Valuation"];
 export type ResearchProfilesConfig = Schemas["ResearchProfilesConfig"];
 export type ResearchProfile = Schemas["ResearchProfile"];
@@ -229,6 +233,7 @@ export function createApiClient(options: {
     fetch: options.fetch,
   });
   if (options.getAccessToken) client.use(bearerAuth(options.getAccessToken));
+  client.use(configSavedSignal());
   return client;
 }
 

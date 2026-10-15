@@ -17,9 +17,11 @@ impact note sentence resting only on a web-search result, whose page the code ne
 """
 
 import datetime as dt
+import hashlib
+import json
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import Any, Literal, Protocol
 
@@ -28,7 +30,8 @@ from pydantic import BaseModel, Field
 from steward.ai import Usage
 from steward.config.jobs import effort_kwargs
 from steward.config.verification import ClaimVerifierSettings
-from steward.llm.routing import RoutingClient
+from steward.llm.cache import ResultCache
+from steward.llm.routing import RoutingClient, parse_many
 from steward.llm.types import LLMError
 
 CheckStatus = Literal["supported", "unsupported", "unchecked"]
@@ -71,6 +74,16 @@ class Number:
     text: str
     value: Decimal
     decimals: int
+
+
+_MD_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+_BARE_URL = re.compile(r"https?://\S+")
+
+
+def strip_links(text: str) -> str:
+    """The sentence without its links: `[sec.gov](https://sec.gov/…/000165204426000071/…)` keeps
+    its label and loses the address, whose digits are not figures the sentence states."""
+    return " ".join(_BARE_URL.sub("", _MD_LINK.sub(r"\1", text)).split())
 
 
 def numbers_in(text: str) -> list[Number]:
@@ -253,10 +266,21 @@ class LLMClaimVerifier:
         model: str,
         system: str = SYSTEM,
         effort: str | None = None,
+        cache: ResultCache | None = None,
+        use_batch: bool = False,
+        wait_minutes: float = 60.0,
     ) -> None:
         self._client = client
         self._model = model
         self._effort = effort
+        self._use_batch = use_batch
+        self._wait_minutes = wait_minutes
+        # Per-claim verdicts (cost lever C8): re-running a report whose sentence and snippets
+        # are unchanged does not ask again. The key holds the model, the system prompt, the
+        # effort, the sentence and its snippets, so any change of those asks again. The date
+        # in the prompt is left out: whether a snippet supports a sentence does not depend on
+        # the day.
+        self._cache = cache
         # The owner's override from the Prompts config, else the built-in default. No cache
         # breakpoint: the batches share only this ~150-token prompt, far below the minimum
         # cacheable prefix (thousands of tokens), and each batch's claims differ.
@@ -267,20 +291,70 @@ class LLMClaimVerifier:
     ) -> tuple[list[ClaimVerdict], Usage]:
         usage = Usage(model=self._model)
         verdicts: list[ClaimVerdict] = []
-        for start in range(0, len(claims), BATCH):
-            batch = claims[start : start + BATCH]
-            response = await self._client.messages.parse(
-                model=self._model,
-                system=self._system,
-                messages=[{"role": "user", "content": claims_prompt(batch, today)}],
-                output_format=ClaimVerdicts,
-                **effort_kwargs(self._model, self._effort, 4000),
-            )
+        keys: dict[int, str] = {}
+        pending = list(claims)
+        if self._cache is not None:
+            pending = []
+            for claim in claims:
+                key = self._claim_key(claim)
+                keys[claim.index] = key
+                hit = await self._cache.get(key)
+                try:
+                    if hit is not None:
+                        verdicts.append(
+                            ClaimVerdict(
+                                index=claim.index,
+                                supported=bool(hit["supported"]),
+                                reason=str(hit["reason"]),
+                            )
+                        )
+                        continue
+                except KeyError:
+                    pass
+                pending.append(claim)
+        chunks = [pending[start : start + BATCH] for start in range(0, len(pending), BATCH)]
+        # The chunks are independent, so with `use_batch` they go to the provider's batch API
+        # as one batch (half price, answered within minutes to hours; a chunk it does not
+        # answer is asked directly).
+        responses = await parse_many(
+            self._client,
+            [
+                {
+                    "model": self._model,
+                    "system": self._system,
+                    "messages": [{"role": "user", "content": claims_prompt(chunk, today)}],
+                    "output_format": ClaimVerdicts,
+                    **effort_kwargs(self._model, self._effort, 4000),
+                }
+                for chunk in chunks
+            ],
+            batch=self._use_batch,
+            wait_minutes=self._wait_minutes,
+        )
+        for batch, response in zip(chunks, responses, strict=True):
+            if isinstance(response, BaseException):
+                raise response
             usage.add(response.usage)
             parsed: Any = response.parsed_output
             if parsed is not None:
                 verdicts.extend(parsed.verdicts)
+                if self._cache is not None:
+                    asked = {c.index for c in batch}
+                    for verdict in parsed.verdicts:
+                        if verdict.index in asked and verdict.index in keys:
+                            await self._cache.put(
+                                keys[verdict.index],
+                                self._model,
+                                {"supported": verdict.supported, "reason": verdict.reason},
+                            )
         return verdicts, usage
+
+    def _claim_key(self, claim: Claim) -> str:
+        payload = json.dumps(
+            [self._model, self._system, self._effort, claim.text, list(claim.evidence)],
+            ensure_ascii=False,
+        )
+        return hashlib.sha256(payload.encode()).hexdigest()
 
 
 @dataclass
@@ -323,6 +397,9 @@ async def check_claims(
     """Check every claim: numbers in code first, then the model for the rest."""
     results: dict[int, ClaimResult] = {}
     to_model: list[Claim] = []
+    # Links inside a sentence are citations, not claims: their digits (accession numbers, CIKs)
+    # must not be tested as figures, and the model does not need to read them.
+    claims = [replace(c, text=strip_links(c.text)) for c in claims]
     for claim in claims:
         if not claim.evidence:
             # E.g. a sentence resting only on a web-search result: the model read the page,

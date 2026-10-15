@@ -49,7 +49,7 @@ from steward.earnings.locate import _result_urls
 from steward.fundamentals.ir import IrError, document_lines
 from steward.fundamentals.ir_discovery import host_denied, is_blocked_page, registrable
 from steward.jobs.runner import JobContext, JobFailed
-from steward.llm.cache import ResultCache
+from steward.llm.cache import SEARCH_CACHE_DAYS, ResultCache
 from steward.llm.client import create_llm
 from steward.llm.routing import RoutingClient, batch_collector, routing_client
 from steward.llm.types import LLMError
@@ -681,7 +681,9 @@ async def gap_research_handler(ctx: JobContext) -> None:
     )[: cfg.slots_per_run]
     try:
         llm = create_llm(settings)
-        client = routing_client(llm, ResultCache(ctx.pool, "gap_research", search_ttl_days=3))
+        client = routing_client(
+            llm, ResultCache(ctx.pool, "gap_research", search_ttl_days=SEARCH_CACHE_DAYS)
+        )
     except AINotConfigured as exc:
         raise JobFailed(str(exc)) from exc
     usage = Usage(model=cfg.model)

@@ -190,7 +190,9 @@ async def price_on_or_before(
     return price, await series_currency(pool, ref, None)
 
 
-async def record(pool: asyncpg.Pool, owner_id: str, body: JournalEntryIn) -> JournalEntry:
+async def record(
+    pool: asyncpg.Pool, owner_id: str, body: JournalEntryIn, origin: str = "owner"
+) -> JournalEntry:
     if body.scope == "security" and not body.ticker:
         raise JournalError("Name the security this decision is about.")
     if body.scope == "portfolio" and body.ticker:
@@ -209,6 +211,8 @@ async def record(pool: asyncpg.Pool, owner_id: str, body: JournalEntryIn) -> Jou
     if body.decided_on is not None and body.decided_on > today:
         raise JournalError("The decision date cannot be in the future.")
     snapshot, last_price, currency = await build_snapshot(pool, body.ticker)
+    if origin != "owner":
+        snapshot["origin"] = origin
     price = body.price_at_decision
     if price is None:
         if body.decided_on is None or body.decided_on >= today or body.ticker is None:
@@ -244,6 +248,12 @@ async def record(pool: asyncpg.Pool, owner_id: str, body: JournalEntryIn) -> Jou
     )
     assert row is not None
     return _entry(row)
+
+
+def written_by_owner(entry: JournalEntry) -> bool:
+    """False for an entry the app logged from a detected trade: the owner has not written the
+    reasons, so the scorecard and the process review leave it out."""
+    return bool(entry.snapshot.get("origin", "owner") == "owner")
 
 
 async def list_entries(

@@ -141,6 +141,13 @@ def test_google_batch_body_tags_each_request() -> None:
     assert [i["metadata"]["key"] for i in items] == ["r0", "r1"]
 
 
+def test_google_batch_sends_the_schema_under_the_name_batch_mode_honours() -> None:
+    body = wire.google_batch_body([_req("gemini-3.8-flash")], "steward")
+    config = body["batch"]["input_config"]["requests"]["requests"][0]["request"]["generationConfig"]
+    assert "responseJsonSchema" not in config
+    assert config["_responseJsonSchema"]["properties"]["value"]
+
+
 def test_google_batch_state_and_results() -> None:
     assert wire.google_batch_state({"metadata": {"state": "BATCH_STATE_SUCCEEDED"}}) == "done"
     assert wire.google_batch_state({"metadata": {"state": "BATCH_STATE_FAILED"}}) == "failed"

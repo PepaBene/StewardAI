@@ -8,6 +8,7 @@ from typing import Any, Literal
 import asyncpg
 from pydantic import BaseModel, Field
 
+from steward.engine import overrides
 from steward.news.brief import BriefBody
 from steward.news.claims import CheckedClaim
 from steward.news.extract import StoryExtraction
@@ -16,6 +17,7 @@ from steward.news.impact import ImpactResult
 from steward.news.market import MarketContext, StudyRow, event_study
 from steward.news.sentiment import SentimentResult
 from steward.news.thesis_link import LinkedAssumption
+from steward.training import labels
 
 
 def _doc(raw: Any) -> Any:
@@ -381,7 +383,43 @@ async def add_feedback(pool: asyncpg.Pool, body: NewsFeedbackIn) -> NewsFeedback
         body.note,
     )
     assert row is not None
+    reason = FEEDBACK_AS_REASON.get(body.kind)
+    if reason is not None:
+        # Marking something wrong is an override of the news engine; the digest and the stories
+        # learn from it, and the engine does not redo the item.
+        await overrides.record(
+            pool,
+            area="digest" if body.target == "brief_line" else "news",
+            subject_kind=f"news_{body.target}",
+            subject_ref=f"{body.target}:{body.target_id}",
+            action="marked_wrong",
+            via="screen",
+            reason_code=reason,
+            note=body.note,
+            decided_by="engine",
+        )
+    # The owner's mark is also a training label on what the news engine produced.
+    await labels.record(
+        pool,
+        source="owner_review",
+        subject_kind=f"news_{body.target}",
+        subject_ref=f"{body.target}:{body.target_id}",
+        label="right" if body.kind in ("useful", "confirmed") else "wrong",
+        by_owner=True,
+        detail={"kind": body.kind, **({"note": body.note} if body.note else {})},
+    )
     return NewsFeedbackOut(**dict(row))
+
+
+# Negative feedback kinds and the override reason each one stands for; "useful" and "confirmed"
+# are not overrides.
+FEEDBACK_AS_REASON: dict[str, overrides.Reason] = {
+    "wrong_entity": "wrong_data",
+    "misread": "wrong_data",
+    "duplicate": "other",
+    "missing_source": "wrong_source",
+    "not_useful": "right_but_unimportant",
+}
 
 
 async def list_feedback(

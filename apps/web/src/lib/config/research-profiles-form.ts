@@ -25,7 +25,77 @@ export type Language = ResearchProfile["language"];
 export type Mode = ResearchProfile["mode"];
 export type WebEmphasis = ResearchProfile["web_emphasis"];
 export type Authoring = ResearchProfile["authoring"];
-export type DefaultView = components["schemas"]["ReportTemplate"]["default_view"];
+export type Engine = NonNullable<ResearchProfile["engine"]>;
+export type Lens = NonNullable<ResearchProfile["lenses"]>[number];
+export type WorkerEffort = NonNullable<ResearchProfile["worker_effort"]>;
+
+export const ENGINES: readonly { value: Engine; label: string }[] = [
+  { value: "fixed", label: "Fixed: one writer per section" },
+  {
+    value: "agentic",
+    label: "Agentic: specialist workers gather evidence first",
+  },
+];
+
+export const LENSES: readonly { value: Lens; label: string }[] = [
+  { value: "financials", label: "Financials and valuation" },
+  { value: "filings_events", label: "Filings and events" },
+  { value: "news_web", label: "News and web (uses searches)" },
+  { value: "portfolio_risk", label: "Portfolio and risk" },
+  { value: "counter_case", label: "Counter-case (uses searches)" },
+];
+export const WORKER_EFFORTS: readonly { value: WorkerEffort; label: string }[] =
+  [
+    { value: "low", label: "low" },
+    { value: "medium", label: "medium" },
+    { value: "high", label: "high" },
+  ];
+export type WriteOrder = NonNullable<ResearchProfile["write_order"]>;
+export type SearchMode = NonNullable<ResearchProfile["search_mode"]>;
+export type Priority = NonNullable<ResearchProfile["priority"]>;
+export type CheapSection = NonNullable<
+  ResearchProfile["cheap_sections"]
+>[number];
+
+export const WRITE_ORDERS: readonly { value: WriteOrder; label: string }[] = [
+  { value: "template", label: "Template order" },
+  {
+    value: "summary_last",
+    label: "Summary, KPIs and open questions last, from what was written",
+  },
+];
+
+export const SEARCH_MODES: readonly { value: SearchMode; label: string }[] = [
+  { value: "model", label: "The writing model searches inside each section" },
+  {
+    value: "scouts",
+    label: "A cheaper model searches; the writing model reads its extracts",
+  },
+];
+
+export const PRIORITIES: readonly { value: Priority; label: string }[] = [
+  { value: "standard", label: "Standard: answers as fast as possible" },
+  { value: "flex", label: "Flex: cheaper, slower model calls" },
+  { value: "batch", label: "Batch: flex, and claim checks as one batch" },
+];
+
+/** Sections a model writes, the ones a cheaper model can write first. */
+export const MODEL_SECTION_OPTIONS: readonly {
+  value: CheapSection;
+  label: string;
+}[] = [
+  { value: "executive_summary", label: "Executive summary" },
+  { value: "business", label: "Business" },
+  { value: "moat_risks", label: "Moat and risks" },
+  { value: "scenarios", label: "Bull, base and bear cases" },
+  { value: "catalysts", label: "Catalysts" },
+  { value: "counter_case", label: "The case against" },
+  { value: "strategy_fit", label: "Fit with the strategy" },
+  { value: "thesis_kpis", label: "Thesis KPIs and exit conditions" },
+  { value: "open_questions", label: "Open questions" },
+];
+export type DefaultView =
+  components["schemas"]["ReportTemplate"]["default_view"];
 export type Tier = 1 | 2 | 3;
 
 export const MODES: readonly { value: Mode; label: string }[] = [
@@ -38,7 +108,10 @@ export const MODES: readonly { value: Mode; label: string }[] = [
 ];
 
 export const WEB_EMPHASES: readonly { value: WebEmphasis; label: string }[] = [
-  { value: "internal", label: "Stored records first (a quarter of the searches)" },
+  {
+    value: "internal",
+    label: "Stored records first (a quarter of the searches)",
+  },
   { value: "balanced", label: "Balanced (full search budget)" },
   { value: "web", label: "Web first (full search budget)" },
 ];
@@ -56,7 +129,11 @@ export const DEFAULT_VIEWS: readonly { value: DefaultView; label: string }[] = [
 ];
 
 /** Source kinds a stale limit can be set for, with the built-in limit in days (ledger.py). */
-export const STALE_KINDS: readonly { kind: string; label: string; builtin: number }[] = [
+export const STALE_KINDS: readonly {
+  kind: string;
+  label: string;
+  builtin: number;
+}[] = [
   { kind: "price", label: "A price", builtin: 7 },
   { kind: "news_item", label: "A news item", builtin: 90 },
   { kind: "search", label: "A search result", builtin: 180 },
@@ -84,6 +161,9 @@ export const BOUNDS = {
   date_horizon_days: { min: 7, max: 3650 },
   max_rounds: { min: 1, max: 3 },
   min_sentences: { min: 1, max: 6 },
+  worker_max_steps: { min: 2, max: 40 },
+  worker_max_searches: { min: 0, max: 30 },
+  parallel_workers: { min: 1, max: 2 },
   stale_days: { min: 1, max: 3650 },
   allow_domains: { max: 20 },
   deny_domains: { max: 40 },
@@ -99,9 +179,18 @@ export const BOUNDS = {
 
 const ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const CUSTOM_ID_PATTERN = /^custom-[a-z0-9]+(-[a-z0-9]+)*$/;
-const DOMAIN_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+const DOMAIN_PATTERN =
+  /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 /** The backend rejects owner-defined titles and questions holding any of these. */
-const MARKUP_MARKS = ["http:", "https:", "www.", "<", ">", "```", "{{"] as const;
+const MARKUP_MARKS = [
+  "http:",
+  "https:",
+  "www.",
+  "<",
+  ">",
+  "```",
+  "{{",
+] as const;
 
 /** The planning, source-policy, iteration and authoring defaults every profile carries. */
 export const PROFILE_DEFAULTS = {
@@ -113,6 +202,30 @@ export const PROFILE_DEFAULTS = {
   min_sentences: 2,
   authoring: "research_only",
   planning: "code",
+  engine: "fixed",
+  lenses: [
+    "financials",
+    "filings_events",
+    "news_web",
+    "portfolio_risk",
+    "counter_case",
+  ] as NonNullable<
+    NonNullable<ResearchProfilesConfig["profiles"]>[number]["lenses"]
+  >,
+  worker_model: "gpt-6-luna",
+  worker_effort: "low",
+  worker_max_steps: 12,
+  worker_max_searches: 8,
+  parallel_workers: 2,
+  write_order: "template",
+  cheap_sections: [] as CheapSection[],
+  cheap_model: "gpt-6-luna",
+  cheap_effort: "medium",
+  follow_up_cheap: false,
+  search_mode: "model",
+  scout_model: "gpt-6-luna",
+  scout_effort: "low",
+  priority: "standard",
 } as const;
 
 /** The backend's defaults, for when nothing is saved yet (a 404). */
@@ -173,6 +286,40 @@ export const DEFAULT_RESEARCH_PROFILES: ResearchProfilesConfig = {
       template_id: "thesis-memo",
       id: "deep-thesis",
       name: "Deep thesis workup",
+      sections: [
+        "executive_summary",
+        "business",
+        "financial_trend",
+        "moat_risks",
+        "valuation",
+        "scenarios",
+        "catalysts",
+        "counter_case",
+        "strategy_fit",
+        "thesis_kpis",
+        "open_questions",
+      ],
+      depth: "deep",
+      model: "gpt-6.1-sol",
+      effort: "high",
+      max_steps: 100,
+      max_searches: 60,
+      source_tiers: [1, 2],
+      include_peers: true,
+      valuation_methods: ["pe_ttm", "earnings_yield", "dividend_yield_ttm"],
+      language: "en",
+      top_holders: 3,
+    },
+    {
+      ...PROFILE_DEFAULTS,
+      mode: "deep_thesis",
+      iterate: true,
+      max_rounds: 2,
+      authoring: "draft_thesis",
+      template_id: "thesis-memo",
+      engine: "agentic",
+      id: "deep-agentic",
+      name: "Deep thesis workup (agents)",
       sections: [
         "executive_summary",
         "business",
@@ -301,6 +448,24 @@ export type ProfileForm = {
   /** Id of a report template; blank = none. */
   template_id: string;
   authoring: Authoring;
+  /** "agentic": cheap-model workers (one per lens) gather the evidence the writer then uses. */
+  engine: Engine;
+  lenses: Lens[];
+  worker_model: string;
+  worker_effort: WorkerEffort;
+  worker_max_steps: string;
+  worker_max_searches: string;
+  parallel_workers: string;
+  /** Cost levers: how the sections are written (see the research cost plan). */
+  write_order: WriteOrder;
+  cheap_sections: CheapSection[];
+  cheap_model: string;
+  cheap_effort: WorkerEffort;
+  follow_up_cheap: boolean;
+  search_mode: SearchMode;
+  scout_model: string;
+  scout_effort: WorkerEffort;
+  priority: Priority;
   rest: Record<string, unknown>;
 };
 
@@ -378,6 +543,22 @@ export function newProfile(existingIds: readonly string[] = []): ProfileForm {
     min_sentences: String(PROFILE_DEFAULTS.min_sentences),
     template_id: "",
     authoring: PROFILE_DEFAULTS.authoring,
+    engine: PROFILE_DEFAULTS.engine,
+    lenses: [...PROFILE_DEFAULTS.lenses],
+    worker_model: PROFILE_DEFAULTS.worker_model,
+    worker_effort: PROFILE_DEFAULTS.worker_effort,
+    worker_max_steps: String(PROFILE_DEFAULTS.worker_max_steps),
+    worker_max_searches: String(PROFILE_DEFAULTS.worker_max_searches),
+    parallel_workers: String(PROFILE_DEFAULTS.parallel_workers),
+    write_order: PROFILE_DEFAULTS.write_order,
+    cheap_sections: [...PROFILE_DEFAULTS.cheap_sections],
+    cheap_model: PROFILE_DEFAULTS.cheap_model,
+    cheap_effort: PROFILE_DEFAULTS.cheap_effort,
+    follow_up_cheap: PROFILE_DEFAULTS.follow_up_cheap,
+    search_mode: PROFILE_DEFAULTS.search_mode,
+    scout_model: PROFILE_DEFAULTS.scout_model,
+    scout_effort: PROFILE_DEFAULTS.scout_effort,
+    priority: PROFILE_DEFAULTS.priority,
     rest: {},
   };
 }
@@ -396,7 +577,9 @@ export function parseDomains(text: string): string[] {
   return out;
 }
 
-export function domainsToText(domains: readonly string[] | undefined | null): string {
+export function domainsToText(
+  domains: readonly string[] | undefined | null,
+): string {
   return (domains ?? []).join("\n");
 }
 
@@ -410,13 +593,18 @@ export function uniqueId(base: string, existingIds: readonly string[]): string {
   }
 }
 
-export function duplicateProfile(profile: ProfileForm, existingIds: readonly string[]): ProfileForm {
+export function duplicateProfile(
+  profile: ProfileForm,
+  existingIds: readonly string[],
+): ProfileForm {
   return {
     ...profile,
     key: nextKey(),
     id: uniqueId(profile.id || "profile", existingIds),
     name: `${profile.name} (copy)`.slice(0, BOUNDS.name.max),
     sections: [...profile.sections],
+    lenses: [...profile.lenses],
+    cheap_sections: [...profile.cheap_sections],
     source_tiers: [...profile.source_tiers],
     valuation_methods: [...profile.valuation_methods],
     stale_days: { ...profile.stale_days },
@@ -452,6 +640,22 @@ function profileFromBody(p: ResearchProfile): ProfileForm {
     min_sentences,
     template_id,
     authoring,
+    engine,
+    lenses,
+    worker_model,
+    worker_effort,
+    worker_max_steps,
+    worker_max_searches,
+    parallel_workers,
+    write_order,
+    cheap_sections,
+    cheap_model,
+    cheap_effort,
+    follow_up_cheap,
+    search_mode,
+    scout_model,
+    scout_effort,
+    priority,
     ...rest
   } = p;
   return {
@@ -466,35 +670,78 @@ function profileFromBody(p: ResearchProfile): ProfileForm {
     max_searches: String(max_searches ?? 15),
     source_tiers: [...(source_tiers ?? [1, 2])] as Tier[],
     include_peers: include_peers ?? true,
-    valuation_methods: [...(valuation_methods ?? ["pe_ttm", "earnings_yield", "dividend_yield_ttm"])],
+    valuation_methods: [
+      ...(valuation_methods ?? [
+        "pe_ttm",
+        "earnings_yield",
+        "dividend_yield_ttm",
+      ]),
+    ],
     language: language ?? "en",
     top_holders: String(top_holders ?? 3),
     mode: mode ?? PROFILE_DEFAULTS.mode,
     web_emphasis: web_emphasis ?? PROFILE_DEFAULTS.web_emphasis,
-    date_horizon_days: date_horizon_days == null ? "" : String(date_horizon_days),
+    date_horizon_days:
+      date_horizon_days == null ? "" : String(date_horizon_days),
     allow_domains: domainsToText(allow_domains),
     deny_domains: domainsToText(deny_domains),
     allow_forums: allow_forums ?? PROFILE_DEFAULTS.allow_forums,
     forum_domains: domainsToText(forum_domains),
-    stale_days: Object.fromEntries(Object.entries(stale_days ?? {}).map(([k, v]) => [k, String(v)])),
+    stale_days: Object.fromEntries(
+      Object.entries(stale_days ?? {}).map(([k, v]) => [k, String(v)]),
+    ),
     iterate: iterate ?? PROFILE_DEFAULTS.iterate,
     max_rounds: String(max_rounds ?? PROFILE_DEFAULTS.max_rounds),
     min_sentences: String(min_sentences ?? PROFILE_DEFAULTS.min_sentences),
     template_id: template_id ?? "",
     authoring: authoring ?? PROFILE_DEFAULTS.authoring,
+    engine: engine ?? PROFILE_DEFAULTS.engine,
+    lenses: [...(lenses ?? PROFILE_DEFAULTS.lenses)],
+    worker_model: worker_model ?? PROFILE_DEFAULTS.worker_model,
+    worker_effort: worker_effort ?? PROFILE_DEFAULTS.worker_effort,
+    worker_max_steps: String(
+      worker_max_steps ?? PROFILE_DEFAULTS.worker_max_steps,
+    ),
+    worker_max_searches: String(
+      worker_max_searches ?? PROFILE_DEFAULTS.worker_max_searches,
+    ),
+    parallel_workers: String(
+      parallel_workers ?? PROFILE_DEFAULTS.parallel_workers,
+    ),
+    write_order: write_order ?? PROFILE_DEFAULTS.write_order,
+    cheap_sections: [...(cheap_sections ?? PROFILE_DEFAULTS.cheap_sections)],
+    cheap_model: cheap_model ?? PROFILE_DEFAULTS.cheap_model,
+    cheap_effort: cheap_effort ?? PROFILE_DEFAULTS.cheap_effort,
+    follow_up_cheap: follow_up_cheap ?? PROFILE_DEFAULTS.follow_up_cheap,
+    search_mode: search_mode ?? PROFILE_DEFAULTS.search_mode,
+    scout_model: scout_model ?? PROFILE_DEFAULTS.scout_model,
+    scout_effort: scout_effort ?? PROFILE_DEFAULTS.scout_effort,
+    priority: priority ?? PROFILE_DEFAULTS.priority,
     rest,
   };
 }
 
-export function researchProfilesFromBody(body: ResearchProfilesConfig | null): ResearchProfilesForm {
+export function researchProfilesFromBody(
+  body: ResearchProfilesConfig | null,
+): ResearchProfilesForm {
   const b = body ?? DEFAULT_RESEARCH_PROFILES;
-  const { profiles, default_profile, templates, schema_version: _version, ...rest } = b;
+  const {
+    profiles,
+    default_profile,
+    templates,
+    schema_version: _version,
+    ...rest
+  } = b;
   void _version;
   return {
-    profiles: (profiles ?? DEFAULT_RESEARCH_PROFILES.profiles!).map(profileFromBody),
+    profiles: (profiles ?? DEFAULT_RESEARCH_PROFILES.profiles!).map(
+      profileFromBody,
+    ),
     default_profile: default_profile ?? "standard",
     // A body without templates gets the backend's defaults, as the backend itself does.
-    templates: (templates ?? DEFAULT_RESEARCH_PROFILES.templates!).map(templateFromBody),
+    templates: (templates ?? DEFAULT_RESEARCH_PROFILES.templates!).map(
+      templateFromBody,
+    ),
     rest,
   };
 }
@@ -538,16 +785,38 @@ function profileToBody(p: ProfileForm): ResearchProfile {
     max_rounds: intOrText(p.max_rounds) as number,
     min_sentences: intOrText(p.min_sentences) as number,
     authoring: p.authoring,
-    ...(p.date_horizon_days.trim() ? { date_horizon_days: intOrText(p.date_horizon_days) as number } : {}),
+    engine: p.engine,
+    lenses: [...p.lenses],
+    worker_model: p.worker_model.trim(),
+    worker_effort: p.worker_effort,
+    worker_max_steps: intOrText(p.worker_max_steps) as number,
+    worker_max_searches: intOrText(p.worker_max_searches) as number,
+    parallel_workers: intOrText(p.parallel_workers) as number,
+    write_order: p.write_order,
+    cheap_sections: [...p.cheap_sections],
+    cheap_model: p.cheap_model.trim(),
+    cheap_effort: p.cheap_effort,
+    follow_up_cheap: p.follow_up_cheap,
+    search_mode: p.search_mode,
+    scout_model: p.scout_model.trim(),
+    scout_effort: p.scout_effort,
+    priority: p.priority,
+    ...(p.date_horizon_days.trim()
+      ? { date_horizon_days: intOrText(p.date_horizon_days) as number }
+      : {}),
     ...(allow.length > 0 ? { allow_domains: allow } : {}),
     ...(deny.length > 0 ? { deny_domains: deny } : {}),
     ...(forums.length > 0 ? { forum_domains: forums } : {}),
-    ...(Object.keys(staleDays).length > 0 ? { stale_days: staleDays as Record<string, number> } : {}),
+    ...(Object.keys(staleDays).length > 0
+      ? { stale_days: staleDays as Record<string, number> }
+      : {}),
     ...(p.template_id.trim() ? { template_id: p.template_id.trim() } : {}),
   } as ResearchProfile;
 }
 
-export function researchProfilesToBody(form: ResearchProfilesForm): ResearchProfilesConfig {
+export function researchProfilesToBody(
+  form: ResearchProfilesForm,
+): ResearchProfilesConfig {
   return {
     ...form.rest,
     schema_version: 1,
@@ -584,7 +853,15 @@ function customFromBody(c: CustomSectionBody): CustomSectionForm {
 }
 
 export function templateFromBody(t: TemplateBody): TemplateForm {
-  const { id, name, default_view, sections, custom_sections, schema_version: _version, ...rest } = t;
+  const {
+    id,
+    name,
+    default_view,
+    sections,
+    custom_sections,
+    schema_version: _version,
+    ...rest
+  } = t;
   void _version;
   return {
     key: nextKey(),
@@ -610,9 +887,16 @@ export function templateToBody(t: TemplateForm): TemplateBody {
       enabled: s.enabled,
       detail_only: s.detail_only,
       ...(s.title.trim() ? { title: s.title.trim() } : {}),
-      ...(s.max_sentences.trim() ? { max_sentences: intOrText(s.max_sentences) as number } : {}),
+      ...(s.max_sentences.trim()
+        ? { max_sentences: intOrText(s.max_sentences) as number }
+        : {}),
     })),
-    custom_sections: t.custom_sections.map((c) => ({ ...c.rest, id: c.id, title: c.title.trim(), task: c.task.trim() })),
+    custom_sections: t.custom_sections.map((c) => ({
+      ...c.rest,
+      id: c.id,
+      title: c.title.trim(),
+      task: c.task.trim(),
+    })),
   } as TemplateBody;
 }
 
@@ -623,24 +907,48 @@ export function newTemplate(existingIds: readonly string[] = []): TemplateForm {
     id: uniqueId("new-template", existingIds),
     name: "New template",
     default_view: "detailed",
-    sections: ["executive_summary", "business", "valuation", "open_questions"].map((id) => newTemplateSection(id)),
+    sections: [
+      "executive_summary",
+      "business",
+      "valuation",
+      "open_questions",
+    ].map((id) => newTemplateSection(id)),
     custom_sections: [],
     rest: {},
   };
 }
 
 function newTemplateSection(id: string): TemplateSectionForm {
-  return { key: nextKey(), id, enabled: true, title: "", max_sentences: "", detail_only: false, rest: {} };
+  return {
+    key: nextKey(),
+    id,
+    enabled: true,
+    title: "",
+    max_sentences: "",
+    detail_only: false,
+    rest: {},
+  };
 }
 
-export function duplicateTemplate(t: TemplateForm, existingIds: readonly string[]): TemplateForm {
+export function duplicateTemplate(
+  t: TemplateForm,
+  existingIds: readonly string[],
+): TemplateForm {
   return {
     ...t,
     key: nextKey(),
     id: uniqueId(t.id || "template", existingIds),
     name: `${t.name} (copy)`.slice(0, BOUNDS.name.max),
-    sections: t.sections.map((s) => ({ ...s, key: nextKey(), rest: { ...s.rest } })),
-    custom_sections: t.custom_sections.map((c) => ({ ...c, key: nextKey(), rest: { ...c.rest } })),
+    sections: t.sections.map((s) => ({
+      ...s,
+      key: nextKey(),
+      rest: { ...s.rest },
+    })),
+    custom_sections: t.custom_sections.map((c) => ({
+      ...c,
+      key: nextKey(),
+      rest: { ...c.rest },
+    })),
     rest: { ...t.rest },
   };
 }
@@ -657,23 +965,40 @@ export function isCustomSectionId(id: string, t: TemplateForm): boolean {
 
 /** Add a built-in section at the end. */
 export function addBuiltinSection(t: TemplateForm, id: string): TemplateForm {
-  if (t.sections.some((s) => s.id === id) || t.sections.length >= BOUNDS.template_sections.max) return t;
+  if (
+    t.sections.some((s) => s.id === id) ||
+    t.sections.length >= BOUNDS.template_sections.max
+  )
+    return t;
   return { ...t, sections: [...t.sections, newTemplateSection(id)] };
 }
 
 /** Add an owner-defined section at the end (the backend allows up to six); its id is made here. */
 export function addCustomSection(t: TemplateForm): TemplateForm {
-  if (t.custom_sections.length >= BOUNDS.custom_sections.max || t.sections.length >= BOUNDS.template_sections.max) return t;
-  const id = uniqueId("custom-section", t.custom_sections.map((c) => c.id));
+  if (
+    t.custom_sections.length >= BOUNDS.custom_sections.max ||
+    t.sections.length >= BOUNDS.template_sections.max
+  )
+    return t;
+  const id = uniqueId(
+    "custom-section",
+    t.custom_sections.map((c) => c.id),
+  );
   return {
     ...t,
     sections: [...t.sections, newTemplateSection(id)],
-    custom_sections: [...t.custom_sections, { key: nextKey(), id, title: "", task: "", rest: {} }],
+    custom_sections: [
+      ...t.custom_sections,
+      { key: nextKey(), id, title: "", task: "", rest: {} },
+    ],
   };
 }
 
 /** Remove a section from the template; an owner-defined one is deleted with its question. */
-export function removeTemplateSection(t: TemplateForm, id: string): TemplateForm {
+export function removeTemplateSection(
+  t: TemplateForm,
+  id: string,
+): TemplateForm {
   return {
     ...t,
     sections: t.sections.filter((s) => s.id !== id),
@@ -682,7 +1007,11 @@ export function removeTemplateSection(t: TemplateForm, id: string): TemplateForm
 }
 
 /** Move a section up (-1) or down (+1); unchanged at either end. */
-export function moveTemplateSection(t: TemplateForm, id: string, direction: -1 | 1): TemplateForm {
+export function moveTemplateSection(
+  t: TemplateForm,
+  id: string,
+  direction: -1 | 1,
+): TemplateForm {
   const row = t.sections.find((s) => s.id === id);
   return row ? { ...t, sections: moveInList(t.sections, row, direction) } : t;
 }
@@ -692,11 +1021,17 @@ export function moveTemplateSection(t: TemplateForm, id: string, direction: -1 |
 // ---------------------------------------------------------------------------
 
 export function toggleInList<T>(list: readonly T[], value: T): T[] {
-  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+  return list.includes(value)
+    ? list.filter((v) => v !== value)
+    : [...list, value];
 }
 
 /** Move one selected section up (-1) or down (+1); unchanged at either end. */
-export function moveInList<T>(list: readonly T[], value: T, direction: -1 | 1): T[] {
+export function moveInList<T>(
+  list: readonly T[],
+  value: T,
+  direction: -1 | 1,
+): T[] {
   const i = list.indexOf(value);
   const j = i + direction;
   if (i < 0 || j < 0 || j >= list.length) return [...list];
@@ -717,29 +1052,91 @@ function intIn(text: string, min: number, max: number): string | null {
 }
 
 /** Errors keyed like the API's (profiles.0.max_steps), so the same fields show them. */
-export function validateResearchProfiles(form: ResearchProfilesForm): FieldErrors {
+export function validateResearchProfiles(
+  form: ResearchProfilesForm,
+): FieldErrors {
   const errors: FieldErrors = {};
-  const add = (path: string, message: string) => (errors[path] ??= []).push(message);
+  const add = (path: string, message: string) =>
+    (errors[path] ??= []).push(message);
   if (form.profiles.length === 0) add("profiles", "Keep at least one profile.");
   const seen = new Map<string, number>();
   form.profiles.forEach((p, i) => {
     const id = p.id.trim();
-    if (!ID_PATTERN.test(id)) add(`profiles.${i}.id`, "Lower-case letters and digits, words joined by single dashes (e.g. quick-screen).");
-    else if (id.length > BOUNDS.id.max) add(`profiles.${i}.id`, `At most ${BOUNDS.id.max} characters.`);
-    if (seen.has(id)) add(`profiles.${i}.id`, `Profile ${seen.get(id)! + 1} already uses this id.`);
+    if (!ID_PATTERN.test(id))
+      add(
+        `profiles.${i}.id`,
+        "Lower-case letters and digits, words joined by single dashes (e.g. quick-screen).",
+      );
+    else if (id.length > BOUNDS.id.max)
+      add(`profiles.${i}.id`, `At most ${BOUNDS.id.max} characters.`);
+    if (seen.has(id))
+      add(
+        `profiles.${i}.id`,
+        `Profile ${seen.get(id)! + 1} already uses this id.`,
+      );
     else seen.set(id, i);
     if (!p.name.trim()) add(`profiles.${i}.name`, "Give the profile a name.");
-    else if (p.name.trim().length > BOUNDS.name.max) add(`profiles.${i}.name`, `At most ${BOUNDS.name.max} characters.`);
-    if (p.sections.length === 0) add(`profiles.${i}.sections`, "Pick at least one section.");
-    if (!/^(gpt|gemini)-[a-z0-9.-]{1,64}$/.test(p.model.trim())) add(`profiles.${i}.model`, "A gpt- or gemini- model id, e.g. gpt-6.1-sol.");
-    const steps = intIn(p.max_steps, BOUNDS.max_steps.min, BOUNDS.max_steps.max);
+    else if (p.name.trim().length > BOUNDS.name.max)
+      add(`profiles.${i}.name`, `At most ${BOUNDS.name.max} characters.`);
+    if (p.sections.length === 0)
+      add(`profiles.${i}.sections`, "Pick at least one section.");
+    if (!/^(gpt|gemini)-[a-z0-9.-]{1,64}$/.test(p.model.trim()))
+      add(
+        `profiles.${i}.model`,
+        "A gpt- or gemini- model id, e.g. gpt-6.1-sol.",
+      );
+    const steps = intIn(
+      p.max_steps,
+      BOUNDS.max_steps.min,
+      BOUNDS.max_steps.max,
+    );
     if (steps) add(`profiles.${i}.max_steps`, steps);
-    const searches = intIn(p.max_searches, BOUNDS.max_searches.min, BOUNDS.max_searches.max);
+    const searches = intIn(
+      p.max_searches,
+      BOUNDS.max_searches.min,
+      BOUNDS.max_searches.max,
+    );
     if (searches) add(`profiles.${i}.max_searches`, searches);
-    const holders = intIn(p.top_holders, BOUNDS.top_holders.min, BOUNDS.top_holders.max);
+    const holders = intIn(
+      p.top_holders,
+      BOUNDS.top_holders.min,
+      BOUNDS.top_holders.max,
+    );
     if (holders) add(`profiles.${i}.top_holders`, holders);
-    if (p.source_tiers.length === 0) add(`profiles.${i}.source_tiers`, "Allow at least one tier.");
-    if (new Set(p.sections).size !== p.sections.length) add(`profiles.${i}.sections`, "A section is listed twice.");
+    if (p.source_tiers.length === 0)
+      add(`profiles.${i}.source_tiers`, "Allow at least one tier.");
+    if (new Set(p.sections).size !== p.sections.length)
+      add(`profiles.${i}.sections`, "A section is listed twice.");
+    if (p.engine === "agentic") {
+      if (p.lenses.length === 0)
+        add(`profiles.${i}.lenses`, "Pick at least one lens for the workers.");
+      if (!/^(gpt|gemini)-[a-z0-9.-]{1,64}$/.test(p.worker_model.trim()))
+        add(
+          `profiles.${i}.worker_model`,
+          "A gpt- or gemini- model id, e.g. gpt-6-luna.",
+        );
+      for (const key of [
+        "worker_max_steps",
+        "worker_max_searches",
+        "parallel_workers",
+      ] as const) {
+        const e = intIn(p[key], BOUNDS[key].min, BOUNDS[key].max);
+        if (e) add(`profiles.${i}.${key}`, e);
+      }
+    }
+    const modelId = /^(gpt|gemini)-[a-z0-9.-]{1,64}$/;
+    if (p.cheap_sections.length > 0 || p.follow_up_cheap) {
+      if (!modelId.test(p.cheap_model.trim()))
+        add(
+          `profiles.${i}.cheap_model`,
+          "A gpt- or gemini- model id, e.g. gpt-6-luna.",
+        );
+    }
+    if (p.search_mode === "scouts" && !modelId.test(p.scout_model.trim()))
+      add(
+        `profiles.${i}.scout_model`,
+        "A gpt- or gemini- model id, e.g. gpt-6-luna.",
+      );
     validateProfilePolicy(p, i, form.templates, add);
   });
   if (!form.profiles.some((p) => p.id.trim() === form.default_profile.trim())) {
@@ -752,15 +1149,32 @@ export function validateResearchProfiles(form: ResearchProfilesForm): FieldError
 type Add = (path: string, message: string) => void;
 
 /** Planning, source-policy, iteration and template fields of one profile. */
-function validateProfilePolicy(p: ProfileForm, i: number, templates: readonly TemplateForm[], add: Add) {
+function validateProfilePolicy(
+  p: ProfileForm,
+  i: number,
+  templates: readonly TemplateForm[],
+  add: Add,
+) {
   const at = `profiles.${i}`;
   if (p.date_horizon_days.trim()) {
-    const e = intIn(p.date_horizon_days, BOUNDS.date_horizon_days.min, BOUNDS.date_horizon_days.max);
+    const e = intIn(
+      p.date_horizon_days,
+      BOUNDS.date_horizon_days.min,
+      BOUNDS.date_horizon_days.max,
+    );
     if (e) add(`${at}.date_horizon_days`, e);
   }
-  const rounds = intIn(p.max_rounds, BOUNDS.max_rounds.min, BOUNDS.max_rounds.max);
+  const rounds = intIn(
+    p.max_rounds,
+    BOUNDS.max_rounds.min,
+    BOUNDS.max_rounds.max,
+  );
   if (rounds) add(`${at}.max_rounds`, rounds);
-  const sentences = intIn(p.min_sentences, BOUNDS.min_sentences.min, BOUNDS.min_sentences.max);
+  const sentences = intIn(
+    p.min_sentences,
+    BOUNDS.min_sentences.min,
+    BOUNDS.min_sentences.max,
+  );
   if (sentences) add(`${at}.min_sentences`, sentences);
 
   const lists = {
@@ -768,20 +1182,42 @@ function validateProfilePolicy(p: ProfileForm, i: number, templates: readonly Te
     deny_domains: parseDomains(p.deny_domains),
     forum_domains: parseDomains(p.forum_domains),
   };
-  for (const [field, domains] of Object.entries(lists) as [keyof typeof lists, string[]][]) {
+  for (const [field, domains] of Object.entries(lists) as [
+    keyof typeof lists,
+    string[],
+  ][]) {
     const max = BOUNDS[field].max;
-    if (domains.length > max) add(`${at}.${field}`, `At most ${max} domains (there are ${domains.length}).`);
+    if (domains.length > max)
+      add(
+        `${at}.${field}`,
+        `At most ${max} domains (there are ${domains.length}).`,
+      );
     for (const d of domains) {
-      if (d.length > BOUNDS.domain.max) add(`${at}.${field}`, `${d}: at most ${BOUNDS.domain.max} characters.`);
-      else if (!DOMAIN_PATTERN.test(d)) add(`${at}.${field}`, `${d}: not a bare domain name (e.g. example.com, no https:// or path).`);
+      if (d.length > BOUNDS.domain.max)
+        add(`${at}.${field}`, `${d}: at most ${BOUNDS.domain.max} characters.`);
+      else if (!DOMAIN_PATTERN.test(d))
+        add(
+          `${at}.${field}`,
+          `${d}: not a bare domain name (e.g. example.com, no https:// or path).`,
+        );
     }
   }
   const deny = new Set(lists.deny_domains);
   const allow = new Set(lists.allow_domains);
   const both = lists.allow_domains.filter((d) => deny.has(d));
-  if (both.length > 0) add(`${at}.allow_domains`, `Also in the denied list: ${both.join(", ")}. A domain cannot be both allowed and denied.`);
-  const forumClash = lists.forum_domains.filter((d) => deny.has(d) || allow.has(d));
-  if (forumClash.length > 0) add(`${at}.forum_domains`, `Also in the allowed or denied list: ${forumClash.join(", ")}.`);
+  if (both.length > 0)
+    add(
+      `${at}.allow_domains`,
+      `Also in the denied list: ${both.join(", ")}. A domain cannot be both allowed and denied.`,
+    );
+  const forumClash = lists.forum_domains.filter(
+    (d) => deny.has(d) || allow.has(d),
+  );
+  if (forumClash.length > 0)
+    add(
+      `${at}.forum_domains`,
+      `Also in the allowed or denied list: ${forumClash.join(", ")}.`,
+    );
 
   for (const [kind, text] of Object.entries(p.stale_days)) {
     if (!STALE_KINDS.some((k) => k.kind === kind)) {
@@ -795,68 +1231,114 @@ function validateProfilePolicy(p: ProfileForm, i: number, templates: readonly Te
 
   const template = p.template_id.trim();
   if (template && !templates.some((t) => t.id.trim() === template)) {
-    add(`${at}.template_id`, `No template with the id ${template}. Pick one, or none.`);
+    add(
+      `${at}.template_id`,
+      `No template with the id ${template}. Pick one, or none.`,
+    );
   }
 }
 
 function plainTextError(value: string): string | null {
   const lowered = value.toLowerCase();
-  return MARKUP_MARKS.some((m) => lowered.includes(m)) ? "Write plain words: no links, markup or template syntax." : null;
+  return MARKUP_MARKS.some((m) => lowered.includes(m))
+    ? "Write plain words: no links, markup or template syntax."
+    : null;
 }
 
 /** Report templates: sections, owner-defined sections, ids and counts, as the backend checks them. */
 function validateTemplates(templates: readonly TemplateForm[], add: Add) {
-  if (templates.length > BOUNDS.templates.max) add("templates", `At most ${BOUNDS.templates.max} templates.`);
+  if (templates.length > BOUNDS.templates.max)
+    add("templates", `At most ${BOUNDS.templates.max} templates.`);
   const seen = new Map<string, number>();
   templates.forEach((t, i) => {
     const at = `templates.${i}`;
     const id = t.id.trim();
-    if (!ID_PATTERN.test(id)) add(`${at}.id`, "Lower-case letters and digits, words joined by single dashes (e.g. thesis-memo).");
-    else if (id.length > BOUNDS.id.max) add(`${at}.id`, `At most ${BOUNDS.id.max} characters.`);
-    if (seen.has(id)) add(`${at}.id`, `Template ${seen.get(id)! + 1} already uses this id.`);
+    if (!ID_PATTERN.test(id))
+      add(
+        `${at}.id`,
+        "Lower-case letters and digits, words joined by single dashes (e.g. thesis-memo).",
+      );
+    else if (id.length > BOUNDS.id.max)
+      add(`${at}.id`, `At most ${BOUNDS.id.max} characters.`);
+    if (seen.has(id))
+      add(`${at}.id`, `Template ${seen.get(id)! + 1} already uses this id.`);
     else seen.set(id, i);
     if (!t.name.trim()) add(`${at}.name`, "Give the template a name.");
-    else if (t.name.trim().length > BOUNDS.name.max) add(`${at}.name`, `At most ${BOUNDS.name.max} characters.`);
+    else if (t.name.trim().length > BOUNDS.name.max)
+      add(`${at}.name`, `At most ${BOUNDS.name.max} characters.`);
 
-    if (t.sections.length === 0) add(`${at}.sections`, "Keep at least one section.");
-    if (t.sections.length > BOUNDS.template_sections.max) add(`${at}.sections`, `At most ${BOUNDS.template_sections.max} sections.`);
-    if (t.sections.length > 0 && !t.sections.some((s) => s.enabled)) add(`${at}.sections`, "Enable at least one section.");
+    if (t.sections.length === 0)
+      add(`${at}.sections`, "Keep at least one section.");
+    if (t.sections.length > BOUNDS.template_sections.max)
+      add(
+        `${at}.sections`,
+        `At most ${BOUNDS.template_sections.max} sections.`,
+      );
+    if (t.sections.length > 0 && !t.sections.some((s) => s.enabled))
+      add(`${at}.sections`, "Enable at least one section.");
 
     if (t.custom_sections.length > BOUNDS.custom_sections.max) {
-      add(`${at}.custom_sections`, `At most ${BOUNDS.custom_sections.max} sections of your own.`);
+      add(
+        `${at}.custom_sections`,
+        `At most ${BOUNDS.custom_sections.max} sections of your own.`,
+      );
     }
     const customIds = t.custom_sections.map((c) => c.id);
     const builtin = new Set<string>(SECTION_IDS);
     const sectionIds = t.sections.map((s) => s.id);
-    if (new Set(sectionIds).size !== sectionIds.length) add(`${at}.sections`, "A section is listed twice.");
-    if (new Set(customIds).size !== customIds.length) add(`${at}.custom_sections`, "Two sections of your own share an id.");
-    const unknown = sectionIds.filter((s) => !builtin.has(s) && !customIds.includes(s));
-    if (unknown.length > 0) add(`${at}.sections`, `Unknown sections: ${unknown.join(", ")}.`);
+    if (new Set(sectionIds).size !== sectionIds.length)
+      add(`${at}.sections`, "A section is listed twice.");
+    if (new Set(customIds).size !== customIds.length)
+      add(`${at}.custom_sections`, "Two sections of your own share an id.");
+    const unknown = sectionIds.filter(
+      (s) => !builtin.has(s) && !customIds.includes(s),
+    );
+    if (unknown.length > 0)
+      add(`${at}.sections`, `Unknown sections: ${unknown.join(", ")}.`);
     const unplaced = customIds.filter((c) => !sectionIds.includes(c));
-    if (unplaced.length > 0) add(`${at}.custom_sections`, `Defined but not placed in the sections: ${unplaced.join(", ")}.`);
+    if (unplaced.length > 0)
+      add(
+        `${at}.custom_sections`,
+        `Defined but not placed in the sections: ${unplaced.join(", ")}.`,
+      );
 
     t.sections.forEach((s, j) => {
       const sat = `${at}.sections.${j}`;
       const title = s.title.trim();
-      if (title && title.length > BOUNDS.section_title.max) add(`${sat}.title`, `At most ${BOUNDS.section_title.max} characters.`);
+      if (title && title.length > BOUNDS.section_title.max)
+        add(`${sat}.title`, `At most ${BOUNDS.section_title.max} characters.`);
       if (s.max_sentences.trim()) {
-        const e = intIn(s.max_sentences, BOUNDS.section_sentences.min, BOUNDS.section_sentences.max);
+        const e = intIn(
+          s.max_sentences,
+          BOUNDS.section_sentences.min,
+          BOUNDS.section_sentences.max,
+        );
         if (e) add(`${sat}.max_sentences`, e);
       }
     });
     t.custom_sections.forEach((c, k) => {
       const cat = `${at}.custom_sections.${k}`;
-      if (!CUSTOM_ID_PATTERN.test(c.id) || c.id.length > BOUNDS.id.max) add(`${cat}.id`, "Must start with custom- (lower-case words joined by dashes).");
+      if (!CUSTOM_ID_PATTERN.test(c.id) || c.id.length > BOUNDS.id.max)
+        add(
+          `${cat}.id`,
+          "Must start with custom- (lower-case words joined by dashes).",
+        );
       const title = c.title.trim();
       if (!title) add(`${cat}.title`, "Give the section a title.");
-      else if (title.length > BOUNDS.section_title.max) add(`${cat}.title`, `At most ${BOUNDS.section_title.max} characters.`);
+      else if (title.length > BOUNDS.section_title.max)
+        add(`${cat}.title`, `At most ${BOUNDS.section_title.max} characters.`);
       else {
         const e = plainTextError(title);
         if (e) add(`${cat}.title`, e);
       }
       const task = c.task.trim();
-      if (task.length < BOUNDS.custom_task.min) add(`${cat}.task`, `Say what the section should answer, in at least ${BOUNDS.custom_task.min} characters.`);
-      else if (task.length > BOUNDS.custom_task.max) add(`${cat}.task`, `At most ${BOUNDS.custom_task.max} characters.`);
+      if (task.length < BOUNDS.custom_task.min)
+        add(
+          `${cat}.task`,
+          `Say what the section should answer, in at least ${BOUNDS.custom_task.min} characters.`,
+        );
+      else if (task.length > BOUNDS.custom_task.max)
+        add(`${cat}.task`, `At most ${BOUNDS.custom_task.max} characters.`);
       else {
         const e = plainTextError(task);
         if (e) add(`${cat}.task`, e);

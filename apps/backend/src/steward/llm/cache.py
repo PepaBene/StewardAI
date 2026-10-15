@@ -16,6 +16,13 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
+# How long an identical web-search request is answered from the cache instead of being searched
+# (and paid for) again. Short, because the web moves; the request key includes the question,
+# the date in the prompt and the domains, so only a true repeat (a retry, a re-run of the same
+# job on the same day or the next) can hit. Time-sensitive jobs use a day.
+SEARCH_CACHE_DAYS = 3
+SEARCH_CACHE_DAYS_FRESH = 1
+
 
 def request_key(
     model: str,

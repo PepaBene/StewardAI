@@ -31,6 +31,7 @@ IssueKind = Literal[
     "provider_access",
     "provider_quota",
     "thesis_gap",
+    "engine_verification",
 ]
 
 
@@ -322,6 +323,55 @@ async def _theses(pool: asyncpg.Pool, weights: dict[str, float]) -> list[Quality
     return out
 
 
+SWEEP_RATE_WARN = 0.10  # share of re-checked decisions that no longer held
+SWEEP_MIN_CHECKED = 10
+
+
+def sweep_problem(checked: int, flagged: int) -> str | None:
+    if checked < SWEEP_MIN_CHECKED or flagged / checked < SWEEP_RATE_WARN:
+        return None
+    return f"{flagged} of {checked} automatic decisions no longer held at the last weekly re-check"
+
+
+async def _engine_verification(pool: asyncpg.Pool) -> list[QualityIssue]:
+    """The autopilot's own checks: the last weekly re-check disagreed too often, or a kind that
+    applies decisions has no check before applying."""
+    from steward.autopilot.kinds import VERIFY_WAIVERS
+
+    out: list[QualityIssue] = []
+    last = await pool.fetchrow(
+        "select checked, flagged from public.engine_sweep where name = 'reverify'"
+        " order by ran_at desc limit 1"
+    )
+    text = sweep_problem(last["checked"], last["flagged"]) if last else None
+    if text:
+        out.append(
+            QualityIssue(
+                kind="engine_verification",
+                subject="weekly re-check",
+                detail=text,
+                fix="Open the autopilot, undo the ones that are wrong and mark them so it learns.",
+            )
+        )
+    rows = await pool.fetch(
+        "select kind, count(*) as n from public.auto_decision where status = 'applied'"
+        " and decided_at >= now() - interval '30 days' and kind = any($1::text[])"
+        " group by kind order by n desc",
+        sorted(VERIFY_WAIVERS),
+    )
+    if rows:
+        names = ", ".join(f"{r['kind']} ({r['n']})" for r in rows[:6])
+        out.append(
+            QualityIssue(
+                kind="engine_verification",
+                subject="unchecked kinds",
+                detail=f"Applied in the last 30 days without a check before applying: {names}",
+                fix="Keep these in shadow, or add a check for them before switching them to auto.",
+            )
+        )
+    return out
+
+
 async def build_cockpit(pool: asyncpg.Pool) -> Cockpit:
     today = dt.date.today()
     weights, isins, total = await _weights(pool)
@@ -334,6 +384,7 @@ async def build_cockpit(pool: asyncpg.Pool) -> Cockpit:
     conflicts = await _conflicts(pool)
     access, quota = await _providers(pool)
     theses = await _theses(pool, weights) if weights else []
+    engine = await _engine_verification(pool)
 
     def check(kind: IssueKind, title: str, denominator: str, found: list[QualityIssue]) -> Check:
         return Check(kind=kind, title=title, ran=True, denominator=denominator, issues=len(found))
@@ -369,8 +420,16 @@ async def build_cockpit(pool: asyncpg.Pool) -> Cockpit:
             quota,
         ),
         check("thesis_gap", "Theses missing or incomplete", held, theses),
+        check(
+            "engine_verification",
+            "Autopilot checks",
+            "applied decisions of the last 30 days; the weekly re-check",
+            engine,
+        ),
     ]
-    issues = rank([*stale, *identity, *funds, *claims, *conflicts, *access, *quota, *theses])
+    issues = rank(
+        [*stale, *identity, *funds, *claims, *conflicts, *access, *quota, *theses, *engine]
+    )
     return Cockpit(
         as_of=today,
         portfolio_value_base=total,

@@ -82,6 +82,10 @@ def openai_body(req: Request) -> dict[str, Any]:
         body["reasoning"] = {"effort": req.effort}
     if req.cache_key:
         body["prompt_cache_key"] = req.cache_key
+        if req.cache_retention:
+            body["prompt_cache_retention"] = req.cache_retention
+    if req.priority == "flex":
+        body["service_tier"] = "flex"
     if req.schema is not None:
         body["text"] = {
             "format": {
@@ -107,6 +111,9 @@ def openai_body(req: Request) -> dict[str, Any]:
             tool["filters"] = {"allowed_domains": list(req.search.allowed_domains[:100])}
         tools.append(tool)
         body["max_tool_calls"] = req.search.max_uses
+        # The pages each search returned, so an answer written as JSON (no prose to annotate)
+        # can still be checked against them.
+        body["include"] = ["web_search_call.action.sources"]
     if tools:
         body["tools"] = tools
     return body
@@ -129,6 +136,7 @@ def _openai_input(messages: Sequence[Message]) -> list[Any]:
 def openai_completion(req: Request, data: dict[str, Any]) -> Completion:
     text_parts: list[str] = []
     citations: list[Citation] = []
+    sources: list[Citation] = []
     calls: list[ToolCall] = []
     searches = 0
     refused = False
@@ -136,6 +144,9 @@ def openai_completion(req: Request, data: dict[str, Any]) -> Completion:
         kind = item.get("type")
         if kind == "web_search_call":
             searches += 1
+            for found in (item.get("action") or {}).get("sources") or []:
+                if isinstance(found, dict) and found.get("url"):
+                    sources.append(Citation(str(found["url"]), ""))
         elif kind == "function_call":
             try:
                 args = json.loads(item.get("arguments") or "{}")
@@ -188,6 +199,7 @@ def openai_completion(req: Request, data: dict[str, Any]) -> Completion:
             searches=searches,
         ),
         citations=_dedupe(citations),
+        sources=_dedupe(sources),
         tool_calls=calls,
         raw=list(data.get("output") or []) if calls else None,
     )
@@ -371,6 +383,18 @@ def openai_batch_results(text: str, requests: Sequence[Request]) -> list[Complet
     return _by_index(found, len(requests))
 
 
+def _batch_request(req: Request) -> dict[str, Any]:
+    """A request as the batch endpoint takes it. Batch mode ignores `responseJsonSchema` (a live
+    probe on 13 October 2026: the model answered with its own structure, strings where the
+    schema wants objects, so every batched digest was discarded and asked again directly, paid
+    twice); the same schema under the underscore name is honoured."""
+    body = google_body(req)
+    config = body["generationConfig"]
+    if "responseJsonSchema" in config:
+        config["_responseJsonSchema"] = config.pop("responseJsonSchema")
+    return body
+
+
 def google_batch_body(requests: Sequence[Request], name: str) -> dict[str, Any]:
     """The `batchGenerateContent` body: the requests inline, each tagged with its key."""
     return {
@@ -379,7 +403,7 @@ def google_batch_body(requests: Sequence[Request], name: str) -> dict[str, Any]:
             "input_config": {
                 "requests": {
                     "requests": [
-                        {"request": google_body(r), "metadata": {"key": custom_id(i)}}
+                        {"request": _batch_request(r), "metadata": {"key": custom_id(i)}}
                         for i, r in enumerate(requests)
                     ]
                 }

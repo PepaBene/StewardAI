@@ -157,6 +157,37 @@ def subject_of(message: str) -> str:
     return message.splitlines()[0][:200] if message else "StewardAI alert"
 
 
+CRITICAL = 3
+
+
+async def send_by_other_channel(
+    conn: asyncpg.Connection, alert_id: int, channels: Collection[str], now: dt.datetime
+) -> int | None:
+    """A critical alert whose channel gave up goes out once more by another configured channel
+    (a copy marked as such), so one dead channel cannot silence the alerts that matter most.
+    Returns the new alert's id; None when it is not critical, no other channel exists, or the
+    other channel already has this alert."""
+    row = await conn.fetchrow("select * from public.alert where id = $1", alert_id)
+    if row is None or row["severity"] < CRITICAL or row["kind"] == "test":
+        return None
+    other = sorted(c for c in channels if c != row["channel"])
+    if not other:
+        return None
+    new_id: int | None = await conn.fetchval(
+        "insert into public.alert (kind, severity, ticker, event_type, cluster_id, verdict_id,"
+        " channel, message, status, send_after, config_version_id, job_id, created_at)"
+        " select kind, severity, ticker, event_type, cluster_id, verdict_id, $2, $3, 'pending',"
+        " $4, config_version_id, job_id, $4 from public.alert where id = $1"
+        " on conflict do nothing returning id",
+        alert_id,
+        other[0],
+        f"{row['channel'].capitalize()} did not deliver this alert; sent here instead.\n"
+        + row["message"],
+        now,
+    )
+    return new_id
+
+
 async def dispatch_due(
     pool: asyncpg.Pool,
     channels: dict[str, Channel],
@@ -187,16 +218,17 @@ async def dispatch_due(
                     MISSING_CHANNEL_HELP.get(row["channel"], "channel not configured"),
                 )
                 result.failed.append(row["id"])
+                await send_by_other_channel(conn, row["id"], channels, moment)
                 continue
             try:
                 subject = subject_of(row["message"])
                 if isinstance(channel, EmailChannel):
                     # A retry after a timeout must not send the email twice.
-                    await channel.send(
+                    provider_id = await channel.send(
                         subject, row["message"], idempotency_key=f"steward-alert-{row['id']}"
                     )
                 else:
-                    await channel.send(subject, row["message"])
+                    provider_id = await channel.send(subject, row["message"])
             except ChannelError as exc:
                 final = attempts >= MAX_ATTEMPTS
                 await conn.execute(
@@ -209,13 +241,16 @@ async def dispatch_due(
                     moment + dt.timedelta(minutes=2**attempts),
                 )
                 (result.failed if final else result.retrying).append(row["id"])
+                if final:
+                    await send_by_other_channel(conn, row["id"], channels, moment)
                 logger.warning("alert %s via %s failed: %s", row["id"], row["channel"], exc)
                 continue
             await conn.execute(
                 "update public.alert set status = 'sent', sent_at = clock_timestamp(),"
-                " attempts = $2, error = null where id = $1",
+                " attempts = $2, error = null, provider_id = $3 where id = $1",
                 row["id"],
                 attempts,
+                provider_id,
             )
             result.sent.append(row["id"])
     return result

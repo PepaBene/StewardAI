@@ -33,7 +33,9 @@ from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import ClaimVerifierSettings, VerificationConfig
 from steward.earnings.read import EvidenceRelation, FactCheck, evidence_relation
+from steward.engine import overrides
 from steward.jobs.runner import JobContext, JobHandler
+from steward.llm.cache import ResultCache
 from steward.llm.client import LLM, create_llm
 from steward.llm.routing import routing_client
 from steward.llm.types import LLMError, Message, Request
@@ -927,11 +929,13 @@ async def deliver(
             outcome[name] = {"status": "failed", "error": MISSING_CHANNEL_HELP[name], "at": at}
             continue
         try:
-            await channel.send(subject, text)
+            provider_id = await channel.send(subject, text)
         except ChannelError as exc:
             outcome[name] = {"status": "failed", "error": str(exc)[:300], "at": at}
         else:
             outcome[name] = {"status": "sent", "at": at}
+            if provider_id:
+                outcome[name]["id"] = provider_id
     return outcome
 
 
@@ -1036,16 +1040,19 @@ def _handler(kind: DigestKind) -> JobHandler:
             writer = verifier = None
         else:
             prompts = await load_prompts(ctx.pool)
+            corrections = await overrides.lessons(ctx.pool, "digest", "lines of earlier digests")
             writer = LLMDigestWriter(
                 llm,
                 digest_settings,
-                system=prompts.text("news_digest", SYSTEM_PROMPT, digest_settings.model),
+                system=prompts.text("news_digest", SYSTEM_PROMPT, digest_settings.model)
+                + ("\n\n" + corrections if corrections else ""),
             )
             verifier = LLMClaimVerifier(
                 routing_client(llm),
                 claim_settings.model,
                 prompts.text("claim_verifier", CLAIM_SYSTEM, claim_settings.model),
                 effort=claim_settings.effort,
+                cache=ResultCache(ctx.pool, "claim_verifier"),
             )
         async with httpx.AsyncClient(
             timeout=30.0, headers={"User-Agent": f"StewardAI/{__version__}"}

@@ -81,6 +81,7 @@ describe("research profiles form", () => {
       "standard",
       "quick",
       "deep-thesis",
+      "deep-agentic",
       "earnings-update",
     ]);
     expect(researchProfilesToBody(form)).toEqual(DEFAULT_RESEARCH_PROFILES);
@@ -151,6 +152,36 @@ describe("research profiles form", () => {
     expect(validateResearchProfiles({ ...form, profiles: [] }).profiles).toEqual(["Keep at least one profile."]);
     form.profiles[0].id = "Bad Id";
     expect(validateResearchProfiles(form)["profiles.0.id"]?.[0]).toMatch(/Lower-case/);
+  });
+});
+
+describe("research profiles form: research workers", () => {
+  it("round-trips the engine and worker fields and starts new profiles on the fixed engine", () => {
+    const form = researchProfilesFromBody(null);
+    const p = form.profiles[0]!;
+    expect(newProfile().engine).toBe("fixed");
+    p.engine = "agentic";
+    p.lenses = ["financials", "counter_case"];
+    p.worker_model = "gpt-6-luna";
+    p.worker_effort = "medium";
+    const back = researchProfilesFromBody(researchProfilesToBody(form)).profiles[0]!;
+    expect([back.engine, back.lenses, back.worker_model, back.worker_effort]).toEqual([
+      "agentic",
+      ["financials", "counter_case"],
+      "gpt-6-luna",
+      "medium",
+    ]);
+  });
+
+  it("asks for a lens and a worker model only when the engine is agentic", () => {
+    const form = researchProfilesFromBody(null);
+    const p = form.profiles[0]!;
+    p.lenses = [];
+    p.worker_model = "";
+    expect(validateResearchProfiles(form)).toEqual({});
+    p.engine = "agentic";
+    const errors = validateResearchProfiles(form);
+    expect(Object.keys(errors)).toEqual(["profiles.0.lenses", "profiles.0.worker_model"]);
   });
 });
 
@@ -378,8 +409,14 @@ describe("web default profiles and templates match the backend defaults", () => 
   const profile = (id: string) => defaults.profiles!.find((p) => p.id === id)!;
   const template = (id: string) => defaults.templates!.find((t) => t.id === id)!;
 
-  it("has the four profiles and two templates, standard as default", () => {
-    expect(defaults.profiles!.map((p) => p.id)).toEqual(["standard", "quick", "deep-thesis", "earnings-update"]);
+  it("has the five profiles and two templates, standard as default", () => {
+    expect(defaults.profiles!.map((p) => p.id)).toEqual([
+      "standard",
+      "quick",
+      "deep-thesis",
+      "deep-agentic",
+      "earnings-update",
+    ]);
     expect(defaults.default_profile).toBe("standard");
     expect(defaults.templates!.map((t) => t.id)).toEqual(["thesis-memo", "update-note"]);
   });
@@ -394,6 +431,23 @@ describe("web default profiles and templates match the backend defaults", () => 
       min_sentences: 2,
       authoring: "research_only",
       planning: "code",
+      engine: "fixed",
+      lenses: ["financials", "filings_events", "news_web", "portfolio_risk", "counter_case"],
+      worker_model: "gpt-6-luna",
+      worker_effort: "low",
+      worker_max_steps: 12,
+      worker_max_searches: 8,
+      parallel_workers: 2,
+      // Cost levers: every default keeps the behaviour from before they existed.
+      write_order: "template",
+      cheap_sections: [],
+      cheap_model: "gpt-6-luna",
+      cheap_effort: "medium",
+      follow_up_cheap: false,
+      search_mode: "model",
+      scout_model: "gpt-6-luna",
+      scout_effort: "low",
+      priority: "standard",
     });
     const pick = (p: ReturnType<typeof profile>) => ({
       mode: p.mode,

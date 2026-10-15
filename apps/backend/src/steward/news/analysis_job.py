@@ -15,6 +15,7 @@ import datetime as dt
 import json
 import logging
 import re
+from collections.abc import Coroutine
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -86,6 +87,7 @@ class BatchedLLM:
 
 
 MAX_STORIES = 500
+SEVERE = 3  # stories at or above this severity are analysed directly and never take a reuse
 
 
 @dataclass
@@ -281,6 +283,47 @@ class AnalysisRun:
         adapter = cast(LLM, BatchedLLM(self.llm, collector))
         await collector.run([self.extract(s, usage, adapter) for s in stories])
 
+    async def analyse_batched(self, work: list[Coroutine[Any, Any, None]]) -> None:
+        """Run the model stages of many stories through one batch: every stage reads
+        `self.llm`, so it is swapped for the batch adapter while the stories run together."""
+        collector = BatchCollector(self.llm, wait_minutes=BATCH_WAIT_MINUTES)
+        direct = self.llm
+        self.llm = cast(LLM, BatchedLLM(direct, collector))
+        try:
+            await collector.run(work)
+        finally:
+            self.llm = direct
+
+    async def reuse_from_repeat(self, story: StoryMaterial, kind: str) -> bool:
+        """Cost lever N5: a quiet story the novelty step marked as a repeat of an earlier story
+        of the same holding takes that story's `kind` analysis instead of a new model call.
+        True when the story now has one (stored under a hash of the source, so a later run
+        finds it and asks nothing)."""
+        if not self.news.reuse_repeat_analysis or story.severity >= SEVERE:
+            return False
+        novelty = await latest_analysis(self.pool, story.cluster_id, "novelty")
+        source_id = novelty.get("similar_story_id") if novelty else None
+        if not novelty or novelty.get("novelty") != "repeat" or not source_id:
+            return False
+        source = await self.pool.fetchrow(
+            "select a.payload, a.model from public.story_analysis a"
+            " join public.story_cluster c on c.id = a.cluster_id"
+            " where a.cluster_id = $1 and a.kind = $2 and c.ticker is not distinct from $3"
+            " order by a.created_at desc, a.id desc limit 1",
+            int(source_id),
+            kind,
+            story.ticker,
+        )
+        if source is None:
+            return False
+        raw = source["payload"]
+        payload: dict[str, Any] = json.loads(raw) if isinstance(raw, str) else dict(raw)
+        hash_ = input_hash("reused", kind, int(source_id), payload)
+        if not await analysis_exists(self.pool, story.cluster_id, kind, hash_):
+            await self.save(story, kind, hash_, source["model"], payload)
+            self.counts.saved_one(f"{kind}_reused")
+        return True
+
     async def extract(self, story: StoryMaterial, usage: Usage, llm: LLM | None = None) -> None:
         model = self.news.extraction_model
         system = self.prompts.text("news_extract", extraction.SYSTEM_PROMPT, model)
@@ -394,6 +437,8 @@ class AnalysisRun:
         result, paths = impacts.graph_chains(graph, story, ex, indicators, attributes=attributes)
         model = self.news.analysis_model
         explain = bool(paths) and self.llm_ready(model)
+        if explain and await self.reuse_from_repeat(story, "impact"):
+            return
         system = self.prompts.text("news_impact", impacts.SYSTEM_PROMPT, model)
         hash_ = input_hash(
             "impact",
@@ -438,6 +483,8 @@ class AnalysisRun:
     async def framing(self, story: StoryMaterial, usage: Usage) -> None:
         model = self.news.analysis_model
         if not framings.eligible(story, self.news.framing_min_outlets) or not self.llm_ready(model):
+            return
+        if await self.reuse_from_repeat(story, "framing"):
             return
         system = self.prompts.text("news_framing", framings.SYSTEM_PROMPT, model)
         hash_ = input_hash("framing", model, system, [(i.id, i.text) for i in story.items])
@@ -505,6 +552,8 @@ class AnalysisRun:
     async def sentiment(self, story: StoryMaterial, usage: Usage) -> None:
         model = self.news.analysis_model
         if not self.llm_ready(model):
+            return
+        if await self.reuse_from_repeat(story, "sentiment"):
             return
         system = self.prompts.text("news_sentiment", sentiments.SYSTEM_PROMPT, model)
         hash_ = input_hash("sentiment", model, system, [(i.id, i.text) for i in story.items])
@@ -662,10 +711,8 @@ async def news_analysis_handler(ctx: JobContext) -> None:
             )
             theses_stored = await load_active(ctx.pool, "theses", ThesesConfig)
             theses = theses_stored.body if theses_stored else None
-            for sid in model_ids:
-                story = stories.get(sid)
-                if story is None:
-                    continue
+
+            async def analyse_story(story: StoryMaterial) -> None:
                 if "impact" in run.techniques and graph is not None:
                     await run.impact(story, graph, indicators, usage, attributes)
                 if "framing" in run.techniques:
@@ -676,6 +723,20 @@ async def news_analysis_handler(ctx: JobContext) -> None:
                     await run.sentiment(story, usage)
                 if "thesis" in run.techniques:
                     await run.thesis(story, theses, usage)
+
+            chosen = [stories[sid] for sid in model_ids if sid in stories]
+            # Cost lever N1: nobody waits for a quiet story's analysis, so those go to the batch
+            # endpoint together; a severe story is analysed directly and at once.
+            waiting = [s for s in chosen if s.severity < SEVERE] if news.batch_analysis else []
+            for story in chosen:
+                if story not in waiting:
+                    await analyse_story(story)
+            if len(waiting) > 1:
+                await run.analyse_batched([analyse_story(s) for s in waiting])
+            else:
+                for story in waiting:
+                    await analyse_story(story)
+            step.detail.update(batched=len(waiting) if len(waiting) > 1 else 0)
             step.detail.update(run.counts.detail())
             step.usage = usage.step_usage()
     # The scheduled ops report rides this job: the first run of each ISO week sends it. A failure

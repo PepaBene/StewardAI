@@ -176,6 +176,10 @@ async def record_evidence_as_of(
     """The evidence attached to a domain record as it stood at `known_at`: only links and
     document versions recorded by then, with the quote (if any) and the version's identity."""
     cutoff = known_at or datetime.now(UTC)
+    if domain_table == "institutional_holding":
+        # A 13F position has no link row of its own: every position of a filing was read from
+        # the one document, so its evidence is the filing's ("accession:infotable_sk" -> accession).
+        domain_table, record_key = "form13f_filing", str(record_key).partition(":")[0]
     rows = await pool.fetch(
         """select r.id, r.domain_table, r.record_key, r.known_at as linked_at,
                   v.id as document_version_id, v.content_hash, v.known_at as version_known_at,

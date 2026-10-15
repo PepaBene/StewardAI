@@ -145,6 +145,15 @@ class EarningsCheckSettings(ConfigModel):
     )
     effort: Effort = "high"
     locate_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    result_cache_days: int = Field(
+        default=0,
+        ge=0,
+        le=30,
+        description="Cost lever: when above 0, an identical request (the same release search, "
+        "the same document read) within this many days is answered from memory instead of "
+        "being searched and paid for again. A season's re-checks of one issuer then cost "
+        "nothing; 0 keeps every check fresh.",
+    )
     max_steps: int = Field(
         default=40, ge=2, le=200, description="Model calls plus document fetches per run."
     )
@@ -252,6 +261,340 @@ class AiApprovalSettings(ConfigModel):
         return self
 
 
+class DocumentIndexSettings(ConfigModel):
+    """The passage index that `search_documents` reads: filings and results releases, your
+    reports, theses and notes, and news, split into passages and embedded. Text is indexed
+    first (keyword search works at once); embedding is capped per run, newest first, so one run
+    costs a bounded amount. A changed document is re-indexed; an unchanged one is never
+    embedded twice."""
+
+    embedding_model: ModelId = Field(
+        default="gemini-embedding-2",
+        description="Embeds the passages and the search queries. Changing it re-embeds every "
+        "passage over the following runs.",
+    )
+    embedding_dimensions: int = Field(
+        default=768,
+        ge=128,
+        le=3072,
+        description="768 is the dimension the vector index is built for; others are stored "
+        "and searched without the index.",
+    )
+    embed_per_run: int = Field(
+        default=1500, ge=0, le=20000, description="Passages embedded per run (0: none)."
+    )
+    filings_per_run: int = Field(
+        default=20, ge=0, le=200, description="Archived documents read and split per run."
+    )
+    reports_per_run: int = Field(default=200, ge=0, le=2000, description="Reports indexed per run.")
+    index_disclosures: bool = Field(
+        default=True,
+        description="Index the disclosure register's prose: relationship passages and alerts.",
+    )
+    disclosure_alert_days: int = Field(
+        default=365, ge=7, le=1825, description="Disclosure alerts of this many days are indexed."
+    )
+    index_agent_notes: bool = Field(
+        default=True, description="Index your working notes for the agent."
+    )
+    news_per_run: int = Field(default=600, ge=0, le=5000, description="News items indexed per run.")
+    news_days: int = Field(
+        default=365,
+        ge=7,
+        le=730,
+        description="News older than this is not added to the index (full-text search over "
+        "the stored news is unaffected).",
+    )
+
+
+class InboxSettings(ConfigModel):
+    """Event-driven agents: each new escalation note or thesis-breach alert starts one bounded
+    run that reads the app's records and leaves an inbox item with the evidence and at most
+    one proposed action. A run never trades, never edits a thesis and never starts a job: the
+    owner confirms a proposed action in the inbox."""
+
+    enabled: bool = True
+    model: ModelId = Field(default="gpt-6-luna", description="The model of the agent run.")
+    effort: Effort | None = Field(default="low", description=EFFORT_HELP)
+    max_steps: int = Field(default=8, ge=2, le=30, description="Model calls per run.")
+    lookback_days: int = Field(
+        default=7, ge=1, le=60, description="Triggers older than this are not picked up."
+    )
+    max_per_scan: int = Field(
+        default=5, ge=1, le=50, description="Runs one scan may queue, newest trigger first."
+    )
+    min_severity: int = Field(
+        default=2, ge=0, le=3, description="Alerts below this severity start no run."
+    )
+
+
+class FundDocument(ConfigModel):
+    """A fund's KID, factsheet or prospectus, read for the fund's text facts (replication,
+    securities lending, UCITS, inception, domicile, index). Listed once; read again whenever
+    the document changes."""
+
+    isin: str = Field(pattern=r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$", description="The fund's ISIN.")
+    url: AnyHttpUrl = Field(description="Where the issuer publishes the PDF or page.")
+
+
+class TrainingCaptureSettings(ConfigModel):
+    """Keep a redacted copy of each AI call (prompt, answer, usage) so models can later be
+    fine-tuned on this app's own work. Nothing is trained or sent anywhere by this."""
+
+    enabled: bool = Field(
+        default=True, description="Record each AI call. Off: nothing further is recorded."
+    )
+    exclude_job_types: list[str] = Field(
+        default_factory=list,
+        max_length=100,
+        description="Job types whose calls are not recorded. Empty: every job type is recorded, "
+        "chat included.",
+    )
+    max_storage_mb: int = Field(
+        default=150,
+        ge=10,
+        le=20000,
+        description="Stop recording when the stored calls take this much space; nothing already "
+        "recorded is deleted.",
+    )
+    max_chars: int = Field(
+        default=60000,
+        ge=1000,
+        le=400000,
+        description="Longest prompt or answer text kept per call; the rest is cut.",
+    )
+
+
+class OpsSettings(ConfigModel):
+    """The ops watchdog: fixes what it safely can (retry a failed job, re-run a refresh, lift
+    an old provider block), and puts one line in "Needs you" for what it could not."""
+
+    enabled: bool = True
+    repair: bool = Field(
+        default=True,
+        description="Re-run the refresh job behind a data-quality issue and retry a failed "
+        "collector. Off: issues are only listed.",
+    )
+    retry_hours: int = Field(
+        default=12, ge=1, le=168, description="Wait this long between two repair attempts."
+    )
+    max_attempts: int = Field(
+        default=2,
+        ge=1,
+        le=5,
+        description="An issue that survives this many repair attempts goes to Needs you.",
+    )
+    block_reset_days: int = Field(
+        default=7,
+        ge=0,
+        le=90,
+        description="Lift a provider block this old so the next call probes it again "
+        "(0: never). A block that returns after the probe goes to Needs you.",
+    )
+    refresh_derived: bool = Field(
+        default=True,
+        description="Rebuild the benchmark index weights and the fund coverage ledger from the "
+        "stored fund holdings, so they follow every look-through refresh without a button.",
+    )
+    suggest_rebalance: bool = Field(
+        default=True,
+        description="Once a day, when positions have drifted outside their bands, put the "
+        "rebalance trades (what, how much, why) in Needs you. Nothing is sent to the broker.",
+    )
+    suggest_hour_utc: int = Field(
+        default=6, ge=0, le=23, description="The hour (UTC) the daily suggestion is worked out."
+    )
+    key_notices: bool = Field(
+        default=True,
+        description="Name each API key that is missing for a job that is switched on.",
+    )
+    budget_forecast: bool = Field(
+        default=True,
+        description="Warn once a month when the AI spend is on course to pass the monthly cap.",
+    )
+    autolog_trades: bool = Field(
+        default=True,
+        description="Put each detected trade on the journal timeline (a journal entry, or a "
+        "switch-log row for a sell and buy pair) marked as automatic. They hold no reasons "
+        "and are left out of the scorecard and process review.",
+    )
+    anticipate_earnings: bool = Field(
+        default=True,
+        description="Once a day, put a line in Needs you for each held company that reports "
+        "within three days, with when its research was last refreshed.",
+    )
+    draft_case_items: bool = Field(
+        default=True,
+        description="Once a day, add your thesis wording to a held company's case items as "
+        "drafts (why owned, pre-mortem, exit conditions). Never confirmed, never added twice.",
+    )
+    tune_alerts: bool = Field(
+        default=True,
+        description="Once a day, lower one instant alert type to a digest highlight when you "
+        "acknowledged under 10% of at least 10 of them in 60 days. A new event-rules version "
+        "you can roll back; never below a digest highlight.",
+    )
+    suggest_opportunities: bool = Field(
+        default=True,
+        description="Once a day, run your saved stock screens and tell you about a stock that "
+        "newly passes one and is not held. The criteria are yours; nothing is ranked or scored.",
+    )
+    release_gate: bool = Field(
+        default=True,
+        description="Switch off a feature you turned on once it has failed the release gate for "
+        "`retry_hours` (a stale input or a failed audit), and say so in Needs you.",
+    )
+    fill_segment_map: bool = Field(
+        default=True,
+        description="Once a day, map a held company's revenue members that the filing names as "
+        "a country to that country. Regions and anything you removed or changed are left alone.",
+    )
+    journal_gaps: bool = Field(
+        default=True,
+        description="Tell the owner about a recent trade the journal does not explain, or a sell "
+        "and a buy that look like a switch. Never writes a journal or switch-log entry.",
+    )
+
+
+class AutopilotKindPolicy(ConfigModel):
+    """How one kind of automatic decision (a fact review, a graph edge, ...) runs."""
+
+    mode: Literal["off", "shadow", "auto"] = Field(
+        default="shadow",
+        description="off: not run. shadow: decide and log, apply nothing (the owner's own "
+        "calls and a stronger model's audit are compared with it). auto: apply decisions at "
+        "or above `min_confidence`. Calibration promotes and demotes between shadow and auto.",
+    )
+    min_confidence: float = Field(
+        default=0.9, ge=0.5, le=1.0, description="Below this the item is escalated, not decided."
+    )
+    model: ModelId | None = Field(
+        default=None, description="The judge; empty uses the autopilot default model."
+    )
+    escalate_model: ModelId | None = Field(
+        default=None,
+        description="A stronger second opinion for an item the first model is unsure of; "
+        "empty uses the autopilot default escalation model.",
+    )
+    sample_rate: float = Field(
+        default=0.05,
+        ge=0.0,
+        le=1.0,
+        description="Share of applied decisions kept for a spot check.",
+    )
+    ttl_days: int = Field(
+        default=14,
+        ge=1,
+        le=365,
+        description="An escalated item nobody settled for this long is closed by the kind's "
+        "expiry rule (where it has one), so no queue grows without bound.",
+    )
+    daily_cap: int = Field(
+        default=50, ge=1, le=1000, description="Most decisions of this kind in 24 hours."
+    )
+
+
+class ThesisSettings(ConfigModel):
+    """The thesis job: started by the owner for one holding or one candidate, it researches
+    with every record the app holds plus web search, writes the thesis and, for a holding,
+    saves it. The portfolio review does the same for the stocks it finds."""
+
+    model: ModelId = Field(default="gpt-6.1-sol", description="Writes the thesis and memo.")
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    research_profile: str = Field(
+        default="deep-thesis", description="The research profile the thesis is built on."
+    )
+    review_max_candidates: int = Field(
+        default=3,
+        ge=0,
+        le=8,
+        description="Most stocks a portfolio review researches in depth (each costs a full "
+        "research run). The ones you name come first.",
+    )
+    review_discovery: bool = Field(
+        default=True,
+        description="Let the portfolio review search the web for stocks that fill the gaps in "
+        "your strategy, besides the ones you name.",
+    )
+    review_discovery_model: ModelId = Field(
+        default="gpt-6-luna", description="Searches the web for candidate stocks."
+    )
+
+
+class AutopilotSettings(ConfigModel):
+    """The autopilot: the app settles its own review queues, logs every decision with its
+    evidence, and asks the owner only for what it cannot settle with confidence."""
+
+    enabled: bool = True
+    model: ModelId = Field(default="gpt-6-luna", description="The default judge.")
+    escalate_model: ModelId | None = Field(
+        default="gpt-6.1-sol", description="The default second opinion; empty for none."
+    )
+    effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    max_calls_per_run: int = Field(default=60, ge=1, le=500)
+    rejudge_days: int = Field(
+        default=7, ge=1, le=90, description="An escalated item is judged again after this long."
+    )
+    default: AutopilotKindPolicy = Field(default_factory=AutopilotKindPolicy)
+    kinds: dict[str, AutopilotKindPolicy] = Field(
+        default_factory=dict, description="Per-kind overrides of `default`, by kind name."
+    )
+    auto_calibrate: bool = Field(
+        default=True,
+        description="Weekly, promote a shadow kind to auto when its reviewed decisions are "
+        "right often enough, and demote an auto kind that falls below the floor.",
+    )
+    promote_precision: float = Field(default=0.95, ge=0.5, le=1.0)
+    promote_min_reviewed: int = Field(default=50, ge=5, le=1000)
+    demote_precision: float = Field(default=0.9, ge=0.0, le=1.0)
+    research_stale: bool = Field(
+        default=True,
+        description="Queue a research run for a held thesis whose review date has passed, "
+        "so the owner does not have to ask. The report's thesis proposal still waits for you.",
+    )
+    research_min_days: int = Field(
+        default=30, ge=1, le=365, description="No new run for a holding this soon after a report."
+    )
+    research_max_per_run: int = Field(
+        default=1, ge=1, le=10, description="Most research runs one autopilot run may queue."
+    )
+    draft_theses: bool = Field(
+        default=False,
+        description="Queue a deep-thesis research run for a held, non-core holding that has no "
+        "thesis, and tell you once when the draft is ready. Nothing is saved until you accept.",
+    )
+    draft_max_per_run: int = Field(
+        default=1, ge=1, le=5, description="Most thesis drafts one autopilot run may queue."
+    )
+    draft_min_days: int = Field(
+        default=60, ge=1, le=365, description="No new draft for a holding this soon after a report."
+    )
+    refresh_review_dates: bool = Field(
+        default=True,
+        description="Move a thesis's review date forward when every KPI passes and the latest "
+        "research proposes no change. A normal config version you can roll back.",
+    )
+    review_extend_days: int = Field(
+        default=90, ge=7, le=365, description="How far the review date moves."
+    )
+    audit_per_run: int = Field(
+        default=25,
+        ge=0,
+        le=200,
+        description="Decisions with no review that the calibration job has the stronger model "
+        "re-judge independently each run (agreement counts as a correct decision).",
+    )
+
+    def policy(self, kind: str) -> AutopilotKindPolicy:
+        return self.kinds.get(kind, self.default)
+
+    @model_validator(mode="after")
+    def _demote_below_promote(self) -> Self:
+        if self.demote_precision > self.promote_precision:
+            raise ValueError("demote_precision cannot exceed promote_precision")
+        return self
+
+
 class ExposureBuildSettings(ConfigModel):
     """The AI steps of the exposure builder. The country split from XBRL needs no AI and always
     runs. Each annual report is read at most once; nothing is guessed: a figure is stored only
@@ -275,6 +618,16 @@ class ExposureBuildSettings(ConfigModel):
     map_products: bool = Field(
         default=True,
         description="Map reported product lines to HS trade codes (always marked estimated).",
+    )
+    use_batch: bool = Field(
+        default=False,
+        description="Read the run's annual reports through the provider's batch endpoint (half "
+        "price, the run waits up to the time below). The answers are stored first and the usual "
+        "step then finds them, so nothing else changes; a report the batch does not answer is "
+        "read directly.",
+    )
+    batch_wait_minutes: int = Field(
+        default=60, ge=5, le=240, description="How long a batch of annual reports is waited for."
     )
 
 
@@ -470,6 +823,13 @@ class NewsSettings(ConfigModel):
     classification_batch_size: int = Field(
         default=50, ge=5, le=100, description="Items per classification call."
     )
+    rules_first_classification: bool = Field(
+        default=True,
+        description="Settle in code, without the model, a watch-topic hit linked to holdings "
+        "only through the topic term (other, not relevant) and a headline that repeats an "
+        "already classified one with the same candidate holdings (it takes that label). "
+        "Measured on the stored wire: 598 of 598 and 87 of 87 matched the model.",
+    )
     classification_use_batch: bool = Field(
         default=True,
         description="Send a run's classification calls through the provider's batch API (half"
@@ -522,6 +882,13 @@ class NewsSettings(ConfigModel):
         description="The model that web-searches for recent news on thinly covered holdings.",
     )
     search_lead_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    ai_search_provider: Literal["model", "brave"] = Field(
+        default="model",
+        description="Who finds the leads: 'model' (the search model's built-in web search) or "
+        "'brave' (a plain search API for the links, at a fraction of the fee; needs "
+        "BRAVE_API_KEY, and the model then only drops pages that are not about the company). "
+        "Switch only after the lead-recall check against the model path.",
+    )
     ai_search_max_searches: int = Field(
         default=3, ge=1, le=20, description="Web searches per holding per run."
     )
@@ -642,6 +1009,18 @@ class NewsSettings(ConfigModel):
         default=False,
         description="Send extraction through the provider's batch endpoint (half price, but a "
         "run waits up to an hour for the results).",
+    )
+    batch_analysis: bool = Field(
+        default=False,
+        description="Send the model stages of the analysis (impact notes, framing, sentiment, "
+        "thesis link) of stories below severity 3 through the provider's batch endpoint (half "
+        "price, a run waits up to an hour). Severe stories are analysed directly, at once.",
+    )
+    reuse_repeat_analysis: bool = Field(
+        default=False,
+        description="A story the novelty step marks as a repeat of an earlier one with the same "
+        "holding takes that story's framing, sentiment and impact notes instead of asking the "
+        "model again. Severe stories are always analysed afresh.",
     )
     sector_benchmarks: dict[str, str] = Field(
         default_factory=lambda: {},
@@ -1537,6 +1916,15 @@ class ChatSettings(ConfigModel):
 
     model: ModelId = "gpt-6.1-sol"
     effort: Effort | None = Field(default=None, description=EFFORT_HELP)
+    escalation_model: ModelId | None = Field(
+        default=None,
+        description="Cascade (cost lever C6): when set, a question the model above could not "
+        "answer (no parseable answer, a refusal, the step cap, or an answer that says it has "
+        "too little evidence or cites nothing) is asked again on this stronger model. Leave "
+        "empty until the chat question set shows the cheaper model above holds quality; the "
+        "first attempt is still paid for.",
+    )
+    escalation_effort: Effort | None = Field(default=None, description=EFFORT_HELP)
     rules_first: bool = Field(
         default=True,
         description="Answer a short, closed question about the portfolio's value or cash from "
@@ -1546,6 +1934,23 @@ class ChatSettings(ConfigModel):
         default=30, ge=1, le=100, description="Model calls plus tool rounds per answer."
     )
     max_searches: int = Field(default=15, ge=0, le=50, description="Web searches per answer.")
+    search_via_api: bool = Field(
+        default=False,
+        description="Cost lever H2: search the news through a plain search API (needs "
+        "BRAVE_API_KEY) instead of the model provider's built-in search, and keep identical "
+        "searches for a few days. The model gets titles and snippets only, from the outlet "
+        "tiers allowed above. Falls back to the provider's search when no key is set.",
+    )
+    search_cache_days: int = Field(
+        default=3, ge=0, le=14, description="Days an identical API search is answered from memory."
+    )
+    cache_retention: Literal["off", "24h"] = Field(
+        default="off",
+        description="Cost lever H1: ask OpenAI to keep the chat prompt prefix cached for 24 "
+        "hours instead of minutes, so the second question of the day reads the system prompt "
+        "and tool list at the cached rate. Unverified for every model; leave off until a "
+        "test call is accepted and the bill shows no cache-write charge that outweighs it.",
+    )
     history_messages: int = Field(
         default=100, ge=2, le=500, description="Earlier messages of the conversation sent along."
     )
@@ -2249,6 +2654,33 @@ class JobsConfig(ConfigModel):
         "SEC XBRL filing (reported basis). Your own exposure entries are never changed. "
         "Default: Tuesdays 05:50.",
     )
+    document_index: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="20 3 * * *"),
+        description="Splits new filings, reports, theses, notes and news into passages and "
+        "embeds them for document search. Default: daily 03:20.",
+    )
+    autopilot: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="20 */6 * * *"),
+        description="The autopilot: settles the review queues (held facts, graph edges, "
+        "disclosure reviews, ...) with rules and models, logs every decision and escalates "
+        "what it cannot settle. Default: every six hours at :20.",
+    )
+    watchdog: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="10 * * * *"),
+        description="The ops watchdog: retries failed collectors, re-runs the refresh behind a "
+        "data-quality issue, lifts old provider blocks, and tells you which API key is missing "
+        "or when the AI budget will run out. Default: hourly at :10.",
+    )
+    autopilot_calibration: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="40 7 * * 0"),
+        description="Compares the autopilot's decisions with the owner's calls and a stronger "
+        "model's audit, then promotes or demotes each kind. Default: Sundays 07:40.",
+    )
+    inbox_scan: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="10 * * * *"),
+        description="Looks for new escalation notes and thesis-breach alerts and queues an "
+        "agent run for each, which leaves an inbox item. Default: hourly at :10.",
+    )
     factor_returns: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="30 5 * * 1"),
         description="Downloads the Ken French Data Library daily factor returns (market, size, "
@@ -2294,6 +2726,19 @@ class JobsConfig(ConfigModel):
     )
     earnings_check: EarningsCheckSettings = Field(default_factory=EarningsCheckSettings)
     exposure_build_settings: ExposureBuildSettings = Field(default_factory=ExposureBuildSettings)
+    document_index_settings: DocumentIndexSettings = Field(default_factory=DocumentIndexSettings)
+    inbox_settings: InboxSettings = Field(default_factory=InboxSettings)
+    autopilot_settings: AutopilotSettings = Field(default_factory=AutopilotSettings)
+    thesis_settings: ThesisSettings = Field(default_factory=ThesisSettings)
+    ops_settings: OpsSettings = Field(default_factory=OpsSettings)
+    training_capture: TrainingCaptureSettings = Field(default_factory=TrainingCaptureSettings)
+    fund_documents: list[FundDocument] = Field(
+        default_factory=list,
+        max_length=60,
+        description="Fund documents to read for facts the issuer readers do not cover (any "
+        "issuer except iShares and WisdomTree). The daily fund facts job reads the new or "
+        "changed ones; every fact must quote the document word for word.",
+    )
     ir_discovery_settings: IrDiscoverySettings = Field(default_factory=IrDiscoverySettings)
     gap_research_settings: GapResearchSettings = Field(default_factory=GapResearchSettings)
     ai_approval: AiApprovalSettings = Field(default_factory=AiApprovalSettings)
@@ -2368,6 +2813,11 @@ class JobsConfig(ConfigModel):
             "news_brief": self.news_brief,
             "gap_research": self.gap_research,
             "exposure_build": self.exposure_build,
+            "document_index": self.document_index,
+            "inbox_scan": self.inbox_scan,
+            "autopilot": self.autopilot,
+            "autopilot_calibration": self.autopilot_calibration,
+            "watchdog": self.watchdog,
             "factor_returns": self.factor_returns,
             "disclosure_sources": self.disclosure_sources,
             "disclosure_ingest": self.disclosure_ingest,

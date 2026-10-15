@@ -95,15 +95,18 @@ def current(rows: list[DefectRow], weights: dict[str, float]) -> list[Defect]:
 _COLUMNS = "id, parent_id, title, detail, ticker, feature, state, created_at"
 
 
-async def report(pool: asyncpg.Pool, owner_id: str, body: DefectIn) -> None:
-    await pool.execute(
-        "insert into public.pilot_defect (owner_id, title, detail, ticker, feature)"
-        " values ($1,$2,$3,$4,$5)",
-        owner_id,
-        body.title.strip(),
-        body.detail,
-        body.ticker.strip().upper() if body.ticker else None,
-        body.feature,
+async def report(pool: asyncpg.Pool, owner_id: str, body: DefectIn) -> int:
+    """Open a defect; its id."""
+    return int(
+        await pool.fetchval(
+            "insert into public.pilot_defect (owner_id, title, detail, ticker, feature)"
+            " values ($1,$2,$3,$4,$5) returning id",
+            owner_id,
+            body.title.strip(),
+            body.detail,
+            body.ticker.strip().upper() if body.ticker else None,
+            body.feature,
+        )
     )
 
 

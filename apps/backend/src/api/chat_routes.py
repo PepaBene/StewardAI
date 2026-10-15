@@ -14,9 +14,13 @@ from pydantic import BaseModel, Field
 
 from api.auth import Owner
 from api.db import IdPath, Pool
+from steward.actions import registry
 from steward.chat.assistant import ChatAnswer
+from steward.chat.tools import CHANGE_KINDS
+from steward.engine import overrides
 from steward.jobs import queue
 from steward.jobs.runner import create_job
+from steward.training import labels
 
 router = APIRouter(tags=["chat"])
 
@@ -48,7 +52,7 @@ class MessageOut(BaseModel):
 class ActionOut(BaseModel):
     id: int
     message_id: int | None
-    kind: Literal["earnings_check", "research", "portfolio_sync"]
+    kind: str = Field(description="A job to start, or an owner action (dismiss_notice, ...).")
     params: dict[str, Any]
     reason: str | None
     status: Literal["proposed", "confirmed", "cancelled"]
@@ -67,8 +71,18 @@ class NewConversation(BaseModel):
     title: str | None = Field(default=None, max_length=200)
 
 
+class PageContext(BaseModel):
+    """What the owner is looking at when they ask; it only helps the chat resolve "this"."""
+
+    path: str = Field(max_length=200, description="The app page, e.g. /autopilot.")
+    selection: str | None = Field(
+        default=None, max_length=100, description="The item picked on the page, e.g. decision 12."
+    )
+
+
 class NewMessage(BaseModel):
     content: str = Field(min_length=1, max_length=100_000)
+    page: PageContext | None = None
 
 
 class PostedMessage(BaseModel):
@@ -168,7 +182,11 @@ async def post_message(
             "chat",
             "chat",
             requested_by=owner.user_id,
-            params={"conversation_id": conversation_id, "message_id": row["id"]},
+            params={
+                "conversation_id": conversation_id,
+                "message_id": row["id"],
+                **({"page": body.page.model_dump()} if body.page else {}),
+            },
         )
         await conn.execute(
             "update public.chat_message set job_id = $2 where id = $1", row["id"], job_id
@@ -194,10 +212,21 @@ async def confirm_action(action_id: IdPath, pool: Pool, owner: Owner) -> ActionO
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"No action {action_id}")
         if row["status"] != "proposed":
             raise HTTPException(status.HTTP_409_CONFLICT, f"Action {action_id} is {row['status']}")
-        job_type = ACTION_JOB_TYPES[row["kind"]]
         params = json.loads(row["params"])
-        job_id = await create_job(conn, job_type, "chat", requested_by=owner.user_id, params=params)
-        await queue.enqueue(conn, job_id, job_type)
+        job_id: int | None = None
+        if row["kind"] in CHANGE_KINDS:
+            # A change to what the engine did runs now, through the same registry the screens
+            # use; the card's button is the owner's confirmation.
+            try:
+                await registry.confirm(pool, int(params["owner_action_id"]), second=True)
+            except (registry.ActionError, KeyError) as exc:
+                raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+        else:
+            job_type = ACTION_JOB_TYPES[row["kind"]]
+            job_id = await create_job(
+                conn, job_type, "chat", requested_by=owner.user_id, params=params
+            )
+            await queue.enqueue(conn, job_id, job_type)
         updated = await conn.fetchrow(
             "update public.chat_action set status = 'confirmed', job_id = $2, decided_at = now(),"
             " decided_by = $3::uuid where id = $1 returning id, message_id, kind, params, reason,"
@@ -206,11 +235,23 @@ async def confirm_action(action_id: IdPath, pool: Pool, owner: Owner) -> ActionO
             job_id,
             owner.user_id,
         )
+    # Confirming what the assistant proposed is the owner agreeing with that answer.
+    await labels.record(
+        pool,
+        source="owner_accept",
+        subject_kind="chat_action",
+        subject_ref=str(action_id),
+        label="right",
+        by_owner=True,
+        detail={"kind": row["kind"]},
+    )
     return _action(updated)
 
 
 @router.post("/chat/actions/{action_id}/cancel")
-async def cancel_action(action_id: IdPath, pool: Pool, owner: Owner) -> ActionOut:
+async def cancel_action(
+    action_id: IdPath, pool: Pool, owner: Owner, reason_code: overrides.Reason | None = None
+) -> ActionOut:
     row = await pool.fetchrow(
         "update public.chat_action set status = 'cancelled', decided_at = now(), decided_by ="
         " $2::uuid where id = $1 and status = 'proposed' returning id, message_id, kind, params,"
@@ -225,4 +266,28 @@ async def cancel_action(action_id: IdPath, pool: Pool, owner: Owner) -> ActionOu
         if current is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"No action {action_id}")
         raise HTTPException(status.HTTP_409_CONFLICT, f"Action {action_id} is {current}")
+    if row["kind"] in CHANGE_KINDS:
+        params = json.loads(row["params"])
+        await registry.cancel(pool, int(params.get("owner_action_id", 0)), reason_code)
+    else:
+        await overrides.record(
+            pool,
+            area="chat",
+            subject_kind="chat_action",
+            subject_ref=f"{row['kind']}:{action_id}",
+            action="rejected",
+            via="chat",
+            reason_code=reason_code,
+            decided_by="chat",
+        )
+    # Cancelling a proposal is the owner disagreeing with that answer.
+    await labels.record(
+        pool,
+        source="owner_review",
+        subject_kind="chat_action",
+        subject_ref=str(action_id),
+        label="wrong",
+        by_owner=True,
+        detail={"kind": row["kind"], **({"reason": reason_code} if reason_code else {})},
+    )
     return _action(row)

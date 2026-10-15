@@ -17,11 +17,14 @@ from typing import Any
 import asyncpg
 import httpx
 
-from steward.chat import analytics_tools, data_tools, research_tools
+from steward.chat import analytics_tools, data_tools, legacy_envelope, research_tools
 from steward.chat.analytics_tools import SELECTOR_KINDS
 from steward.chat.data_tool_defs import DATA_TOOL_DEFINITIONS
-from steward.chat.envelope import neutralise_tree, stamp
+from steward.chat.envelope import clamp_limit, neutralise_tree, stamp
 from steward.chat.research_tools import EVIDENCE_SECTIONS, RISK_KINDS
+from steward.chat.visuals import KINDS as VISUAL_KINDS
+from steward.chat.visuals import Block
+from steward.chat.visuals import build as build_visual
 from steward.config.research import ResearchProfilesConfig
 from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
@@ -33,12 +36,42 @@ from steward.data_context.research import (
     country_context,
 )
 from steward.earnings.read import holding_detail
+from steward.engine import overrides
 from steward.news.embeddings import Embedder, EmbeddingError, GeminiEmbedder, cosine
 from steward.news.read_analysis import like_pattern
 from steward.portfolio.read import portfolio_overview
-from steward.research.sources import Registry
+from steward.research.sources import Registry, SourceKind
+from steward.retrieval import search as retrieval_search
+from steward.retrieval.search import Filters
 
-ACTION_KINDS = ("earnings_check", "research", "portfolio_sync")
+JOB_KINDS = ("earnings_check", "research", "portfolio_sync")
+# The owner actions of `steward.actions.registry` that chat may propose; a test holds this list
+# equal to the registry. None of them places or prepares a trade.
+CHANGE_KINDS = (
+    "dismiss_notice",
+    "snooze_notice",
+    "mark_fact",
+    "resolve_story",
+    "close_story",
+    "revert_decision",
+    "accept_recommendation",
+    "review_decision",
+    "set_autopilot_mode",
+    "rollback_config",
+    "roll_back_change",
+    "apply_change",
+    "teach",
+    "retract_teaching",
+)
+ACTION_KINDS = (*JOB_KINDS, *CHANGE_KINDS)
+DOCUMENT_KINDS = ("filing", "report", "thesis", "note", "news", "disclosure", "agent_note")
+DOCUMENT_SOURCE_KIND: dict[str, SourceKind] = {
+    "filing": "observation",
+    "note": "observation",
+    "report": "report",
+    "thesis": "thesis",
+    "news": "news_item",
+}
 REPORT_PATHS = {
     "research": "/research/{}",
     "review": "/reviews/{}",
@@ -126,6 +159,37 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "input_schema": {
             "type": "object",
             "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "search_documents",
+        "description": "Passage search over the prose the app holds: archived filings and "
+        "results releases, the owner's reports, theses and notes, and news. Combines keyword "
+        "and meaning-based matching, so it finds a passage that uses different words from the "
+        "question. Each hit is a short passage with its section, date, source URL or app page "
+        "and a registry id to cite; the top hits also carry the surrounding section. Use it "
+        "for 'what does the 10-K say about X', 'what did I write about Y' and 'what do the "
+        "documents say about Z'. Figures belong to the data tools: read them there, not from "
+        "a passage. It reads only what has been indexed, so say when nothing matches.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "What to find, in plain words."},
+                "ticker": {"type": "string", "description": "Optional, e.g. AAPL_US_EQ."},
+                "kinds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": list(DOCUMENT_KINDS),
+                    },
+                    "description": "Optional: limit to these kinds of document.",
+                },
+                "since": {"type": "string", "description": "Optional ISO date, earliest."},
+                "until": {"type": "string", "description": "Optional ISO date, latest."},
+                "limit": {"type": "integer", "description": "Passages, 1-20 (default 8)."},
+            },
             "required": ["query"],
             "additionalProperties": False,
         },
@@ -379,6 +443,62 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "agent_notes",
+        "description": "The owner's own working notes for the assistant: standing instructions "
+        "and context about a holding or about how to read events (for example 'Nexperia "
+        "matters to this holding because of its chip supply'). Read them before judging an "
+        "event; they are the owner's words, not findings, so say when you lean on one. "
+        "Optional ticker adds that holding's notes to the general ones.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"ticker": {"type": "string", "description": "e.g. TSM_US_EQ"}},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "thesis_memos",
+        "description": "The detailed theses the app wrote for the owner: each has a stance "
+        "(keep, add, trim, exit for a holding; buy or pass for a stock considered), an "
+        "executive summary and, with full=true for one ticker, the whole memo (business, "
+        "financials, valuation and scenarios, fit with the strategy, risks and pre-mortem, KPIs, "
+        "catalysts, next steps) with the KPIs, exit conditions and targets. Use it for 'why do I "
+        "own X', 'what does my thesis for X say', 'should I sell X' and 'what was the case for "
+        "buying X'. Newest first; say when none exists and offer to start one.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string", "description": "e.g. TSM_US_EQ"},
+                "full": {"type": "boolean", "description": "Include the whole memo (one ticker)."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "portfolio_review",
+        "description": "The latest portfolio review the owner asked for: holdings to trim or "
+        "exit with the reasons, strategy gaps, and the stocks researched as buys or passes with "
+        "expected return and upside against loss. Read-only; say when no review exists.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "event_feed",
+        "description": "Recent classified news stories about companies that reach the "
+        "portfolio along supply-chain links, most serious first: headline, outlet, whether it "
+        "is confirmed, reported or a rumour, the direction, the share of the portfolio "
+        "reached and whether it would meet the high-severity alert rule. Use for 'what has "
+        "happened lately that touches my holdings'. Optional ticker narrows it. Lists only; "
+        "stories are auto-classified, so say so.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "days": {"type": "integer", "description": "Look-back days, 1-90 (default 14)."},
+                "ticker": {"type": "string", "description": "e.g. TSM or TSM_US_EQ"},
+                "limit": {"type": "integer", "description": "Items, 1-25 (default 10)."},
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "event_paths",
         "description": "Where an event at one company (a supplier outage, a lost customer) "
         "reaches the portfolio along supply-chain links you or filings recorded, with each "
@@ -474,10 +594,11 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "name": "valuation_scenarios",
-        "description": "The app's scenario DCF for one covered company under default "
-        "assumptions built from its own filed growth: value per share per scenario, the range, "
-        "the price, the discount-rate build and the filed inputs. The assumptions are "
-        "placeholders, not forecasts; there is no single target value.",
+        "description": "The app's scenario DCF for one covered company: value per share per "
+        "scenario, the range, the price, the discount-rate build and the filed inputs. Uses the "
+        "owner's newest saved scenario set when one exists (assumptions_basis owner_saved), "
+        "otherwise default placeholders built from its own filed growth (say they are not "
+        "forecasts). There is no single target value.",
         "input_schema": {
             "type": "object",
             "properties": {"ticker": {"type": "string"}},
@@ -579,16 +700,72 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
     *DATA_TOOL_DEFINITIONS,
     {
+        "name": "show_visual",
+        "description": "Show the owner a chart in the chat, drawn by the app from stored "
+        f"records: {', '.join(VISUAL_KINDS)}. You only choose which; you never supply the "
+        "numbers. Say in a sentence what it shows, citing the returned source id.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"kind": {"type": "string", "enum": list(VISUAL_KINDS)}},
+            "required": ["kind"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "engine_activity",
+        "description": "What the automatic engine needs from the owner and what it did: the "
+        "notices and escalations waiting in Needs you, each with the id and the propose_job "
+        "kind that settles it, and the latest automatic decisions with counts per kind. Use "
+        "it before proposing a change, and to answer 'what needs me' or 'what did the app "
+        "do this week'.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"limit": {"type": "integer", "description": "Items per list."}},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "explain_decision",
+        "description": "Why the engine did something: one automatic decision with what it "
+        "decided, who or what decided it, its confidence, the evidence it used, whether the "
+        "owner reviewed or overruled it, and how to undo it or teach the engine. Use it for "
+        "'why did you do that?'. Find the decision id with engine_activity or from the page "
+        "the owner is viewing.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"decision_id": {"type": "integer"}},
+            "required": ["decision_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "propose_job",
-        "description": "Propose starting a job: re-run a holding's earnings check, start a "
-        "research report, or run the portfolio sync. Nothing starts until the owner "
-        "confirms it in the chat; say that you proposed it.",
+        "description": "Propose a job (re-run a holding's earnings check, start a research "
+        "report, run the portfolio sync) or a change to what the engine did (dismiss a "
+        "notice, undo an automatic decision, accept its recommendation, mark a decision "
+        "right or wrong, set an autopilot kind off/shadow/auto, put a setting back, give "
+        "the engine a standing instruction with teach, forget one with retract_teaching). "
+        "Find the ids with engine_activity. Nothing happens until the owner confirms it in "
+        "the chat; say what you proposed. This never places or prepares a trade.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "kind": {"type": "string", "enum": list(ACTION_KINDS)},
                 "ticker": {"type": "string"},
                 "profile": {"type": "string", "description": "Research profile id."},
+                "args": {
+                    "type": "object",
+                    "description": "For a change: task_id (dismiss_notice), task_id and days "
+                    "(snooze_notice), fact_id and rating wrong|irrelevant|useful (mark_fact), "
+                    "story_id with resolution confirmed|false (resolve_story) or closed "
+                    "(close_story), decision_id "
+                    "(the others), verdict ok|wrong (review_decision), kind and mode "
+                    "(set_autopilot_mode), domain and version_id (rollback_config), "
+                    "change_id (roll_back_change, apply_change), area "
+                    "theses|chat|digest|news or autopilot:<kind> (every one is tested before "
+                    "it applies) and text "
+                    "(teach), ref (retract_teaching).",
+                },
                 "reason": {"type": "string"},
             },
             "required": ["kind", "reason"],
@@ -641,6 +818,7 @@ class ChatTools:
         embedder: Embedder | None = None,
         *,
         owner_id: str | None = None,
+        doc_embedder: Embedder | None = None,
     ) -> None:
         # Outside chat (the research run) there is no conversation: `conversation_id` is None,
         # and owner-scoped tools use `owner_id` if given, else report that they have no owner.
@@ -650,8 +828,15 @@ class ChatTools:
         self.message_id = message_id
         self.owner_id = owner_id
         self.embedder = embedder
+        # Embeds document-search queries; must be the model the passages were embedded with.
+        self.doc_embedder = doc_embedder
         self.used: list[str] = []
         self.actions: list[int] = []
+        self.page = ""  # what the owner is looking at, set by the chat job
+        # A test of a prompt addition sets the owner-correction text itself (engine/replay.py).
+        self.corrections_override: str | None = None
+        # Charts the model asked to show; the panel draws them from these blocks.
+        self.visuals: list[Block] = []
         # One entry per call, for the job's step detail: what was asked, how long it took,
         # whether it returned data or an error, and how many citable records it added.
         self.trace: list[dict[str, Any]] = []
@@ -660,7 +845,7 @@ class ChatTools:
         self.used.append(name)
         started = time.monotonic()
         known = len(self.registry.sources)
-        result = await self._dispatch(name, args)
+        result = legacy_envelope.wrap(name, await self._dispatch(name, args), self.registry)
         self.trace.append(
             {
                 "tool": name,
@@ -706,7 +891,9 @@ class ChatTools:
         return await research_tools.fundamentals(self.pool, self.registry, ticker, groups, periods)
 
     async def _tool_valuation_scenarios(self, ticker: str) -> dict[str, Any]:
-        return await research_tools.valuation_scenarios(self.pool, self.registry, ticker)
+        return await research_tools.valuation_scenarios(
+            self.pool, self.registry, ticker, await self._owner()
+        )
 
     async def _tool_price_history(
         self, ticker: str, days: int = 365, benchmark: str | None = None
@@ -881,6 +1068,112 @@ class ChatTools:
             return {"error": "this conversation has no owner"}
         return await analytics_tools.event_reach(
             self.pool, self.registry, owner, symbol, direction, state
+        )
+
+    async def _tool_agent_notes(self, ticker: str | None = None) -> dict[str, Any]:
+        rows = await self.pool.fetch(
+            "select id, ticker, text, updated_at from public.agent_note where active"
+            " and (ticker is null or ticker = $1) order by ticker nulls first, id limit 20",
+            ticker,
+        )
+        notes = []
+        for r in rows:
+            sid = self.registry.add(
+                "observation",
+                f"agent_note:{r['id']}",
+                f"Owner note{' on ' + r['ticker'] if r['ticker'] else ''}",
+                app_path="/agent-notes",
+                tier=1,
+                snippet=r["text"],
+                as_of=str(r["updated_at"].date()),
+            )
+            notes.append(
+                {"source_id": sid, "ticker": r["ticker"], "note": r["text"], "author": "owner"}
+            )
+        return {
+            "tool": "agent_notes",
+            "notes": notes,
+            "note": None if notes else "The owner has written no notes for this scope.",
+        }
+
+    async def _tool_thesis_memos(
+        self, ticker: str | None = None, full: bool = False
+    ) -> dict[str, Any]:
+        rows = await self.pool.fetch(
+            "select id, ticker, mode, stance, status, executive_summary, body, created_at"
+            " from public.thesis_memo where ($1::text is null or ticker = $1)"
+            " order by id desc limit $2",
+            ticker,
+            3 if (full and ticker) else 8,
+        )
+        memos: list[dict[str, Any]] = []
+        for r in rows:
+            body = json.loads(r["body"]) if isinstance(r["body"], str) else r["body"]
+            sid = self.registry.add(
+                "thesis",
+                f"thesis_memo:{r['id']}",
+                f"Thesis memo for {r['ticker']} ({r['stance']})",
+                app_path=f"/thesis/memos/{r['id']}",
+                tier=1,
+                snippet=r["executive_summary"],
+                as_of=str(r["created_at"].date()),
+            )
+            item: dict[str, Any] = {
+                "source_id": sid,
+                "ticker": r["ticker"],
+                "mode": r["mode"],
+                "stance": r["stance"],
+                "status": r["status"],
+                "written": str(r["created_at"].date()),
+                "executive_summary": r["executive_summary"],
+                "stance_reason": body.get("stance_reason"),
+            }
+            if full and ticker:
+                item["memo"] = body.get("memo")
+                item["thesis"] = body.get("thesis")
+            memos.append(item)
+        return {
+            "tool": "thesis_memos",
+            "memos": memos,
+            "note": None if memos else "No thesis memo has been written for this scope.",
+        }
+
+    async def _tool_portfolio_review(self) -> dict[str, Any]:
+        row = await self.pool.fetchrow(
+            "select id, status, summary, body, created_at from public.portfolio_review"
+            " order by id desc limit 1"
+        )
+        if row is None:
+            return {"tool": "portfolio_review", "note": "No portfolio review has been run."}
+        body = json.loads(row["body"]) if isinstance(row["body"], str) else row["body"]
+        sid = self.registry.add(
+            "observation",
+            f"portfolio_review:{row['id']}",
+            "Portfolio review",
+            app_path=f"/thesis/reviews/{row['id']}",
+            tier=1,
+            snippet=row["summary"],
+            as_of=str(row["created_at"].date()),
+        )
+        return {
+            "tool": "portfolio_review",
+            "source_id": sid,
+            "status": row["status"],
+            "summary": row["summary"],
+            "holdings": body.get("holdings"),
+            "gaps": body.get("gaps"),
+            "buys": body.get("buys"),
+            "passes": body.get("passes"),
+        }
+
+    async def _tool_event_feed(
+        self, days: int = 14, ticker: str | None = None, limit: int = 10
+    ) -> dict[str, Any]:
+        owner = await self._owner()
+        if owner is None:
+            return {"error": "this conversation has no owner"}
+        return await analytics_tools.event_feed(
+            self.pool, self.registry, owner, days, ticker, limit
         )
 
     async def _tool_fund_overlap(self, ticker: str) -> dict[str, Any]:
@@ -1185,6 +1478,70 @@ class ChatTools:
             )
         return out
 
+    async def _tool_search_documents(
+        self,
+        query: str,
+        ticker: str | None = None,
+        kinds: list[str] | None = None,
+        since: str | None = None,
+        until: str | None = None,
+        limit: int = 8,
+    ) -> dict[str, Any]:
+        if not isinstance(query, str) or not query.strip():
+            return {"error": "give a query"}
+        bad = [k for k in kinds or [] if k not in DOCUMENT_KINDS]
+        if bad:
+            return {"error": f"kinds must be among {', '.join(DOCUMENT_KINDS)}"}
+        filters = Filters(
+            tickers=(ticker.strip(),) if ticker and ticker.strip() else (),
+            kinds=tuple(kinds or ()),
+            since=dt.date.fromisoformat(since) if since else None,
+            until=dt.date.fromisoformat(until) if until else None,
+        )
+        found = await retrieval_search.search(
+            self.pool,
+            self.doc_embedder or self.embedder,
+            query.strip(),
+            filters=filters,
+            limit=limit,
+        )
+        hits = []
+        for rank, h in enumerate(found.hits):
+            sid = self.registry.add(
+                DOCUMENT_SOURCE_KIND[h.kind],
+                f"chunk:{h.chunk_id}",
+                f"{h.title}"
+                + (f" - {h.section_path}" if h.section_path not in (None, h.title) else ""),
+                url=h.source_url,
+                app_path=h.app_path,
+                tier=h.tier,
+                snippet=h.text[:1500],
+                as_of=str(h.as_of) if h.as_of else None,
+            )
+            hits.append(
+                {
+                    "source_id": sid,
+                    "kind": h.kind,
+                    "title": h.title,
+                    "section": h.section_path,
+                    "date": str(h.as_of) if h.as_of else None,
+                    "tickers": list(h.tickers),
+                    "passage": h.text[:1500],
+                    **({"section_context": h.context[:1200]} if rank < 3 and h.context else {}),
+                    "matched_by": [
+                        n
+                        for n, r in (("keywords", h.keyword_rank), ("meaning", h.vector_rank))
+                        if r is not None
+                    ],
+                }
+            )
+        out: dict[str, Any] = {"passages": hits}
+        if not hits:
+            out["note"] = "no indexed passage matches; the documents may not be indexed yet"
+        if found.notes:
+            out["notes"] = found.notes
+        return out
+
     async def _tool_get_story_thread(self, story_id: int) -> dict[str, Any]:
         from steward.news.read_analysis import thread_detail
 
@@ -1310,16 +1667,196 @@ class ChatTools:
         context = await company_context(self.pool, ticker, cutoff)
         return self._register_context(context, f"/holdings/{ticker}")
 
+    async def _tool_show_visual(self, kind: str) -> dict[str, Any]:
+        if kind not in VISUAL_KINDS:
+            return {"error": f"kind must be one of {', '.join(VISUAL_KINDS)}"}
+        block = await build_visual(self.pool, kind, dt.datetime.now(dt.UTC))
+        if block.chart == "none":
+            return {"tool": "show_visual", "shown": False, "reason": block.summary}
+        sid = self.registry.add(
+            "observation",
+            f"visual:{kind}",
+            block.title,
+            app_path="/",
+            tier=1,
+            snippet=block.summary,
+            as_of=block.as_of,
+        )
+        self.visuals.append(block)
+        return {
+            "tool": "show_visual",
+            "shown": True,
+            "source_id": sid,
+            "title": block.title,
+            "summary": block.summary,
+            "as_of": block.as_of,
+        }
+
+    async def _tool_engine_activity(self, limit: int = 15) -> dict[str, Any]:
+        from steward.autopilot import ledger
+        from steward.ops import tasks as ops_tasks
+
+        cap = clamp_limit(limit, default=15, maximum=30)
+        notices = []
+        for t in (await ops_tasks.needs_owner(self.pool))[:cap]:
+            sid = self.registry.add(
+                "observation",
+                f"ops_task:{t.id}",
+                t.title,
+                app_path=t.href or "/autopilot",
+                tier=1,
+                snippet=t.detail,
+                as_of=str(t.last_seen.date()),
+            )
+            notices.append(
+                {
+                    "source_id": sid,
+                    "task_id": t.id,
+                    "title": t.title,
+                    "detail": t.detail,
+                    "settle_with": {"kind": "dismiss_notice", "args": {"task_id": t.id}},
+                }
+            )
+        waiting = []
+        for d in (await ledger.escalations(self.pool, cap))[:cap]:
+            sid = self.registry.add(
+                "observation",
+                f"auto_decision:{d.id}",
+                f"{d.kind}: {d.summary[:80]}",
+                app_path="/autopilot",
+                tier=1,
+                snippet=d.summary,
+                as_of=str(d.decided_at.date()),
+            )
+            waiting.append(
+                {
+                    "source_id": sid,
+                    "decision_id": d.id,
+                    "autopilot_kind": d.kind,
+                    "recommendation": d.decision,
+                    "confidence": d.confidence,
+                    "summary": d.summary,
+                    "settle_with": {
+                        "kind": "accept_recommendation",
+                        "args": {"decision_id": d.id},
+                    },
+                }
+            )
+        from steward.engine import timeline
+
+        now = dt.datetime.now(dt.UTC)
+        done = await timeline.recent(
+            self.pool, timeline.Query(now - dt.timedelta(days=7), limit=cap)
+        )
+        week = await ledger.stats(self.pool, now - dt.timedelta(days=7))
+        return {
+            "tool": "engine_activity",
+            "what_the_engine_did": [
+                {
+                    "when": e.at.isoformat(timespec="minutes"),
+                    "by": e.source,
+                    "kind": e.kind,
+                    "summary": e.summary,
+                    "status": e.status,
+                    "undo_with": (
+                        {"kind": e.undo_action, "args": e.undo_args} if e.undo_action else None
+                    ),
+                }
+                for e in done
+            ],
+            "notices": notices,
+            "standing_instructions": [
+                {"ref": s.ref, "area": s.area, "text": s.text}
+                for s in await overrides.standing_instructions(self.pool)
+            ],
+            "waiting_for_the_owner": waiting,
+            "last_7_days": [
+                {
+                    "autopilot_kind": s.kind,
+                    "decided": s.decided,
+                    "applied": s.applied,
+                    "undone_by_owner": s.reverted,
+                    "waiting": s.escalated,
+                }
+                for s in week
+            ],
+        }
+
+    async def _tool_explain_decision(self, decision_id: int) -> dict[str, Any]:
+        from steward.autopilot import ledger
+        from steward.autopilot.kinds import all_kinds
+
+        d = await ledger.get(self.pool, decision_id)
+        if d is None:
+            return {"error": f"no automatic decision {decision_id}"}
+        overruled = await self.pool.fetch(
+            "select action, reason_code, note, created_at from public.owner_override"
+            " where decision_id = $1 order by created_at",
+            decision_id,
+        )
+        sid = self.registry.add(
+            "observation",
+            f"auto_decision:{d.id}",
+            f"{d.kind}: {d.summary[:80]}",
+            app_path="/autopilot",
+            tier=1,
+            snippet=d.summary,
+            as_of=str(d.decided_at.date()),
+        )
+        kind = all_kinds().get(d.kind)
+        return {
+            "tool": "explain_decision",
+            "source_id": sid,
+            "autopilot_kind": d.kind,
+            "what": d.summary,
+            "decision": d.decision,
+            "decided_by": d.decided_by,
+            "confidence": d.confidence,
+            "status": d.status,
+            "decided_at": d.decided_at.isoformat(timespec="minutes"),
+            "evidence": json.dumps(d.evidence, default=str)[:1500],
+            "owner_review": d.review,
+            "owner_overrides": [
+                {"action": o["action"], "reason": o["reason_code"], "note": o["note"]}
+                for o in overruled
+            ],
+            "checked_before_applying": kind is not None and kind.verify is not None,
+            "undo_with": (
+                {"kind": "revert_decision", "args": {"decision_id": d.id}}
+                if d.status == "applied" and d.revert_payload is not None
+                else None
+            ),
+            "teach_with": {
+                "kind": "teach",
+                "args": {
+                    "area": "<theses|chat|digest|news|autopilot:KIND>",
+                    "text": "<the owner's rule>",
+                },
+            },
+        }
+
     async def _tool_propose_job(
         self,
         kind: str,
         reason: str,
         ticker: str | None = None,
         profile: str | None = None,
+        args: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if kind not in ACTION_KINDS:
             return {"error": f"kind must be one of {', '.join(ACTION_KINDS)}"}
         params: dict[str, Any] = {}
+        if kind in CHANGE_KINDS:
+            from steward.actions import registry
+
+            try:
+                proposal = await registry.propose(
+                    self.pool, kind, args or {}, via="chat", reason=reason[:500]
+                )
+            except registry.ActionError as exc:
+                return {"error": str(exc)}
+            params = {"owner_action_id": proposal.id, "args": proposal.args}
+            reason = f"{proposal.summary}. {reason}"[:500]
         if kind in ("earnings_check", "research"):
             if not ticker:
                 return {"error": f"{kind} needs a ticker"}

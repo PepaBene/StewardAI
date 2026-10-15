@@ -7,6 +7,7 @@ import { AlertMessage } from "@/components/alert-message";
 import { Absent, ResourceGate, SourceLink } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { usePageSelection } from "@/lib/chat/page-selection-store";
 import {
   fractionToPercent,
   gridMatrix,
@@ -339,6 +340,7 @@ export function ValuationView({ ticker }: { ticker: string }) {
   const [edited, setDrafts] = useState<Draft[] | null>(null);
   const drafts = edited ?? (defaults.kind === "ok" ? sortScenarios(defaults.data).map(toDraft) : null);
   const [selected, setSelected] = useState<string>("base");
+  usePageSelection(`scenario ${selected}`);
   const [result, setResult] = useState<Valuation | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [running, setRunning] = useState(false);

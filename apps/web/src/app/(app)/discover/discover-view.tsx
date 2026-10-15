@@ -11,6 +11,7 @@ import { BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { usePageSelection } from "@/lib/chat/page-selection-store";
 import {
   apiToTyped,
   buildFilters,
@@ -80,6 +81,7 @@ export function DiscoverView() {
   const [screens, setScreens] = useState<ScreenSummary[]>([]);
   const [columnSets, setColumnSets] = useState<ColumnSet[]>([]);
   const [activeScreen, setActiveScreen] = useState<number | null>(null);
+  usePageSelection(activeScreen !== null ? `screen ${activeScreen}` : null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 

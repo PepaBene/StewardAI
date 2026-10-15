@@ -13,8 +13,10 @@ from fastapi.routing import APIRoute
 from pydantic import BaseModel
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from api.action_routes import router as action_router
 from api.alert_trail_routes import router as alert_trail_router
 from api.auth import Owner
+from api.autopilot_routes import router as autopilot_router
 from api.budget_routes import router as budget_router
 from api.chat_routes import router as chat_router
 from api.company_routes import router as company_router
@@ -37,6 +39,7 @@ from api.fund_routes import router as fund_router
 from api.fundamentals_routes import router as fundamentals_router
 from api.gate_routes import router as gate_router
 from api.graph_routes import router as graph_router
+from api.inbox_routes import router as inbox_router
 from api.insider_activity_routes import router as insider_activity_router
 from api.insider_routes import router as insider_router
 from api.insight_routes import router as insight_router
@@ -58,10 +61,12 @@ from api.research_routes import router as research_router
 from api.routes import router
 from api.screen_routes import router as screen_router
 from api.source_routes import router as source_router
+from api.thesis_routes import router as thesis_router
 from api.valuation_routes import router as valuation_router
 from api.verify_routes import router as verify_router
 from api.watchlist_routes import router as watchlist_router
 from api.web_fact_routes import router as web_fact_router
+from api.webhook_routes import router as webhook_router
 from api.xray_routes import router as xray_router
 from steward import __version__
 from steward.config import StrategyConfig, ThesesConfig
@@ -259,12 +264,17 @@ def create_app() -> FastAPI:
     app.include_router(prompts_router)
     app.include_router(budget_router)
     app.include_router(research_router)  # before news: /reports/search vs /reports/{id}
+    app.include_router(thesis_router)
+    app.include_router(webhook_router)
     app.include_router(escalation_router)  # before news: /escalations/stats vs /{id}
     app.include_router(news_router)
     app.include_router(reference_router)
     app.include_router(web_fact_router)
     app.include_router(verify_router)
     app.include_router(chat_router)
+    app.include_router(inbox_router)
+    app.include_router(autopilot_router)
+    app.include_router(action_router)
     app.include_router(fundamentals_router)
     app.include_router(free_sources_router)
     app.include_router(watchlist_router)

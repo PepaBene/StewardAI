@@ -29,6 +29,10 @@ Surprise = Literal["none", "in_line", "above", "below", "unknown"]
 
 RECYCLED_AFTER_DAYS = 7
 
+# cluster_id -> ((embedding count, newest embedding id), centroid); bounded, oldest evicted first.
+_CENTROIDS: dict[int, tuple[tuple[int, int], list[float]]] = {}
+_CENTROIDS_MAX = 5000
+
 
 @dataclass(frozen=True)
 class NoveltyResult:
@@ -99,17 +103,45 @@ async def story_vectors(pool: asyncpg.Pool, cluster_ids: Sequence[int]) -> dict[
     """Each story's embedding centroid (stories with no embedded item are absent)."""
     if not cluster_ids:
         return {}
-    rows = await pool.fetch(
-        "select i.cluster_id, e.vector from public.news_embedding e"
+    ids = list(cluster_ids)
+    # A vector is ~3 KB, and the same stories are compared again on every item. Ask for a cheap
+    # signature (count, newest embedding) first and download vectors only for stories that changed.
+    sigs = await pool.fetch(
+        "select i.cluster_id, count(*) n, max(e.id) newest from public.news_embedding e"
         " join public.news_article a on a.id = e.article_id"
         " join public.news_item i on i.id = a.news_item_id"
-        " where i.cluster_id = any($1::bigint[])",
-        list(cluster_ids),
+        " where i.cluster_id = any($1::bigint[]) group by i.cluster_id",
+        ids,
     )
-    by: dict[int, list[list[float]]] = {}
-    for r in rows:
-        by.setdefault(r["cluster_id"], []).append(list(r["vector"]))
-    return {cid: centroid(vs) for cid, vs in by.items() if vs}
+    out: dict[int, list[float]] = {}
+    stale: list[int] = []
+    for r in sigs:
+        sig = (r["n"], r["newest"])
+        hit = _CENTROIDS.get(r["cluster_id"])
+        if hit is not None and hit[0] == sig:
+            out[r["cluster_id"]] = hit[1]
+        else:
+            stale.append(r["cluster_id"])
+    if stale:
+        rows = await pool.fetch(
+            "select i.cluster_id, e.vector from public.news_embedding e"
+            " join public.news_article a on a.id = e.article_id"
+            " join public.news_item i on i.id = a.news_item_id"
+            " where i.cluster_id = any($1::bigint[])",
+            stale,
+        )
+        by: dict[int, list[list[float]]] = {}
+        for r in rows:
+            by.setdefault(r["cluster_id"], []).append(list(r["vector"]))
+        sig_of = {r["cluster_id"]: (r["n"], r["newest"]) for r in sigs}
+        for cid, vs in by.items():
+            c = centroid(vs)
+            if len(_CENTROIDS) >= _CENTROIDS_MAX:
+                _CENTROIDS.pop(next(iter(_CENTROIDS)))
+            _CENTROIDS[cid] = (sig_of[cid], c)
+            if vs:
+                out[cid] = c
+    return out
 
 
 async def earlier_stories(

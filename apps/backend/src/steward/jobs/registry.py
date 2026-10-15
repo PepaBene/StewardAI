@@ -7,6 +7,7 @@ queue. Both look the handler up here.
 from typing import Literal
 
 from steward.approvals.ai import ai_approvals_handler
+from steward.autopilot.job import autopilot_calibration_handler, autopilot_handler
 from steward.changes.alerts import change_alerts_handler
 from steward.chat.assistant import chat_handler
 from steward.disclosure.jobs import (
@@ -34,6 +35,7 @@ from steward.fundamentals.ir_discovery import ir_discovery_handler
 from steward.fundresearch.issuer_sync import fund_issuer_facts_handler
 from steward.funds.drift import fund_characteristics_audit_handler
 from steward.graph.jobs import graph_review_handler
+from steward.inbox.run import inbox_agent_handler, inbox_scan_handler
 from steward.jobs.runner import JobHandler
 from steward.lookthrough.collect import etf_look_through_handler
 from steward.macro.collect import macro_collect_handler
@@ -45,6 +47,7 @@ from steward.news.digest import daily_digest_handler, weekly_digest_handler
 from steward.news.escalation import event_escalation_handler
 from steward.news.pipeline import news_ingest_handler
 from steward.news.triage import news_triage_handler
+from steward.ops.watchdog import watchdog_handler
 from steward.ownership.collect import ownership_13f_handler
 from steward.ownership.control_stakes import control_stakes_handler
 from steward.ownership.insider_collect import insider_trades_handler
@@ -60,6 +63,7 @@ from steward.reference.returns import returns_refresh_handler
 from steward.research.retention import research_trace_retention_handler
 from steward.research.run import research_handler
 from steward.research.web_facts import gap_research_handler
+from steward.retrieval.job import document_index_handler
 from steward.review.monthly import monthly_review_handler
 from steward.sources.audit import source_audit_handler
 from steward.sources.fund_probes import fund_probes_handler
@@ -71,6 +75,8 @@ from steward.sources.provider_jobs import (
     fmp_company_handler,
     twelve_data_corporate_actions_handler,
 )
+from steward.thesis.job import thesis_handler
+from steward.thesis.review import review_handler
 from steward.valuation.collect import valuation_refresh_handler
 from steward.verify_sources.jobs import (
     raw_retention_handler,
@@ -132,6 +138,8 @@ JobType = Literal[
     "edinet_filings",
     "twelve_data_corporate_actions",
     "ai_approvals",
+    "autopilot",
+    "autopilot_calibration",
     "ir_discovery",
     "news_ai_search",
     "news_triage",
@@ -139,6 +147,9 @@ JobType = Literal[
     "news_brief",
     "gap_research",
     "exposure_build",
+    "document_index",
+    "inbox_scan",
+    "inbox_agent",
     "factor_returns",
     "disclosure_sources",
     "disclosure_ingest",
@@ -147,6 +158,9 @@ JobType = Literal[
     "disclosure_esef",
     "disclosure_estimates",
     "disclosure_alerts",
+    "watchdog",
+    "thesis",
+    "portfolio_review",
 ]
 
 JOB_HANDLERS: dict[str, JobHandler] = {
@@ -202,6 +216,9 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "edinet_filings": edinet_filings_handler,
     "twelve_data_corporate_actions": twelve_data_corporate_actions_handler,
     "ai_approvals": ai_approvals_handler,
+    "autopilot": autopilot_handler,
+    "autopilot_calibration": autopilot_calibration_handler,
+    "watchdog": watchdog_handler,
     "ir_discovery": ir_discovery_handler,
     "news_ai_search": news_ai_search_handler,
     "news_triage": news_triage_handler,
@@ -209,6 +226,9 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "news_brief": news_brief_handler,
     "gap_research": gap_research_handler,
     "exposure_build": exposure_build_handler,
+    "document_index": document_index_handler,
+    "inbox_scan": inbox_scan_handler,
+    "inbox_agent": inbox_agent_handler,
     "factor_returns": factor_returns_handler,
     "disclosure_sources": disclosure_sources_handler,
     "disclosure_ingest": disclosure_ingest_handler,
@@ -217,4 +237,6 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "disclosure_esef": disclosure_esef_handler,
     "disclosure_estimates": disclosure_estimates_handler,
     "disclosure_alerts": disclosure_alerts_handler,
+    "thesis": thesis_handler,
+    "portfolio_review": review_handler,
 }

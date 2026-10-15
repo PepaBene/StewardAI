@@ -6,10 +6,12 @@ and returns no figure; the model is told to report that rather than estimate."""
 
 from __future__ import annotations
 
+import datetime as dt
 from typing import Any
 
 import asyncpg
 
+from steward.chat import envelope as env
 from steward.decision import service as decision_service
 from steward.decision.themes import METHOD as THEME_METHOD
 from steward.decision.themes import ThemeDefinition, ThemeSelector, theme_exposure
@@ -585,6 +587,67 @@ async def event_reach(
         ],
         "notes": impact.notes,
         "formula": impact.method,
+    }
+
+
+async def event_feed(
+    pool: asyncpg.Pool,
+    registry: Registry,
+    owner_id: str,
+    days: int,
+    ticker: str | None,
+    limit: int,
+) -> dict[str, Any]:
+    """Recent classified news about companies linked to the holdings along the supply chain,
+    most serious first. Lists what reached the book; sends nothing."""
+    days = max(1, min(int(days), 90))
+    limit = env.clamp_limit(limit, default=10, maximum=25)
+    today = dt.datetime.now(dt.UTC).date()
+    since = today - dt.timedelta(days=days)
+    chain, indicators = await events_feed.chain_and_indicators(pool, owner_id)
+    stories = await events_feed.load_stories(pool, since)
+    feed = events_feed.build(stories, chain, indicators, today, since)
+    wanted = ticker.split("_")[0].strip().upper() if ticker else None
+    items = [
+        i
+        for i in feed.items
+        if wanted is None or wanted in (i.story.ticker.split("_")[0].upper(), i.top.end.upper())
+    ]
+    shown = items[:limit]
+    sid = registry.add(
+        "observation",
+        f"event_feed:{since}:{wanted or 'all'}",
+        f"Event feed since {since}",
+        app_path="/xray/events",
+        tier=2,
+        snippet="; ".join(f"{i.story.ticker}: {i.story.headline[:80]}" for i in shown[:5])[:500],
+        as_of=str(today),
+    )
+    return {
+        "source_id": sid,
+        "since": str(since),
+        "stories_read": feed.stories_read,
+        "items": [
+            {
+                "headline": i.story.headline,
+                "url": i.story.url,
+                "outlet": i.story.outlet,
+                "published": i.story.published_at.date().isoformat(),
+                "event_type": i.story.event_type,
+                "company": i.story.ticker,
+                "state": i.state,
+                "direction": i.direction,
+                "reached_weight": env.datum(
+                    i.impact.reached_weight, unit="fraction", source_id=sid, as_of=today
+                ),
+                "would_alert": i.would_alert,
+                "top_path": f"{i.top.start} > {i.top.end}",
+                "confidence": i.top.confidence,
+            }
+            for i in shown
+        ],
+        "page": env.page(shown, limit, total=len(items)),
+        "note": feed.note,
     }
 
 

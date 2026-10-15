@@ -18,7 +18,7 @@ import httpx
 from steward import budget_guard
 from steward.costs import DEFAULT_PRICES
 from steward.jobs.runner import current_job, current_step, record_response
-from steward.llm import wire
+from steward.llm import capture, wire
 from steward.llm.types import (
     AINotConfigured,
     Citation,
@@ -42,6 +42,7 @@ OPENAI_FILES = "https://api.openai.com/v1/files"
 OPENAI_BATCHES = "https://api.openai.com/v1/batches"
 RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504}
 DEADLINE_MARGIN = 30.0
+FLEX_TIMEOUT = 600.0  # seconds per attempt: flex answers queue behind standard traffic
 # Search calls a batch request makes directly (Gemini batch mode does not ground) at once.
 DIRECT_SEARCH_CONCURRENCY = 4
 
@@ -77,11 +78,32 @@ class LLM:
         else:
             _log_unrecorded(done)
         await record_response(done.model, done.usage)
+        if ctx is not None:
+            await capture.record(ctx.pool, ctx.job_id, ctx.job_type, req, done)
         return done
 
     # ------------------------------------------------------------------ OpenAI, Google
 
     async def _openai(self, req: Request) -> Completion:
+        if req.priority == "flex":
+            # Flex is slower and can be refused when capacity is short: wait longer for it, and
+            # on a refusal or timeout ask again at the standard tier instead of failing the step.
+            try:
+                return await self._openai_once(dataclasses.replace(req, timeout=FLEX_TIMEOUT))
+            except LLMError:
+                # Any refusal (busy, or a model without the tier) is answered at standard.
+                pass
+            req = dataclasses.replace(req, priority="standard")
+        if req.cache_retention:
+            # A model that does not know the option answers with an error: repeat without it
+            # rather than fail the question.
+            try:
+                return await self._openai_once(req)
+            except LLMError:
+                req = dataclasses.replace(req, cache_retention=None)
+        return await self._openai_once(req)
+
+    async def _openai_once(self, req: Request) -> Completion:
         data = await self._post(
             "openai",
             OPENAI_URL,
@@ -217,6 +239,25 @@ class LLM:
     # ------------------------------------------------------------------ Batch
 
     async def complete_batch(
+        self,
+        requests: Sequence[Request],
+        *,
+        poll_seconds: float = 30.0,
+        wait_minutes: float = 60.0,
+    ) -> list[Completion | None]:
+        """The answers to `requests` as `_complete_batch` returns them, each also kept as
+        training data when the call is made inside a job."""
+        answers = await self._complete_batch(
+            requests, poll_seconds=poll_seconds, wait_minutes=wait_minutes
+        )
+        ctx = current_job.get()
+        if ctx is not None:
+            for req, done in zip(requests, answers, strict=True):
+                if done is not None:
+                    await capture.record(ctx.pool, ctx.job_id, ctx.job_type, req, done)
+        return answers
+
+    async def _complete_batch(
         self,
         requests: Sequence[Request],
         *,

@@ -46,6 +46,7 @@ export const CLUSTERS: readonly Cluster[] = [
       { href: "/review", label: "Review queue" },
       { href: "/relationships", label: "Relationship review" },
       { href: "/research", label: "Research" },
+      { href: "/thesis", label: "Thesis workup" },
       { href: "/screens", label: "Screens" },
       { href: "/discover", label: "Discover" },
       { href: "/funds/research", label: "Fund research" },
@@ -75,6 +76,9 @@ export const CLUSTERS: readonly Cluster[] = [
     description: "What needs my attention and what happened.",
     href: "/reports",
     pages: [
+      { href: "/autopilot", label: "Autopilot" },
+      { href: "/engine-ledger", label: "What the engine did" },
+      { href: "/inbox", label: "Inbox" },
       { href: "/escalations", label: "Escalations" },
       { href: "/reports", label: "Reports" },
       { href: "/reviews", label: "Reviews" },

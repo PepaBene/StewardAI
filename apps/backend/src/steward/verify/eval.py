@@ -55,6 +55,8 @@ class ClaimScore:
     injected_missed: list[str] = field(default_factory=list)
     injected_unchecked: list[str] = field(default_factory=list)
     faithful_flagged: list[str] = field(default_factory=list)
+    input_tokens: int = 0
+    output_tokens: int = 0
 
     @property
     def catch_rate(self) -> float:
@@ -66,6 +68,8 @@ class ClaimScore:
             "injected_flagged": len(self.injected_flagged),
             "catch_rate": round(self.catch_rate, 4),
             "faithful_flagged": len(self.faithful_flagged),
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
         }
 
     def report(self) -> str:
@@ -73,6 +77,7 @@ class ClaimScore:
             f"injected errors flagged: {len(self.injected_flagged)}/{self.cases} "
             f"= {self.catch_rate:.0%} (target 100 %)",
             f"faithful sentences flagged: {len(self.faithful_flagged)}/{self.cases}",
+            f"tokens: {self.input_tokens} in, {self.output_tokens} out",
         ]
         if self.injected_missed:
             lines.append(f"missed: {', '.join(self.injected_missed)}")
@@ -92,6 +97,9 @@ async def score(
         claims.append(Claim(2 * n + 1, case.injected, case.evidence))
     outcome = await check_claims(claims, settings, verifier, TODAY)
     result = ClaimScore(cases=len(cases))
+    if outcome.usage is not None:
+        result.input_tokens = outcome.usage.input_tokens
+        result.output_tokens = outcome.usage.output_tokens
     for n, case in enumerate(cases):
         faithful, injected = outcome.results[2 * n], outcome.results[2 * n + 1]
         if faithful.status == "unsupported":
@@ -109,12 +117,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--live", action="store_true", help="call the configured model")
     parser.add_argument("--model", default=ClaimVerifierSettings().model)
+    parser.add_argument("--effort", choices=["low", "medium", "high"], help="reasoning effort")
     parser.add_argument("--json", action="store_true", help="print the score as JSON")
     args = parser.parse_args(argv)
     cases = load_cases()
-    settings = ClaimVerifierSettings(model=args.model)
+    settings = ClaimVerifierSettings(model=args.model, effort=args.effort)
     verifier = (
-        LLMClaimVerifier(create_routing_client(get_settings())[0], args.model)
+        LLMClaimVerifier(create_routing_client(get_settings())[0], args.model, effort=args.effort)
         if args.live
         else None
     )

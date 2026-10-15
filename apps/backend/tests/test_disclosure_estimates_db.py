@@ -4,6 +4,7 @@ release."""
 
 import datetime as dt
 from decimal import Decimal as D
+from typing import Any
 
 import asyncpg
 import pytest
@@ -134,7 +135,7 @@ async def test_corrected_file_at_three_cutoffs_and_surprise_before_release(
     )
     await value(backend_pool, corrected, "1262.0", low=D("1230"), high=D("1270"))
 
-    def means(view: dict) -> list[str]:
+    def means(view: dict[str, Any]) -> list[str]:
         return [x["mean"] for x in view["lanes"]["published_analyst_consensus"]]
 
     assert (

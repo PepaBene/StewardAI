@@ -122,10 +122,19 @@ async def relationship_sample(pool: Pool, n: int = 100, seed: str = "p5.1") -> l
 
 async def insider_sample(pool: Pool, n: int = 50, seed: str = "p4.3") -> list[SampleItem]:
     """Classified transaction rows, drawn across the classes, with the footnote the class used."""
+    # At most `n` rows per class, chosen by a seeded hash in the database: the sample needs a few
+    # dozen rows, not every classified transaction sent over the wire.
     rows = await pool.fetch(
         """select accession, row_index, transaction_code, economic_class, classification_basis,
                   footnote_text, shares, price_per_share, derivative
-             from public.insider_transaction where economic_class is not null"""
+             from (select accession, row_index, transaction_code, economic_class,
+                          classification_basis, footnote_text, shares, price_per_share, derivative,
+                          row_number() over (partition by economic_class
+                              order by md5($1 || accession || ':' || row_index::text)) as rn
+                     from public.insider_transaction where economic_class is not null) t
+            where rn <= $2""",
+        seed,
+        n,
     )
     by_ref = {f"{r['accession']}:{r['row_index']}": r for r in rows}
     by_class: dict[str, list[str]] = defaultdict(list)
@@ -159,12 +168,18 @@ async def ownership_sample(pool: Pool, n: int = 50, seed: str = "p3.7") -> list[
     filed and the name of the ticker it was matched to, and says whether they are one company.
     One line per CUSIP and ticker pair, so a popular name is not sampled fifty times."""
     rows = await pool.fetch(
-        """select distinct on (h.cusip, h.ticker) h.accession, h.infotable_sk, h.cusip, h.ticker,
-                  h.issuer_name, h.title_of_class, i.name as instrument_name
+        """select p.accession, p.infotable_sk, p.cusip, p.ticker, p.issuer_name, p.title_of_class,
+                  p.instrument_name
+             from (select distinct on (h.cusip, h.ticker) h.accession, h.infotable_sk,
+                  h.cusip, h.ticker, h.issuer_name, h.title_of_class, i.name as instrument_name
              from public.institutional_holding h
              left join public.instrument i on i.t212_ticker = h.ticker
             where h.ticker is not null
-            order by h.cusip, h.ticker, h.accession"""
+            order by h.cusip, h.ticker, h.accession) p
+            order by md5($1 || p.cusip || ':' || p.ticker)
+            limit $2""",
+        seed,
+        n,
     )
     by_ref = {f"{r['accession']}:{r['infotable_sk']}": r for r in rows}
     return [

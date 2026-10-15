@@ -10,6 +10,7 @@ import { NewsFeedback } from "@/components/news/news-feedback";
 import { NewsTabs } from "@/components/news/news-tabs";
 import { TierBadge } from "@/components/news/severity-badge";
 import { PageHeader } from "@/components/page-header";
+import { useTrackOpen } from "@/lib/use-track-open";
 import { BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type StoryEvidence } from "@/lib/api/client";
@@ -51,6 +52,7 @@ function Panel({ title, note, children }: { title: string; note?: string; childr
 
 /** One story: why it is linked and confirmed, then everything the analysis engine found in it. */
 export function StoryView({ id }: { id: number }) {
+  useTrackOpen("news_story", id);
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [closing, setClosing] = useState(false);
   const [closeError, setCloseError] = useState<string | null>(null);

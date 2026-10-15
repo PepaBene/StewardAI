@@ -46,11 +46,13 @@ from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import TrustSettings, VerificationConfig
 from steward.documents.fetch import FetchError, NotModified
+from steward.engine import overrides
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
-from steward.llm.cache import ResultCache
+from steward.llm.cache import SEARCH_CACHE_DAYS_FRESH, ResultCache
 from steward.llm.client import LLM, create_llm
 from steward.llm.routing import routing_client
+from steward.news import classify_rules
 from steward.news.classify import SYSTEM_PROMPT as CLASSIFICATION_PROMPT
 from steward.news.classify import (
     Candidate,
@@ -1139,6 +1141,40 @@ async def refresh_cluster_sources(
     )
 
 
+async def classify_by_rules(
+    pool: asyncpg.Pool,
+    rows: list[asyncpg.Record],
+    now: dt.datetime,
+    touched: set[int],
+    detail: dict[str, Any],
+) -> list[asyncpg.Record]:
+    """Label, in code, the pending items a rule settles (steward.news.classify_rules); returns
+    the rest for the model. A repeat is matched against items classified in the last 14 days
+    and, within this run, against the items the rules just labelled."""
+    recent = await pool.fetch(
+        "select headline, links, event_type, affected_ticker, relevant, thesis_link, rumour,"
+        " event_date from public.news_item where classified_at is not null"
+        " and classified_at > $1 and classified_by not like 'rules:%' order by classified_at",
+        now - dt.timedelta(days=14),
+    )
+    known = classify_rules.known_from_rows(recent)
+    rest: list[asyncpg.Record] = []
+    for row in rows:
+        label = classify_rules.topic_only_label(row["source_id"], row["headline"], row["links"])
+        by = classify_rules.TOPIC_ONLY_BY
+        if label is None:
+            label = known.match(row["headline"], row["links"])
+            by = classify_rules.DUPLICATE_BY
+        if label is None:
+            rest.append(row)
+            continue
+        await save_label(pool, row["id"], label, by, now)
+        touched.add(row["cluster_id"])
+        detail["by_rule"] += 1
+        detail["labelled"] += 1
+    return rest
+
+
 async def classify_pending(
     ctx: JobContext,
     classifier: Classifier,
@@ -1148,13 +1184,21 @@ async def classify_pending(
 ) -> tuple[set[int], dict[str, Any]]:
     """Classify stored items that have no label yet. Returns the clusters touched."""
     rows = await ctx.pool.fetch(
-        "select id, headline, summary, outlet, tier, published_at, links, cluster_id"
+        "select id, source_id, headline, summary, outlet, tier, published_at, links, cluster_id"
         " from public.news_item where classified_at is null"
         " order by first_seen_at limit $1",
         settings.max_items_per_run,
     )
     touched: set[int] = set()
-    detail: dict[str, Any] = {"pending": len(rows), "labelled": 0, "missing": 0, "errors": []}
+    detail: dict[str, Any] = {
+        "pending": len(rows),
+        "labelled": 0,
+        "missing": 0,
+        "by_rule": 0,
+        "errors": [],
+    }
+    if settings.rules_first_classification and rows:
+        rows = await classify_by_rules(ctx.pool, rows, now, touched, detail)
     size = settings.classification_batch_size
     prepared = []
     for start in range(0, len(rows), size):
@@ -2012,16 +2056,27 @@ async def news_ingest_handler(ctx: JobContext) -> None:
         llm = LLM()  # no key: the classifier, corroborator and translator stay off
     prompts = await load_prompts(ctx.pool)
     if llm.configured(news.classification_model):
+        instructions = prompts.text(
+            "news_classification", CLASSIFICATION_PROMPT, news.classification_model
+        )
+        wishes = await overrides.in_force(ctx.pool, "news", "news items")
+        if wishes:
+            instructions = f"{instructions.rstrip()}\n\n{wishes}"
         classifier = LLMClassifier(
             llm,
             news.classification_model,
-            prompts.text("news_classification", CLASSIFICATION_PROMPT, news.classification_model),
+            instructions,
             effort=news.classification_effort,
             cache=ResultCache(ctx.pool, "news_classification"),
         )
     if llm.configured(news.corroboration_model):
         corroborator = LLMCorroborator(
-            routing_client(llm),
+            routing_client(
+                llm,
+                ResultCache(
+                    ctx.pool, "news_corroboration", search_ttl_days=SEARCH_CACHE_DAYS_FRESH
+                ),
+            ),
             news.corroboration_model,
             news.corroboration_max_searches,
             prompts.text("news_corroboration", SEARCH_SYSTEM, news.corroboration_model),

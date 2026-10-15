@@ -276,7 +276,10 @@ async def _main(dry_run: bool) -> int:
     try:
         async with httpx.AsyncClient(timeout=60.0) as http:
             storage = SupabaseStorage(
-                http, settings.supabase_url, settings.supabase_secret_key.get_secret_value()
+                http,
+                settings.supabase_url,
+                settings.supabase_secret_key.get_secret_value(),
+                public_api_url=settings.public_api_url,
             )
             report = await export_candidates(pool, storage, dry_run=dry_run)
     finally:

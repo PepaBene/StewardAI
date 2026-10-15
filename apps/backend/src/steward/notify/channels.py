@@ -21,7 +21,9 @@ class ChannelError(Exception):
 
 
 class Channel(Protocol):
-    async def send(self, subject: str, text: str) -> None: ...
+    async def send(self, subject: str, text: str) -> str | None:
+        """Send it; the provider's id for the message when it gives one (the receipt)."""
+        ...
 
 
 def _truncate(text: str, limit: int, tail: str = "…") -> str:
@@ -44,13 +46,24 @@ def _api_error(response: httpx.Response, field: str, secrets: tuple[str, ...] = 
     return _truncate(" ".join(detail.split()), 200)
 
 
+def _provider_id(response: httpx.Response, *path: str) -> str | None:
+    """The message id from a provider's JSON reply, following `path`; None when absent."""
+    try:
+        value = response.json()
+        for key in path:
+            value = value[key]
+    except (ValueError, KeyError, TypeError):
+        return None
+    return str(value) if isinstance(value, str | int) else None
+
+
 class TelegramChannel:
     def __init__(self, http: httpx.AsyncClient, token: str, chat_id: str) -> None:
         self._http = http
         self._token = token
         self._chat_id = chat_id
 
-    async def send(self, subject: str, text: str) -> None:
+    async def send(self, subject: str, text: str) -> str | None:
         body = text if text.startswith(subject) else f"{subject}\n\n{text}"
         try:
             response = await self._http.post(
@@ -70,6 +83,7 @@ class TelegramChannel:
                 f"Telegram returned HTTP {response.status_code}"
                 + (f": {description}" if description else "")
             )
+        return _provider_id(response, "result", "message_id")
 
 
 def text_to_html(text: str) -> str:
@@ -92,7 +106,23 @@ class EmailChannel:
         self._sender = sender
         self._to = [a.strip() for a in to.split(",") if a.strip()]
 
-    async def send(self, subject: str, text: str, idempotency_key: str | None = None) -> None:
+    async def status(self, provider_id: str) -> str | None:
+        """Resend's own record of what happened to a message ("delivered", "bounced",
+        "complained", "delivery_delayed", "sent"); None when it cannot be read."""
+        try:
+            response = await self._http.get(
+                f"{RESEND_URL}/{provider_id}",
+                headers={"Authorization": f"Bearer {self._api_key}"},
+                timeout=20.0,
+            )
+            if response.status_code != 200:
+                return None
+            event = response.json().get("last_event")
+        except (httpx.HTTPError, ValueError, AttributeError):
+            return None
+        return event if isinstance(event, str) else None
+
+    async def send(self, subject: str, text: str, idempotency_key: str | None = None) -> str | None:
         headers = {"Authorization": f"Bearer {self._api_key}"}
         if idempotency_key:
             # Resend drops a repeat of the same key (24 h), so a retry after a timeout
@@ -121,6 +151,7 @@ class EmailChannel:
                 f"email API returned HTTP {response.status_code}"
                 + (f": {message}" if message else "")
             )
+        return _provider_id(response, "id")
 
 
 def configured_channels(settings: Settings) -> frozenset[str]:

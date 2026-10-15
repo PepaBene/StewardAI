@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     alpha_vantage_api_key: SecretStr | None = None
     eodhd_api_key: SecretStr | None = None
     fmp_api_key: SecretStr | None = None
+    # Brave Search API (cost lever C1d): a plain search for `ai_search_provider = "brave"`.
+    brave_api_key: SecretStr | None = None
     twelve_data_api_key: SecretStr | None = None
     un_comtrade_api_key: SecretStr | None = None
     people_data_labs_api_key: SecretStr | None = None
@@ -88,10 +90,16 @@ class Settings(BaseSettings):
     telegram_bot_token: SecretStr | None = None
     telegram_chat_id: str | None = None
     resend_api_key: SecretStr | None = None
+    # Signing secret of the Resend webhook (`whsec_...`); the webhook route is off without it.
+    resend_webhook_secret: SecretStr | None = None
     alert_email_from: str | None = None
     alert_email_to: str | None = None
     # Public URL of the web app, for links in alerts and digests.
     app_url: str | None = None
+    # Public base URL of this API (e.g. https://api.example.com). When set, archived text is
+    # stored gzipped and evidence links point at /evidence/blob here; when unset, nothing is
+    # compressed and links are Supabase signed URLs.
+    public_api_url: str | None = None
     # Dead-man's switch: the worker GETs this URL every minute (e.g. a healthchecks.io check),
     # so a stopped or stuck worker raises an alert outside this host.
     heartbeat_ping_url: SecretStr | None = None
@@ -140,6 +148,7 @@ class Settings(BaseSettings):
             self.alpha_vantage_api_key,
             self.eodhd_api_key,
             self.fmp_api_key,
+            self.brave_api_key,
             self.twelve_data_api_key,
             self.un_comtrade_api_key,
             self.people_data_labs_api_key,
@@ -154,6 +163,7 @@ class Settings(BaseSettings):
             self.stooq_api_key,
             self.telegram_bot_token,
             self.resend_api_key,
+            self.resend_webhook_secret,
             self.heartbeat_ping_url,
         ]
         return [s.get_secret_value() for s in secrets if s is not None and s.get_secret_value()]

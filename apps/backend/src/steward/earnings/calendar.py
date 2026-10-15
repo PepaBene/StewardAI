@@ -37,6 +37,7 @@ from steward.config.prompts import load_prompts
 from steward.documents.fetch import FetchError, default_headers, fetch_document
 from steward.documents.text import contains
 from steward.earnings.check import load_config, local_today
+from steward.engine import triggers
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
 from steward.llm.client import LLM, create_llm
@@ -478,13 +479,28 @@ async def queue_due_checks(pool: asyncpg.Pool, offsets: list[int], today: dt.dat
             )
             if done:
                 continue
-            async with pool.acquire() as conn, conn.transaction():
-                job_id = await create_job(
-                    conn,
-                    "earnings_check",
-                    "event",
-                    params={"ticker": ticker, "report_date": report_date.isoformat()},
-                )
-                await queue.enqueue(conn, job_id, "earnings_check")
+
+            async def start(ticker: str = ticker, report_date: dt.date = report_date) -> int | None:
+                async with pool.acquire() as conn, conn.transaction():
+                    job_id = await create_job(
+                        conn,
+                        "earnings_check",
+                        "event",
+                        params={"ticker": ticker, "report_date": report_date.isoformat()},
+                    )
+                    await queue.enqueue(conn, job_id, "earnings_check")
+                return job_id
+
+            # Essential: the check after a report is never held back by a cap, only recorded.
+            await triggers.fire(
+                pool,
+                "event",
+                f"{ticker}:{report_date.isoformat()}",
+                f"{ticker} reported on {report_date.isoformat()}, {(today - report_date).days} "
+                "day(s) ago, and no check of that report has run.",
+                "start an earnings check",
+                start,
+                essential=True,
+            )
             queued.append(f"{ticker} ({report_date.isoformat()})")
     return queued

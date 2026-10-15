@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 
 from api.auth import Owner
 from api.db import Pool
+from steward.engine import overrides
 from steward.journal import entries, process
 from steward.journal import export as owner_export
 from steward.journal import service as journal_service
@@ -40,9 +41,36 @@ async def add_journal_entry(body: JournalEntryIn, pool: Pool, owner: Owner) -> J
     and method versions in force are stored with it, so a later outcome can be judged against what
     was known. An entry is never edited; to revisit one, add a review that names it."""
     try:
-        return await entries.record(pool, owner.user_id, body)
+        entry = await entries.record(pool, owner.user_id, body)
     except entries.JournalError as err:
         raise HTTPException(422, str(err)) from err
+    await _note_auto_entry_replaced(pool, owner.user_id, entry)
+    return entry
+
+
+async def _note_auto_entry_replaced(pool: Pool, owner_id: str, entry: JournalEntry) -> None:
+    """The owner wrote their own entry for a trade the engine had logged from the broker sync:
+    that is the owner supplying what the engine could not, recorded as an edit."""
+    auto_id = await pool.fetchval(
+        "select id from public.decision_journal where owner_id = $1 and ticker is not distinct"
+        " from $2 and decision = $3 and decided_on = $4 and snapshot->>'origin' = 'auto'"
+        " order by id desc limit 1",
+        owner_id,
+        entry.ticker,
+        entry.decision,
+        entry.decided_on,
+    )
+    if auto_id is not None:
+        await overrides.record(
+            pool,
+            area="journal",
+            subject_kind="journal_autolog",
+            subject_ref=f"decision_journal:{auto_id}",
+            action="edited",
+            via="screen",
+            decided_by="engine",
+            after={"entry_id": entry.id},
+        )
 
 
 @router.get("/journal/scorecard")
