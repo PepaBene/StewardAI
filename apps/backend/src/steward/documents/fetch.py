@@ -15,8 +15,6 @@ from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
 
 import httpx
-from pypdf import PdfReader
-from pypdf.errors import DependencyError, PyPdfError
 
 from steward import __version__
 from steward.documents.text import html_to_text, plain_to_text
@@ -80,6 +78,11 @@ def _charset(data: bytes) -> str:
 
 
 def pdf_text(data: bytes) -> str:
+    # Imported here: pypdf drags in fontTools, PIL and cryptography (~50 MB) that the API
+    # process would otherwise hold for its whole life.
+    from pypdf import PdfReader
+    from pypdf.errors import DependencyError, PyPdfError
+
     try:
         reader = PdfReader(io.BytesIO(data))
         pages = [page.extract_text() or "" for page in reader.pages]
