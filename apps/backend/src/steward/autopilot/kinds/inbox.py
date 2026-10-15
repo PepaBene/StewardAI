@@ -31,6 +31,28 @@ logger = logging.getLogger("steward.autopilot")
 PROMPT_CAP = 6000
 # Kinds that take no model: they are idempotent reads of the broker, with no model spend.
 RULE_CONFIRM_KINDS = frozenset({"portfolio_sync"})
+# Data refreshes with no model spend. A model judges them first; once its decisions on a job have
+# been reviewed often enough and were right, a rule confirms that job without asking the model.
+CALIBRATED_KINDS = frozenset({"price_history", "fact_reconcile"})
+CALIBRATION_MIN_REVIEWED = 10
+CALIBRATION_MIN_PRECISION = 0.95
+
+
+def calibrated(reviewed: int, right: int) -> bool:
+    return reviewed >= CALIBRATION_MIN_REVIEWED and right / reviewed >= CALIBRATION_MIN_PRECISION
+
+
+async def calibrated_jobs(pool: asyncpg.Pool) -> set[str]:
+    """The job kinds whose past inbox decisions earn a rule instead of a model call."""
+    rows = await pool.fetch(
+        "select evidence->>'job' as job, count(*) filter (where review is not null) as reviewed,"
+        " count(*) filter (where review = 'ok') as right from public.auto_decision"
+        " where kind = 'inbox_action' and decided_by like 'model:%'"
+        " and status in ('shadow', 'applied', 'reverted') and evidence->>'job' = any($1::text[])"
+        " group by 1",
+        sorted(CALIBRATED_KINDS),
+    )
+    return {r["job"] for r in rows if calibrated(r["reviewed"], r["right"])}
 
 
 def _clip(text: Any, limit: int) -> str:
@@ -96,6 +118,7 @@ async def _load_actions(pool: asyncpg.Pool, limit: int) -> list[Candidate]:
         limit,
     )
     out: list[Candidate] = []
+    earned = await calibrated_jobs(pool)
     for row in rows:
         action = _json(row["proposed_action"]) or {}
         kind = str(action.get("kind", ""))
@@ -120,7 +143,7 @@ async def _load_actions(pool: asyncpg.Pool, limit: int) -> list[Candidate]:
                 ref=f"inbox_action:{row['id']}",
                 ticker=row["ticker"],
                 prompt=prompt[:PROMPT_CAP],
-                evidence={"item_id": row["id"], "job": kind},
+                evidence={"item_id": row["id"], "job": kind, "earned_rule": kind in earned},
             )
         )
     return out
@@ -129,6 +152,12 @@ async def _load_actions(pool: asyncpg.Pool, limit: int) -> list[Candidate]:
 def _action_rule(cand: Candidate) -> RuleResult | None:
     if cand.evidence.get("job") in RULE_CONFIRM_KINDS:
         return RuleResult("confirm", "idempotent-sync", "a broker sync is idempotent and free")
+    if cand.evidence.get("job") in CALIBRATED_KINDS and cand.evidence.get("earned_rule"):
+        return RuleResult(
+            "confirm",
+            "calibrated-refresh",
+            "a data refresh costs no model spend, and the model's past calls on it held up",
+        )
     return None
 
 

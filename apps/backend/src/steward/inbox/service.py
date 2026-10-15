@@ -19,6 +19,8 @@ ACTION_JOB_TYPES = {
     "earnings_check": "earnings_check",
     "research": "research",
     "portfolio_sync": "portfolio_sync",
+    "price_history": "price_history",
+    "fact_reconcile": "fact_reconcile",
 }
 ItemStatus = Literal["new", "read", "actioned", "dismissed"]
 COLUMNS = (

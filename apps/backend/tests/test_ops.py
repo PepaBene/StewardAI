@@ -259,3 +259,20 @@ async def test_budget_forecast_notice_opens_and_clears(
     out = await watchdog.check_budget(backend_pool, NOW)
     assert out["cap"] is None
     assert await tasks.needs_owner(backend_pool) == []
+
+
+@pytest.mark.db
+async def test_a_primary_that_keeps_failing_gets_its_standby_run_once(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    jobs = JobsConfig()
+    first = await watchdog.run_failover(backend_pool, jobs, {"sec_xbrl"}, NOW)
+    assert first == {"started": ["sec_xbrl->fmp_company"]}
+    # The standby is now queued: not started a second time, and a healthy primary is ignored.
+    again = await watchdog.run_failover(backend_pool, jobs, {"sec_xbrl"}, NOW)
+    assert again == {"started": []}
+    assert (await watchdog.run_failover(backend_pool, jobs, set(), NOW)) == {"started": []}
+    open_notices = await backend_pool.fetchval(
+        "select count(*) from public.ops_task where kind = 'failover' and status <> 'resolved'"
+    )
+    assert open_notices == 0  # the primary is healthy again

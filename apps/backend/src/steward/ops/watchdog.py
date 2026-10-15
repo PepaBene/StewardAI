@@ -145,7 +145,63 @@ async def check_failed_jobs(
 
         await _act(pool, task, cfg, now, can_repair=True, repair=retry, summary=summary)
     summary["resolved"] = await tasks.settle(pool, "job_failed", failing)
+    summary["failover"] = await run_failover(pool, jobs, failing, now)
     return summary
+
+
+# A primary collector that is still failing after its retry, and the standby jobs that read the
+# same kind of data from another provider (D1). The standby must already be switched on.
+FAILOVER: dict[str, tuple[str, ...]] = {
+    "sec_xbrl": ("fmp_company", "alpha_vantage_statements"),
+    "disclosure_estimates": ("fmp_company",),
+    "news_ingest": ("news_ai_search",),
+}
+STANDBY_EVERY = dt.timedelta(hours=12)
+
+
+async def run_failover(
+    pool: asyncpg.Pool, jobs: JobsConfig, failing: set[str], now: dt.datetime
+) -> dict[str, list[str]]:
+    """Run the standby for each primary that is still failing, at most once per `STANDBY_EVERY`
+    and never one whose own last run failed. A notice says the data is coming from the
+    standby; it resolves when the primary runs again."""
+    enabled = {name for name, s in jobs.schedules().items() if s.enabled}
+    started: list[str] = []
+    for primary, standbys in FAILOVER.items():
+        if primary not in failing:
+            continue
+        for standby in standbys:
+            if standby not in enabled:
+                continue
+            last = await pool.fetchrow(
+                "select status, created_at from public.job where job_type = $1"
+                " order by id desc limit 1",
+                standby,
+            )
+            if last is not None and last["status"] == "failed":
+                continue  # this standby is down too: try the next one
+            if last is not None and now - last["created_at"] < STANDBY_EVERY:
+                break  # it already ran (or is running) for this outage
+            if await queue_job(pool, standby) is not None:
+                started.append(f"{primary}->{standby}")
+                await tasks.see(
+                    pool,
+                    "failover",
+                    primary,
+                    title=f"{primary} is down; {standby} is filling in",
+                    detail=f"{primary} is still failing after a retry, so {standby} was run to "
+                    "keep the data fresh from another provider. This resolves when "
+                    f"{primary} runs again.",
+                    href="/status",
+                    weight=0.2,
+                )
+            break
+    await pool.execute(
+        "update public.ops_task set status = 'resolved', resolved_at = now()"
+        " where kind = 'failover' and status <> 'resolved' and subject <> all($1::text[])",
+        sorted(failing),
+    )
+    return {"started": started}
 
 
 # ------------------------------------------------------------------------------ data quality

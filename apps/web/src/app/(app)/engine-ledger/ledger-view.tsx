@@ -13,6 +13,7 @@ import type { components } from "@/lib/api/schema";
 import { cn } from "@/lib/utils";
 
 import { GatesPanel, WatchersPanel } from "./gates-panel";
+import { ScorecardPanel } from "./scorecard-panel";
 import { TrainingPanel } from "./training-panel";
 
 type Entry = components["schemas"]["Entry-Input"];
@@ -124,6 +125,7 @@ export function LedgerView() {
         </p>
       ) : null}
 
+      <ScorecardPanel />
       <GatesPanel />
       <WatchersPanel />
       <TrainingPanel />

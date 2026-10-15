@@ -20,6 +20,8 @@ class FakePool:
 
     async def fetch(self, query: str, *args: Any) -> list[dict[str, Any]]:
         self.queries.append(query)
+        if "auto_decision" in query:  # the calibration record: none yet
+            return []
         return self.rows
 
     async def fetchval(self, query: str, *args: Any) -> Any:
@@ -46,7 +48,7 @@ async def test_load_actions_builds_a_judge_prompt_from_the_evidence() -> None:
     assert (
         "NVDA cut guidance" in prompt and "Cut by 8%" in prompt and "Job: earnings_check" in prompt
     )
-    assert cands[0].evidence == {"item_id": 7, "job": "earnings_check"}
+    assert cands[0].evidence == {"item_id": 7, "job": "earnings_check", "earned_rule": False}
 
 
 async def test_load_actions_skips_a_job_kind_the_service_would_refuse() -> None:
@@ -60,6 +62,20 @@ def test_only_the_idempotent_sync_is_settled_by_a_rule() -> None:
     ruled = inbox._action_rule(sync)
     assert ruled is not None and ruled.decision == "confirm"
     assert inbox._action_rule(check) is None
+
+
+def test_a_data_refresh_gets_a_rule_only_after_the_models_calls_on_it_held_up() -> None:
+    assert not inbox.calibrated(9, 9)  # too few reviewed
+    assert not inbox.calibrated(20, 18)  # 90% is not enough
+    assert inbox.calibrated(20, 19)
+    unproven = Candidate("inbox_action:3", None, "", {"job": "price_history", "earned_rule": False})
+    proven = Candidate("inbox_action:4", None, "", {"job": "price_history", "earned_rule": True})
+    assert inbox._action_rule(unproven) is None
+    ruled = inbox._action_rule(proven)
+    assert ruled is not None and ruled.decision == "confirm"
+    # A job that costs model money never gets the rule, whatever its record.
+    costly = Candidate("inbox_action:5", None, "", {"job": "research", "earned_rule": True})
+    assert inbox._action_rule(costly) is None
 
 
 async def test_confirm_starts_the_job_with_no_requester_and_cannot_be_undone(

@@ -13263,6 +13263,33 @@
         ]
       }
     },
+    "/engine/scorecard": {
+      "get": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Get Autonomy Scorecard",
+        "description": "The autonomy plan's success metrics, measured now, each with its target.",
+        "operationId": "get_autonomy_scorecard",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutonomyScorecard"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/engine/watchers": {
       "get": {
         "tags": [
@@ -35659,6 +35686,164 @@
           "decided_at"
         ],
         "title": "AutoDecision"
+      },
+      "AutonomyScorecard": {
+        "properties": {
+          "window_days": {
+            "type": "integer",
+            "title": "Window Days"
+          },
+          "items_per_week": {
+            "type": "number",
+            "title": "Items Per Week"
+          },
+          "items_per_week_target": {
+            "type": "number",
+            "title": "Items Per Week Target"
+          },
+          "items_open_now": {
+            "type": "integer",
+            "title": "Items Open Now"
+          },
+          "items_met": {
+            "type": "boolean",
+            "title": "Items Met"
+          },
+          "decisions_automatic": {
+            "type": "integer",
+            "title": "Decisions Automatic"
+          },
+          "decisions_shadow": {
+            "type": "integer",
+            "title": "Decisions Shadow"
+          },
+          "decisions_escalated": {
+            "type": "integer",
+            "title": "Decisions Escalated"
+          },
+          "automatic_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Automatic Share"
+          },
+          "automatic_share_target": {
+            "type": "number",
+            "title": "Automatic Share Target"
+          },
+          "automatic_met": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Automatic Met"
+          },
+          "precision": {
+            "items": {
+              "$ref": "#/components/schemas/KindPrecision"
+            },
+            "type": "array",
+            "title": "Precision"
+          },
+          "precision_target": {
+            "type": "number",
+            "title": "Precision Target"
+          },
+          "oldest_open_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Open Days"
+          },
+          "oldest_open_days_target": {
+            "type": "number",
+            "title": "Oldest Open Days Target"
+          },
+          "oldest_met": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Met"
+          },
+          "late_jobs": {
+            "type": "integer",
+            "title": "Late Jobs"
+          },
+          "missing_keys": {
+            "type": "integer",
+            "title": "Missing Keys"
+          },
+          "spend_month": {
+            "type": "number",
+            "title": "Spend Month"
+          },
+          "spend_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spend Cap"
+          },
+          "spend_met": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spend Met"
+          }
+        },
+        "type": "object",
+        "required": [
+          "window_days",
+          "items_per_week",
+          "items_per_week_target",
+          "items_open_now",
+          "items_met",
+          "decisions_automatic",
+          "decisions_shadow",
+          "decisions_escalated",
+          "automatic_share",
+          "automatic_share_target",
+          "automatic_met",
+          "precision",
+          "precision_target",
+          "oldest_open_days",
+          "oldest_open_days_target",
+          "oldest_met",
+          "late_jobs",
+          "missing_keys",
+          "spend_month",
+          "spend_cap",
+          "spend_met"
+        ],
+        "title": "AutonomyScorecard"
       },
       "AutopilotKindPolicy": {
         "properties": {
@@ -71464,6 +71649,58 @@
           "bins"
         ],
         "title": "KindCalibration"
+      },
+      "KindPrecision": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "reviewed": {
+            "type": "integer",
+            "title": "Reviewed"
+          },
+          "right": {
+            "type": "integer",
+            "title": "Right"
+          },
+          "precision": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Precision"
+          },
+          "enough_evidence": {
+            "type": "boolean",
+            "title": "Enough Evidence"
+          },
+          "met": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Met"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "reviewed",
+          "right",
+          "precision",
+          "enough_evidence",
+          "met"
+        ],
+        "title": "KindPrecision"
       },
       "KindSummary": {
         "properties": {

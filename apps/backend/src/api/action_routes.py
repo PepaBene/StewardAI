@@ -15,6 +15,8 @@ from steward.actions import registry
 from steward.autopilot import reverify
 from steward.chat import visuals
 from steward.engine import gates, overrides, timeline, triggers
+from steward.engine.scorecard import AutonomyScorecard
+from steward.engine.scorecard import build as build_scorecard
 from steward.training.summary import TrainingSummary
 from steward.training.summary import summary as training_summary
 
@@ -270,6 +272,12 @@ async def put_gates(body: gates.FloorGateSettings, pool: Pool, owner: Owner) -> 
 async def get_training(pool: Pool, _owner: Owner) -> TrainingSummary:
     """What is being collected for fine-tuning: recorded AI calls and labels, by kind."""
     return await training_summary(pool)
+
+
+@router.get("/engine/scorecard")
+async def get_autonomy_scorecard(pool: Pool, _owner: Owner) -> AutonomyScorecard:
+    """The autonomy plan's success metrics, measured now, each with its target."""
+    return await build_scorecard(pool, dt.datetime.now(dt.UTC))
 
 
 @router.get("/engine/watchers")

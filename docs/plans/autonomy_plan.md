@@ -5,6 +5,33 @@ Written 2026-10-13. Source: a sweep of the backend routers, `config/jobs.py`, `a
 config, not every handler body, so each `file:line` below is a starting point to verify before
 implementing. Nothing in this plan is implemented yet.
 
+## Status (2026-11-27): the rest of the open items
+
+The autonomous engine (`autonomous_engine_plan.md`) now covers E1 (override patterns, floor
+challengers, prompt proposals), most of E2 (source switch-off, schedules, alert and model tuning),
+the A3 trust gates, D7 liveness of every job, and the data audits. On top of that:
+
+- **Success metrics measured** (`engine/scorecard.py`, `GET /engine/scorecard`, a panel on the
+  engine ledger page): items needing you per week, share of decisions applied by the app, oldest
+  open item, precision per kind (judged only after 20 reviewed decisions), late jobs, missing keys
+  and the month's spend, each with its target from this plan.
+- **B2 domain tier learning** (`engine/domain_learning.py`): an AI-placed web domain whose facts
+  you rejected three times or more, and more often than you approved, is demoted to rejected.
+  One-way, never touches a tier you set, shown as a notice.
+- **E2 source weight** (`tuners.tune_source_tiers`): a second-tier feed you used under 5% of in 60
+  days moves to tier 3 (labelled, never alerts alone), through the same gated, versioned config
+  change as the switch-off. A feed nobody used is still switched off.
+- **D1 failover** (`watchdog.run_failover`): a primary collector still failing after its retry
+  runs its standby (SEC XBRL to FMP then Alpha Vantage, estimates to FMP, news to AI news search),
+  at most once per 12 hours, only a standby that is switched on and not failing itself.
+- **B7 allow-list** (`autopilot/kinds/inbox.py`): the event agent may propose `price_history` and
+  `fact_reconcile` (data refreshes, no model spend). A model judges them first; once its decisions
+  on a job have been reviewed 10 times with 95% right, a rule confirms that job.
+
+Still not built, on purpose: D5 throttling (the budget is outside what the engine may change),
+C3 data that needs provider keys, notification batching by engagement (opens are recorded for
+news stories only).
+
 ## Status (2026-11-10): phases C, D and E implemented in part
 
 Built:

@@ -30,7 +30,7 @@ ALLOWED: dict[Kind, tuple[str, re.Pattern[str]]] = {
     "rule": ("event_rules", re.compile(r"^severities\.[a-z0-9_]+$")),
     "source_weight": (
         "news_sources",
-        re.compile(r"^sources\[id=[a-z0-9]+(-[a-z0-9]+)*\]\.enabled$"),
+        re.compile(r"^sources\[id=[a-z0-9]+(-[a-z0-9]+)*\]\.(enabled|tier)$"),
     ),
     "schedule": ("jobs", re.compile(r"^[a-z0-9_]+\.cron$")),
     "model": (

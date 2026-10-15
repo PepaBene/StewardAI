@@ -313,6 +313,29 @@ async def test_a_feed_nobody_used_is_switched_off_and_one_that_was_used_is_kept(
     assert (await tuners.tune_sources(backend_pool, NOW))["switched_off"] is None
 
 
+def test_a_feed_used_a_little_is_demoted_not_switched_off() -> None:
+    use = tuners.SourceUse
+    assert tuners.barely_used(use("a", 100, 3, 0))
+    assert not tuners.barely_used(use("a", 100, 0, 0))  # switched off instead
+    assert not tuners.barely_used(use("a", 100, 20, 0))
+    assert not tuners.barely_used(use("a", 10, 1, 0))  # too few items to judge
+
+
+@pytest.mark.db
+async def test_a_feed_used_rarely_moves_to_tier_three_and_one_used_often_stays(
+    backend_pool: asyncpg.Pool, migrated_db: MigratedDatabase
+) -> None:
+    await seed_source(migrated_db.admin_url, "meh-feed", 45, 1)
+    await seed_source(migrated_db.admin_url, "busy-feed", 45, 20)
+    await store_sources(backend_pool, ["meh-feed", "busy-feed"])
+    out = await tuners.tune_source_tiers(backend_pool, NOW)
+    assert out == {"demoted": "meh-feed"}
+    stored = await load_active(backend_pool, "news_sources", NewsSourcesConfig)
+    assert stored is not None
+    assert {s.id: s.tier for s in stored.body.sources} == {"meh-feed": 3, "busy-feed": 2}
+    assert (await tuners.tune_source_tiers(backend_pool, NOW))["demoted"] is None
+
+
 def test_a_daily_cron_is_read_and_written_back_and_other_shapes_are_left_alone() -> None:
     assert tuners.parse_daily("30 7 * * *") == (450, "* * *")
     assert tuners.parse_daily("0 6 * * 1-5") == (360, "* * 1-5")

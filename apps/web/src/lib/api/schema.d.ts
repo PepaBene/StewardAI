@@ -4554,6 +4554,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/engine/scorecard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Autonomy Scorecard
+         * @description The autonomy plan's success metrics, measured now, each with its target.
+         */
+        get: operations["get_autonomy_scorecard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/engine/watchers": {
         parameters: {
             query?: never;
@@ -11557,6 +11577,51 @@ export interface components {
              * Format: date-time
              */
             decided_at: string;
+        };
+        /** AutonomyScorecard */
+        AutonomyScorecard: {
+            /** Window Days */
+            window_days: number;
+            /** Items Per Week */
+            items_per_week: number;
+            /** Items Per Week Target */
+            items_per_week_target: number;
+            /** Items Open Now */
+            items_open_now: number;
+            /** Items Met */
+            items_met: boolean;
+            /** Decisions Automatic */
+            decisions_automatic: number;
+            /** Decisions Shadow */
+            decisions_shadow: number;
+            /** Decisions Escalated */
+            decisions_escalated: number;
+            /** Automatic Share */
+            automatic_share: number | null;
+            /** Automatic Share Target */
+            automatic_share_target: number;
+            /** Automatic Met */
+            automatic_met: boolean | null;
+            /** Precision */
+            precision: components["schemas"]["KindPrecision"][];
+            /** Precision Target */
+            precision_target: number;
+            /** Oldest Open Days */
+            oldest_open_days: number | null;
+            /** Oldest Open Days Target */
+            oldest_open_days_target: number;
+            /** Oldest Met */
+            oldest_met: boolean | null;
+            /** Late Jobs */
+            late_jobs: number;
+            /** Missing Keys */
+            missing_keys: number;
+            /** Spend Month */
+            spend_month: number;
+            /** Spend Cap */
+            spend_cap: number | null;
+            /** Spend Met */
+            spend_met: boolean | null;
         };
         /**
          * AutopilotKindPolicy
@@ -24134,6 +24199,21 @@ export interface components {
             verdict: string;
             /** Bins */
             bins: components["schemas"]["Bin"][];
+        };
+        /** KindPrecision */
+        KindPrecision: {
+            /** Kind */
+            kind: string;
+            /** Reviewed */
+            reviewed: number;
+            /** Right */
+            right: number;
+            /** Precision */
+            precision: number | null;
+            /** Enough Evidence */
+            enough_evidence: boolean;
+            /** Met */
+            met: boolean | null;
         };
         /** KindSummary */
         KindSummary: {
@@ -48063,6 +48143,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrainingSummary"];
+                };
+            };
+        };
+    };
+    get_autonomy_scorecard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutonomyScorecard"];
                 };
             };
         };

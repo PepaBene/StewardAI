@@ -162,6 +162,68 @@ async def tune_sources(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, Any]:
     return {"switched_off": None}
 
 
+LOW_USE = 0.05  # a feed whose items you used this rarely stops carrying alerts on its own
+TIER_GATES = Gates(
+    min_n=SOURCE_MIN_ITEMS,
+    min_reviewed=SOURCE_MIN_ITEMS,
+    max_wrong_rate_increase=LOW_USE,
+    max_cost_increase=1.0,
+    max_escalation_drop=1.0,
+    require_golden=False,
+)
+
+
+def barely_used(row: SourceUse) -> bool:
+    """Used a little, but under 5% of its items: too rare to keep, too real to switch off."""
+    return row.items >= SOURCE_MIN_ITEMS and 0 < row.used <= row.items * LOW_USE
+
+
+async def tune_source_tiers(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, Any]:
+    """Move one second-tier feed to tier 3 (labelled, never alerts alone) when you used under 5%
+    of its items in 60 days. Only ever downward; a feed nobody used is switched off instead."""
+    stored = await load_active(pool, "news_sources", NewsSourcesConfig)
+    config = stored.body if stored else NewsSourcesConfig()
+    eligible = [
+        s
+        for s in config.sources
+        if s.enabled and s.tier == 2 and s.type in ("rss", "page") and not s.tickers and not s.macro
+    ]
+    use = await source_use(
+        pool, [s.id for s in eligible], now - dt.timedelta(days=SOURCE_WINDOW_DAYS)
+    )
+    for s in eligible:
+        row = use.get(s.id)
+        edit = config_change.Edit("news_sources", f"sources[id={s.id}].tier")
+        if row is None or not barely_used(row) or await _recent_change(pool, edit.target, now):
+            continue
+        c = await config_change.propose(
+            pool,
+            "source_weight",
+            edit,
+            3,
+            f"Move {s.name} to tier 3: you used {row.used} of its {row.items} items in "
+            f"{SOURCE_WINDOW_DAYS} days, so it should no longer alert on its own",
+            "share of its items you used",
+            TIER_GATES,
+        )
+        baseline = Metrics(row.items, row.items, 0, 0, 0, 1.0)
+        candidate = Metrics(row.items, row.items, row.used, 0, 0, 1.0)
+        await change.record_results(pool, c.id, baseline, candidate)
+        settled = await config_change.promote(pool, c, golden_passed=None)
+        if settled.status == "promoted":
+            await _tell(
+                pool,
+                settled,
+                f"{s.name} now counts as tier 3",
+                f"{settled.hypothesis}. Set it back in the news sources config, or undo the "
+                "change from the engine ledger.",
+                "/engine-ledger",
+            )
+            return {"demoted": s.id}
+        return {"rejected": s.id}
+    return {"demoted": None}
+
+
 # ---------------------------------------------------------------------------------- schedules
 
 NEWS_JOB = "news_ingest"

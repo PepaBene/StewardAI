@@ -21,6 +21,7 @@ from steward.engine import audit as engine_audit
 from steward.engine import (
     challenger,
     data_audit,
+    domain_learning,
     instructions,
     learning,
     outcomes,
@@ -177,10 +178,14 @@ async def autopilot_calibration_handler(ctx: JobContext) -> None:
         step.detail.update(await outcomes.backtest(ctx.pool, now))
     async with ctx.step("source_tuning") as step:
         step.detail.update(await tuners.tune_sources(ctx.pool, now))
+    async with ctx.step("source_tiers") as step:
+        step.detail.update(await tuners.tune_source_tiers(ctx.pool, now))
     async with ctx.step("schedule_tuning") as step:
         step.detail.update(await tuners.tune_schedule(ctx.pool, now))
     async with ctx.step("daily_times") as step:
         step.detail.update(await tuners.tune_daily_times(ctx.pool, now))
+    async with ctx.step("domain_learning") as step:
+        step.detail.update(await domain_learning.learn(ctx.pool, now))
     async with ctx.step("config_rollbacks") as step:
         step.detail.update(await tuners.check_rollbacks(ctx.pool, now))
     async with ctx.step("challengers") as step:
