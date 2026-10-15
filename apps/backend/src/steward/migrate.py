@@ -31,10 +31,11 @@ def default_dir() -> Path:
     configured = os.environ.get("MIGRATIONS_DIR")
     if configured:
         return Path(configured)
-    for candidate in (
-        Path("/app/migrations"),
-        Path(__file__).resolve().parents[4] / "supabase" / "migrations",
-    ):
+    candidates = [Path("/app/migrations")]
+    parents = Path(__file__).resolve().parents
+    if len(parents) > 4:  # a checkout; the image has the code at /app/src, one level short
+        candidates.append(parents[4] / "supabase" / "migrations")
+    for candidate in candidates:
         if candidate.is_dir():
             return candidate
     raise SystemExit("no migrations directory: set MIGRATIONS_DIR")
