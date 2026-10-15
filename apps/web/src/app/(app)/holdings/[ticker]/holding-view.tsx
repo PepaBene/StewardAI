@@ -15,6 +15,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { AskAboutSelection } from "@/components/chat/ask-about-selection";
+import { usePageSelection } from "@/lib/chat/page-selection-store";
 import { EmptyState } from "@/components/empty-state";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { ConfidenceBar } from "@/components/evidence/confidence-bar";
@@ -484,6 +485,7 @@ type OnFeedback = (mark: FeedbackOut) => void;
 
 function KpiTable({ kpis, facts, onFeedback }: { kpis: KpiStatus[]; facts: Map<number, FactOut>; onFeedback: OnFeedback }) {
   const [open, setOpen] = useState<string | null>(null);
+  usePageSelection(open ? `kpi ${open}` : null);
   // A command-palette KPI result ("revenue growth AAPL") links to #kpi-<id>: open that row
   // and scroll to it once, on arrival — not just the holding page, the KPI itself. Done
   // after mount (never in the initial render) so server and client markup still agree.

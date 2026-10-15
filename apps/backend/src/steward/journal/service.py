@@ -4,19 +4,22 @@ series that followed them. Reads only."""
 from __future__ import annotations
 
 import datetime as dt
+import logging
 
 import asyncpg
 
 from steward.config.holding_profiles import HoldingProfilesConfig
 from steward.config.store import load_active
 from steward.config.strategy import StrategyConfig
-from steward.journal import switches
+from steward.journal import recompute, switches
 from steward.journal.entries import JournalEntry, list_entries, written_by_owner
 from steward.journal.scorecard import DecisionOutcome, Scorecard, SwitchOutcome, build_scorecard
 from steward.reference.price_series import choose_series, holding_symbols
 from steward.reference.read import load_series
 from steward.reference.returns import series_currency
 from steward.sources.market import quote_unit_of
+
+logger = logging.getLogger("steward.journal")
 
 
 def sell_target_of(entry: JournalEntry) -> tuple[float | None, str | None]:
@@ -130,8 +133,9 @@ async def scorecard(
     except asyncpg.PostgresError:  # the table is not migrated yet
         switch_outcomes = None
     strategy = await load_active(pool, "strategy", StrategyConfig)
-    return build_scorecard(
-        await outcomes(pool, entries),
+    found = await outcomes(pool, entries)
+    card = build_scorecard(
+        found,
         since=since or today - dt.timedelta(days=365),
         until=today,
         ticker=ticker,
@@ -139,3 +143,7 @@ async def scorecard(
         switches=switch_outcomes,
         safety_margin=strategy.body.pretrade.switch_safety_margin if strategy else None,
     )
+    # A second computation of the same figures; a difference is logged, never silently shown.
+    for problem in recompute.check(card, found, switch_outcomes):
+        logger.error("scorecard recompute differs: %s", problem)
+    return card

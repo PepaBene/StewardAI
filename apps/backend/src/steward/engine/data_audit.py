@@ -167,8 +167,85 @@ async def digests(pool: asyncpg.Pool, now: dt.datetime) -> list[Finding]:
     return found
 
 
+MACRO_DAYS = 30
+MACRO_DISAGREE = 0.02
+
+
+def macro_problem(kind: str, series: str, period: dt.date, detail: str) -> Finding:
+    titles = {
+        "early": f"{series} for {period:%b %Y} was stored as known before it was published",
+        "backwards": f"{series} for {period:%b %Y} has a later revision known earlier",
+        "sources": f"{series} for {period:%b %Y} differs between two sources",
+    }
+    return Finding(f"macro:{kind}:{series}:{period.isoformat()}", titles[kind], detail)
+
+
+async def macro(pool: asyncpg.Pool, now: dt.datetime) -> list[Finding]:
+    """Time and value checks on macro data stored in the last month: a value dated before it was
+    released (it would leak the future into an as-of read), a revision that is known before the
+    one it revises, and two sources giving different values for the same series and period."""
+    since = now - dt.timedelta(days=MACRO_DAYS)
+    found: list[Finding] = []
+    for r in await pool.fetch(
+        "select series_id, period, known_at, release_at from public.macro_observation"
+        " where fetched_at >= $1 and release_at is not null and known_at < release_at"
+        " order by series_id, period limit 50",
+        since,
+    ):
+        found.append(
+            macro_problem(
+                "early",
+                r["series_id"],
+                r["period"],
+                f"It is dated {r['known_at']:%d %b %Y} but was released "
+                f"{r['release_at']:%d %b %Y}. A read as of the earlier date would see a "
+                "number nobody had yet.",
+            )
+        )
+    for r in await pool.fetch(
+        "select a.series_id, a.period, a.revision as low, b.revision as high"
+        " from public.macro_observation a join public.macro_observation b"
+        " on b.series_id = a.series_id and b.source = a.source and b.geography = a.geography"
+        " and b.period = a.period and b.revision > a.revision and b.known_at < a.known_at"
+        " where a.fetched_at >= $1 order by a.series_id, a.period limit 50",
+        since,
+    ):
+        found.append(
+            macro_problem(
+                "backwards",
+                r["series_id"],
+                r["period"],
+                f"Revision {r['high']} is stored as known before revision {r['low']}, so an "
+                "as-of read picks the wrong one.",
+            )
+        )
+    latest: dict[tuple[str, str, dt.date], dict[str, float]] = {}
+    for r in await pool.fetch(
+        "select distinct on (series_id, geography, period, source)"
+        " series_id, geography, period, source, value * unit_multiplier as value"
+        " from public.macro_observation where fetched_at >= $1 and value is not null"
+        " order by series_id, geography, period, source, known_at desc, revision desc",
+        since,
+    ):
+        key = (r["series_id"], r["geography"], r["period"])
+        latest.setdefault(key, {})[r["source"]] = float(r["value"])
+    for (series, _geo, period), values in sorted(latest.items()):
+        if len(values) < 2:
+            continue
+        gap = relative_gap(min(values.values()), max(values.values()))
+        if gap > MACRO_DISAGREE:
+            sources = ", ".join(f"{s} {v:g}" for s, v in sorted(values.items()))
+            found.append(macro_problem("sources", series, period, f"{sources}: {gap:.1%} apart."))
+    return found
+
+
 Audit = Callable[[asyncpg.Pool, dt.datetime], Awaitable[list[Finding]]]
-AUDITS: dict[str, Audit] = {"prices": prices, "fund_holdings": fund_holdings, "digests": digests}
+AUDITS: dict[str, Audit] = {
+    "prices": prices,
+    "fund_holdings": fund_holdings,
+    "digests": digests,
+    "macro": macro,
+}
 
 
 async def run(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int]:

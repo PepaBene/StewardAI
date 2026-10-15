@@ -2,7 +2,7 @@
 a proposal with fixed gates, numbers from a replay, a config version with no author, an undo."""
 
 import datetime as dt
-from typing import Any
+from typing import Any, ClassVar
 
 import asyncpg
 import pytest
@@ -158,6 +158,77 @@ async def test_a_change_that_fails_its_gates_is_not_written(backend_pool: asyncp
     )
     assert (await config_change.promote(backend_pool, c, golden_passed=None)).status == "rejected"
     assert await config_change.current(backend_pool, edit) == before
+
+
+class _NoCases:
+    """An evaluator with nothing to test, so that field is skipped."""
+
+    max_cases = 1
+
+    async def cases(self, pool: Any) -> list[Any]:
+        return []
+
+
+class _Llm:
+    def configured(self, model: str) -> bool:
+        return True
+
+
+class _Client:
+    llm = _Llm()
+
+
+@pytest.mark.db
+async def test_a_cheaper_chat_model_is_used_only_after_it_passes_the_chat_test_set(
+    backend_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from steward.config.jobs import JobsConfig
+    from steward.engine import evaluators
+    from steward.engine.replay import Outcome
+
+    class FakeChat:
+        max_cases = 3
+        bad_for: ClassVar[set[str]] = set()
+
+        async def cases(self, pool: Any) -> list[Any]:
+            return [1, 2, 3]
+
+        async def run(
+            self,
+            pool: Any,
+            client: Any,
+            case: Any,
+            extra: str,
+            usage: Any,
+            model: str | None = None,
+        ) -> Outcome:
+            usage.input_tokens += 1000
+            usage.output_tokens += 500
+            return Outcome(checked=10, bad=5 if model in FakeChat.bad_for else 0)
+
+    for name in ("NewsEvaluator", "DigestEvaluator", "ThesisEvaluator"):
+        monkeypatch.setattr(evaluators, name, _NoCases)
+    monkeypatch.setattr(evaluators, "ChatEvaluator", FakeChat)
+    current = JobsConfig().chat.model
+
+    # The cheaper model is much worse on the chat set: nothing changes.
+    FakeChat.bad_for = {"gpt-6-luna", "gemini-3.8-flash"}
+    out = await tuners.tune_models(backend_pool, _Client(), NOW, {"calls": 500})
+    assert out["model"] == "chat.model" and out["status"] == "rejected"
+    stored = await load_active(backend_pool, "jobs", JobsConfig)
+    assert stored is None or stored.body.chat.model == current
+
+    # Once the earlier proposal is old enough to retry and the model is as good, it is used.
+    await backend_pool.execute(
+        "update public.engine_change set created_at = created_at - interval '40 days'"
+    )
+    FakeChat.bad_for = set()
+    out = await tuners.tune_models(
+        backend_pool, _Client(), NOW + dt.timedelta(days=1), {"calls": 500}
+    )
+    assert out["status"] == "promoted"
+    stored = await load_active(backend_pool, "jobs", JobsConfig)
+    assert stored is not None and stored.body.chat.model == out["candidate"] != current
 
 
 async def seed_source(admin_url: str, source_id: str, items: int, opened: int) -> None:

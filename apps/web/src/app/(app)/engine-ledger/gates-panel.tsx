@@ -33,6 +33,110 @@ const FIELDS: { key: keyof Gates; label: string; help: string; step: string }[] 
   },
 ];
 
+type Watchers = components["schemas"]["WatcherSettings"];
+
+const WATCHER_FIELDS: { key: keyof Watchers; label: string; help: string; step: string }[] = [
+  {
+    key: "large_move",
+    label: "Price move worth a note",
+    help: "A fraction: 0.08 is 8% in one day for a stock you hold (0.03 to 0.5).",
+    step: "0.01",
+  },
+  {
+    key: "insider_min_people",
+    label: "Insiders buying together",
+    help: "How many different insiders make a cluster (2 to 10).",
+    step: "1",
+  },
+  {
+    key: "insider_days",
+    label: "Cluster window, days",
+    help: "Purchases within this many days count together (3 to 60).",
+    step: "1",
+  },
+  {
+    key: "review_lead_days",
+    label: "Review notice, days",
+    help: "How many days before month end you are reminded (1 to 10).",
+    step: "1",
+  },
+  {
+    key: "cooldown_days",
+    label: "Do not repeat for, days",
+    help: "The same heads-up is not sent again within this time (3 to 60).",
+    step: "1",
+  },
+];
+
+/** How sensitive the heads-up watchers are. Only you can change it; the engine cannot. */
+export function WatchersPanel() {
+  const [s, setS] = useState<Watchers | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getBrowserApiClient()
+      .GET("/engine/watchers")
+      .then((r) => {
+        if (r.data) setS(r.data);
+        else setError(`Could not load the settings (HTTP ${r.response.status}).`);
+      });
+  }, []);
+
+  async function save() {
+    if (!s) return;
+    setMessage(null);
+    setError(null);
+    const r = await getBrowserApiClient().PUT("/engine/watchers", { body: s });
+    if (r.data) {
+      setS(r.data);
+      setMessage("Saved. The next check uses these numbers.");
+    } else {
+      setError(
+        r.response.status === 422
+          ? "One of the numbers is outside its allowed range."
+          : `Not saved (HTTP ${r.response.status}).`,
+      );
+    }
+  }
+
+  return (
+    <Blueprint>
+      <div className="space-y-3 p-5">
+        <h2 className="text-[15px] font-medium">When the engine tells you without being asked</h2>
+        <p className="max-w-prose text-sm text-text-muted">
+          Large moves in what you hold, insiders buying together and the monthly review coming up.
+          These numbers decide how sensitive those heads-ups are. Only you can change them.
+        </p>
+        {s ? (
+          <div className="grid max-w-3xl gap-3 sm:grid-cols-3">
+            {WATCHER_FIELDS.map((f) => (
+              <div key={f.key} className="space-y-1">
+                <Label htmlFor={`watcher-${f.key}`}>{f.label}</Label>
+                <Input
+                  id={`watcher-${f.key}`}
+                  type="number"
+                  step={f.step}
+                  value={s[f.key]}
+                  onChange={(e) => setS({ ...s, [f.key]: Number(e.target.value) })}
+                />
+                <p className="text-xs text-text-muted">{f.help}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div className="flex items-center gap-3">
+          <Button size="sm" onClick={() => void save()} disabled={!s}>
+            Save
+          </Button>
+          {message ? <span className="text-sm text-text-muted">{message}</span> : null}
+        </div>
+        {error ? <AlertMessage title="Not saved">{error}</AlertMessage> : null}
+      </div>
+    </Blueprint>
+  );
+}
+
 /** The bar a stricter confidence floor must clear. Only you can change it; the engine cannot. */
 export function GatesPanel() {
   const [gates, setGates] = useState<Gates | null>(null);

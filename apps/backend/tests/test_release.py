@@ -168,6 +168,25 @@ def test_ready_needs_audit_and_zero_cost() -> None:
     assert not assess(f, {}, counts, full, False).can_activate  # zero-cost failed
 
 
+def test_an_open_automatic_finding_fails_a_feature_but_nothing_passes_one() -> None:
+    f = Feature("x", "X", "M0", needs=("holdings",))
+    counts = {"holdings": 12}
+    full = complete_ledger("x")
+    out = assess(f, {}, counts, full, True, machine_findings=2)
+    assert out.audit == "mismatch" and not out.can_activate
+    assert "2 open finding" in out.reason
+    # Without findings the same ledger activates; the automatic check never adds a pass.
+    assert assess(f, {}, counts, full, True, machine_findings=0).can_activate
+    assert assess(f, {}, counts, [], True, machine_findings=0).audit == "none"
+
+
+def test_findings_block_only_the_features_that_show_that_data() -> None:
+    from steward.release import machine_audit
+
+    got = machine_audit.blocked(["price:AAA:2026-10-01", "macro:early:CPI:2026-08-01", "other:x"])
+    assert got == {"company": 1, "performance": 1, "risk": 1, "macro": 1}
+
+
 def complete_ledger(feature: str) -> list[AuditRow]:
     regions = ["EU", "US", "Asia"]
     rows = [

@@ -279,6 +279,15 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
     # field -> the job types whose health shows a problem with it
     "news.classification_model": ("news_ingest",),
     "digest.model": ("daily_digest", "weekly_digest"),
+    "thesis_settings.model": ("thesis",),
+    "chat.model": (),  # chat is not a job: no health to watch, so no automatic put-back
+}
+# Calls to reserve from the run's budget for one candidate test (both models, all cases).
+CALLS_NEEDED = {
+    "news.classification_model": 40,
+    "digest.model": 40,
+    "thesis_settings.model": 30,
+    "chat.model": 70,
 }
 CHEAPER_THAN = 0.7  # a candidate must cost at most this share of the model it replaces
 CLASSIFICATION_DROP = 0.01  # accuracy points it may lose
@@ -314,7 +323,12 @@ def cheaper_than(table: BudgetConfig, model: str, usable: set[str]) -> str | Non
     return max(options)[1] if options else None
 
 
-TOLERANCE = {"news.classification_model": CLASSIFICATION_DROP, "digest.model": 0.03}
+TOLERANCE = {
+    "news.classification_model": CLASSIFICATION_DROP,
+    "digest.model": 0.03,
+    "thesis_settings.model": 0.0,
+    "chat.model": 0.05,
+}
 
 
 async def _arm(
@@ -322,7 +336,12 @@ async def _arm(
 ) -> Metrics | None:
     """One model's numbers on the area's own test set, or None when it has no cases."""
     from steward.ai import Usage
-    from steward.engine.evaluators import DigestEvaluator, NewsEvaluator
+    from steward.engine.evaluators import (
+        ChatEvaluator,
+        DigestEvaluator,
+        NewsEvaluator,
+        ThesisEvaluator,
+    )
 
     usage = Usage(model=model)
     checked = bad = 0
@@ -334,14 +353,20 @@ async def _arm(
         out = await ev.run(pool, client, golden[0], "", usage, model=model)
         checked, bad = out.checked, out.bad
     else:
-        dev = DigestEvaluator()
-        cases = (await dev.cases(pool))[:2]
+        dev: Any = {
+            "digest.model": DigestEvaluator(),
+            "thesis_settings.model": ThesisEvaluator(),
+            "chat.model": ChatEvaluator(),
+        }[field]
+        cases = (await dev.cases(pool))[: 2 if field == "digest.model" else dev.max_cases]
         if not cases:
             return None
         for case in cases:
             out = await dev.run(pool, client, case, "", usage, model=model)
             checked += out.checked
             bad += out.bad
+        if checked == 0:
+            return None
     cost = prices.cost(model, input_tokens=usage.input_tokens, output_tokens=usage.output_tokens)
     return Metrics(1, checked, bad, 0, 0, float(cost) if cost is not None else 0.0)
 
@@ -363,9 +388,9 @@ async def tune_models(
             continue
         current = str(await config_change.current(pool, edit))
         candidate = cheaper_than(table, current, usable)
-        if candidate is None or budget["calls"] < 40:
+        if candidate is None or budget["calls"] < CALLS_NEEDED[field]:
             continue
-        budget["calls"] -= 40
+        budget["calls"] -= CALLS_NEEDED[field]
         base = await _arm(pool, client, field, current, prices)
         cand = await _arm(pool, client, field, candidate, prices) if base else None
         if base is None or cand is None:

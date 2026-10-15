@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/page-header";
 import { Blueprint } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient, type JobSummary, type ThesisBoard } from "@/lib/api/client";
+import { usePageSelection } from "@/lib/chat/page-selection-store";
 import {
   boardSummary,
   groupByState,
@@ -159,6 +160,7 @@ type Open = { ticker: string; kpiId: string } | null;
 
 function Board({ board }: { board: ThesisBoard }) {
   const [open, setOpen] = useState<Open>(null);
+  usePageSelection(open ? `thesis ${open.ticker} ${open.kpiId}` : null);
 
   if (board.rows.length === 0) {
     return (

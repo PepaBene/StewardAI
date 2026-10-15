@@ -23,6 +23,7 @@ from steward.engine import (
     data_audit,
     instructions,
     learning,
+    outcomes,
     override_watch,
     prompt_change,
     proposer,
@@ -171,6 +172,8 @@ async def autopilot_calibration_handler(ctx: JobContext) -> None:
         )
     async with ctx.step("watchers") as step:
         step.detail.update(await watchers.run(ctx.pool, now))
+    async with ctx.step("plan_outcomes") as step:
+        step.detail.update(await outcomes.backtest(ctx.pool, now))
     async with ctx.step("source_tuning") as step:
         step.detail.update(await tuners.tune_sources(ctx.pool, now))
     async with ctx.step("schedule_tuning") as step:

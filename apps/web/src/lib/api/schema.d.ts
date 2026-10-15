@@ -4534,6 +4534,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/engine/watchers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Watchers
+         * @description How sensitive the heads-up watchers are.
+         */
+        get: operations["get_watchers"];
+        /**
+         * Put Watchers
+         * @description Change that sensitivity. Only you can; the engine cannot propose a change to it.
+         */
+        put: operations["put_watchers"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/holdings/{ticker}/segments": {
         parameters: {
             query?: never;
@@ -39231,6 +39255,42 @@ export interface components {
             /** Value Base */
             value_base: number;
         };
+        /**
+         * WatcherSettings
+         * @description How sensitive the heads-up watchers are. Bounded so none can be switched off by a typo.
+         */
+        WatcherSettings: {
+            /**
+             * Insider Min People
+             * @description Insiders buying together.
+             * @default 3
+             */
+            insider_min_people: number;
+            /**
+             * Insider Days
+             * @description Window for that cluster.
+             * @default 14
+             */
+            insider_days: number;
+            /**
+             * Large Move
+             * @description One-day move of a held stock worth a note.
+             * @default 0.08
+             */
+            large_move: number;
+            /**
+             * Review Lead Days
+             * @description Days of notice for review.
+             * @default 3
+             */
+            review_lead_days: number;
+            /**
+             * Cooldown Days
+             * @description Days before it repeats.
+             * @default 14
+             */
+            cooldown_days: number;
+        };
         /** WatchlistCreate */
         WatchlistCreate: {
             /** Ticker */
@@ -47911,6 +47971,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_watchers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatcherSettings"];
+                };
+            };
+        };
+    };
+    put_watchers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatcherSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatcherSettings"];
                 };
             };
             /** @description Validation Error */

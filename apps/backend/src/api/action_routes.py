@@ -262,3 +262,17 @@ async def put_gates(body: gates.FloorGateSettings, pool: Pool, owner: Owner) -> 
     """Change that bar. Only you can; the engine cannot propose a change to it."""
     saved = await gates.save(pool, body, owner.user_id)
     return GateOut(**saved.model_dump())
+
+
+@router.get("/engine/watchers")
+async def get_watchers(pool: Pool, _owner: Owner) -> gates.WatcherSettings:
+    """How sensitive the heads-up watchers are."""
+    return await gates.load_watchers(pool)
+
+
+@router.put("/engine/watchers")
+async def put_watchers(
+    body: gates.WatcherSettings, pool: Pool, owner: Owner
+) -> gates.WatcherSettings:
+    """Change that sensitivity. Only you can; the engine cannot propose a change to it."""
+    return await gates.save_watchers(pool, body, owner.user_id)

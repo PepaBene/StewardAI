@@ -15,6 +15,7 @@ import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.release import audit as audit_ledger
+from steward.release import machine_audit
 from steward.verify_sources.zero_cost import audit_zero_cost
 
 Status = Literal["ready", "partial", "unavailable", "untested"]
@@ -169,6 +170,7 @@ def assess(
     counts: dict[str, int],
     audit_rows: list[audit_ledger.AuditRow],
     zero_cost_passed: bool,
+    machine_findings: int = 0,
 ) -> FeatureReadiness:
     inputs = [_endpoint_input(s, access, True) for s in feature.required]
     inputs += [_store_input(n, counts) for n in feature.needs]
@@ -203,8 +205,11 @@ def assess(
     mine = [r for r in standing if r.feature == feature.id]
     matches = sum(r.result == "match" for r in mine)
     subjects = audit_ledger.feature_match_subjects(audit_rows, feature.id)
-    if any(r.result == "mismatch" for r in mine):
+    if any(r.result == "mismatch" for r in mine) or machine_findings:
+        # The automatic check can only fail a feature, never pass one.
         audit_state: AuditState = "mismatch"
+        if machine_findings:
+            reason += f"; the automatic data check has {machine_findings} open finding(s)"
     elif matches >= audit_ledger.MIN_FACTS_PER_FEATURE and (
         subjects >= audit_ledger.MIN_SUBJECTS_PER_FEATURE
     ):
@@ -261,7 +266,8 @@ async def build_readiness(pool: asyncpg.Pool, owner_id: str) -> Readiness:
     zero = await audit_zero_cost(pool)
     # An empty endpoint manifest proves nothing, so it does not pass.
     zero_ok = zero.passed and zero.checked > 0
-    features = [assess(f, access, counts, rows, zero_ok) for f in FEATURES]
+    blocks = await machine_audit.open_blocks(pool)
+    features = [assess(f, access, counts, rows, zero_ok, blocks.get(f.id, 0)) for f in FEATURES]
     return Readiness(
         as_of=dt.date.today(),
         features=features,

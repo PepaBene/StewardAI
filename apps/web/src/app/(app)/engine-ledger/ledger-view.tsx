@@ -12,7 +12,7 @@ import { getBrowserApiClient } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 import { cn } from "@/lib/utils";
 
-import { GatesPanel } from "./gates-panel";
+import { GatesPanel, WatchersPanel } from "./gates-panel";
 
 type Entry = components["schemas"]["Entry-Input"];
 type Sweep = components["schemas"]["SweepOut"];
@@ -124,6 +124,7 @@ export function LedgerView() {
       ) : null}
 
       <GatesPanel />
+      <WatchersPanel />
 
       <Blueprint aria-labelledby="ledger-heading">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">

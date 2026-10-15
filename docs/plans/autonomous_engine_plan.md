@@ -443,13 +443,53 @@ calibration and needs-you digest as tables or text.
   a position above its cap, a cluster of 3 or more insiders buying in 14 days, and a heads-up in the
   last 3 days of the month that the monthly review is due.
 
-Still open after this batch:
-- Standing instructions for theses, chat, digest and news still reach prompts untested; rule, source-weight,
-  schedule and model changes still have no pipeline; no model proposes prompt changes by itself.
+#### Phase 5 and the remaining open items delivered
+
+- Standing instructions for news, digest, theses and chat are `engine_change` rows (`prompt:<area>`),
+  tested before use by `engine/replay.py` + `engine/evaluators.py` (the current text against the text
+  with the addition, a judge reading both orders; news also has its labelled set as a hard check). In
+  force only when promoted; an untestable one is held and the owner can apply it with `apply_change`.
+- Rule, source-weight, schedule and model changes are one-field edits of a config domain
+  (`engine/config_change.py`, allowed fields listed in code), saved as a config version with no author and
+  rolled back by restoring the old value unless the owner has edited the field since. Tuners
+  (`engine/tuners.py`): alert severities, feeds nobody used in 60 days, news ingest cadence, a cheaper model
+  for news classification and the digest. Schedule and model changes roll back on a rise in failed jobs.
+- A model drafts prompt additions from the owner's repeated corrections (`engine/proposer.py`), 7-day
+  cooldown, a filter on what an addition may say (no links, no trading words, no instructions to ignore).
+- 5.1 `engine/outcomes.py`: saved rebalance plans older than 60 days are scored against later prices (a buy
+  is a hit if the position beat the plan's average; a sell if it lagged); a notice below 40% over 20 trades.
+- 5.2 `engine/data_audit.py` macro audit (look-ahead, revision order, two sources disagreeing) and
+  `journal/recompute.py`, an independent recomputation of the scorecard's medians and shares, logged on a
+  difference.
+- 5.3 `release/machine_audit.py`: open data-audit findings mark the features that show that data as
+  "mismatch" in the release gate; the machine never adds a "match".
+- Large-move watcher added; watcher sensitivity (`gates.WatcherSettings`: move size, insider count and
+  window, review lead, cooldown) is edited by the owner only (`GET/PUT /engine/watchers`, panel in the engine
+  ledger); migration `20261125100000_engine_watcher_setting`.
+- Triggers that queue jobs already pause after dismissals (`triggers.fire` does this); the earlier note was
+  wrong.
+
+- Phase 5 gaps closed afterwards: the scorecard recompute now covers sell targets, the risk section, switches
+  and bought-versus-passed as well as conviction, reason, trim and sell; the plan-outcome score is also
+  computed against the first configured benchmark index (`hit_rate_vs_index`). Model tuning now also covers
+  the chat and thesis models (chat is tested on the owner's past questions, thesis on stored research
+  reports); a chat change has no automatic put-back because chat is not a job with a health signal.
+- Page selection is sent from the deals, thesis board, discover (active screen), holding KPI and valuation
+  scenario screens, as well as review and disclosures.
+
+Still open:
+- All new tests use fakes for the models; nothing here has been run against a live model, and the judge's
+  counts feed code gates, so a weak judge weakens the gate.
+- Rule and source changes have no automatic rollback (the owner rolls them back from the ledger; there is
+  no signal that measures a harm from a lowered alert or a switched-off feed); the schedule tuner touches
+  the news ingest only, because lateness is only measurable there; model tuning covers news
+  classification, digest, thesis and chat, and not the autopilot model.
+- No guidance or rating-change triggers (no data source stores them); filings stay with the disclosure alerts.
 - The replay cannot know what the owner would have decided on items newly escalated by a floor.
-- No large-move, filings, guidance or rating triggers (covered by news escalation and disclosure alerts);
-  the watchers' thresholds are constants in code.
-- Screens other than review and disclosures still send path-only context.
+- Screens not listed above (for example risk, news stories, escalations, inbox) still send path-only context.
+- Telegram offers no delivery status; owner decisions still open: critical alerts at all hours (question 2),
+  the `news_feedback` "never train" wording, training licences and route, retention.
+- 5.4: the remaining rows of the section 4 table were not worked one by one; only the items above exist.
 
 ## 6. Success metrics (measured against the owner, not against the engine)
 

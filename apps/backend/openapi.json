@@ -13236,6 +13236,78 @@
         ]
       }
     },
+    "/engine/watchers": {
+      "get": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Get Watchers",
+        "description": "How sensitive the heads-up watchers are.",
+        "operationId": "get_watchers",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatcherSettings"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "actions"
+        ],
+        "summary": "Put Watchers",
+        "description": "Change that sensitivity. Only you can; the engine cannot propose a change to it.",
+        "operationId": "put_watchers",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatcherSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatcherSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/holdings/{ticker}/segments": {
       "get": {
         "tags": [
@@ -112393,6 +112465,53 @@
           "value_base"
         ],
         "title": "Via"
+      },
+      "WatcherSettings": {
+        "properties": {
+          "insider_min_people": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 2.0,
+            "title": "Insider Min People",
+            "description": "Insiders buying together.",
+            "default": 3
+          },
+          "insider_days": {
+            "type": "integer",
+            "maximum": 60.0,
+            "minimum": 3.0,
+            "title": "Insider Days",
+            "description": "Window for that cluster.",
+            "default": 14
+          },
+          "large_move": {
+            "type": "number",
+            "maximum": 0.5,
+            "minimum": 0.03,
+            "title": "Large Move",
+            "description": "One-day move of a held stock worth a note.",
+            "default": 0.08
+          },
+          "review_lead_days": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Review Lead Days",
+            "description": "Days of notice for review.",
+            "default": 3
+          },
+          "cooldown_days": {
+            "type": "integer",
+            "maximum": 60.0,
+            "minimum": 3.0,
+            "title": "Cooldown Days",
+            "description": "Days before it repeats.",
+            "default": 14
+          }
+        },
+        "type": "object",
+        "title": "WatcherSettings",
+        "description": "How sensitive the heads-up watchers are. Bounded so none can be switched off by a typo."
       },
       "WatchlistCreate": {
         "properties": {

@@ -285,12 +285,20 @@ class ThesisEvaluator:
         return f"A thesis for {case.ticker} written from stored research report {case.report_id}."
 
     async def run(
-        self, pool: asyncpg.Pool, client: RoutingClient, case: ThesisCase, extra: str, usage: Usage
+        self,
+        pool: asyncpg.Pool,
+        client: RoutingClient,
+        case: ThesisCase,
+        extra: str,
+        usage: Usage,
+        model: str | None = None,
     ) -> Outcome:
         from steward.thesis import author
         from steward.thesis.job import MAX_OUTPUT_TOKENS, _body, _position
 
         cfg = (await _jobs(pool)).thesis_settings
+        if model:
+            cfg = cfg.model_copy(update={"model": model})
         mode: Any = case.mode
         row = await pool.fetchrow("select body from public.report where id = $1", case.report_id)
         strategy = await load_active(pool, "strategy", StrategyConfig)
@@ -365,13 +373,21 @@ class ChatEvaluator:
         return f"The owner asked: {case.question}"
 
     async def run(
-        self, pool: asyncpg.Pool, client: RoutingClient, case: ChatCase, extra: str, usage: Usage
+        self,
+        pool: asyncpg.Pool,
+        client: RoutingClient,
+        case: ChatCase,
+        extra: str,
+        usage: Usage,
+        model: str | None = None,
     ) -> Outcome:
         from steward.chat.assistant import SYSTEM, LLMChatAssistant
         from steward.chat.tools import ChatTools
         from steward.research.sources import Registry
 
         settings = (await _jobs(pool)).chat
+        if model:
+            settings = settings.model_copy(update={"model": model})
         prompts = await load_prompts(pool)
         assistant = LLMChatAssistant(
             client.llm, settings, (), system=prompts.text("chat_assistant", SYSTEM, settings.model)

@@ -13,6 +13,7 @@ import { Field } from "@/components/reference/form-bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
+import { usePageSelection } from "@/lib/chat/page-selection-store";
 import { useUrlTicker } from "@/lib/disclosure/url-ticker";
 import { filterDeals, TYPE_LABEL, type DealFilter, type HoldingDeals, type PortfolioDeals } from "@/lib/disclosure/deals";
 import { SAMPLE_DEAL_DAY, SAMPLE_DEAL_NAMES, SAMPLE_DEAL_TICKER, sampleDeals, samplePortfolioDeals } from "@/lib/disclosure/fixtures-deals";
@@ -49,6 +50,7 @@ export function DealsPageView() {
   const [offerError, setOfferError] = useState<string | undefined>();
   const [filter, setFilter] = useState<DealFilter>({ type: "", state: "" });
   const [selected, setSelected] = useState<number | null>(null);
+  usePageSelection(selected !== null ? `deal ${selected}` : null);
   // "Show deals" bumps this so the same inputs fetch again
   const [nonce, setNonce] = useState(0);
 

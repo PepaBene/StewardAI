@@ -53,16 +53,52 @@ async def floor_gates(pool: asyncpg.Pool) -> Gates:
     return (await load_settings(pool)).gates()
 
 
-async def save(
-    pool: asyncpg.Pool, settings: FloorGateSettings, owner_id: str | None
-) -> FloorGateSettings:
-    """Only the owner route calls this."""
+async def _put(pool: asyncpg.Pool, name: str, body: BaseModel, owner_id: str | None) -> None:
     await pool.execute(
         "insert into public.engine_gate_setting (name, body, updated_by) values ($1, $2::jsonb, $3)"
         " on conflict (name) do update set body = excluded.body, updated_at = now(),"
         " updated_by = excluded.updated_by",
-        NAME,
-        settings.model_dump_json(),
+        name,
+        body.model_dump_json(),
         owner_id,
     )
+
+
+async def save(
+    pool: asyncpg.Pool, settings: FloorGateSettings, owner_id: str | None
+) -> FloorGateSettings:
+    """Only the owner route calls this."""
+    await _put(pool, NAME, settings, owner_id)
+    return settings
+
+
+WATCHERS = "watchers"
+
+
+class WatcherSettings(BaseModel):
+    """How sensitive the heads-up watchers are. Bounded so none can be switched off by a typo."""
+
+    insider_min_people: int = Field(default=3, ge=2, le=10, description="Insiders buying together.")
+    insider_days: int = Field(default=14, ge=3, le=60, description="Window for that cluster.")
+    large_move: float = Field(
+        default=0.08, ge=0.03, le=0.5, description="One-day move of a held stock worth a note."
+    )
+    review_lead_days: int = Field(default=3, ge=1, le=10, description="Days of notice for review.")
+    cooldown_days: int = Field(default=14, ge=3, le=60, description="Days before it repeats.")
+
+
+async def load_watchers(pool: asyncpg.Pool) -> WatcherSettings:
+    body: Any = await pool.fetchval(
+        "select body from public.engine_gate_setting where name = $1", WATCHERS
+    )
+    if body is None:
+        return WatcherSettings()
+    return WatcherSettings.model_validate(json.loads(body) if isinstance(body, str) else body)
+
+
+async def save_watchers(
+    pool: asyncpg.Pool, settings: WatcherSettings, owner_id: str | None
+) -> WatcherSettings:
+    """Only the owner route calls this."""
+    await _put(pool, WATCHERS, settings, owner_id)
     return settings

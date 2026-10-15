@@ -39,6 +39,50 @@ def test_a_digest_is_flagged_only_when_enough_sentences_are_unbacked() -> None:
     assert audit.digest_problem(1, "Daily", 5, 3, 0) is not None
 
 
+async def test_macro_values_known_before_release_or_out_of_order_or_disputed_are_flagged(
+    migrated_db: MigratedDatabase, backend_pool: asyncpg.Pool
+) -> None:
+    admin = await asyncpg.connect(migrated_db.admin_url)
+    period = dt.date(2026, 8, 1)
+    day = NOW - dt.timedelta(days=3)
+
+    async def add(
+        series: str, source: str, value: float, revision: int, known: dt.datetime, release=None
+    ) -> None:  # type: ignore[no-untyped-def]
+        await admin.execute(
+            "insert into public.macro_observation (series_id, source, geography, period, value,"
+            " unit, frequency, release_at, known_at, vintage, revision, source_url)"
+            " values ($1, $2, 'US', $3, $4, 'pct', 'monthly', $5, $6, 'v', $7, 'http://x')",
+            series,
+            source,
+            period,
+            value,
+            release,
+            known,
+            revision,
+        )
+
+    try:
+        # Known five days before it was released.
+        await add("EARLY", "fred", 1.0, 0, day - dt.timedelta(days=5), release=day)
+        # Revision 1 known before revision 0.
+        await add("BACK", "alfred", 2.0, 0, day)
+        await add("BACK", "alfred", 2.1, 1, day - dt.timedelta(days=1))
+        # Two sources 10% apart; a third series that agrees is left alone.
+        await add("DISPUTE", "fred", 3.0, 0, day)
+        await add("DISPUTE", "ecb", 3.3, 0, day)
+        await add("AGREE", "fred", 4.0, 0, day)
+        await add("AGREE", "ecb", 4.01, 0, day)
+        found = await audit.macro(backend_pool, NOW)
+    finally:
+        await admin.close()
+    assert sorted(f.subject.split(":")[1:3] for f in found) == [
+        ["backwards", "BACK"],
+        ["early", "EARLY"],
+        ["sources", "DISPUTE"],
+    ]
+
+
 async def open_notices(pool: asyncpg.Pool) -> int:
     return int(
         await pool.fetchval(
