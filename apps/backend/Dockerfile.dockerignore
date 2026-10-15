@@ -1,0 +1,10 @@
+# Context is the repository root: let through only what the Dockerfile copies.
+*
+!apps/backend/pyproject.toml
+!apps/backend/uv.lock
+!apps/backend/.python-version
+!apps/backend/README.md
+!apps/backend/start.sh
+!apps/backend/src
+!supabase/migrations
+**/__pycache__
