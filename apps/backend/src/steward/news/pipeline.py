@@ -46,6 +46,7 @@ from steward.config.store import load_active
 from steward.config.thesis import ThesesConfig
 from steward.config.verification import TrustSettings, VerificationConfig
 from steward.documents.fetch import FetchError, NotModified
+from steward.engine import overrides
 from steward.jobs import queue
 from steward.jobs.runner import JobContext, create_job
 from steward.llm.cache import SEARCH_CACHE_DAYS_FRESH, ResultCache
@@ -2055,10 +2056,16 @@ async def news_ingest_handler(ctx: JobContext) -> None:
         llm = LLM()  # no key: the classifier, corroborator and translator stay off
     prompts = await load_prompts(ctx.pool)
     if llm.configured(news.classification_model):
+        instructions = prompts.text(
+            "news_classification", CLASSIFICATION_PROMPT, news.classification_model
+        )
+        wishes = await overrides.in_force(ctx.pool, "news", "news items")
+        if wishes:
+            instructions = f"{instructions.rstrip()}\n\n{wishes}"
         classifier = LLMClassifier(
             llm,
             news.classification_model,
-            prompts.text("news_classification", CLASSIFICATION_PROMPT, news.classification_model),
+            instructions,
             effort=news.classification_effort,
             cache=ResultCache(ctx.pool, "news_classification"),
         )

@@ -25,6 +25,7 @@ WRITERS: dict[str, tuple[str, set[str]]] = {
             "steward/autopilot/kinds/graph.py",
             "steward/exposures/ai_steps.py",
             "steward/fundamentals/ir_discovery.py",
+            "steward/engine/config_change.py",
         },
     ),
     "autopilot": (
@@ -60,11 +61,18 @@ WRITERS: dict[str, tuple[str, set[str]]] = {
             "steward/engine/data_audit.py",
             "steward/engine/prompt_change.py",
             "steward/engine/watchers.py",
+            "steward/engine/instructions.py",
+            "steward/engine/tuners.py",
         },
     ),
     "engine_change": (
         r"\bchange\.propose\(|engine_change\.propose\(",
-        {"steward/engine/override_watch.py", "steward/engine/prompt_change.py"},
+        {
+            "steward/engine/override_watch.py",
+            "steward/engine/prompt_change.py",
+            "steward/engine/instructions.py",
+            "steward/engine/config_change.py",
+        },
     ),
     "trigger": (
         r"\btriggers\.(fire|log)\(",

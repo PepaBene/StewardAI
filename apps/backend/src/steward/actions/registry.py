@@ -28,7 +28,7 @@ from steward.config.store import RollbackError, load_active
 from steward.config.store import rollback as config_rollback
 from steward.config.verification import VerificationConfig
 from steward.engine import change as engine_change
-from steward.engine import overrides, prompt_change
+from steward.engine import config_change, instructions, overrides, prompt_change
 from steward.news.read import resolve_story, set_story_closed
 from steward.ops import tasks as ops_tasks
 from steward.settings import get_settings
@@ -369,14 +369,24 @@ async def _describe_roll_back_change(pool: asyncpg.Pool, a: ChangeArgs) -> str:
 
 
 async def _run_roll_back_change(pool: asyncpg.Pool, a: ChangeArgs) -> dict[str, Any]:
-    if not await engine_change.roll_back(pool, a.change_id, ["rolled back by the owner"]):
+    row = await pool.fetchrow(
+        "select " + engine_change.COLUMNS + " from public.engine_change where id = $1",  # noqa: S608
+        a.change_id,
+    )
+    reasons = ["rolled back by the owner"]
+    # A change to a setting also puts the old value back (unless it was edited since).
+    if row is not None and str(row["target"]).startswith(config_change.PREFIX):
+        live = await config_change.undo(pool, engine_change.from_row(row), reasons)
+    else:
+        live = await engine_change.roll_back(pool, a.change_id, reasons)
+    if not live:
         raise ActionError(f"Engine change {a.change_id} is not live")
     return {"change_id": a.change_id}
 
 
 class TeachArgs(BaseModel):
-    # theses, chat, digest and news go straight into those prompts; `autopilot:<kind>` is for one
-    # autopilot queue and is tested against your own earlier calls before it applies.
+    # Every area is tested before it applies: `autopilot:<kind>` against your own earlier calls,
+    # the others by re-running the area on stored inputs (`engine/instructions.py`).
     area: str = Field(pattern=r"^(theses|chat|digest|news|autopilot:[a-z_]{2,40})$")
     text: str = Field(min_length=5, max_length=overrides.STANDING_MAX)
 
@@ -400,18 +410,46 @@ async def _describe_teach(pool: asyncpg.Pool, a: TeachArgs) -> str:
             "on items you settled yourself first and applies only if it agrees with you at "
             "least as often as now"
         )
-    return f"Remember for {a.area}: “{a.text}”"
+    return (
+        f"Remember for {a.area}: “{a.text}”. It is tested on stored {a.area} work first and "
+        "applies only if the checks hold and it follows your words better than it loses"
+    )
+
+
+async def _describe_apply_change(pool: asyncpg.Pool, a: ChangeArgs) -> str:
+    row = await pool.fetchrow(
+        "select hypothesis, status from public.engine_change where id = $1"
+        " and change_kind = 'prompt' and target like 'prompt:%'",
+        a.change_id,
+    )
+    if row is None:
+        raise ActionError(f"No prompt addition {a.change_id}")
+    if row["status"] not in ("shadow", "rejected"):
+        raise ActionError(f"Prompt addition {a.change_id} is {row['status']}")
+    return f"Apply without a passing test: {row['hypothesis']}"
+
+
+async def _run_apply_change(pool: asyncpg.Pool, a: ChangeArgs) -> dict[str, Any]:
+    if not await instructions.owner_apply(pool, a.change_id):
+        raise ActionError(f"Prompt addition {a.change_id} cannot be applied")
+    return {"change_id": a.change_id}
 
 
 async def _run_teach(pool: asyncpg.Pool, a: TeachArgs) -> dict[str, Any]:
     ref = await overrides.teach(pool, a.area, a.text, current_via.get())
     if a.area.startswith("autopilot:"):
         await prompt_change.propose(pool, a.area.removeprefix("autopilot:"), a.text, ref)
+    else:
+        await instructions.propose(pool, a.area, a.text, ref, "owner")
     return {"ref": ref, "area": a.area}
 
 
 async def _describe_retract(pool: asyncpg.Pool, a: RetractArgs) -> str:
-    found = [s for s in await overrides.standing_instructions(pool) if s.ref == a.ref]
+    found = [
+        s
+        for s in await overrides.standing_instructions(pool, include_waiting=True)
+        if s.ref == a.ref
+    ]
     if not found:
         raise ActionError(f"No standing instruction {a.ref}")
     return f"Forget the standing instruction for {found[0].area}: “{found[0].text}”"
@@ -517,6 +555,15 @@ ACTIONS: dict[str, Action] = {
             "after new evidence.",
             _describe_roll_back_change,
             _run_roll_back_change,
+        ),
+        Action(
+            "apply_change",
+            "Apply a prompt addition that was not tested or did not pass",
+            "medium",
+            ChangeArgs,
+            "Undo it with the roll_back_change action.",
+            _describe_apply_change,
+            _run_apply_change,
         ),
         Action(
             "teach",

@@ -243,8 +243,27 @@ async def lessons(pool: asyncpg.Pool, area: str, label: str, now: dt.datetime | 
         total,
         label,
     )
-    standing = render_standing([s.text for s in await standing_instructions(pool, area)], label)
+    standing = await in_force(pool, area, label)
     return "\n\n".join(b for b in (standing, block) if b)
+
+
+async def in_force(pool: asyncpg.Pool, area: str, label: str) -> str:
+    """The standing instructions and drafted additions that apply to an area now, as a block."""
+    texts = [s.text for s in await standing_instructions(pool, area)]
+    texts += await drafted_additions(pool, area)
+    return render_standing(texts, label)
+
+
+async def drafted_additions(pool: asyncpg.Pool, area: str) -> list[str]:
+    """Prompt additions the engine drafted for an area that passed their test and are not rolled
+    back (the owner's own words come from `standing_instructions`)."""
+    rows = await pool.fetch(
+        "select after->>'addendum' as text from public.engine_change where target = $1"
+        " and change_kind = 'prompt' and status = 'promoted' and after->>'author' = 'model'"
+        " order by id",
+        f"prompt:{area}",
+    )
+    return [r["text"] for r in rows if r["text"]]
 
 
 @dataclass(frozen=True)
@@ -257,14 +276,23 @@ class Standing:
 STANDING_MAX = 500
 
 
-async def standing_instructions(pool: asyncpg.Pool, area: str | None = None) -> list[Standing]:
-    """What the owner told the engine in words, minus what they withdrew."""
+async def standing_instructions(
+    pool: asyncpg.Pool, area: str | None = None, *, include_waiting: bool = False
+) -> list[Standing]:
+    """What the owner told the engine in words, minus what they withdrew. By default only what is
+    in force: not an instruction still being tested or one that failed its test."""
     rows = await pool.fetch(
         "select t.subject_ref, t.area, t.note from public.owner_override t"
         " where t.action = 'taught' and ($1::text is null or t.area = $1)"
         " and not exists (select 1 from public.owner_override r where r.action = 'retracted'"
-        "  and r.subject_ref = t.subject_ref) order by t.created_at",
+        "  and r.subject_ref = t.subject_ref)"
+        # An instruction that is being tested, or failed its test, is not in force.
+        " and ($2 or not exists (select 1 from public.engine_change c"
+        "  where c.change_kind = 'prompt' and c.target like 'prompt:%'"
+        "  and c.after->>'ref' = t.subject_ref and c.status <> 'promoted'))"
+        " order by t.created_at",
         area,
+        include_waiting,
     )
     return [Standing(r["subject_ref"], r["area"], r["note"] or "") for r in rows]
 
@@ -299,7 +327,7 @@ async def teach(pool: asyncpg.Pool, area: str, text: str, via: Via) -> str:
 
 async def retract(pool: asyncpg.Pool, ref: str, via: Via) -> bool:
     """Withdraw a standing instruction; False when there is none by that ref (or it is gone)."""
-    found = [s for s in await standing_instructions(pool) if s.ref == ref]
+    found = [s for s in await standing_instructions(pool, include_waiting=True) if s.ref == ref]
     if not found:
         return False
     await pool.execute(

@@ -190,8 +190,13 @@ class LLMChatAssistant:
         # What the owner keeps declining goes in the turn, not the system prompt, so the cached
         # prefix stays the same between questions.
         pool = getattr(tools, "pool", None)
+        override = getattr(tools, "corrections_override", None)
         corrections = (
-            await overrides.lessons(pool, "chat", "proposals the chat made") if pool else ""
+            override
+            if override is not None
+            else await overrides.lessons(pool, "chat", "proposals the chat made")
+            if pool
+            else ""
         )
         page = getattr(tools, "page", "")
         messages: list[Message] = [

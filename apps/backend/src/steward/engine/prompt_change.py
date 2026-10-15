@@ -55,7 +55,7 @@ def instruction_block(texts: list[str]) -> str:
     the owner, never as anything that can change the judge's output format."""
     if not texts:
         return ""
-    lines = ["<owner_instructions>", "The owner asked for the following about this queue:"]
+    lines = ["<owner_instructions>", "The following apply to this queue (tested before use):"]
     lines += [f"- {t}" for t in texts]
     lines.append("</owner_instructions>")
     return "\n".join(lines)

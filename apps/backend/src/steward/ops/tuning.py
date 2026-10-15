@@ -25,6 +25,8 @@ import asyncpg
 from steward.config.event_rules import DEFAULT_SEVERITIES, EventRulesConfig
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active, save_config
+from steward.engine import change, config_change
+from steward.engine.change import Gates, Metrics
 from steward.ops import tasks
 
 logger = logging.getLogger("steward.ops")
@@ -35,6 +37,15 @@ MAX_ACK_RATE = 0.1
 COOLDOWN_DAYS = 90
 FLOOR = 2
 KIND = "alert_tuning"
+MISS_WEIGHT = 3
+RULE_GATES = Gates(
+    min_n=MIN_ALERTS,
+    min_reviewed=MIN_ALERTS,
+    max_wrong_rate_increase=0.0,
+    max_cost_increase=1.0,
+    max_escalation_drop=1.0,
+    require_golden=False,
+)
 
 
 @dataclass(frozen=True)
@@ -223,25 +234,35 @@ async def tune_alerts(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, Any]:
     chosen = pick(await engagement(pool, now), severities, recently)
     if chosen is None:
         return {"lowered": None}
-    new = config.model_copy(
-        update={
-            "severities": {
-                **config.severities,
-                chosen.event_type: severities[chosen.event_type] - 1,
-            }
-        }
-    )
-    async with pool.acquire() as conn:
-        saved = await save_config(
-            conn,
-            "event_rules",
-            new,
-            created_by=None,
-            note=f"Automatic: {chosen.event_type} alerts were acknowledged "
-            f"{chosen.acknowledged} of {chosen.sent} times.",
-            expected_active_id=stored.id if stored else None,
-        )
+    if chosen.event_type not in config.severities:
+        return {"lowered": None}
+    # The change goes through the engine's pipeline: its numbers are stored, its gates are fixed
+    # beforehand, and it shows in the engine ledger. An alert you needed and would have missed
+    # counts as three ignored ones.
     kind_name = chosen.event_type.replace("_", " ")
+    proposal = await config_change.propose(
+        pool,
+        "rule",
+        config_change.Edit("event_rules", f"severities.{chosen.event_type}"),
+        severities[chosen.event_type] - 1,
+        f"{kind_name.capitalize()} stops being an instant alert: you acknowledged "
+        f"{chosen.acknowledged} of {chosen.sent} in {WINDOW_DAYS} days",
+        "alerts you acted on that would have waited for the digest",
+        RULE_GATES,
+    )
+    ignored = chosen.sent - chosen.acknowledged
+    await change.record_results(
+        pool,
+        proposal.id,
+        Metrics(chosen.sent, chosen.sent, ignored, 0, 0, 0.0),
+        Metrics(chosen.sent, chosen.sent, MISS_WEIGHT * chosen.acknowledged, 0, 0, 0.0),
+    )
+    settled = await config_change.promote(pool, proposal, golden_passed=None)
+    if settled.status != "promoted":
+        return {"lowered": None, "rejected": chosen.event_type}
+    saved_id = await pool.fetchval(
+        "select id from public.config_version where domain = 'event_rules' and active"
+    )
     await tasks.see(
         pool,
         KIND,
@@ -256,4 +277,4 @@ async def tune_alerts(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, Any]:
         weight=0.2,
         status="needs_owner",
     )
-    return {"lowered": chosen.event_type, "config_version": saved.id}
+    return {"lowered": chosen.event_type, "config_version": saved_id}

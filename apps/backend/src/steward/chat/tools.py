@@ -59,6 +59,7 @@ CHANGE_KINDS = (
     "set_autopilot_mode",
     "rollback_config",
     "roll_back_change",
+    "apply_change",
     "teach",
     "retract_teaching",
 )
@@ -760,8 +761,9 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     "(close_story), decision_id "
                     "(the others), verdict ok|wrong (review_decision), kind and mode "
                     "(set_autopilot_mode), domain and version_id (rollback_config), "
-                    "change_id (roll_back_change), area theses|chat|digest|news or "
-                    "autopilot:<kind> (tested on your own calls first) and text "
+                    "change_id (roll_back_change, apply_change), area "
+                    "theses|chat|digest|news or autopilot:<kind> (every one is tested before "
+                    "it applies) and text "
                     "(teach), ref (retract_teaching).",
                 },
                 "reason": {"type": "string"},
@@ -831,6 +833,8 @@ class ChatTools:
         self.used: list[str] = []
         self.actions: list[int] = []
         self.page = ""  # what the owner is looking at, set by the chat job
+        # A test of a prompt addition sets the owner-correction text itself (engine/replay.py).
+        self.corrections_override: str | None = None
         # Charts the model asked to show; the panel draws them from these blocks.
         self.visuals: list[Block] = []
         # One entry per call, for the job's step detail: what was asked, how long it took,

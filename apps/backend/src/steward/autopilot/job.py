@@ -18,7 +18,17 @@ from steward.autopilot.thesis_upkeep import (
 from steward.config.jobs import JobsConfig
 from steward.config.store import load_active
 from steward.engine import audit as engine_audit
-from steward.engine import challenger, data_audit, learning, override_watch, prompt_change, watchers
+from steward.engine import (
+    challenger,
+    data_audit,
+    instructions,
+    learning,
+    override_watch,
+    prompt_change,
+    proposer,
+    tuners,
+    watchers,
+)
 from steward.jobs.runner import JobContext
 from steward.llm.cache import ResultCache
 from steward.llm.client import create_llm
@@ -102,6 +112,15 @@ async def autopilot_handler(ctx: JobContext) -> None:
     if cfg.refresh_review_dates:
         async with ctx.step("review_dates") as step:
             step.detail.update(await refresh_review_dates(ctx.pool, days=cfg.review_extend_days))
+    if client is not None:
+        # An instruction you just gave is tested on the next run, not the next calibration.
+        async with ctx.step("area_instructions") as step:
+            tested = await instructions.settle_one(
+                ctx.pool, client, cfg, {"calls": cfg.max_calls_per_run}
+            )
+            if "usage" in tested:
+                step.usage = tested.pop("usage").step_usage()
+            step.detail.update(tested)
 
 
 async def autopilot_calibration_handler(ctx: JobContext) -> None:
@@ -152,17 +171,26 @@ async def autopilot_calibration_handler(ctx: JobContext) -> None:
         )
     async with ctx.step("watchers") as step:
         step.detail.update(await watchers.run(ctx.pool, now))
+    async with ctx.step("source_tuning") as step:
+        step.detail.update(await tuners.tune_sources(ctx.pool, now))
+    async with ctx.step("schedule_tuning") as step:
+        step.detail.update(await tuners.tune_schedule(ctx.pool, now))
+    async with ctx.step("config_rollbacks") as step:
+        step.detail.update(await tuners.check_rollbacks(ctx.pool, now))
     async with ctx.step("challengers") as step:
         step.detail.update(await challenger.settle_floors(ctx.pool, now))
     if client is not None:
+        calls = {"calls": cfg.max_calls_per_run}
+        async with ctx.step("model_tuning") as step:
+            step.detail.update(await tuners.tune_models(ctx.pool, client, now, calls))
+        async with ctx.step("prompt_proposals") as step:
+            drafted = await proposer.propose_one(ctx.pool, client, kinds, cfg, calls, now)
+            if "usage" in drafted:
+                step.usage = drafted.pop("usage").step_usage()
+            step.detail.update(drafted)
         async with ctx.step("prompt_changes") as step:
             tested = await prompt_change.settle_one(
-                ctx.pool,
-                client,
-                kinds,
-                cfg,
-                {"calls": cfg.max_calls_per_run},
-                lambda kind: lessons_for(ctx.pool, kind),
+                ctx.pool, client, kinds, cfg, calls, lambda kind: lessons_for(ctx.pool, kind)
             )
             if "usage" in tested:
                 step.usage = tested.pop("usage").step_usage()
