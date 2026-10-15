@@ -10,7 +10,8 @@ name: stewardai
 
 x-backend: &backend
   build:
-    context: ../apps/backend
+    context: ..
+    dockerfile: apps/backend/Dockerfile
   image: stewardai-backend
   env_file: ../.env
   restart: always
