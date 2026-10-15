@@ -72,7 +72,7 @@ def gaming(prev: Window, now: Window) -> list[str]:
 async def window(pool: asyncpg.Pool, kind: str, start: dt.datetime, end: dt.datetime) -> Window:
     row = await pool.fetchrow(
         "select count(*) filter (where status in ('applied', 'shadow', 'reverted')) as decided,"
-        " count(*) filter (where status = 'escalated') as escalated,"
+        " count(*) filter (where status in ('escalated', 'closed')) as escalated,"
         " count(*) filter (where status in ('applied', 'shadow', 'reverted')"
         "   and review is not null) as reviewed,"
         " count(*) filter (where status in ('applied', 'shadow', 'reverted')"

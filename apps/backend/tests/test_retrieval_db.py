@@ -170,6 +170,19 @@ async def test_prune_removes_records_that_left_the_source(backend_pool: asyncpg.
 
 
 @pytest.mark.db
+async def test_a_document_with_no_passages_is_remembered_and_not_picked_again(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    empty = SourceDoc(**{**REPORT.__dict__, "ref": "99", "text": ""})
+    assert await index.index_document(backend_pool, empty) == (0, 0, 0)
+    assert await backend_pool.fetchval(
+        "select reason from public.document_index_skip where kind = 'report' and ref = '99'"
+    )
+    assert await backend_pool.fetchval("select " + index.not_skipped("report", "'99'")) is False
+    assert await backend_pool.fetchval("select " + index.not_skipped("report", "'100'")) is True
+
+
+@pytest.mark.db
 async def test_only_missing_or_foreign_vectors_are_embedded(backend_pool: asyncpg.Pool) -> None:
     await index.index_documents(backend_pool, [FILING, REPORT])
     embedder = FakeEmbedder()

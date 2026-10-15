@@ -60,10 +60,12 @@ def cadence_hours(schedule: JobSchedule, now: dt.datetime) -> int | None:
 
 async def check_all(pool: asyncpg.Pool, jobs: JobsConfig, now: dt.datetime) -> dict[str, float]:
     """Every scheduled job is watched, not only the two that watch each other. A job whose
-    schedule is switched off is no longer watched and its notice resolves."""
+    schedule is switched off is no longer watched and its notice resolves. Interval jobs (the
+    intraday poll) are not watched: they pause outside market hours, and a skipped poll is
+    covered by the next one."""
     late: dict[str, float] = {}
     watched_types = {AUTOPILOT.job_type, WATCHDOG.job_type}
-    for job_type, schedule in jobs.worker_schedules().items():
+    for job_type, schedule in jobs.schedules().items():
         if not schedule.enabled or job_type in watched_types:
             continue
         hours = cadence_hours(schedule, now)

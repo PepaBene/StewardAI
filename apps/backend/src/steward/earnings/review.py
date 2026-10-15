@@ -56,7 +56,10 @@ async def review_fact(
     *,
     owner_id: str | None,
     corrected_value: Decimal | None = None,
+    by: Literal["owner", "autopilot"] = "owner",
 ) -> ReviewOutcome:
+    """Record a decision on a held fact. `by` is who made it: the autopilot's correction is not
+    the owner's value, so it stays an extraction-origin fact that reconciliation still checks."""
     reason = reason.strip()
     if not reason:
         raise ReviewError("a reason is required")
@@ -72,10 +75,10 @@ async def review_fact(
         corrected_id: int | None = None
         if action == "accept":
             new_status = "verified"
-            status_reason = f"accepted by the owner: {reason}"
+            status_reason = f"accepted by the {by}: {reason}"
         elif action == "reject":
             new_status = "rejected"
-            status_reason = f"rejected by the owner: {reason}"
+            status_reason = f"rejected by the {by}: {reason}"
         else:
             assert corrected_value is not None
             corrected_id = await conn.fetchval(
@@ -87,18 +90,19 @@ async def review_fact(
                 " select ticker, metric, basis, fiscal_year, fiscal_period, period, period_end,"
                 " $2, $3, scale, unit, currency, source_url, snippet, unit_snippet,"
                 " evidence_sha256, evidence_path, 'verified', $4, $5::jsonb, id,"
-                " config_version_ids, 'owner', $6, $7::uuid from public.fact where id = $1"
+                " config_version_ids, $8, $6, $7::uuid from public.fact where id = $1"
                 " returning id",
                 fact_id,
                 corrected_value,
                 format(corrected_value, "f"),
-                f"owner correction: {reason}",
-                json.dumps([{"check": "owner_override", "ok": True, "detail": reason}]),
+                f"{by} correction: {reason}",
+                json.dumps([{"check": f"{by}_override", "ok": True, "detail": reason}]),
                 now,
                 owner_id,
+                "owner" if by == "owner" else "extraction",
             )
             new_status = "rejected"
-            status_reason = f"corrected by the owner (fact #{corrected_id}): {reason}"
+            status_reason = f"corrected by the {by} (fact #{corrected_id}): {reason}"
         await conn.execute(
             "update public.fact set status = $2, status_reason = $3, reviewed_at = $4,"
             " reviewed_by = $5::uuid where id = $1",

@@ -14,6 +14,7 @@ it is stored.
 
 import datetime as dt
 import re
+import unicodedata
 import uuid
 from typing import Any
 
@@ -46,12 +47,25 @@ AREA_TEXT = {
 
 # A draft that touches any of these never reaches the test: the engine does not trade and does
 # not talk about its own configuration or secrets.
+# The check runs on text normalised by `_plain`. Words match by stem (buying, bought, tokens), but
+# only the endings of a word that is about trading, so "traditional" and "executive" pass.
+_TLDS = "com|org|net|io|ai|app|dev|info|biz|gov|edu|uk|de|cz|eu|ly|xyz|site|online|ru|cn"
 BLOCKED = re.compile(
-    r"https?://|www\.|\b(trade|trades|trading|order|orders|buy|sell|execute|broker|margin|"
-    r"password|secret|credential|api key|token|system prompt|ignore|disregard|override|"
-    r"previous instructions)\b",
+    r"[<>]|\]\s*\(|[a-z][a-z0-9+.-]*://|\bwww\.|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:" + _TLDS + r")\b"
+    r"|\b(?:trad(?:e|es|ed|er|ers|ing)|orders?|ordering|buy|bought|sell|sold"
+    r"|liquidat(?:e|es|ed|ing|ion)|execut(?:e|es|ed|ing|ion)|broker|margin|password|secrets?"
+    r"|credential|api[\s_-]?keys?|tokens?|system prompt|ignor|disregard|overrid"
+    r"|previous instructions)",
     re.IGNORECASE,
 )
+
+
+def _plain(text: str) -> str:
+    """The text as a reader sees it: compatibility forms folded (full-width letters), invisible
+    format characters such as zero-width spaces removed."""
+    folded = unicodedata.normalize("NFKC", text)
+    return "".join(ch for ch in folded if unicodedata.category(ch) != "Cf").strip()
+
 
 SYSTEM = (
     "You improve one prompt of a personal portfolio-research app. You are shown corrections the "
@@ -73,7 +87,7 @@ class Proposed(BaseModel):
 
 def acceptable(text: str) -> bool:
     """A draft the engine may even test."""
-    t = text.strip()
+    t = _plain(text)
     return MIN_CHARS <= len(t) <= MAX_CHARS and BLOCKED.search(t) is None
 
 
@@ -139,7 +153,7 @@ async def _draft(
     parsed = response.parsed_output
     if parsed is None:
         return None
-    text = parsed.instruction.strip()
+    text = _plain(parsed.instruction)  # what was checked is what is stored
     return text if acceptable(text) else None
 
 

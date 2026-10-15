@@ -79,6 +79,7 @@ async def index_document(pool: asyncpg.Pool, doc: SourceDoc) -> tuple[int, int, 
         return None
     chunked = chunking.chunk(doc.text, doc.title, structured=doc.structured)
     if not chunked.children:
+        await skip(pool, doc.kind, doc.ref, "no passages in the text")
         return 0, 0, 0
     common = (doc.kind, doc.ref, doc.version)
     shared = (list(doc.tickers), doc.as_of, doc.source_url, doc.app_path, doc.tier)
@@ -139,6 +140,35 @@ async def index_document(pool: asyncpg.Pool, doc: SourceDoc) -> tuple[int, int, 
             rows,
         )
     return len(chunked.parents), len(chunked.children), reused
+
+
+# Kinds picked as "not indexed yet": one that cannot be used is remembered, or it would be picked
+# again every run and keep older documents from ever getting their turn.
+SKIPPABLE = frozenset({"report", "news", "filing"})
+SKIP_RETRY_DAYS = 30
+
+
+async def skip(pool: asyncpg.Pool, kind: str, ref: str, reason: str) -> None:
+    """Remember a document the index could not use; it is tried again after `SKIP_RETRY_DAYS`."""
+    if kind not in SKIPPABLE:
+        return
+    await pool.execute(
+        "insert into public.document_index_skip (kind, ref, reason) values ($1, $2, $3)"
+        " on conflict (kind, ref) do update set reason = excluded.reason, skipped_at = now()",
+        kind,
+        ref,
+        reason[:300] or "unusable",
+    )
+
+
+def not_skipped(kind: str, ref_sql: str) -> str:
+    """A SQL condition that leaves out documents skipped within `SKIP_RETRY_DAYS`."""
+    if kind not in SKIPPABLE:
+        raise ValueError(f"{kind} is not a kind the index skips")
+    return (
+        f"not exists (select 1 from public.document_index_skip s where s.kind = '{kind}'"  # noqa: S608 - kind is one of SKIPPABLE
+        f" and s.ref = {ref_sql} and s.skipped_at > now() - interval '{SKIP_RETRY_DAYS} days')"
+    )
 
 
 async def index_documents(pool: asyncpg.Pool, docs: Sequence[SourceDoc]) -> IndexStats:

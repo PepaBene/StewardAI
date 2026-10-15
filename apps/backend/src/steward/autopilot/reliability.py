@@ -84,12 +84,14 @@ async def report(pool: asyncpg.Pool, now: dt.datetime) -> list[KindCalibration]:
     rows = await pool.fetch(
         "select kind, confidence, review from public.auto_decision where confidence is not null"
         " and review is not null and status in ('applied', 'shadow', 'reverted')"
-        " and decided_at >= $1 order by kind",
+        " and decided_by <> 'owner-accepted' and decided_at >= $1 order by kind",
         now - dt.timedelta(days=WINDOW_DAYS),
     )
     by_kind: dict[str, list[Point]] = {}
     for r in rows:
-        by_kind.setdefault(r["kind"], []).append(Point(float(r["confidence"]), r["review"] == "ok"))
+        # The column is a float4: 0.9 reads back as 0.8999999762 and would fall in the bin below.
+        point = Point(round(float(r["confidence"]), 4), r["review"] == "ok")
+        by_kind.setdefault(r["kind"], []).append(point)
     out = []
     for kind, points in sorted(by_kind.items()):
         bins = bins_of(points)

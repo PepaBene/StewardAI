@@ -20,6 +20,7 @@ subject and resolves the notices of subjects that are fine again. Audits only re
 
 import datetime as dt
 import json
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -27,6 +28,8 @@ import asyncpg
 
 from steward.autopilot import ledger
 from steward.ops import tasks
+
+logger = logging.getLogger("steward.engine")
 
 KIND = "data_audit"
 PRICE_DISAGREE = 0.02  # two sources differ by more than 2%
@@ -48,7 +51,11 @@ class Finding:
 
 
 def relative_gap(a: float, b: float) -> float:
-    return abs(a - b) / max(abs(a), abs(b)) if a and b else 0.0
+    """How far apart two figures are, as a share of the larger. Two zeros agree; a zero against
+    anything else is a full disagreement."""
+    if not a and not b:
+        return 0.0
+    return abs(a - b) / max(abs(a), abs(b))
 
 
 def price_disagreement(symbol: str, day: dt.date, closes: dict[str, float]) -> Finding | None:
@@ -129,7 +136,7 @@ async def prices(pool: asyncpg.Pool, now: dt.datetime) -> list[Finding]:
     for r in await pool.fetch(
         "select symbol, date, close, lag(close) over (partition by symbol, source, bar_type"
         " order by date)"
-        " as prev from public.price_bar where date >= $1::date - 5"
+        " as prev from public.price_bar where date >= $1::date - 5 and bar_type = 'adjusted'"
         " order by symbol, date",
         since,
     ):
@@ -191,8 +198,8 @@ def portfolio_problems(
     now: dt.date,
 ) -> list[Finding]:
     """Invariants of the latest sync: the positions add up to what the broker says is invested,
-    cash and invested add up to the total, nothing has a zero quantity or price, and the sync is
-    recent."""
+    cash (free, in pies and reserved) and invested add up to the total, nothing has a zero
+    quantity or price, and the sync is recent."""
     found: list[Finding] = []
     if relative_gap(positions_sum, invested) > SNAPSHOT_TOLERANCE:
         found.append(
@@ -232,7 +239,9 @@ def portfolio_problems(
 
 async def portfolio(pool: asyncpg.Pool, now: dt.datetime) -> list[Finding]:
     row = await pool.fetchrow(
-        "select a.snapshot_date, a.invested_value, a.cash_available, a.total_value,"
+        "select a.snapshot_date, a.invested_value, a.total_value,"
+        " coalesce(a.cash_available, 0) + coalesce(a.cash_in_pies, 0)"
+        "  + coalesce(a.cash_reserved, 0) as cash,"
         " (select coalesce(sum(p.value_account), 0) from public.position_snapshot p"
         "  where p.snapshot_date = a.snapshot_date) as positions,"
         " (select count(*) from public.position_snapshot p where p.snapshot_date = a.snapshot_date"
@@ -245,7 +254,7 @@ async def portfolio(pool: asyncpg.Pool, now: dt.datetime) -> list[Finding]:
         row["snapshot_date"],
         float(row["positions"]),
         float(row["invested_value"]),
-        float(row["cash_available"]),
+        float(row["cash"]),
         float(row["total_value"]),
         int(row["bad"]),
         now.date(),
@@ -553,11 +562,18 @@ AUDITS: dict[str, Audit] = {
 
 
 async def run(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int]:
-    """Run every audit; one notice per finding, resolved when the finding is gone."""
+    """Run every audit; one notice per finding, resolved when the finding is gone. An audit that
+    fails is logged and reported as `<name>_failed`; the others still run, and nothing is
+    resolved while one failed, since its findings are unknown."""
     counts: dict[str, int] = {}
     present: set[str] = set()
     for name, audit in AUDITS.items():
-        findings = await audit(pool, now)
+        try:
+            findings = await audit(pool, now)
+        except Exception:
+            logger.exception("data audit %s failed", name)
+            counts[f"{name}_failed"] = 1
+            continue
         counts[name] = len(findings)
         for f in findings:
             present.add(f.subject)
@@ -571,5 +587,6 @@ async def run(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, int]:
                 weight=0.3,
                 status="needs_owner",
             )
-    await tasks.settle(pool, KIND, present)
+    if not any(k.endswith("_failed") for k in counts):
+        await tasks.settle(pool, KIND, present)
     return counts

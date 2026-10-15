@@ -29,27 +29,23 @@ def due(task: tasks.OpsTask, now: dt.datetime, retry_hours: float) -> bool:
     return now - task.first_seen >= dt.timedelta(hours=retry_hours)
 
 
+def defect_title(feature: str) -> str:
+    return f"Release gate: {feature} was switched off"
+
+
 async def close_fixed_defects(pool: asyncpg.Pool, owner_id: str, readiness: Readiness) -> int:
-    """Close the defects this module opened once the feature passes the gate again."""
+    """Close the defects this module opened once the feature passes the gate again. They are
+    found in the defect log itself, so dismissing or snoozing the notice does not lose them."""
     passing = {f.id for f in readiness.features if f.can_activate}
-    rows = await pool.fetch(
-        "select id, subject, last_action from public.ops_task"
-        " where kind = $1 and last_action like 'defect:%'",
-        KIND,
-    )
     closed = 0
-    for r in rows:
-        if r["subject"] not in passing:
+    for d in await defects.list_current(pool, owner_id):
+        if d.state != "open" or d.feature not in passing or d.title != defect_title(d.feature):
             continue
-        defect_id = int(r["last_action"].split(":", 1)[1])
         await defects.update(
             pool,
             owner_id,
-            defect_id,
+            d.id,
             defects.DefectUpdate(state="fixed", detail="The release gate passes again."),
-        )
-        await pool.execute(
-            "update public.ops_task set last_action = 'defect closed' where id = $1", r["id"]
         )
         closed += 1
     return closed
@@ -64,15 +60,24 @@ async def check_release_gate(
     switched_off: list[str] = []
     for item in failing:
         note = item.gate_note or "no longer passes the release gate"
-        task = await tasks.see(
-            pool,
-            KIND,
-            item.feature,
-            title=f"{item.feature} fails the release gate",
-            detail=note,
-            href="/release",
-            weight=0.4,
-        )
+
+        async def seen(feature: str = item.feature, detail: str = note) -> tasks.OpsTask:
+            return await tasks.see(
+                pool,
+                KIND,
+                feature,
+                title=f"{feature} fails the release gate",
+                detail=detail,
+                href="/release",
+                weight=0.4,
+            )
+
+        task = await seen()
+        if task.status == "needs_owner":
+            # It was switched off and the owner switched it back on while it still fails: the
+            # old notice is done, and a new failure window starts from now.
+            await tasks.resolve(pool, task.id)
+            task = await seen()
         if task.status == "fixing" and due(task, now, retry_hours):
             await activation.record(
                 pool,
@@ -88,7 +93,7 @@ async def check_release_gate(
                 pool,
                 owner_id,
                 defects.DefectIn(
-                    title=f"Release gate: {item.feature} was switched off",
+                    title=defect_title(item.feature),
                     detail=f"Opened automatically. {note}"[:2000],
                     ticker=None,
                     feature=item.feature,

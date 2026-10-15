@@ -201,9 +201,16 @@ async def post_message(
     return PostedMessage(message=_message({**dict(row), "job_id": job_id}), job_id=job_id)
 
 
+class ConfirmIn(BaseModel):
+    second: bool = False
+
+
 @router.post("/chat/actions/{action_id}/confirm")
-async def confirm_action(action_id: IdPath, pool: Pool, owner: Owner) -> ActionOut:
-    """Start a job the assistant proposed. It appears in the job log with trigger `chat`."""
+async def confirm_action(
+    action_id: IdPath, pool: Pool, owner: Owner, body: ConfirmIn | None = None
+) -> ActionOut:
+    """Start a job the assistant proposed. It appears in the job log with trigger `chat`. A
+    high-risk change answers 428 until it is confirmed a second time (`second: true`)."""
     async with pool.acquire() as conn, conn.transaction():
         row = await conn.fetchrow(
             "select * from public.chat_action where id = $1 for update", action_id
@@ -216,9 +223,14 @@ async def confirm_action(action_id: IdPath, pool: Pool, owner: Owner) -> ActionO
         job_id: int | None = None
         if row["kind"] in CHANGE_KINDS:
             # A change to what the engine did runs now, through the same registry the screens
-            # use; the card's button is the owner's confirmation.
+            # use; the card's button is the owner's confirmation, and a high-risk change needs
+            # the card's second confirmation as well.
             try:
-                await registry.confirm(pool, int(params["owner_action_id"]), second=True)
+                await registry.confirm(
+                    pool, int(params["owner_action_id"]), second=bool(body and body.second)
+                )
+            except registry.NeedsSecondConfirm as exc:
+                raise HTTPException(status.HTTP_428_PRECONDITION_REQUIRED, str(exc)) from exc
             except (registry.ActionError, KeyError) as exc:
                 raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
         else:

@@ -5,8 +5,10 @@ is applied and undone. A fake pool stands in for the database; the real SQL is c
 import json
 from typing import Any
 
+import asyncpg
 import pytest
 
+from steward.autopilot import ledger
 from steward.autopilot.judge import ApplyError, Candidate
 from steward.autopilot.kinds import inbox
 from steward.inbox import service
@@ -149,6 +151,49 @@ async def test_the_owners_call_counts_as_an_outcome_but_the_autopilots_does_not(
             return False if "auto_decision" in query else "confirmed"
 
     assert await inbox._action_outcome(OwnerPool(), "inbox_action:7") == "confirm"
+
+
+async def _decide(
+    pool: asyncpg.Pool, n: int, decision: str, by: str, review: str, old: bool = False
+) -> None:
+    row_id = await ledger.record(
+        pool,
+        kind="inbox_action",
+        subject_ref=f"inbox_action:{n}",
+        ticker=None,
+        decision=decision,
+        confidence=0.95,
+        decided_by=by,
+        summary="s",
+        evidence={"job": "price_history"},
+        status="applied",
+    )
+    await pool.execute(
+        "update public.auto_decision set review = $2, reviewed_by = 'owner',"
+        " decided_at = now() - make_interval(days => $3) where id = $1",
+        row_id,
+        review,
+        100 if old else 1,
+    )
+
+
+@pytest.mark.db
+async def test_the_refresh_rule_is_earned_by_recent_confirms_and_lost_to_a_wrong_one(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    pool = backend_pool
+    for n in range(10):  # right declines say nothing about confirming
+        await _decide(pool, n, "decline", "model:m", "ok")
+    for n in range(10, 19):
+        await _decide(pool, n, "confirm", "model:m", "ok")
+    assert await inbox.calibrated_jobs(pool) == set()  # nine confirms are too few
+    await _decide(pool, 19, "confirm", "model:m", "ok", old=True)  # outside the window
+    assert await inbox.calibrated_jobs(pool) == set()
+    await _decide(pool, 20, "confirm", "model:m", "ok")
+    assert await inbox.calibrated_jobs(pool) == {"price_history"}
+    # The rule's own confirm was judged wrong: 10 of 11 is below the bar, so the rule is lost.
+    await _decide(pool, 21, "confirm", "rule:calibrated-refresh", "wrong")
+    assert await inbox.calibrated_jobs(pool) == set()
 
 
 def test_both_kinds_expire_to_a_decline_and_are_registered() -> None:

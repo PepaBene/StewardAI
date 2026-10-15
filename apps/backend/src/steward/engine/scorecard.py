@@ -88,7 +88,7 @@ async def build(pool: asyncpg.Pool, now: dt.datetime) -> AutonomyScorecard:
         or 0
     )
     stats = await ledger.stats(pool, since)
-    escalated = sum(s.escalated for s in stats)
+    escalated = sum(s.raised for s in stats)
     items_per_week = (new_notices + escalated) / weeks
     open_notices = int(
         await pool.fetchval("select count(*) from public.ops_task where status = 'needs_owner'")

@@ -3785,7 +3785,8 @@ export interface paths {
         put?: never;
         /**
          * Confirm Action
-         * @description Start a job the assistant proposed. It appears in the job log with trigger `chat`.
+         * @description Start a job the assistant proposed. It appears in the job log with trigger `chat`. A
+         *     high-risk change answers 428 until it is confirmed a second time (`second: true`).
          */
         post: operations["confirm_action"];
         delete?: never;
@@ -46810,7 +46811,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ConfirmIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

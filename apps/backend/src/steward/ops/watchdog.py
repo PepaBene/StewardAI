@@ -24,6 +24,8 @@ job, so it shows in the job list like any other run.
 import datetime as dt
 import logging
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from decimal import Decimal
 from typing import Any
 
@@ -115,7 +117,9 @@ async def check_failed_jobs(
     pool: asyncpg.Pool, jobs: JobsConfig, cfg: OpsSettings, now: dt.datetime
 ) -> dict[str, Any]:
     summary: dict[str, Any] = {}
-    watched = [t for t in jobs.monitoring.alert_failed_jobs if t not in NO_RETRY]
+    # The primaries that have a standby are watched even when they are not on the alert list,
+    # or their failover could never start.
+    watched = sorted((set(jobs.monitoring.alert_failed_jobs) | set(FAILOVER)) - NO_RETRY)
     rows = await pool.fetch(
         "select distinct on (job_type) job_type, status, error, finished_at from public.job"
         " where job_type = any($1::text[]) and created_at >= $2"
@@ -124,7 +128,14 @@ async def check_failed_jobs(
         now - dt.timedelta(days=2),
     )
     failing: set[str] = set()
+    # Failing although a retry was already tried: the standby takes over for these.
+    after_retry: set[str] = set()
+    # A retry that is still queued or running keeps its task (and its attempts) open.
+    in_flight: set[str] = set()
     for r in rows:
+        if r["status"] in OPEN_STATES:
+            in_flight.add(r["job_type"])
+            continue
         # A run a deploy interrupted is not a failure; the worker's catch-up reruns it.
         if r["status"] != "failed" or (r["error"] or "").startswith("interrupted"):
             continue
@@ -138,14 +149,16 @@ async def check_failed_jobs(
             href="/status",
             weight=0.3,
         )
+        if task.attempts > 0:
+            after_retry.add(r["job_type"])
 
         async def retry(job_type: str = r["job_type"]) -> str | None:
             job_id = await queue_job(pool, job_type)
             return None if job_id is None else f"retried as job {job_id}"
 
         await _act(pool, task, cfg, now, can_repair=True, repair=retry, summary=summary)
-    summary["resolved"] = await tasks.settle(pool, "job_failed", failing)
-    summary["failover"] = await run_failover(pool, jobs, failing, now)
+    summary["resolved"] = await tasks.settle(pool, "job_failed", failing | in_flight)
+    summary["failover"] = await run_failover(pool, jobs, after_retry, now, failing | in_flight)
     return summary
 
 
@@ -160,11 +173,17 @@ STANDBY_EVERY = dt.timedelta(hours=12)
 
 
 async def run_failover(
-    pool: asyncpg.Pool, jobs: JobsConfig, failing: set[str], now: dt.datetime
+    pool: asyncpg.Pool,
+    jobs: JobsConfig,
+    failing: set[str],
+    now: dt.datetime,
+    still_down: set[str] | None = None,
 ) -> dict[str, list[str]]:
-    """Run the standby for each primary that is still failing, at most once per `STANDBY_EVERY`
-    and never one whose own last run failed. A notice says the data is coming from the
-    standby; it resolves when the primary runs again."""
+    """Run the standby for each primary in `failing` (still failing after its retry), at most
+    once per `STANDBY_EVERY` and never one whose own last run failed. A notice says the data is
+    coming from the standby; it resolves when the primary runs again (it stays while the
+    primary is in `still_down`, which defaults to `failing`)."""
+    still_down = failing if still_down is None else still_down
     enabled = {name for name, s in jobs.schedules().items() if s.enabled}
     started: list[str] = []
     for primary, standbys in FAILOVER.items():
@@ -199,7 +218,7 @@ async def run_failover(
     await pool.execute(
         "update public.ops_task set status = 'resolved', resolved_at = now()"
         " where kind = 'failover' and status <> 'resolved' and subject <> all($1::text[])",
-        sorted(failing),
+        sorted(still_down),
     )
     return {"started": started}
 
@@ -262,6 +281,8 @@ async def check_blocks(pool: asyncpg.Pool, cfg: OpsSettings, now: dt.datetime) -
             href="/status",
             weight=0.2,
         )
+        # A block that is back after it was lifted keeps the attempts already spent on it.
+        task = await tasks.carry_attempts(pool, task, max(age, dt.timedelta(days=30)))
         aged = cfg.block_reset_days > 0 and now - r["updated_at"] >= age
 
         async def lift(provider: str = r["provider"], endpoint: str = r["endpoint"]) -> str | None:
@@ -356,11 +377,31 @@ async def check_budget(pool: asyncpg.Pool, now: dt.datetime) -> dict[str, Any]:
         href="/config/budget",
         weight=0.5,
         status="needs_owner",
+        keep_dismissed=True,  # the subject is the month: dismissed means for this month
     )
     return {"projected": round(fc.projected, 2), "cap": cap}
 
 
 # ---------------------------------------------------------------------------------- handler
+
+
+class Steps:
+    """Runs each check as its own job step. A check that raises is recorded as a failed step
+    and the run goes on to the next one, so one broken check does not silence the rest every
+    hour; the job still ends failed, naming the checks that failed."""
+
+    def __init__(self, ctx: JobContext) -> None:
+        self.ctx = ctx
+        self.failed: list[str] = []
+
+    @asynccontextmanager
+    async def run(self, name: str) -> AsyncIterator[Any]:
+        try:
+            async with self.ctx.step(name) as step:
+                yield step
+        except Exception:
+            logger.exception("watchdog check %s failed", name)
+            self.failed.append(name)
 
 
 async def watchdog_handler(ctx: JobContext) -> None:
@@ -371,54 +412,63 @@ async def watchdog_handler(ctx: JobContext) -> None:
     if not cfg.enabled:
         return
     now = dt.datetime.now(dt.UTC)
-    async with ctx.step("failed_jobs") as step:
+    steps = Steps(ctx)
+    await _checks(ctx, steps, jobs, cfg, now)
+    if steps.failed:
+        raise RuntimeError(f"watchdog checks failed: {', '.join(steps.failed)}")
+
+
+async def _checks(
+    ctx: JobContext, steps: Steps, jobs: JobsConfig, cfg: OpsSettings, now: dt.datetime
+) -> None:
+    async with steps.run("failed_jobs") as step:
         step.detail.update(await check_failed_jobs(ctx.pool, jobs, cfg, now))
-    async with ctx.step("quality") as step:
+    async with steps.run("quality") as step:
         step.detail.update(await check_quality(ctx.pool, cfg, now))
-    async with ctx.step("provider_blocks") as step:
+    async with steps.run("provider_blocks") as step:
         step.detail.update(await check_blocks(ctx.pool, cfg, now))
     if jobs.autopilot_settings.enabled:
-        async with ctx.step("liveness") as step:
+        async with steps.run("liveness") as step:
             step.detail["autopilot_overdue_hours"] = await liveness.check(
                 ctx.pool, liveness.AUTOPILOT, now
             )
-    async with ctx.step("delivery") as step:
+    async with steps.run("delivery") as step:
         async with httpx.AsyncClient(timeout=20.0) as http:
             step.detail["undelivered"] = await delivery.check(
                 ctx.pool, now, channels_from_settings(http, get_settings())
             )
-    async with ctx.step("job_liveness") as step:
+    async with steps.run("job_liveness") as step:
         step.detail["overdue"] = await liveness.check_all(ctx.pool, jobs, now)
     if cfg.refresh_derived:
-        async with ctx.step("derived_inputs") as step:
+        async with steps.run("derived_inputs") as step:
             step.detail.update(await refresh_derived(ctx.pool, jobs))
     if cfg.suggest_rebalance and now.hour == cfg.suggest_hour_utc:
-        async with ctx.step("suggestions") as step:
+        async with steps.run("suggestions") as step:
             step.detail.update(await suggest_rebalance(ctx.pool))
             step.detail["thesis_breaks"] = await suggest_thesis_breaks(ctx.pool)
     owner_id = get_settings().owner_user_id
     if cfg.fill_segment_map and owner_id and now.hour == cfg.suggest_hour_utc:
-        async with ctx.step("company_inputs") as step:
+        async with steps.run("company_inputs") as step:
             held = sorted(await ledger.holding_weights(ctx.pool))
             step.detail.update(await fill_country_maps(ctx.pool, uuid.UUID(owner_id), held))
     if cfg.tune_alerts and now.hour == cfg.suggest_hour_utc:
-        async with ctx.step("tune_alerts") as step:
+        async with steps.run("tune_alerts") as step:
             step.detail.update(await tune_alerts(ctx.pool, now))
             step.detail["inbox"] = await tune_inbox(ctx.pool, now)
             step.detail["notices"] = await tune_notices(ctx.pool, now)
     if cfg.anticipate_earnings and now.hour == cfg.suggest_hour_utc:
-        async with ctx.step("anticipate") as step:
+        async with steps.run("anticipate") as step:
             step.detail.update(await anticipate.announce(ctx.pool, now.date()))
     if cfg.suggest_opportunities and owner_id and now.hour == cfg.suggest_hour_utc:
-        async with ctx.step("opportunities") as step:
+        async with steps.run("opportunities") as step:
             step.detail.update(await check_opportunities(ctx.pool, uuid.UUID(owner_id)))
     if cfg.release_gate and owner_id:
-        async with ctx.step("release_gate") as step:
+        async with steps.run("release_gate") as step:
             step.detail.update(await check_release_gate(ctx.pool, owner_id, now, cfg.retry_hours))
     if cfg.draft_case_items and owner_id and now.hour == cfg.suggest_hour_utc:
         theses = await load_active(ctx.pool, "theses", ThesesConfig)
         if theses is not None:
-            async with ctx.step("case_items") as step:
+            async with steps.run("case_items") as step:
                 step.detail.update(
                     await fill_case_items(
                         ctx.pool,
@@ -428,15 +478,15 @@ async def watchdog_handler(ctx: JobContext) -> None:
                     )
                 )
     if cfg.key_notices:
-        async with ctx.step("keys") as step:
+        async with steps.run("keys") as step:
             step.detail.update(await check_keys(ctx.pool, jobs))
     if cfg.journal_gaps:
-        async with ctx.step("journal_gaps") as step:
+        async with steps.run("journal_gaps") as step:
             step.detail.update(
                 await journal_gaps.check_journal_gaps(
                     ctx.pool, now.date(), owner_id if cfg.autolog_trades else None
                 )
             )
     if cfg.budget_forecast:
-        async with ctx.step("budget") as step:
+        async with steps.run("budget") as step:
             step.detail.update(await check_budget(ctx.pool, now))

@@ -87,7 +87,7 @@ The risk is overlap: the worker runs up to 4 jobs at once in one process
 | 8 | `valuation/read.py:509-515` | `fx_rate` already filtered by source and date; only the currency is not | small | none: the table needs the base currency too, so a currency filter risks wrong conversions | checked, left |
 | 9 | `quant/french_store.py:51-60` | `load_factors` takes `since` and its only caller (`portfolio/factors.py:392`) passes it | small | none | checked, left |
 | 10 | `engine/data_audit.py:110-130` | two unbounded `price_bar` fetches (~20K rows) | small | compare in SQL | open |
-| 11-12 | `portfolio/exante.py` `_BOOK_CACHE`, `xray/service.py` `_cache` | caches evict by TTL only | low | hard size cap | open |
+| 11-12 | `portfolio/exante.py` `_BOOK_CACHE`, `xray/service.py` `_cache` | `_BOOK_CACHE` keeps one entry (cleared on insert); `_cache` drops expired entries on every insert | low | none | checked, left |
 | 14 | `news/pipeline.py:1813-1906` | all collected items plus 72 h of recent members | modest | process per source | open |
 | - | `worker/__main__.py:59` | 4 jobs at once in one process | multiplies the above | 4 to 2 only with a separate lane for short jobs: `news_ingest` (up to 37 min) and `price_history` (up to 2 h) could otherwise starve the 15-minute `monitor` and `intraday_prices` | open |
 
@@ -100,8 +100,9 @@ Checked against the live database on 2026-10-15:
 - pgmq: replaced by the `public.job_queue` table (migration `20261126100000`,
   `jobs/queue.py` rewritten with the same four functions). Done in code; pending messages are
   copied over after the deploy (see the migration comment).
-- `auth.users`: no foreign keys from `public` tables to it; one function uses `auth.uid()` and
-  24 of 474 policies mention `auth.`. Restore with stub `auth.uid()` / `auth.jwt()` functions and
+- `auth.users`: 23 `public` tables have `owner_id` foreign keys to it (cascade); the copy keeps
+  them valid with a one-row `auth.users` stub holding the owner. One function uses `auth.uid()`
+  and 24 of 474 policies mention `auth.`; 207 policies call `private.is_owner()`. Restore with stub `auth.uid()` / `auth.jwt()` functions and
   the roles `anon`, `authenticated`, `service_role`, or drop those policies: the backend checks
   the owner itself (`OWNER_USER_ID`) and connects as `app_backend`.
 - 234 tables in `public`, roles granted: `anon`, `app_backend`, `authenticated`, `postgres`,
@@ -111,6 +112,27 @@ Checked against the live database on 2026-10-15:
 - Live sync status: serve `job` and `job_step` from a backend endpoint (poll or SSE) and remove
   the direct Supabase reads and the Realtime channel from `sync-status-provider.tsx`.
 - pg_cron: move the retention job to the backend scheduler (worker already uses APScheduler).
+
+Progress (2026-10-15):
+- Done in code: live sync status now polls `GET /jobs` / `GET /jobs/{id}` (no Supabase table
+  reads or Realtime in `sync-status-provider.tsx`); the retention job also runs from the worker
+  scheduler (`Worker.run_retention`, 03:17 daily), so the pg_cron job is not needed.
+- Provisioned: service `Postgres` (image `pgvector/pgvector:pg17`, the upstream pgvector image
+  rather than an unverified marketplace template), 3 GB volume in europe-west4-drams3a,
+  Railway-generated passwords, tuning flags below. A Railway image service ignores its start
+  command for one-off jobs (a throwaway `db-restore` service exited at once with no output), so
+  the copy runs from a workstation: `deploy/db-move/run-local.sh` (docker, `postgres:17`) over a
+  temporary TCP proxy.
+- Restore rehearsal done 2026-10-15: public schema copied in about 13 minutes; row counts of
+  the big tables identical; 630 MB on Railway against 741 MB on Supabase (no bloat). Smoke test
+  (`deploy/db-move/smoke.sql`, as `app_backend`): vector data, queue read/delete, sequences,
+  the append-only guard and the owner foreign key all behave. It found that `app_backend` had no
+  USAGE on schema `private` (so the worker retention job would have failed on Supabase too);
+  fixed by migration `20261129100000`.
+- What the copy needs that `pg_dump` cannot give `app_backend`: `private` schema (applied from
+  `private_schema.sql`), sequence values (reset from the data), and a temporary
+  `grant select on all sequences in schema public to app_backend` on Supabase (revoke after).
+- Not started: cutover, backups, removing the TCP proxy and the `db-restore` service.
 
 Steps:
 1. Provision Postgres (pgvector) in project `dependable-vitality`, same environment, private
@@ -128,16 +150,39 @@ Steps:
    test a restore once.
 6. Remove `public` tables from Supabase after the fallback window so only Auth remains.
 
-## Phase 4: other Railway cost cuts
+## Phase 4: other Railway cost cuts (done 2026-10-15: measured, decisions recorded)
 
-- Egress to Supabase falls to near zero once the DB is private-network.
-- Keep one replica in one region (already so). CPU and RAM limits do not change the bill;
-  usage does.
-- Review the schedule: `monitor` runs 672 times a week and `intraday_prices` 320; check
-  whether either needs to run outside market hours.
-- `price_history` and `news_ingest` are the long jobs; shortening them lowers peak RAM time.
-- Do not use a second service for the worker unless Chromium is enabled: two always-on
-  services double the baseline RAM.
+Measured over 7 days: jobs ran about 34 hours of 168; memory is flat at 0.485 GB average
+(0.50 before `MALLOC_ARENA_MAX=2`); CPU about 0.004 vCPU. Railway bills the always-on baseline,
+not the job minutes, so:
+- Schedules: left as they are. `monitor` is 672 runs of about 1 s (16 minutes a week) and
+  `intraday_prices` 320 runs of 18 s (98 minutes); moving either off-hours saves nothing on the
+  bill and would delay alerts. `news_ingest` (923 min) and `price_history` (314 min, mostly
+  pacing sleeps) are the long jobs; they only matter for peaks, which the bounded-memory audit
+  already covers.
+- One replica in one region (already so); limits do not change the bill, usage does.
+- No second service for the worker unless Chromium is enabled: two always-on services double
+  the baseline.
+- Egress to Supabase falls to near zero once the database is on the private network (cutover).
+- Left to measure after the cutover: the Postgres service's real RAM against the 150-250 MB
+  expectation, then tune `shared_buffers`.
+
+### Re-creating the Postgres service (the rehearsal copy was deleted)
+
+The rehearsal service was removed so no idle copy or exposed password stays around. Recreate it
+the same way, with fresh generated passwords, just before the cutover:
+- Service `Postgres`, image `pgvector/pgvector:pg17`, region `europe-west4-drams3a`, a 3 GB
+  volume at `/var/lib/postgresql/data` in the same region.
+- Variables: `POSTGRES_USER=postgres`, `POSTGRES_DB=steward`,
+  `PGDATA=/var/lib/postgresql/data/pgdata`, and `POSTGRES_PASSWORD` / `APP_BACKEND_PASSWORD`
+  as `${{secret(40)}}`.
+- Start command: `docker-entrypoint.sh postgres -c max_connections=30 -c shared_buffers=128MB
+  -c effective_cache_size=384MB -c work_mem=4MB -c maintenance_work_mem=64MB -c
+  autovacuum_max_workers=2 -c max_wal_size=512MB -c listen_addresses=*`.
+- Then, with a temporary TCP proxy and the three values in `~/db-move.env`:
+  `sh deploy/db-move/run-local.sh` (about 13 minutes), `deploy/db-move/smoke.sql` as
+  `app_backend`, remove the proxy and the env file. For the cutover itself, stop the worker
+  first and repeat the copy so it is current.
 
 ## Expected cost (Hobby, usage-based; verify against Railway's current price list)
 

@@ -104,6 +104,29 @@ async def test_cancel_unknown_and_bad_arguments_are_refused(backend_pool: asyncp
 
 
 @pytest.mark.db
+async def test_an_action_that_breaks_is_logged_as_failed_not_done(
+    backend_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    row = await registry.propose(
+        backend_pool, "dismiss_notice", {"task_id": await notice(backend_pool)}, via="chat"
+    )
+    action, parsed = registry._parse(row.action, row.args)
+
+    async def broken(_pool: asyncpg.Pool, _args: object) -> dict[str, object]:
+        raise RuntimeError("database went away")
+
+    monkeypatch.setattr(
+        registry, "_parse", lambda *_: (dataclasses.replace(action, run=broken), parsed)
+    )
+    with pytest.raises(RuntimeError):
+        await registry.confirm(backend_pool, row.id)
+    status, result = await backend_pool.fetchrow(
+        "select status, result->>'error' from public.owner_action where id = $1", row.id
+    )
+    assert (status, result) == ("failed", "database went away")
+
+
+@pytest.mark.db
 async def test_changing_a_mode_needs_a_second_confirmation(backend_pool: asyncpg.Pool) -> None:
     row = await registry.propose(
         backend_pool, "set_autopilot_mode", {"kind": "fact", "mode": "off"}, via="chat"

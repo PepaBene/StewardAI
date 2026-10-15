@@ -9,6 +9,7 @@ from typing import Any
 import asyncpg
 import pytest
 
+from steward.autopilot import ledger
 from steward.autopilot.judge import ApplyError, Candidate
 from steward.autopilot.kinds import facts
 from steward.autopilot.kinds.facts import (
@@ -353,6 +354,63 @@ async def test_fact_correct_uses_a_stored_value_and_a_human_call_is_final(
     assert await facts.fact_outcome(pool, f"fact:{held_id}") == "reject"
     with pytest.raises(ApplyError):
         await facts.fact_apply(pool, cand, "accept", "Autopilot (model:x, 0.95): x")
+
+
+@pytest.mark.db
+async def test_a_correction_is_not_the_owners_and_is_not_flagged_as_restated(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    pool = backend_pool
+    held_id = await _fact(pool, "DBR_US_EQ", "143800")
+    source_id = await _fact(pool, "DBR_US_EQ", "134800", status="verified", sha_tag="b")
+    cand = next(c for c in await facts.fact_load(pool, 50) if c.ref == f"fact:{held_id}")
+    assert await facts.fact_verify(pool, cand, "correct_other_1") == []
+
+    payload = await facts.fact_apply(pool, cand, "correct_other_1", "Autopilot (model:x, 0.95): x")
+    assert payload is not None
+    made = await pool.fetchrow(
+        "select origin, status_reason from public.fact where id = $1", payload["corrected_fact_id"]
+    )
+    # Reconciliation skips owner-origin facts; this one is the model's and must still be checked.
+    assert made["origin"] == "extraction" and made["status_reason"].startswith("autopilot")
+
+    row = ledger.AutoDecision(
+        id=1,
+        kind="fact",
+        subject_ref=cand.ref,
+        ticker=cand.ticker,
+        decision="correct_other_1",
+        confidence=0.95,
+        decided_by="model:x",
+        summary="s",
+        evidence=cand.evidence,
+        status="applied",
+        revert_payload=payload,
+        sampled=False,
+        review=None,
+        reviewed_by=None,
+        reviewed_at=None,
+        decided_at=dt.datetime.now(dt.UTC),
+    )
+    assert await facts.fact_recheck(pool, row) == []  # its own correction is not a restatement
+
+    # Another fact restating it later still counts.
+    await pool.execute(
+        "insert into public.fact (ticker, metric, basis, fiscal_year, fiscal_period, period,"
+        " period_end, value, value_as_written, scale, unit, currency, source_url, snippet,"
+        " evidence_sha256, evidence_path, status, status_reason, checks, restates_fact_id)"
+        " select ticker, metric, basis, fiscal_year, fiscal_period, period, period_end, 150000,"
+        " '150000', scale, unit, currency, source_url, snippet, evidence_sha256, evidence_path,"
+        " 'unverified', 'restated', '[]'::jsonb, id from public.fact where id = $1",
+        held_id,
+    )
+    assert await facts.fact_recheck(pool, row) == ["a later filing restated it"]
+
+    # A correction needs its source fact to be verified when it is applied, not as judged.
+    await pool.execute("update public.fact set status = 'rejected' where id = $1", source_id)
+    assert await facts.fact_verify(pool, cand, "correct_other_1") == [
+        "the fact holding the competing value is rejected"
+    ]
 
 
 async def _web(pool: asyncpg.Pool, ticker: str, host: str, decided_by: str = "ai:m") -> int:

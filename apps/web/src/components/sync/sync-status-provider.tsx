@@ -1,6 +1,5 @@
 "use client";
 
-import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import {
   createContext,
   useCallback,
@@ -13,33 +12,21 @@ import {
 } from "react";
 
 import { getBrowserApiClient } from "@/lib/api/client";
-import { getSupabaseConfig } from "@/lib/env";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import {
-  describeSync,
-  JOB_COLUMNS,
-  STEP_COLUMNS,
-  type JobRow,
-  type StepRow,
-  type SyncView,
-} from "@/lib/sync/sync-state";
+import { describeSync, type JobRow, type StepRow, type SyncView } from "@/lib/sync/sync-state";
 
 /*
  * Live portfolio-sync status for the whole app shell.
  *
- * Reads the latest `portfolio_sync` job and its current step straight from Postgres
- * (RLS: owner only) and re-reads them on every `job` / `job_step` change pushed by
- * Supabase Realtime, so a sync started anywhere (another tab, the scheduler) shows up
- * here within about a second. If Realtime is unavailable it falls back to polling.
+ * Reads the latest `portfolio_sync` job and its current step from the backend API and polls:
+ * every few seconds while a sync is queued or running, slowly otherwise, and at once when the
+ * tab becomes visible again. A sync started anywhere (another tab, the scheduler) shows up
+ * within one poll.
  */
-
-export type RealtimeState = "connecting" | "live" | "offline";
 
 type SyncStatusValue = {
   view: SyncView;
   /** Id of the latest succeeded sync; pages refetch their data when it changes. */
   lastSuccessJobId: number | null;
-  realtime: RealtimeState;
   startSync: () => Promise<void>;
   starting: boolean;
   startError: string | null;
@@ -47,117 +34,84 @@ type SyncStatusValue = {
 
 const SyncStatusContext = createContext<SyncStatusValue | null>(null);
 
-const POLL_FALLBACK_MS = 15_000;
+const POLL_ACTIVE_MS = 3_000;
+const POLL_IDLE_MS = 15_000;
 
 type Snapshot = { latest: JobRow | null; lastSuccess: JobRow | null; step: StepRow | null };
 
-async function readSyncRows(supabase: SupabaseClient): Promise<Snapshot> {
-  const jobs = () =>
-    supabase
-      .from("job")
-      .select(JOB_COLUMNS)
-      .eq("job_type", "portfolio_sync")
-      .order("id", { ascending: false })
-      .limit(1);
-  const [latestRes, successRes] = await Promise.all([
-    jobs().maybeSingle<JobRow>(),
-    jobs().eq("status", "succeeded").maybeSingle<JobRow>(),
-  ]);
-  if (latestRes.error) throw latestRes.error;
-  if (successRes.error) throw successRes.error;
-  const latest = latestRes.data;
+async function readSyncRows(): Promise<Snapshot> {
+  const api = getBrowserApiClient();
+  const latestJobs = (status?: "succeeded") =>
+    api.GET("/jobs", {
+      params: {
+        query: { job_type: ["portfolio_sync"], limit: 1, ...(status ? { status: [status] } : {}) },
+      },
+    });
+  const [latestRes, successRes] = await Promise.all([latestJobs(), latestJobs("succeeded")]);
+  if (!latestRes.response.ok || !latestRes.data) throw new Error(`HTTP ${latestRes.response.status}`);
+  if (!successRes.response.ok || !successRes.data) {
+    throw new Error(`HTTP ${successRes.response.status}`);
+  }
+  const latest = latestRes.data.jobs[0] ?? null;
   let step: StepRow | null = null;
   if (latest && latest.status !== "succeeded" && latest.status !== "failed") {
-    const stepRes = await supabase
-      .from("job_step")
-      .select(STEP_COLUMNS)
-      .eq("job_id", latest.id)
-      .order("step_index", { ascending: false })
-      .limit(1)
-      .maybeSingle<StepRow>();
-    step = stepRes.data;
+    const detail = await api.GET("/jobs/{job_id}", { params: { path: { job_id: latest.id } } });
+    const last = detail.data?.steps.at(-1);
+    if (last) {
+      step = { job_id: latest.id, step_index: last.step_index, name: last.name, status: last.status };
+    }
   }
-  return { latest, lastSuccess: successRes.data, step };
+  return { latest, lastSuccess: successRes.data.jobs[0] ?? null, step };
 }
 
 export function SyncStatusProvider({ children }: { children: ReactNode }) {
   const [rows, setRows] = useState<Snapshot | null>(null);
   const [readFailed, setReadFailed] = useState(false);
-  const [realtime, setRealtime] = useState<RealtimeState>(() =>
-    getSupabaseConfig() ? "connecting" : "offline",
-  );
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const reloadRef = useRef<() => Promise<void>>(async () => {});
+  const active = rows?.latest
+    ? rows.latest.status !== "succeeded" && rows.latest.status !== "failed"
+    : false;
 
   useEffect(() => {
-    if (!getSupabaseConfig()) return;
-    const supabase: SupabaseClient = getSupabaseBrowserClient();
     let cancelled = false;
-    let channel: RealtimeChannel | null = null;
-    // Reads can overlap when events arrive in bursts: only the newest result is applied.
+    // Reads can overlap (a poll and a manual refresh): only the newest result is applied.
     let sequence = 0;
-
     const reload = async () => {
       const mine = ++sequence;
       try {
-        const next = await readSyncRows(supabase);
+        const next = await readSyncRows();
         if (!cancelled && mine === sequence) {
           setRows(next);
           setReadFailed(false);
         }
       } catch {
-        // Keep the last known state if there is one; the next event or poll retries.
+        // Keep the last known state if there is one; the next poll retries.
         if (!cancelled && mine === sequence) setReadFailed(true);
       }
     };
     reloadRef.current = reload;
-
-    (async () => {
-      // Join the channel with the user's token, not the anon key: RLS would hide every row.
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (cancelled) return;
-        if (data.session) await supabase.realtime.setAuth(data.session.access_token);
-      } catch {
-        if (!cancelled) setReadFailed(true);
-      }
-      await reload();
-      if (cancelled) return;
-      channel = supabase
-        .channel("portfolio-sync-status")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "job", filter: "job_type=eq.portfolio_sync" },
-          () => void reload(),
-        )
-        .on("postgres_changes", { event: "*", schema: "public", table: "job_step" }, () => {
-          void reload();
-        })
-        .subscribe((status) => {
-          if (cancelled) return;
-          if (status === "SUBSCRIBED") {
-            setRealtime("live");
-            // Catch anything that changed between the first read and the subscription.
-            void reload();
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-            setRealtime("offline");
-          }
-        });
-    })();
-
+    void reload();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void reload();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
-      if (channel) void supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 
-  // Without Realtime, poll so the indicator still moves (slower).
   useEffect(() => {
-    if (realtime === "live") return;
-    const timer = setInterval(() => void reloadRef.current(), POLL_FALLBACK_MS);
+    const timer = setInterval(
+      () => {
+        if (document.visibilityState === "visible") void reloadRef.current();
+      },
+      active ? POLL_ACTIVE_MS : POLL_IDLE_MS,
+    );
     return () => clearInterval(timer);
-  }, [realtime]);
+  }, [active]);
 
   const startSync = useCallback(async () => {
     setStarting(true);
@@ -177,7 +131,7 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
       );
     } finally {
       setStarting(false);
-      // Show the queued job at once, even before its Realtime event arrives.
+      // Show the queued job at once instead of waiting for the next poll.
       void reloadRef.current();
     }
   }, []);
@@ -186,16 +140,15 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
     () => ({
       view: rows
         ? describeSync(rows.latest, rows.lastSuccess, rows.step)
-        : readFailed || !getSupabaseConfig()
+        : readFailed
           ? { kind: "unavailable" }
           : { kind: "loading" },
       lastSuccessJobId: rows?.lastSuccess?.id ?? null,
-      realtime,
       startSync,
       starting,
       startError,
     }),
-    [rows, readFailed, realtime, startSync, starting, startError],
+    [rows, readFailed, startSync, starting, startError],
   );
 
   return <SyncStatusContext.Provider value={value}>{children}</SyncStatusContext.Provider>;

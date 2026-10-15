@@ -198,6 +198,17 @@ class Worker:
         if result.sent or result.failed:
             logger.info("alerts sent %s, failed %s", result.sent, result.failed)
 
+    async def run_retention(self) -> None:
+        """Delete rows past their `retention_policy` age (a plain Postgres has no pg_cron)."""
+        try:
+            rows = await self.pool.fetch("select tbl, deleted from private.run_retention()")
+        except (OSError, asyncpg.PostgresError, TimeoutError):
+            logger.exception("retention run failed; retrying tomorrow")
+            return
+        deleted = {r["tbl"]: r["deleted"] for r in rows if r["deleted"]}
+        if deleted:
+            logger.info("retention deleted %s", deleted)
+
     async def heartbeat(self, http: httpx.AsyncClient) -> None:
         try:
             await beat(self.pool)
@@ -271,6 +282,14 @@ async def run() -> None:
             args=[http],
             id="internal:dispatch_alerts",
             name="dispatch_alerts",
+        )
+        scheduler.add_job(
+            worker.run_retention,
+            "cron",
+            hour=3,
+            minute=17,
+            id="internal:run_retention",
+            name="run_retention",
         )
         scheduler.add_job(
             worker.heartbeat,

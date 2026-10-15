@@ -143,6 +143,36 @@ async def test_the_total_cap_counts_runs_across_kinds(backend_pool: asyncpg.Pool
     assert held.skipped is not None
 
 
+async def test_only_jobs_the_trigger_table_started_count_toward_the_dollar_cap(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    async def new_job(cost: str) -> int:
+        job_id = int(
+            await backend_pool.fetchval(
+                "insert into public.job (job_type, trigger, status) values ('research', 'event',"
+                " 'succeeded') returning id"
+            )
+        )
+        await backend_pool.execute(
+            "insert into public.job_step (job_id, step_index, name, status, started_at, cost_usd)"
+            " values ($1, 0, 'ai', 'succeeded', $2, $3::numeric)",
+            job_id,
+            NOW,
+            cost,
+        )
+        return job_id
+
+    mine = await new_job("1.25")
+    await new_job("9.00")  # news escalation, a watchdog retry: event-triggered, not ours
+
+    async def act() -> int | None:
+        return mine
+
+    await triggers.fire(backend_pool, "staleness", "AAA", "r", "a", act, now=NOW)
+    loaded = await triggers.load(backend_pool, "staleness", NOW)
+    assert loaded.usd_today == pytest.approx(1.25)
+
+
 async def test_an_essential_start_ignores_cooldown_and_caps(backend_pool: asyncpg.Pool) -> None:
     c = Counter()
     for _ in range(triggers.DAILY_PER_KIND + 2):

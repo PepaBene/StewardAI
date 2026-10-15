@@ -276,3 +276,69 @@ async def test_a_primary_that_keeps_failing_gets_its_standby_run_once(
         "select count(*) from public.ops_task where kind = 'failover' and status <> 'resolved'"
     )
     assert open_notices == 0  # the primary is healthy again
+
+
+@pytest.mark.db
+async def test_a_primary_off_the_alert_list_gets_its_standby_only_after_its_retry_fails(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    jobs = JobsConfig()
+    assert "sec_xbrl" not in jobs.monitoring.alert_failed_jobs
+    cfg = OpsSettings()
+    now = dt.datetime.now(dt.UTC)
+    await backend_pool.execute(
+        "insert into public.job (job_type, trigger, status, error, created_at, finished_at)"
+        " values ('sec_xbrl', 'schedule', 'failed', 'boom', $1, $1)",
+        now - dt.timedelta(hours=1),
+    )
+    first = await watchdog.check_failed_jobs(backend_pool, jobs, cfg, now)
+    assert first["repaired"] == ["job_failed:sec_xbrl"]
+    assert first["failover"] == {"started": []}  # the retry comes first
+    # While the retry is queued its task stays open with the attempt it made.
+    queued = await watchdog.check_failed_jobs(backend_pool, jobs, cfg, now)
+    assert queued["resolved"] == 0 and queued["failover"] == {"started": []}
+    await backend_pool.execute(
+        "update public.job set status = 'failed', error = 'boom again', finished_at = now()"
+        " where job_type = 'sec_xbrl' and status = 'queued'"
+    )
+    after = await watchdog.check_failed_jobs(backend_pool, jobs, cfg, now)
+    assert after["failover"] == {"started": ["sec_xbrl->fmp_company"]}
+
+
+@pytest.mark.db
+async def test_a_block_that_comes_back_after_it_was_lifted_keeps_its_attempts(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    first = await tasks.see(backend_pool, "provider_block", "sec/api", title="t", detail="d")
+    await tasks.acted(backend_pool, first.id, "lifted the block to probe again")
+    assert await tasks.settle(backend_pool, "provider_block", set()) == 1  # the lift worked
+    back = await tasks.see(backend_pool, "provider_block", "sec/api", title="t", detail="d")
+    assert back.id != first.id and back.attempts == 0
+    carried = await tasks.carry_attempts(backend_pool, back, dt.timedelta(days=30))
+    assert carried.attempts == 1 and carried.last_action == "lifted the block to probe again"
+    # With its attempts carried over the policy runs out and hands it to the owner.
+    late = NOW + dt.timedelta(days=60)
+    assert tasks.decide(carried, late, retry_hours=12, max_attempts=1, can_repair=True) == (
+        "escalate"
+    )
+
+
+@pytest.mark.db
+async def test_a_dismissed_notice_for_one_occurrence_stays_dismissed(
+    backend_pool: asyncpg.Pool,
+) -> None:
+    notice = await tasks.see(
+        backend_pool, "budget_forecast", "2026-11", title="t", detail="d", status="needs_owner"
+    )
+    assert await tasks.dismiss(backend_pool, notice.id)
+    again = await tasks.see(
+        backend_pool,
+        "budget_forecast",
+        "2026-11",
+        title="t",
+        detail="d",
+        status="needs_owner",
+        keep_dismissed=True,
+    )
+    assert again.id == notice.id and again.status == "resolved"
+    assert await tasks.needs_owner(backend_pool) == []

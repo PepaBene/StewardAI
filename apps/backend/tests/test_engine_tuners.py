@@ -119,7 +119,7 @@ async def test_a_promoted_rule_change_is_a_config_version_and_its_undo_restores_
         )
         is None
     )
-    assert await config_change.undo(backend_pool, settled, ["owner"])
+    assert await config_change.undo(backend_pool, settled, ["owner"]) == "restored"
     assert await config_change.current(backend_pool, edit) == before
     assert await backend_pool.fetchval("select status from public.engine_change") == "rolled_back"
 
@@ -167,6 +167,50 @@ async def test_an_undo_leaves_a_value_the_owner_changed_since(backend_pool: asyn
         await save_config(conn, "event_rules", owner_edit, created_by=None, note="owner")
     assert await config_change.revert(backend_pool, settled) is False
     assert await config_change.current(backend_pool, edit) == before - 2
+
+
+async def _promoted_rule(pool: asyncpg.Pool, edit: config_change.Edit) -> change.Change:
+    before = await config_change.current(pool, edit)
+    gates = Gates(min_n=1, min_reviewed=1, require_golden=False)
+    c = await config_change.propose(pool, "rule", edit, before - 1, "h", "m", gates)
+    await change.record_results(
+        pool, c.id, Metrics(5, 5, 4, 0, 0, 0.0), Metrics(5, 5, 1, 0, 0, 0.0)
+    )
+    return await config_change.promote(pool, c, golden_passed=None)
+
+
+@pytest.mark.db
+async def test_an_undo_after_the_owner_edited_the_field_is_not_an_engine_rollback(
+    backend_pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await seed_rules(backend_pool)
+    edit = config_change.Edit("event_rules", "severities.m_and_a")
+    for i in range(2):
+        settled = await _promoted_rule(backend_pool, edit)
+        stored = await load_active(backend_pool, "event_rules", EventRulesConfig)
+        assert stored is not None
+        owner_edit = stored.body.model_copy(
+            update={"severities": {**stored.body.severities, "m_and_a": 1 + i}}
+        )
+        async with backend_pool.acquire() as conn:
+            await save_config(conn, "event_rules", owner_edit, created_by=None, note="owner")
+        assert await config_change.undo(backend_pool, settled, ["worse"]) == "kept"
+        assert await config_change.current(backend_pool, edit) == 1 + i  # the owner's value
+    statuses = await backend_pool.fetch("select status, verdict from public.engine_change")
+    assert {r["status"] for r in statuses} == {"rejected"}
+    assert not await config_change.blocked(backend_pool, edit.target, dt.datetime.now(dt.UTC))
+
+    async def broken(pool: asyncpg.Pool, c: change.Change) -> bool:
+        raise ValueError("no longer valid")
+
+    settled = await _promoted_rule(backend_pool, edit)
+    monkeypatch.setattr(config_change, "revert", broken)
+    assert await config_change.undo(backend_pool, settled, ["worse"]) == "kept"
+    row = await backend_pool.fetchrow(
+        "select status, verdict from public.engine_change where id = $1", settled.id
+    )
+    assert row is not None and row["status"] == "rejected"
+    assert "no longer valid" in row["verdict"]
 
 
 @pytest.mark.db
@@ -455,6 +499,16 @@ def test_the_daily_job_moves_only_when_it_is_well_after_the_wanted_time() -> Non
     assert tuners.better_minute([420] * 9, 10, 400) is None  # less than 15 minutes to gain
     assert tuners.better_minute([420] * 9, 10, 390) is None  # already at the floor
     assert tuners.better_minute([600] * 9, 10, 700) == 545  # 10:00 - 45 - 10 = 09:05
+
+
+def test_a_nightly_job_is_for_the_next_morning_and_is_not_moved() -> None:
+    cron = "30 22 * * *"  # the default portfolio_sync
+    minute, _tail = tuners.parse_daily(cron) or (0, "")
+    assert minute == 22 * 60 + 30
+    morning = [8 * 60] * 9  # the owner's first visit is at 08:00
+    assert not tuners.serves_same_day_visit(morning, minute)
+    assert tuners.serves_same_day_visit(morning, 9 * 60)  # a job after the visit still counts
+    assert tuners.serves_same_day_visit(morning, 6 * 60 + 30)
 
 
 def test_days_the_job_finished_after_the_first_visit_are_counted() -> None:

@@ -6,4 +6,8 @@
 -- Apply only after the backend that resolves a position's evidence through its filing
 -- (`record_evidence_as_of` in sources/documents.py) is deployed, and run VACUUM FULL on
 -- source_record_evidence afterwards to give the space back to the database.
+--
+-- source_record_evidence is append-only; this is a deliberate maintenance change, so lift the
+-- guard for this transaction only (see 20261005100200_lifecycle_evidence_integrity.sql).
+select set_config('steward.allow_append_only_changes', 'on', true);
 delete from public.source_record_evidence where domain_table = 'institutional_holding';

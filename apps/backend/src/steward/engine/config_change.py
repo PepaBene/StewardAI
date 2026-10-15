@@ -250,9 +250,26 @@ async def promote(
     return settled
 
 
-async def undo(pool: asyncpg.Pool, c: change.Change, reasons: list[str]) -> bool:
-    """Roll a promoted config change back and restore the old value."""
+async def undo(
+    pool: asyncpg.Pool, c: change.Change, reasons: list[str]
+) -> Literal["restored", "kept"] | None:
+    """Roll a promoted config change back and restore the old value. None when the change was not
+    live. "kept" when the owner changed the field since (or the old value no longer fits): their
+    value stands, and the row is closed as rejected so it never counts as an engine rollback."""
     if not await change.roll_back(pool, c.id, reasons):
-        return False
-    await revert(pool, c)
-    return True
+        return None
+    try:
+        restored = await revert(pool, c)
+    except ValueError as exc:
+        restored = False
+        why = f"the old value could not be put back: {exc}"
+    else:
+        why = "the field was changed since, so that value stands"
+    if restored:
+        return "restored"
+    await pool.execute(
+        "update public.engine_change set status = 'rejected', verdict = $2 where id = $1",
+        c.id,
+        f"not rolled back: {why}"[:500],
+    )
+    return "kept"

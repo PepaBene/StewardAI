@@ -36,6 +36,7 @@ RULE_CONFIRM_KINDS = frozenset({"portfolio_sync"})
 CALIBRATED_KINDS = frozenset({"price_history", "fact_reconcile"})
 CALIBRATION_MIN_REVIEWED = 10
 CALIBRATION_MIN_PRECISION = 0.95
+CALIBRATION_WINDOW_DAYS = 90  # older decisions no longer count, for or against the rule
 
 
 def calibrated(reviewed: int, right: int) -> bool:
@@ -43,14 +44,18 @@ def calibrated(reviewed: int, right: int) -> bool:
 
 
 async def calibrated_jobs(pool: asyncpg.Pool) -> set[str]:
-    """The job kinds whose past inbox decisions earn a rule instead of a model call."""
+    """The job kinds whose recent confirms earn a rule instead of a model call. Only confirms
+    count (a right decline says nothing about starting the job), and the rule's own confirms are
+    in the tally, so a wrong one takes the rule away again."""
     rows = await pool.fetch(
         "select evidence->>'job' as job, count(*) filter (where review is not null) as reviewed,"
         " count(*) filter (where review = 'ok') as right from public.auto_decision"
-        " where kind = 'inbox_action' and decided_by like 'model:%'"
+        " where kind = 'inbox_action' and decision = 'confirm'"
+        " and (decided_by like 'model:%' or decided_by = 'rule:calibrated-refresh')"
         " and status in ('shadow', 'applied', 'reverted') and evidence->>'job' = any($1::text[])"
-        " group by 1",
+        " and decided_at >= now() - make_interval(days => $2) group by 1",
         sorted(CALIBRATED_KINDS),
+        CALIBRATION_WINDOW_DAYS,
     )
     return {r["job"] for r in rows if calibrated(r["reviewed"], r["right"])}
 

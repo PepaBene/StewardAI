@@ -1,6 +1,6 @@
 /*
- * What the sync indicator shows, derived from the latest `job` / `job_step` rows the
- * frontend reads straight from Postgres (RLS: owner only) and follows via Realtime.
+ * What the sync indicator shows, derived from the latest job and step the frontend reads
+ * from the backend API (`GET /jobs`, `GET /jobs/{id}`) and polls.
  */
 
 export type JobStatus = "queued" | "waiting" | "running" | "succeeded" | "failed";
@@ -21,9 +21,6 @@ export type StepRow = {
   name: string;
   status: "running" | "succeeded" | "failed";
 };
-
-export const JOB_COLUMNS = "id,status,trigger,created_at,started_at,finished_at,error";
-export const STEP_COLUMNS = "job_id,step_index,name,status";
 
 /** Human names for the portfolio sync's steps (backend: steward/portfolio/sync.py). */
 export const STEP_LABELS: Record<string, string> = {

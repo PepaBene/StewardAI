@@ -149,6 +149,7 @@ def build_call(
 
 def read_response(response: Any, model: str, usage: Usage) -> Settled | None:
     if isinstance(response, BaseException):
+        logger.warning("judge call to %s failed", model, exc_info=response)
         return None
     usage.add(response.usage)
     verdict = response.parsed_output
@@ -199,7 +200,9 @@ async def run_kind(
     skip |= await ledger.decided_refs(pool, kind.name, ("reverted",), now - UNDONE_MEMORY)
     if mode == "shadow":
         skip |= await ledger.decided_refs(pool, kind.name, ("shadow",), now - dt.timedelta(days=90))
-    loaded = await kind.load(pool, min(room * 2, 200))
+    # `load` returns the oldest first, so the items waiting on the owner would crowd out new ones:
+    # ask for enough to get past them.
+    loaded = await kind.load(pool, min(room + len(skip), 500))
     candidates = [c for c in loaded if c.ref not in skip][:room]
 
     first_model = policy.model or settings.model
@@ -225,6 +228,7 @@ async def run_kind(
             c.ref: read_response(a, first_model, usage)
             for c, a in zip(affordable, answers, strict=True)
         }
+        raw = {c.ref: a for c, a in zip(affordable, answers, strict=True)}
 
         def unsettled(ref: str) -> bool:
             first = firsts[ref]
@@ -249,7 +253,16 @@ async def run_kind(
             }
             out["usage_second"] = usage2
             out["second_opinions"] = len(retry)
+            raw |= {
+                c.ref: a
+                for c, a in zip(retry, answers2, strict=True)
+                if not isinstance(a, BaseException)
+            }
         for cand in affordable:
+            if isinstance(raw[cand.ref], BaseException):
+                # The call failed (not "no confident answer"): leave the item for the next run.
+                out["errors"] = out.get("errors", 0) + 1
+                continue
             settled[cand.ref] = plan_step(firsts[cand.ref], seconds.get(cand.ref), policy, kind)
 
     for cand in candidates:
@@ -383,7 +396,12 @@ async def revert(pool: asyncpg.Pool, kind: JudgeKind, row: ledger.AutoDecision) 
         raise ApplyError("this decision cannot be reverted")
     if not await ledger.set_status(pool, row.id, "reverted", only_from=("applied",)):
         raise ApplyError("the decision is no longer applied")
-    await kind.revert(pool, row.revert_payload)
+    try:
+        await kind.revert(pool, row.revert_payload)
+    except Exception:
+        # Nothing was undone: the ledger must not say it was.
+        await ledger.set_status(pool, row.id, "applied", only_from=("reverted",))
+        raise
     await ledger.set_review(pool, row.id, "wrong", "owner")
 
 

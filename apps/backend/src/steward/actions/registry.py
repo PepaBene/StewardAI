@@ -683,15 +683,17 @@ async def confirm(pool: asyncpg.Pool, action_id: int, *, second: bool = False) -
     )
     if claimed is None:
         raise ActionError(f"Action {action_id} is already being run")
-    action, parsed = _parse(row.action, row.args)
     token = current_via.set(row.via)
     try:
+        action, parsed = _parse(row.action, row.args)
         result = await action.run(pool, parsed)
-    except ActionError as exc:
+    except Exception as exc:
+        # Any failure, not only a refusal, leaves the row failed with its reason, so the log
+        # never shows an action as done that did not run.
         await pool.execute(
             "update public.owner_action set status = 'failed', result = $2::jsonb where id = $1",
             action_id,
-            json.dumps({"error": str(exc)}),
+            json.dumps({"error": str(exc) or type(exc).__name__}),
         )
         raise
     finally:
