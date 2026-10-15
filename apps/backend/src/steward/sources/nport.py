@@ -9,6 +9,7 @@ identifier is ``None`` (never zero or an empty string), and nothing is converted
 from __future__ import annotations
 
 import datetime as dt
+import io
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -16,7 +17,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from steward.sources.ciks import ten_digit_cik
-from steward.sources.xml_guard import safe_fromstring
+from steward.sources.xml_guard import reject_dtd
 
 # Public availability: N-PORT is filed within 60 days after the fiscal quarter end and made
 # public then (SEC Form N-PORT general instructions); counted from the report date.
@@ -203,9 +204,33 @@ def _holding(index: int, node: ET.Element) -> NportHolding:
     )
 
 
+def _parse_streaming(xml: bytes) -> tuple[ET.Element, list[NportHolding]]:
+    """The document tree without its holdings, and the holdings.
+
+    A big fund's report has tens of thousands of `invstOrSec` elements; a whole-tree parse
+    holds all of them at once (hundreds of MB). Each is turned into a `NportHolding` and
+    cleared the moment it closes, so only one is alive at a time."""
+    reject_dtd(xml, NportError)
+    holdings: list[NportHolding] = []
+    root: ET.Element | None = None
+    try:
+        for event, node in ET.iterparse(io.BytesIO(xml), events=("start", "end")):  # noqa: S314 - DTDs refused above
+            if event == "start":
+                if root is None:
+                    root = node
+            elif _local(node.tag) == "invstOrSec":
+                holdings.append(_holding(len(holdings), node))
+                node.clear()
+    except ET.ParseError as exc:
+        raise NportError(f"malformed XML: {exc}") from exc
+    if root is None:
+        raise NportError("malformed XML: empty document")
+    return root, holdings
+
+
 def parse_nport(xml: bytes) -> NportReport:
     """Parse one NPORT-P / NPORT-P/A primary document."""
-    root = safe_fromstring(xml, NportError)
+    root, holdings = _parse_streaming(xml)
     if _local(root.tag) != "edgarSubmission":
         raise NportError("not an EDGAR N-PORT submission")
     header = _child(root, "headerData")
@@ -246,9 +271,6 @@ def parse_nport(xml: bytes) -> NportReport:
         for c in _children(_path(header, "filerInfo", "seriesClassInfo"), "classId")
         if c.text and c.text.strip()
     )
-    holdings = [
-        _holding(i, n) for i, n in enumerate(_children(_child(form, "invstOrSecs"), "invstOrSec"))
-    ]
     cik = _text(_path(header, "filerInfo", "filer", "issuerCredentials"), "cik") or _text(
         gen, "regCik"
     )

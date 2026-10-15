@@ -4,6 +4,8 @@ Date: 2026-10-11. Scope: `apps/web` (Next.js 16, Tailwind 4, Ledger tokens, cust
 Supersedes the *scope* of `ux_ui_dataviz_improvement_plan.md` (2026-10-06, ~30 routes). It keeps that plan's principles and foundations (F1-F8) and re-applies them to the app as it is now: **~110 routes**, up from ~30. Where this plan does not restate something, the old plan still applies.
 Companion docs: `Ledger_Design_System_Redesign_Proposal.md`, `Ledger_II_Redesign_Proposal.md` (tokens, motion, confidence chips — **not re-litigated here**).
 
+**Visual language (added 2026-10-15).** The owner likes how the reference product in `docs/research/simplywallst_visualization_catalog.md` shows information, so that catalog now shapes the whole plan, not just new screens: principles P10-P15 (§2), chart-choice rows (§2.1), foundations F18-F32 (§4b), the coverage matrix (§5), the risk and holding visuals (§6), sequencing (§8) and success criteria (§9). New features that use these pieces are specified in `insight_features_implementation_plan.md` (phases I0-I14). Rule: borrow the *patterns* (one recognisable score mark, sentence beside every number, honest limited states, typed dots and zones instead of gridlines), never the reference product's branding, wording or proprietary scoring.
+
 **Goal (owner, 2026-10-11).** Clean yet interesting. Very simple to use. **No functionality or information removed.** As visual as possible, but every visual has a plain table/text twin. Each visual is the form that best fits the shape of its data.
 
 ---
@@ -94,6 +96,17 @@ Added by the owner brief:
 | P8 | **Fast to feel** | Skeletons with the final aspect ratio; ≤1 batched summary request per page; show last-known values while refreshing; lists paginate or virtualise at >50 rows. |
 | P9 | **Calm density** | One focal visual, then quiet tables. Max 2 accent colours per view (+ confidence hues where data is evidence). Matches Ledger tokens; no new palette. |
 
+Added from the visualization catalog (2026-10-15); these apply to **every** chart and page, old and new:
+
+| # | Principle | Concrete rule |
+|---|---|---|
+| P10 | **Colour means one thing** | Gain/loss use `gain`/`loss` only for good/bad; `accent` marks selection and the user's own series; estimates and forecasts share one hue (`--chart-forecast`); fair value is always a stepped line in `--chart-fair-value`; benchmark is always `chart-benchmark`. A hue never changes meaning between pages. |
+| P11 | **Zones and reference lines, not gridlines** | Charts show tinted zones (over/under, safe/risky) and labelled reference lines (portfolio, benchmark, peer median, limit) instead of dense gridlines; axes keep 3-5 ticks. |
+| P12 | **Every number gets a sentence** | A verdict line (`VerdictLine`, F31) sits next to scores, ratios and risk metrics, written by the backend ("Debt to equity (9%) is below 40%"), with the basis named. |
+| P13 | **One score mark at every scale** | The five-axis mark (`ScoreMark`, F18) is the single glyph for a stock's profile: 24 px in table rows, 64 px in headers, large in cards and Discover. Unknown axes are open gaps, never zero. |
+| P14 | **Footer on every chart** | `ChartFooter` (F26): `Data` toggle (the table twin, P4), `Learn` link to the method, and dataset / as-of / source. This is where provenance lives. |
+| P15 | **Honest limited states** | Too little data produces a stated reason and what unlocks it ("needs 5 peers, has 3"), never a thin or invented chart. A missing value is never drawn as zero. Estimated values are marked in the data and the chart. |
+
 ### 2.1 Chart choice by data job (applies to every page)
 
 | Data job | Use | Avoid |
@@ -104,18 +117,30 @@ Added by the owner brief:
 | Part-to-whole, many parts / hierarchy | treemap (sector → holding), sunburst only for 2-level | donut with "Other 40%" |
 | Ranking / comparison | sorted horizontal bar; dumbbell for before→after | vertical bars with long labels |
 | Positive/negative contribution | waterfall or diverging bars (shared zero line) | stacked bars crossing zero |
-| Value vs target/limit/band | bullet chart / range bar | gauge/speedometer |
+| Value vs target/limit/band | bullet chart / range bar / `BandGauge` (F21) | gauge/speedometer |
 | Distribution | histogram, box/strip, CDF; empirical tail marked at VaR/ES | mean-only |
 | Relationship between two measures | scatter with labelled outliers | table of coefficients |
 | Many-to-many (correlation, overlap) | heat matrix, clustered, diverging palette | table of pairs |
 | Flow / supply chain / money movement | Sankey (≤30 nodes), else ranked bars | node-link hairball |
 | Network (≤60 nodes) | force/radial graph, edge style = confirmed vs suggested | list of 21 rows |
 | Events in time | timeline / lollipop, Gantt for durations | table sorted by date |
-| Calendar patterns | calendar heatmap | long table |
+| Calendar patterns | calendar heatmap; `MonthCalendar` (F22) for dated events | long table |
 | Geography | choropleth/bubble map *only if* location is the point; else ranked bars | map for 3 countries |
 | Status across items | status matrix (issuer × dataset), coloured + labelled (never colour alone) | one card per item |
 | Estimate/forecast uncertainty | fan / range band with the point estimate | single number |
 | Ordered confidence | ordinal stacked bar (existing `ConfidenceBar`) | rainbow |
+| Multi-criteria profile of one item (5-6 axes) | `ScoreMark` (F18) at table/header/card scale; radar only where the axes are real measures on one scale | radar with unlabelled axes |
+| Pass / fail checks with reasons | `CheckList` (F19): state icon + sentence + section link, "n of m applicable", all-checks modal | a bare score |
+| One item's position among many (valuation, growth, yield) | `DotStrip` (F20): ranked dots, portfolio and benchmark reference lines, tinted zones | table of numbers |
+| Value vs a 3-zone verdict (under / about right / over) | `BandGauge` (F21) with marker and zone labels | speedometer |
+| Regular income or events over months | `ForecastBars` (F23): history vs estimate hue, Monthly/Annual toggle, hover panel listing the items | line for lumpy cash flows |
+| Dates of mixed event types | `MonthCalendar` (F22): typed dots + legend, agenda list on mobile | long event table |
+| Price against a fair-value path | line with `StepLine` overlay (F25), cursor at today | two separate charts |
+| Analyst or scenario outlook | `FanBand` cone (F24) from last price to the 12-month high-low with the mean marked | single target number |
+| One item against its peers' spread | histogram with the item's bin highlighted and average line (reuse `lib/charts/histogram`) + peer bars with median line | mean-only |
+| Pairwise correlation of holdings | triangle `HeatMatrix` (F32), diverging scale, "moves most / least together" lists | full square duplicate |
+| Grouped lists with verdict (over / stale / under) | `GroupedTable` (F28): section header with count + one-line explanation | one long sorted table |
+| Computation shown step by step | `CalcChain` (F29): ordered rows, each with expression and value | prose |
 
 ---
 
@@ -126,7 +151,7 @@ Six labels + Settings gear. Each label opens a **single page with tabs**, not a 
 
 | Label | Question | Contains |
 |---|---|---|
-| **Portfolio** (home `/`) | What do I own and how is it doing? | Overview · Holdings · Performance · Allocation (today's X-Ray) · Risk |
+| **Portfolio** (home `/`) | What do I own and how is it doing? | Overview (with the five-axis scorecard) · Holdings (view presets) · Performance · **Income** (dividends) · **Valuation** (price vs fair value) · Allocation (today's X-Ray) · Risk |
 | **Companies** | Tell me about one company/fund | Single company page (merges holding page + workbench) · Funds |
 | **Research** | Is my thesis still true? What should I look at? | Theses · Research reports · Discover & Screens · Journal · What changed |
 | **Markets** | What is happening outside? | News · Macro · Filings (public disclosures) · 13F investors |
@@ -152,7 +177,7 @@ Fixes in passing: per-tab `<title>`/h1, breadcrumbs, sticky right-rail TOC (F1) 
 
 ### 3.3 One company page
 `/companies/[ticker]` (old `/holdings/[ticker]` and `/companies/[ticker]/*` redirect here). Header: name + symbol chip, price, position summary, thesis verdict, **ticker switcher**, Ask/Research actions. Tabs:
-**Overview** (price, position, thesis, next event, key KPIs) · **Thesis & evidence** (case, assessment, facts, KPIs, news) · **Financials** (statements, ratios, segments, estimates, capital allocation, valuation) · **Peers** · **Ownership & governance** (13F, stakes, insiders, governance) · **Network** (customers/suppliers/patents/network) · **Report** · **Reference data** (identity, listings, price completeness, corporate actions). Funds keep `/funds/[isin]` with the same header pattern (Overview · Holdings · Performance · Style · Bond · Checklist).
+**Overview** (price, position, thesis, next event, key KPIs, `ScoreMark` + verdict line with top rewards/risks) · **Thesis & evidence** (case, assessment, facts, KPIs, news) · **Checks** (five axes × six checks + risk checks as `CheckList`, F19) · **Financials** (statements, ratios, segments, estimates, capital allocation, dividends, valuation with method tabs, peer pictures and consensus) · **Peers** · **Ownership & governance** (13F, stakes, insiders, governance) · **Network** (customers/suppliers/patents/network) · **Report** · **Reference data** (identity, listings, price completeness, corporate actions). Funds keep `/funds/[isin]` with the same header pattern (Overview · Holdings · Performance · Style · Bond · Checklist).
 *Tab visibility rule:* a tab with no data shows a muted dot and opens to a coverage card, but is never hidden (P3).
 
 ### 3.4 Inbox (replaces 8 queues)
@@ -177,6 +202,7 @@ Every editor keeps: versioned save with note, Validate, Preview-and-save (event 
 - **Shell:** bottom bar (Portfolio · Research · Markets · Inbox · More), 44px touch targets, Inbox badge; top bar reduces to logo, search, Ask Steward, sync dot. Remove the horizontally scrolling nav. "More" sheet holds Companies search, Briefings, System, Settings, theme, sign out.
 - **Tabs:** page tabs become a horizontally scrollable chip row with edge fade and the active tab scrolled into view; more than 5 tabs collapse the rest into a "More" chip. Never 13 tabs in one row (Risk, workbench today).
 - **Answer strip:** 2×2 tiles on mobile; hero visual full-bleed, height ≤ 55% of viewport; secondary panels stack in one column.
+- **Catalog components on mobile:** `ScoreMark` stays visible in every list row (24 px); `SideDrawer` (F27) becomes a full-screen sheet; `MonthCalendar` defaults to an agenda list with "Open calendar"; `DotStrip` and `ForecastBars` keep their table twin one tap away; `CheckList` rows wrap sentences, with the section link on its own line; the holdings view presets become a horizontally scrolling chip row that switches the card fields.
 - **Tables:** `<ResponsiveTable>` renders a card list under `md`: primary value + name on the first line, 2-3 key fields, "Details" expander for the rest; sort/filter in a bottom sheet. Wide matrices (overlap heat matrix, status matrix) get a pinned first column and pinch-free horizontal scroll *inside the card only*, with a "Switch to list" fallback.
 - **Charts:** touch tooltips (tap to pin, tap away to dismiss), no hover-only information, labels thinned by width, legends become tappable chips that filter; Chart ⇄ Table toggle is a pill directly above each chart. Force graph and Sankey show a ranked-list view by default on mobile with "Open diagram" for full-screen landscape.
 - **Forms/editors (Settings, What-if, Pre-trade):** single column, sticky SaveBar above the bottom bar, number inputs use numeric keypads, date inputs native.
@@ -206,6 +232,29 @@ New chart components (add to the old list: Bullet, RangeBar, RunTimeline/Gantt, 
 `HeatMatrix` (clustered, diverging) · `Underwater` (drawdown area) · `Tornado` (scenario/factor impact) · `Lollipop timeline` (insiders, deals, alerts) · `StatusMatrix` (issuer × dataset) · `CDF/Lorenz` (concentration) · `FanBand` (estimates/forecast) · `Sunburst-lite` (look-through, only 2 levels).
 All built with `lib/palette`, `components/charts/shared.tsx` tooltip/axis rules, and the **dataviz skill** when implementing.
 
+### 4b. Visual-language foundations from the catalog (F18-F32)
+Built after F9-F17 and before any page restructure (§8 Phase 2b). Each has a table twin, a mobile form and tests. New colour roles are token aliases only (`--chart-forecast`, `--chart-fair-value`, `--tier-low/medium/high`, `--score-mark-*`), added to `tokens.css` in light and dark and kept green under `npm run lint:colors`.
+
+| # | Component | Purpose | First used by |
+|---|---|---|---|
+| F18 | `<ScoreMark>` | Five-axis profile glyph (radial petals, open gap = unknown), 24 / 64 / 300 px, clickable axis points in the large form; extends `radar.tsx` data shape | Holdings rows, company header, Discover, scorecard |
+| F19 | `<CheckList>` | Rows of state icon (pass / fail / not applicable / unknown), sentence, section link; "n of m applicable"; "All checks" modal, failed first | Checks tab, company header, dividend panel |
+| F20 | `<DotStrip>` | Ranked dots on one scale, reference lines (portfolio, benchmark, median), tinted zones, name labels (F12) | Allocation fundamentals, valuation, peers |
+| F21 | `<BandGauge>` | Three-zone horizontal band with marker and zone labels; replaces speedometers (§6.3) | DCF position, risk score, burn-up |
+| F22 | `<MonthCalendar>` | Month grid with typed dots, legend, chips, prev/next; agenda list on mobile | Income, earnings, ex-dividend dates |
+| F23 | `<ForecastBars>` | Bars with history vs estimate hue, Monthly/Annual toggle, hover/tap panel listing items | Dividend income, revenue/EPS estimates |
+| F24 | `FanBand` cone extension | Cone from last price to the 12-month high/low with mean marked and a tooltip card | Consensus, scenario outlook |
+| F25 | `<StepLine>` overlay | Stepped fair-value line over a price line; cursor at today; starts at the first stored value | Portfolio valuation, Check-In sparklines, watchlist |
+| F26 | `<ChartFooter>` | `Data` toggle (builds on F9), `Learn` link, dataset / as-of / known-at / source from evidence ids | Every chart (P14) |
+| F27 | `<SideDrawer>` | Right panel opened from a row with tabs and a "Full page" button; sheet on mobile | Holdings, Discover, Inbox |
+| F28 | `<GroupedTable>` | Extends F14: section headers with count and one-line explanation, optional chip columns | Valuation groups, feed, watchlist |
+| F29 | `<CalcChain>` | Ordered calculation rows (label, expression, value, unit) printed exactly as computed | Multiple-path scenario, DCF steps |
+| F30 | `<SliderRange>` | Dual-handle range with per-metric non-linear tick scale | Advanced screen filters |
+| F31 | `<VerdictLine>` | One backend-written sentence beside a number, tone from verdict not from sign | Scores, ratios, risk tiles |
+| F32 | `HeatMatrix` triangle mode | Lower-triangle diverging matrix with "moves most / least together" lists | Risk correlations, overlap |
+
+Also adopted as small patterns inside existing components: grouped counted tab chips (Feed type filters), segmented 0-100 progress bars, name-chip + symbol avatars, stacked share bars for tier mixes.
+
 ---
 
 ## 5. Coverage matrix — every route has a home
@@ -215,29 +264,35 @@ All built with `lib/palette`, `components/charts/shared.tsx` tooltip/axis rules,
 ### Portfolio
 | Today | → v2 | Hero visual (right type) | Notes |
 |---|---|---|---|
-| `/` Overview (6.6k px) | Portfolio › **Overview** | ▣ Portfolio vs benchmark line (existing); answer strip: value · P/L · cash · Sharpe · drift status | Move Risk, Heatmap, Concentration, Cash flow, Exposure, Contribution, Valuation to Overview sub-tabs *Performance · Allocation · Risk · Cash & flows · Data quality*; merge Drift + Weights-vs-targets; names not tickers |
-| `/holdings` | Portfolio › **Holdings** tabs: Positions · Watchlist · Transactions · Funds & ETFs | ▣ Treemap (size = value, colour = P/L) beside table; Watchlist ▣ RangeBar (buy ← price → sell) | Card list < md; mute 30× "NO TARGET"; sort/filter/search; row-expand editor for watchlist |
+| `/` Overview (6.6k px) | Portfolio › **Overview** | ▣ Portfolio vs benchmark line (existing, with zone shading and reference lines per P11); answer strip: value · P/L · cash · Sharpe · drift status; beside it the **five-axis scorecard** (`ScoreMark` large, axis lists "lifting / holding back") and a one-sentence concentration/risk verdict (F31) | Move Risk, Heatmap, Concentration, Cash flow, Exposure, Contribution, Valuation to Overview sub-tabs *Performance · Allocation · Risk · Cash & flows · Data quality*; merge Drift + Weights-vs-targets; names not tickers |
+| `/holdings` | Portfolio › **Holdings** tabs: Positions · Watchlist · Transactions · Funds & ETFs | ▣ Treemap (size = value, colour = P/L) beside table; **view presets** (Check-In, Holding, Income, Growth, Value, Score, Fundamentals, Custom) where Check-In rows show name chip + `ScoreMark` avatar, last event, price vs fair value and a sparkline with `StepLine`; row click opens `SideDrawer` (F27); Watchlist ▣ RangeBar (buy ← price → sell) + fair-value column | Card list < md; mute 30× "NO TARGET"; sort/filter/search; row-expand editor for watchlist; presets are versioned config (insight plan I9) |
 | `/transactions` | Holdings › Transactions | ▣ Calendar heatmap of flows + net-flow bars | Pagination |
 | `/watchlist` | Holdings › Watchlist | RangeBar per row | Replaces per-row form grid |
 | `/funds`, `/funds/compare` | Holdings › Funds & ETFs; Compare as a mode | ▣ Cost/return scatter; compare = small multiples + dumbbell | |
-| `/performance` (+4) | Portfolio › **Performance**: Overview · Attribution · Core vs stocks · Ledger · Lots | Overview ▣ line + drawdown underwater; Attribution ▣ **waterfall** (+ Brinson bars); Core vs stocks ▣ line pair + spread area; Ledger ▣ cash-flow bars; Lots ▣ age ladder + inline gain bar | Distinct h1 per tab |
-| `/xray` (+7) | Portfolio › **Allocation**: Exposure · Overlap · Concentration · Fundamentals · Benchmark · Supply chain · What-if · Your data | Exposure ▣ treemap + sector/country ranked bars (+ map only if ≥6 countries); Overlap ▣ **HeatMatrix** (fund×fund) + shared-holdings bars; Concentration ▣ Lorenz/CDF + HHI bullet; Fundamentals ▣ strip plot vs benchmark; Benchmark ▣ diverging active-weight bars; Supply chain ▣ Sankey | As-of date picker stays (global control in the header strip); `xray/proposed` and `xray/inputs` become the *What-if* and *Your data* tabs |
+| `/performance` (+4) | Portfolio › **Performance**: Overview · Attribution · Core vs stocks · Ledger · Lots | Overview ▣ line + drawdown underwater, returns breakdown **waterfall** (unrealised, realised, dividends, currency, fees) and closed-positions block; Attribution ▣ **waterfall** (+ Brinson bars) with ranked contributor bars; Core vs stocks ▣ line pair + spread area; Ledger ▣ cash-flow bars; Lots ▣ age ladder + inline gain bar | Distinct h1 per tab |
+| `/xray` (+7) | Portfolio › **Allocation**: Exposure · Overlap · Concentration · Fundamentals · Benchmark · Supply chain · What-if · Your data | Exposure ▣ treemap + **sector → industry → holding Sankey** with a Sector/Industry/Holding toggle + revenue-by-geography ranked bars (coverage % shown; map only if ≥6 countries); Overlap ▣ **HeatMatrix** (fund×fund, triangle mode F32) + shared-holdings bars; Concentration ▣ Lorenz/CDF + HHI bullet + one-sentence verdict; Fundamentals ▣ **`DotStrip` per metric** (valuation, forecast growth, ROE, debt/equity, yield) with portfolio and benchmark lines, tabbed by basis; Benchmark ▣ diverging active-weight bars; Supply chain ▣ Sankey | As-of date picker stays (global control in the header strip); `xray/proposed` and `xray/inputs` become the *What-if* and *Your data* tabs |
 | `/risk` (+10) | Portfolio › **Risk**: Overview · Today · Bad months · Past episodes · Factors · Stress · Themes · **Decide** (What-if · Rebalance · Pre-trade · Deposit) · Does it hold up | see §6.1 | One banner for sample-size caveat (F15); 13 tabs → 7 + grouped "Decide" |
 
+### Portfolio — new tabs (insight plan)
+| Today | → v2 | Hero visual (right type) | Notes |
+|---|---|---|---|
+| (new) dividends | Portfolio › **Income** | ▣ `ForecastBars` (36 months history + 12 estimated, Monthly/Annual) with hover panel; `MonthCalendar` typed dots; contributors bars; quality-tier rows + stacked share bar | Answer strip: next-12-month income, yield, yield on cost; estimates marked; I1/I2 |
+| (new) fair value | Portfolio › **Valuation** | ▣ price line + `StepLine` fair-value overlay; KPI trio (value, fair value, % difference); `GroupedTable` Overvalued / Stale / Undervalued; basis switcher (not persisted) | I5; chart starts at first stored fair value |
+
 ### Companies
-| `/holdings/[t]` + `/companies/[t]/*` (13) | Companies › **[Company]** (one page, tabs per §3.3) | Overview ▣ price line with events; Financials ▣ small multiples (revenue, margins, FCF), cash→FCF waterfall, debt ladder; Segments ▣ donut ≤7 + hbar delta; Peers ▣ strip plot with median line (hide metric if <2 peers); Network ▣ force graph; Ownership ▣ holder-class stacked area + stakes timeline | Ticker switcher; resolve names; lazy tabs; paginate 431-row identity table |
+| `/holdings/[t]` + `/companies/[t]/*` (13) | Companies › **[Company]** (one page, tabs per §3.3) | Overview ▣ price line with events, header `ScoreMark` + verdict line (top 3 rewards / 3 risks) and "See all checks"; **Checks** ▣ `CheckList` per axis (five axes × six checks, risk checks separate); Financials ▣ small multiples (revenue, margins, FCF), cash→FCF waterfall, debt ladder, **dividend history + yield-vs-peers bar + payout rings as status**, **valuation: `BandGauge` position, peer bars with median line and growth column, industry histogram with highlighted bin, PE-history band, `CalcChain` for the scenario, `FanBand` consensus cone**; Past ▣ revenue→earnings→cash **Sankey** with year strip; Health ▣ paired assets/liabilities bars + debt/cash history; Segments ▣ donut ≤7 + hbar delta; Peers ▣ strip plot with median line (hide metric if <2 peers); Network ▣ force graph; Ownership ▣ holder-type stacked bar + top-25 table + insider net-volume strip + CEO pay/tenure; Updates ▣ typed feed chips | Ticker switcher; resolve names; lazy tabs; paginate 431-row identity table |
 | `/funds/[isin]/*` (6) | Companies › Fund page | Holdings ▣ treemap; Performance ▣ line + calendar returns; Style ▣ style box; Bond ▣ maturity ladder + duration bullet; Checklist ▣ status list | |
 
 ### Research
 | `/theses` | Research › **Theses** | ▣ Board grouped by verdict, `ConfidenceBar` per holding, KPI bullet vs target | |
 | `/research`, `/research/[id]` | Research › Reports | TOC rail; title + short id chip | |
-| `/screens`, `/discover`, `/discover/backtest` | Research › **Discover**: Screens · Discover · Backtest | ▣ Percentile bars per metric; backtest ▣ equity line vs benchmark + hit-rate bars | |
+| `/screens`, `/discover`, `/discover/backtest` | Research › **Discover**: Screens · Discover · Backtest | ▣ Percentile bars per metric; idea cards (title, rationale, aggregate `ScoreMark`); **"Ask for a screen" box → editable filter chips** (never auto-executed); filter dialog with `SliderRange` (F30) and "n new in 7 days"; result rows with `ScoreMark`, grid ⇄ list; backtest ▣ equity line vs benchmark + hit-rate bars | I10 |
 | `/journal`, `/journal/scorecard` | Research › Journal / Scorecard | ▣ Calibration dots (confidence vs outcome) | |
 | `/insights`, `/insights/sectors` | Research › What changed | ▣ Diverging bars of change by sector; timeline | |
 | `/funds/research` | Research › Fund research | Table + inline sparkline | |
 
 ### Markets
-| `/news` (+9) | Markets › **News**: Feed · Stories · Wire · Brief · Ask · Sources · Disputed · Review(ops) | Feed ▣ severity timeline (keep) + source-reliability small multiples; default hides *Ignored*; group "34 8-Ks mention tariffs"; day headers; virtualise (431 SVGs → <60) | Disputed also a filter in Inbox |
+| `/news` (+9) | Markets › **News**: Feed · Stories · Wire · Brief · Ask · Sources · Disputed · Review(ops) | Feed ▣ severity timeline (keep) + **typed filter chips with counts** + source-reliability small multiples; default hides *Ignored*; group "34 8-Ks mention tariffs"; day headers; virtualise (431 SVGs → <60) | Disputed also a filter in Inbox |
 | `/macro` | Markets › Macro | ▣ Small multiples **with axes, dates, units**; drop repeated "Not tracked" rows; geography select | |
 | `/disclosures` (+12) | Markets › **Filings**: Timeline · Ownership · Insiders · Network · Deals · Estimates · Screen · Look-through · Coverage · Replay | Ownership ▣ stacked area by holder class + top-holder bars with QoQ arrows; Insiders ▣ lollipop timeline over price + net-buy bars; Network ▣ Sankey/radial; Deals ▣ timeline; Estimates ▣ beat/miss bars + revision lines; Look-through ▣ treemap; Coverage ▣ **StatusMatrix** | `alerts`, `adjudication`, `deals/parties` → Inbox; Replay keeps known-at scrubber |
 | `/investors`, `/investors/[cik]` | Markets › 13F investors | ▣ Treemap of positions; delta bars previous→reported | |
@@ -248,10 +303,10 @@ All built with `lib/palette`, `components/charts/shared.tsx` tooltip/axis rules,
 ### Inbox / System / Settings
 | `/escalations(/id)`, `/review`, `/relationships`, `/news/disputed`, `/disclosures/{alerts,adjudication,deals/parties}`, `/verification` flags | **Inbox** | ▣ Count strip by queue; age ladder; ack-latency histogram | Relationships ▣ force graph, holding picker (select, default first) |
 | `/activity`, `/jobs/[id]` | System › Activity | ▣ **Run timeline/Gantt** (lane = job type); job detail ▣ step Gantt (duration, cost) | Label maps, no raw JSON, paginate (14k → 1 screen) |
-| `/data-sources` | System › Data sources & cost | ▣ Coverage StatusMatrix + budget burn-up vs cap | 57-row table paginated; budget moved in |
+| `/data-sources` | System › Data sources & cost | ▣ Coverage StatusMatrix + budget burn-up vs cap on a `BandGauge`; insight-feature coverage matrix (`ready / partial / unavailable` per feature × holding, I0.1) | 57-row table paginated; budget moved in; access state per provider with test date |
 | `/quality`, `/verification`, `/release(/audit,/pilot)`, `/status` | System › Quality · Verification · Release · Status | Pass-rate trend line; rule×source heatmap; release checks as checklist matrix | |
 | `/ai-decisions` | System › AI decisions (audit) | ▣ Stacked bars by type/outcome + confidence histogram; list virtualised, filter "confirmed / rejected / disagree" | 29k px → one screen |
-| `/config/*` (13) | Settings (master-detail editors, §3.5) | Budget ▣ stacked bars/treemap by job & model + burn-up; Jobs ▣ week timeline; Event rules ▣ severity matrix; News sources ▣ trust bars; Holding profiles ▣ completeness rings; History ▣ timeline + DiffRows | 30.8k/27.9k px editors → ≤3 screens |
+| `/config/*` (13) | Settings (master-detail editors, §3.5) | Budget ▣ stacked bars/treemap by job & model + burn-up; Jobs ▣ week timeline; Event rules ▣ severity matrix; News sources ▣ trust bars; Holding profiles ▣ completeness rings; History ▣ timeline + DiffRows; **Checks rules** (new, Investment rules) ▣ threshold rows with `SliderRange` and a live count of holdings that would change state; **Holdings views** editor with column picker | 30.8k/27.9k px editors → ≤3 screens |
 | `/chat`, `/glossary`, `/evidence/[id]`, login/mfa | unchanged (chat slide-over, help menu, evidence page, auth) | | |
 
 ---
@@ -261,23 +316,23 @@ All built with `lib/palette`, `components/charts/shared.tsx` tooltip/axis rules,
 ### 6.1 Risk (11 tabs, today almost all text)
 | Tab | Question | Visual |
 |---|---|---|
-| Overview | How risky am I? | Answer strip (vol, max drawdown, VaR/ES status, Sharpe) + **Underwater** drawdown ▣ + return-vs-risk scatter of holdings; sample-size caveat once |
-| Today's risk | What moves me today? | Contribution-to-risk hbar (sorted, names) with weight overlay |
+| Overview | How risky am I? | **Headline risk score 0-100 on a `BandGauge`** with portfolio and benchmark markers (insight plan I12, formula published, sub-scores on expand); metric tiles (vol, max drawdown, ES, Sharpe, beta), each with a `VerdictLine`; **Underwater** drawdown ▣ + return-vs-risk scatter of holdings; sample-size caveat once |
+| Today's risk | What moves me today? | Contribution-to-risk hbar (sorted, names) with weight overlay; tabs Volatility / Drawdown / Beta each a ranked per-holding bar with portfolio and market reference bars |
 | Bad months | How bad can a month be? | Histogram of monthly returns with worst 5% shaded + calendar strip |
 | Past episodes | How did I do in past crashes? | Timeline of episodes, loss bars (portfolio vs benchmark) |
 | Factors | What am I really betting on? | Diverging hbar of factor loadings + R² ring; small rolling-loading lines |
 | Stress test | What if X? | **Tornado/waterfall** of scenario P&L by holding; scenario picker |
-| Themes | Hidden clusters? | Treemap by theme; **HeatMatrix** of correlations (clustered) |
+| Themes | Hidden clusters? | Treemap by theme; **HeatMatrix triangle** (F32) of correlations on a diverging scale with "moves most / least together" lists |
 | Decide: What-if / Rebalance / Pre-trade / Deposit | What would this trade do? | **Dumbbell** before→after weights, risk deltas as bullets; trade list table; empty form shows an example result, not a blank page |
 | Does it hold up | Is the model calibrated? | VaR-breach strip plot + hit-rate vs expected bullet |
 Show "Unknown" once via F15 with the reason and what unlocks it ("needs 250 observations; have 191").
 
 ### 6.2 Holding/company visuals (from old plan §6, kept)
-Business network (force graph, dedupe counterparties), Revenue mix (donut ≤7 + hbar delta + region map/bubble), Financial history (small multiples + peer-median), Cash & debt (waterfall + maturity ladder), Dependencies (Sankey), Country/industry (ranked bars/map), Trade (Sankey/ranked bars), Input costs (rebased-100 lines + rolling correlation), Correlation (heat matrix + diverging bars), Ownership (holder-class area + stakes timeline), Peers (strip plots, hide <2 peers), Insider trades (lollipop over price), Estimates (beat/miss + revisions), Price completeness (calendar strip). All with Chart ⇄ Table. **Add a coverage check first**: many of these panels are empty for most holdings, so fix data jobs per `empty_data_fill_plan.md` before polishing.
+Business network (force graph, dedupe counterparties), Revenue mix (donut ≤7 + hbar delta + region map/bubble), Financial history (small multiples + peer-median), Cash & debt (waterfall + maturity ladder), Dependencies (Sankey), Country/industry (ranked bars/map), Trade (Sankey/ranked bars), Input costs (rebased-100 lines + rolling correlation), Correlation (heat matrix + diverging bars), Ownership (holder-class area + stakes timeline), Peers (strip plots, hide <2 peers), Insider trades (lollipop over price), Estimates (beat/miss + revisions), Price completeness (calendar strip). Catalog additions: five-axis `ScoreMark` + `CheckList` (header and Checks tab), valuation pictures (band gauge, peer bars, industry histogram, PE band), dividend history with yield-vs-peer bar, health paired bars, past-year Sankey with year strip, ownership by holder type + insider volume strip, CEO pay panel, consensus cone, earnings-release summary with questions (cited AI note). Every one uses `ChartFooter` and a `VerdictLine`. All with Chart ⇄ Table. **Add a coverage check first**: many of these panels are empty for most holdings, so fix data jobs per `empty_data_fill_plan.md` before polishing.
 
 ### 6.3 Existing visuals to review for fit
 Donuts with >6 slices → treemap/sorted bars; Overview "Cash" drift card (one row) → merge; monthly heatmap with a single row → calendar strip; Peers "Position" mini-scale for one value → hide; macro small multiples without axes → add axes/units; "Unknown 100%" filled bar for 0% mapped → striped "unmapped" pattern + text.
-Added by Phase 0 (live): Activity **speedometer gauge** → burn-up line + bullet; News severity as **three blues** → hue + pattern; Escalations empty/one-bar charts → hide below 3 points; Contribution "Not assigned" bar same colour as real contributions → grey/striped and sort by magnitude; Overview/Activity **ring gauges** for coverage % → keep only as small status rings next to a count ("27 of 30"), never the sole encoding.
+Added by Phase 0 (live): Activity **speedometer gauge** → burn-up line + `BandGauge`; every remaining gauge or ring used as a verdict → `BandGauge` / `ScoreMark`; radar charts in `holding-overview.tsx` and `risk-panel.tsx` → `ScoreMark` where axes are check scores, otherwise labelled axes with a table twin; per-holding scatter/strip charts get tinted zones and labelled reference lines (P11); News severity as **three blues** → hue + pattern; Escalations empty/one-bar charts → hide below 3 points; Contribution "Not assigned" bar same colour as real contributions → grey/striped and sort by magnitude; Overview/Activity **ring gauges** for coverage % → keep only as small status rings next to a count ("27 of 30"), never the sole encoding.
 **Spread the winner:** the Activity job-run heatmap pattern (row = item, column = day, colour = status, legend, last value at row end) becomes the shared `StatusMatrix` and is reused for Inbox ageing, Data coverage (issuer × dataset), Release checks (check × week) and Verification (rule × source).
 
 ---
@@ -301,6 +356,7 @@ Independent of the restructure, can ship first:
 15. Hide empty/one-point chart boxes on Escalations; replace the Activity budget gauge with a burn-up line; make news severity colours distinguishable in dark mode.
 16. Relationships: holding selector as a searchable select defaulting to the first holding; paginate (15k px).
 17. Command palette: take cluster labels from `lib/nav.ts` so palette and nav agree.
+18. Catalog quick wins that need no new data: add reference lines/zones (P11) to existing line and bar charts; add a `ChartFooter`-style "as of / source" line to charts that already know it; write verdict sentences under the existing risk and performance tiles; use grouped counted chips for the news feed types; make the correlation matrix triangular with the diverging palette; swap any speedometer for a band gauge.
 
 ---
 
@@ -312,8 +368,9 @@ Independent of the restructure, can ship first:
 | 0b | Walk the dynamic detail routes (`escalations/[id]`, `evidence`, `jobs/[id]`, `reports/[id]`, `reviews/[id]`, `research/[id]`, `investors/[cik]`, `funds/[isin]/*`, `news/stories/[id]`, `config/history/[domain]`) and interaction states (menus, drawers, form submits, empty→filled); add findings to §1.4 | one screenshot per route-state |
 | 1 | §7 quick wins (now 17 items) | before/after heights; no raw ids; mobile 390 no horizontal scroll; "clean load not dirty" tests green |
 | 2 | Foundations F1-F17 + chart components (unit tests for formatters/labels/ViewToggle) | `tsc` in `apps/web`, touched-file lint, vitest for new components |
+| 2b | **Visual language** (§4b): tokens (`--chart-forecast`, `--chart-fair-value`, tier and score-mark aliases) → F18-F32 with table twins, mobile forms, vitest; apply P10-P15 to existing charts (reference lines, footers, verdict lines). Backend data for the new screens follows `insight_features_implementation_plan.md` I0-I4 | components render in a gallery/storybook-style test page in light, dark and 390 px; `lint:colors` green |
 | 3 | IA v2: `lib/nav.ts` model (+tabs, badges, `REDIRECTS`), Inbox page, Settings sidebar, Companies merge, mobile bottom bar | every old URL redirects (test that every nav/redirect target resolves); nav tests pass |
-| 4 | Page restructure by area, in this order: Overview → Holdings → Company → Risk → Allocation → Performance | desktop + mobile screenshots; answer strip + hero visual on each |
+| 4 | Page restructure by area, in this order: Overview (+ scorecard) → Holdings (presets, drawer) → Company (Checks, valuation pictures) → **Income and Valuation tabs** → Risk (score, tabs) → Allocation → Performance | desktop + mobile screenshots; answer strip + hero visual on each |
 | 5 | Markets & Filings, Research, Briefings | same |
 | 6 | System & Settings (master-detail editors per §3.5, StatusMatrix reuse), viz wave 2 (Gantt, week timeline, budget burn-up, graph) | editors ≤ 3 screens; same screenshots |
 | 7 | A11y (every chart has table twin + aria-label; no colour-only status), perf (LCP, requests per page), Lighthouse a11y ≥ 90 on 5 key pages | numbers recorded |
@@ -330,6 +387,7 @@ Ship in two steps for IA: (a) tabs + redirects with the old nav intact, (b) swit
 - 390px: no horizontal page scroll; no clipped nav.
 - Coverage matrix (§5) checked off route by route: no route, field or action lost.
 - No "Loading…" spinner visible >1 s without a skeleton; one batched summary request per page.
+- Catalog language: every chart has a footer (data / learn / as-of / source); every score, ratio and risk tile has a verdict sentence; no speedometer remains; a colour keeps one meaning across pages (P10); unknown values render as gaps or stated reasons, never zero (P15); `ScoreMark` agrees with its table twin to the decimal.
 
 ## 10. Decisions (owner delegated all calls, 2026-10-11)
 1. **Briefings is its own top-level label.** It serves the distinct "what did I miss" habit, and folding it into Research would push Research past 7 tabs.
@@ -340,5 +398,8 @@ Ship in two steps for IA: (a) tabs + redirects with the old nav intact, (b) swit
 6. **Filings stays under Markets** (it is external public-record data); alerts, accuracy checks and deal-party review move to Inbox.
 7. **Settings stays a gear icon, not a menu label,** with the grouped sidebar.
 8. **IA ships in two steps** (tabs + redirects first, nav switch second) so nothing is unreachable at any point.
+
+9. **The visualization catalog sets the house chart language (2026-10-15).** Patterns are borrowed, not branding or proprietary scoring; all colour stays on Ledger/Industry tokens (aliases only); every new component has a table twin; new data features are built in `insight_features_implementation_plan.md` and appear in the v2 slots listed in §3.1 and §5.
+10. **The five-axis mark replaces ad-hoc radar and ring verdicts** for stocks; funds keep their checklist until fund checks are defined.
 
 No open questions remain; Phase 0 (visual audit of the remaining routes) is the next step and may refine page-level details, not these decisions.

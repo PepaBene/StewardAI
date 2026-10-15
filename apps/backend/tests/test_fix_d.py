@@ -431,7 +431,7 @@ def test_pypdf_limit_errors_are_fetch_errors(monkeypatch: pytest.MonkeyPatch) ->
     def boom(*_: Any, **__: Any) -> Any:
         raise LimitReachedError("too big")
 
-    monkeypatch.setattr(fetch_module, "PdfReader", boom)
+    monkeypatch.setattr("pypdf.PdfReader", boom)
     with pytest.raises(FetchError, match="unreadable PDF"):
         pdf_text(b"%PDF-1.4")
 
