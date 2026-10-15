@@ -1,11 +1,14 @@
-"""The pgmq `jobs` queue: the API enqueues on-demand runs, the worker consumes them."""
+"""The `job_queue` table: the API enqueues on-demand runs, the worker consumes them.
+
+A message is read by hiding it for a visibility timeout (`vt`); it comes back if it is not
+archived (deleted) in time, so a worker that dies mid-run does not lose the job. Several workers
+can read at once: `for update skip locked` gives each a different message.
+"""
 
 import json
 from dataclasses import dataclass
 
 import asyncpg
-
-QUEUE = "jobs"
 
 
 @dataclass(frozen=True)
@@ -19,10 +22,10 @@ class QueuedJob:
 async def enqueue(
     conn: asyncpg.Connection | asyncpg.Pool, job_id: int, job_type: str, *, delay: int = 0
 ) -> int:
-    """Send a job to the queue, readable after `delay` seconds."""
+    """Add a job to the queue, readable after `delay` seconds."""
     msg_id: int = await conn.fetchval(
-        "select * from pgmq.send($1, $2::jsonb, $3::integer)",
-        QUEUE,
+        "insert into public.job_queue (message, vt)"
+        " values ($1::jsonb, now() + make_interval(secs => $2::integer)) returning msg_id",
         json.dumps({"job_id": job_id, "job_type": job_type}),
         delay,
     )
@@ -35,13 +38,18 @@ async def read(
     """Next messages, hidden from other readers for `visibility_timeout` seconds.
     Unreadable messages are returned as their bare msg_id so the caller can archive them."""
     rows = await conn.fetch(
-        "select msg_id, read_ct, message from pgmq.read($1, $2, $3)",
-        QUEUE,
+        "with next as ("
+        "  select msg_id from public.job_queue where vt <= now()"
+        "  order by msg_id limit $2 for update skip locked)"
+        " update public.job_queue q"
+        " set vt = now() + make_interval(secs => $1::integer), read_ct = q.read_ct + 1"
+        " from next where q.msg_id = next.msg_id"
+        " returning q.msg_id, q.read_ct, q.message",
         visibility_timeout,
         limit,
     )
     messages: list[QueuedJob | int] = []
-    for row in rows:
+    for row in sorted(rows, key=lambda r: r["msg_id"]):
         try:
             body = json.loads(row["message"])
             messages.append(
@@ -53,11 +61,16 @@ async def read(
 
 
 async def archive(conn: asyncpg.Connection | asyncpg.Pool, msg_id: int) -> None:
-    await conn.execute("select pgmq.archive($1, $2::bigint)", QUEUE, msg_id)
+    await conn.execute("delete from public.job_queue where msg_id = $1", msg_id)
 
 
 async def set_visibility(
     conn: asyncpg.Connection | asyncpg.Pool, msg_id: int, seconds: int
 ) -> None:
     """Hide message `msg_id` from readers for `seconds` from now (0: visible again now)."""
-    await conn.execute("select pgmq.set_vt($1, $2::bigint, $3::integer)", QUEUE, msg_id, seconds)
+    await conn.execute(
+        "update public.job_queue set vt = now() + make_interval(secs => $2::integer)"
+        " where msg_id = $1",
+        msg_id,
+        seconds,
+    )

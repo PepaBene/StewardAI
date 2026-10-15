@@ -363,8 +363,6 @@ async def test_held_fact_review_requeues_verdicts(
     deps: EarningsDeps,
     migrated_db: MigratedDatabase,
 ) -> None:
-    if not any("pgmq" in name for name in migrated_db.applied):
-        pytest.skip("pgmq extension not available on this server")
     await _setup(backend_pool)
     async with backend_pool.acquire() as conn:
         await save_config(

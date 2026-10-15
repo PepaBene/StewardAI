@@ -84,8 +84,8 @@ The risk is overlap: the worker runs up to 4 jobs at once in one process
 | 5 | `sources/xbrl.py:291,401` | 20-32 MB filings parsed whole | 200-500 MB | clear elements while iterating | open |
 | 6 | `fundamentals/ir.py:94-110,159` | up to 25 MB `BytesIO`, then pypdf / `fromstring` | ~100 MB | spool to disk, cap pages | open |
 | 7 | `sources/market.py:177-230` | FX backfill expands ~60K `FxRate` objects | ~50 MB, once | fetch in yearly chunks | open |
-| 8 | `valuation/read.py:509-515` | `fx_rate` for all currencies, no filter | tens of MB | filter by currency | open |
-| 9 | `quant/french_store.py:51-60` | all `factor_return` rows for a region (144K) | ~30 MB | always pass `since` | open |
+| 8 | `valuation/read.py:509-515` | `fx_rate` already filtered by source and date; only the currency is not | small | none: the table needs the base currency too, so a currency filter risks wrong conversions | checked, left |
+| 9 | `quant/french_store.py:51-60` | `load_factors` takes `since` and its only caller (`portfolio/factors.py:392`) passes it | small | none | checked, left |
 | 10 | `engine/data_audit.py:110-130` | two unbounded `price_bar` fetches (~20K rows) | small | compare in SQL | open |
 | 11-12 | `portfolio/exante.py` `_BOOK_CACHE`, `xray/service.py` `_cache` | caches evict by TTL only | low | hard size cap | open |
 | 14 | `news/pipeline.py:1813-1906` | all collected items plus 72 h of recent members | modest | process per source | open |
@@ -93,14 +93,21 @@ The risk is overlap: the worker runs up to 4 jobs at once in one process
 
 ## Phase 3: Postgres on Railway
 
-Open questions to settle before cutover:
-- pgmq: Railway's stock Postgres lacks it. Either deploy an image that has pgmq and pgvector,
-  or replace the queue with a table using `FOR UPDATE SKIP LOCKED` (`jobs/queue.py` is small).
-- `auth.users` references: check for foreign keys from `public` tables to `auth.users` and for
-  functions using `auth.uid()`. Replace with plain `uuid` columns; the backend already checks
-  the owner (`OWNER_USER_ID`).
-- Roles and RLS: policies reference `app_backend` and `private.is_owner()`. On Railway the
-  backend connects as one owner role; drop the policies or keep them with a local role.
+Checked against the live database on 2026-10-15:
+- Extensions in use: `vector`, `pgcrypto`, `uuid-ossp`, `pgmq` (one queue, `jobs`), plus
+  `pg_cron` (added by the retention migration), `pg_stat_statements` and `supabase_vault`.
+  Railway's Postgres image has the first three; pgvector needs the pgvector template.
+- pgmq: replaced by the `public.job_queue` table (migration `20261126100000`,
+  `jobs/queue.py` rewritten with the same four functions). Done in code; pending messages are
+  copied over after the deploy (see the migration comment).
+- `auth.users`: no foreign keys from `public` tables to it; one function uses `auth.uid()` and
+  24 of 474 policies mention `auth.`. Restore with stub `auth.uid()` / `auth.jwt()` functions and
+  the roles `anon`, `authenticated`, `service_role`, or drop those policies: the backend checks
+  the owner itself (`OWNER_USER_ID`) and connects as `app_backend`.
+- 234 tables in `public`, roles granted: `anon`, `app_backend`, `authenticated`, `postgres`,
+  `service_role`.
+- `supabase_vault`: check for use before the move; the retention job and the stub approach do
+  not need it.
 - Live sync status: serve `job` and `job_step` from a backend endpoint (poll or SSE) and remove
   the direct Supabase reads and the Realtime channel from `sync-status-provider.tsx`.
 - pg_cron: move the retention job to the backend scheduler (worker already uses APScheduler).
