@@ -54,7 +54,10 @@ class DraftKPI(BaseModel):
     description: str = Field(max_length=300)
 
 
-_PER_SHARE = " A value per share in the position's currency, near the current price, not a return."
+_PER_SHARE = (
+    " A 12-month value per share in the position's currency (the same scale as the price), not "
+    "a return or a percentage."
+)
 
 
 class DraftScenarios(BaseModel):
@@ -284,8 +287,12 @@ trend), not on a round number you like.
 - pre_mortem: exactly three likeliest reasons the stock loses 40%.
 - scenarios: bear, base and bull value per share in the position's currency with probabilities \
 that add to 1, with bear strictly below base and base strictly below bull (even for an exit: \
-the bear case is the lowest value, whatever the stance). Anchor them on the report's computed \
-valuation figures and the current price; never use a number the report does not support.
+the bear case is the lowest value, whatever the stance). Derive each from the report's \
+valuation figures: a multiple applied to earnings (trailing or forward P/E), the analysts' \
+consensus target and its range as a cross-check, a drawdown for the bear case. The base case is \
+what the valuation supports, not the current price restated; set it at the price only when the \
+figures say the stock is fairly valued, and say so. Name the method in valuation_method; never \
+use a number the report does not support.
 - sell_target above buy_target, both in the same currency; leave one out if the report gives no \
 basis for it.
 - conviction 1 to 5 and the main reason; review_in_months by how fast the facts change.
