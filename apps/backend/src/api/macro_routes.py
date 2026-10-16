@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from api.auth import Owner
 from api.db import DbId, Pool
 from api.routes import _enqueue
+from steward.macro.dashboard import MacroCard, macro_dashboard
 from steward.macro.hs import normalize_hs_revision
 from steward.macro.providers import TradePoint, flow_totals, trade_metrics
 from steward.macro.read import MacroContext, context_for_holding
@@ -99,6 +100,12 @@ async def get_macro_context(
 ) -> MacroContext:
     """Latest point-in-time country context, ranges, provenance and mapped exposure."""
     return await context_for_holding(pool, ticker, as_of or dt.datetime.now(dt.UTC))
+
+
+@router.get("/macro/dashboard", response_model=list[MacroCard], tags=["macro"])
+async def get_macro_dashboard(pool: Pool, _owner: Owner) -> list[MacroCard]:
+    """Every stored series as a card: latest value, changes, 1/5/10-year range, 5-year line."""
+    return await macro_dashboard(pool, dt.datetime.now(dt.UTC).date())
 
 
 @router.get("/macro/series", response_model=list[MacroSeriesHistory], tags=["macro"])

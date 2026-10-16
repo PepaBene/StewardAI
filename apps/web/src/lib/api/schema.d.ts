@@ -367,6 +367,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/macro/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Macro Dashboard
+         * @description Every stored series as a card: latest value, changes, 1/5/10-year range, 5-year line.
+         */
+        get: operations["get_macro_dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/macro/series": {
         parameters: {
             query?: never;
@@ -28137,6 +28157,42 @@ export interface components {
             explain: components["schemas"]["PerformanceExplain"];
             freshness?: components["schemas"]["FreshnessOut"] | null;
         };
+        /** MacroCard */
+        MacroCard: {
+            /** Series Id */
+            series_id: string;
+            /** Source */
+            source: string;
+            /** Label */
+            label: string;
+            /** Unit */
+            unit: string;
+            /** Geography */
+            geography: string;
+            /**
+             * Latest Period
+             * Format: date
+             */
+            latest_period: string;
+            /** Latest Value */
+            latest_value: number | string;
+            /** Previous Period */
+            previous_period: string | null;
+            /** Previous Value */
+            previous_value: number | string | null;
+            /** Year Ago Period */
+            year_ago_period: string | null;
+            /** Year Ago Value */
+            year_ago_value: number | string | null;
+            /** Ranges */
+            ranges: components["schemas"]["RangeStat"][];
+            /** Spark */
+            spark: components["schemas"]["SparkPoint"][];
+            /** Source Url */
+            source_url: string | null;
+            /** Fetched At */
+            fetched_at: string | null;
+        };
         /** MacroComparison */
         MacroComparison: {
             /** Series Id */
@@ -34732,6 +34788,19 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** RangeStat */
+        RangeStat: {
+            /** Years */
+            years: number;
+            /** Low */
+            low: number | string;
+            /** High */
+            high: number | string;
+            /** Percentile */
+            percentile: number;
+            /** Readings */
+            readings: number;
+        };
         /** RankingResponse */
         RankingResponse: {
             /** Method Version */
@@ -40115,6 +40184,16 @@ export interface components {
             after: string;
             /** Signed Url */
             signed_url: string | null;
+        };
+        /** SparkPoint */
+        SparkPoint: {
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Value */
+            value: number | string;
         };
         /**
          * SpinOffEntry
@@ -46344,6 +46423,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_macro_dashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MacroCard"][];
                 };
             };
         };

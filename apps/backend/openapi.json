@@ -944,6 +944,37 @@
         }
       }
     },
+    "/macro/dashboard": {
+      "get": {
+        "tags": [
+          "macro"
+        ],
+        "summary": "Get Macro Dashboard",
+        "description": "Every stored series as a card: latest value, changes, 1/5/10-year range, 5-year line.",
+        "operationId": "get_macro_dashboard",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MacroCard"
+                  },
+                  "type": "array",
+                  "title": "Response Get Macro Dashboard"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/macro/series": {
       "get": {
         "tags": [
@@ -83547,6 +83578,157 @@
         ],
         "title": "LotsResponse"
       },
+      "MacroCard": {
+        "properties": {
+          "series_id": {
+            "type": "string",
+            "title": "Series Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "geography": {
+            "type": "string",
+            "title": "Geography"
+          },
+          "latest_period": {
+            "type": "string",
+            "format": "date",
+            "title": "Latest Period"
+          },
+          "latest_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Latest Value"
+          },
+          "previous_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Period"
+          },
+          "previous_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Value"
+          },
+          "year_ago_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year Ago Period"
+          },
+          "year_ago_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year Ago Value"
+          },
+          "ranges": {
+            "items": {
+              "$ref": "#/components/schemas/RangeStat"
+            },
+            "type": "array",
+            "title": "Ranges"
+          },
+          "spark": {
+            "items": {
+              "$ref": "#/components/schemas/SparkPoint"
+            },
+            "type": "array",
+            "title": "Spark"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "series_id",
+          "source",
+          "label",
+          "unit",
+          "geography",
+          "latest_period",
+          "latest_value",
+          "previous_period",
+          "previous_value",
+          "year_ago_period",
+          "year_ago_value",
+          "ranges",
+          "spark",
+          "source_url",
+          "fetched_at"
+        ],
+        "title": "MacroCard"
+      },
       "MacroComparison": {
         "properties": {
           "series_id": {
@@ -101954,6 +102136,55 @@
         ],
         "title": "Quote"
       },
+      "RangeStat": {
+        "properties": {
+          "years": {
+            "type": "integer",
+            "title": "Years"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Low"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "High"
+          },
+          "percentile": {
+            "type": "number",
+            "title": "Percentile"
+          },
+          "readings": {
+            "type": "integer",
+            "title": "Readings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "years",
+          "low",
+          "high",
+          "percentile",
+          "readings"
+        ],
+        "title": "RangeStat"
+      },
       "RankingResponse": {
         "properties": {
           "method_version": {
@@ -116814,6 +117045,33 @@
           "signed_url"
         ],
         "title": "SpanText"
+      },
+      "SparkPoint": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "format": "date",
+            "title": "Period"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "value"
+        ],
+        "title": "SparkPoint"
       },
       "SpinOffEntry": {
         "properties": {
