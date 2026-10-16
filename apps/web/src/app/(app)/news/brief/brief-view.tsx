@@ -29,6 +29,7 @@ function latestPerTicker(briefs: BriefOut[]): BriefOut[] {
   const seen = new Set<string>();
   return briefs.filter((b) => (seen.has(b.ticker) ? false : (seen.add(b.ticker), true)));
 }
+import { shortTicker } from "@/lib/portfolio/ticker";
 import { cn } from "@/lib/utils";
 
 const KINDS = ["morning", "region", "weekly", "holding", "theme"] as const;
@@ -173,7 +174,7 @@ function Brief({ brief }: { brief: BriefOut }) {
   return (
     <div className="space-y-4">
       <p className="text-xs text-text-muted">
-        {brief.ticker ? <span className="font-mono">{brief.ticker}</span> : null} <time dateTime={brief.period_start}>{formatDateTime(brief.period_start)}</time>{" "}
+        {brief.ticker ? <span className="font-mono" title={brief.ticker}>{shortTicker(brief.ticker)}</span> : null} <time dateTime={brief.period_start}>{formatDateTime(brief.period_start)}</time>{" "}
         to <time dateTime={brief.period_end}>{formatDateTime(brief.period_end)}</time>.{" "}
         {brief.body.generated_without_model ? "Plain headline lines, no model." : `Written by ${brief.model}.`}
         {brief.body.suppressed > 0 ? ` ${brief.body.suppressed} repeat${brief.body.suppressed === 1 ? "" : "s"} left out.` : ""}
@@ -187,7 +188,7 @@ function Brief({ brief }: { brief: BriefOut }) {
                 <p className="flex items-start gap-2 text-base">
                   <SeverityDot severity={line.severity} className="mt-2" />
                   <span>
-                    {line.ticker ? <span className="mr-1.5 font-mono text-xs text-accent-ink">{line.ticker}</span> : null}
+                    {line.ticker ? <span className="mr-1.5 font-mono text-xs text-accent-ink" title={line.ticker}>{shortTicker(line.ticker)}</span> : null}
                     {line.text}
                   </span>
                 </p>
