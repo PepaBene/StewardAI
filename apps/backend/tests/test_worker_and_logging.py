@@ -156,3 +156,26 @@ def test_only_warnings_and_worse_go_to_stderr(capsys: pytest.CaptureFixture[str]
     assert "ran with [REDACTED]" in out and "missed a run" not in out
     assert "missed a run" in err and "ran with" not in err
     assert "Running job" not in out + err
+
+
+async def test_a_stopping_worker_hands_its_running_jobs_back_without_counting_a_crash() -> None:
+    from typing import Any
+
+    from worker.__main__ import QUEUE_RELEASE_SECONDS, Worker
+
+    class Pool:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, tuple[Any, ...]]] = []
+
+        async def execute(self, sql: str, *args: Any) -> None:
+            self.calls.append((sql, args))
+
+    pool: Any = Pool()
+    worker = Worker(pool)
+    await worker.release_in_flight()
+    assert pool.calls == []  # nothing running, nothing to hand back
+    worker._in_flight.update({12, 7})
+    await worker.release_in_flight()
+    ((sql, args),) = pool.calls
+    assert args == ([7, 12], QUEUE_RELEASE_SECONDS)
+    assert "read_ct = greatest(read_ct - 1, 0)" in sql

@@ -61,6 +61,9 @@ QUEUE_BUSY_DELAY_SECONDS = 30
 # A message whose run hit an error outside the job (the database, say) is retried after this.
 QUEUE_RETRY_SECONDS = 60
 QUEUE_MAX_READS = 3
+# A stopping worker's running jobs come back this long after the stop: past the container's
+# kill (about ten seconds after SIGTERM on Railway), so the old process no longer holds them.
+QUEUE_RELEASE_SECONDS = 30
 # A scheduled run that failed because the database restarted is tried once more after this.
 SCHEDULE_RETRY_SECONDS = 300
 MAX_CONCURRENT_QUEUED_JOBS = 4
@@ -72,6 +75,7 @@ class Worker:
         self.pool = pool
         self._tasks: set[asyncio.Task[None]] = set()
         self._slots = asyncio.Semaphore(MAX_CONCURRENT_QUEUED_JOBS)
+        self._in_flight: set[int] = set()
 
     async def run_scheduled(self, job_type: str) -> None:
         """A scheduled run that the database dropped out of (a Postgres restart) is tried
@@ -189,11 +193,13 @@ class Worker:
                     await queue.archive(self.pool, message.msg_id)
                     return
                 extender = asyncio.create_task(self._keep_hidden(message.msg_id))
+                self._in_flight.add(message.msg_id)
                 try:
                     outcome = await self._run(
                         message.job_type, "manual", message.job_id, wait=False
                     )
                 finally:
+                    self._in_flight.discard(message.msg_id)
                     extender.cancel()
                 if outcome == "busy":
                     # Another run holds the lock: requeue (a fresh message, so waiting is
@@ -253,6 +259,26 @@ class Worker:
                 await http.get(url.get_secret_value(), timeout=10.0)
             except httpx.HTTPError as exc:
                 logger.warning("heartbeat ping failed (%s)", type(exc).__name__)
+
+    async def release_in_flight(self) -> None:
+        """At a stop (a redeploy sends SIGTERM and kills the container seconds later): hand
+        the running jobs' messages back so the next worker resumes them from their saved steps
+        in a minute rather than after the hour-long visibility timeout, and without counting
+        the stop as a crash towards QUEUE_MAX_READS. A job that still finishes here archives
+        its message as usual."""
+        if not self._in_flight:
+            return
+        ids = sorted(self._in_flight)
+        try:
+            await self.pool.execute(
+                "update public.job_queue set vt = now() + make_interval(secs => $2::integer),"
+                " read_ct = greatest(read_ct - 1, 0) where msg_id = any($1::bigint[])",
+                ids,
+                QUEUE_RELEASE_SECONDS,
+            )
+            logger.info("handed %d running jobs back to the queue", len(ids))
+        except (OSError, asyncpg.PostgresError, TimeoutError):
+            logger.exception("handing running jobs back to the queue failed")
 
     async def drain(self) -> None:
         if self._tasks:
@@ -353,6 +379,8 @@ async def run() -> None:
             catching_up.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await catching_up
+        if worker is not None:
+            await worker.release_in_flight()
         if consumer is not None:
             await consumer
         if worker is not None:
