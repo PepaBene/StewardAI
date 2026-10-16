@@ -46,6 +46,7 @@ SOURCE_JOBS = [
     "companies_house_filings",
     "edinet_filings",
     "twelve_data_corporate_actions",
+    "yahoo_dividends",
     "insider_trades",
     "control_stakes",
     "nport_holdings",

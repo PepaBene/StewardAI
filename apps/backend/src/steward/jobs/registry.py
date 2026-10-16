@@ -74,6 +74,7 @@ from steward.sources.provider_jobs import (
     epo_patents_handler,
     fmp_company_handler,
     twelve_data_corporate_actions_handler,
+    yahoo_dividends_handler,
 )
 from steward.thesis.job import thesis_handler
 from steward.thesis.review import review_handler
@@ -137,6 +138,7 @@ JobType = Literal[
     "companies_house_filings",
     "edinet_filings",
     "twelve_data_corporate_actions",
+    "yahoo_dividends",
     "ai_approvals",
     "autopilot",
     "autopilot_calibration",
@@ -215,6 +217,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "companies_house_filings": companies_house_filings_handler,
     "edinet_filings": edinet_filings_handler,
     "twelve_data_corporate_actions": twelve_data_corporate_actions_handler,
+    "yahoo_dividends": yahoo_dividends_handler,
     "ai_approvals": ai_approvals_handler,
     "autopilot": autopilot_handler,
     "autopilot_calibration": autopilot_calibration_handler,

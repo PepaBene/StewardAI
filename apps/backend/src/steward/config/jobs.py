@@ -2593,6 +2593,15 @@ class JobsConfig(ConfigModel):
             "latches the endpoint as paid-only."
         ),
     )
+    yahoo_dividends: JobSchedule = Field(
+        default_factory=lambda: JobSchedule(cron="20 11 * * *"),
+        description=(
+            "Ten years of Yahoo dividend events of holdings with a confirmed listing, stored as "
+            "suggested corporate actions: the keyless dividend source, cross-checked against "
+            "Twelve Data where that endpoint is on the plan. Daily, at most 15 holdings a run, "
+            "stalest first, so each holding is refreshed about weekly."
+        ),
+    )
     valuation_refresh: JobSchedule = Field(
         default_factory=lambda: JobSchedule(cron="45 7 * * *"),
         description="Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read "
@@ -2827,6 +2836,7 @@ class JobsConfig(ConfigModel):
             "disclosure_estimates": self.disclosure_estimates,
             "disclosure_alerts": self.disclosure_alerts,
             "twelve_data_corporate_actions": self.twelve_data_corporate_actions,
+            "yahoo_dividends": self.yahoo_dividends,
             "etf_look_through": self.etf_look_through,
             "sec_xbrl": self.sec_xbrl,
         }

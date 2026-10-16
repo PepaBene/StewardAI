@@ -305,6 +305,12 @@ export const SCHEDULES: Record<
       "Dividends and splits of holdings with a confirmed listing, stored as suggestions for you to confirm. Off by default; also needs the Twelve Data provider enabled.",
     cron: "50 10 * * 6",
   },
+  yahoo_dividends: {
+    label: "Yahoo dividends",
+    description:
+      "Ten years of dividend events from Yahoo for holdings with a confirmed listing, stored as suggestions and cross-checked against Twelve Data where your plan has it. Keyless; runs daily, a few holdings each time, so every holding is refreshed about weekly.",
+    cron: "20 11 * * *",
+  },
   ai_approvals: {
     label: "AI approvals",
     description:

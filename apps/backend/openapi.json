@@ -70658,6 +70658,10 @@
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Twelve Data dividends and splits of holdings with a confirmed listing, stored as suggested corporate actions for the owner to confirm. Runs when TWELVE_DATA_API_KEY is set. A few holdings per run inside the Basic plan's credits; a plan denial latches the endpoint as paid-only."
           },
+          "yahoo_dividends": {
+            "$ref": "#/components/schemas/JobSchedule",
+            "description": "Ten years of Yahoo dividend events of holdings with a confirmed listing, stored as suggested corporate actions: the keyless dividend source, cross-checked against Twelve Data where that endpoint is on the plan. Daily, at most 15 holdings a run, stalest first, so each holding is refreshed about weekly."
+          },
           "valuation_refresh": {
             "$ref": "#/components/schemas/JobSchedule",
             "description": "Fundamentals (SEC XBRL, ESEF) of holdings that filed since the last read (all of them weekly) and the ETF providers' fund P/E and P/B. Default: daily 07:45."

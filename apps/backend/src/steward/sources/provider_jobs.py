@@ -571,3 +571,58 @@ async def twelve_data_corporate_actions_handler(ctx: JobContext) -> None:
                     continue
                 await _save_state(ctx.pool, twelve_data_state_key(ticker), {"at": now.isoformat()})
         step.detail["refreshed"] = results
+
+
+# ---------------------------------------------------------------- Yahoo dividends (I1.3)
+
+YAHOO_DIVIDEND_HOLDINGS_PER_RUN = 15
+YAHOO_DIVIDEND_REFRESH_HOURS = 24 * 6
+
+
+def yahoo_dividend_state_key(ticker: str) -> str:
+    return f"yahoo_dividends:{ticker}"
+
+
+async def yahoo_dividends_handler(ctx: JobContext) -> None:
+    """Daily: ten years of Yahoo dividend events of holdings with a confirmed listing, stored as
+    suggested corporate actions (the keyless dividend source; cross-checked against Twelve Data in
+    the dividend reconciliation when that endpoint is on the plan). Stalest holdings first, each
+    at most every six days; stops at a block or quota."""
+    from steward.sources.yahoo import YahooError, collect_yahoo_dividends, yahoo_symbol_for
+
+    async with ctx.step("yahoo_dividends") as step:
+        tickers = await holding_tickers(ctx.pool)
+        targets: dict[str, tuple[int, str, str]] = {}
+        for t in tickers:
+            got = await yahoo_symbol_for(ctx.pool, t)
+            if got is not None:
+                targets[t] = got
+        step.detail["without_symbol"] = [t for t in tickers if t not in targets]
+        done = await _state_times(ctx.pool, [yahoo_dividend_state_key(t) for t in targets])
+        now = dt.datetime.now(dt.UTC)
+        due = stalest_first(
+            list(targets),
+            lambda t: _as_datetime(done.get(yahoo_dividend_state_key(t))),
+            now=now,
+            refresh_hours=YAHOO_DIVIDEND_REFRESH_HOURS,
+            limit=YAHOO_DIVIDEND_HOLDINGS_PER_RUN,
+        )
+        results: dict[str, Any] = {}
+        async with httpx.AsyncClient(
+            timeout=30, headers={"User-Agent": f"StewardAI/{__version__}"}
+        ) as http:
+            for ticker in due:
+                listing_id, symbol, ysym = targets[ticker]
+                try:
+                    results[ticker] = await collect_yahoo_dividends(
+                        ctx.pool, http, listing_id=listing_id, symbol=symbol, yahoo_symbol=ysym
+                    )
+                except (QuotaExceeded, RuntimeError) as exc:
+                    step.detail["stopped"] = f"{type(exc).__name__}: {exc}"[:200]
+                    break
+                except (FreeSourceError, YahooError, httpx.HTTPError) as exc:
+                    results[ticker] = f"failed: {type(exc).__name__}"
+                    continue
+                key = yahoo_dividend_state_key(ticker)
+                await _save_state(ctx.pool, key, {"at": now.isoformat()})
+        step.detail["refreshed"] = results
