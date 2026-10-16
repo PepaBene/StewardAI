@@ -601,6 +601,16 @@ async def test_scan_all_covers_every_held_ticker_and_counts_nothing_failed(
     assert totals["insider_trade"] == 1 and totals["failed"] == 0
 
 
+async def test_scan_all_leaves_a_backfilled_old_trade_alone(backend_pool: asyncpg.Pool) -> None:
+    await seed_portfolio(backend_pool, {"AAA": 100})
+    await filing(backend_pool, "0000099999-21-000001", dt.date(2021, 3, 3))
+    await buy(backend_pool, "0000099999-21-000001", 0, "100", "2000", dt.date(2021, 3, 1))
+    totals = await alerts.scan_all(backend_pool, NOW)
+    assert totals["insider_trade"] == 0
+    # asked without a window, the same trade still alerts
+    assert await alerts.scan_insiders(backend_pool, "AAA", NOW) == 1
+
+
 # ------------------------------------------------------------------------------- adjudication
 async def test_labels_are_stored_per_person_and_the_gate_reads_them(
     backend_pool: asyncpg.Pool,

@@ -164,11 +164,20 @@ def _money(value: Decimal) -> str:
 
 
 async def scan_insiders(
-    pool: Pool, ticker: str, now: dt.datetime, *, min_value: Decimal = Decimal(100_000)
+    pool: Pool,
+    ticker: str,
+    now: dt.datetime,
+    *,
+    min_value: Decimal = Decimal(100_000),
+    since: dt.datetime | None = None,
 ) -> int:
+    """With `since`, only a trade filed after it can alert: a backfill that loads years of Form 4s
+    is history, not news, and the daily throttle would otherwise feed it out a few a day."""
     raised = 0
     for a in await insider_analysis.pending_alerts(pool, ticker, min_value, now):
         t = a.tx
+        if since is not None and t.known_at <= since:
+            continue
         lines = a.rows or (t,)
         accessions = sorted({r.accession for r in lines})
         # The key names the person, day and direction, never split-restated share counts, so a
@@ -668,7 +677,7 @@ async def scan_all(
     }
     for ticker in await held_tickers(pool):
         scans: list[tuple[str, Callable[[], Awaitable[int | tuple[int, int]]]]] = [
-            ("insider_trade", partial(scan_insiders, pool, ticker, end)),
+            ("insider_trade", partial(scan_insiders, pool, ticker, end, since=start)),
             ("major_holder", partial(scan_major_holders, pool, ticker, start, end)),
             ("relationship_change", partial(scan_relationships, pool, ticker, start, end)),
             ("deal_state", partial(scan_deals, pool, ticker, start, end)),
