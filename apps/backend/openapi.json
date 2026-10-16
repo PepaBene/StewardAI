@@ -78861,6 +78861,11 @@
             "type": "string",
             "title": "Legal Name"
           },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "The holding's own name; the legal name otherwise"
+          },
           "cik": {
             "anyOf": [
               {
@@ -78897,6 +78902,7 @@
         "required": [
           "issuer_id",
           "legal_name",
+          "display_name",
           "cik",
           "document_count",
           "latest_known_at",

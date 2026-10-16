@@ -13,6 +13,7 @@ import type { Claim, Coverage, Filing, IssuerRow, Observation, Provenance, Revie
 export const SAMPLE_ISSUER: IssuerRow = {
   issuer_id: 1,
   legal_name: "Acme Corp (sample)",
+  display_name: "Acme Corp (sample)",
   cik: "0000001234",
   document_count: 6,
   latest_known_at: "2026-05-09T08:12:00Z",

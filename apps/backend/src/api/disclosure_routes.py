@@ -332,6 +332,7 @@ async def _snapshot_rows(pool: Pool, issuer_id: int, as_of: dt.datetime | None) 
 class IssuerRow(BaseModel):
     issuer_id: int
     legal_name: str
+    display_name: str = Field(description="The holding's own name; the legal name otherwise")
     cik: str | None
     document_count: int
     latest_known_at: dt.datetime | None
@@ -343,6 +344,10 @@ async def issuers(pool: Pool, _owner: Owner) -> list[IssuerRow]:
     """Issuers that have at least one disclosure document, with how many and the newest one."""
     rows = await pool.fetch(
         """select i.id as issuer_id, i.legal_name, i.cik,
+                  coalesce((select ins.name from public.security s
+                              join public.instrument ins on ins.isin = s.isin
+                             where s.issuer_id = i.id and ins.name is not null
+                             order by ins.t212_ticker limit 1), i.legal_name) as display_name,
                   count(distinct d.id)::int as document_count,
                   max(v.known_at) as latest_known_at,
                   (select count(*)::int from public.quality_review q
@@ -353,7 +358,7 @@ async def issuers(pool: Pool, _owner: Owner) -> list[IssuerRow]:
              from public.issuer i
              join public.source_document d on d.issuer_id = i.id
              join public.source_document_version v on v.document_id = d.id
-            group by i.id order by max(v.known_at) desc, i.legal_name limit 500"""
+            group by i.id order by display_name limit 500"""
     )
     return [IssuerRow(**dict(r)) for r in rows]
 

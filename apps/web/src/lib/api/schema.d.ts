@@ -26484,6 +26484,11 @@ export interface components {
             issuer_id: number;
             /** Legal Name */
             legal_name: string;
+            /**
+             * Display Name
+             * @description The holding's own name; the legal name otherwise
+             */
+            display_name: string;
             /** Cik */
             cik: string | null;
             /** Document Count */

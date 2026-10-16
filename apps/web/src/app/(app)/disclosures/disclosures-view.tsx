@@ -231,7 +231,7 @@ export function DisclosuresView() {
           >
             {live.map((i) => (
               <option key={i.issuer_id} value={i.issuer_id}>
-                {i.legal_name}
+                {i.display_name}
               </option>
             ))}
           </select>
@@ -240,7 +240,7 @@ export function DisclosuresView() {
 
       {!sample && issuer ? (
         <Panel id="ingest" title="Ingest filings" description="Fetch this company’s newest annual and quarterly filings now. Each filing’s result, including gaps and failures, is listed.">
-          <IngestFilings key={issuer.issuer_id} issuerId={issuer.issuer_id} issuerName={issuer.legal_name} onDone={() => issuers.reload()} />
+          <IngestFilings key={issuer.issuer_id} issuerId={issuer.issuer_id} issuerName={issuer.display_name} onDone={() => issuers.reload()} />
         </Panel>
       ) : null}
 
