@@ -6995,6 +6995,18 @@
             }
           },
           {
+            "name": "direct",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "With a ticker: only items about the company itself, not ones reached through a rival, supplier, customer or watch topic.",
+              "default": false,
+              "title": "Direct"
+            },
+            "description": "With a ticker: only items about the company itself, not ones reached through a rival, supplier, customer or watch topic."
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,

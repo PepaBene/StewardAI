@@ -93,6 +93,13 @@ async def get_news(
         int | None, Query(ge=1, le=DB_ID_MAX, description="Only this story's items.")
     ] = None,
     before_id: IdQuery = None,
+    direct: Annotated[
+        bool,
+        Query(
+            description="With a ticker: only items about the company itself, not ones reached "
+            "through a rival, supplier, customer or watch topic."
+        ),
+    ] = False,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> NewsFeed:
     """News items, newest first, each with its story's severity and confidence. Filters
@@ -104,6 +111,7 @@ async def get_news(
         tiers=tier or [],
         story_id=story,
         before_id=before_id,
+        direct=direct,
         limit=limit,
     )
     return await news_feed(pool, filters, await _jobs_config(pool))

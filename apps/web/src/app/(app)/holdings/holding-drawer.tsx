@@ -173,7 +173,7 @@ function Updates({ ticker, row }: { ticker: string; row: HoldingInsight | undefi
   useEffect(() => {
     let live = true;
     getBrowserApiClient()
-      .GET("/news", { params: { query: { ticker, limit: 8 } } })
+      .GET("/news", { params: { query: { ticker, direct: true, limit: 8 } } })
       .then(({ data }) => {
         if (!live) return;
         if (data) setItems(data.items);

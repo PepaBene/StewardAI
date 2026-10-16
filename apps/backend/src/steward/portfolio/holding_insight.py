@@ -17,6 +17,7 @@ import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.analytics.versions import version
+from steward.news.link import INDIRECT_VIA
 
 # The discovery metrics the presets show (formula and coverage are in the screener catalogue).
 DISCOVERY_FIELDS = (
@@ -128,12 +129,17 @@ async def last_events(
 ) -> dict[str, LastEvent]:
     """The newest dated event per ticker across verdicts, company events, dividends and news."""
     out: dict[str, list[LastEvent]] = {t: [] for t in tickers}
+    # Only a story about the company itself: one reached through a rival, a supplier, a customer
+    # or a watch topic is about someone else and never the holding's last event.
     for r in await pool.fetch(
-        """select distinct on (ticker) ticker, coalesce(event_date, first_seen::date) as d, headline, id
-           from public.story_cluster where ticker = any($1::text[]) and not recycled and status <> 'pending'
-             and coalesce(event_date, first_seen::date) <= $2
-           order by ticker, coalesce(event_date, first_seen::date) desc""",
-        tickers, today,
+        """select distinct on (c.ticker) c.ticker, coalesce(c.event_date, c.first_seen::date) as d, c.headline, c.id
+           from public.story_cluster c where c.ticker = any($1::text[]) and not c.recycled and c.status <> 'pending'
+             and coalesce(c.event_date, c.first_seen::date) <= $2
+             and exists (select 1 from public.news_item n, jsonb_array_elements(n.links) l
+                          where n.cluster_id = c.id and l->>'ticker' = c.ticker
+                            and not (l->>'via' = any($3::text[])))
+           order by c.ticker, coalesce(c.event_date, c.first_seen::date) desc""",
+        tickers, today, sorted(INDIRECT_VIA),
     ):  # fmt: skip
         out[r["ticker"]].append(
             LastEvent(kind="news", date=r["d"], title=r["headline"], href=f"/news?story={r['id']}")

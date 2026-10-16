@@ -11,6 +11,7 @@ from steward.config.jobs import JobsConfig
 from steward.news.digest import DigestBody
 from steward.news.escalation import EscalationBody
 from steward.news.evidence import Lifecycle
+from steward.news.link import INDIRECT_VIA
 from steward.news.normalize import host_of
 from steward.portfolio.read import JobStatus, JobSummary
 
@@ -94,6 +95,7 @@ class FeedFilters(BaseModel):
     tiers: list[int] = Field(default_factory=list)
     story_id: int | None = None
     before_id: int | None = None
+    direct: bool = False
     limit: int = 50
 
 
@@ -109,9 +111,18 @@ def feed_where(filters: FeedFilters) -> tuple[str, list[Any]]:
 
     if filters.ticker:
         add("i.tickers @> array[?::text]", filters.ticker)
+        ticker_arg = f"${len(args)}"
         # One holding's updates: an item the classifier judged irrelevant (another filer's 8-K
         # that merely mentions a watch topic) is not an update for it.
         clauses.append("i.relevant is not false")
+        if filters.direct:
+            # About the company itself, not reached through a rival, supplier, customer or topic.
+            add(
+                "exists (select 1 from jsonb_array_elements(i.links) l where l->>'ticker' = "  # noqa: S608 - a placeholder
+                + ticker_arg
+                + " and not (l->>'via' = any(?::text[])))",
+                sorted(INDIRECT_VIA),
+            )
     if filters.severities:
         add("c.severity = any(?::smallint[])", filters.severities)
     if filters.confidences:
