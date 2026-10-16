@@ -79,11 +79,11 @@ export function InvestorView({ cik }: { cik: string }) {
         <>
           <dl className="blueprint grid gap-4 px-5 py-4 sm:grid-cols-3">
             <div>
-              <dt className="text-xs text-text-muted">Reported value</dt>
+              <dt className="text-xs text-text-muted">Value in your holdings</dt>
               <dd className="num font-heading mt-1 text-2xl">{money(data.reported_value_usd, true)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-text-muted">Reported positions</dt>
+              <dt className="text-xs text-text-muted">Your holdings owned</dt>
               <dd className="num font-heading mt-1 text-2xl">{data.positions}</dd>
             </div>
             <div>

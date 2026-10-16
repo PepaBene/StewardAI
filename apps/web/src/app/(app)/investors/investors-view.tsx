@@ -101,7 +101,7 @@ export function InvestorsView() {
       {bars.length > 0 ? (
         <section aria-labelledby="change-heading" className="blueprint space-y-2 px-5 py-4">
           <h2 id="change-heading" className="font-heading text-lg leading-tight font-semibold">
-            Reported value against the previous quarter
+            Value in your holdings against the previous quarter
           </h2>
           <DivergingBar rows={bars} colorMode="direction" label="Change in reported value since the previous quarter, per manager" formatValue={(v) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}%`} />
           <p className="text-xs text-text-muted">Reported values move with prices and trading. They are not investment returns.</p>
@@ -125,10 +125,10 @@ export function InvestorsView() {
                     Quarter
                   </th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">
-                    Reported value
+                    Value in your holdings
                   </th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">
-                    Positions
+                    Your holdings owned
                   </th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">
                     Change
@@ -142,7 +142,7 @@ export function InvestorsView() {
                     <tr key={m.cik} className="border-b border-border last:border-0">
                       <th scope="row" className="px-3 py-2 text-left font-normal">
                         <span className="flex items-center gap-2.5">
-                          <ConcentrationMark positions={m.positions} />
+                          {m.book_positions != null ? <ConcentrationMark positions={m.book_positions} /> : null}
                           <Link className="font-medium hover:text-accent-ink hover:underline" href={`/investors/${m.cik}`}>
                             {m.name}
                           </Link>
@@ -162,7 +162,7 @@ export function InvestorsView() {
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-text-muted">The bars beside each name show how concentrated the book is: fewer reported positions means a more concentrated manager.</p>
+          <p className="text-xs text-text-muted">Value and count cover only the manager’s positions in companies you hold, not its whole book. The bars beside a name, where the filing states its size, show how concentrated the whole book is.</p>
         </section>
       ) : null}
 

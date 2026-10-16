@@ -84173,12 +84173,42 @@
                 "type": "null"
               }
             ],
-            "title": "Reported Value Usd"
+            "title": "Reported Value Usd",
+            "description": "Value of the manager's positions in the portfolio's holdings"
           },
           "positions": {
             "type": "integer",
             "title": "Positions",
+            "description": "How many of the portfolio's holdings it owns",
             "default": 0
+          },
+          "book_positions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Book Positions",
+            "description": "Lines in the whole 13F filing, when the filing states it"
+          },
+          "book_value_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Book Value Usd",
+            "description": "Total value of the whole 13F filing, when it states it"
           },
           "previous_value_usd": {
             "anyOf": [
@@ -84428,12 +84458,42 @@
                 "type": "null"
               }
             ],
-            "title": "Reported Value Usd"
+            "title": "Reported Value Usd",
+            "description": "Value of the manager's positions in the portfolio's holdings"
           },
           "positions": {
             "type": "integer",
             "title": "Positions",
+            "description": "How many of the portfolio's holdings it owns",
             "default": 0
+          },
+          "book_positions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Book Positions",
+            "description": "Lines in the whole 13F filing, when the filing states it"
+          },
+          "book_value_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Book Value Usd",
+            "description": "Total value of the whole 13F filing, when it states it"
           },
           "previous_value_usd": {
             "anyOf": [

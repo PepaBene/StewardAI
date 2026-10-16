@@ -9,6 +9,10 @@ from pydantic import BaseModel, Field
 
 from steward.ownership.read import EFFECTIVE
 
+# Only quarters whose rows were read: a filing on record with none stored (the dataset load
+# timed out or has not run) would read as an empty book and a fall to zero.
+_READ = " and exists (select 1 from public.institutional_holding h where h.accession = f.accession)"
+
 
 async def _period_summary(pool: asyncpg.Pool, cik: str, period: date) -> tuple[Decimal, int]:
     row = await pool.fetchrow(
@@ -26,8 +30,16 @@ class ManagerSummary(BaseModel):
     name: str
     period: date | None = None
     filed: date | None = None
-    reported_value_usd: Decimal | None = None
-    positions: int = 0
+    reported_value_usd: Decimal | None = Field(
+        default=None, description="Value of the manager's positions in the portfolio's holdings"
+    )
+    positions: int = Field(default=0, description="How many of the portfolio's holdings it owns")
+    book_positions: int | None = Field(
+        default=None, description="Lines in the whole 13F filing, when the filing states it"
+    )
+    book_value_usd: Decimal | None = Field(
+        default=None, description="Total value of the whole 13F filing, when it states it"
+    )
     previous_value_usd: Decimal | None = None
     earlier_period: date | None = None
 
@@ -86,12 +98,24 @@ class ManagerDetail(ManagerSummary):
     )
 
 
+async def _earlier_period(pool: asyncpg.Pool, cik: str, period: date) -> date | None:
+    """The quarter before `period` whose rows were read, to compare with."""
+    found: date | None = await pool.fetchval(
+        "select max(period) from public.form13f_filing f where cik=$1 and period < $2" + _READ,  # noqa: S608 - fixed SQL
+        cik.zfill(10),
+        period,
+    )
+    return found
+
+
 async def managers(pool: asyncpg.Pool, tracked: list[tuple[str, str]]) -> list[ManagerSummary]:
     if not tracked:
         return []
     rows = await pool.fetch(
-        """select distinct on (cik) cik, period, filed from public.form13f_filing
-           where cik = any($1::text[]) order by cik, period desc, filed desc""",
+        "select distinct on (cik) cik, period, filed, reported_line_count,"  # noqa: S608 - fixed SQL
+        " reported_total_value_usd from public.form13f_filing f where cik = any($1::text[])"
+        + _READ
+        + " order by cik, period desc, filed desc",
         [cik.zfill(10) for cik, _ in tracked],
     )
     by_cik = {row["cik"]: row for row in rows}
@@ -102,11 +126,7 @@ async def managers(pool: asyncpg.Pool, tracked: list[tuple[str, str]]) -> list[M
             result.append(ManagerSummary(cik=cik.zfill(10), name=name))
             continue
         value, count = await _period_summary(pool, cik, latest["period"])
-        previous = await pool.fetchval(
-            "select max(period) from public.form13f_filing where cik=$1 and period < $2",
-            cik.zfill(10),
-            latest["period"],
-        )
+        previous = await _earlier_period(pool, cik, latest["period"])
         previous_value = (await _period_summary(pool, cik, previous))[0] if previous else None
         result.append(
             ManagerSummary(
@@ -116,6 +136,8 @@ async def managers(pool: asyncpg.Pool, tracked: list[tuple[str, str]]) -> list[M
                 filed=latest["filed"],
                 reported_value_usd=value,
                 positions=count,
+                book_positions=latest["reported_line_count"],
+                book_value_usd=latest["reported_total_value_usd"],
                 previous_value_usd=previous_value,
                 earlier_period=previous,
             )
@@ -125,20 +147,15 @@ async def managers(pool: asyncpg.Pool, tracked: list[tuple[str, str]]) -> list[M
 
 async def manager_detail(pool: asyncpg.Pool, cik: str, name: str) -> ManagerDetail | None:
     latest = await pool.fetchrow(
-        "select accession, period, filed from public.form13f_filing where cik=$1"
-        " order by period desc, filed desc limit 1",
+        "select accession, period, filed, reported_line_count, reported_total_value_usd"  # noqa: S608 - fixed SQL
+        " from public.form13f_filing f where cik=$1" + _READ + " order by period desc, filed desc"
+        " limit 1",
         cik.zfill(10),
     )
     if latest is None:
         return None
     value, count = await _period_summary(pool, cik, latest["period"])
-    periods = await pool.fetch(
-        "select distinct period from public.form13f_filing where cik=$1 and period < $2"
-        " order by period desc limit 1",
-        cik.zfill(10),
-        latest["period"],
-    )
-    earlier = periods[0]["period"] if periods else None
+    earlier = await _earlier_period(pool, cik, latest["period"])
     earlier_value = None
     if earlier:
         earlier_value, _ = await _period_summary(pool, cik, earlier)
@@ -178,6 +195,8 @@ async def manager_detail(pool: asyncpg.Pool, cik: str, name: str) -> ManagerDeta
         filed=latest["filed"],
         reported_value_usd=value,
         positions=count,
+        book_positions=latest["reported_line_count"],
+        book_value_usd=latest["reported_total_value_usd"],
         previous_value_usd=earlier_value,
         earlier_period=earlier,
         positions_detail=detail,

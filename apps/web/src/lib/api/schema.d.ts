@@ -28372,13 +28372,27 @@ export interface components {
             period?: string | null;
             /** Filed */
             filed?: string | null;
-            /** Reported Value Usd */
+            /**
+             * Reported Value Usd
+             * @description Value of the manager's positions in the portfolio's holdings
+             */
             reported_value_usd?: number | string | null;
             /**
              * Positions
+             * @description How many of the portfolio's holdings it owns
              * @default 0
              */
             positions: number;
+            /**
+             * Book Positions
+             * @description Lines in the whole 13F filing, when the filing states it
+             */
+            book_positions?: number | null;
+            /**
+             * Book Value Usd
+             * @description Total value of the whole 13F filing, when it states it
+             */
+            book_value_usd?: number | string | null;
             /** Previous Value Usd */
             previous_value_usd?: number | string | null;
             /** Earlier Period */
@@ -28453,13 +28467,27 @@ export interface components {
             period?: string | null;
             /** Filed */
             filed?: string | null;
-            /** Reported Value Usd */
+            /**
+             * Reported Value Usd
+             * @description Value of the manager's positions in the portfolio's holdings
+             */
             reported_value_usd?: number | string | null;
             /**
              * Positions
+             * @description How many of the portfolio's holdings it owns
              * @default 0
              */
             positions: number;
+            /**
+             * Book Positions
+             * @description Lines in the whole 13F filing, when the filing states it
+             */
+            book_positions?: number | null;
+            /**
+             * Book Value Usd
+             * @description Total value of the whole 13F filing, when it states it
+             */
+            book_value_usd?: number | string | null;
             /** Previous Value Usd */
             previous_value_usd?: number | string | null;
             /** Earlier Period */
