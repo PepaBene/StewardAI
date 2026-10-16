@@ -84,7 +84,8 @@ export function Treemap({
                 title={title}
                 className={cn(
                   "absolute inset-px flex flex-col justify-between overflow-hidden p-2 no-underline",
-                  level ? HEAT_BG[level] : "bg-surface-muted",
+                  fits && "rounded-[4px]",
+                  level ? HEAT_BG[level] : "bg-chart-unknown",
                   text,
                   item.href && "hover:outline-2 hover:outline-text focus-visible:outline-2",
                 )}

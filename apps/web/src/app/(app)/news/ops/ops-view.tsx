@@ -12,6 +12,7 @@ import { getBrowserApiClient } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 import { formatDateTime } from "@/lib/format";
 import { minutesLabel, usdLabel } from "@/lib/news/ops";
+import { decodeEntities } from "@/lib/news/entities";
 
 type OpsReport = components["schemas"]["OpsReport"];
 type Candidate = components["schemas"]["CandidateCase"];
@@ -152,7 +153,7 @@ function Report({ report, marks }: { report: OpsReport; marks: Candidate[] | nul
             {report.incidents.map((i) => (
               <li key={`${i.kind}${i.story_id}`} className="space-y-0.5 py-2">
                 <Link href={`/news/stories/${i.story_id}`} className="font-medium text-accent-ink hover:underline">
-                  {i.headline}
+                  {decodeEntities(i.headline)}
                 </Link>
                 <p className="text-xs text-text-muted">
                   {i.ticker ? <span className="font-mono">{i.ticker}</span> : null} {formatDateTime(i.first_seen)}. {i.reason}.
@@ -179,7 +180,7 @@ function Report({ report, marks }: { report: OpsReport; marks: Candidate[] | nul
           <ul className="m-0 list-none divide-y divide-border p-0 text-sm">
             {marks.map((m) => (
               <li key={m.id} className="space-y-0.5 py-2">
-                <p>{m.headline}</p>
+                <p>{decodeEntities(m.headline)}</p>
                 <p className="text-xs text-text-muted">
                   Marked {m.mark.replace("_", " ")} {formatDateTime(m.marked_at)}
                   {m.candidates?.length ? `, linked to ${m.candidates.join(", ")}` : ""}

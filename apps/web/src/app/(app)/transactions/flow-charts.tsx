@@ -85,7 +85,7 @@ export function FlowCharts() {
         {graph && currency && graph.links.length ? (
           <>
             <CashFlowSankey graph={graph} currency={currency} height={310} label={`Cash flow, ${period.title}, ${currency}`} />
-            <p className="text-[11px] leading-snug text-text-faint">
+            <p className="text-xs leading-snug text-text-faint">
               In {currency} as booked by Trading212.{" "}
               {graph.nodes.some((n) => n.id.startsWith("out:buy:")) ? "Buys split by each instrument's security type. " : ""}
               {graph.nodes.some((n) => n.id === "in:earlier") ? "“Earlier cash” is cash held before the period that was spent in it. " : ""}
@@ -104,7 +104,7 @@ export function FlowCharts() {
             kicker="Net flow by month"
             title="Bought vs sold"
             action={
-              <div className="flex gap-3 text-[11px] text-text-muted" aria-hidden="true">
+              <div className="flex gap-3 text-xs text-text-muted" aria-hidden="true">
                 <span className="flex items-center gap-1.5">
                   <span className="size-2.5 bg-accent" />
                   Buys
@@ -166,7 +166,7 @@ function MonthBars({ months, currency }: { months: MonthFlow[]; currency: string
             <div className="flex w-full justify-center" style={{ height: down }}>
               <div className="w-[70%] bg-accent-300" style={{ height: `${m.sells * scale}px` }} />
             </div>
-            <span className="font-mono text-[10px] text-text-faint">{label(m.month)}</span>
+            <span className="font-mono text-xs text-text-faint">{label(m.month)}</span>
           </div>
         ))}
       </div>
@@ -235,7 +235,7 @@ function DividendPanel({
       ) : (
         <ChartEmpty minHeight={48} label={loadingLabel ?? "No dividends in this period"} />
       )}
-      {yoy === null && prevTotal === 0 && total ? <p className="text-[11px] text-text-faint">No dividends in the same period a year earlier.</p> : null}
+      {yoy === null && prevTotal === 0 && total ? <p className="text-xs text-text-faint">No dividends in the same period a year earlier.</p> : null}
     </Blueprint>
   );
 }

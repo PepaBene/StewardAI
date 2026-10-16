@@ -3,19 +3,11 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * The four "+" registration marks of a blueprint frame. Render them as children of any
- * element with the `blueprint` utility (position: relative + hairline border); they sit
- * just outside the corners and are out of flow, so they never affect layout.
+ * The old frame's "+" registration marks. The rounded card (visual spec B1) dropped them, so
+ * this renders nothing; it stays exported so the remaining call sites need no change.
  */
 function BlueprintCorners() {
-  return (
-    <>
-      <i aria-hidden="true" className="bp-corner" data-corner="tl" />
-      <i aria-hidden="true" className="bp-corner" data-corner="tr" />
-      <i aria-hidden="true" className="bp-corner" data-corner="bl" />
-      <i aria-hidden="true" className="bp-corner" data-corner="br" />
-    </>
-  );
+  return null;
 }
 
 /**
@@ -36,7 +28,10 @@ function Blueprint({
   );
 }
 
-/** Kicker + condensed title, the heading every framed panel in the design opens with. */
+/**
+ * The heading every framed panel opens with: the title, then the kicker as a quiet context line
+ * under it (scope, period, counts). It never sits above the title as an eyebrow.
+ */
 function PanelHeading({
   kicker,
   title,
@@ -52,10 +47,10 @@ function PanelHeading({
 }) {
   const H = level === 2 ? "h2" : "h3";
   return (
-    <div className={cn("flex items-start justify-between gap-3", className)}>
-      <div className="min-w-0">
-        {kicker ? <div className="kicker">{kicker}</div> : null}
-        <H className="mt-1 text-[22px] leading-tight font-semibold">{title}</H>
+    <div className={cn("flex flex-wrap items-start justify-between gap-x-3 gap-y-2", className)}>
+      <div className="min-w-0 flex-[1_1_14rem]">
+        <H className="panel-title">{title}</H>
+        {kicker ? <div className="kicker mt-0.5 font-normal">{kicker}</div> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>

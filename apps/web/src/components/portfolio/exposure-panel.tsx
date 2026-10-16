@@ -59,7 +59,7 @@ export function ExposurePanel({
       />
       {on && lookThrough ? <LookThroughExposure report={lookThrough} currency={currency} /> : null}
       {lookThrough && !available ? (
-        <p className="text-[11px] text-text-faint">
+        <p className="text-xs text-text-faint">
           Look-through: no fund holdings stored yet. The weekly ETF look-through job (Config → Jobs) fetches them from the issuers.
         </p>
       ) : null}
@@ -142,7 +142,7 @@ function AsHeld({ dims, cash, currency }: { dims: DriftReport["categories"]; cas
           </div>
         </details>
       ) : null}
-      <p className="text-[11px] text-text-faint">
+      <p className="text-xs text-text-faint">
         Currency is each instrument&rsquo;s trading currency; ETFs are classified as a whole (no look-through).
       </p>
     </>

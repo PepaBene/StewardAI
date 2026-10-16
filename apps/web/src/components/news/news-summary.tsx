@@ -156,7 +156,7 @@ function FeedHealth({ health, now }: { health: SourcesHealth; now: Date }) {
         {health.sources.map((src) => (
           <li key={src.id} className="flex flex-wrap items-baseline justify-between gap-x-2">
             <span className={cn(!src.enabled && "text-text-faint")}>
-              {src.name} <span className="font-mono text-[10px] text-text-faint">T{src.tier}</span>
+              {src.name} <span className="font-mono text-xs text-text-faint">T{src.tier}</span>
             </span>
             <span className="num text-text-muted">
               {!src.enabled

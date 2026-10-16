@@ -119,8 +119,8 @@ describe("monthly review: proposed actions", () => {
       `#${complianceAnchor("band:position:AAPL_US_EQ")}`,
       null,
     ]);
-    expect(basis.kpis[0]).toMatchObject({ href: `#${kpiAnchor("AAPL_US_EQ:revenue_growth")}`, holdingHref: "/holdings/AAPL_US_EQ" });
-    expect(basis.kpis[1]).toMatchObject({ row: null, href: null, ticker: "MSFT_US_EQ", holdingHref: "/holdings/MSFT_US_EQ" });
+    expect(basis.kpis[0]).toMatchObject({ href: `#${kpiAnchor("AAPL_US_EQ:revenue_growth")}`, holdingHref: "/companies/AAPL_US_EQ" });
+    expect(basis.kpis[1]).toMatchObject({ row: null, href: null, ticker: "MSFT_US_EQ", holdingHref: "/companies/MSFT_US_EQ" });
   });
 
   it("makes anchors safe for ids with colons", () => {

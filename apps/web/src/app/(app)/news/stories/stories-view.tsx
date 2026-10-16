@@ -6,15 +6,17 @@ import { useEffect, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { FeedList } from "@/components/feed/feed-list";
+import { EntityName } from "@/components/entity-name";
 import { NewsTabs } from "@/components/news/news-tabs";
 import { PageHeader } from "@/components/page-header";
-import { Blueprint } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { useNow } from "@/lib/hooks/use-now";
 import { LIFECYCLE_LABELS, type StudyRow, type ThreadDetail, type ThreadOut } from "@/lib/news/analysis";
 import { eventLabel } from "@/lib/news/labels";
 import { cn } from "@/lib/utils";
+import { decodeEntities } from "@/lib/news/entities";
 
 type Load =
   | { kind: "loading" }
@@ -48,12 +50,10 @@ export function StoriesView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="News"
         title="Stories"
         description={
           <span className="block max-w-prose">
-            Stories on one developing situation, such as a merger, a strike or a tariff dispute, grouped so ten articles do
-            not read as ten events. Open a thread to see what each update added.
+            Articles about one developing situation, such as a merger or a tariff dispute, grouped so ten articles do not read as ten events. Open a story to see what each update added.
           </span>
         }
       />
@@ -71,11 +71,12 @@ export function StoriesView() {
         </EmptyState>
       ) : null}
       {load.kind === "ok" && load.threads.length > 0 ? (
-        <ul className="m-0 flex list-none flex-col gap-3 p-0" aria-label="Threads">
-          {load.threads.map((t) => (
-            <ThreadCard key={t.id} thread={t} />
-          ))}
-        </ul>
+        <FeedList
+          label="Stories"
+          items={load.threads.map((t) => ({ id: String(t.id), at: t.last_update_at, title: decodeEntities(t.title), kind: t.state, thread: t }))}
+          kindLabel={(k) => (k === "open" ? "Open" : k === "quiet" ? "Quiet" : "Closed")}
+          renderItem={(e) => <ThreadCard thread={e.thread} />}
+        />
       ) : null}
       {load.kind === "ok" && load.study === null ? (
         <AlertMessage title="Could not load the event study">The request failed, so the study is unknown, not empty.</AlertMessage>
@@ -113,15 +114,15 @@ function ThreadCard({ thread }: { thread: ThreadOut }) {
   }
 
   return (
-    <Blueprint as="li" className="space-y-2 px-5 py-3">
+    <div className="space-y-2">
       <button type="button" onClick={() => void toggle()} aria-expanded={open} className="flex w-full items-start justify-between gap-3 text-left">
         <span className="min-w-0 space-y-0.5">
-          <span className="block text-base font-semibold [overflow-wrap:anywhere]">{thread.title}</span>
+          <span className="block text-base font-semibold [overflow-wrap:anywhere]">{decodeEntities(thread.title)}</span>
           <span className="block text-xs text-text-muted">
-            {thread.ticker ? <span className="font-mono">{thread.ticker}</span> : "No single holding"}
-            {" · "}
+            {thread.ticker ? <EntityName id={thread.ticker} /> : "No single holding"}
+            {", "}
             {thread.stories} stor{thread.stories === 1 ? "y" : "ies"}
-            {" · "}
+            {", "}
             {thread.state === "open" ? "open" : thread.state === "quiet" ? "quiet" : "closed"}, last update{" "}
             <time dateTime={thread.last_update_at}>{formatRelative(new Date(thread.last_update_at), now)}</time>
           </span>
@@ -141,7 +142,7 @@ function ThreadCard({ thread }: { thread: ThreadOut }) {
               <li key={s.story_id} className="space-y-1 text-sm">
                 <p>
                   <Link href={`/news/stories/${s.story_id}`} className="font-medium hover:text-accent-ink hover:underline">
-                    {s.headline}
+                    {decodeEntities(s.headline)}
                   </Link>{" "}
                   <span className="text-xs text-text-muted">
                     {LIFECYCLE_LABELS[s.lifecycle] ?? s.lifecycle}, <time dateTime={s.at}>{formatDateTime(s.at)}</time>
@@ -155,7 +156,7 @@ function ThreadCard({ thread }: { thread: ThreadOut }) {
           </ol>
         )
       ) : null}
-    </Blueprint>
+    </div>
   );
 }
 

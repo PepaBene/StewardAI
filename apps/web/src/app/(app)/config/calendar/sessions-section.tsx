@@ -60,7 +60,7 @@ export function SessionsSection({ mics, onRecorded }: { mics: string[]; onRecord
   return (
     <section aria-labelledby="sessions-heading" className="space-y-3">
       <div>
-        <h2 id="sessions-heading" className="text-[22px] leading-tight font-semibold">
+        <h2 id="sessions-heading" className="panel-title">
           Recorded sessions
         </h2>
         <p className="max-w-[72ch] text-sm text-text-muted">
@@ -105,13 +105,13 @@ export function SessionsSection({ mics, onRecorded }: { mics: string[]; onRecord
         <>
           <ul className="flex flex-wrap gap-2 text-sm" aria-label="Sessions by state">
             {counts.map((c) => (
-              <li key={c.state} className="border border-border px-2 py-1">
+              <li key={c.state} className="rounded-control bg-surface-muted px-2 py-1">
                 <span aria-hidden="true">{SESSION_STATE[c.state].glyph} </span>
                 {SESSION_STATE[c.state].label} <span className="num font-semibold">{c.count}</span>
               </li>
             ))}
           </ul>
-          <div className="overflow-x-auto border border-border">
+          <div className="overflow-x-auto rounded-card bg-surface-muted">
             <table className="w-full min-w-[40rem] text-sm">
               <caption className="sr-only">Recorded exchange sessions for {cleanMic}</caption>
               <thead className="bg-surface-muted">

@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { ScoreMark } from "@/components/insight/score-mark";
 import { getBrowserApiClient } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
-import type { MetricInfo } from "@/lib/discover/discover";
+import type { MetricInfo, ScreenSummary } from "@/lib/discover/discover";
 import { chipText, type TemplateOut, type TemplatesOut } from "@/lib/discover/screen-draft";
 import { petalsFromMap } from "@/lib/insight/insight";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,11 @@ export function TemplatesPanel({
   selected,
   onUse,
   current,
+  saved = [],
+  onRunSaved,
 }: {
+  saved?: readonly ScreenSummary[];
+  onRunSaved?: (id: number) => void;
   catalogue: readonly MetricInfo[];
   selected: string | null;
   onUse: (t: TemplateOut) => void;
@@ -34,6 +38,7 @@ export function TemplatesPanel({
   const [data, setData] = useState<TemplatesOut | null>(null);
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState(false);
+  const [manage, setManage] = useState(false);
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
   const [rationale, setRationale] = useState("");
@@ -94,7 +99,7 @@ export function TemplatesPanel({
     <section aria-labelledby="templates-heading" className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="templates-heading" className="text-[22px] leading-tight font-semibold">
-          Starter screens
+          Ideas to start from
         </h2>
         <span className="text-xs text-text-muted">
           {data?.note}{" "}
@@ -113,18 +118,18 @@ export function TemplatesPanel({
         {shown.map((t) => (
           <li
             key={t.id}
-            className={cn("flex flex-col gap-2 border bg-surface-raised p-4", selected === t.id ? "border-accent" : "border-border")}
+            className={cn("flex flex-col gap-2 rounded-xl border bg-surface-raised p-4", selected === t.id ? "border-accent" : "border-border")}
           >
             <div className="flex items-start justify-between gap-3">
-              <h3 className="text-sm font-semibold">{t.title}</h3>
-              <ScoreMark petals={petalsFromMap(t.mark)} label={`${t.title}, ${t.mark_basis}`} className="shrink-0" />
+              <h3 className="font-heading text-base leading-snug font-semibold">{t.title}</h3>
+              <ScoreMark petals={petalsFromMap(t.mark)} size="header" label={`${t.title}, ${t.mark_basis}`} className="shrink-0" />
             </div>
-            <p className="line-clamp-4 text-xs text-text-muted" title={t.rationale}>
+            <p className="line-clamp-2 text-xs text-text-muted" title={t.rationale}>
               {t.rationale}
             </p>
             <ul className="flex flex-wrap gap-1" aria-label="Conditions">
               {t.filters.map((f, i) => (
-                <li key={i} className="bg-surface-muted px-1.5 py-0.5 text-[11px]">
+                <li key={i} className="bg-surface-muted px-1.5 py-0.5 text-xs">
                   {chipText(f as never, catalogue)}
                 </li>
               ))}
@@ -134,16 +139,16 @@ export function TemplatesPanel({
                 {t.matched !== null && t.matched !== undefined ? (
                   <>
                     <span className="num font-semibold">{t.matched}</span> pass today
-                    <span className="block text-[11px] text-text-faint">{t.mark_basis}</span>
+                    <span className="block text-xs text-text-faint">{t.mark_basis}</span>
                   </>
                 ) : (
                   <span className="text-text-muted" title={(t.disabled ?? []).join("; ")}>
-                    Cannot run yet: {(t.disabled ?? [])[0]}
+                    Not ready yet. {(t.disabled ?? [])[0]}
                   </span>
                 )}
               </span>
               <span className="flex shrink-0 gap-1">
-                {confirm === t.id ? (
+                {!manage ? null : confirm === t.id ? (
                   <button
                     type="button"
                     onClick={() => void change((ts) => ts.filter((x) => x.id !== t.id)).then(() => setConfirm(null))}
@@ -159,26 +164,66 @@ export function TemplatesPanel({
                 <button
                   type="button"
                   onClick={() => onUse(t)}
-                  className="border border-border px-2.5 py-1 text-xs whitespace-nowrap hover:border-accent hover:text-accent-ink"
+                  className="rounded-md border border-border px-2.5 py-1 text-xs whitespace-nowrap hover:border-accent hover:text-accent-ink focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none"
                 >
-                  Use this screen
+                  Show matches
                 </button>
               </span>
             </div>
           </li>
         ))}
       </ul>
+      {saved.length > 0 ? (
+        <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Your saved screens">
+          {saved.map((s) => (
+            <li key={s.id} className="flex flex-col gap-2 rounded-xl border border-border bg-surface-raised p-4">
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="font-heading text-base leading-snug font-semibold">{s.name}</h3>
+                {s.mark ? <ScoreMark petals={petalsFromMap(s.mark)} size="header" label={`${s.name}, average of ${s.last_matched ?? 0} matches`} className="shrink-0" /> : null}
+              </div>
+              <p className="text-xs text-text-muted">
+                {s.last_run_at ? (
+                  <>
+                    <span className="num font-semibold text-text">{s.last_matched ?? 0}</span> matches
+                    {s.new_last_7d !== null && s.new_last_7d !== undefined ? (
+                      <>
+                        , <span className={cn("num font-semibold", s.new_last_7d > 0 && "text-accent-ink")}>{s.new_last_7d}</span> new in 7 days
+                      </>
+                    ) : null}
+                  </>
+                ) : (
+                  "Not run yet."
+                )}
+              </p>
+              <div className="mt-auto pt-1">
+                <button
+                  type="button"
+                  onClick={() => onRunSaved?.(s.id)}
+                  className="rounded-md border border-border px-2.5 py-1 text-xs whitespace-nowrap hover:border-accent hover:text-accent-ink focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none"
+                >
+                  Show matches
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <div className="flex flex-wrap items-center gap-3">
+        <button type="button" onClick={() => setManage((m) => !m)} aria-pressed={manage} className="text-sm text-accent-ink underline underline-offset-2">
+          {manage ? "Done managing" : "Manage ideas"}
+        </button>
         {data && data.templates.length > 4 ? (
           <button type="button" onClick={() => setOpen((o) => !o)} className="text-sm text-accent-ink underline underline-offset-2">
             {open ? "Show fewer" : `Show all ${data.templates.length}`}
           </button>
         ) : null}
-        <button type="button" onClick={() => setAdding((a) => !a)} aria-expanded={adding} className="text-sm text-accent-ink underline underline-offset-2">
-          Save the current conditions as a starter screen
-        </button>
+        {manage ? (
+          <button type="button" onClick={() => setAdding((a) => !a)} aria-expanded={adding} className="text-sm text-accent-ink underline underline-offset-2">
+            Save the current filters as an idea
+          </button>
+        ) : null}
       </div>
-      {adding ? (
+      {manage && adding ? (
         <form
           className="grid max-w-2xl gap-2 border border-border p-3"
           onSubmit={async (e) => {

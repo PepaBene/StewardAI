@@ -1,5 +1,7 @@
 # UX / UI Redesign v2 — whole-app plan
 
+> **Superseded for implementation by `ux_ui_final_redesign_plan.md` (2026-10-16).** v2 was never implemented; the final plan re-audits all 147 routes, keeps v2's principles and decisions, and wins where the two differ.
+
 Date: 2026-10-11. Scope: `apps/web` (Next.js 16, Tailwind 4, Ledger tokens, custom SVG chart kit in `components/charts`, Tremor Raw sparklines, recharts in a few places).
 Supersedes the *scope* of `ux_ui_dataviz_improvement_plan.md` (2026-10-06, ~30 routes). It keeps that plan's principles and foundations (F1-F8) and re-applies them to the app as it is now: **~110 routes**, up from ~30. Where this plan does not restate something, the old plan still applies.
 Companion docs: `Ledger_Design_System_Redesign_Proposal.md`, `Ledger_II_Redesign_Proposal.md` (tokens, motion, confidence chips — **not re-litigated here**).

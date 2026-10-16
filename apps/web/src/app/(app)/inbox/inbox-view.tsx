@@ -15,6 +15,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { EntityName } from "@/components/entity-name";
+import { labelText } from "@/lib/labels";
 import { PageHeader } from "@/components/page-header";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
@@ -42,7 +44,6 @@ import {
   type NoteVersion,
   type RouteStat,
 } from "@/lib/inbox";
-import { UpdatesFeedPanel } from "@/components/insight/updates-feed";
 import { cn } from "@/lib/utils";
 
 type Load =
@@ -123,7 +124,6 @@ export function InboxView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Oversight"
         title="Inbox"
         description="Events the agents looked into for you. Nothing here has started anything: a proposed job runs only when you confirm it."
         aside={
@@ -166,7 +166,7 @@ export function InboxView() {
                     "border-l border-border px-3 py-1.5 text-xs first:border-l-0",
                     tab === t
                       ? "bg-accent text-accent-foreground"
-                      : "text-text hover:bg-border-soft",
+                      : "text-text hover:bg-surface-muted",
                   )}
                 >
                   {TAB_LABELS[t]}
@@ -231,7 +231,6 @@ export function InboxView() {
         </Blueprint>
 
         <div className="flex flex-col gap-5">
-          <UpdatesFeedPanel title="Everything else that changed" kicker="News, what changed and dividends, with the inbox" limit={15} />
           <NotesPanel />
           <RoutesPanel reloadKey={reloadKey} />
         </div>
@@ -259,7 +258,7 @@ function ItemRow({
   const proposal = actionLabel(item.proposed_action);
   const reason =
     typeof item.proposed_action?.reason === "string"
-      ? item.proposed_action.reason
+      ? labelText(item.proposed_action.reason)
       : null;
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -305,10 +304,12 @@ function ItemRow({
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <p className="text-[15px] font-medium">
-              <span className="mr-2 font-mono text-xs font-semibold">
-                {item.ticker ?? "—"}
-              </span>
-              {item.headline}
+              {item.ticker ? (
+                <EntityName id={item.ticker} className="mr-2 text-xs font-semibold" />
+              ) : (
+                <span className="mr-2 text-xs font-semibold">—</span>
+              )}
+              {labelText(item.headline)}
             </p>
             <span className="text-xs text-text-muted">
               {kindLabel(item.trigger_kind)}

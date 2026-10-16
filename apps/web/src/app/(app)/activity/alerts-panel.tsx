@@ -7,11 +7,14 @@ import { useEffect, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { EntityName } from "@/components/entity-name";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { SeverityBadge } from "@/components/news/severity-badge";
 import { SeverityDot } from "@/components/news/severity-timeline";
 import { Button } from "@/components/ui/button";
 import { BlueprintCorners } from "@/components/ui/blueprint";
+import { CompactRow } from "@/components/ui/compact-row";
+import { ResponsiveTable } from "@/components/ui/responsive-table";
 import { getBrowserApiClient, type AlertOut } from "@/lib/api/client";
 import { ALERT_KIND_LABELS, alertEventLabel, alertHeadline, alertOutcome } from "@/lib/activity/activity";
 import { CHANNEL_LABELS } from "@/lib/config/news-forms";
@@ -110,39 +113,79 @@ export function AlertsPanel() {
         </EmptyState>
       ) : null}
       {load.kind === "ok" && load.alerts.length > 0 ? (
-        <ul className="divide-y divide-border-soft border border-border" aria-label={all ? "All alerts" : "Monitoring alerts"}>
-          {load.alerts.map((a) => (
-            <li key={a.id} className="flex flex-wrap items-start justify-between gap-3 p-3 text-sm">
-              <div className="min-w-0 flex-1 space-y-1">
-                <p className="flex flex-wrap items-center gap-2">
-                  <SeverityDot severity={a.severity} />
-                  <SeverityBadge severity={a.severity} />
-                  <span className="font-medium">{alertEventLabel(a)}</span>
-                  {a.kind !== "system" ? <span className="text-xs text-text-muted">{ALERT_KIND_LABELS[a.kind]}</span> : null}
-                  {a.ticker ? (
-                    <Link href={`/holdings/${encodeURIComponent(a.ticker)}`} className="font-mono text-xs text-accent-ink hover:underline">
-                      {a.ticker}
+        <ResponsiveTable
+          rows={load.alerts}
+          rowKey={(a) => String(a.id)}
+          pageSize={10}
+          caption={all ? "All alerts, newest first" : "Monitoring alerts, newest first"}
+          columns={[
+            {
+              key: "alert",
+              header: "Alert",
+              className: "max-w-xl",
+              cell: (a) => (
+                <div className="space-y-1">
+                  <p className="flex flex-wrap items-center gap-2">
+                    <SeverityDot severity={a.severity} />
+                    <SeverityBadge severity={a.severity} />
+                    <span className="font-medium">{alertEventLabel(a)}</span>
+                    {a.kind !== "system" ? <span className="text-xs text-text-muted">{ALERT_KIND_LABELS[a.kind]}</span> : null}
+                  </p>
+                  <p className="break-words">{alertHeadline(a.message)}</p>
+                  {a.cluster_id !== null ? (
+                    <Link href={`/news?story=${a.cluster_id}`} className="text-xs text-accent-ink hover:underline">
+                      Open the story
                     </Link>
                   ) : null}
-                </p>
-                <p className="break-words">{alertHeadline(a.message)}</p>
-                <p className="num flex flex-wrap gap-x-2 text-xs text-text-muted">
+                </div>
+              ),
+            },
+            {
+              key: "holding",
+              header: "Holding",
+              cell: (a) =>
+                a.ticker ? (
+                  <Link href={`/companies/${encodeURIComponent(a.ticker)}`} className="text-accent-ink hover:underline">
+                    <EntityName id={a.ticker} chip={false} />
+                  </Link>
+                ) : (
+                  <span className="text-text-muted">None</span>
+                ),
+            },
+            {
+              key: "when",
+              header: "Sent",
+              cell: (a) => (
+                <>
                   <time dateTime={a.created_at} title={formatDateTime(a.created_at)}>
                     {formatRelative(new Date(a.created_at), now)}
                   </time>
-                  <span>· {CHANNEL_LABELS[a.channel] ?? a.channel}</span>
-                  <span>· {alertOutcome(a)}</span>
-                  {a.cluster_id !== null ? (
-                    <Link href={`/news?story=${a.cluster_id}`} className="text-accent-ink hover:underline">
-                      · the story
-                    </Link>
-                  ) : null}
-                </p>
+                  <span className="block text-xs text-text-muted">
+                    {CHANNEL_LABELS[a.channel] ?? a.channel} · {alertOutcome(a)}
+                  </span>
+                </>
+              ),
+            },
+            {
+              key: "feedback",
+              header: "Was it right?",
+              cell: (a) => <FeedbackControl target={{ kind: "alert", id: a.id }} label={`alert “${alertHeadline(a.message).slice(0, 60)}”`} />,
+            },
+          ]}
+          compact={(a) => (
+            <div>
+              <CompactRow
+                name={alertEventLabel(a)}
+                symbol={a.severity}
+                primary={formatRelative(new Date(a.created_at), now)}
+                secondary={[alertHeadline(a.message).slice(0, 60)]}
+              />
+              <div className="px-4 pb-2">
+                <FeedbackControl target={{ kind: "alert", id: a.id }} label={`alert “${alertHeadline(a.message).slice(0, 60)}”`} />
               </div>
-              <FeedbackControl target={{ kind: "alert", id: a.id }} label={`alert “${alertHeadline(a.message).slice(0, 60)}”`} />
-            </li>
-          ))}
-        </ul>
+            </div>
+          )}
+        />
       ) : null}
     </section>
   );

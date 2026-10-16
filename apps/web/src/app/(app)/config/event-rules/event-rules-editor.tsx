@@ -26,7 +26,7 @@ import {
 } from "@/lib/config/news-forms";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
 import { EVENT_LABELS, EVENT_TYPES, SEVERITY } from "@/lib/news/labels";
-import { BlueprintCorners } from "@/components/ui/blueprint";
+import { MoreSettings, SummaryPanel } from "@/components/config/summary";
 
 const api = () => getBrowserApiClient();
 const LEVELS = ([0, 1, 2, 3] as const).map((s) => ({ value: s, label: `${s} · ${SEVERITY[s].label}` }));
@@ -47,7 +47,7 @@ export function EventRulesEditor() {
     onLoaded: (body) => {
       const loaded = eventRulesFromBody(body);
       setForm(loaded);
-      setBaseline(body ? JSON.stringify(eventRulesToBody(loaded)) : "");
+      setBaseline(JSON.stringify(eventRulesToBody(loaded)));
     },
   });
   const body = useMemo(() => (form ? eventRulesToBody(form) : null), [form]);
@@ -85,33 +85,67 @@ export function EventRulesEditor() {
 
       {form ? (
         <>
-          <section aria-labelledby="severity-heading" className="space-y-3 blueprint p-5">
-            <BlueprintCorners />
-            <h2 id="severity-heading" className="text-[22px] leading-tight font-semibold">
-              Severity per event type
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {EVENT_TYPES.map((t) => (
-                <SelectField
-                  key={t}
-                  label={EVENT_LABELS[t]}
-                  path={`severities.${t}`}
-                  errors={editor.errors}
-                  value={form.severities[t] as 0 | 1 | 2 | 3}
-                  options={LEVELS}
-                  onChange={(v) => set({ severities: { ...form.severities, [t]: v } })}
-                  hint={form.severities[t] !== DEFAULT_SEVERITIES[t] ? `Default ${DEFAULT_SEVERITIES[t]}` : undefined}
-                />
-              ))}
+          <SummaryPanel
+            title="Severity per event type"
+            reading="Pick the level each kind of event raises. A marked cell is the current level; the default is shown in words."
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-120 text-sm">
+                <caption className="sr-only">Severity level for each event type</caption>
+                <thead>
+                  <tr className="text-left text-xs text-text-muted">
+                    <th scope="col" className="py-1.5 pr-3 font-medium">
+                      Event type
+                    </th>
+                    {([0, 1, 2, 3] as const).map((s) => (
+                      <th key={s} scope="col" className="px-2 py-1.5 text-center font-medium">
+                        {SEVERITY[s].label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {EVENT_TYPES.map((t) => (
+                    <tr key={t} className="border-t border-border/60">
+                      <th scope="row" className="py-1.5 pr-3 text-left font-normal">
+                        {EVENT_LABELS[t]}
+                        {form.severities[t] !== DEFAULT_SEVERITIES[t] ? (
+                          <span className="ml-2 text-xs text-text-muted">changed from {SEVERITY[DEFAULT_SEVERITIES[t] as 0 | 1 | 2 | 3].label.toLowerCase()}</span>
+                        ) : null}
+                      </th>
+                      {([0, 1, 2, 3] as const).map((s) => {
+                        const on = form.severities[t] === s;
+                        return (
+                          <td key={s} className="px-2 py-1 text-center">
+                            <label
+                              className={`mx-auto flex h-8 w-full max-w-24 cursor-pointer items-center justify-center rounded-control text-xs has-focus-visible:ring-2 has-focus-visible:ring-focus/30 ${on ? "bg-accent font-semibold text-accent-foreground" : "bg-surface text-text-muted hover:text-text"}`}
+                            >
+                              <input
+                                type="radio"
+                                name={`severity-${t}`}
+                                className="sr-only"
+                                checked={on}
+                                onChange={() => set({ severities: { ...form.severities, [t]: s } })}
+                                aria-label={`${EVENT_LABELS[t]}: ${SEVERITY[s].label}`}
+                              />
+                              {on ? "✓ Selected" : s === DEFAULT_SEVERITIES[t] ? "Default" : ""}
+                            </label>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </section>
+          </SummaryPanel>
 
           <section aria-labelledby="overrides-heading" className="space-y-3">
-            <h2 id="overrides-heading" className="text-[22px] leading-tight font-semibold">
+            <h2 id="overrides-heading" className="panel-title">
               Per-holding overrides
             </h2>
             {form.overrides.map((o, i) => (
-              <div key={o.key} className="flex flex-wrap items-start gap-3 border border-border p-3">
+              <div key={o.key} className="flex flex-wrap items-start gap-3 rounded-card bg-surface-muted p-3">
                 <TextField className="w-56" label="Ticker" path={`overrides.${i}.ticker`} errors={editor.errors} value={o.ticker} onChange={(v) => setOverride(o.key, { ticker: v })} />
                 <SelectField className="w-60" label="Event type" path={`overrides.${i}.event_type`} errors={editor.errors} value={o.event_type} options={EVENT_OPTIONS} onChange={(v) => setOverride(o.key, { event_type: v })} />
                 <SelectField className="w-44" label="Severity" path={`overrides.${i}.severity`} errors={editor.errors} value={o.severity as 0 | 1 | 2 | 3} options={LEVELS} onChange={(v) => setOverride(o.key, { severity: v })} />
@@ -126,9 +160,9 @@ export function EventRulesEditor() {
             </Button>
           </section>
 
-          <section aria-labelledby="adjust-heading" className="space-y-3 blueprint p-5">
-            <BlueprintCorners />
-            <h2 id="adjust-heading" className="text-[22px] leading-tight font-semibold">
+          <MoreSettings title="More settings" hint="Adjustments, price moves, macro bands and announcement types">
+          <section aria-labelledby="adjust-heading" className="space-y-3">
+            <h2 id="adjust-heading" className="text-lg font-semibold">
               Adjustments
             </h2>
             <CheckboxGroup label="Raise one level when the item touches a thesis KPI or exit condition" path="escalate_when_thesis_linked" errors={editor.errors} values={form.escalate_when_thesis_linked} options={EVENT_OPTIONS} onChange={(v) => set({ escalate_when_thesis_linked: v as EventType[] })} />
@@ -150,9 +184,8 @@ export function EventRulesEditor() {
             </div>
           </section>
 
-          <section aria-labelledby="triggers-heading" className="space-y-3 blueprint p-5">
-            <BlueprintCorners />
-            <h2 id="triggers-heading" className="text-[22px] leading-tight font-semibold">
+          <section aria-labelledby="triggers-heading" className="space-y-3">
+            <h2 id="triggers-heading" className="text-lg font-semibold">
               Price moves and macro surprises
             </h2>
             <div className="grid gap-3 lg:grid-cols-[1fr_2fr]">
@@ -182,6 +215,7 @@ export function EventRulesEditor() {
             errors={editor.errors}
             onChange={(announcement_types) => set({ announcement_types })}
           />
+          </MoreSettings>
 
           <SaveBar
             dirty={dirty}
@@ -221,7 +255,7 @@ function AnnouncementRules({
   return (
     <section aria-labelledby="announcements-heading" className="space-y-3">
       <div>
-        <h2 id="announcements-heading" className="text-[22px] leading-tight font-semibold">
+        <h2 id="announcements-heading" className="panel-title">
           Regulatory announcement types
         </h2>
         <p className="max-w-prose text-sm text-text-muted">
@@ -235,7 +269,7 @@ function AnnouncementRules({
         {rules.map((r, i) => {
           const path = `announcement_types.${i}`;
           return (
-            <li key={r.key} className="grid items-start gap-2 border border-border p-3 sm:grid-cols-[auto_10rem_minmax(0,1fr)_14rem_auto]">
+            <li key={r.key} className="grid items-start gap-2 rounded-card bg-surface-muted p-3 sm:grid-cols-[auto_10rem_minmax(0,1fr)_14rem_auto]">
               <span className="mt-7 font-mono text-sm text-text-muted">{i + 1}.</span>
               <SelectField label="Service" hideLabel={i > 0} path={`${path}.service`} errors={errors} value={r.service} options={ANNOUNCEMENT_SERVICES} onChange={(v) => set(r.key, { service: v })} />
               <TextField

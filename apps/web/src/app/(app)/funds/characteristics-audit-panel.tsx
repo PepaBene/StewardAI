@@ -106,11 +106,11 @@ export function CharacteristicsAuditPanel() {
                   <tr key={r.key} className="border-b border-border-soft align-top last:border-0">
                     <td className="num px-3 py-2 whitespace-nowrap">
                       {r.observedAt ? formatDate(r.observedAt) : "Unknown"}
-                      {r.asOf ? <div className="text-[11px] text-text-muted">figures as of {formatDate(r.asOf)}</div> : null}
+                      {r.asOf ? <div className="text-xs text-text-muted">figures as of {formatDate(r.asOf)}</div> : null}
                     </td>
                     <td className="px-3 py-2">
                       <div className="font-mono text-xs">{r.fundKey}</div>
-                      <div className="text-[11px] text-text-muted">Source: {r.provider ?? "Unknown"}</div>
+                      <div className="text-xs text-text-muted">Source: {r.provider ?? "Unknown"}</div>
                     </td>
                     <td className="px-3 py-2">
                       <span className="font-medium">
@@ -118,8 +118,8 @@ export function CharacteristicsAuditPanel() {
                         {verdictLabel(r.verdict)}
                       </span>
                       {r.alert ? <div className="text-xs">Alert raised</div> : null}
-                      {r.basis ? <div className="max-w-[28ch] text-[11px] text-text-muted">Stated basis: {r.basis}</div> : null}
-                      {r.fingerprint ? <div className="font-mono text-[11px] text-text-muted">Page shape {r.fingerprint.slice(0, 8)}</div> : null}
+                      {r.basis ? <div className="max-w-[28ch] text-xs text-text-muted">Stated basis: {r.basis}</div> : null}
+                      {r.fingerprint ? <div className="font-mono text-xs text-text-muted">Page shape {r.fingerprint.slice(0, 8)}</div> : null}
                     </td>
                     <td className="num px-3 py-2 text-right">{fig(r.pe)}</td>
                     <td className="num px-3 py-2 text-right">{fig(r.pb)}</td>

@@ -17704,6 +17704,53 @@
         ]
       }
     },
+    "/checks/preview": {
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Preview Checks",
+        "description": "Per holding, the current and would-be check states under the draft config, and how many\nholdings change. Evaluates the real checks engine with the draft limits against today's stored\ninputs; saves and caches nothing. Up to 60 holdings, largest first.",
+        "operationId": "preview_checks",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChecksConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChecksPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/portfolio/dividends": {
       "get": {
         "tags": [
@@ -21322,6 +21369,153 @@
         }
       }
     },
+    "/companies/{ticker}/summary": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Company Summary",
+        "description": "Name, symbol, exchange, last price and day change, the default fair value, your position\nwhen held and the check axes: what the page header and sidebar need in one request.",
+        "operationId": "get_company_summary",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanySummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/market-context": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Company Market Context",
+        "description": "7-day and 1-year shareholder returns against the industry and the market (the first\nPrices benchmark) with a pass sentence, the spread of weekly price moves, and up to four\ncompetitors with their check scores. Every figure is null when its history is missing, and\n`reasons` says which.",
+        "operationId": "get_company_market_context",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyMarketContext"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/companies/{ticker}/fair-values": {
+      "get": {
+        "tags": [
+          "companies"
+        ],
+        "summary": "Get Company Fair Values",
+        "description": "Every fair value on file in the listing's currency beside the last price: your DCF and\nmultiple-path scenarios, the default DCF, the thesis target, the peer-multiple value and the\nanalyst mean, low and high, each with its date and a note on where it came from.",
+        "operationId": "get_company_fair_values",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]{1,32}$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyFairValues"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/funds/catalog": {
       "get": {
         "tags": [
@@ -23496,6 +23690,108 @@
         }
       }
     },
+    "/portfolio/performance/drawdown": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Drawdown",
+        "description": "The underwater curve of the flow-adjusted portfolio index over `days` (deposits and\nwithdrawals excluded), with the maximum drawdown and its peak, trough and recovery dates.\nEmpty with a reason before two snapshots exist.",
+        "operationId": "get_drawdown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3700,
+              "minimum": 7,
+              "default": 365,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrawdownResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/performance/waterfall": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Waterfall",
+        "description": "Start value to end value over `days`: net deposits, price return, FX effect, income, costs\nand what the attribution could not place. A step it cannot compute is null with a reason.",
+        "operationId": "get_waterfall",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3650,
+              "minimum": 7,
+              "default": 365,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaterfallResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/portfolio/performance/sleeves": {
       "get": {
         "tags": [
@@ -24137,6 +24433,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/XrayConcentrationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/portfolio/xray/allocation": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Allocation",
+        "description": "Lorenz curve of the equity holdings with HHI, effective number of holdings and Gini, and\nthe full sector to industry to holding tree with weights (every holding, unlike the capped\nflow in /diversification). Issuers looked through funds; unclassified ones are marked.",
+        "operationId": "get_allocation",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show the holdings as they were on this date (the latest snapshot before).",
+              "title": "As Of"
+            },
+            "description": "Show the holdings as they were on this date (the latest snapshot before)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Allocation"
                 }
               }
             }
@@ -34637,6 +34991,53 @@
         ],
         "title": "Alignment"
       },
+      "Allocation": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          },
+          "equity_weight": {
+            "type": "number",
+            "title": "Equity Weight",
+            "description": "Share of the portfolio that is equity."
+          },
+          "lorenz": {
+            "$ref": "#/components/schemas/LorenzCurve"
+          },
+          "tree": {
+            "items": {
+              "$ref": "#/components/schemas/AllocationNode"
+            },
+            "type": "array",
+            "title": "Tree",
+            "description": "Sectors, largest first."
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "equity_weight",
+          "lorenz",
+          "tree",
+          "notes"
+        ],
+        "title": "Allocation"
+      },
       "AllocationLine": {
         "properties": {
           "ticker": {
@@ -34729,6 +35130,60 @@
           "volatility_change"
         ],
         "title": "AllocationLine"
+      },
+      "AllocationNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level",
+            "description": "sector, industry or holding."
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Share of the whole portfolio."
+          },
+          "share_of_equity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Of Equity"
+          },
+          "unclassified": {
+            "type": "boolean",
+            "title": "Unclassified",
+            "default": false
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/AllocationNode"
+            },
+            "type": "array",
+            "title": "Children"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "level",
+          "weight",
+          "share_of_equity"
+        ],
+        "title": "AllocationNode"
       },
       "AllocationPlan": {
         "properties": {
@@ -43873,6 +44328,34 @@
         "title": "ChatSettings",
         "description": "The chat panel's assistant: DB tools, web search on tiered outlets, cited answers."
       },
+      "CheckChange": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "was": {
+            "type": "string",
+            "title": "Was"
+          },
+          "now": {
+            "type": "string",
+            "title": "Now"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "was",
+          "now"
+        ],
+        "title": "CheckChange"
+      },
       "CheckLimits": {
         "properties": {
           "payout_limit_earnings": {
@@ -44414,6 +44897,52 @@
           "body"
         ],
         "title": "ChecksConfigVersion"
+      },
+      "ChecksPreview": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "partial",
+              "unavailable"
+            ],
+            "title": "Status"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingPreview"
+            },
+            "type": "array",
+            "title": "Holdings"
+          },
+          "changed_count": {
+            "type": "integer",
+            "title": "Changed Count",
+            "description": "Holdings with at least one check that would flip."
+          },
+          "holdings_total": {
+            "type": "integer",
+            "title": "Holdings Total"
+          },
+          "skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped",
+            "description": "Holdings whose inputs could not be loaded."
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "holdings",
+          "changed_count",
+          "holdings_total",
+          "skipped"
+        ],
+        "title": "ChecksPreview"
       },
       "Citation": {
         "properties": {
@@ -46203,6 +46732,207 @@
         ],
         "title": "CompanyEventInput"
       },
+      "CompanyFairValues": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
+          },
+          "price_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Date"
+          },
+          "default_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Source"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/FairValueItem"
+            },
+            "type": "array",
+            "title": "Values"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "price",
+          "price_currency",
+          "price_date",
+          "default_source",
+          "values",
+          "reasons"
+        ],
+        "title": "CompanyFairValues"
+      },
+      "CompanyMarketContext": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "industry_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry Label"
+          },
+          "industry_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry Basis"
+          },
+          "industry_members": {
+            "type": "integer",
+            "title": "Industry Members"
+          },
+          "market_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Label"
+          },
+          "returns": {
+            "items": {
+              "$ref": "#/components/schemas/ReturnRow"
+            },
+            "type": "array",
+            "title": "Returns"
+          },
+          "return_sentence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Sentence"
+          },
+          "industry_sentence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry Sentence"
+          },
+          "volatility": {
+            "$ref": "#/components/schemas/Volatility"
+          },
+          "competitors": {
+            "items": {
+              "$ref": "#/components/schemas/Competitor"
+            },
+            "type": "array",
+            "title": "Competitors"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "as_of",
+          "industry_label",
+          "industry_basis",
+          "industry_members",
+          "market_label",
+          "returns",
+          "return_sentence",
+          "industry_sentence",
+          "volatility",
+          "competitors",
+          "reasons"
+        ],
+        "title": "CompanyMarketContext"
+      },
       "CompanyReport": {
         "properties": {
           "ticker": {
@@ -46462,6 +47192,143 @@
         ],
         "title": "CompanyResearchObservationsResponse",
         "description": "`GET /holdings/{ticker}/company-research-observations`."
+      },
+      "CompanySummary": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
+          },
+          "mic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mic"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "held": {
+            "type": "boolean",
+            "title": "Held"
+          },
+          "price": {
+            "$ref": "#/components/schemas/Quote"
+          },
+          "fair_value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SummaryFairValue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SummaryPosition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "axes": {
+            "items": {
+              "$ref": "#/components/schemas/SummaryAxis"
+            },
+            "type": "array",
+            "title": "Axes"
+          },
+          "checks_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checks Status"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "symbol",
+          "name",
+          "exchange",
+          "mic",
+          "currency",
+          "country",
+          "held",
+          "price",
+          "fair_value",
+          "position",
+          "axes",
+          "checks_status",
+          "reasons"
+        ],
+        "title": "CompanySummary"
       },
       "CompanyValuation": {
         "properties": {
@@ -47258,6 +48125,88 @@
           "provider"
         ],
         "title": "Compensation"
+      },
+      "Competitor": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "last_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Price"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis",
+            "description": "confirmed_peer or same_industry."
+          },
+          "scores": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scores",
+            "description": "Latest cached check-axis scores (0-6); null when the company has none."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "last_price",
+          "currency",
+          "basis",
+          "scores"
+        ],
+        "title": "Competitor"
       },
       "ComplianceRow": {
         "properties": {
@@ -55900,6 +56849,145 @@
         ],
         "title": "DrawdownOdds"
       },
+      "DrawdownPoint": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "drawdown": {
+            "type": "number",
+            "title": "Drawdown",
+            "description": "Index / running peak - 1; 0 at a new high, else negative."
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "drawdown"
+        ],
+        "title": "DrawdownPoint"
+      },
+      "DrawdownResponse": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/DrawdownPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "max_drawdown": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown",
+            "description": "The deepest drawdown as a negative fraction."
+          },
+          "peak_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Date",
+            "description": "High that preceded the deepest drawdown."
+          },
+          "trough_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trough Date"
+          },
+          "recovery_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery Date",
+            "description": "First day the index regained the peak; null while still under water."
+          },
+          "current_drawdown": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Drawdown"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "base_currency",
+          "days",
+          "points",
+          "max_drawdown",
+          "peak_date",
+          "trough_date",
+          "recovery_date",
+          "current_drawdown"
+        ],
+        "title": "DrawdownResponse"
+      },
       "Drift": {
         "properties": {
           "stale": {
@@ -62651,6 +63739,106 @@
           "footer"
         ],
         "title": "FairMultiple"
+      },
+      "FairValueItem": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "dcf, dcf_default, dcf_bear, dcf_bull, multiple_path, multiple_path_bear, multiple_path_bull, thesis_target, peer_multiple, analyst_mean, analyst_low or analyst_high."
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis",
+            "description": "The stored basis, where one exists."
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "upside": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upside",
+            "description": "Value / last price - 1."
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "basis_note": {
+            "type": "string",
+            "title": "Basis Note"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "basis",
+          "label",
+          "value",
+          "currency",
+          "upside",
+          "as_of",
+          "basis_note"
+        ],
+        "title": "FairValueItem"
       },
       "FairValueRules": {
         "properties": {
@@ -71220,6 +72408,52 @@
         ],
         "title": "HoldingPeriodRow",
         "description": "An open purchase lot with both dates of the holding-period test (plan M4.8)."
+      },
+      "HoldingPreview": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "current": {
+            "$ref": "#/components/schemas/StateTally"
+          },
+          "would_be": {
+            "$ref": "#/components/schemas/StateTally"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/CheckChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "changed": {
+            "type": "boolean",
+            "title": "Changed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "current",
+          "would_be",
+          "changes",
+          "changed"
+        ],
+        "title": "HoldingPreview"
       },
       "HoldingPrices": {
         "properties": {
@@ -81888,6 +83122,111 @@
         "title": "LookThroughSettings",
         "description": "ETF look-through: holdings of the funds the portfolio holds, from the issuers'\n(undocumented) data endpoints, stored weekly as dated snapshots."
       },
+      "LorenzCurve": {
+        "properties": {
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/LorenzPoint"
+            },
+            "type": "array",
+            "title": "Points",
+            "description": "Starts at (0, 0), ends at (1, 1)."
+          },
+          "holdings": {
+            "type": "integer",
+            "title": "Holdings"
+          },
+          "hhi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hhi",
+            "description": "Sum of squared shares of the equity, 0 to 1."
+          },
+          "effective_n": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective N",
+            "description": "1 / HHI: equally sized holdings that match it."
+          },
+          "gini": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gini",
+            "description": "0 equal weights, towards 1 one holding dominates."
+          },
+          "top_weight_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Weight Share",
+            "description": "Share of equity in the largest holding."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "points",
+          "holdings",
+          "hhi",
+          "effective_n",
+          "gini",
+          "top_weight_share"
+        ],
+        "title": "LorenzCurve"
+      },
+      "LorenzPoint": {
+        "properties": {
+          "holdings_share": {
+            "type": "number",
+            "title": "Holdings Share",
+            "description": "Cumulative share of holdings, smallest first."
+          },
+          "weight_share": {
+            "type": "number",
+            "title": "Weight Share",
+            "description": "Cumulative share of equity value they make up."
+          }
+        },
+        "type": "object",
+        "required": [
+          "holdings_share",
+          "weight_share"
+        ],
+        "title": "LorenzPoint"
+      },
       "LotOut": {
         "properties": {
           "lot_id": {
@@ -82866,6 +84205,14 @@
             "type": "array",
             "title": "Positions Detail"
           },
+          "sold_out": {
+            "items": {
+              "$ref": "#/components/schemas/ManagerPosition"
+            },
+            "type": "array",
+            "title": "Sold Out",
+            "description": "Largest positions held at the earlier quarter end and gone at the latest."
+          },
           "performance_available": {
             "type": "boolean",
             "title": "Performance Available",
@@ -82932,6 +84279,62 @@
           "shares_type": {
             "type": "string",
             "title": "Shares Type"
+          },
+          "previous_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Shares",
+            "description": "Shares at the earlier quarter end; null when not held then."
+          },
+          "previous_value_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Value Usd"
+          },
+          "change": {
+            "type": "string",
+            "enum": [
+              "new",
+              "added",
+              "trimmed",
+              "unchanged",
+              "sold",
+              "unknown"
+            ],
+            "title": "Change",
+            "default": "unknown"
+          },
+          "share_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Change Pct",
+            "description": "Shares now / shares then - 1; null for new or sold positions."
           }
         },
         "type": "object",
@@ -100359,6 +101762,117 @@
         "type": "object",
         "title": "QuietHours"
       },
+      "Quote": {
+        "properties": {
+          "last": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "Major unit, e.g. GBP for a pence-quoted listing."
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous"
+          },
+          "day_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Change",
+            "description": "Last minus previous close."
+          },
+          "day_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Change Pct",
+            "description": "Last / previous close - 1, a fraction."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "last",
+          "currency",
+          "as_of",
+          "previous",
+          "day_change",
+          "day_change_pct"
+        ],
+        "title": "Quote"
+      },
       "RankingResponse": {
         "properties": {
           "method_version": {
@@ -105918,6 +107432,81 @@
           "meets_asymmetry"
         ],
         "title": "ReturnFigures"
+      },
+      "ReturnRow": {
+        "properties": {
+          "window": {
+            "type": "string",
+            "title": "Window",
+            "description": "7d or 1y."
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "vs_market": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vs Market",
+            "description": "Company minus market, as a fraction."
+          },
+          "vs_industry": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vs Industry"
+          }
+        },
+        "type": "object",
+        "required": [
+          "window",
+          "company",
+          "industry",
+          "market",
+          "vs_market",
+          "vs_industry"
+        ],
+        "title": "ReturnRow"
       },
       "ReverseSolve": {
         "properties": {
@@ -116224,6 +117813,34 @@
         ],
         "title": "StartSize"
       },
+      "StateTally": {
+        "properties": {
+          "passes": {
+            "type": "integer",
+            "title": "Passes"
+          },
+          "fails": {
+            "type": "integer",
+            "title": "Fails"
+          },
+          "unknown": {
+            "type": "integer",
+            "title": "Unknown"
+          },
+          "risk_flags": {
+            "type": "integer",
+            "title": "Risk Flags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "passes",
+          "fails",
+          "unknown",
+          "risk_flags"
+        ],
+        "title": "StateTally"
+      },
       "StatedAction": {
         "properties": {
           "kind": {
@@ -118683,6 +120300,183 @@
           "waiting"
         ],
         "title": "Summary"
+      },
+      "SummaryAxis": {
+        "properties": {
+          "axis": {
+            "type": "string",
+            "title": "Axis"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "max": {
+            "type": "integer",
+            "title": "Max"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "'4 of 5 applicable', or why there is no score."
+          }
+        },
+        "type": "object",
+        "required": [
+          "axis",
+          "label",
+          "score",
+          "max",
+          "text"
+        ],
+        "title": "SummaryAxis"
+      },
+      "SummaryFairValue": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Value"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "basis_label": {
+            "type": "string",
+            "title": "Basis Label"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "upside": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upside"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "currency",
+          "source",
+          "basis_label",
+          "as_of",
+          "upside"
+        ],
+        "title": "SummaryFairValue"
+      },
+      "SummaryPosition": {
+        "properties": {
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "value_account": {
+            "type": "number",
+            "title": "Value Account"
+          },
+          "account_currency": {
+            "type": "string",
+            "title": "Account Currency"
+          },
+          "value_base": {
+            "type": "number",
+            "title": "Value Base"
+          },
+          "ppl": {
+            "type": "number",
+            "title": "Ppl",
+            "description": "Unrealised P/L in the account currency."
+          },
+          "ppl_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ppl Pct",
+            "description": "Unrealised P/L over cost, a fraction."
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight",
+            "description": "Share of the portfolio, a fraction."
+          }
+        },
+        "type": "object",
+        "required": [
+          "quantity",
+          "value_account",
+          "account_currency",
+          "value_base",
+          "ppl",
+          "ppl_pct",
+          "weight"
+        ],
+        "title": "SummaryPosition"
       },
       "SupplyChain": {
         "properties": {
@@ -125893,6 +127687,100 @@
         ],
         "title": "Via"
       },
+      "Volatility": {
+        "properties": {
+          "company": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company",
+            "description": "Sample std of weekly returns, over 52 weeks."
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "company_annualised": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Annualised",
+            "description": "Weekly std x sqrt(52)."
+          },
+          "industry_annualised": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry Annualised"
+          },
+          "market_annualised": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Annualised"
+          },
+          "sentence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "company",
+          "industry",
+          "market",
+          "company_annualised",
+          "industry_annualised",
+          "market_annualised",
+          "sentence"
+        ],
+        "title": "Volatility"
+      },
       "WatchFairValue": {
         "properties": {
           "ticker": {
@@ -126272,6 +128160,144 @@
         "additionalProperties": false,
         "type": "object",
         "title": "WatchlistUpdate"
+      },
+      "WaterfallResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "partial",
+              "unavailable"
+            ],
+            "title": "Status"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/WaterfallStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "start",
+          "end",
+          "days",
+          "base_currency",
+          "steps"
+        ],
+        "title": "WaterfallResponse"
+      },
+      "WaterfallStep": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "start",
+              "net_deposits",
+              "price",
+              "fx",
+              "income",
+              "costs",
+              "unattributed",
+              "end"
+            ],
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value",
+            "description": "Signed amount in the base currency; null if unknown."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "total",
+              "delta"
+            ],
+            "title": "Kind"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the value is null."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "value",
+          "kind"
+        ],
+        "title": "WaterfallStep"
       },
       "WebFactDecision": {
         "properties": {

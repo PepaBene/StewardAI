@@ -23,7 +23,7 @@ function CriterionRow({ c }: { c: Criterion }) {
       <div className="min-w-0 text-sm">
         <p className="font-medium">
           {c.label}
-          {c.critical ? <span className="ml-2 text-[11px] font-normal text-text-muted">needed for a summary</span> : null}
+          {c.critical ? <span className="ml-2 text-xs font-normal text-text-muted">needed for a summary</span> : null}
         </p>
         <p className={cn(c.status === "unknown" && "text-text-muted")}>{c.observed}</p>
         <p className="text-xs text-text-muted">

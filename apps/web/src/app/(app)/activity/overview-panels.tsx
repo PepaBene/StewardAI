@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { ChartEmpty, Gauge, GridStatus, HBar, Ring } from "@/components/charts";
-import { Blueprint, BlueprintCorners, PanelHeading } from "@/components/ui/blueprint";
+import { ChartEmpty, Gauge, GridStatus, HBar } from "@/components/charts";
+import { KpiStrip, type KpiTileProps } from "@/components/insight/kpi-tile";
+import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient, type JobList, type JobListItem } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
 import {
@@ -16,7 +17,9 @@ import {
   identityCoverage,
   jobGrid,
   lastRunNote,
+  matrixRows,
   priceCoverage,
+  costByJob,
   sourceCoverage,
   spend,
   type CoverageRatio,
@@ -49,8 +52,8 @@ export function SpendPanel() {
   return (
     <Blueprint aria-labelledby="spend-heading" className="flex flex-col gap-4 px-5 py-5">
       <PanelHeading
-        kicker={data ? `AI spend · ${monthName(data)}` : "AI spend"}
-        title={<span id="spend-heading">{data ? (data.cap_usd !== null ? `Budget ${formatCost(data.cap_usd)}` : "No monthly cap set") : "This month"}</span>}
+        kicker={null}
+        title={<span id="spend-heading">{data ? `AI spend in ${monthName(data)}${data.cap_usd !== null ? `, budget ${formatCost(data.cap_usd)}` : ", no cap set"}` : "AI spend this month"}</span>}
         action={
           <Link href="/config/budget" className="text-xs text-accent-ink hover:underline">
             Budget
@@ -84,7 +87,7 @@ function SpendBody({ data, now }: { data: CostSummary; now: Date }) {
         ) : (
           <p className="num font-heading text-[34px] leading-none font-semibold">{formatCost(data.total_usd)}</p>
         )}
-        <p className="mt-1 text-center text-[11px] text-text-muted">
+        <p className="mt-1 text-center text-xs text-text-muted">
           {s.projected !== null ? (
             <>
               Projection, linear: <span className="num font-medium text-text">{formatCost(s.projected)}</span> by{" "}
@@ -100,14 +103,14 @@ function SpendBody({ data, now }: { data: CostSummary; now: Date }) {
         </p>
       </div>
       <div className="flex min-w-0 flex-col gap-4 text-xs">
-        <SpendList title="By model" rows={top(data.by_model).map((m) => ({ key: m.model, label: m.model, sub: `${m.steps} steps`, cost: m.cost_usd }))} max={max} mono />
+        <SpendList title="By model" rows={top(data.by_model).map((m) => ({ key: m.model, label: m.model, sub: `${m.steps} steps`, cost: m.cost_usd }))} max={max} />
         <SpendList
-          title="By purpose"
-          rows={top(data.by_job_type).map((j) => ({
-            key: j.job_type,
-            label: jobTypeLabel(j.job_type),
-            sub: `${j.runs} runs${j.critical ? " · critical" : ""}`,
-            cost: j.cost_usd,
+          title="Cost by job"
+          rows={costByJob(data.by_job_type, jobTypeLabel, 8).map((j) => ({
+            key: j.jobType,
+            label: j.label,
+            sub: `${j.runs} runs`,
+            cost: j.cost,
           }))}
           max={max}
         />
@@ -120,23 +123,21 @@ function SpendList({
   title,
   rows,
   max,
-  mono = false,
 }: {
   title: string;
   rows: { key: string; label: string; sub: string; cost: number }[];
   max: number;
-  mono?: boolean;
 }) {
   return (
     <div>
-      <p className="kicker mb-1.5">{title}</p>
+      <p className="mb-1.5 text-xs font-semibold">{title}</p>
       {rows.length === 0 ? <p className="text-text-muted">Nothing spent yet.</p> : null}
-      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+      <ul aria-label={`${title}, largest first`} className="m-0 flex list-none flex-col gap-2 p-0">
         {rows.map((r) => (
           <li key={r.key} className="space-y-1">
             <span className="flex items-baseline justify-between gap-2">
               <span className="min-w-0 truncate">
-                <span className={mono ? "font-mono text-[11px]" : undefined}>{r.label}</span>{" "}
+                <span>{r.label}</span>{" "}
                 <span className="text-text-muted">· {r.sub}</span>
               </span>
               <span className="num font-semibold">{formatCost(r.cost)}</span>
@@ -198,10 +199,10 @@ export function JobGridPanel() {
   return (
     <Blueprint aria-labelledby="job-grid-heading" className="flex flex-col gap-3 px-5 py-5">
       <PanelHeading
-        kicker="Job runs"
+        kicker={null}
         title={
           <span id="job-grid-heading" className="num">
-            Last {GRID_DAYS} days{rate ? ` · ${formatPct(rate.rate, 1)} ran first time` : ""}
+            Job runs, last {GRID_DAYS} days{rate ? ` · ${formatPct(rate.rate, 1)} ran first time` : ""}
           </span>
         }
         action={
@@ -218,11 +219,7 @@ export function JobGridPanel() {
             className="min-w-[44rem]"
             caption={`Job runs by type and day, last ${GRID_DAYS} days`}
             columns={days.map((d) => shortDay(new Date(`${d}T12:00:00Z`)))}
-            rows={rows.map((r) => ({
-              label: jobTypeLabel(r.jobType),
-              cells: r.cells,
-              note: r.last ? lastRunNote(r.last, now) : undefined,
-            }))}
+            rows={matrixRows(rows, jobTypeLabel, (last) => lastRunNote(last, now))}
           />
         </div>
       ) : null}
@@ -260,44 +257,32 @@ export function CoverageRings() {
       href: "/status",
     },
   ];
-  return (
-    <section aria-label="Coverage" className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-      {rings.map((r) => {
-        const pct = r.ratio && r.ratio.total > 0 ? r.ratio.value / r.ratio.total : null;
-        return (
-          <div key={r.title} className="blueprint flex items-center gap-4 px-5 py-4">
-            <BlueprintCorners />
-            <Ring
-              value={pct === null ? null : pct * 100}
-              label={pct === null ? "—" : `${Math.round(pct * 100)}%`}
-              size={58}
-              thickness={4.5}
-              ariaLabel={`${r.title} coverage`}
-            />
-            <div className="min-w-0">
-              <h3 className="text-lg leading-tight font-semibold">
-                <Link href={r.href} className="hover:underline">
-                  {r.title}
-                </Link>
-              </h3>
-              <p className="text-xs text-text-muted">
-                {r.ratio ? (
-                  <>
-                    <span className="num">
-                      {r.ratio.value} of {r.ratio.total}
-                    </span>{" "}
-                    · {r.ratio.note}
-                  </>
-                ) : r.loading ? (
-                  "Loading…"
-                ) : (
-                  "Unavailable"
-                )}
-              </p>
-            </div>
-          </div>
-        );
-      })}
-    </section>
-  );
+  const tiles: KpiTileProps[] = rings.map((r): KpiTileProps => {
+    const pct = r.ratio && r.ratio.total > 0 ? r.ratio.value / r.ratio.total : null;
+    return {
+      label: r.title,
+      value: pct === null ? "—" : `${Math.round(pct * 100)}%`,
+      note: r.ratio ? (
+        <>
+          {r.ratio.value} of {r.ratio.total}
+        </>
+      ) : undefined,
+      verdict: {
+        tone: pct === null ? "unknown" : pct >= 0.95 ? "good" : pct >= 0.8 ? "caution" : "bad",
+        text: r.ratio ? (
+          <>
+            {r.ratio.note}{" "}
+            <Link href={r.href} className="text-accent-ink underline underline-offset-2">
+              See which
+            </Link>
+          </>
+        ) : r.loading ? (
+          "Loading…"
+        ) : (
+          "Not available right now. Reload to try again."
+        ),
+      },
+    };
+  });
+  return <KpiStrip tiles={tiles} label="Coverage at a glance" />;
 }

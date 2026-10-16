@@ -56,7 +56,7 @@ export function treemapItems(
       label: displayTicker(h.ticker),
       weight: h.weight ?? h.value_base / total,
       change: typeof change === "number" && Number.isFinite(change) ? change : null,
-      href: `/holdings/${encodeURIComponent(h.ticker)}`,
+      href: `/companies/${encodeURIComponent(h.ticker)}`,
     };
   });
 }

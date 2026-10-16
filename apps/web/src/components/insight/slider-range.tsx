@@ -72,7 +72,7 @@ export function SliderRange({
           className="range-thumb pointer-events-none absolute inset-0 w-full appearance-none bg-transparent"
         />
       </div>
-      <div className="relative h-4 text-[10px] text-text-faint">
+      <div className="relative h-4 text-xs text-text-faint">
         {ticks.map((t, i) => (
           <span key={t} className="num absolute -translate-x-1/2" style={{ left: `${(i / Math.max(1, ticks.length - 1)) * 100}%` }}>
             {format(t)}

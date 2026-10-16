@@ -9,3 +9,5 @@ export default function LotsPage() {
     </Suspense>
   );
 }
+
+export const metadata = { title: "Lots and holding periods · Performance" };

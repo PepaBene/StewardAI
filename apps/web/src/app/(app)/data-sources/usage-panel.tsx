@@ -10,6 +10,7 @@ import { getBrowserApiClient } from "@/lib/api/client";
 import { formatNumber } from "@/lib/charts/format";
 import { dailySeries, endpointTotals, parseUsage, providersOf } from "@/lib/data-sources/usage";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { label } from "@/lib/labels";
 
 const fetchUsage = () => getBrowserApiClient().GET("/sources/usage", { params: { query: {} } });
 
@@ -64,10 +65,10 @@ export function UsagePanel() {
           ) : (
             <p className="text-sm text-text-muted">Fewer than two days with a figure for this selection, so there is no line to draw.</p>
           )}
-          <ul className="divide-y divide-border-soft border border-border">
+          <ul className="divide-y divide-border-soft rounded-card bg-surface-muted px-3">
             {totals.map((t) => (
               <li key={t.key} className="grid grid-cols-1 items-center gap-x-4 gap-y-1 px-3 py-1.5 sm:grid-cols-[minmax(10rem,16rem)_1fr_6rem]">
-                <span className="font-mono text-xs">{t.key}</span>
+                <span className="text-sm font-medium">{label("provider", t.key)}</span>
                 <HBar value={t.total} max={top} label={`${t.key} ${metric}`} formatValue={(v) => formatNumber(v, v % 1 === 0 ? 0 : 1)} />
                 <span className="num text-right text-xs text-text-muted">
                   {formatNumber(t.total, t.total % 1 === 0 ? 0 : 1)} {metric}

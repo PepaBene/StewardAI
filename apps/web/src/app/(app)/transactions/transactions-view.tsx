@@ -6,7 +6,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
+import { ActivityCalendar } from "@/components/charts";
 import { EmptyState } from "@/components/empty-state";
+import { ChartFrame } from "@/components/portfolio/chart-frame";
 import { PageHeader } from "@/components/page-header";
 import { HoldingsTabs } from "@/components/portfolio/holdings-tabs";
 import { FeeCell, FeeTotalsPanel } from "@/components/portfolio/transaction-fees";
@@ -21,6 +23,7 @@ import {
   type TransactionOut,
   type TransactionsPage,
 } from "@/lib/api/client";
+import { countByDay } from "@/lib/charts/calendar";
 import { formatDate, formatMoney, formatQuantity, formatTime } from "@/lib/format";
 import {
   activeTab,
@@ -93,6 +96,31 @@ function humanize(value: string | null): string {
   if (!value) return "—";
   const words = value.replaceAll("_", " ").toLowerCase();
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+const CALENDAR_WEEKS = 26;
+
+/** When you traded over the last half-year: every row type, one square per day. */
+function ActivityPanel({ reloadKey }: { reloadKey: number }) {
+  // Fixed at mount: the window must not move between renders.
+  const [today] = useState(() => new Date().toISOString().slice(0, 10));
+  const [counts, setCounts] = useState<{ key: number; map: Map<string, number>; capped: boolean } | null>(null);
+  useEffect(() => {
+    let live = true;
+    const from = new Date(Date.parse(`${today}T00:00:00Z`) - CALENDAR_WEEKS * 7 * 86_400_000).toISOString().slice(0, 10);
+    fetchPage({ ...EMPTY_TRANSACTION_FILTERS, from }, null, EXPORT_PAGE)
+      .then((page) => live && setCounts({ key: reloadKey, map: countByDay(page.items.map((r) => r.occurred_at)), capped: page.next_cursor !== null }))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [today, reloadKey]);
+  if (!counts || counts.key !== reloadKey || counts.map.size === 0) return null;
+  return (
+    <ChartFrame title="When you were active" reading={counts.capped ? `Shows the latest ${EXPORT_PAGE} rows of the period.` : undefined}>
+      <ActivityCalendar counts={counts.map} end={today} weeks={CALENDAR_WEEKS} unit="transaction" label="Transactions per day" />
+    </ChartFrame>
+  );
 }
 
 function periodLabel(filters: TransactionFilters): string {
@@ -200,6 +228,7 @@ export function TransactionsView() {
       <HoldingsTabs />
 
       <FlowCharts key={reloadKey} />
+      <ActivityPanel reloadKey={reloadKey} />
 
       <section aria-labelledby="rows-heading" className="blueprint min-w-0">
         <BlueprintCorners />
@@ -376,7 +405,7 @@ function Toolbar({
                 className={cn(
                   "px-3 py-1.5 whitespace-nowrap outline-offset-2 focus-visible:outline-2 focus-visible:outline-focus",
                   i > 0 && "border-l border-border",
-                  on ? "bg-accent text-accent-foreground" : "text-text hover:bg-border-soft",
+                  on ? "bg-accent text-accent-foreground" : "text-text hover:bg-surface-muted",
                 )}
               >
                 {t.label}
@@ -519,7 +548,7 @@ function TransactionTable({ rows, busy }: { rows: TransactionOut[]; busy: boolea
       <table className="w-full min-w-[62rem] text-sm">
         <caption className="sr-only">Transactions, newest first</caption>
         <thead className="bg-surface-muted">
-          <tr className="border-b border-border text-left text-[11px] tracking-[0.08em] text-text-muted uppercase">
+          <tr className="border-b border-border text-left text-xs text-text-muted">
             <th scope="col" className="px-5 py-2.5 font-medium">Date</th>
             <th scope="col" className="px-3 py-2.5 font-medium">Type</th>
             <th scope="col" className="px-3 py-2.5 font-medium">Instrument</th>
@@ -542,23 +571,23 @@ function TransactionTable({ rows, busy }: { rows: TransactionOut[]; busy: boolea
             const max = largest.get(r.currency ?? "") ?? 0;
             const at = new Date(r.occurred_at);
             return (
-              <tr key={r.id} className="border-b border-border-soft last:border-0 hover:bg-border-soft">
+              <tr key={r.id} className="border-b border-border-soft last:border-0 hover:bg-surface-muted">
                 <td className="num px-5 py-2.5 whitespace-nowrap">
                   <time dateTime={r.occurred_at} className="block font-mono text-xs text-text-muted">
                     {formatDate(at)}
                   </time>
-                  <span className="block font-mono text-[11px] text-text-faint">{formatTime(at)}</span>
+                  <span className="block font-mono text-xs text-text-faint">{formatTime(at)}</span>
                 </td>
                 <th scope="row" className="px-3 py-2.5 text-left font-normal">
-                  <span className={cn("inline-block px-2 py-0.5 text-[11px] font-semibold", b.cls)}>{b.text}</span>
-                  <span className="mt-0.5 block text-[11px] text-text-muted">
+                  <span className={cn("inline-block px-2 py-0.5 text-xs font-semibold", b.cls)}>{b.text}</span>
+                  <span className="mt-0.5 block text-xs text-text-muted">
                     {TYPE_SINGULAR[r.type]}
                     {r.subtype ? ` · ${humanize(r.subtype)}` : null}
                   </span>
                 </th>
                 <td className="px-3 py-2.5">
                   {r.ticker ? (
-                    <Link href={`/holdings/${encodeURIComponent(r.ticker)}`} className="group inline-flex flex-wrap items-baseline gap-x-1.5">
+                    <Link href={`/companies/${encodeURIComponent(r.ticker)}`} className="group inline-flex flex-wrap items-baseline gap-x-1.5">
                       <span className="font-mono text-xs font-medium text-text" title={r.ticker}>
                         {shortTicker(r.ticker)}
                       </span>
@@ -645,7 +674,7 @@ function Totals({ totals, count }: { totals: TotalByCurrency[]; count: number })
           <table className="w-full min-w-[32rem] text-sm">
             <caption className="sr-only">Count and sum of amounts per type, subtype and currency over every matching transaction</caption>
             <thead className="bg-surface-muted">
-              <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
+              <tr className="border-b border-border text-xs text-text-muted">
                 <th scope="col" className="px-5.5 py-2 text-left font-medium">Type</th>
                 <th scope="col" className="px-3 py-2 text-left font-medium">Subtype</th>
                 <th scope="col" className="px-3 py-2 text-left font-medium">Currency</th>

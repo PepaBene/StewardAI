@@ -28,7 +28,7 @@ export function FundExpandButton({
       aria-controls={controls}
       onClick={onToggle}
       title={open ? "Hide underlying holdings" : "Show underlying holdings"}
-      className="inline-flex shrink-0 items-center gap-1 border border-border px-1.5 py-0.5 text-[10px] font-medium tracking-[0.06em] text-text-muted uppercase hover:text-text focus-visible:outline-2 focus-visible:outline-focus"
+      className="inline-flex shrink-0 items-center gap-1 border border-border px-1.5 py-0.5 text-xs font-medium text-text-muted hover:text-text focus-visible:outline-2 focus-visible:outline-focus"
     >
       <span className="sr-only">{name}: </span>
       Holdings
@@ -87,14 +87,14 @@ export function FundLookThroughRow({
   } else {
     body = (
       <div className="flex flex-col gap-2">
-        <p className="text-[11px] text-text-muted">
+        <p className="text-xs text-text-muted">
           Top {fund.top_holdings.length} of {fund.holdings_count ?? "?"} equity holdings · {fundProvenance(fund)} · {fund.source_label}
           {fund.equity_share != null ? ` · ${formatPct(fund.equity_share, 1)} in equities, the rest cash & derivatives` : null}
         </p>
         <table className="w-full min-w-[40rem] text-xs">
           <caption className="sr-only">Top holdings of {fund.name ?? fund.label}</caption>
           <thead>
-            <tr className="border-b border-border text-[10px] tracking-[0.08em] text-text-muted uppercase">
+            <tr className="border-b border-border text-xs text-text-muted">
               <th scope="col" className="py-1.5 pr-3 text-left font-medium">Holding</th>
               <th scope="col" className="px-3 py-1.5 text-left font-medium">Sector</th>
               <th scope="col" className="px-3 py-1.5 text-left font-medium">Country</th>
@@ -108,7 +108,7 @@ export function FundLookThroughRow({
               <tr key={`${h.isin ?? h.name}-${i}`} className="border-b border-border-soft last:border-b-0">
                 <th scope="row" className="py-1 pr-3 text-left font-normal">
                   <span className="font-medium text-text">{h.name}</span>
-                  {h.ticker ? <span className="ml-1.5 font-mono text-[10px] text-text-muted">{h.ticker}</span> : null}
+                  {h.ticker ? <span className="ml-1.5 font-mono text-xs text-text-muted">{h.ticker}</span> : null}
                 </th>
                 <td className="px-3 py-1 text-text-muted">{h.sector ?? "—"}</td>
                 <td className="px-3 py-1 text-text-muted">{countryLabel(h.country)}</td>
@@ -119,7 +119,7 @@ export function FundLookThroughRow({
             ))}
           </tbody>
         </table>
-        {fund.warnings.length ? <p className="text-[11px] text-text-faint">Source notes: {fund.warnings.join("; ")}</p> : null}
+        {fund.warnings.length ? <p className="text-xs text-text-faint">Source notes: {fund.warnings.join("; ")}</p> : null}
       </div>
     );
   }

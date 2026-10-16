@@ -9,3 +9,5 @@ export default function XrayPage() {
     </Suspense>
   );
 }
+
+export const metadata = { title: "Exposure · X-Ray" };

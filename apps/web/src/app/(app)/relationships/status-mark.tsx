@@ -19,7 +19,7 @@ export function StatusMark({ status, className }: { status: GraphStatus | null; 
   const m = MARK[status ?? "suggested"];
   const word = status ? statusWord(status) : "Awaiting decision";
   return (
-    <span className={cn("inline-flex items-center gap-1 border bg-surface-raised px-1.5 py-0.5 text-[11px] leading-none", m.border, m.text, className)}>
+    <span className={cn("inline-flex items-center gap-1 border bg-surface-raised px-1.5 py-0.5 text-xs leading-none", m.border, m.text, className)}>
       <m.Icon aria-hidden="true" className="size-3" />
       {word}
     </span>

@@ -118,7 +118,7 @@ export function StepLineChart({
             { label: fairLabel, swatch: "line", className: "bg-chart-fair-value" },
           ]}
         />
-        <p className="num text-[11px] text-text-muted" aria-live="polite">
+        <p className="num text-xs text-text-muted" aria-live="polite">
           {h ? `${formatDay(h.date)}: ${valueLabel} ${isFiniteNumber(h.value) ? format(h.value) : "—"}, ${fairLabel} ${isFiniteNumber(h.fair) ? format(h.fair) : "not yet recorded"}` : " "}
         </p>
       </div>
@@ -130,7 +130,7 @@ export function StepLineChart({
 /** Row-sized price line with the fair-value steps, for Check-In and the watchlist. */
 export function StepSparkline({ rows, label, className }: { rows: readonly StepRow[]; label?: string; className?: string }) {
   const ext = extent(rows.flatMap((r) => [r.value, r.fair]));
-  if (rows.length < 2 || !ext) return <span className={cn("text-[11px] text-text-faint", className)}>—</span>;
+  if (rows.length < 2 || !ext) return <span className={cn("text-xs text-text-faint", className)}>—</span>;
   const W = 96;
   const H = 28;
   const x = linearScale([0, rows.length - 1], [2, W - 2]);

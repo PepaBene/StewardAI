@@ -89,13 +89,13 @@ export function RiskPanel({
       <dl className="grid grid-cols-2 gap-y-3 border-t border-border pt-3 sm:grid-cols-3">
         {stats.map((s) => (
           <div key={s.k} className="min-w-0">
-            <dt className="truncate text-[11px] text-text-muted">{s.k}</dt>
+            <dt className="truncate text-xs text-text-muted">{s.k}</dt>
             <dd className="num font-heading text-xl font-semibold">{s.v}</dd>
-            {s.note ? <dd className="truncate text-[11px] text-text-faint" title={s.note}>{s.note}</dd> : null}
+            {s.note ? <dd className="truncate text-xs text-text-faint" title={s.note}>{s.note}</dd> : null}
           </div>
         ))}
       </dl>
-      <p className="text-[11px] leading-snug text-text-faint">
+      <p className="text-xs leading-snug text-text-faint">
         {window ? `Volatility, drawdown and beta over the ${window} of the flow-adjusted index; beta in local currencies. ` : null}
         {lt
           ? `Concentration and FX with the ETFs looked through (${formatPct(lt.coverage?.portfolio_share_looked_through ?? 0, 0)} of value covered). `

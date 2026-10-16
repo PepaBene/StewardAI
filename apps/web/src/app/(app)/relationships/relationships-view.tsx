@@ -88,7 +88,6 @@ export function RelationshipsView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research & Verification"
         title="Relationship review"
         description="Customer and supplier links, source conflicts, graph edges and corporate actions that wait for your decision. Nothing is confirmed or merged until you decide, and every decision keeps your reason."
       />

@@ -6,6 +6,8 @@ import { AlertMessage } from "@/components/alert-message";
 import { Blueprint } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
+import { label } from "@/lib/labels";
+import { kindName } from "@/lib/oversight/gates";
 
 type Summary = components["schemas"]["TrainingSummary"];
 
@@ -26,7 +28,7 @@ export function TrainingPanel() {
   return (
     <Blueprint>
       <div className="space-y-3 p-5">
-        <h2 className="text-[15px] font-medium">What is kept for fine-tuning</h2>
+        <h2 className="panel-title">What is kept for fine-tuning</h2>
         <p className="max-w-prose text-sm text-text-muted">
           Every AI call (chat included) is stored with secrets and account numbers removed, and your
           decisions on the engine&apos;s work are kept as labels. Nothing is trained or sent anywhere.
@@ -44,7 +46,7 @@ export function TrainingPanel() {
               <ul className="space-y-1 text-sm text-text-muted">
                 {s.by_job_type.map((c) => (
                   <li key={c.job_type} className="flex justify-between border-b border-border-soft py-1">
-                    <span>{c.job_type}</span>
+                    <span>{label("job", c.job_type)}</span>
                     <span>
                       {c.calls.toLocaleString()} ({c.last_30_days.toLocaleString()} recent)
                     </span>
@@ -60,7 +62,7 @@ export function TrainingPanel() {
               <ul className="space-y-1 text-sm text-text-muted">
                 {s.by_subject.map((l) => (
                   <li key={l.subject_kind} className="flex justify-between border-b border-border-soft py-1">
-                    <span>{l.subject_kind}</span>
+                    <span>{kindName(l.subject_kind)}</span>
                     <span>
                       {l.right} right, {l.wrong} wrong, {l.corrected} corrected
                     </span>

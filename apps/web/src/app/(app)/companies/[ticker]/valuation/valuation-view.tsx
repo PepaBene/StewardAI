@@ -105,7 +105,7 @@ function ScenarioEditor({ draft, selected, onChange, onSelect }: { draft: Draft;
           <Field key={i} label={`Year ${i + 1}`} suffix="%" value={g} onChange={(v) => set("growth", draft.growth.map((x, j) => (j === i ? v : x)))} />
         ))}
       </div>
-      <p className="-mt-1 text-[11px] text-text-muted">Free-cash-flow growth in each year.</p>
+      <p className="-mt-1 text-xs text-text-muted">Free-cash-flow growth in each year.</p>
       <div className="grid grid-cols-2 gap-1.5">
         <Field label="Terminal growth" suffix="%" value={draft.terminal_growth} onChange={(v) => set("terminal_growth", v)} />
         <Field label="Risk-free rate" suffix="%" value={draft.risk_free} onChange={(v) => set("risk_free", v)} />
@@ -156,8 +156,8 @@ function Results({ v }: { v: Valuation }) {
                 <tr key={s.name} className="border-t border-border-soft align-top">
                   <th scope="row" className="px-3 py-1.5 text-left font-normal capitalize">
                     {s.name}
-                    {s.selected ? <span className="ml-2 border border-accent px-1 text-[11px] normal-case">selected</span> : null}
-                    <span className="block max-w-72 text-[11px] normal-case text-text-muted">{s.discount_rate_build}</span>
+                    {s.selected ? <span className="ml-2 border border-accent px-1 text-xs normal-case">selected</span> : null}
+                    <span className="block max-w-72 text-xs normal-case text-text-muted">{s.discount_rate_build}</span>
                   </th>
                   <td className="num px-2 py-1.5 text-right">{`${(Number(s.discount_rate) * 100).toFixed(2)}%`}</td>
                   <td className="num px-2 py-1.5 text-right">{money(s.enterprise_value, 0) ?? <Absent reason="missing: no enterprise value" />}</td>
@@ -205,7 +205,7 @@ function Results({ v }: { v: Valuation }) {
                         return (
                           <td key={c} className={cn("num border border-border-soft px-2 py-1 text-right", i === mid && j === midC && "border-accent font-semibold")}>
                             {val !== null ? money(val) : <Absent reason="missing: not computable" />}
-                            {val !== null && price !== null ? <span aria-hidden="true" className={cn("ml-1 text-[10px]", aboveClose ? "text-gain" : "text-loss")}>{aboveClose ? "▲" : "▼"}</span> : null}
+                            {val !== null && price !== null ? <span aria-hidden="true" className={cn("ml-1 text-xs", aboveClose ? "text-gain" : "text-loss")}>{aboveClose ? "▲" : "▼"}</span> : null}
                             {val !== null && price !== null ? <span className="sr-only">{aboveClose ? " at or above the last close" : " below the last close"}</span> : null}
                           </td>
                         );

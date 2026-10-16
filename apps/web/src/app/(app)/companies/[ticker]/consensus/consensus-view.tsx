@@ -117,7 +117,7 @@ function TargetChart({ v }: { v: View }) {
             { label: "Cone to the 12-month target", swatch: "dashed", className: "border-chart-forecast" },
           ]}
         />
-        <div aria-live="polite" className="min-h-[3.5rem] min-w-56 border border-border-soft px-2 py-1 text-[11px]">
+        <div aria-live="polite" className="min-h-[3.5rem] min-w-56 border border-border-soft px-2 py-1 text-xs">
           {hp ? (
             <>
               <p className="font-semibold">{formatDate(new Date(hp.t).toISOString().slice(0, 10))}</p>

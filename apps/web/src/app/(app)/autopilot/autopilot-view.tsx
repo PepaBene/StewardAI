@@ -9,7 +9,9 @@ import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Blueprint } from "@/components/ui/blueprint";
+import { EntityName } from "@/components/entity-name";
 import { Button } from "@/components/ui/button";
+import { FilterChips } from "@/components/ui/filter-chips";
 
 import { type OverrideReason, ReasonChips } from "./reason-chips";
 import { getBrowserApiClient } from "@/lib/api/client";
@@ -32,6 +34,9 @@ import {
   type NeedsYouItem,
 } from "@/lib/autopilot";
 import { cn } from "@/lib/utils";
+
+/** Decisions shown at a time in the feed. */
+const PAGE = 25;
 
 type Load<T> =
   | { kind: "loading" }
@@ -93,7 +98,6 @@ export function AutopilotView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Oversight"
         title="Autopilot"
         description="The app settles its own review queues and logs every decision. Only what it could not settle with confidence waits here for you."
         aside={
@@ -131,7 +135,7 @@ export function AutopilotView() {
                   "border-l border-border px-3 py-1.5 text-xs first:border-l-0",
                   tab === t
                     ? "bg-accent text-accent-foreground"
-                    : "text-text hover:bg-border-soft",
+                    : "text-text hover:bg-surface-muted",
                 )}
               >
                 {TAB_LABELS[t]}
@@ -155,7 +159,7 @@ export function AutopilotView() {
         ) : null}
         {tab === "kinds" ? <KindsPanel load={summary} /> : null}
         {tab === "calibration" ? (
-          <CalibrationPanel load={calibration} />
+          <CalibrationPanel load={calibration} kinds={summary.kind === "ok" ? summary.data.kinds : []} />
         ) : null}
       </Blueprint>
     </div>
@@ -309,9 +313,12 @@ function NeedsYouRow({
     <li className="border-b border-border-soft px-5 py-4 last:border-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className="text-[15px] font-medium">
-          <span className="mr-2 font-mono text-xs font-semibold">
-            {item.ticker ?? "—"}
-          </span>
+          {item.ticker ? (
+            <>
+              <EntityName id={item.ticker} chip={false} className="font-semibold" />
+              <span className="text-text-muted"> · </span>
+            </>
+          ) : null}
           {item.label}
         </p>
         <span className="text-xs text-text-muted">
@@ -410,6 +417,7 @@ function DecisionsPanel({
 }) {
   const [kind, setKind] = useState("");
   const [status, setStatus] = useState("");
+  const [shown, setShown] = useState(PAGE);
   const api = getBrowserApiClient();
   const load = useLoad(
     () =>
@@ -426,39 +434,28 @@ function DecisionsPanel({
   );
   return (
     <div>
-      <div className="flex flex-wrap gap-3 border-b border-border-soft px-5 py-3 text-sm">
-        <label className="flex items-center gap-2">
-          Queue
-          <select
-            value={kind}
-            onChange={(e) => setKind(e.target.value)}
-            className="border border-border bg-surface px-2 py-1"
-          >
-            <option value="">All</option>
-            {kinds.map((k) => (
-              <option key={k.kind} value={k.kind}>
-                {k.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-2">
-          Outcome
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="border border-border bg-surface px-2 py-1"
-          >
-            <option value="">All</option>
-            {(
-              ["applied", "shadow", "escalated", "reverted", "closed"] as const
-            ).map((s) => (
-              <option key={s} value={s}>
-                {statusLabel(s)}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="flex flex-col gap-2 border-b border-border-soft px-5 py-3">
+        <FilterChips
+          label="Queue"
+          value={kind || "all"}
+          onChange={(key) => {
+            setKind(key === "all" ? "" : key);
+            setShown(PAGE);
+          }}
+          chips={[{ key: "all", label: "All queues" }, ...kinds.map((k) => ({ key: k.kind, label: k.label }))]}
+        />
+        <FilterChips
+          label="Outcome"
+          value={status || "all"}
+          onChange={(key) => {
+            setStatus(key === "all" ? "" : key);
+            setShown(PAGE);
+          }}
+          chips={[
+            { key: "all", label: "Any outcome" },
+            ...(["applied", "shadow", "escalated", "reverted", "closed"] as const).map((s) => ({ key: s, label: statusLabel(s) })),
+          ]}
+        />
       </div>
       {load.kind === "loading" ? <Loading what="decisions" /> : null}
       {load.kind === "error" ? (
@@ -477,16 +474,28 @@ function DecisionsPanel({
         </div>
       ) : null}
       {load.kind === "ok" && load.data.length > 0 ? (
-        <ul className="m-0 list-none p-0">
-          {load.data.map((d) => (
-            <DecisionRow
-              key={d.id}
-              decision={d}
-              label={kinds.find((k) => k.kind === d.kind)?.label ?? d.kind}
-              onChanged={onChanged}
-            />
-          ))}
-        </ul>
+        <>
+          <ul aria-label="Autopilot decisions, newest first" className="m-0 list-none p-0">
+            {load.data.slice(0, shown).map((d) => (
+              <DecisionRow
+                key={d.id}
+                decision={d}
+                label={kinds.find((k) => k.kind === d.kind)?.label ?? d.kind}
+                onChanged={onChanged}
+              />
+            ))}
+          </ul>
+          {load.data.length > shown ? (
+            <div className="flex items-center gap-3 px-5 py-3">
+              <Button variant="outline" size="sm" onClick={() => setShown((n) => n + PAGE)}>
+                Show {Math.min(PAGE, load.data.length - shown)} more
+              </Button>
+              <span className="text-xs text-text-muted">
+                {shown} of {load.data.length}
+              </span>
+            </div>
+          ) : null}
+        </>
       ) : null}
     </div>
   );
@@ -535,9 +544,12 @@ function DecisionRow({
     <li className="border-b border-border-soft px-5 py-3 last:border-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className="text-sm font-medium">
-          <span className="mr-2 font-mono text-xs font-semibold">
-            {d.ticker ?? "—"}
-          </span>
+          {d.ticker ? (
+            <>
+              <EntityName id={d.ticker} chip={false} className="font-semibold" />
+              <span className="text-text-muted"> · </span>
+            </>
+          ) : null}
           {label}: {d.decision}
           <span className="num ml-2 text-xs font-normal text-text-muted">
             {confidenceLabel(d.confidence)}
@@ -637,7 +649,8 @@ function ReliabilityChart({
 }
 
 /** When a queue says it is 90% sure, how often is it right? One small table per queue. */
-function CalibrationPanel({ load }: { load: Load<KindCalibration[]> }) {
+function CalibrationPanel({ load, kinds }: { load: Load<KindCalibration[]>; kinds: KindSummary[] }) {
+  const nameOf = (kind: string) => kinds.find((k) => k.kind === kind)?.label ?? kind.replaceAll("_", " ");
   if (load.kind === "loading") return <Loading what="the calibration" />;
   if (load.kind === "error")
     return (
@@ -662,11 +675,11 @@ function CalibrationPanel({ load }: { load: Load<KindCalibration[]> }) {
       {load.data.map((k) => (
         <section
           key={k.kind}
-          aria-label={k.kind}
+          aria-label={nameOf(k.kind)}
           className="border-b border-border-soft px-5 py-4 last:border-0"
         >
           <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-            <h3 className="text-[15px] font-medium">{k.kind}</h3>
+            <h3 className="text-[15px] font-medium">{nameOf(k.kind)}</h3>
             <span className="text-xs text-text-muted">
               {k.reviewed} checked
               {k.ece !== null
@@ -677,7 +690,7 @@ function CalibrationPanel({ load }: { load: Load<KindCalibration[]> }) {
           <p className="mt-1 max-w-prose text-sm text-text-muted">
             {k.verdict}
           </p>
-          <ReliabilityChart kind={k.kind} bins={k.bins} />
+          <ReliabilityChart kind={nameOf(k.kind)} bins={k.bins} />
           <table
             aria-label="How often it was right, by how sure it said it was"
             className="mt-2 w-full max-w-md text-left text-sm"

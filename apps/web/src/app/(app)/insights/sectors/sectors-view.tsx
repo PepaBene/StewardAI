@@ -1,6 +1,7 @@
 "use client";
 
 import { ResourceGate } from "@/components/company/primitives";
+import { EntityName } from "@/components/entity-name";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatPercent } from "@/lib/format";
@@ -40,7 +41,15 @@ function Body({ map }: { map: SectorMap }) {
       <Detail groups={map.sectors} />
       {map.unclassified.length > 0 ? (
         <p className="max-w-prose text-sm">
-          Held but not classified, so left out of every group: <span className="font-semibold">{map.unclassified.join(", ")}</span>.
+          Held but not classified, so left out of every group: <span className="font-semibold">
+            {map.unclassified.map((t, i) => (
+              <span key={t}>
+                {i > 0 ? ", " : ""}
+                <EntityName id={t} chip={false} />
+              </span>
+            ))}
+          </span>
+          .
         </p>
       ) : null}
       <Notes notes={[...map.not_covered, map.method]} title="Not covered, and how this works" />
@@ -62,7 +71,7 @@ function Detail({ groups }: { groups: GroupStats[] }) {
               <ul className="mt-1">
                 {(g.top_products ?? []).map((p) => (
                   <li key={`${p.ticker}-${p.label}`}>
-                    {p.ticker.split("_")[0]}, {p.label}: {pct(p.share)} of revenue
+                    <EntityName id={p.ticker} chip={false} />, {p.label}:{pct(p.share)} of revenue
                   </li>
                 ))}
               </ul>
@@ -133,7 +142,14 @@ function Table({ title, groups }: { title: string; groups: GroupStats[] }) {
                 <th scope="row" className="py-1.5 pr-3 text-left font-normal">
                   {g.name}
                   {g.parent ? <div className="text-xs text-text-muted">{g.parent}</div> : null}
-                  <div className="text-xs text-text-muted">{g.tickers.map((t) => t.split("_")[0]).join(", ")}</div>
+                  <div className="text-xs text-text-muted">
+                    {g.tickers.map((t, i) => (
+                      <span key={t}>
+                        {i > 0 ? ", " : ""}
+                        <EntityName id={t} chip={false} />
+                      </span>
+                    ))}
+                  </div>
                 </th>
                 <td className="num py-1.5 text-right">{g.companies}</td>
                 <td className="py-1.5 pr-3 text-xs">{g.markets.join(", ") || "Not stated"}</td>

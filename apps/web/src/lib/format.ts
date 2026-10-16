@@ -80,7 +80,9 @@ export function formatTime(date: Date, locale?: Locale) {
 
 /** "25 Sep 2026". */
 export function formatDate(date: Date | string, locale?: Locale) {
-  const d = typeof date === "string" ? new Date(`${date}T00:00:00`) : date;
+  // A bare date is read as local midnight; a full timestamp is parsed as given.
+  const d = typeof date === "string" ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T00:00:00` : date) : date;
+  if (Number.isNaN(d.getTime())) return EM_DASH;
   return d.toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
 }
 

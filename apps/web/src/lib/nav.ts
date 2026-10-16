@@ -1,123 +1,249 @@
 /**
- * The Ledger information architecture: pages grouped by job, not by feature (see
- * Ledger_Design_System_Redesign_Proposal.md section 3). Chat is deliberately not a cluster —
- * it stays a global Cmd/Ctrl+K + slide-over, reachable from anywhere, never a nav destination.
+ * The information architecture (docs/plans/ux_ui_final_redesign_plan.md §3): seven
+ * destinations plus Settings, each with its tabs. Every route in `app/(app)` has exactly one
+ * home: a tab here, a global route, or an entry in `REDIRECTS` (nav.test.ts checks this).
+ *
+ * Matching: a tab claims its own href and its sub-paths, plus any extra patterns in `match`.
+ * A pattern ending in "/*" claims only the sub-paths ("/funds/*" claims "/funds/IE00…" but
+ * not "/funds"). When several tabs claim a path, the longest pattern wins, so "/risk/whatif"
+ * belongs to Decide and "/risk/tail" to Risk.
+ *
+ * Chat is not a destination: it stays a global Cmd/Ctrl+K entry and slide-over.
  */
 
-export type ClusterPage = { readonly href: string; readonly label: string };
-
-export type Cluster = {
-  readonly id: "portfolio" | "research" | "oversight" | "config";
-  readonly label: string;
-  readonly description: string;
-  /** Primary landing page: what clicking the cluster's own label opens. */
+export type NavTab = {
   readonly href: string;
-  /** Pages shown in the cluster's menu. */
-  readonly pages: readonly ClusterPage[];
-  /** Detail-only routes that belong to this cluster but aren't a page of their own. */
-  readonly extra?: readonly string[];
+  readonly label: string;
+  /** Extra paths this tab owns (see the matching note above). */
+  readonly match?: readonly string[];
 };
 
-export const CLUSTERS: readonly Cluster[] = [
+export type NavGroup = { readonly label: string; readonly tabs: readonly NavTab[] };
+
+export type DestinationId =
+  | "portfolio"
+  | "companies"
+  | "research"
+  | "markets"
+  | "briefings"
+  | "inbox"
+  | "system"
+  | "settings";
+
+export type Destination = {
+  readonly id: DestinationId;
+  readonly label: string;
+  readonly description: string;
+  /** What clicking the destination opens. */
+  readonly href: string;
+  readonly tabs: readonly NavTab[];
+  /** Settings shows its tabs as a grouped side menu. */
+  readonly groups?: readonly NavGroup[];
+};
+
+const SETTINGS_GROUPS: readonly NavGroup[] = [
+  {
+    label: "Investment rules",
+    tabs: [
+      { href: "/config/strategy", label: "Strategy" },
+      { href: "/config/theses", label: "Theses" },
+      { href: "/config/holding-profiles", label: "Holding profiles" },
+      { href: "/config/event-rules", label: "Event rules" },
+      { href: "/config/checks", label: "Checks" },
+    ],
+  },
+  {
+    label: "Sources and data",
+    tabs: [
+      { href: "/config/news-sources", label: "News sources" },
+      { href: "/config/calendar", label: "Exchange calendar" },
+      { href: "/config/research-profiles", label: "Research profiles" },
+      { href: "/config/verification", label: "Verification" },
+    ],
+  },
+  {
+    label: "Automation",
+    tabs: [
+      { href: "/config/jobs", label: "Jobs" },
+      { href: "/config/budget", label: "Budget" },
+      { href: "/config/prompts", label: "Prompts" },
+      { href: "/config/notifications", label: "Notifications" },
+      { href: "/config/autonomy", label: "Autonomy" },
+    ],
+  },
+  {
+    label: "History and export",
+    tabs: [{ href: "/config/history", label: "History and export" }],
+  },
+];
+
+export const DESTINATIONS: readonly Destination[] = [
   {
     id: "portfolio",
     label: "Portfolio",
-    description: "What do I hold and how has it done.",
+    description: "What you own, how it has done and what it is worth.",
     href: "/",
-    pages: [
+    tabs: [
       { href: "/", label: "Overview" },
-      { href: "/holdings", label: "Holdings" },
+      { href: "/holdings", label: "Holdings", match: ["/transactions", "/watchlist", "/funds"] },
       { href: "/performance", label: "Performance" },
       { href: "/portfolio/income", label: "Income" },
       { href: "/portfolio/valuation", label: "Valuation" },
-      { href: "/xray", label: "X-Ray" },
+      { href: "/xray", label: "Allocation" },
       { href: "/risk", label: "Risk" },
-      { href: "/transactions", label: "Transactions" },
-      { href: "/watchlist", label: "Watchlist" },
-      { href: "/funds", label: "Funds" },
+      {
+        href: "/risk/whatif",
+        label: "Decide",
+        match: ["/risk/rebalance", "/risk/pretrade", "/risk/deposit", "/xray/proposed"],
+      },
+    ],
+  },
+  {
+    id: "companies",
+    label: "Companies",
+    description: "One company or fund at a time.",
+    href: "/companies",
+    tabs: [
+      { href: "/companies", label: "Companies", match: ["/holdings/*"] },
+      { href: "/funds/research", label: "Funds", match: ["/funds/*"] },
     ],
   },
   {
     id: "research",
-    label: "Research & Verification",
-    description: "Is my thesis still true.",
+    label: "Research",
+    description: "Your reasons, your research and new ideas.",
     href: "/theses",
-    pages: [
-      { href: "/theses", label: "Theses" },
-      { href: "/journal", label: "Decision journal" },
-      { href: "/review", label: "Review queue" },
-      { href: "/relationships", label: "Relationship review" },
-      { href: "/research", label: "Research" },
-      { href: "/thesis", label: "Thesis workup" },
-      { href: "/screens", label: "Screens" },
-      { href: "/discover", label: "Discover" },
-      { href: "/funds/research", label: "Fund research" },
+    tabs: [
+      { href: "/theses", label: "Theses", match: ["/thesis"] },
+      { href: "/research", label: "Reports" },
+      { href: "/discover", label: "Discover", match: ["/screens"] },
+      { href: "/journal", label: "Journal" },
       { href: "/insights", label: "What changed" },
-      { href: "/macro", label: "Macro series" },
+    ],
+  },
+  {
+    id: "markets",
+    label: "Markets",
+    description: "News, filings and the economy around your holdings.",
+    href: "/news",
+    tabs: [
       { href: "/news", label: "News" },
+      { href: "/macro", label: "Macro" },
+      { href: "/disclosures", label: "Filings" },
       { href: "/investors", label: "13F investors" },
-      { href: "/disclosures", label: "Public disclosures" },
-      { href: "/disclosures/ownership", label: "Ownership" },
-      { href: "/disclosures/insiders", label: "Insider activity" },
-      { href: "/disclosures/network", label: "Customers and suppliers" },
-      { href: "/disclosures/deals", label: "Deals and financing" },
-      { href: "/disclosures/estimates", label: "Published estimates" },
-      { href: "/disclosures/screen", label: "Evidence screen" },
-      { href: "/disclosures/look-through", label: "Portfolio look-through" },
-      { href: "/disclosures/coverage", label: "Data coverage" },
-      { href: "/disclosures/replay", label: "Decision replay" },
-      { href: "/disclosures/alerts", label: "Disclosure alerts" },
-      { href: "/disclosures/adjudication", label: "Accuracy checks" },
-      { href: "/glossary", label: "Glossary" },
     ],
-    extra: ["/evidence"],
   },
   {
-    id: "oversight",
-    label: "Oversight",
-    description: "What needs my attention and what happened.",
+    id: "briefings",
+    label: "Briefings",
+    description: "The digests and reviews written for you.",
     href: "/reports",
-    pages: [
-      { href: "/autopilot", label: "Autopilot" },
-      { href: "/engine-ledger", label: "What the engine did" },
-      { href: "/inbox", label: "Inbox" },
-      { href: "/escalations", label: "Escalations" },
-      { href: "/reports", label: "Reports" },
-      { href: "/reviews", label: "Reviews" },
-      { href: "/activity", label: "Activity" },
-      { href: "/data-sources", label: "Data sources" },
-      { href: "/quality", label: "Data quality" },
-      { href: "/release", label: "Release checks" },
-      { href: "/verification", label: "Verification" },
-      { href: "/ai-decisions", label: "AI decisions" },
+    tabs: [
+      { href: "/reports", label: "Daily and weekly" },
+      { href: "/reviews", label: "Monthly reviews" },
     ],
-    extra: ["/jobs", "/status"],
   },
   {
-    id: "config",
-    label: "Config",
-    description: "Strategy, theses, sources, notifications, research profiles, schedules and budget.",
-    href: "/config",
-    pages: [{ href: "/config", label: "Config" }],
+    id: "inbox",
+    label: "Inbox",
+    description: "Everything that waits for your decision.",
+    href: "/inbox",
+    tabs: [{ href: "/inbox", label: "Inbox", match: ["/news/ops"] }],
   },
-] as const;
+  {
+    id: "system",
+    label: "System",
+    description: "What the app did, what it cost and whether its data holds up.",
+    href: "/engine-ledger",
+    tabs: [
+      { href: "/engine-ledger", label: "Autonomy", match: ["/autopilot"] },
+      { href: "/activity", label: "Activity", match: ["/jobs"] },
+      { href: "/data-sources", label: "Data sources" },
+      { href: "/quality", label: "Data quality", match: ["/disclosures/coverage"] },
+      { href: "/verification", label: "Verification" },
+      { href: "/release", label: "Release" },
+      { href: "/ai-decisions", label: "AI decisions" },
+      { href: "/status", label: "API status" },
+    ],
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    description: "Your rules, sources, schedules and budget.",
+    href: "/config/strategy",
+    tabs: SETTINGS_GROUPS.flatMap((g) => g.tabs),
+    groups: SETTINGS_GROUPS,
+  },
+];
 
-/** Every page across every cluster, in cluster order — the flat list a "Go to" list needs. */
-export const CLUSTER_PAGES: readonly (ClusterPage & { cluster: Cluster["label"] })[] = CLUSTERS.flatMap((c) =>
-  c.pages.map((p) => ({ ...p, cluster: c.label })),
+/** Routes that belong to no destination: reachable from everywhere. */
+export const GLOBAL_ROUTES: readonly string[] = ["/chat", "/glossary", "/methods", "/evidence", "/dev"];
+
+/**
+ * Old URLs and their new home. Wired into next.config.ts (`redirects()`); query strings pass
+ * through, so `/review?ticker=X` lands on `/inbox?kind=figures&ticker=X`. Temporary (307)
+ * until the IA migration finishes (plan R7), so a wrong target is never cached for good.
+ */
+export const REDIRECTS: readonly { readonly source: string; readonly destination: string }[] = [
+  { source: "/config", destination: "/config/strategy" },
+  { source: "/holdings/:ticker", destination: "/companies/:ticker" },
+  { source: "/escalations", destination: "/inbox?kind=escalations" },
+  { source: "/escalations/:id", destination: "/inbox?kind=escalations&item=:id" },
+  { source: "/review", destination: "/inbox?kind=figures" },
+  { source: "/relationships", destination: "/inbox?kind=relationships" },
+  { source: "/news/disputed", destination: "/inbox?kind=disputed" },
+  { source: "/disclosures/alerts", destination: "/inbox?kind=disclosure-alerts" },
+  { source: "/disclosures/adjudication", destination: "/inbox?kind=accuracy" },
+  { source: "/disclosures/deals/parties", destination: "/inbox?kind=deal-parties" },
+];
+
+/** Where an old URL now lives (the `REDIRECTS` target), or null when it has not moved. */
+export function redirectTarget(pathname: string): string | null {
+  const path = pathname.split(/[?#]/)[0];
+  for (const r of REDIRECTS) {
+    const pattern = new RegExp(`^${r.source.replace(/:(\w+)/g, "(?<$1>[^/]+)")}$`);
+    const m = pattern.exec(path);
+    if (m) return r.destination.replace(/:(\w+)/g, (_, k: string) => m.groups?.[k] ?? "");
+  }
+  return null;
+}
+
+type Claim = { destination: Destination; tab: NavTab; score: number };
+
+function patternScore(pattern: string, pathname: string): number {
+  if (pattern.endsWith("/*")) {
+    const base = pattern.slice(0, -2);
+    return pathname.startsWith(`${base}/`) ? base.length + 1 : -1;
+  }
+  if (pattern === "/") return pathname === "/" ? 1 : -1;
+  return pathname === pattern || pathname.startsWith(`${pattern}/`) ? pattern.length : -1;
+}
+
+/** The tab (and its destination) that owns `pathname`, or null for a global route. */
+export function resolveNav(pathname: string): { destination: Destination; tab: NavTab } | null {
+  const raw = pathname.split(/[?#]/)[0] || "/";
+  const path = (redirectTarget(raw) ?? raw).split(/[?#]/)[0];
+  let best: Claim | null = null;
+  for (const destination of DESTINATIONS) {
+    for (const tab of destination.tabs) {
+      for (const pattern of [tab.href, ...(tab.match ?? [])]) {
+        const score = patternScore(pattern, path);
+        if (score > (best?.score ?? 0)) best = { destination, tab, score };
+      }
+    }
+  }
+  return best ? { destination: best.destination, tab: best.tab } : null;
+}
+
+export function isDestinationActive(id: DestinationId, pathname: string): boolean {
+  return resolveNav(pathname)?.destination.id === id;
+}
+
+export function isTabActive(tab: NavTab, pathname: string): boolean {
+  return resolveNav(pathname)?.tab.href === tab.href;
+}
+
+/** Every tab with its destination's label: the flat list a "Go to" list needs. */
+export const NAV_PAGES: readonly (NavTab & { destination: Destination["label"] })[] = DESTINATIONS.flatMap((d) =>
+  d.tabs.map((t) => ({ ...t, destination: d.label })),
 );
-
-function hrefMatches(href: string, pathname: string): boolean {
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-/** Is `pathname` this exact page (or one of its sub-paths, e.g. a ticker or id detail page)? */
-export function isPageActive(pageHref: string, pathname: string): boolean {
-  return hrefMatches(pageHref, pathname);
-}
-
-/** Is `pathname` anywhere in this cluster — one of its pages, or a detail-only extra route? */
-export function isClusterActive(cluster: Pick<Cluster, "pages" | "extra">, pathname: string): boolean {
-  return cluster.pages.some((p) => hrefMatches(p.href, pathname)) || (cluster.extra ?? []).some((p) => hrefMatches(p, pathname));
-}

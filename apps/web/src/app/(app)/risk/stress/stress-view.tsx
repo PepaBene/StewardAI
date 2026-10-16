@@ -173,10 +173,13 @@ function Workbench({ standard }: { standard: Standard }) {
       {run ? (
         <Blueprint className="p-4">
           <PanelHeading level={2} kicker={label ?? "Scenario"} title="Where the loss comes from" />
-          <Ladder result={run.result} currency={currency} />
+          <Ladder result={{ ...run.result, warnings: run.result.warnings.filter((w) => !standard.notes.includes(w)) }} currency={currency} />
           <div className="mt-4 space-y-3">
             <Sensitivities run={run} />
-            <Notes notes={run.notes} />
+            {/* The standard table above already carries the shared caveats; show only what is new here. */}
+            {run.notes.filter((n) => !standard.notes.includes(n)).length > 0 ? (
+              <Notes notes={run.notes.filter((n) => !standard.notes.includes(n))} />
+            ) : null}
             <div className="border-t border-border-soft pt-3">
               <SaveBar save={save} onSaved={() => setRefresh((n) => n + 1)} />
             </div>

@@ -77,7 +77,7 @@ function ExposureBlock({ exposure }: { exposure: TradeExposure }) {
                 type="button"
                 aria-pressed={flow === f}
                 onClick={() => setPicked(f)}
-                className={cn("px-2.5 py-1.5", i > 0 && "border-l border-border", flow === f ? "bg-accent text-accent-foreground" : "text-text hover:bg-border-soft")}
+                className={cn("px-2.5 py-1.5", i > 0 && "border-l border-border", flow === f ? "bg-accent text-accent-foreground" : "text-text hover:bg-surface-muted")}
               >
                 {FLOW_LABEL[f]}
               </button>

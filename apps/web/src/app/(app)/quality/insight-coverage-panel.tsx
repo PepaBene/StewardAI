@@ -6,6 +6,8 @@ import type { components } from "@/lib/api/schema";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate, formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { label } from "@/lib/labels";
+import { sentenceCase, subjectWords } from "@/lib/oversight/plain";
 import { cn } from "@/lib/utils";
 
 /*
@@ -143,13 +145,15 @@ function Access({ rows }: { rows: Verdict[] }) {
       {rows.map((r) => (
         <li key={`${r.provider}.${r.endpoint}`} className="py-1.5">
           <span className="font-medium">
-            {r.provider} · {r.endpoint}
+            {label("provider", r.provider)}, {subjectWords(r.endpoint).toLowerCase()}
           </span>{" "}
-          <span className={cn("ml-1 px-1.5 text-xs", r.state === "available" ? "bg-gain-subtle" : r.state === "paid_only" ? "bg-loss-subtle" : "bg-surface-muted")}>{r.state.replace("_", " ")}</span>
+          <span className={cn("ml-1 rounded-mark px-1.5 text-xs", r.state === "available" ? "bg-gain-subtle" : r.state === "paid_only" ? "bg-loss-subtle" : "bg-surface-muted")}>
+            {sentenceCase(r.state.replaceAll("_", " "))}
+          </span>
           <span className="block text-xs text-text-muted">
-            {r.tested_at ? `tested ${formatDate(r.tested_at)}` : "never tested"}
-            {r.status_code ? ` · HTTP ${r.status_code}` : ""}
-            {r.detail ? ` · ${r.detail}` : ""}
+            {r.tested_at ? `Tested ${formatDate(r.tested_at)}` : "Never tested"}
+            {r.status_code ? `, HTTP ${r.status_code}` : ""}
+            {r.detail ? `. ${sentenceCase(r.detail)}.` : ""}
           </span>
         </li>
       ))}
@@ -221,7 +225,7 @@ export function InsightCoveragePanel() {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <Blueprint className="p-4 lg:col-span-2">
-        <PanelHeading level={3} kicker="Forecasts and targets judged after the fact" title="Insight clocks" />
+        <PanelHeading level={3} title="Insight clocks" />
         <div className="mt-3">
           <ResourceGate state={clocks} label="the insight clocks">
             {(d) => <Clocks data={d} />}
@@ -229,7 +233,7 @@ export function InsightCoveragePanel() {
         </div>
       </Blueprint>
       <Blueprint className="p-4">
-        <PanelHeading level={3} kicker="What dividends, checks and targets can claim" title="Insight coverage" />
+        <PanelHeading level={3} title="Insight coverage" />
         <div className="mt-3">
           <ResourceGate state={coverage} label="the insight coverage">
             {(d) => <Matrix data={d} />}
@@ -237,7 +241,7 @@ export function InsightCoveragePanel() {
         </div>
       </Blueprint>
       <Blueprint className="p-4">
-        <PanelHeading level={3} kicker="Second dividend source and price targets" title="Endpoint access verdicts" />
+        <PanelHeading level={3} title="Endpoint access verdicts" />
         <div className="mt-3">
           <ResourceGate state={access} label="the access verdicts">
             {(rows) => <Access rows={rows} />}

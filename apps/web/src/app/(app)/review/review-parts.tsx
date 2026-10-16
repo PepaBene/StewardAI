@@ -152,11 +152,11 @@ export function Reconciliation({ fact, rows }: { fact: FactOut; rows: Reconcilia
         <table className="w-full min-w-[36rem] text-xs">
           <thead className="bg-surface-muted">
             <tr className="border-b border-border text-text-muted">
-              <th scope="col" className="px-2 py-1.5 text-left text-[11px] font-medium tracking-wide uppercase">Filing</th>
-              <th scope="col" className="px-2 py-1.5 text-left text-[11px] font-medium tracking-wide uppercase">Concept</th>
-              <th scope="col" className="px-2 py-1.5 text-right text-[11px] font-medium tracking-wide uppercase">XBRL value</th>
-              <th scope="col" className="px-2 py-1.5 text-right text-[11px] font-medium tracking-wide uppercase">Difference</th>
-              <th scope="col" className="px-2 py-1.5 text-left text-[11px] font-medium tracking-wide uppercase">Outcome</th>
+              <th scope="col" className="px-2 py-1.5 text-left text-xs font-medium">Filing</th>
+              <th scope="col" className="px-2 py-1.5 text-left text-xs font-medium">Concept</th>
+              <th scope="col" className="px-2 py-1.5 text-right text-xs font-medium">XBRL value</th>
+              <th scope="col" className="px-2 py-1.5 text-right text-xs font-medium">Difference</th>
+              <th scope="col" className="px-2 py-1.5 text-left text-xs font-medium">Outcome</th>
             </tr>
           </thead>
           <tbody>
@@ -271,7 +271,7 @@ export function ResolutionCard({ resolution, onDismiss }: { resolution: Resolved
   const { fact, action, reason, value, result, ticker, name } = resolution;
   const { run, retry } = useVerdictRun(ticker, result.verdict_job.id);
   const heading = useRef<HTMLHeadingElement>(null);
-  const holdingHref = `/holdings/${encodeURIComponent(ticker)}`;
+  const holdingHref = `/companies/${encodeURIComponent(ticker)}`;
   const holdingName = name ?? ticker;
 
   // The item the owner acted on has left the list; move focus to its outcome.

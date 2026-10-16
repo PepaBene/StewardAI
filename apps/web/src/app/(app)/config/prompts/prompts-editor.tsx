@@ -21,7 +21,6 @@ import {
 } from "@/lib/config/prompts-form";
 import { mergeErrors } from "@/lib/config/strategy-form";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
-import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
 
@@ -97,7 +96,7 @@ export function PromptsEditor() {
 
       {overrides && defaults.kind === "ready" ? (
         <>
-          <div className="space-y-4">
+          <div className="space-y-2">
             {defaults.prompts.map((p) => (
               <PromptCard
                 key={p.key}
@@ -142,24 +141,28 @@ function PromptCard({
   onReset: () => void;
   onChange: (value: string) => void;
 }) {
+  const [showCode, setShowCode] = useState(false);
   const overridden = text !== undefined;
   const headingId = `prompt-${prompt.key}`;
   return (
-    <section aria-labelledby={headingId} className="space-y-3 blueprint p-5">
-      <BlueprintCorners />
+    <details aria-labelledby={headingId} open={overridden && text !== prompt.default_text ? true : undefined} className="group rounded-card bg-surface-muted">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 outline-none focus-visible:ring-2 focus-visible:ring-focus/30">
+        <h2 id={headingId} className="text-base font-semibold">
+          {prompt.title}
+        </h2>
+        {overridden ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-surface px-2 py-0.5 text-xs font-medium text-text">
+            <TriangleAlertIcon aria-hidden="true" className="size-3.5 text-warning-signal" />
+            Customized, not covered by CI evals
+          </span>
+        ) : (
+          <span className="rounded-full bg-surface px-2 py-0.5 text-xs font-medium text-text-muted">Built-in</span>
+        )}
+        <span className="min-w-0 flex-1 truncate text-sm text-text-muted">{prompt.description}</span>
+      </summary>
+      <div className="space-y-3 px-5 pb-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-prose space-y-1">
-          <h2 id={headingId} className="flex flex-wrap items-center gap-2 text-[22px] leading-tight font-semibold">
-            {prompt.title}
-            {overridden ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-warning-signal/40 px-2 py-0.5 text-xs font-medium text-text">
-                <TriangleAlertIcon aria-hidden="true" className="size-3.5 text-warning-signal" />
-                Overridden — not covered by CI evals
-              </span>
-            ) : (
-              <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-text-muted">Built-in</span>
-            )}
-          </h2>
           <p className="text-sm text-text-muted">{prompt.description}</p>
         </div>
         {overridden ? (
@@ -192,12 +195,15 @@ function PromptCard({
         />
       ) : null}
 
-      <details className="rounded-md border border-border p-3">
+      <details className="rounded-control bg-surface p-3" onToggle={(e) => setShowCode(e.currentTarget.open)}>
         <summary className="cursor-pointer text-sm font-medium">
-          Built-in prompt <span className="font-normal text-text-muted">({characterCount(prompt.default_text)})</span>
+          Read the built-in prompt <span className="font-normal text-text-muted">({characterCount(prompt.default_text)})</span>
         </summary>
-        <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-text">{prompt.default_text}</pre>
+        {showCode ? (
+          <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-text">{prompt.default_text}</pre>
+        ) : null}
       </details>
-    </section>
+      </div>
+    </details>
   );
 }

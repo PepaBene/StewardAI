@@ -2,7 +2,7 @@ import type { DriftStatus } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
 /*
- * The drift band as a compact uppercase tag (the Holdings table's UNDER / WITHIN / OVER).
+ * The drift band as a compact tag (the Holdings table's UNDER / WITHIN / OVER).
  * Drift is an allocation signal, not a gain or loss, so it never uses gain/loss colours:
  * out-of-band is the solid accent, in-band a quiet tint, and the word always carries the
  * meaning.
@@ -21,7 +21,7 @@ export function BandBadge({ status, className }: { status: DriftStatus; classNam
     <span
       title={b.title}
       className={cn(
-        "inline-flex items-center px-1.5 py-0.5 text-[10px] leading-none font-semibold tracking-[0.05em] whitespace-nowrap uppercase",
+        "inline-flex items-center px-1.5 py-0.5 text-xs leading-none font-semibold whitespace-nowrap",
         b.tone === "quiet" && "bg-border-soft text-text-muted",
         b.tone === "strong" && "bg-accent text-accent-foreground",
         b.tone === "alarm" && "bg-warning-signal text-accent-foreground",

@@ -1,13 +1,12 @@
 "use client";
 
-import { LoaderCircleIcon, PlayIcon, SnowflakeIcon } from "lucide-react";
+import { LoaderCircleIcon, PlayIcon, SlidersHorizontalIcon, SnowflakeIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrowserApiClient } from "@/lib/api/client";
@@ -18,6 +17,8 @@ import {
   DEFAULT_FUND_COLUMNS,
   DEFAULT_STOCK_COLUMNS,
   IDEA_PIPELINE_NOTE,
+  OP_LABEL,
+  unitSuffix,
   UNIVERSES,
   type ApiFilter,
   type CatalogueResponse,
@@ -33,6 +34,7 @@ import { draftFilters, templateId, toDrafts, type ParseResult, type TemplateOut 
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+import { AdvancedDialog } from "./advanced-dialog";
 import { AskScreen } from "./ask-screen";
 import { CompareTray } from "./compare-tray";
 import { FilterBuilder, SELECT } from "./filter-builder";
@@ -89,6 +91,7 @@ export function DiscoverView() {
   const [notice, setNotice] = useState<string | null>(null);
   const [template, setTemplate] = useState<string | null>(null);
   const [pendingRun, setPendingRun] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // A link such as /discover?template=quality_payers highlights that starter screen.
   useEffect(() => {
@@ -343,7 +346,8 @@ export function DiscoverView() {
     if (basic && t.filters.some((f) => allMetrics.find((m) => m.id === f.metric)?.needs_provider)) chooseBasic(false);
     setTemplate(t.id);
     fillBuilder(t.filters as never, t.sort_by);
-    setNotice(`Filled in "${t.title}". Change any condition, then run it.`);
+    setNotice(`Showing matches for "${t.title}". Open Advanced filters to change it.`);
+    setPendingRun(true);
   };
   const applyDraft = (result: ParseResult, runNow: boolean) => {
     if (basic) chooseBasic(false);
@@ -371,16 +375,8 @@ export function DiscoverView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research & Verification"
         title="Discover"
-        description="Screen the instruments and funds the app covers. Coverage is shown before you filter, and what a filter leaves out is counted, not hidden."
-        aside={
-          catalogue ? (
-            <span className="num">
-              Data date {formatDate(catalogue.as_of)} · method {catalogue.method_version}
-            </span>
-          ) : null
-        }
+        description="Find stocks and funds that fit an idea. Start from a ready-made screen or describe what you want, and see what matches."
       />
 
       <div role="tablist" aria-label="What to screen" className="flex gap-1 border-b border-border">
@@ -408,43 +404,100 @@ export function DiscoverView() {
         </p>
       ) : null}
 
-      {catalogue && kind === "stock" ? <TemplatesPanel catalogue={metrics} selected={template} onUse={applyTemplate} current={currentScreen} /> : null}
+      {catalogue && kind === "stock" ? <TemplatesPanel catalogue={metrics} selected={template} onUse={applyTemplate} current={currentScreen} saved={screens} onRunSaved={(id) => void runSaved(id)} /> : null}
 
-      <section aria-labelledby="builder-heading" className="blueprint space-y-4 px-5 py-5">
-        <BlueprintCorners />
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 id="builder-heading" className="text-[22px] leading-tight font-semibold">
-              Conditions
-            </h2>
-            {info ? (
-              <p className="max-w-[72ch] text-sm text-text-muted">
-                {kind === "stock" ? (
-                  <>
-                    <span className="num">{String(info.members)}</span> instruments in scope,{" "}
-                    <span className="num">{String(info.with_statements)}</span> with filed statements,{" "}
-                    <span className="num">{String(info.with_prices)}</span> with price history. Markets:{" "}
-                    {Object.entries((info.countries as Record<string, number>) ?? {})
-                      .slice(0, 8)
-                      .map(([c, n]) => `${c} ${n}`)
-                      .join(", ") || "none yet"}
-                    .
-                  </>
-                ) : (
-                  <>
-                    <span className="num">{String(info.members)}</span> funds, <span className="num">{String(info.with_holdings)}</span> with stored holdings,{" "}
-                    <span className="num">{String(info.with_factsheet)}</span> with a factsheet.
-                  </>
-                )}
-              </p>
+      {catalogue && kind === "stock" ? <AskScreen catalogue={metrics} onApply={applyDraft} /> : null}
+
+      <div className="flex flex-wrap items-center gap-2" aria-label="Your filters">
+        <Button type="button" variant="outline" size="sm" onClick={() => setFiltersOpen(true)} disabled={!catalogue}>
+          <SlidersHorizontalIcon aria-hidden="true" />
+          Advanced filters{drafts.length > 0 ? ` (${drafts.length})` : ""}
+        </Button>
+        {drafts.length > 0 ? (
+          <ul className="flex flex-wrap gap-1.5" aria-label="Filters in this screen">
+            {drafts.map((d) => {
+              const m = metrics.find((x) => x.id === d.metric);
+              const suffix = m ? unitSuffix(m.unit) : "";
+              return (
+                <li key={d.id} className="flex items-center gap-1 rounded-full border border-border bg-surface-raised py-0.5 pr-1 pl-2.5 text-xs">
+                  <span>
+                    {m?.label ?? d.metric} {OP_LABEL[d.op]} <span className="num">{d.value}</span>
+                    {suffix}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDrafts((cur) => cur.filter((x) => x.id !== d.id))}
+                    aria-label={`Remove filter ${m?.label ?? d.metric}`}
+                    className="rounded-full p-0.5 text-text-muted hover:text-text focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none"
+                  >
+                    <XIcon aria-hidden="true" className="size-3" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <span className="text-sm text-text-muted">No filters yet. Pick an idea above, describe a screen, or add filters yourself.</span>
+        )}
+        {drafts.length > 0 ? (
+          <Button type="button" size="sm" onClick={() => void execute()} disabled={run.kind === "running" || !catalogue}>
+            {run.kind === "running" ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <PlayIcon aria-hidden="true" />}
+            Show matches
+          </Button>
+        ) : null}
+      </div>
+
+      {run.kind === "idle" ? (
+        <EmptyState title="Nothing to show yet">Choose one of the ideas above, or describe the stocks you want. Matches appear here.</EmptyState>
+      ) : null}
+      {run.kind === "running" ? (
+        <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
+          <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
+          Finding matches…
+        </p>
+      ) : null}
+      {run.kind === "error" ? <AlertMessage title={run.title}>{run.detail}</AlertMessage> : null}
+      {run.kind === "ok" ? (
+        <ResultsPanel
+          kind={kind}
+          result={run.result}
+          rows={rows}
+          catalogue={metrics}
+          columns={columns}
+          selected={new Set(selected.keys())}
+          onToggleSelect={toggleSelect}
+          onLoadMore={() => void execute(run.result.next_cursor ?? undefined)}
+          loadingMore={loadingMore}
+          onExport={() => void exportCsv()}
+          exporting={exporting}
+          onWatch={(k) => void watch(k)}
+          watched={watched}
+        />
+      ) : null}
+
+      <footer className="text-xs text-text-muted">
+        {info ? (
+          <p>
+            <span className="num">{String(info.members)}</span> {kind === "fund" ? "funds" : "instruments"} covered
+            {kind === "stock" ? ` — ${universe === "holdings" ? "your holdings" : universe === "watchlist" ? "your watchlist" : universe === "snapshot" ? "a frozen universe" : "everything the app covers"}` : ""}.{" "}
+            {kind === "stock" ? (
+              <>
+                <span className="num">{String(info.with_statements)}</span> have filed statements and <span className="num">{String(info.with_prices)}</span> have price history.{" "}
+              </>
             ) : (
-              <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
-                <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
-                Measuring coverage…
-              </p>
+              <>
+                <span className="num">{String(info.with_holdings)}</span> have stored holdings and <span className="num">{String(info.with_factsheet)}</span> a factsheet.{" "}
+              </>
             )}
-          </div>
-        </div>
+            {catalogue ? `Data as of ${formatDate(catalogue.as_of)}.` : ""}
+          </p>
+        ) : (
+          <p role="status">Counting what is covered…</p>
+        )}
+        {catalogue?.keyless_note ? <p className="mt-1 max-w-[72ch] text-text-faint">{catalogue.keyless_note}</p> : null}
+      </footer>
+
+      <AdvancedDialog open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Advanced filters">
 
         <div className="flex flex-wrap items-end gap-4">
           {kind === "stock" ? (
@@ -491,8 +544,6 @@ export function DiscoverView() {
         ) : null}
 
         {catalogue ? <ProviderPanel catalogue={catalogue} basic={basic} onBasic={chooseBasic} /> : null}
-
-        {catalogue && kind === "stock" ? <AskScreen catalogue={metrics} onApply={applyDraft} /> : null}
 
         {catalogue ? (
           <FilterBuilder catalogue={metrics} drafts={drafts} onChange={setDrafts} nextId={() => nextId.current++} />
@@ -574,9 +625,16 @@ export function DiscoverView() {
           </AlertMessage>
         ) : null}
 
-        <Button type="button" onClick={() => void execute()} disabled={run.kind === "running" || !catalogue}>
+        <Button
+          type="button"
+          onClick={() => {
+            setFiltersOpen(false);
+            void execute();
+          }}
+          disabled={run.kind === "running" || !catalogue}
+        >
           {run.kind === "running" ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <PlayIcon aria-hidden="true" />}
-          Run screen
+          Show matches
         </Button>
         {kind === "stock" ? (
           <p className="text-xs text-text-muted">
@@ -607,36 +665,7 @@ export function DiscoverView() {
           </div>
         </details>
 
-        {catalogue?.keyless_note ? <p className="max-w-[72ch] text-xs text-text-faint">{catalogue.keyless_note}</p> : null}
-      </section>
-
-      {run.kind === "idle" ? (
-        <EmptyState title="No screen run yet">Set conditions above and run the screen. Every member of the universe is counted in the result, matched or not.</EmptyState>
-      ) : null}
-      {run.kind === "running" ? (
-        <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
-          <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
-          Running the screen…
-        </p>
-      ) : null}
-      {run.kind === "error" ? <AlertMessage title={run.title}>{run.detail}</AlertMessage> : null}
-      {run.kind === "ok" ? (
-        <ResultsPanel
-          kind={kind}
-          result={run.result}
-          rows={rows}
-          catalogue={metrics}
-          columns={columns}
-          selected={new Set(selected.keys())}
-          onToggleSelect={toggleSelect}
-          onLoadMore={() => void execute(run.result.next_cursor ?? undefined)}
-          loadingMore={loadingMore}
-          onExport={() => void exportCsv()}
-          exporting={exporting}
-          onWatch={(k) => void watch(k)}
-          watched={watched}
-        />
-      ) : null}
+      </AdvancedDialog>
 
       <CompareTray
         rows={selectedRows}

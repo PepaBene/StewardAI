@@ -9,3 +9,5 @@ export default function CoreVsStocksPage() {
     </Suspense>
   );
 }
+
+export const metadata = { title: "Core and stocks · Performance" };

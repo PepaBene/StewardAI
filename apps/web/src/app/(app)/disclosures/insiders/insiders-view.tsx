@@ -80,7 +80,6 @@ export function InsidersPageView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research & Verification"
         title="Insider activity"
         description="What a company's officers, directors and large holders filed, as it was known on a chosen date. Only open-market purchases and sales count toward the net."
         aside={<span>{ticker ?? SAMPLE_INSIDER_TICKER} · as known on {formatDay(new Date(cutoff).toISOString())}</span>}

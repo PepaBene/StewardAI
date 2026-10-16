@@ -3,13 +3,18 @@
 import { useState } from "react";
 
 import { ResourceGate } from "@/components/company/primitives";
+import { KpiStrip, type KpiTileProps } from "@/components/insight/kpi-tile";
+import { StatusList, type StatusRow } from "@/components/oversight/status-list";
 import { Problem, problemText } from "@/components/risk/common";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
+import { CompactRow } from "@/components/ui/compact-row";
+import { ResponsiveTable } from "@/components/ui/responsive-table";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate, formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
 import { ISSUE_LABEL } from "@/lib/journal/journal";
+import { titleCase } from "@/lib/parse-untyped";
 import { pilotDayLabel, type PilotReport, type PilotState } from "@/lib/release/release";
 
 import { DefectLog } from "./defect-log";
@@ -30,7 +35,12 @@ function Body({ pilot, onStarted }: { pilot: PilotState; onStarted: () => void }
     <div className="flex flex-col gap-5">
       <StartPanel pilot={pilot} onStarted={onStarted} />
       {pilot.report ? <Report report={pilot.report} /> : null}
-      <DefectLog />
+      <details className="group rounded-card bg-surface-muted px-5 py-3">
+        <summary className="cursor-pointer text-[15px] font-semibold">Details: defects you logged yourself</summary>
+        <div className="mt-3">
+          <DefectLog />
+        </div>
+      </details>
     </div>
   );
 }
@@ -46,17 +56,13 @@ function StartPanel({ pilot, onStarted }: { pilot: PilotState; onStarted: () => 
     setProblem(null);
     const res = await getBrowserApiClient().POST("/release/pilot", { body: { length_days: 30 } });
     setBusy(false);
-    if (!res.response.ok) return setProblem(problemText(res.error, "The pilot could not be started."));
+    if (!res.response.ok) return setProblem(problemText(res.error, "The pilot could not be started. Check that the API is running, then try again."));
     onStarted();
   }
 
   return (
     <Blueprint className="p-4">
-      <PanelHeading
-        level={2}
-        kicker="30-day pilot"
-        title={w === null ? "No pilot has started" : pilotDayLabel(w.day, w.length_days, w.over)}
-      />
+      <PanelHeading level={2} title={w === null ? "No pilot has started" : pilotDayLabel(w.day, w.length_days, w.over)} />
       <p className="mt-2 max-w-prose text-sm">
         {w === null
           ? "While a pilot runs, the app counts which pages you open, how many alerts you rate as wrong, how often sources fail and how much of the portfolio the data checks flag. Nothing is sent anywhere."
@@ -77,135 +83,135 @@ function StartPanel({ pilot, onStarted }: { pilot: PilotState; onStarted: () => 
 
 function Report({ report }: { report: PilotReport }) {
   const a = report.alerts;
-  return (
-    <>
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Blueprint className="p-4">
-          <PanelHeading level={3} kicker="Use" title={`${report.days_used} of ${report.window.length_days} days used`} />
-          {report.use.length === 0 ? (
-            <p className="mt-2 text-sm text-text-muted">No page has been opened since the pilot started.</p>
-          ) : (
-            <table className="mt-3 w-full text-sm">
-              <caption className="sr-only">Pages opened during the pilot</caption>
-              <thead>
-                <tr className="text-left text-xs text-text-muted">
-                  <th scope="col" className="py-1 font-medium">
-                    Page
-                  </th>
-                  <th scope="col" className="py-1 text-right font-medium">
-                    Opens
-                  </th>
-                  <th scope="col" className="py-1 text-right font-medium">
-                    Days
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.use.map((u) => (
-                  <tr key={u.path} className="border-t border-border-soft">
-                    <th scope="row" className="py-1.5 text-left font-normal">
-                      {u.path}
-                    </th>
-                    <td className="num py-1.5 text-right">{u.opens}</td>
-                    <td className="num py-1.5 text-right">{u.days}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Blueprint>
+  const rated = a.false_rate !== null && a.false_rate !== undefined;
+  const tiles: KpiTileProps[] = [
+    {
+      label: "Days used",
+      value: `${report.days_used} of ${report.window.length_days}`,
+      verdict: { tone: "unknown", text: "Days on which you opened the app." },
+    },
+    {
+      label: "False alerts",
+      value: rated ? formatPercent(a.false_rate, { decimals: 0 }) : "Not rated",
+      verdict: {
+        tone: !rated ? "unknown" : a.wrong_or_irrelevant === 0 ? "good" : "caution",
+        text: rated ? `${a.wrong_or_irrelevant} of ${a.rated} rated alerts were wrong or irrelevant.` : `${a.sent} sent, none rated yet.`,
+      },
+    },
+    {
+      label: "Background jobs failed",
+      value: `${report.jobs.failed} of ${report.jobs.runs}`,
+      verdict: { tone: report.jobs.failed === 0 ? "good" : "bad", text: report.jobs.failed === 0 ? "Every run finished." : "See Activity for which ones." },
+    },
+    {
+      label: "Portfolio flagged",
+      value: formatPercent(report.affected_weight, { decimals: 0 }),
+      verdict: { tone: report.top_issues.length === 0 ? "good" : "caution", text: "Share touched by at least one data issue today." },
+    },
+  ];
 
-        <Blueprint className="p-4">
-          <PanelHeading level={3} kicker="Alerts" title="False alerts" />
-          <p className="mt-2 text-sm">
-            {a.false_rate === null || a.false_rate === undefined
-              ? `${a.sent} alert${a.sent === 1 ? "" : "s"} sent and none rated, so there is no false-alert rate. Rate an alert as wrong or irrelevant to count it.`
-              : `${a.wrong_or_irrelevant} of ${a.rated} rated alerts were wrong or irrelevant (${formatPercent(a.false_rate, { decimals: 0 })}). ${a.sent} sent in all.`}
-          </p>
-          <h4 className="mt-4 text-sm font-semibold">Corrections you made</h4>
-          {report.corrections.length === 0 ? (
-            <p className="text-sm text-text-muted">None marked wrong.</p>
-          ) : (
-            <ul className="mt-1 text-sm">
-              {report.corrections.map((c) => (
-                <li key={c.target_kind}>
-                  {c.count} × {c.target_kind.replace("_", " ")}
-                </li>
+  const rows: StatusRow[] = [
+    {
+      id: "alerts",
+      state: !rated ? "unknown" : a.wrong_or_irrelevant === 0 ? "pass" : "fail",
+      lead: "Alerts",
+      sentence: rated
+        ? `${a.wrong_or_irrelevant} of ${a.rated} rated alerts were wrong or irrelevant (${formatPercent(a.false_rate, { decimals: 0 })}). ${a.sent} sent in all.`
+        : `${a.sent} alert${a.sent === 1 ? "" : "s"} sent and none rated, so there is no false-alert rate. Rate an alert as wrong or irrelevant to count it.`,
+    },
+    {
+      id: "jobs",
+      state: report.jobs.failed === 0 ? "pass" : "fail",
+      lead: "Background jobs",
+      sentence: `${report.jobs.failed} of ${report.jobs.runs} runs failed during the pilot.`,
+      href: "/activity#job-log",
+      hrefLabel: "Open the job log",
+    },
+    ...report.providers.map(
+      (p): StatusRow => ({
+        id: `provider-${p.provider}`,
+        state: p.failures === 0 ? "pass" : "fail",
+        lead: titleCase(p.provider),
+        sentence: `${p.failures} of ${p.attempts} requests failed.`,
+      }),
+    ),
+    {
+      id: "portfolio",
+      state: report.top_issues.length === 0 ? "pass" : "fail",
+      lead: "Portfolio data checks",
+      sentence:
+        report.top_issues.length === 0
+          ? "No issues found by the checks that ran."
+          : `${formatPercent(report.affected_weight, { decimals: 0 })} of the portfolio is touched by at least one data issue. Fix the largest first.`,
+    },
+  ];
+
+  return (
+    <Blueprint className="space-y-4 p-4">
+      <PanelHeading level={2} title="How the pilot is going" />
+      <KpiStrip label="Pilot at a glance" tiles={tiles} />
+      <StatusList caption="Pilot measures" passWord="look healthy" rows={rows} />
+      <details className="text-sm">
+        <summary className="cursor-pointer font-semibold">Details: page use, corrections, issues and what is not measured</summary>
+        <div className="mt-3 space-y-5">
+          <div>
+            <h3 className="text-sm font-semibold">Pages opened</h3>
+            {report.use.length === 0 ? (
+              <p className="mt-1 text-text-muted">No page has been opened since the pilot started.</p>
+            ) : (
+              <ResponsiveTable
+                className="mt-1"
+                rows={report.use}
+                rowKey={(u) => u.path}
+                caption="Pages opened during the pilot"
+                columns={[
+                  { key: "page", header: "Page", cell: (u) => u.path },
+                  { key: "opens", header: "Opens", numeric: true, cell: (u) => u.opens },
+                  { key: "days", header: "Days", numeric: true, cell: (u) => u.days },
+                ]}
+                compact={(u) => <CompactRow name={u.path} primary={`${u.opens} opens`} secondary={[`${u.days} days`]} />}
+              />
+            )}
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold">Corrections you made</h3>
+            {report.corrections.length === 0 ? (
+              <p className="mt-1 text-text-muted">None marked wrong.</p>
+            ) : (
+              <ul className="mt-1">
+                {report.corrections.map((c) => (
+                  <li key={c.target_kind}>
+                    {c.count} marked wrong: {c.target_kind.replace("_", " ")}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {report.top_issues.length > 0 ? (
+            <div>
+              <h3 className="text-sm font-semibold">Largest data issues</h3>
+              <ol className="mt-1 divide-y divide-border-soft border-y border-border-soft">
+                {report.top_issues.map((i, n) => (
+                  <li key={`${i.kind}-${i.subject}-${n}`} className="flex flex-wrap justify-between gap-x-3 py-1.5">
+                    <span>
+                      <span className="font-semibold">{i.subject}</span> <span className="text-text-muted">{ISSUE_LABEL[i.kind]}</span>
+                    </span>
+                    <span className="num">{i.weight === null || i.weight === undefined ? "No holding" : formatPercent(i.weight, { decimals: 1 })}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
+          <div>
+            <h3 className="text-sm font-semibold">What this report cannot tell you</h3>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-text-muted">
+              {report.not_measured.map((n) => (
+                <li key={n}>{n}</li>
               ))}
             </ul>
-          )}
-        </Blueprint>
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Blueprint className="p-4">
-          <PanelHeading level={3} kicker="Sources" title="Failures by provider" />
-          <p className="mt-2 text-sm">
-            {report.jobs.failed} of {report.jobs.runs} background jobs failed.
-          </p>
-          {report.providers.length === 0 ? (
-            <p className="mt-1 text-sm text-text-muted">No provider requests were recorded.</p>
-          ) : (
-            <table className="mt-2 w-full text-sm">
-              <caption className="sr-only">Provider requests and failures during the pilot</caption>
-              <thead>
-                <tr className="text-left text-xs text-text-muted">
-                  <th scope="col" className="py-1 font-medium">
-                    Provider
-                  </th>
-                  <th scope="col" className="py-1 text-right font-medium">
-                    Failed
-                  </th>
-                  <th scope="col" className="py-1 text-right font-medium">
-                    Of
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.providers.map((p) => (
-                  <tr key={p.provider} className="border-t border-border-soft">
-                    <th scope="row" className="py-1.5 text-left font-normal">
-                      {p.provider}
-                    </th>
-                    <td className="num py-1.5 text-right">{p.failures}</td>
-                    <td className="num py-1.5 text-right">{p.attempts}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Blueprint>
-
-        <Blueprint className="p-4">
-          <PanelHeading level={3} kicker="Data today" title="Share of the portfolio flagged" />
-          <p className="mt-2 text-sm">
-            {formatPercent(report.affected_weight, { decimals: 0 })} of the portfolio is touched by at least one data issue today. Fix the largest first:
-          </p>
-          {report.top_issues.length === 0 ? (
-            <p className="mt-1 text-sm text-text-muted">No issues found by the checks that ran.</p>
-          ) : (
-            <ol className="mt-2 divide-y divide-border-soft border-y border-border-soft text-sm">
-              {report.top_issues.map((i, n) => (
-                <li key={`${i.kind}-${i.subject}-${n}`} className="flex flex-wrap justify-between gap-x-3 py-1.5">
-                  <span>
-                    <span className="font-semibold">{i.subject}</span> <span className="text-text-muted">{ISSUE_LABEL[i.kind]}</span>
-                  </span>
-                  <span className="num">{i.weight === null || i.weight === undefined ? "no holding" : formatPercent(i.weight, { decimals: 1 })}</span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </Blueprint>
-      </div>
-
-      <Blueprint className="border-dashed p-4">
-        <PanelHeading level={3} kicker="Not measured" title="What this report cannot tell you" />
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-text-muted">
-          {report.not_measured.map((n) => (
-            <li key={n}>{n}</li>
-          ))}
-        </ul>
-      </Blueprint>
-    </>
+          </div>
+        </div>
+      </details>
+    </Blueprint>
   );
 }

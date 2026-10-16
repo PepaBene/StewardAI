@@ -17,6 +17,7 @@ import { AlertMessage } from "@/components/alert-message";
 import { AskAboutSelection } from "@/components/chat/ask-about-selection";
 import { usePageSelection } from "@/lib/chat/page-selection-store";
 import { EmptyState } from "@/components/empty-state";
+import { EntityName } from "@/components/entity-name";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { ConfidenceBar } from "@/components/evidence/confidence-bar";
 import { EvidenceLinks } from "@/components/evidence/evidence-links";
@@ -25,6 +26,8 @@ import { ProvenanceTag } from "@/components/evidence/provenance-tag";
 import { VerdictStatusBadge } from "@/components/evidence/verdict-status-badge";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { HoldingNews, useHoldingNews } from "@/components/news/holding-news";
+import { MoreDetail } from "@/components/company/more-detail";
+import type { CompanySectionId } from "@/components/company/sections";
 import { HoldingMorePanels } from "@/components/reference/holding-more-panels";
 import { IdentitySection, useHoldingIdentity } from "@/components/reference/identity-section";
 import { DisclosureAlertsPanel } from "@/components/reference/disclosure-alerts-panel";
@@ -86,20 +89,29 @@ import {
   current,
   DrawdownPanel,
   HoldersPanel,
-  HoldingHeader,
   KpiBarsPanel,
   NextReportPanel,
   PositionPanel,
   ScorePanel,
   TimelinePanel,
 } from "./holding-overview";
-import { intradayData, useHoldingIntraday } from "./holding-intraday";
+import { useHoldingIntraday } from "./holding-intraday";
 
 const POLL_MS = 3000;
 const POLL_LIMIT_MS = 10 * 60 * 1000;
 const TERMINAL = new Set(["succeeded", "failed"]);
 
-export function HoldingView({ ticker }: { ticker: string }) {
+/**
+ * The position-specific panels of one company section. The holding page was merged into the
+ * company page: each panel now sits in the section it belongs to (see docs/plans/r4_moved_here.md).
+ */
+export function HoldingSectionPanels({ ticker, section }: { ticker: string; section: CompanySectionId }) {
+  // The dividend section has no holding-page panel; skip the requests entirely.
+  if (section === "dividend") return null;
+  return <HoldingView ticker={ticker} section={section} />;
+}
+
+export function HoldingView({ ticker, section }: { ticker: string; section: CompanySectionId }) {
   const fetcher = useCallback(
     () => getBrowserApiClient().GET("/holdings/{ticker}", { params: { path: { ticker } } }),
     [ticker],
@@ -123,11 +135,11 @@ export function HoldingView({ ticker }: { ticker: string }) {
   }, [busy, watching, reload]);
 
   return (
-    <div className="space-y-[22px]">
+    <div className="space-y-5">
       {state.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
           <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
-          Loading {ticker}…
+          Loading <EntityName id={ticker} chip={false} />…
         </p>
       ) : null}
       {state.kind === "error" ? (
@@ -141,6 +153,7 @@ export function HoldingView({ ticker }: { ticker: string }) {
       ) : null}
       {detail ? (
         <HoldingContent
+          section={section}
           detail={detail}
           busy={busy}
           onQueued={(job) => {
@@ -155,7 +168,6 @@ export function HoldingView({ ticker }: { ticker: string }) {
 }
 
 const fetchBoard = () => getBrowserApiClient().GET("/theses/board");
-const fetchStrategy = () => getBrowserApiClient().GET("/config/strategy");
 const fetchOverview = () => getBrowserApiClient().GET("/portfolio/overview");
 const fetchPortfolioHistory = () =>
   getBrowserApiClient().GET("/portfolio/history", { params: { query: { days: BASE_PRICE_DAYS } } });
@@ -165,11 +177,13 @@ function isoDay(d: Date) {
 }
 
 export function HoldingContent({
+  section,
   detail,
   busy,
   onQueued,
   reload,
 }: {
+  section: CompanySectionId;
   detail: HoldingDetail;
   busy: boolean;
   onQueued: (job: JobSummary) => void;
@@ -188,7 +202,6 @@ export function HoldingContent({
   );
   const prices = useApiResource(pricesFetcher).state;
   const board = useApiResource(fetchBoard).state;
-  const strategy = useApiResource(fetchStrategy).state;
   const overview = useApiResource(fetchOverview).state;
   const portfolioHistory = useApiResource(fetchPortfolioHistory).state;
   const ownership = useHoldingOwnership(ticker);
@@ -199,7 +212,6 @@ export function HoldingContent({
   const priceData = current(prices);
   const boardData = current(board);
   const row = boardData?.rows.find((r) => r.ticker === ticker) ?? null;
-  const classes = current(strategy)?.body.classifications?.[ticker] ?? null;
   const drift = current(overview)?.drift?.positions.find((p) => p.ticker === ticker) ?? null;
   const indexPoints = current(portfolioHistory)?.points ?? null;
 
@@ -256,64 +268,72 @@ export function HoldingContent({
 
   return (
     <>
-      <HoldingHeader
-        detail={detail}
-        identity={current(identity.state)}
-        classes={classes}
-        row={row}
-        bars={priceData?.bars ?? []}
-        intraday={intradayData(intraday)}
-      />
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,1fr)]">
-        <CandlePanel ticker={ticker} history={priceData} loading={prices.kind === "loading"} intraday={intraday} />
-        <div className="flex min-w-0 flex-col gap-5">
-          <PositionPanel position={detail.position} base={detail.base_currency ?? ""} drift={drift} />
-          <ScorePanel row={row} kpis={detail.kpis} method={boardData?.score_method ?? null} loaded={board.kind !== "loading"} />
-          <div className="lg:sticky lg:top-3 lg:self-start">
-            <ValuationPanel ticker={ticker} compact />
+      {section === "overview" ? (
+        <>
+          {detail.position ? <PositionPanel position={detail.position} base={detail.base_currency ?? ""} drift={drift} /> : null}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <DrawdownPanel history={priceData} portfolioIndex={indexPoints} ticker={ticker} />
+            <NextReportPanel detail={detail} today={isoDay(now)} />
           </div>
+          <TimelinePanel ticker={ticker} entries={timeline} loaded={news.items !== null || news.failed} />
+          <HoldingNews ticker={ticker} news={news} />
+          <MoreDetail title="Price chart with intraday readout">
+            <CandlePanel ticker={ticker} history={priceData} loading={prices.kind === "loading"} intraday={intraday} />
+          </MoreDetail>
+          <MoreDetail title="Price risk and volatility">
+            <PriceRiskSection ticker={ticker} currency={detail.position?.instrument_currency} />
+          </MoreDetail>
+          <MoreDetail title="Where it sits in your portfolio">
+            <ConcentrationPanel ticker={ticker} />
+          </MoreDetail>
+        </>
+      ) : null}
+
+      {section === "valuation" ? (
+        <MoreDetail title="Multiples and peers as stored">
+          <ValuationPanel ticker={ticker} compact />
+          <PeerPanel ticker={ticker} />
+        </MoreDetail>
+      ) : null}
+
+      {section === "future" ? (
+        <MoreDetail title="Estimates as stored">
+          <EstimatesPanel ticker={ticker} />
+        </MoreDetail>
+      ) : null}
+
+      {section === "past" ? (
+        <MoreDetail title="Segments and financial history as stored">
+          <SegmentsPanel ticker={ticker} />
+          <FinancialHistoryPanel ticker={ticker} />
+        </MoreDetail>
+      ) : null}
+
+      {section === "health" ? (
+        <MoreDetail title="Cash and debt as stored">
+          <CashDebtPanel ticker={ticker} />
+        </MoreDetail>
+      ) : null}
+
+      {section === "ownership" ? (
+        <>
+          <HoldersPanel data={current(ownership.state)} loaded={ownership.state.kind !== "loading"} />
+          <MoreDetail title="Ownership, insider trades and stakes">
+            <OwnershipSection resource={ownership} />
+            <InsiderTradesSection ticker={ticker} />
+            <StakesPanel ticker={ticker} />
+          </MoreDetail>
+        </>
+      ) : null}
+
+      {section === "research" ? (
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <ScorePanel row={row} kpis={detail.kpis} method={boardData?.score_method ?? null} loaded={board.kind !== "loading"} />
+          <KpiBarsPanel ticker={ticker} kpis={detail.kpis} hasThesis={Boolean(thesis)} />
         </div>
-      </div>
+      ) : null}
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <KpiBarsPanel ticker={ticker} kpis={detail.kpis} hasThesis={Boolean(thesis)} />
-        <DrawdownPanel history={priceData} portfolioIndex={indexPoints} ticker={ticker} />
-        <NextReportPanel detail={detail} today={isoDay(now)} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-        <TimelinePanel ticker={ticker} entries={timeline} loaded={news.items !== null || news.failed} />
-        <HoldersPanel data={current(ownership.state)} loaded={ownership.state.kind !== "loading"} />
-      </div>
-
-      <SegmentsPanel ticker={ticker} />
-
-      <FinancialHistoryPanel ticker={ticker} />
-
-      <CashDebtPanel ticker={ticker} />
-
-      <PeerPanel ticker={ticker} />
-
-      <WebFactsPanel ticker={ticker} />
-
-      <EstimatesPanel ticker={ticker} />
-
-      <DisclosureAlertsPanel ticker={ticker} />
-      <NetworkPanel ticker={ticker} />
-
-      <PatentsPanel ticker={ticker} />
-
-      <PatentOverlapPanel ticker={ticker} />
-
-      <ConcentrationPanel ticker={ticker} />
-
-      <MacroContextPanel ticker={ticker} />
-
-      <TradePanel ticker={ticker} />
-
-      <InputCostsPanel ticker={ticker} />
-
+      {section === "research" ? (
       <Blueprint aria-labelledby="thesis-heading" className="space-y-5 px-[22px] py-5">
         <PanelHeading
           kicker="Thesis & evidence"
@@ -353,7 +373,7 @@ export function HoldingContent({
           </div>
         ) : (
           <EmptyState title="No thesis yet">
-            Write why you own {ticker} and the KPIs that must hold in the{" "}
+            Write why you own <EntityName id={ticker} name={detail.instrument?.name ?? detail.profile?.company_name} chip={false} /> and the KPIs that must hold in the{" "}
             <Link className="text-accent-ink underline-offset-4 hover:underline" href="/config/theses">
               theses editor
             </Link>
@@ -364,28 +384,40 @@ export function HoldingContent({
           <KpiTable kpis={detail.kpis} facts={facts} onFeedback={onFeedback} />
         ) : null}
       </Blueprint>
+      ) : null}
 
-      <FactsSection ticker={ticker} facts={detail.facts} reload={reload} onQueued={onQueued} onFeedback={onFeedback} />
+      {section === "research" ? (
+        <>
+          <FactsSection ticker={ticker} facts={detail.facts} reload={reload} onQueued={onQueued} onFeedback={onFeedback} />
+          <div id="research">
+            <HoldingResearch ticker={ticker} />
+          </div>
+          <MoreDetail title="Web facts and disclosure alerts">
+            <WebFactsPanel ticker={ticker} />
+            <DisclosureAlertsPanel ticker={ticker} />
+          </MoreDetail>
+        </>
+      ) : null}
 
-      <HoldingResearch ticker={ticker} />
+      {section === "network" ? (
+        <MoreDetail title="Network, patents and trade exposure">
+          <NetworkPanel ticker={ticker} />
+          <PatentsPanel ticker={ticker} />
+          <PatentOverlapPanel ticker={ticker} />
+          <MacroContextPanel ticker={ticker} />
+          <TradePanel ticker={ticker} />
+          <InputCostsPanel ticker={ticker} />
+        </MoreDetail>
+      ) : null}
 
-      <HoldingNews ticker={ticker} news={news} />
-
-      <PriceRiskSection ticker={ticker} currency={detail.position?.instrument_currency} />
-
-      <OwnershipSection resource={ownership} />
-
-      <StakesPanel ticker={ticker} />
-
-      <PriceDataPanel ticker={ticker} />
-
-      <CorporateActionCoveragePanel ticker={ticker} />
-
-      <InsiderTradesSection ticker={ticker} />
-
-      <IdentitySection ticker={ticker} resource={identity} />
-
-      <HoldingMorePanels ticker={ticker} />
+      {section === "network" ? (
+        <MoreDetail title="Reference data: identity, listings, price completeness, corporate actions">
+          <IdentitySection ticker={ticker} resource={identity} />
+          <PriceDataPanel ticker={ticker} />
+          <CorporateActionCoveragePanel ticker={ticker} />
+          <HoldingMorePanels ticker={ticker} />
+        </MoreDetail>
+      ) : null}
     </>
   );
 }
@@ -507,7 +539,7 @@ function KpiTable({ kpis, facts, onFeedback }: { kpis: KpiStatus[]; facts: Map<n
         <table className="w-full min-w-[48rem] text-sm">
           <caption className="sr-only">Latest verdict per KPI; open a row for its evidence and history</caption>
           <thead className="bg-surface-muted">
-            <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
+            <tr className="border-b border-border text-xs text-text-muted">
               <th scope="col" className="px-3 py-2 text-left font-medium">KPI</th>
               <th scope="col" className="px-3 py-2 text-right font-medium">Target</th>
               <th scope="col" className="px-3 py-2 text-left font-medium">Period</th>
@@ -627,7 +659,7 @@ function KpiRows({
             {current ? <VerdictEvidence verdict={current} facts={facts} onFeedback={onFeedback} /> : <p>{NEVER_JUDGED}.</p>}
             {history.length > 1 ? (
               <div>
-                <p className="mb-1 text-xs font-medium tracking-wide text-text-muted uppercase">History</p>
+                <p className="mb-1 text-xs font-medium text-text-muted">History</p>
                 <ul className="divide-y divide-border rounded-md border border-border bg-surface-raised">
                   {history.map((v) => (
                     <li key={v.id} className="flex flex-wrap items-center gap-3 px-3 py-1.5">
@@ -813,7 +845,7 @@ function FactTable({
     <div className="relative mt-2 overflow-x-auto border border-border">
       <table className="w-full min-w-[48rem] text-sm">
         <thead className="bg-surface-muted">
-          <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
+          <tr className="border-b border-border text-xs text-text-muted">
             <th scope="col" className="px-3 py-2 text-left font-medium">Period</th>
             <th scope="col" className="px-3 py-2 text-left font-medium">Metric</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Value</th>

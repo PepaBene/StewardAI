@@ -73,7 +73,7 @@ function CellView({ cell, line, onPick }: { cell: StatementCell | undefined; lin
       aria-label={`${text}${cell.derived ? ", derived" : ""}${cell.restated ? ", restated" : ""}${cell.reconciled === false ? ", does not reconcile" : ""}. Open source`}
     >
       {text}
-      {marks ? <sup className="text-[10px] text-unconfirmed">{marks}</sup> : null}
+      {marks ? <sup className="text-xs text-unconfirmed">{marks}</sup> : null}
     </button>
   );
 }

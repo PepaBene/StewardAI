@@ -104,7 +104,7 @@ export function actionBasis(action: ProposedAction, body: Pick<ReviewBody, "comp
         row,
         ticker,
         href: row ? `#${kpiAnchor(ref)}` : null,
-        holdingHref: ticker ? `/holdings/${encodeURIComponent(ticker)}` : null,
+        holdingHref: ticker ? `/companies/${encodeURIComponent(ticker)}` : null,
       };
     }),
   };

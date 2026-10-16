@@ -116,7 +116,6 @@ export function ReviewView() {
   return (
     <div className="flex flex-col gap-[22px]">
       <PageHeader
-        kicker="Research & Verification"
         title="Review queue"
         description="Figures the model extracted that need your eyes before they count toward a verdict."
         aside={
@@ -275,7 +274,7 @@ function StatTiles({ stats, queue, ticker }: { stats: StatsState; queue: readonl
           {perDay.some((v) => v > 0) ? (
             <SparkArea values={perDay} width={110} height={40} className="h-10" label="Decisions per day, 30 days" formatValue={(v) => String(v)} />
           ) : (
-            <p className="text-right text-[11px] text-text-faint">No decision in 30 days</p>
+            <p className="text-right text-xs text-text-faint">No decision in 30 days</p>
           )}
         </div>
       </div>
@@ -334,7 +333,7 @@ function QueueFilter({
           <XIcon aria-hidden="true" />
           Show every holding
         </Button>
-        <Link href={`/holdings/${encodeURIComponent(ticker)}`} className={LINK}>
+        <Link href={`/companies/${encodeURIComponent(ticker)}`} className={LINK}>
           Open the holding page
         </Link>
       </p>
@@ -419,7 +418,7 @@ function QueueList({
                   aria-current={active ? "true" : undefined}
                   onClick={() => onSelect(f.id)}
                   className={cn(
-                    "flex w-full flex-col gap-2 border-b border-l-[3px] border-b-border-soft px-4 py-3.5 text-left hover:bg-border-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus",
+                    "flex w-full flex-col gap-2 border-b border-l-[3px] border-b-border-soft px-4 py-3.5 text-left hover:bg-surface-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus",
                     active ? "border-l-accent bg-accent-soft" : "border-l-transparent",
                   )}
                 >
@@ -438,7 +437,7 @@ function QueueList({
                   </span>
                   <span className="grid grid-cols-[1fr_auto] items-center gap-2">
                     <Meter value={f.check_score} size="sm" label={`${humanizeMetric(f.metric)}: checks passed`} formatValue={(v) => `${Math.round(v * 100)}% of checks passed`} />
-                    <span className="num text-[11px] text-text-muted" aria-hidden="true">
+                    <span className="num text-xs text-text-muted" aria-hidden="true">
                       {f.check_score === null ? "no checks" : `${Math.round(f.check_score * 100)}% checks`}
                     </span>
                   </span>
@@ -496,7 +495,7 @@ function FactDetail({
       <header className="flex flex-wrap items-start justify-between gap-5">
         <div className="min-w-0 flex-1 basis-[20rem] space-y-1">
           <p className="font-mono text-[13px] text-text-muted">
-            <Link href={`/holdings/${encodeURIComponent(item.ticker)}`} className="hover:text-text hover:underline" title={name}>
+            <Link href={`/companies/${encodeURIComponent(item.ticker)}`} className="hover:text-text hover:underline" title={name}>
               {shortTicker(item.ticker)}
             </Link>{" "}
             · {fact.period} · fact #{fact.id}
@@ -548,7 +547,7 @@ function FactDetail({
             tone={fact.check_score !== null && fact.check_score < 1 ? "warning" : "accent"}
             ariaLabel="Checks passed"
           />
-          <p className="text-[11px] text-text-muted">
+          <p className="text-xs text-text-muted">
             Checks passed
             <span className="num block">
               {fact.checks.length > 0 ? `${passed} of ${fact.checks.length} validator checks` : "No check ran"}
@@ -614,7 +613,7 @@ function FactDetail({
       {item.reconciliation.length > 0 ? <Reconciliation fact={fact} rows={item.reconciliation} /> : null}
 
       <ReviewActionBar fact={fact} filed={filed} hotkeys onResolved={onResolved} onFeedback={onFeedback} />
-      <p className="text-[11px] text-text-faint">
+      <p className="text-xs text-text-faint">
         {fact.reviewed_at ? `Last reviewed ${formatDateTime(fact.reviewed_at)}. ` : ""}Held figures stay in the{" "}
         <Link href={reviewQueueHref(item.ticker)} className={LINK}>
           {shortTicker(item.ticker)} queue

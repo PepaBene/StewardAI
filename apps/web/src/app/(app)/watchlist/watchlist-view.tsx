@@ -116,7 +116,7 @@ export function WatchlistView() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="Research" title="Watchlist" description="Track your thesis, price targets, and notes separately from positions you own." />
+      <PageHeader title="Watchlist" description="Track your thesis, price targets, and notes separately from positions you own." />
       {error ? <AlertMessage title="Watchlist needs attention">{error}</AlertMessage> : null}
 
       <Blueprint className="space-y-4 p-5">
@@ -142,7 +142,16 @@ export function WatchlistView() {
           <span className="kicker">{items.length} {items.length === 1 ? "ticker" : "tickers"}</span>
         </div>
         {loading ? <p className="flex items-center gap-2 px-5 py-7 text-sm text-text-muted" role="status"><LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />Loading watchlist…</p> : items.length === 0 ? (
-          <div className="p-5"><EmptyState title="No tickers yet">Add a company above to start a research thesis and track the prices that matter to you.</EmptyState></div>
+          <div className="p-5"><EmptyState
+            title="Nothing on your watchlist yet"
+            action={
+              <Button asChild size="sm">
+                <Link href="/discover">Find companies in Discover</Link>
+              </Button>
+            }
+          >
+            Add a ticker above, or pick ideas in Discover. Each one gets a fair value and the buy and sell prices you set.
+          </EmptyState></div>
         ) : (
           <div className="overflow-x-auto">
             <div className="min-w-[1160px]">

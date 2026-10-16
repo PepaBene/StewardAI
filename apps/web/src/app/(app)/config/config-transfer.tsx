@@ -115,7 +115,7 @@ export function ConfigTransfer() {
     <section aria-labelledby="transfer-heading" className="space-y-4 blueprint p-5">
       <BlueprintCorners />
       <div>
-        <h2 id="transfer-heading" className="text-[22px] leading-tight font-semibold">
+        <h2 id="transfer-heading" className="panel-title">
           Export and import
         </h2>
         <p className="max-w-prose text-sm text-text-muted">
@@ -150,7 +150,7 @@ export function ConfigTransfer() {
       </div>
 
       {chosen ? (
-        <div className="space-y-3 rounded-md border border-border p-3">
+        <div className="space-y-3 rounded-card bg-surface-muted p-3">
           <p className="text-sm">
             <span className="font-medium">{chosen.name}</span>
             {chosen.file.exported_at ? <span className="text-text-muted"> · exported {formatDateTime(chosen.file.exported_at)}</span> : null}
@@ -222,7 +222,7 @@ export function ConfigTransfer() {
               <ul className="list-disc space-y-0.5 pl-4">
                 {group.errors.map((e, i) => (
                   <li key={`${i}:${e.path}`}>
-                    {e.path ? <span className="font-mono text-xs">{e.path}</span> : null} {e.message}
+                    {e.path ? <span className="text-xs text-text-muted">{e.path}:</span> : null} {e.message}
                   </li>
                 ))}
               </ul>

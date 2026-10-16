@@ -38,6 +38,7 @@ export function digestItems(reports: readonly ReportSummary[], period: DigestPer
     title: r.headline || r.title,
     meta: itemsMeta(r),
     chips: <DeliveryChips delivery={r.delivery} />,
+    quiet: !!r.nothing_material,
   }));
 }
 

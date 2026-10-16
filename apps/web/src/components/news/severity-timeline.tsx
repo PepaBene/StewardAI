@@ -63,7 +63,7 @@ export function SeverityTimeline({ columns, height = 150 }: { columns: readonly 
       </div>
       <div aria-hidden="true" className="flex gap-1.5">
         {columns.map((c, i) => (
-          <span key={c.date} className="num min-w-0 flex-1 text-center font-mono text-[10px] text-text-faint">
+          <span key={c.date} className="num min-w-0 flex-1 text-center font-mono text-xs text-text-faint">
             {columns.length > 16 && i % 2 === 1 ? "" : c.label}
           </span>
         ))}

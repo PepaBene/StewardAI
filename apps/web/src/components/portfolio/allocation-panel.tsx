@@ -3,6 +3,7 @@ import { AllocationBars, type AllocationItem } from "@/components/portfolio/allo
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { formatMoney, formatPercent } from "@/lib/format";
 import { formatCompactMoney } from "@/lib/portfolio/money";
+import { shortTicker } from "@/lib/portfolio/ticker";
 import { cn } from "@/lib/utils";
 
 const HEAD = 9;
@@ -15,12 +16,12 @@ function slices(items: AllocationItem[]): Slice[] {
   const cash = items.filter((i) => i.muted);
   const head = positions.length <= HEAD + 1 ? positions : positions.slice(0, HEAD);
   const tail = positions.slice(head.length);
-  const out: Slice[] = head.map((i) => ({ key: i.key, label: i.key, title: i.label, value: i.value }));
+  const out: Slice[] = head.map((i) => ({ key: i.key, label: shortTicker(i.key), title: `${i.label} (${i.key})`, value: i.value }));
   if (tail.length) {
     out.push({
       key: "__other",
       label: `Other ${tail.length}`,
-      title: tail.map((t) => t.key).join(", "),
+      title: tail.map((t) => t.label).join(", "),
       value: tail.reduce((s, t) => s + t.value, 0),
     });
   }
@@ -57,7 +58,7 @@ export function AllocationPanel({
             className="grid grid-cols-[minmax(0,5.5rem)_1fr_auto_2.75rem] items-center gap-2"
             title={`${p.title}: ${formatMoney(p.value, currency, { decimals: 0 })}`}
           >
-            <span className={cn("truncate text-text", p.key !== "CASH" && !p.key.startsWith("__") && "font-mono text-[11px]")}>{p.label}</span>
+            <span className={cn("truncate text-text", p.key !== "CASH" && !p.key.startsWith("__") && "font-mono text-xs")}>{p.label}</span>
             <HBar value={total > 0 ? p.value / total : null} label={`${p.label} share of portfolio`} formatValue={(v) => formatPercent(v)} />
             <span className="num text-text-faint">{formatCompactMoney(p.value, currency)}</span>
             <span className="num text-right text-text-muted">{formatPercent(total > 0 ? p.value / total : null)}</span>

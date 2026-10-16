@@ -45,8 +45,8 @@ export function SyncIndicator() {
     } else if (view.lastSuccessAt) {
       const at = new Date(view.lastSuccessAt);
       icon = <span aria-hidden="true" className="size-[7px] rounded-full bg-gain" />;
-      text = `Synced ${formatTime(at)} · ${formatRelative(at, now)}`;
-      title = at.toLocaleString();
+      text = `Synced ${formatRelative(at, now)}`;
+      title = `Last synced ${formatTime(at)}, ${at.toLocaleDateString()}`;
     }
   }
 
@@ -63,8 +63,8 @@ export function SyncIndicator() {
         className={cn("flex items-center gap-[7px] text-[13px]", tone)}
       >
         {icon}
-        <span className="hidden md:inline num">{text}</span>
-        <span className="sr-only md:hidden">{text}</span>
+        <span className="num hidden whitespace-nowrap xl:inline">{text}</span>
+        <span className="sr-only xl:hidden">{text}</span>
       </p>
       <Button
         variant="outline"
@@ -72,10 +72,12 @@ export function SyncIndicator() {
         onClick={() => void startSync()}
         disabled={busy}
         title={startError ?? undefined}
+        aria-label="Sync now"
       >
         <RefreshCwIcon aria-hidden="true" className={cn(starting && "animate-spin")} />
-        <span className="hidden sm:inline">Sync now</span>
-        <span className="sr-only sm:hidden">Sync now</span>
+        <span aria-hidden="true" className="hidden sm:inline lg:hidden xl:inline">
+          Sync now
+        </span>
       </Button>
     </div>
   );

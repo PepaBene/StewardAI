@@ -11,6 +11,7 @@ import {
   TextAreaField,
   TextField,
 } from "@/components/config/fields";
+import { MoreSettings, ShareBar, SummaryPanel } from "@/components/config/summary";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,9 +43,21 @@ import {
   configSaveQuery,
   useConfigEditor,
 } from "@/lib/hooks/use-config-editor";
-import { BlueprintCorners } from "@/components/ui/blueprint";
 
 const api = () => getBrowserApiClient();
+
+type ThesisStatus = "complete" | "gaps" | "overdue";
+const STATUS_LABEL: Record<ThesisStatus, string> = {
+  complete: "Complete",
+  gaps: "Gaps open",
+  overdue: "Review overdue",
+};
+
+/** Overdue review first, then missing rigor, otherwise complete. */
+function thesisStatus(f: ThesisForm, today: string): ThesisStatus {
+  if (f.review_date && f.review_date < today) return "overdue";
+  return rigorGaps(f.rigor).length > 0 ? "gaps" : "complete";
+}
 
 export function ThesesEditor() {
   const [forms, setForms] = useState<ThesisForm[]>([]);
@@ -80,19 +93,28 @@ export function ThesesEditor() {
     };
   }, []);
 
-  // Jump to the thesis named in the URL hash (links from a holding page).
-  useEffect(() => {
-    if (editor.status.kind !== "ready" || !window.location.hash) return;
-    document
-      .getElementById(decodeURIComponent(window.location.hash.slice(1)))
-      ?.scrollIntoView();
-  }, [editor.status.kind]);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // The thesis named in the URL hash (links from a holding page) opens first, until another is picked.
+  const [hashTicker] = useState(() => (typeof window === "undefined" ? "" : decodeURIComponent(window.location.hash.slice(1))));
 
   const body = useMemo(() => thesesToBody(forms), [forms]);
   const dirty = JSON.stringify(body) !== baseline;
   const withoutThesis = holdings.filter(
     (h) => !forms.some((f) => f.ticker === h.ticker),
   );
+  const [today] = useState(() => new Date().toISOString().slice(0, 10));
+  const current = forms.find((f) => f.key === selectedKey) ?? (hashTicker ? forms.find((f) => f.ticker === hashTicker) : undefined) ?? forms[0];
+  const statusCounts = { complete: 0, gaps: 0, overdue: 0 };
+  for (const f of forms) statusCounts[thesisStatus(f, today)] += 1;
+  const nameOf = (ticker: string) => {
+    const h = holdings.find((x) => x.ticker === ticker);
+    return h?.name ?? (ticker || "New thesis");
+  };
+  const addThesis = (ticker = "") => {
+    const t = newThesis(ticker);
+    setForms((all) => [...all, t]);
+    setSelectedKey(t.key);
+  };
 
   const update = (key: string, change: (form: ThesisForm) => ThesisForm) =>
     setForms((all) => all.map((f) => (f.key === key ? change(f) : f)));
@@ -151,23 +173,63 @@ export function ThesesEditor() {
             </EmptyState>
           ) : null}
 
-          {forms.map((form, index) => (
-            <ThesisCard
-              key={form.key}
-              form={form}
-              index={index}
-              errors={editor.errors}
-              onChange={(change) => update(form.key, change)}
-              onRemove={() =>
-                setForms((all) => all.filter((f) => f.key !== form.key))
-              }
-            />
-          ))}
+          {forms.length > 0 ? (
+            <SummaryPanel
+              title="Thesis status"
+              reading={`${forms.length} thesis${forms.length === 1 ? "" : "es"}; ${withoutThesis.length} holding${withoutThesis.length === 1 ? " has" : "s have"} none.`}
+            >
+              <ShareBar
+                label="Theses by status"
+                segments={[
+                  { label: STATUS_LABEL.complete, value: statusCounts.complete, tone: "gain" },
+                  { label: STATUS_LABEL.gaps, value: statusCounts.gaps, tone: "warning" },
+                  { label: STATUS_LABEL.overdue, value: statusCounts.overdue, tone: "loss" },
+                ]}
+              />
+            </SummaryPanel>
+          ) : null}
+
+          {forms.length > 0 ? (
+            <div className="grid items-start gap-4 lg:grid-cols-[20rem_1fr]">
+              <ul aria-label="Theses" className="space-y-1">
+                {forms.map((f) => (
+                  <li key={f.key}>
+                    <button
+                      type="button"
+                      aria-current={f.key === current?.key ? "true" : undefined}
+                      onClick={() => setSelectedKey(f.key)}
+                      className={`block w-full rounded-control px-3 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-focus/30 ${
+                        f.key === current?.key ? "bg-surface-muted font-semibold" : "hover:bg-surface-muted"
+                      }`}
+                    >
+                      <span className="block truncate">{nameOf(f.ticker)}</span>
+                      <span className="block truncate text-xs font-normal text-text-muted">
+                        {STATUS_LABEL[thesisStatus(f, today)]}
+                        {f.review_date ? `, review ${f.review_date}` : ", no review date"}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {current ? (
+                <ThesisCard
+                  key={current.key}
+                  form={current}
+                  index={forms.findIndex((f) => f.key === current.key)}
+                  errors={editor.errors}
+                  onChange={(change) => update(current.key, change)}
+                  onRemove={() =>
+                    setForms((all) => all.filter((f) => f.key !== current.key))
+                  }
+                />
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
-              onClick={() => setForms((all) => [...all, newThesis()])}
+              onClick={() => addThesis()}
             >
               <PlusIcon aria-hidden="true" />
               Add thesis
@@ -177,7 +239,7 @@ export function ThesesEditor() {
                 key={h.ticker}
                 variant="ghost"
                 size="sm"
-                onClick={() => setForms((all) => [...all, newThesis(h.ticker)])}
+                onClick={() => addThesis(h.ticker)}
               >
                 <PlusIcon aria-hidden="true" />
                 {h.name ?? h.ticker}
@@ -248,6 +310,9 @@ function ThesisCard({
   const setRigor = (change: Partial<RigorForm>) =>
     onChange((f) => ({ ...f, rigor: { ...f.rigor, ...change } }));
   const gaps = rigorGaps(form.rigor);
+  // Fixed at mount (the card is keyed per thesis) so typing never collapses a disclosure.
+  const [openScenarios] = useState(() => Boolean(form.target.bear || form.target.base || form.target.bull));
+  const [openRigor] = useState(() => gaps.length > 0 && gaps.length < 6);
   const [prefillBusy, setPrefillBusy] = useState(false);
   const [prefillNote, setPrefillNote] = useState<string | null>(null);
 
@@ -321,9 +386,8 @@ function ThesisCard({
     <section
       id={form.ticker || undefined}
       aria-label={`Thesis ${form.ticker || index + 1}`}
-      className="scroll-mt-24 space-y-4 blueprint p-5"
+      className="scroll-mt-24 space-y-4 rounded-card bg-surface-muted p-5"
     >
-      <BlueprintCorners />
       <div className="flex flex-wrap items-start gap-3">
         <TextField
           className="w-56"
@@ -458,8 +522,12 @@ function ThesisCard({
             onChange={(v) => setTarget({ set_on: v })}
           />
         </div>
-        <div className="space-y-2 border-t border-border-soft pt-3">
-          <p className="text-sm font-medium">Scenarios</p>
+        <MoreSettings
+          title="Scenarios"
+          hint="Bear, base and bull values with their chances"
+          defaultOpen={openScenarios}
+          className="bg-surface"
+        >
           <p className="text-sm text-text-muted">
             What one share is worth if the thesis fails, plays out, or plays out better, in the
             currency above, with how likely you think each is. They give the expected return and
@@ -477,7 +545,7 @@ function ThesisCard({
             <TextField label="Catalyst date" type="date" path={`${path}.price_target.catalyst_date`} errors={errors} value={form.target.catalyst_date} hint="Blank: two years" onChange={(v) => setTarget({ catalyst_date: v })} />
             <TextField label="Expected volatility (%)" path={`${path}.price_target.volatility_band`} errors={errors} value={form.target.volatility_band} inputMode="decimal" className="num" hint="A year, e.g. 30" onChange={(v) => setTarget({ volatility_band: v })} />
           </div>
-        </div>
+        </MoreSettings>
         {errorsAt(errors, `${path}.price_target`).map((m) => (
           <p key={m} className="text-xs text-text">
             <span aria-hidden="true" className="text-warning-signal">
@@ -488,8 +556,14 @@ function ThesisCard({
         ))}
       </fieldset>
 
+      <MoreSettings
+        title="Before you rely on it"
+        hint={gaps.length > 0 ? `${gaps.length} still missing` : "Every requirement is filled in"}
+        defaultOpen={openRigor}
+        className="bg-surface"
+      >
       <fieldset className="space-y-3">
-        <legend className="text-sm font-medium">Before you rely on it</legend>
+        <legend className="sr-only">Before you rely on it</legend>
         <p className="text-sm text-text-muted">
           What the price already assumes, how often that has happened, how it
           could fail and what you know that the market does not.
@@ -617,6 +691,7 @@ function ThesisCard({
           />
         </div>
       </fieldset>
+      </MoreSettings>
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">KPIs</legend>
@@ -630,7 +705,7 @@ function ThesisCard({
           return (
             <div
               key={kpi.key}
-              className="grid grid-cols-2 items-start gap-2 rounded-md border border-border p-3 sm:grid-cols-4 lg:grid-cols-[1.4fr_1fr_0.6fr_0.8fr_0.9fr_0.9fr_0.9fr_auto]"
+              className="grid grid-cols-2 items-start gap-2 rounded-card bg-surface p-3 sm:grid-cols-4 lg:grid-cols-[1.4fr_1fr_0.6fr_0.8fr_0.9fr_0.9fr_0.9fr_auto]"
             >
               <TextField
                 label="Metric"

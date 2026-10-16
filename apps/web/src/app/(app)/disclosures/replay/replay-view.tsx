@@ -66,7 +66,6 @@ export function ReplayPageView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research & Verification"
         title="Decision replay"
         description="Choose a date to see your holdings and only the filings, estimates, deals, owners and insider trades that were public by then. What appeared afterwards is shown separately."
       />

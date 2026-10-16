@@ -56,7 +56,7 @@ function Body({ c }: { c: CompanyChecks }) {
               })}
             </div>
             {selected ? <p className="mt-2 text-xs text-text-muted">{axisCoverage(selected)}. Not-applicable and unknown checks never count as a fail.</p> : null}
-            <p className="mt-3 text-[11px] text-text-faint">
+            <p className="mt-3 text-xs text-text-faint">
               Computed {formatDateTime(c.computed_at)} · method {c.method_version}, sentences {c.sentences_version}
               {c.rules_version ? (
                 <>

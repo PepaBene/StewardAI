@@ -120,7 +120,7 @@ function FactsheetBody({ isin }: { isin: string }) {
             <table className="w-full min-w-[34rem] border-collapse text-sm">
               <caption className="sr-only">Factsheet history</caption>
               <thead>
-                <tr className="border-b border-border text-left text-[11px] text-text-muted uppercase">
+                <tr className="border-b border-border text-left text-xs text-text-muted">
                   <th scope="col" className="py-1.5 pr-3 font-medium">As of</th>
                   <th scope="col" className="py-1.5 pr-3 text-right font-medium">Annual charge</th>
                   <th scope="col" className="py-1.5 pr-3 font-medium">Source</th>
@@ -153,7 +153,7 @@ function FactsheetBody({ isin }: { isin: string }) {
 function Fact({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-[11px] text-text-muted uppercase">{label}</dt>
+      <dt className="text-xs text-text-muted">{label}</dt>
       <dd>{value}</dd>
     </div>
   );

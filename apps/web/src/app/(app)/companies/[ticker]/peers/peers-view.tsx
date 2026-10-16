@@ -68,7 +68,7 @@ function IndexChart({ data }: { data: PeerCompare }) {
         {ticks.map((t) => (
           <g key={t}>
             <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} className={t === 100 ? "stroke-border" : "stroke-border-soft"} strokeDasharray={t === 100 ? "" : "2 3"} />
-            <text x={pad.l - 6} y={y(t) + 3} textAnchor="end" className="fill-text-muted text-[10px]">
+            <text x={pad.l - 6} y={y(t) + 3} textAnchor="end" className="fill-text-muted text-xs">
               {Math.round(t)}
             </text>
           </g>
@@ -82,17 +82,17 @@ function IndexChart({ data }: { data: PeerCompare }) {
               <g key={s.ticker}>
                 <path d={path(s.pts)} fill="none" className={s.subject ? "stroke-chart-line" : "stroke-chart-benchmark"} strokeWidth={s.subject ? 2.25 : 1} />
                 {last && last.index !== null ? (
-                  <text x={x(last.offset) + 5} y={y(last.index) + 3} className={cn("text-[10px]", s.subject ? "fill-text font-semibold" : "fill-text-muted")}>
+                  <text x={x(last.offset) + 5} y={y(last.index) + 3} className={cn("text-xs", s.subject ? "fill-text font-semibold" : "fill-text-muted")}>
                     {s.ticker}
                   </text>
                 ) : null}
               </g>
             );
           })}
-        <text x={pad.l} y={H - 6} className="fill-text-muted text-[10px]">
+        <text x={pad.l} y={H - 6} className="fill-text-muted text-xs">
           {Math.abs(minO)} years back
         </text>
-        <text x={W - pad.r} y={H - 6} textAnchor="end" className="fill-text-muted text-[10px]">
+        <text x={W - pad.r} y={H - 6} textAnchor="end" className="fill-text-muted text-xs">
           latest fiscal year
         </text>
       </svg>

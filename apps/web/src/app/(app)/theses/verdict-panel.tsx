@@ -19,7 +19,7 @@ const LINK = "text-accent-ink underline-offset-4 hover:underline";
 export function VerdictPanel({ row, cell, onClose }: { row: BoardRow; cell: BoardKpi; onClose: () => void }) {
   const { kpi, verdict } = cell;
   const { observed, target } = observedVsTarget(cell);
-  const holdingHref = `/holdings/${encodeURIComponent(row.ticker)}`;
+  const holdingHref = `/companies/${encodeURIComponent(row.ticker)}`;
   return (
     <div
       id={kpiPanelId(row.ticker, kpi.id)}
@@ -30,7 +30,7 @@ export function VerdictPanel({ row, cell, onClose }: { row: BoardRow; cell: Boar
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-semibold">{kpiLabel(kpi)}</p>
-          <p className="font-mono text-[11px] break-all text-text-muted">
+          <p className="font-mono text-xs break-all text-text-muted">
             {kpi.id} · {kpi.period} · {kpi.basis}
           </p>
         </div>

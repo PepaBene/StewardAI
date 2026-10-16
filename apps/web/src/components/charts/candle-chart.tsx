@@ -35,7 +35,7 @@ export type CandleChartProps = {
 
 /**
  * OHLC candles with an optional moving-average line and volume bars beneath. Up candles are
- * solid accent, down candles loss-outlined (shape differs, not only hue). When any priced bar
+ * solid gain, down candles loss-outlined (shape differs, not only hue). When any priced bar
  * lacks open/high/low the whole series falls back to a close-price line, marked "Close only".
  */
 export function CandleChart({
@@ -101,7 +101,7 @@ export function CandleChart({
   const legendItems: LegendEntry[] = [
     ...(candles
       ? [
-          { label: "Up day", swatch: "square", className: "bg-accent" } as const,
+          { label: "Up day", swatch: "square", className: "bg-gain" } as const,
           { label: "Down day", swatch: "outline", className: "border-loss bg-loss-subtle" } as const,
         ]
       : hasMa
@@ -139,14 +139,14 @@ export function CandleChart({
             const top = y(Math.max(o, c));
             const bodyH = Math.max(1, y(Math.min(o, c)) - top);
             return (
-              <g key={i} className={up ? "stroke-accent" : "stroke-loss"}>
+              <g key={i} className={up ? "stroke-gain" : "stroke-loss"}>
                 <line x1={cx(i)} x2={cx(i)} y1={y(b.high!)} y2={y(b.low!)} strokeWidth={1} />
                 <rect
                   x={band.x(i)}
                   y={top}
                   width={band.bandwidth}
                   height={bodyH}
-                  className={up ? "fill-accent" : "fill-loss-subtle"}
+                  className={up ? "fill-gain" : "fill-loss-subtle"}
                   strokeWidth={1}
                 />
               </g>
@@ -169,7 +169,7 @@ export function CandleChart({
         )}
 
         {maPts ? (
-          <path d={linePath(maPts)} fill="none" className="stroke-text" strokeWidth={1.25} strokeLinejoin="round" />
+          <path d={linePath(maPts)} fill="none" className="stroke-text-muted" strokeWidth={1.5} strokeLinejoin="round" />
         ) : null}
 
         {lastClose ? (
@@ -199,10 +199,7 @@ export function CandleChart({
         {showVolume
           ? bars.map((b, i) => {
               if (!isFiniteNumber(b.volume) || b.volume <= 0) return null;
-              const up =
-                isFiniteNumber(b.open) && isFiniteNumber(b.close)
-                  ? b.close >= b.open
-                  : i === 0 || !isFiniteNumber(closes[i - 1]) || (b.close ?? 0) >= closes[i - 1]!;
+              // Volume is neutral (chart-track), never up/down coloured: the candles already say so.
               return (
                 <rect
                   key={i}
@@ -210,7 +207,7 @@ export function CandleChart({
                   y={vy(b.volume)}
                   width={band.bandwidth}
                   height={volBottom - vy(b.volume)}
-                  className={up ? "fill-accent-300" : "fill-heat-down-soft"}
+                  className="fill-chart-track"
                 />
               );
             })

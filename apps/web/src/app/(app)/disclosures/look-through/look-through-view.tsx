@@ -51,7 +51,6 @@ export function LookThroughPageView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research & Verification"
         title="Portfolio look-through"
         description="Exposure to customers, suppliers and deals across what you hold, including the part reached through funds. Every share is of the whole portfolio."
         aside={view ? <span>Holdings snapshot {view.snapshot_date ?? "none"} · value {money(view.denominator_value)}</span> : undefined}

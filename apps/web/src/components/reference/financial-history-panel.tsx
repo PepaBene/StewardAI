@@ -49,7 +49,7 @@ export function FinancialHistoryPanel({ ticker }: { ticker: string }) {
                   className={cn(
                     "px-2.5 py-1.5",
                     i > 0 && "border-l border-border",
-                    shown === s.id ? "bg-accent text-accent-foreground" : "text-text hover:bg-border-soft",
+                    shown === s.id ? "bg-accent text-accent-foreground" : "text-text hover:bg-surface-muted",
                   )}
                 >
                   {s.label}

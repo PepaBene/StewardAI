@@ -40,7 +40,7 @@ function IssuerRow({ issuer }: { issuer: Issuer }) {
             {issuer.merged_securities > 1 ? (
               <span className="ml-2 text-xs text-text-muted">{issuer.merged_securities} securities merged</span>
             ) : null}
-            {shared ? <span className="ml-2 border border-border px-1 text-[11px] text-text-muted">{issuer.channels.length} channels</span> : null}
+            {shared ? <span className="ml-2 border border-border px-1 text-xs text-text-muted">{issuer.channels.length} channels</span> : null}
           </span>
           <span className="num text-right">{formatPercent(issuer.weight, { decimals: 2 })}</span>
           <span className="num hidden text-right text-text-muted sm:block">

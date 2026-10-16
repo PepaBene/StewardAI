@@ -9,3 +9,5 @@ export default function PerformancePage() {
     </Suspense>
   );
 }
+
+export const metadata = { title: "Returns · Performance" };

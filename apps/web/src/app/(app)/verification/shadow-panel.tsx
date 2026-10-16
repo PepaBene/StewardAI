@@ -5,6 +5,8 @@ import { useMemo } from "react";
 import { HBar } from "@/components/charts";
 import { EmptyState } from "@/components/empty-state";
 import { dataOf, Panel, ResourceNotice } from "@/components/oversight/panel";
+import { CompactRow } from "@/components/ui/compact-row";
+import { ResponsiveTable } from "@/components/ui/responsive-table";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatPct } from "@/lib/charts/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
@@ -31,6 +33,7 @@ export function ShadowPanel() {
   return (
     <Panel
       id="shadow"
+      rounded
       title="Shadow report"
       description="The sign-off report from the 30-day shadow collection: for each free provider, how much it adds beyond other sources, how often it fails and how much of its quota it uses. Informational only; it changes nothing by itself."
     >
@@ -45,7 +48,7 @@ export function ShadowPanel() {
             <Verdict ok={report.signOffReady} yes="Ready to sign off" no="Not ready to sign off" />
             <span className="num text-xs text-text-muted">
               {report.daysObserved ?? "Unknown"} of {report.windowDays ?? "Unknown"} days observed
-              {report.generatedAt ? ` · generated ${report.generatedAt.slice(0, 10)}` : ""}
+              {report.generatedAt ? ` · made on ${report.generatedAt.slice(0, 10)}` : ""}
             </span>
           </div>
           {report.blockers.length > 0 ? (
@@ -55,34 +58,39 @@ export function ShadowPanel() {
               ))}
             </ul>
           ) : null}
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[44rem] border-collapse text-sm">
-              <caption className="sr-only">Providers in the shadow report</caption>
-              <thead>
-                <tr className="border-b border-border text-left text-[11px] text-text-muted uppercase">
-                  <th scope="col" className="py-1.5 pr-3 font-medium">Provider</th>
-                  <th scope="col" className="py-1.5 pr-3 font-medium">Verdict</th>
-                  <th scope="col" className="w-[18%] py-1.5 pr-3 font-medium">Value added, of its observations</th>
-                  <th scope="col" className="w-[18%] py-1.5 pr-3 font-medium">Failures, of fetches</th>
-                  <th scope="col" className="w-[18%] py-1.5 font-medium">Quota pressure</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.providers.map((p) => (
-                  <tr key={p.provider} className="border-b border-border-soft align-top">
-                    <th scope="row" className="py-1.5 pr-3 text-left font-mono text-xs font-normal">{p.provider}</th>
-                    <td className="py-1.5 pr-3 text-xs">
-                      {p.recommendation ? titleCase(p.recommendation) : UNKNOWN}
-                      {p.reasons.length > 0 ? <span className="block text-text-muted">{p.reasons.join("; ")}</span> : null}
-                    </td>
-                    <td className="py-1.5 pr-3"><Ratio value={p.valueAddedRatio} label={`${p.provider} value added`} /></td>
-                    <td className="py-1.5 pr-3"><Ratio value={p.failureRate} label={`${p.provider} failure rate`} /></td>
-                    <td className="py-1.5"><Ratio value={p.quotaPressure} label={`${p.provider} quota pressure`} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable
+            rows={report.providers}
+            rowKey={(p) => p.provider}
+            caption="Providers in the shadow report"
+            columns={[
+              { key: "provider", header: "Provider", cell: (p) => <span className="font-medium">{titleCase(p.provider)}</span> },
+              {
+                key: "verdict",
+                header: "Verdict",
+                className: "text-xs",
+                cell: (p) => (
+                  <>
+                    {p.recommendation ? titleCase(p.recommendation) : UNKNOWN}
+                    {p.reasons.length > 0 ? <span className="block text-text-muted">{p.reasons.join("; ")}</span> : null}
+                  </>
+                ),
+              },
+              { key: "value", header: "Adds beyond other sources", className: "w-[18%]", cell: (p) => <Ratio value={p.valueAddedRatio} label={`${titleCase(p.provider)} adds beyond other sources`} /> },
+              { key: "failures", header: "Fetches that failed", className: "w-[18%]", cell: (p) => <Ratio value={p.failureRate} label={`${titleCase(p.provider)} fetches that failed`} /> },
+              { key: "quota", header: "Quota used", className: "w-[18%]", cell: (p) => <Ratio value={p.quotaPressure} label={`${titleCase(p.provider)} quota used`} /> },
+            ]}
+            compact={(p) => (
+              <CompactRow
+                name={titleCase(p.provider)}
+                symbol={p.recommendation ? titleCase(p.recommendation) : "Not measured"}
+                secondary={[
+                  `Adds ${p.valueAddedRatio === null ? "not measured" : formatPct(p.valueAddedRatio, 0)}`,
+                  `Failed ${p.failureRate === null ? "not measured" : formatPct(p.failureRate, 0)}`,
+                ]}
+              />
+            )}
+            empty={<p className="text-sm text-text-muted">The report lists no providers.</p>}
+          />
           <ul className="space-y-0.5 text-xs text-text-muted">
             {report.notes.map((n) => (
               <li key={n}>{n}</li>

@@ -11,6 +11,7 @@ import type { CitationPreview } from "@/lib/news/digest";
 import { TIERS } from "@/lib/news/labels";
 import { useAnchoredPosition } from "@/lib/hooks/use-anchored-position";
 import { cn } from "@/lib/utils";
+import { decodeEntities } from "@/lib/news/entities";
 
 const CHIP = "num rounded-sm border border-border px-1 text-xs text-accent hover:border-accent";
 
@@ -109,7 +110,7 @@ export function PreviewBody({ preview }: { preview: CitationPreview }) {
         </span>
       </p>
       <p className="flex flex-wrap items-center gap-1.5 font-medium">
-        {preview.title}
+        {decodeEntities(preview.title)}
         {preview.relation ? <EvidenceRelationBadge relation={preview.relation} /> : null}
         {preview.provenance ? <ProvenanceTag provenance={preview.provenance} /> : null}
       </p>

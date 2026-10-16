@@ -14,7 +14,74 @@ import { JOB_TYPES } from "./activity";
 type CostSummary = components["schemas"]["CostSummary"];
 type SourcesHealth = components["schemas"]["SourcesHealth"];
 
-export const GRID_DAYS = 21;
+export const GRID_DAYS = 14;
+
+/** Job groups for the status matrix, in display order. Types not listed fall under "Other". */
+export const JOB_GROUPS: readonly { name: string; types: readonly string[] }[] = [
+  { name: "Portfolio and prices", types: ["portfolio_sync", "price_history", "holiday_refresh", "reference_data", "macro_collect", "valuation_refresh"] },
+  { name: "News and alerts", types: ["news_ingest", "event_escalation", "monitor", "daily_digest", "weekly_digest"] },
+  {
+    name: "Earnings and filings",
+    types: ["earnings_check", "earnings_due", "earnings_calendar", "earnings_calendar_full", "sec_xbrl", "ownership_13f", "etf_look_through", "fact_reconcile"],
+  },
+  { name: "Analysis", types: ["thesis_verdicts", "research", "monthly_review", "chat"] },
+  { name: "Upkeep and safety checks", types: [] },
+];
+
+const OTHER_GROUP = "Other";
+
+/**
+ * For job types not listed above: the group by the job's human name, tried in this order so
+ * "Fund endpoint probes" lands in upkeep rather than filings.
+ */
+const GROUP_BY_LABEL: readonly { name: string; match: RegExp }[] = [
+  { name: "Upkeep and safety checks", match: /retention|audit|gate|shadow|probe|tests?\b|watchdog|access test/i },
+  { name: "News and alerts", match: /news|digest|monitor|alert|triage/i },
+  { name: "Portfolio and prices", match: /portfolio|price|holiday|reference|macro|returns|exchange|factor|exposure/i },
+  { name: "Analysis", match: /review|research|\bai\b|autopilot|approvals|checks|gap|agent|document index|investor page|identifier|calibration|answer/i },
+  {
+    name: "Earnings and filings",
+    match: /earnings|sec|13f|13d|xbrl|filing|n-port|fund|insider|statements|edinet|companies house|annual report|director|disclosure|dividend|corporate actions|consensus|fair-value|fmp|alpha vantage|patent|deal|issuer|releases|profile|valuation|etf|reconciliation|ownership/i,
+  },
+];
+
+/** The group a job belongs to: by its type when listed, else by its human name, else "Other". */
+export function jobGroup(jobType: string, label?: string): string {
+  const listed = JOB_GROUPS.find((g) => g.types.includes(jobType))?.name;
+  if (listed) return listed;
+  return (label && GROUP_BY_LABEL.find((g) => g.match.test(label))?.name) || OTHER_GROUP;
+}
+
+export type MatrixRow = { label: string; group: string; cells: GridCell[]; note?: string };
+
+/**
+ * StatusMatrix rows from the job grid: one row per job with its human name and group, groups in
+ * display order, jobs within a group in registry order. Columns are the grid's days.
+ */
+export function matrixRows(rows: readonly JobGridRow[], labelOf: (jobType: string) => string, noteOf?: (job: JobListItem) => string): MatrixRow[] {
+  const groupRank = (name: string) => {
+    const k = JOB_GROUPS.findIndex((g) => g.name === name);
+    return k < 0 ? JOB_GROUPS.length : k;
+  };
+  return rows
+    .map((r) => {
+      const label = labelOf(r.jobType);
+      return { jobType: r.jobType, row: { label, group: jobGroup(r.jobType, label), cells: r.cells, note: r.last && noteOf ? noteOf(r.last) : undefined } };
+    })
+    .sort((a, b) => groupRank(a.row.group) - groupRank(b.row.group))
+    .map((x) => x.row);
+}
+
+export type JobCost = { jobType: string; label: string; cost: number; runs: number };
+
+/** Spend per job type, largest first, capped at `limit`; zero-cost types are left out. */
+export function costByJob(rows: readonly { job_type: string; cost_usd: number; runs: number }[], labelOf: (jobType: string) => string, limit = 8): JobCost[] {
+  return rows
+    .filter((r) => r.cost_usd > 0)
+    .map((r) => ({ jobType: r.job_type, label: labelOf(r.job_type), cost: r.cost_usd, runs: r.runs }))
+    .sort((a, b) => b.cost - a.cost || a.label.localeCompare(b.label))
+    .slice(0, limit);
+}
 
 function dayKey(date: Date, timeZone?: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);

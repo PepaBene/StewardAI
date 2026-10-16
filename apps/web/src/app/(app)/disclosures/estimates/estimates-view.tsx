@@ -88,7 +88,6 @@ export function EstimatesPageView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research & Verification"
         title="Published estimates"
         description="What a company and the analysts it publishes said to expect, how that moved, and how the result compared. Five kinds of number, kept in five lanes."
         aside={<span>{ticker ?? SAMPLE_EST_TICKER} · as known on {formatDay(new Date(cutoff).toISOString())}</span>}

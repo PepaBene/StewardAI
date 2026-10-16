@@ -13,8 +13,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
-import { BarChart, Gauge, SparkArea, StackedBar } from "@/components/charts";
-import { EmptyState } from "@/components/empty-state";
+import { BarChart, SparkArea } from "@/components/charts";
+import { KpiStrip } from "@/components/insight/kpi-tile";
 import { JobStatusBadge } from "@/components/jobs/job-status-badge";
 import { PageHeader } from "@/components/page-header";
 import { Blueprint } from "@/components/ui/blueprint";
@@ -28,7 +28,6 @@ import {
   shortTicker,
   stateCounts,
   THESIS_STATE,
-  THESIS_STATE_ORDER,
   type ThesisState,
 } from "@/lib/evidence/board";
 import { formatDate, formatDateTime, formatRelative } from "@/lib/format";
@@ -38,6 +37,7 @@ import { useNow } from "@/lib/hooks/use-now";
 import { jobHref } from "@/lib/jobs/job-detail";
 import { cn } from "@/lib/utils";
 
+import { GuidedStart } from "./guided-start";
 import { RankingSection } from "./ranking-section";
 import { ThesisCard } from "./thesis-card";
 
@@ -54,7 +54,6 @@ export function ThesisBoardView() {
   return (
     <div className="flex flex-col gap-[22px]">
       <PageHeader
-        kicker="Research & Verification"
         title="Theses"
         description="Each holding's thesis, scored from its KPIs against the latest verified figures."
         aside={<RejudgeAll onDone={reload} />}
@@ -165,14 +164,7 @@ function Board({ board }: { board: ThesisBoard }) {
   if (board.rows.length === 0) {
     return (
       <>
-        <VerdictsAsOf asOf={board.as_of} />
-        <EmptyState title="No theses configured">
-          Write why you own each holding and the KPIs that must hold in the{" "}
-          <Link className={LINK} href="/config/theses">
-            theses editor
-          </Link>
-          . Saving queues a verdict run, and every holding with a thesis appears here.
-        </EmptyState>
+        <GuidedStart />
       </>
     );
   }
@@ -191,19 +183,19 @@ function Board({ board }: { board: ThesisBoard }) {
 
   return (
     <>
-      <StatRow board={board} />
+      <AnswerStrip board={board} overdue={summary.overdue} />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
         <VerdictsAsOf asOf={board.as_of} />
         <p className="num text-text-muted">
           <span className="font-medium text-text">
             {summary.holdings} holding{summary.holdings === 1 ? "" : "s"}
-          </span>{" "}
-          · {summary.byOverall.breach} breach · {summary.byOverall.unknown} unknown · {summary.byOverall.pass} pass
-          {summary.byOverall.no_kpis > 0 ? ` · ${summary.byOverall.no_kpis} without KPIs` : ""}
+          </span>
+          : {summary.byOverall.breach} with a KPI in breach, {summary.byOverall.unknown} not yet known, {summary.byOverall.pass} passing
+          {summary.byOverall.no_kpis > 0 ? `, ${summary.byOverall.no_kpis} without KPIs` : ""}
         </p>
         {summary.openReviewItems > 0 ? (
-          <Link href="/review" className={`inline-flex items-center gap-1 ${LINK}`}>
+          <Link href="/inbox?kind=figures" className={`inline-flex items-center gap-1 ${LINK}`}>
             <InboxIcon aria-hidden="true" className="size-4" />
             <span className="num">{summary.openReviewItems}</span> figure{summary.openReviewItems === 1 ? "" : "s"} wait
             {summary.openReviewItems === 1 ? "s" : ""} for review
@@ -234,6 +226,8 @@ function Board({ board }: { board: ThesisBoard }) {
         </Column>
       ) : null}
 
+      <StatRow board={board} />
+
       <p id="score-method" className="flex max-w-4xl items-start gap-1.5 text-xs text-text-muted">
         <InfoIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
         <span>
@@ -246,12 +240,43 @@ function Board({ board }: { board: ThesisBoard }) {
   );
 }
 
-const RULE: Record<ThesisState, string> = {
-  intact: "border-accent",
-  watch: "border-warning-signal",
-  at_risk: "border-loss",
-  unjudged: "border-border",
+const DOT: Record<ThesisState, string> = {
+  intact: "bg-gain",
+  watch: "bg-warning-signal",
+  at_risk: "bg-loss",
+  unjudged: "bg-text-faint",
 };
+
+/** Portfolio score, the three state counts and overdue reviews: the board's answer in one row. */
+function AnswerStrip({ board, overdue }: { board: ThesisBoard; overdue: number }) {
+  const counts = stateCounts(board.rows);
+  const change = scoreChange(board.portfolio_score, board.portfolio_score_history);
+  return (
+    <KpiStrip
+      label="Theses summary"
+      tiles={[
+        {
+          label: "Weighted thesis score",
+          value: board.portfolio_score == null ? "–" : Math.round(board.portfolio_score),
+          note:
+            board.portfolio_score == null
+              ? "No held company has a score yet"
+              : change
+                ? `${change.delta > 0 ? "+" : change.delta < 0 ? "−" : "±"}${Math.abs(change.delta)} since ${formatDate(change.since)}`
+                : "Out of 100, by position weight",
+        },
+        { label: "Intact", value: counts.intact, signed: counts.intact > 0 ? "gain" : undefined },
+        { label: "Watch", value: counts.watch },
+        { label: "At risk", value: counts.at_risk, signed: counts.at_risk > 0 ? "loss" : undefined },
+        {
+          label: "Reviews overdue",
+          value: overdue,
+          note: overdue > 0 ? "Past their review date" : "All reviews on time",
+        },
+      ]}
+    />
+  );
+}
 
 function Column({
   state,
@@ -267,15 +292,16 @@ function Column({
   const id = `column-${state}`;
   return (
     <section aria-labelledby={id} className="flex min-w-0 flex-col gap-3">
-      <div className={cn("flex items-center gap-2.5 border-b-2 pb-2.5", RULE[state])}>
-        <h2 id={id} className="text-[22px] leading-tight font-semibold">
+      <div className="flex items-center gap-2.5 pb-1">
+        <span aria-hidden="true" className={cn("size-2.5 rounded-full", DOT[state])} />
+        <h2 id={id} className="panel-title">
           {THESIS_STATE[state].label}
         </h2>
-        <span className="num bg-border-soft px-2 py-px text-xs">{count}</span>
+        <span className="num rounded-full bg-surface-muted px-2 py-px text-xs text-text-muted">{count}</span>
         <span className="ml-auto text-xs text-text-muted">{THESIS_STATE[state].note}</span>
       </div>
       {count === 0 ? (
-        <p className="border border-dashed border-border px-4 py-6 text-center text-xs text-text-faint">None</p>
+        <p className="rounded-card bg-surface-muted px-4 py-6 text-center text-xs text-text-faint">None</p>
       ) : (
         <div className={cn("grid items-start gap-3.5", wide && "sm:grid-cols-2", wide && state === "unjudged" && "lg:grid-cols-4")}>
           {children}
@@ -285,31 +311,18 @@ function Column({
   );
 }
 
+/** Below the board: the score per holding and the verdicts recorded over 30 days. */
 function StatRow({ board }: { board: ThesisBoard }) {
-  const counts = stateCounts(board.rows);
-  const segments = THESIS_STATE_ORDER.filter((s) => s !== "unjudged" || counts.unjudged > 0)
-    .map((s) => ({ state: s, label: THESIS_STATE[s].label, value: counts[s] }))
-    .filter((s) => s.value > 0);
   const scored = board.rows
     .filter((r) => r.score !== null)
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-  const change = scoreChange(board.portfolio_score, board.portfolio_score_history);
   const perDay = board.verdicts_30d.per_day.map((d) => d.count);
   const methodHint = "How the score is computed: see the note under the board.";
 
   return (
-    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-[1fr_1.3fr_1fr_1fr]">
-      <Blueprint className="flex flex-col justify-center gap-2 px-5 py-[18px]" aria-label="Theses by state">
-        <StackedBar
-          segments={segments.map((s) => ({ label: s.label, value: s.value }))}
-          title="Theses by state"
-          note={`${board.rows.length} ${board.rows.length === 1 ? "thesis" : "theses"}`}
-          formatShare={(f) => String(Math.round(f * board.rows.length))}
-        />
-      </Blueprint>
-
+    <div className="grid items-start gap-5 md:grid-cols-[1.6fr_1fr]">
       <Blueprint className="flex flex-col gap-2 px-5 py-[18px]">
-        <h2 className="font-sans text-xs font-normal text-text-muted" title={methodHint}>
+        <h2 className="panel-title" title={methodHint}>
           Score by holding
         </h2>
         {scored.length === 0 ? (
@@ -330,32 +343,8 @@ function StatRow({ board }: { board: ThesisBoard }) {
         )}
       </Blueprint>
 
-      <Blueprint className="flex flex-col gap-1 px-5 py-[18px]">
-        <h2 className="flex items-center gap-1 font-sans text-xs font-normal text-text-muted">
-          Weighted thesis score
-          <a href="#score-method" title={methodHint} className="text-text-faint hover:text-text">
-            <InfoIcon aria-hidden="true" className="size-3.5" />
-            <span className="sr-only">How the score is computed</span>
-          </a>
-        </h2>
-        <Gauge
-          value={board.portfolio_score ?? null}
-          max={100}
-          formatValue={(v) => String(Math.round(v))}
-          sublabel={
-            change
-              ? `${change.delta > 0 ? "▲ +" : change.delta < 0 ? "▼ −" : "±"}${Math.abs(change.delta)} since ${formatDate(change.since)}`
-              : board.portfolio_score == null
-                ? "No held holding has a score yet"
-                : undefined
-          }
-          ariaLabel="Weighted thesis score, by position weight"
-          className="mx-auto w-full max-w-[240px]"
-        />
-      </Blueprint>
-
       <Blueprint className="flex flex-col gap-1.5 px-5 py-[18px]">
-        <h2 className="font-sans text-xs font-normal text-text-muted">Verdicts, last 30 days</h2>
+        <h2 className="panel-title">Verdicts, last 30 days</h2>
         <p className="font-heading text-[32px] leading-none font-semibold">
           <span className="num">{board.verdicts_30d.count}</span>{" "}
           <span className="font-sans text-sm font-normal text-text-muted">

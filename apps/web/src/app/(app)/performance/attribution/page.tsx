@@ -9,3 +9,5 @@ export default function AttributionPage() {
     </Suspense>
   );
 }
+
+export const metadata = { title: "Contribution · Performance" };

@@ -35,7 +35,7 @@ export function AllocationBars({
         const width = Math.max(0, Math.min(1, item.weight ?? 0)) * 100;
         const barClass = classes[i];
         return (
-          <li key={item.key} className="space-y-1">
+          <li key={item.key} className="space-y-1" title={item.key}>
             <div className="flex items-baseline justify-between gap-3 text-sm">
               <span className="min-w-0 truncate">
                 <span aria-hidden="true" className={cn("mr-1.5 inline-block size-2 rounded-full align-middle", barClass)} />

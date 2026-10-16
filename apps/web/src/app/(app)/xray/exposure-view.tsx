@@ -1,5 +1,6 @@
 "use client";
 
+import { LookThroughSection } from "@/components/portfolio/moved-sections";
 import { TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -9,6 +10,7 @@ import { ResourceGate } from "@/components/company/primitives";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { DataAgeBadge, ageInDays } from "@/components/freshness/data-age-badge";
 import { CsvDownload } from "@/components/ui/csv-download";
+import { AllocationOverview } from "@/components/xray/allocation-overview";
 import { CompositionStrip } from "@/components/xray/composition-strip";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate, formatMoney, formatPercent } from "@/lib/format";
@@ -35,9 +37,13 @@ export function ExposureView() {
   );
   const { state } = useApiResource(fetcher);
   return (
-    <ResourceGate state={state} label="X-Ray">
-      {(data) => <Exposure data={data} asOf={asOf} />}
-    </ResourceGate>
+    <div className="flex flex-col gap-5">
+      <AllocationOverview asOf={asOf} />
+      <ResourceGate state={state} label="X-Ray">
+        {(data) => <Exposure data={data} asOf={asOf} />}
+      </ResourceGate>
+      <LookThroughSection />
+    </div>
   );
 }
 
@@ -90,7 +96,7 @@ function Coverage({ data, asOf }: { data: XrayData; asOf: string }) {
                 <tr key={f.isin} className="border-t border-border-soft align-top">
                   <th scope="row" className="px-3 py-1.5 text-left font-normal">
                     {f.label}
-                    {f.warnings.length > 0 ? <span className="block text-[11px] text-text-muted">{f.warnings[0]}</span> : null}
+                    {f.warnings.length > 0 ? <span className="block text-xs text-text-muted">{f.warnings[0]}</span> : null}
                   </th>
                   <td className={TD}>{formatPercent(f.weight, { decimals: 1 })}</td>
                   <td className="px-3 py-1.5">
@@ -198,9 +204,9 @@ function BucketTable({ view, currency, total }: { view: XrayView; currency: stri
                     <i aria-hidden="true" className={cn("mt-1 inline-block size-2.5 shrink-0 border border-border", tone.className)} />
                     <span>
                       {b.label}
-                      {unknownish ? <span className="block text-[11px] text-text-muted">Not known: shown, not estimated</span> : null}
+                      {unknownish ? <span className="block text-xs text-text-muted">Not known: shown, not estimated</span> : null}
                       {b.fund_weight > 0 && b.direct_weight > 0 ? (
-                        <span className="block text-[11px] text-text-muted">
+                        <span className="block text-xs text-text-muted">
                           direct {formatPercent(b.direct_weight, { decimals: 1 })} · through funds {formatPercent(b.fund_weight, { decimals: 1 })}
                         </span>
                       ) : null}

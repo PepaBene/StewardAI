@@ -116,7 +116,40 @@ export const PRESETS: readonly { id: string; label: string; description: string;
       { metric: "gross_margin", op: "gte", value: "40" },
     ],
   },
+  {
+    id: "growth",
+    label: "Growing and profitable",
+    description: "Revenue growth at least 10%, operating margin at least 10%",
+    filters: [
+      { metric: "revenue_growth", op: "gte", value: "10" },
+      { metric: "operating_margin", op: "gte", value: "10" },
+    ],
+  },
+  {
+    id: "balance",
+    label: "Clean balance sheet",
+    description: "Net debt to equity at most 0.3×, return on invested capital at least 8%",
+    filters: [
+      { metric: "net_debt_to_equity", op: "lte", value: "0.3" },
+      { metric: "roic", op: "gte", value: "8" },
+    ],
+  },
 ];
+
+/** A draft condition in words, e.g. "Gross margin at least 40%"; "enter a number" while blank. */
+export function describeDraft(d: Pick<FilterDraft, "metric" | "op" | "value">): string {
+  const info = metricInfo(d.metric);
+  const v = d.value.trim();
+  const value = v === "" || !Number.isFinite(Number(v)) ? "…" : `${v}${unitSuffix(d.metric)}`;
+  return `${info?.label ?? d.metric} ${OP_LABEL[d.op]} ${value}`;
+}
+
+/** Which preset the drafts are, if they match one exactly (order does not matter). */
+export function activePreset(drafts: readonly Pick<FilterDraft, "metric" | "op" | "value">[]): string | null {
+  const key = (f: Pick<FilterDraft, "metric" | "op" | "value">) => `${f.metric}|${f.op}|${Number(f.value)}`;
+  const mine = drafts.map(key).sort().join(";");
+  return PRESETS.find((p) => p.filters.map(key).sort().join(";") === mine)?.id ?? null;
+}
 
 export type FunnelStep = { id: "matched" | "filtered_out" | "no_data" | "no_period"; label: string; value: number };
 

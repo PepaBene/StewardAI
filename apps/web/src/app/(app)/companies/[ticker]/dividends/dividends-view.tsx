@@ -81,7 +81,6 @@ function Body({ d, onChanged }: { d: CompanyDividends; onChanged: () => void }) 
     );
   }
   const axis = d.dividend_axis;
-  const next = d.schedule[0];
   const forward = d.schedule.reduce((s, p) => s + (num(p.per_share) ?? 0), 0);
   return (
     <div className="flex flex-col gap-5">
@@ -111,8 +110,8 @@ function Body({ d, onChanged }: { d: CompanyDividends; onChanged: () => void }) 
       />
       {d.buy_before ? (
         <VerdictLine verdict="neutral">
-          Buy before {formatDay(d.buy_before)} to receive the next payment
-          {next ? ` of ${money(next.per_share, next.currency ?? ccy, 4)} a share on ${formatDay(next.date)} (${KIND_LABEL[next.kind].toLowerCase()})` : ""}.
+          {/* The backend sends the whole sentence ("Buy before <date> ... payment of ..."). */}
+          {d.buy_before}
         </VerdictLine>
       ) : null}
       {d.disagreements.length || d.filed_dps_check ? (
@@ -260,7 +259,7 @@ function PayoutPanel({ d }: { d: CompanyDividends }) {
                 {r.v !== null ? <div className={cn("h-full", over ? "bg-loss" : "bg-gain")} style={{ width: `${(Math.max(0, r.v) / scaleMax) * 100}%` }} /> : null}
                 <span aria-hidden="true" className="absolute -top-1 h-4 w-px bg-text" style={{ left: `${(r.limit / scaleMax) * 100}%` }} />
               </div>
-              <p className="mt-0.5 text-[11px] text-text-faint">{r.v === null ? "Input missing" : over ? "Above the limit" : "Within the limit"}</p>
+              <p className="mt-0.5 text-xs text-text-faint">{r.v === null ? "Input missing" : over ? "Above the limit" : "Within the limit"}</p>
             </div>
           );
         })}

@@ -107,7 +107,7 @@ function ConcentrationPanel({ data, currency }: { data: PortfolioDataContext; cu
                 type="button"
                 aria-pressed={dim === d}
                 onClick={() => setDim(d)}
-                className={cn("px-2.5 py-1.5", i > 0 && "border-l border-border", dim === d ? "bg-accent text-accent-foreground" : "text-text hover:bg-border-soft")}
+                className={cn("px-2.5 py-1.5", i > 0 && "border-l border-border", dim === d ? "bg-accent text-accent-foreground" : "text-text hover:bg-surface-muted")}
               >
                 {d === "country" ? "Country" : "Product"}
               </button>

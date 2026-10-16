@@ -9,3 +9,5 @@ export default function ProposedPage() {
     </Suspense>
   );
 }
+
+export const metadata = { title: "What if · X-Ray" };

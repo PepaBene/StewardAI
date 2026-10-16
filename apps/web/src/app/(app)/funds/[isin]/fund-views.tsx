@@ -87,7 +87,7 @@ export function ProfileView({ isin }: { isin: string }) {
                   <dd className="min-w-0">
                     <FieldValue f={f} />
                     {f.value && f.source ? (
-                      <span className="block text-[11px] text-text-muted">
+                      <span className="block text-xs text-text-muted">
                         {f.source}
                         {f.as_of ? `, ${formatDate(f.as_of)}` : ""} {f.source_url ? <SourceLink href={f.source_url}>source</SourceLink> : null}
                       </span>
@@ -197,7 +197,7 @@ export function HoldingsTab({ isin }: { isin: string }) {
                         <tr key={l.issuer_key} className="border-t border-border-soft">
                           <th scope="row" className="px-3 py-1 text-left font-normal">
                             {l.label}
-                            {l.isins.length > 0 ? <span className="block font-mono text-[11px] text-text-muted">{l.isins.join(", ")}</span> : <span className="block text-[11px] text-unconfirmed">no ISIN, matched by name only</span>}
+                            {l.isins.length > 0 ? <span className="block font-mono text-xs text-text-muted">{l.isins.join(", ")}</span> : <span className="block text-xs text-unconfirmed">no ISIN, matched by name only</span>}
                           </th>
                           <td className="num px-2 py-1 text-right">{pct(l.weight)}</td>
                           <td className="px-2 py-1">{l.sector ?? <Absent reason="missing: no sector published" />}</td>

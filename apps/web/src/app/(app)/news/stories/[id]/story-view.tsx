@@ -31,6 +31,7 @@ import {
 } from "@/lib/news/analysis";
 import { eventLabel } from "@/lib/news/labels";
 import { isExternalUrl } from "@/lib/sources/sources";
+import { decodeEntities } from "@/lib/news/entities";
 
 type Load =
   | { kind: "loading" }
@@ -170,11 +171,11 @@ export function StoryView({ id }: { id: number }) {
               </p>
               {isExternalUrl(item.url) ? (
                 <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 hover:text-accent-ink hover:underline">
-                  <span className="[overflow-wrap:anywhere]">{item.headline}</span>
+                  <span className="[overflow-wrap:anywhere]">{decodeEntities(item.headline)}</span>
                   <ExternalLinkIcon aria-hidden="true" className="mt-1 size-3 shrink-0 text-text-muted" />
                 </a>
               ) : (
-                <span className="inline-flex [overflow-wrap:anywhere]">{item.headline}</span>
+                <span className="inline-flex [overflow-wrap:anywhere]">{decodeEntities(item.headline)}</span>
               )}
               {item.links.length > 0 ? (
                 <p className="text-xs text-text-muted">
@@ -362,8 +363,8 @@ function AnalysisPanels({ analysis, items }: { analysis: StoryAnalysis; items: S
           </p>
           <TextList title="Conflicts" items={framing.conflicts} />
           {framing.divergences.map((d, i) => (
-            <p key={`${i}:${d.summary}`} className="text-sm">
-              <span className="font-mono text-xs">{d.regions.join(", ")}</span> {d.summary}
+            <p key={`${i}:${decodeEntities(d.summary)}`} className="text-sm">
+              <span className="font-mono text-xs">{d.regions.join(", ")}</span> {decodeEntities(d.summary)}
             </p>
           ))}
           <ul className="m-0 list-none space-y-1 p-0 text-sm">

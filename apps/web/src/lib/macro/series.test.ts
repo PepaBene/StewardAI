@@ -44,8 +44,8 @@ describe("seriesView", () => {
     expect(v.hasVintages).toBe(false);
   });
 
-  it("falls back to the series id when no label is stored", () => {
-    expect(seriesView(series("cpi_yoy", [pt("2025-11-01", "1", "1")])).title).toBe("cpi_yoy");
+  it("falls back to the humanised series id when no label is stored", () => {
+    expect(seriesView(series("cpi_yoy", [pt("2025-11-01", "1", "1")])).title).toBe("Cpi yoy");
   });
 });
 

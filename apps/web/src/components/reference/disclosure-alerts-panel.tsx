@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback } from "react";
 
+import { EntityName } from "@/components/entity-name";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { ALERT_HREF, ALERT_KIND_LABEL, byKnown, whyLines } from "@/lib/disclosure/alerts";
@@ -36,7 +37,7 @@ function AlertsForTicker({ ticker }: { ticker: string }) {
       {state.kind === "loading" && !alerts ? <p className="text-sm text-text-muted">Loading…</p> : null}
       {state.kind === "error" && !alerts ? <p className="text-sm text-text-muted">Disclosure alerts unavailable: {state.title}</p> : null}
       {stale ? <p role="alert" className="text-sm text-text-muted">Could not refresh: {state.kind === "error" ? state.title : ""}. These alerts are from the last successful load and may be out of date.</p> : null}
-      {alerts && shown.length === 0 ? <p className="text-sm text-text-muted">Nothing unread for {ticker}. New filings appear here after the next collection.</p> : null}
+      {alerts && shown.length === 0 ? <p className="text-sm text-text-muted">Nothing unread for <EntityName id={ticker} chip={false} />. New filings appear here after the next collection.</p> : null}
       {shown.length > 0 ? (
         <ul className="divide-y divide-border-soft border-y border-border-soft">
           {shown.map((a) => (

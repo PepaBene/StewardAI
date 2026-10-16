@@ -1,123 +1,117 @@
 "use client";
 
-import { useMemo } from "react";
-
-import { dataOf, Panel, ResourceNotice } from "@/components/oversight/panel";
+import { Panel, ResourceNotice } from "@/components/oversight/panel";
+import { StatusList, type StatusRow } from "@/components/oversight/status-list";
 import { getBrowserApiClient } from "@/lib/api/client";
-import { useApiResource } from "@/lib/hooks/use-api-resource";
+import type { ResourceState } from "@/lib/hooks/use-api-resource";
 import { titleCase } from "@/lib/parse-untyped";
-import { parseDomainGates, parseZeroCost } from "@/lib/verification/verification";
 import { cn } from "@/lib/utils";
+import type { Conclusion, DomainGate, ZeroCostGate } from "@/lib/verification/verification";
 
-const fetchZero = () => getBrowserApiClient().GET("/verification/zero-cost-gate");
-const fetchDomains = () => getBrowserApiClient().GET("/verification/domain-gates");
+export const fetchZero = () => getBrowserApiClient().GET("/verification/zero-cost-gate");
+export const fetchDomains = () => getBrowserApiClient().GET("/verification/domain-gates");
 
-/** A gate verdict as a word plus a bordered mark; never a gain/loss colour. */
+/** A gate verdict as a word plus a mark; never a gain/loss colour. */
 export function Verdict({ ok, yes = "Open", no = "Blocked" }: { ok: boolean; yes?: string; no?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-1.5 border px-1.5 py-0.5 text-[11px] font-semibold uppercase", ok ? "border-accent text-accent-ink" : "border-warning-signal text-text")}>
-      <span aria-hidden="true" className={cn("size-1.5", ok ? "bg-accent" : "bg-warning-signal")} />
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-control border px-1.5 py-0.5 text-xs font-semibold",
+        ok ? "border-accent text-accent-ink" : "border-warning-signal text-text",
+      )}
+    >
+      <span aria-hidden="true" className={cn("size-1.5 rounded-full", ok ? "bg-accent" : "bg-warning-signal")} />
       {ok ? yes : no}
     </span>
   );
 }
 
-const UNKNOWN = <span className="text-text-muted">Not measured</span>;
+/** The zero-cost audit and every reconciliation gate as check rows, blocked ones first. */
+export function GatesPanel({
+  zero,
+  domains,
+  z,
+  d,
+}: {
+  /** The two fetches, owned by the page so the summary tiles and this panel share one request each. */
+  zero: { state: ResourceState<unknown> };
+  domains: { state: ResourceState<unknown> };
+  z: ZeroCostGate | null;
+  d: { domains: DomainGate[]; conclusions: Conclusion[] } | null;
+}) {
 
-export function GatesPanel() {
-  const zero = useApiResource(fetchZero);
-  const domains = useApiResource(fetchDomains);
-  const z = useMemo(() => (dataOf(zero.state) ? parseZeroCost(dataOf(zero.state)) : null), [zero.state]);
-  const d = useMemo(() => (dataOf(domains.state) ? parseDomainGates(dataOf(domains.state)) : null), [domains.state]);
+  const gateRows: StatusRow[] = [];
+  if (z) {
+    gateRows.push({
+      id: "zero-cost",
+      state: z.passed ? "pass" : "fail",
+      lead: "Zero-cost audit",
+      sentence: z.passed
+        ? `Nothing paid is reachable. ${z.checked ?? "Unknown"} endpoints checked, ${z.freeAvailable ?? "unknown"} free and available.`
+        : `A paid endpoint is reachable (${z.violations ?? "unknown"} violations). Turn it off in Data sources.`,
+      details: (
+        <>
+          <p>
+            {z.disabledOk ?? "Unknown"} disabled · {z.gatedUnverified ?? "Unknown"} gated and unverified · {z.warnings ?? "Unknown"} warnings
+          </p>
+          {z.findings.map((f, i) => (
+            <p key={i}>
+              {f.provider} {f.endpoint} · {titleCase(f.severity)} · {f.code}: {f.message}
+            </p>
+          ))}
+        </>
+      ),
+      href: "/data-sources#access",
+      hrefLabel: "Open Data sources",
+    });
+  }
+  for (const g of d?.domains ?? []) {
+    gateRows.push({
+      id: `domain-${g.domain}`,
+      state: g.samples === null && g.failures === null ? "unknown" : g.allowed ? "pass" : "fail",
+      lead: `${titleCase(g.domain)} reconciliation`,
+      sentence:
+        g.samples === null
+          ? "Not measured yet, so conclusions that need it stay closed."
+          : g.allowed
+            ? `Open: ${g.samples} samples agree with the source${g.failures ? `, ${g.failures} failed` : ""}.`
+            : `Blocked: ${g.failures ?? "unknown"} of ${g.samples} samples disagree with the source.`,
+      details: g.reasons.length > 0 ? <p>{g.reasons.join("; ")}</p> : undefined,
+    });
+  }
+
+  const conclusionRows: StatusRow[] = (d?.conclusions ?? []).map((c) => ({
+    id: `conclusion-${c.name}`,
+    state: c.allowed ? "pass" : "fail",
+    lead: titleCase(c.name),
+    sentence: c.allowed
+      ? `Open: every domain it rests on is open (${c.domains.map(titleCase).join(", ")}).`
+      : `Blocked until ${c.domains.map(titleCase).join(", ")} ${c.domains.length === 1 ? "is" : "are"} open.`,
+  }));
 
   return (
     <Panel
       id="gates"
       title="Gates"
+      rounded
       description="The zero-cost audit checks that nothing paid is reachable. Each reconciliation domain is open only when its measured samples agree; a conclusion is open only when every domain it rests on is."
     >
       <ResourceNotice state={zero.state} what="zero-cost gate" />
-      {z ? (
-        <div className="space-y-2 border border-border-soft px-4 py-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <h3 className="text-sm font-semibold">Zero-cost gate</h3>
-            <Verdict ok={z.passed} yes="Nothing paid is reachable" no="Paid endpoint reachable" />
-          </div>
-          <p className="num text-xs text-text-muted">
-            {z.checked ?? "Unknown"} endpoints checked · {z.freeAvailable ?? "Unknown"} free and available · {z.disabledOk ?? "Unknown"} disabled · {z.gatedUnverified ?? "Unknown"} gated and unverified · {z.violations ?? "Unknown"} violations · {z.warnings ?? "Unknown"} warnings
-          </p>
-          {z.findings.length > 0 ? (
-            <details className="text-sm">
-              <summary className="cursor-pointer text-accent-ink hover:underline">{z.findings.length} findings</summary>
-              <ul className="mt-2 space-y-1 text-xs">
-                {z.findings.map((f, i) => (
-                  <li key={i}>
-                    <span className="font-mono">
-                      {f.provider} {f.endpoint}
-                    </span>{" "}
-                    <span className="text-text-muted">
-                      {titleCase(f.severity)} · {f.code}: {f.message}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ) : null}
-        </div>
-      ) : null}
-
       <ResourceNotice state={domains.state} what="domain gates" />
-      {d ? (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
-              <caption className="mb-1 text-left text-sm font-semibold">Reconciliation by domain</caption>
-              <thead>
-                <tr className="border-b border-border text-left text-[11px] text-text-muted uppercase">
-                  <th scope="col" className="py-1.5 pr-3 font-medium">Domain</th>
-                  <th scope="col" className="py-1.5 pr-3 font-medium">Gate</th>
-                  <th scope="col" className="py-1.5 pr-3 text-right font-medium">Samples</th>
-                  <th scope="col" className="py-1.5 text-right font-medium">Failures</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.domains.map((g) => (
-                  <tr key={g.domain} className="border-b border-border-soft align-top">
-                    <th scope="row" className="py-1.5 pr-3 text-left font-normal">
-                      {titleCase(g.domain)}
-                      {g.reasons.length > 0 ? <span className="block text-[11px] text-text-muted">{g.reasons.join("; ")}</span> : null}
-                    </th>
-                    <td className="py-1.5 pr-3"><Verdict ok={g.allowed} /></td>
-                    <td className="num py-1.5 pr-3 text-right">{g.samples ?? UNKNOWN}{g.subjects !== null ? <span className="block text-[11px] text-text-muted">{g.subjects} subjects</span> : null}</td>
-                    <td className="num py-1.5 text-right">{g.failures ?? UNKNOWN}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+        {gateRows.length > 0 ? (
+          <div>
+            <h3 className="text-sm font-semibold">Audits and reconciliation by domain</h3>
+            <StatusList caption="Zero-cost audit and reconciliation gates" passWord="are open" rows={gateRows} />
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
-              <caption className="mb-1 text-left text-sm font-semibold">Conclusions and the domains they need</caption>
-              <thead>
-                <tr className="border-b border-border text-left text-[11px] text-text-muted uppercase">
-                  <th scope="col" className="py-1.5 pr-3 font-medium">Conclusion</th>
-                  <th scope="col" className="py-1.5 pr-3 font-medium">Needs</th>
-                  <th scope="col" className="py-1.5 font-medium">Gate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.conclusions.map((c) => (
-                  <tr key={c.name} className="border-b border-border-soft">
-                    <th scope="row" className="py-1.5 pr-3 text-left font-normal">{titleCase(c.name)}</th>
-                    <td className="py-1.5 pr-3 text-xs text-text-muted">{c.domains.map(titleCase).join(", ")}</td>
-                    <td className="py-1.5"><Verdict ok={c.allowed} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        ) : null}
+        {conclusionRows.length > 0 ? (
+          <div>
+            <h3 className="text-sm font-semibold">Conclusions and the domains they need</h3>
+            <StatusList caption="Conclusions and the gates they need" passWord="are open" rows={conclusionRows} />
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </Panel>
   );
 }

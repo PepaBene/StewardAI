@@ -18,7 +18,7 @@ export function JobTriggersPanel() {
   return (
     <section id="run-job" aria-labelledby="run-job-heading" className="blueprint scroll-mt-24 space-y-3 px-5 py-5">
       <BlueprintCorners />
-      <h2 id="run-job-heading" className="text-[22px] leading-tight font-semibold">
+      <h2 id="run-job-heading" className="panel-title">
         Run a job now
       </h2>
       <p className="max-w-[68ch] text-sm text-text-muted">
@@ -56,7 +56,7 @@ function JobCard({ path, label, note }: { path: JobPath; label: string; note: st
   }
 
   return (
-    <li className="space-y-2 border border-border bg-surface p-3">
+    <li className="space-y-2 rounded-card bg-surface-muted p-3">
       <div>
         <h3 className="text-base font-semibold">{label}</h3>
         <p className="text-xs text-text-muted">{note}</p>
@@ -75,8 +75,8 @@ function JobCard({ path, label, note }: { path: JobPath; label: string; note: st
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" variant="outline" size="sm" disabled={state.kind === "saving" || !tickerOk} onClick={start}>
-          Run {label.toLowerCase()}
+        <Button type="button" variant="outline" size="sm" disabled={state.kind === "saving" || !tickerOk} onClick={start} aria-label={`Run ${label} now`}>
+          Run now
         </Button>
         <SaveNote state={state} />
       </div>

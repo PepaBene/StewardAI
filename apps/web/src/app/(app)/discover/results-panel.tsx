@@ -1,13 +1,16 @@
 "use client";
 
-import { ChevronDownIcon, ChevronRightIcon, DownloadIcon, EyeIcon, LoaderCircleIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronRightIcon, DownloadIcon, EyeIcon, LayoutGridIcon, ListIcon, LoaderCircleIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 import { StackedBar } from "@/components/charts";
 import { EmptyState } from "@/components/empty-state";
+import { EntityName } from "@/components/entity-name";
+import { ScoreMark } from "@/components/insight/score-mark";
 import { BlueprintCorners } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
+import { useMarks } from "@/lib/insight/use-marks";
 import { formatDate } from "@/lib/format";
 import {
   describeFilter,
@@ -102,6 +105,8 @@ export function ResultsPanel({
   watched: ReadonlySet<string>;
 }) {
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  const [view, setView] = useState<"list" | "grid">("list");
+  const marks = useMarks(kind === "stock" ? rows.map((r) => r.key) : []);
   const steps = funnel(result);
   const shown = columns.map((id) => catalogue.find((m) => m.id === id)).filter((m): m is MetricInfo => Boolean(m));
   const colSpan = shown.length + 4;
@@ -128,10 +133,34 @@ export function ResultsPanel({
               : "No conditions, so everything with data is listed."}
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={onExport} disabled={exporting}>
-          {exporting ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <DownloadIcon aria-hidden="true" />}
-          Export CSV
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div role="group" aria-label="Show results as" className="inline-flex overflow-hidden rounded-md border border-border">
+            {(
+              [
+                ["list", "List", ListIcon],
+                ["grid", "Cards", LayoutGridIcon],
+              ] as const
+            ).map(([id, label, Icon]) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={view === id}
+                onClick={() => setView(id)}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1.5 text-xs focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none",
+                  view === id ? "bg-accent-soft font-medium text-accent-ink" : "text-text-muted hover:text-text",
+                )}
+              >
+                <Icon aria-hidden="true" className="size-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={onExport} disabled={exporting}>
+            {exporting ? <LoaderCircleIcon aria-hidden="true" className="animate-spin" /> : <DownloadIcon aria-hidden="true" />}
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -169,6 +198,43 @@ export function ResultsPanel({
 
       {rows.length === 0 ? (
         <EmptyState title="Nothing matches">Loosen a condition, or keep members with a missing number to see what the gaps hide.</EmptyState>
+      ) : view === "grid" ? (
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Matches">
+          {rows.map((row) => {
+            const petals = marks.petals.get(row.key);
+            const href = kind === "stock" ? `/companies/${encodeURIComponent(row.key)}` : `/funds/${encodeURIComponent(row.key)}`;
+            return (
+              <li key={row.key} className="flex items-center gap-4 rounded-xl border border-border bg-surface-raised p-4">
+                {petals ? (
+                  <ScoreMark petals={petals} size="sidebar" label={row.name ?? row.key} className="shrink-0" />
+                ) : (
+                  <span className="grid size-[120px] shrink-0 place-items-center rounded-full border border-dashed border-border px-3 text-center text-xs text-text-muted">
+                    No score yet
+                  </span>
+                )}
+                <div className="min-w-0 space-y-1">
+                  <Link href={href} className="block truncate font-medium hover:text-accent-ink hover:underline">
+                    {kind === "stock" ? <EntityName id={row.key} name={row.name} /> : (row.name ?? row.key)}
+                  </Link>
+                  <dl className="space-y-0.5 text-xs">
+                    {shown.slice(0, 3).map((m) => (
+                      <div key={m.id} className="flex gap-1.5">
+                        <dt className="text-text-muted">{m.label}</dt>
+                        <dd className="num">{formatMetric(row.values[m.id], m.unit) ?? "Unknown"}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {kind === "stock" ? (
+                    <Button type="button" variant="ghost" size="sm" disabled={watched.has(row.key)} onClick={() => onWatch(row.key)}>
+                      <EyeIcon aria-hidden="true" />
+                      {watched.has(row.key) ? "Watching" : "Watch"}
+                    </Button>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       ) : (
         <div className="relative overflow-x-auto border border-border">
           <table className="w-full min-w-[56rem] text-sm">
@@ -184,7 +250,7 @@ export function ResultsPanel({
                 {shown.map((m) => (
                   <th key={m.id} scope="col" className="px-3 py-2 text-right font-medium">
                     {m.label}
-                    {result.filters.some((f) => f.metric === m.id) ? <span className="block text-[11px] font-normal text-accent-ink">in screen</span> : null}
+                    {result.filters.some((f) => f.metric === m.id) ? <span className="block text-xs font-normal text-accent-ink">in screen</span> : null}
                   </th>
                 ))}
                 <th scope="col" className="px-3 py-2 text-right font-medium">
@@ -210,9 +276,12 @@ export function ResultsPanel({
                       <th scope="row" className="px-3 py-2 text-left font-normal">
                         {kind === "stock" ? (
                           <>
-                            <Link href={`/companies/${encodeURIComponent(row.key)}`} className="font-medium hover:text-accent-ink hover:underline">
-                              {row.name ?? row.key}
-                            </Link>
+                            <span className="flex items-center gap-2">
+                              {marks.petals.get(row.key) ? <ScoreMark petals={marks.petals.get(row.key)!} label={row.name ?? row.key} className="shrink-0" /> : <span className="size-6 shrink-0" aria-hidden="true" />}
+                              <Link href={`/companies/${encodeURIComponent(row.key)}`} className="font-medium hover:text-accent-ink hover:underline">
+                                <EntityName id={row.key} name={row.name} />
+                              </Link>
+                            </span>
                             <span className="mt-0.5 flex gap-2 text-xs">
                               <Link href={`/companies/${encodeURIComponent(row.key)}/financials`} className="text-text-muted hover:text-accent-ink hover:underline">Financials</Link>
                               <Link href={`/companies/${encodeURIComponent(row.key)}/ratios`} className="text-text-muted hover:text-accent-ink hover:underline">Ratios</Link>
@@ -223,7 +292,7 @@ export function ResultsPanel({
                             {row.name ?? row.key}
                           </Link>
                         )}
-                        <span className="block font-mono text-xs text-text-muted">{row.key}</span>
+                        {kind === "fund" ? <span className="block font-mono text-xs text-text-muted">{row.key}</span> : null}
                       </th>
                       {shown.map((m) => {
                         const text = formatMetric(row.values[m.id], m.unit);

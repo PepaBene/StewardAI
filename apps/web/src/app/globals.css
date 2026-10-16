@@ -7,10 +7,11 @@
 @custom-variant cvd (&:where(.cvd, .cvd *));
 
 @theme {
-  /* Barlow for body, Barlow Condensed for headings and big figures, IBM Plex Mono for
-     tickers and data labels. */
+  /* Type (visual spec A.3): IBM Plex Serif for display (titles, panel titles, KPI figures,
+     feed headlines), IBM Plex Sans for the interface, IBM Plex Mono for code, ids and cron.
+     `font-heading` is the serif so every existing heading picks up the display face. */
   --font-sans:
-    "Barlow", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   --font-serif:
     "IBM Plex Serif", ui-serif, Georgia, "Times New Roman", serif;
@@ -18,39 +19,40 @@
     "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", monospace;
   --font-heading:
-    "Barlow Condensed", "Barlow", ui-sans-serif, system-ui, sans-serif;
+    "IBM Plex Serif", ui-serif, Georgia, "Times New Roman", serif;
 
-  /* The Industry system is square: every radius utility resolves to 0. Only
-     rounded-full survives (status dots, rings, the sync dot). */
-  --radius-xs: 0px;
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --radius-xl: 0px;
-  --radius-2xl: 0px;
-  --radius-3xl: 0px;
-  --radius-4xl: 0px;
-  --radius: 0px;
+  /* Radius (visual spec A.4): cards 12, controls 8, chips full, bar ends 4. */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+  --radius-4xl: 24px;
+  --radius: 8px;
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-mark: 4px;
 }
 
-/* Section kicker above a heading: small, tracked, uppercase, accent ink. */
+/* Eyebrow above a heading: small, sentence case, muted. No caps, no tracking. */
 @utility kicker {
-  font-size: 11px;
-  line-height: 1.2;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  font-weight: 600;
-  color: var(--color-accent-ink);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--color-text-muted);
 }
 
 /*
- * Blueprint frame: the square, hairline-bordered object every card, figure and framed
- * section wears, with "+" registration marks just outside its four corners. The marks
- * are drawn by <BlueprintCorners/> (components/ui/blueprint.tsx) as four children.
+ * Card surface: every card, figure and framed section. A rounded surface step above the
+ * page, with no border and no shadow. A frame nested inside another frame steps down to
+ * surface-muted so the nesting still reads.
  */
 @utility blueprint {
   position: relative;
-  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background-color: var(--color-surface);
 }
 
 /*
@@ -84,21 +86,28 @@
 
   html,
   body {
-    background-color: var(--color-surface);
+    background-color: var(--color-page);
     color: var(--color-text);
   }
 
   body {
     font-family: var(--font-sans);
-    line-height: 1.45;
+    font-size: 14px;
+    line-height: 1.5;
+    font-variant-numeric: lining-nums;
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Page and panel titles in the serif; h3 and below stay in the interface face. */
   h1,
-  h2,
-  h3 {
+  h2 {
     font-family: var(--font-heading);
-    letter-spacing: -0.01em;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    text-wrap: balance;
+  }
+  h3 {
+    font-weight: 600;
   }
 
   a {
@@ -199,47 +208,63 @@
   text-underline-offset: 2px;
 }
 
-/* Registration marks of a .blueprint frame (see BlueprintCorners). */
+/* Nested frames step down one surface so a card inside a card still reads. */
+.blueprint .blueprint {
+  background-color: var(--color-surface-muted);
+}
+/* Legacy registration marks (the old square frame): no longer drawn. */
 .bp-corner {
-  position: absolute;
-  width: 11px;
-  height: 11px;
-  pointer-events: none;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  display: none;
 }
-.bp-corner::before,
-.bp-corner::after {
-  content: "";
-  position: absolute;
-  background: currentColor;
-}
-.bp-corner::before {
-  left: 5px;
-  top: 0;
-  width: 1px;
-  height: 100%;
-}
-.bp-corner::after {
-  top: 5px;
-  left: 0;
-  width: 100%;
-  height: 1px;
-}
-.bp-corner[data-corner="tl"] { top: -6px; left: -6px; }
-.bp-corner[data-corner="tr"] { top: -6px; right: -6px; }
-.bp-corner[data-corner="bl"] { bottom: -6px; left: -6px; }
-.bp-corner[data-corner="br"] { bottom: -6px; right: -6px; }
 
-/* Page title: the condensed 46px display heading every screen opens with. */
+/* Page title (visual spec A.3 h1): serif 32/38, 26/32 below md. */
 @utility page-title {
   font-family: var(--font-heading);
   font-weight: 600;
-  font-size: 34px;
-  line-height: 1;
-  letter-spacing: -0.02em;
+  font-size: 26px;
+  line-height: 32px;
+  letter-spacing: -0.005em;
   @media (width >= 48rem) {
-    font-size: 46px;
+    font-size: 32px;
+    line-height: 38px;
   }
+}
+
+/* KPI figure (visual spec A.3 kpi): serif 28/32, 24/28 below md. */
+@utility kpi-figure {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 28px;
+  font-variant-numeric: tabular-nums lining-nums;
+  @media (width >= 48rem) {
+    font-size: 28px;
+    line-height: 32px;
+  }
+}
+
+/* Panel title (visual spec A.3 h2): serif 20/26, 18/24 below md. */
+@utility panel-title {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 24px;
+  @media (width >= 48rem) {
+    font-size: 20px;
+    line-height: 26px;
+  }
+}
+
+/* Forecast / estimate fill: a 45° hatch in the forecast hue (visual spec A.2 texture). */
+.hatch-forecast {
+  background-image: repeating-linear-gradient(45deg, var(--color-chart-forecast) 0 1px, transparent 1px 5px);
+}
+
+/* A full queue view shown inside the Inbox: the Inbox header already names the page, so the
+   embedded view keeps its description and actions but drops its own kicker and title. */
+.embedded-view [data-slot="page-header-kicker"],
+.embedded-view [data-slot="page-header-title"] {
+  display: none;
 }
 
 /* Dual-handle range (SliderRange, F30): two stacked native inputs; only the thumbs take input. */

@@ -89,7 +89,7 @@ export function ChatView() {
                     aria-current={c.id === conversationId ? "page" : undefined}
                     className={cn(
                       "block space-y-0.5 border-l-2 px-3 py-2 text-sm",
-                      c.id === conversationId ? "border-accent bg-accent-soft" : "border-transparent hover:bg-border-soft",
+                      c.id === conversationId ? "border-accent bg-accent-soft" : "border-transparent hover:bg-surface-muted",
                     )}
                   >
                     <span className="flex items-center gap-1.5 font-medium">

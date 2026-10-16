@@ -77,7 +77,7 @@ function SavedComparisons() {
               {rows.map((c) => (
                 <li key={c.id} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-1.5">
                   <Link href={compareHref(c.isins)} className="font-medium text-accent-ink hover:underline">{c.name}</Link>
-                  <span className="font-mono text-[11px] text-text-muted">{c.isins.join(", ")}</span>
+                  <span className="font-mono text-xs text-text-muted">{c.isins.join(", ")}</span>
                   {c.note ? <span className="text-xs text-text-muted">{c.note}</span> : null}
                   <span className="ml-auto text-xs text-text-muted">saved {formatDate(c.created_at)}</span>
                   <button type="button" onClick={() => archive(c.id)} className="border border-border px-2 py-0.5 text-xs hover:border-accent">Archive</button>
@@ -125,7 +125,7 @@ function Catalog({ rows, filter, picked, onToggle }: { rows: CatalogRow[]; filte
                   </td>
                   <th scope="row" className="px-2 py-1.5 text-left font-normal">
                     <Link href={fundHref(r.isin)} className="font-medium hover:text-accent-ink hover:underline">{r.name ?? r.isin}</Link>
-                    <span className="block font-mono text-[11px] text-text-muted">{r.isin}{r.tickers.length ? ` · ${r.tickers.join(", ")}` : ""}</span>
+                    <span className="block font-mono text-xs text-text-muted">{r.isin}{r.tickers.length ? ` · ${r.tickers.join(", ")}` : ""}</span>
                   </th>
                   <td className="px-2 py-1.5">{r.provider ?? <Absent reason="missing: not stored" />}</td>
                   <td className="num px-2 py-1.5 text-right">{pct(r.expense_ratio) ?? <Absent reason="missing: no factsheet" />}</td>

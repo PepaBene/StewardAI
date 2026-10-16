@@ -28,3 +28,9 @@ npm-debug.log*
 # local playwright / screenshots
 /test-results/
 /playwright-report/
+
+# route walk (e2e/)
+/e2e/out/
+/e2e/.auth/
+/test-results/
+/playwright-report/

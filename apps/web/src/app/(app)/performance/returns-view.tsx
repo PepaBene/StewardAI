@@ -7,7 +7,11 @@ import { useState } from "react";
 import { AlertMessage } from "@/components/alert-message";
 import { Absent, ResourceGate } from "@/components/company/primitives";
 import { DataAgeBadge } from "@/components/freshness/data-age-badge";
+import { KpiStrip, type KpiTileProps } from "@/components/insight/kpi-tile";
 import { LineChart } from "@/components/performance/line-chart";
+import { MonthlyHeatmapSection } from "@/components/portfolio/moved-sections";
+import { DrawdownSection, WaterfallSection } from "@/components/portfolio/performance-curves";
+import { benchmarkVerdict } from "@/lib/verdicts/portfolio";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate, formatPercent } from "@/lib/format";
@@ -71,7 +75,7 @@ function ActiveCell({ w }: { w: WindowData }) {
   return (
     <span title={(active.warnings ?? []).join(" ") || undefined}>
       <Points value={active.value} />
-      {(active.warnings ?? []).length > 0 ? <span className="ml-1 text-[11px] text-text-muted">qualified</span> : null}
+      {(active.warnings ?? []).length > 0 ? <span className="ml-1 text-xs text-text-muted">qualified</span> : null}
     </span>
   );
 }
@@ -98,11 +102,11 @@ function StatementTable({ data }: { data: PerformanceData }) {
               <tr key={w.label} className="border-t border-border-soft align-top">
                 <th scope="row" className="px-3 py-1.5 text-left font-normal">
                   {windowName(w.label)}
-                  <span className="block text-[11px] text-text-muted">
+                  <span className="block text-xs text-text-muted">
                     {w.start && w.end ? `${formatDate(w.start)} to ${formatDate(w.end)}` : (w.reason ?? "no data")}
                   </span>
                   {w.opening_gap_days > 0 ? (
-                    <span className="block text-[11px] text-text-muted">
+                    <span className="block text-xs text-text-muted">
                       opens {w.opening_gap_days} {w.opening_gap_days === 1 ? "day" : "days"} before its start, the nearest stored day
                     </span>
                   ) : null}
@@ -112,7 +116,7 @@ function StatementTable({ data }: { data: PerformanceData }) {
                 <td className={TD}>
                   <ReturnCell figure={w.xirr} />
                   {w.xirr_annualized === false && w.xirr.value !== null && w.xirr.value !== undefined ? (
-                    <span className="block text-[11px] text-text-muted">over the window, not a yearly rate</span>
+                    <span className="block text-xs text-text-muted">over the window, not a yearly rate</span>
                   ) : null}
                 </td>
                 <td className={TD}><BenchmarkCell w={w} /></td>
@@ -130,6 +134,28 @@ function StatementTable({ data }: { data: PerformanceData }) {
       </p>
     </div>
   );
+}
+
+/** Answer strip: the investment return for up to four windows, each against the benchmark. */
+function ReturnsStrip({ data }: { data: PerformanceData }) {
+  const tiles: KpiTileProps[] = data.windows
+    .filter((w) => w.twr.value !== null && w.twr.value !== undefined)
+    .slice(0, 4)
+    .map((w) => {
+      const r = Number(w.twr.value);
+      const b = w.benchmark?.benchmark_return;
+      const bench = b === null || b === undefined ? null : Number(b);
+      const v = benchmarkVerdict(r, bench, data.benchmark_label ?? "the benchmark");
+      return {
+        label: `${windowName(w.label)} return`,
+        value: formatPercent(r, { decimals: 1, signed: true }),
+        signed: r >= 0 ? ("gain" as const) : ("loss" as const),
+        note: bench === null ? undefined : `${data.benchmark_label ?? "Benchmark"} ${formatPercent(bench, { decimals: 1, signed: true })}`,
+        verdict: { tone: v.tone, text: v.text },
+      };
+    });
+  if (tiles.length < 3) return null;
+  return <KpiStrip tiles={tiles} label="Returns by window" />;
 }
 
 function Costs({ data }: { data: PerformanceData }) {
@@ -222,6 +248,7 @@ function ReportBody({ data }: { data: PerformanceData }) {
         ) : (
           <div className="flex flex-col gap-5">
             <LedgerStrip data={data} />
+            <ReturnsStrip data={data} />
             <Blueprint className="px-[22px] py-4">
               <PanelHeading
                 kicker={`Base currency ${data.base_currency ?? "unknown"} · as of ${data.as_of ? formatDate(data.as_of) : "unknown"}`}
@@ -258,7 +285,12 @@ function ReportBody({ data }: { data: PerformanceData }) {
                 />
               </div>
             </Blueprint>
-            <div className="grid gap-5 lg:grid-cols-2">
+            <div className="grid items-start gap-5 lg:grid-cols-2">
+              <WaterfallSection />
+              <DrawdownSection />
+            </div>
+            <div className="grid items-start gap-5 lg:grid-cols-2">
+              <MonthlyHeatmapSection />
               <Costs data={data} />
               <Blueprint className="px-[22px] py-4">
                 <PanelHeading kicker="Data used" title="Dates and freshness" />

@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from "react";
 
-import { AlertMessage } from "@/components/alert-message";
+import { LimitedState } from "@/components/insight/limited-state";
 import { ResourceGate } from "@/components/company/primitives";
 import { HBar } from "@/components/charts/hbar";
 import { BandGauge, type GaugeZone } from "@/components/insight/band-gauge";
 import { ChartWithFooter } from "@/components/insight/chart-footer";
 import { VerdictLine } from "@/components/insight/verdict-line";
 import { RangeButtons } from "@/components/portfolio/range-buttons";
+import { notScored } from "@/components/portfolio/risk-glance";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import type { components } from "@/lib/api/schema";
 import { getBrowserApiClient } from "@/lib/api/client";
@@ -158,6 +159,13 @@ function corrClass(v: number): string {
 function Correlation({ data }: { data: Headline }) {
   const m = data.correlation;
   if (m.tickers.length < 2) return null;
+  if (m.pairs_measured === 0) {
+    return (
+      <LimitedState>
+        Which holdings move together needs {m.min_observations} shared trading days per pair; none of the {m.pairs_total} pairs has that yet.
+      </LimitedState>
+    );
+  }
   return (
     <Blueprint className="px-[22px] py-4">
       <PanelHeading
@@ -166,7 +174,7 @@ function Correlation({ data }: { data: Headline }) {
       />
       <div className="mt-3 grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="overflow-x-auto">
-          <table className="border-separate border-spacing-0.5 text-[11px]">
+          <table className="border-separate border-spacing-0.5 text-xs">
             <caption className="sr-only">Correlation of daily returns between each pair of holdings (lower triangle)</caption>
             <thead>
               <tr>
@@ -202,7 +210,7 @@ function Correlation({ data }: { data: Headline }) {
               })}
             </tbody>
           </table>
-          <p className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-text-muted" aria-hidden="true">
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-muted" aria-hidden="true">
             <span className="bg-diverging-under px-1.5 text-accent-foreground">−1 opposite</span>
             <span className="bg-diverging-neutral px-1.5 text-text">0 unrelated</span>
             <span className="bg-diverging-over px-1.5 text-accent-foreground">+1 together</span>
@@ -249,7 +257,7 @@ function Body({ data }: { data: Headline }) {
           title={s.score === null || s.score === undefined ? "Risk score not available" : `Risk score ${Math.round(s.score)}: ${s.band ?? ""}`}
         />
         {s.status === "unknown" ? (
-          <p className="mt-2 text-sm text-text-muted">{s.reason ?? "An input is missing, so no score is given."}</p>
+          <LimitedState className="mt-3">{notScored(s.reason)}</LimitedState>
         ) : (
           <div className="mt-3 max-w-xl">
             <BandGauge value={s.score} min={0} max={100} zones={ZONES} marker="Your portfolio" markers={markers} format={(v) => Math.round(v).toString()} label="Risk score from 0 (no risk) to 100 (very high)" />
@@ -275,7 +283,7 @@ function Body({ data }: { data: Headline }) {
                 <tr key={x.input} className="border-t border-border-soft">
                   <td className="px-3 py-1">{x.label}{x.reason ? <span className="block text-xs text-text-muted">{x.reason}</span> : null}</td>
                   <td className="num px-3 py-1 text-right">{x.value === null || x.value === undefined ? "—" : fmt(x.input, x.value)}</td>
-                  <td className="num px-3 py-1 text-right">{fmt(x.input, x.reference)}<span className="block text-[11px] text-text-muted">{x.reference_basis === "benchmark" ? "the market" : "fixed level"}</span></td>
+                  <td className="num px-3 py-1 text-right">{fmt(x.input, x.reference)}<span className="block text-xs text-text-muted">{x.reference_basis === "benchmark" ? "the market" : "fixed level"}</span></td>
                   <td className="num px-3 py-1 text-right">{fmt(x.input, x.very_high)}</td>
                   <td className="num px-3 py-1 text-right">{x.score === null || x.score === undefined ? "—" : Math.round(x.score)}</td>
                   <td className="num px-3 py-1 text-right">{formatPercent(x.weight, { decimals: 0 })}</td>
@@ -285,9 +293,9 @@ function Body({ data }: { data: Headline }) {
           </table>
           <p className="mt-2 font-mono text-xs text-text-muted">{s.formula}</p>
           <p className="mt-1 text-xs text-text-muted">{data.concentration_basis} Method {s.method_version}.</p>
+          {data.warnings.length > 0 ? <p className="mt-1 text-xs text-text-muted">Read with the score: {data.warnings.join(" ")}</p> : null}
         </details>
       </Blueprint>
-      {data.warnings.length > 0 ? <AlertMessage title="Read these with the score">{data.warnings.join(" ")}</AlertMessage> : null}
       <PerHolding data={data} />
       <Correlation data={data} />
     </div>

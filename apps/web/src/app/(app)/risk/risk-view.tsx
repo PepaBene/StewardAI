@@ -43,27 +43,32 @@ function figureText(key: string, f: AnalyticsFigure): string | null {
 function Stat({ id, figure }: { id: string; figure: AnalyticsFigure | undefined }) {
   if (!figure) return null;
   const text = figureText(id, figure);
-  const sample = (figure.warnings ?? []).find((w) => /daily observations/.test(w));
+  // The reason a figure is withheld is stated once for the page (see `pageCaveats`), not under each figure.
   return (
     <div className="grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-0.5 border-b border-border-soft py-2 last:border-b-0">
       <dt className="text-sm">{statLabel(id)}</dt>
       <dd className="num text-right text-base font-semibold">
         {text ?? <Absent reason={(figure.warnings ?? [])[0] ?? "not enough history"} />}
       </dd>
-      {text === null ? (
-        <p className="col-span-2 text-xs text-text-muted">{(figure.warnings ?? []).join(" ") || "Withheld: not enough history."}</p>
-      ) : sample ? (
-        <p className="col-span-2 text-xs text-text-muted">{sample}</p>
-      ) : null}
     </div>
   );
+}
+
+/** Every distinct caveat on the page, report-level first, so each is shown once at the top. */
+function pageCaveats(report: RiskReport): string[] {
+  const all = [
+    ...report.warnings,
+    ...Object.values(report.stats).flatMap((f) => f?.warnings ?? []),
+    ...(report.diversification.warnings ?? []),
+  ];
+  return [...new Set(all)];
 }
 
 function Report({ report }: { report: RiskReport }) {
   const empty = report.window.observations === 0;
   return (
     <div className="flex flex-col gap-5">
-      <Warnings warnings={report.warnings} />
+      <Warnings warnings={pageCaveats(report)} />
       {empty ? null : (
         <p className="text-sm text-text-muted">
           {report.window.observations} daily returns, {formatDate(report.window.start ?? "")} to {formatDate(report.window.end ?? "")}, in{" "}
@@ -127,7 +132,7 @@ function Diversification({ report }: { report: RiskReport }) {
     <Blueprint className="p-4">
       <PanelHeading level={3} kicker="Diversification" title="How much holding several things helps" />
       {value === null ? (
-        <p className="mt-2 text-sm text-text-muted">{(d.warnings ?? [])[0] ?? "Withheld: not enough shared history."}</p>
+        <p className="mt-2 text-sm text-text-muted">Withheld; the reason is in the notice at the top of the page.</p>
       ) : (
         <p className="mt-2 max-w-prose text-sm">
           Mixing the holdings at today’s weights cuts volatility by{" "}

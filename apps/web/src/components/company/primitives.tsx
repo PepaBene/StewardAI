@@ -48,7 +48,7 @@ export function Absent({ reason, className }: { reason?: string | null; classNam
   return (
     <span
       title={r.text || "no value"}
-      className={cn("inline-block border border-dashed border-border px-1 text-[11px] leading-5 text-text-muted", className)}
+      className={cn("inline-block border border-dashed border-border px-1 text-xs leading-5 text-text-muted", className)}
     >
       {label}
       <span className="sr-only">: {r.text || "no value"}</span>
@@ -113,7 +113,7 @@ export function Stat({ label, children, note }: { label: string; children: React
     <div className="min-w-0 border-l border-border pl-3">
       <dt className="text-xs text-text-muted">{label}</dt>
       <dd className="num mt-0.5 text-lg font-semibold">{children}</dd>
-      {note ? <p className="mt-0.5 text-[11px] text-text-muted">{note}</p> : null}
+      {note ? <p className="mt-0.5 text-xs text-text-muted">{note}</p> : null}
     </div>
   );
 }

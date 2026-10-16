@@ -31,8 +31,8 @@ const FLAG_CLASS: Record<string, string> = {
 
 function Flag({ children }: { children: string }) {
   return (
-    <span className={cn("px-1.5 py-px font-mono text-[10px] tracking-wide uppercase", FLAG_CLASS[children] ?? FLAG_CLASS.annual)}>
-      {children}
+    <span className={cn("px-1.5 py-px text-xs", FLAG_CLASS[children] ?? FLAG_CLASS.annual)}>
+      {children.charAt(0).toUpperCase() + children.slice(1)}
     </span>
   );
 }
@@ -40,9 +40,9 @@ function Flag({ children }: { children: string }) {
 function Stat({ label, value, sub, title }: { label: string; value: string; sub?: ReactNode; title?: string }) {
   return (
     <div className="min-w-0" title={title}>
-      <dt className="text-[11px] text-text-muted">{label}</dt>
+      <dt className="text-xs text-text-muted">{label}</dt>
       <dd className="num font-heading text-[28px] leading-[1.1] font-semibold">{value}</dd>
-      {sub ? <dd className="text-[11px] leading-snug text-text-faint">{sub}</dd> : null}
+      {sub ? <dd className="text-xs leading-snug text-text-faint">{sub}</dd> : null}
     </div>
   );
 }
@@ -89,7 +89,7 @@ export function ValuationPanel({ ticker, compact = false }: { ticker: string; co
         action={<RefreshControl ticker={ticker} />}
       />
       {data?.price ? (
-        <p className="-mt-1 text-[11px] text-text-faint">
+        <p className="-mt-1 text-xs text-text-faint">
           Close {data.price.currency ?? ""} {data.price.close.toLocaleString("en-GB", { maximumFractionDigits: 2 })} on{" "}
           {formatDate(data.price.date)} ({data.price.source}){data.price.stale ? " · stale" : ""}
           {data.checked_at ? <> · fundamentals checked {formatDateTime(data.checked_at)}</> : null}
@@ -132,12 +132,12 @@ function RefreshControl({ ticker }: { ticker: string }) {
         Refresh
       </Button>
       {queued !== null ? (
-        <Link href={jobHref(queued)} className="text-[11px] text-accent-ink hover:underline">
+        <Link href={jobHref(queued)} className="text-xs text-accent-ink hover:underline">
           Queued as job #{queued}
         </Link>
       ) : null}
       {error ? (
-        <p role="alert" className="text-[11px] text-text">
+        <p role="alert" className="text-xs text-text">
           {error}
         </p>
       ) : null}
@@ -177,7 +177,7 @@ function StockBody({ data, compact = false }: { data: HoldingValuation; compact?
           <Stat label="ROE" value={ratioText(ratios.roe, "yield")} sub={reasonOf(ratios.roe)} />
           <Stat label="ROIC" value={ratioText(ratios.roic, "yield")} sub={reasonOf(ratios.roic)} />
         </dl>
-        <p className="border-t border-border pt-2 text-[11px] leading-snug text-text-faint">TTM figures from {sourceLine(data) ?? "the latest available fundamentals"}. PEG uses the latest comparable annual EPS growth. Missing or stale source data stay marked as unavailable.</p>
+        <p className="border-t border-border pt-2 text-xs leading-snug text-text-faint">TTM figures from {sourceLine(data) ?? "the latest available fundamentals"}. PEG uses the latest comparable annual EPS growth. Missing or stale source data stay marked as unavailable.</p>
       </div>
     );
   }
@@ -251,7 +251,7 @@ function StockBody({ data, compact = false }: { data: HoldingValuation; compact?
         ) : null}
         {data.alternatives.length > 0 ? (
           <div className="border-t border-border pt-3">
-            <p className="text-[11px] tracking-wide text-text-muted uppercase">Other sources and bases (not used)</p>
+            <p className="text-xs text-text-muted">Other sources and bases (not used)</p>
             <ul className="mt-1 space-y-0.5 text-[12px]">
               {data.alternatives.map((a) => (
                 <li key={`${a.source}-${a.basis}`} className="flex flex-wrap gap-x-2">
@@ -283,7 +283,7 @@ function StockBody({ data, compact = false }: { data: HoldingValuation; compact?
       </div>
       {manual ? null : (
       <div className="flex min-w-0 flex-col gap-2">
-        <p className="text-[11px] tracking-wide text-text-muted uppercase">
+        <p className="text-xs text-text-muted">
           {history.length > 1 && historySpanDays(history) < 600 ? `P/E since ${formatDate(history[0].date)}` : "P/E over two years"}
         </p>
         {history.length >= 4 ? (
@@ -300,7 +300,7 @@ function StockBody({ data, compact = false }: { data: HoldingValuation; compact?
             Not enough EPS history to chart the P/E.
           </div>
         )}
-        <p className="text-[11px] leading-snug text-text-faint">
+        <p className="text-xs leading-snug text-text-faint">
           Each week&rsquo;s close over the EPS TTM in force then (a step on each report&rsquo;s filing date). {data.method}
         </p>
       </div>
@@ -333,7 +333,7 @@ function FundBody({ data, compact = false }: { data: HoldingValuation; compact?:
           {fund.provider_label}, as of {formatDate(fund.as_of)}
         </SourceLink>
         {fund.stale ? <Flag>stale</Flag> : null}
-      </p> : <p className="text-[11px] text-text-faint">As of {formatDate(fund.as_of)} · {fund.provider_label}{fund.stale ? " · stale" : ""}</p>}
+      </p> : <p className="text-xs text-text-faint">As of {formatDate(fund.as_of)} · {fund.provider_label}{fund.stale ? " · stale" : ""}</p>}
       {!compact && fund.methodology ? (
         <details className="text-[12px] text-text-muted">
           <summary className="cursor-pointer">Provider&rsquo;s methodology</summary>

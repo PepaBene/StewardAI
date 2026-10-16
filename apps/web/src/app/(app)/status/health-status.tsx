@@ -65,39 +65,55 @@ export function HealthStatus() {
   return (
     <Card>
       <CardHeader>
-        <div className="kicker">Backend</div>
-        <CardTitle>Python API</CardTitle>
-        <CardDescription className="break-all font-mono">{getApiBaseUrl()}</CardDescription>
+        <CardTitle>StewardAI server</CardTitle>
+        <CardDescription>The service behind every page. Its address is under Details.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4" aria-live="polite">
         {result.kind === "loading" ? (
           <p className="flex items-center gap-2 text-sm text-text-muted">
             <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
-            Checking /health...
+            Checking the server…
           </p>
         ) : null}
 
         {result.kind === "ok" ? (
-          <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-            <dt className="text-text-muted">Status</dt>
-            <dd className="flex items-center gap-1.5 font-medium">
-              <CircleCheckIcon aria-hidden="true" className="size-4 text-accent" />
-              {result.data.status}
-            </dd>
-            <dt className="text-text-muted">HTTP</dt>
-            <dd className="num">{result.httpStatus}</dd>
-            <dt className="text-text-muted">Version</dt>
-            <dd className="num font-mono">{result.data.version}</dd>
-            <dt className="text-text-muted">Checked at</dt>
-            <dd className="num">{formatTime(result.checkedAt)}</dd>
-          </dl>
+          <>
+            <p className="flex items-start gap-1.5 text-sm font-medium">
+              <CircleCheckIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-gain" />
+              <span>
+                The server is running (version <span className="num">{result.data.version}</span>). Checked at{" "}
+                <span className="num">{formatTime(result.checkedAt)}</span>.
+              </span>
+            </p>
+            <details className="text-xs text-text-muted">
+              <summary className="cursor-pointer">Details</summary>
+              <dl className="mt-1 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+                <dt>Reported status</dt>
+                <dd>{result.data.status}</dd>
+                <dt>HTTP</dt>
+                <dd className="num">{result.httpStatus}</dd>
+                <dt>Address</dt>
+                <dd className="break-all">{getApiBaseUrl()}</dd>
+              </dl>
+            </details>
+          </>
         ) : null}
 
         {result.kind === "error" ? (
-          <AlertMessage title={result.title}>
-            <p>{result.detail}</p>
-            <p className="num mt-1">Checked at {formatTime(result.checkedAt)}</p>
-          </AlertMessage>
+          <>
+            <AlertMessage title="The server is not answering">
+              <p>
+                Pages that need data will stay empty until it is back. Start the server, or check that the address and its access settings are
+                right. Checked at <span className="num">{formatTime(result.checkedAt)}</span>.
+              </p>
+            </AlertMessage>
+            <details className="text-xs text-text-muted">
+              <summary className="cursor-pointer">Details</summary>
+              <p className="mt-1 break-words">
+                {result.title}. {result.detail}
+              </p>
+            </details>
+          </>
         ) : null}
 
         <Button

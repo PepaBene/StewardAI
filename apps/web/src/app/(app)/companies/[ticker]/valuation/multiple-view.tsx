@@ -58,7 +58,7 @@ function SeedNote({ v, k, unit }: { v: MultipleValuation | null; k: string; unit
   if (!s) return null;
   const f = (x: unknown) => (unit === "pct" ? pctText(x) : num(x as number) !== null ? `${num(x as number)!.toFixed(1)}×` : null);
   return (
-    <p className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-text-muted">
+    <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-text-muted">
       <span>
         Company: <span className="num text-text">{f(s.company) ?? "—"}</span>
         {s.company_basis ? ` (${s.company_basis})` : ""}
@@ -150,8 +150,8 @@ function Results({ v }: { v: MultipleValuation }) {
                 <tr key={s.name} className="border-t border-border-soft align-top">
                   <th scope="row" className="px-3 py-1.5 text-left font-normal capitalize">
                     {s.name}
-                    {s.selected ? <span className="ml-2 border border-accent px-1 text-[11px] normal-case">selected</span> : null}
-                    <span className="block max-w-72 text-[11px] normal-case text-text-muted">{s.discount_rate_build}</span>
+                    {s.selected ? <span className="ml-2 border border-accent px-1 text-xs normal-case">selected</span> : null}
+                    <span className="block max-w-72 text-xs normal-case text-text-muted">{s.discount_rate_build}</span>
                   </th>
                   <td className="num px-2 py-1.5 text-right">{moneyText(s.exit_price) ?? <Absent reason="missing: not computable" />}</td>
                   <td className="num px-2 py-1.5 text-right">{pctText(s.discount_rate, 2)}</td>
@@ -400,7 +400,7 @@ export function MultipleView({ ticker, onHeadline }: { ticker: string; onHeadlin
                       className={cn("border px-3 py-1 text-sm capitalize", editing === x.name ? "border-accent bg-accent-soft text-accent-ink" : "border-border text-text-muted")}
                     >
                       {x.name}
-                      {selected === x.name ? <span className="ml-1 text-[11px] normal-case">(measured)</span> : null}
+                      {selected === x.name ? <span className="ml-1 text-xs normal-case">(measured)</span> : null}
                     </button>
                   ))}
                   <label className="ml-auto flex items-center gap-2 text-xs">

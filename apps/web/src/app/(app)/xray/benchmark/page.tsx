@@ -9,3 +9,5 @@ export default function BenchmarkPage() {
     </Suspense>
   );
 }
+
+export const metadata = { title: "Against a benchmark · X-Ray" };

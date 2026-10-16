@@ -20,7 +20,9 @@ from api.autopilot_routes import router as autopilot_router
 from api.budget_routes import router as budget_router
 from api.chat_routes import router as chat_router
 from api.check_routes import router as check_router
+from api.checks_preview_routes import router as checks_preview_router
 from api.company_routes import router as company_router
+from api.company_view_routes import router as company_view_router
 from api.config_history_routes import router as config_history_router
 from api.control_stake_routes import router as control_stake_router
 from api.data_context_routes import router as data_context_router
@@ -288,6 +290,7 @@ def create_app() -> FastAPI:
     app.include_router(screen_router)
     app.include_router(discover_router)
     app.include_router(check_router)
+    app.include_router(checks_preview_router)
     app.include_router(dividend_router)
     app.include_router(insight_value_router)
     app.include_router(holding_insight_router)
@@ -295,6 +298,7 @@ def create_app() -> FastAPI:
     app.include_router(updates_router)
     app.include_router(insight_company_router)
     app.include_router(company_router)
+    app.include_router(company_view_router)
     app.include_router(fund_research_router)
     app.include_router(insider_router)
     app.include_router(investor_router)

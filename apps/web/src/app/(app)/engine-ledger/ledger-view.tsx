@@ -10,9 +10,14 @@ import { Blueprint } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
 import { getBrowserApiClient } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
-import { cn } from "@/lib/utils";
+import { labelText } from "@/lib/labels";
+import { sentenceCase } from "@/lib/oversight/plain";
+import { shortTicker } from "@/lib/portfolio/ticker";
+import { FilterChips } from "@/components/ui/filter-chips";
 
-import { GatesPanel, WatchersPanel } from "./gates-panel";
+import { AutonomySubnav } from "@/components/autonomy-subnav";
+import { SettingsLink } from "@/components/ui/settings-link";
+
 import { ScorecardPanel } from "./scorecard-panel";
 import { TrainingPanel } from "./training-panel";
 
@@ -105,8 +110,7 @@ export function LedgerView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Oversight"
-        title="What the engine did"
+        title="Autonomy"
         description="Every change the engine made on its own, and every change you made, in one list. Where a change can be reversed, there is an undo."
         aside={
           <Button variant="ghost" size="sm" onClick={reload}>
@@ -127,43 +131,27 @@ export function LedgerView() {
         </p>
       ) : null}
 
+      <AutonomySubnav />
       <ScorecardPanel />
-      <GatesPanel />
-      <WatchersPanel />
+      <SettingsLink href="/config/autonomy">
+        How sure the engine must be before it acts, and when it tells you without being asked, are set in Settings.
+      </SettingsLink>
       <TrainingPanel />
 
       <Blueprint aria-labelledby="ledger-heading">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-          <h2
-            id="ledger-heading"
-            className="text-[22px] leading-tight font-semibold"
-          >
+          <h2 id="ledger-heading" className="panel-title">
             {source ? sourceLabel(source) : "Everything"}
           </h2>
-          <nav
-            aria-label="Show"
-            className="flex flex-wrap border border-border"
-          >
-            {[null, ...Object.keys(SOURCE_LABELS)].map((s) => (
-              <button
-                key={s ?? "all"}
-                type="button"
-                aria-pressed={source === s}
-                onClick={() => {
-                  setSource(s);
-                  setOffset(0);
-                }}
-                className={cn(
-                  "border-l border-border px-3 py-1.5 text-xs first:border-l-0",
-                  source === s
-                    ? "bg-accent text-accent-foreground"
-                    : "text-text hover:bg-border-soft",
-                )}
-              >
-                {s ? sourceLabel(s) : "Everything"}
-              </button>
-            ))}
-          </nav>
+          <FilterChips
+            label="Show"
+            value={source ?? "all"}
+            onChange={(key) => {
+              setSource(key === "all" ? null : key);
+              setOffset(0);
+            }}
+            chips={[{ key: "all", label: "Everything" }, ...Object.keys(SOURCE_LABELS).map((s) => ({ key: s, label: sourceLabel(s) }))]}
+          />
         </div>
 
         {error ? (
@@ -298,12 +286,12 @@ function EntryRow({
   return (
     <li className="border-b border-border-soft px-5 py-3 last:border-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <p className="max-w-prose text-sm">{entry.summary}</p>
+        <p className="max-w-prose text-sm">{labelText(entry.summary).replace(/\b[A-Z0-9.]+[a-z]?_(?:[A-Z]{2}_)?EQ\b/g, shortTicker)}</p>
         <span className="text-xs text-text-muted">
-          {sourceLabel(entry.source)} · {whenLabel(entry.at)}
+          {sourceLabel(entry.source)}, {whenLabel(entry.at)}
         </span>
       </div>
-      <p className="mt-0.5 text-xs text-text-muted">{entry.status}</p>
+      <p className="mt-0.5 text-xs text-text-muted">{sentenceCase(labelText(entry.status).replaceAll("_", " "))}</p>
 
       {entry.undo_action && !proposal ? (
         <div className="mt-2">
@@ -320,7 +308,7 @@ function EntryRow({
       ) : null}
 
       {proposal ? (
-        <div className="mt-2 flex flex-col gap-2 border border-border-soft p-3">
+        <div className="mt-2 flex flex-col gap-2 rounded-card bg-surface-muted p-3">
           <p className="max-w-prose text-sm">{proposal.summary}</p>
           <p className="text-xs text-text-muted">{proposal.undo}</p>
           <div className="flex gap-2">

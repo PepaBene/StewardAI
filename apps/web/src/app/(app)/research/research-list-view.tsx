@@ -49,7 +49,6 @@ export function ResearchListView() {
   return (
     <div className="flex flex-col gap-[22px]">
       <PageHeader
-        kicker="Research & Verification"
         title="Research"
         description="Deep research on any ticker under a research profile. Figures come from stored records and are computed in code; the model writes only the narrative sections, and every sentence cites its sources."
         aside={
@@ -119,7 +118,7 @@ export function ResearchListView() {
           <table className="w-full min-w-[44rem] text-sm">
             <caption className="sr-only">Research reports, newest first</caption>
             <thead className="bg-surface-muted">
-              <tr className="border-b border-border text-[11px] tracking-wide text-text-muted uppercase">
+              <tr className="border-b border-border text-xs text-text-muted">
                 <th scope="col" className="px-4 py-2 text-left font-medium">Report</th>
                 <th scope="col" className="px-4 py-2 text-left font-medium">Ticker</th>
                 <th scope="col" className="px-4 py-2 text-left font-medium">Profile</th>
@@ -129,7 +128,7 @@ export function ResearchListView() {
             </thead>
             <tbody>
               {load.items.map((r) => (
-                <tr key={r.id} className="border-b border-border-soft align-top last:border-0 hover:bg-border-soft">
+                <tr key={r.id} className="border-b border-border-soft align-top last:border-0 hover:bg-surface-muted">
                   <th scope="row" className="px-4 py-3 text-left font-normal">
                     <Link href={researchHref(r.id)} className="font-heading text-[17px] font-semibold hover:text-accent-ink hover:underline">
                       {r.headline || r.title}

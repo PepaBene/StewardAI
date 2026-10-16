@@ -6,8 +6,11 @@ import { useMemo } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { EmptyState } from "@/components/empty-state";
+import { EntityName } from "@/components/entity-name";
 import { Button } from "@/components/ui/button";
 import { BlueprintCorners } from "@/components/ui/blueprint";
+import { CompactRow } from "@/components/ui/compact-row";
+import { ResponsiveTable } from "@/components/ui/responsive-table";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { coverageRows, type CoverageCell } from "@/lib/activity/activity";
 import { formatDateTime } from "@/lib/format";
@@ -75,51 +78,52 @@ export function CoveragePanel() {
           {rows.length === 0 ? (
             <EmptyState title="No open holdings">Coverage is listed once a portfolio sync has recorded positions.</EmptyState>
           ) : (
-            <div className="relative overflow-x-auto border border-border">
-              <table className="w-full min-w-[48rem] text-sm">
-                <caption className="sr-only">Coverage per holding; holdings with gaps first</caption>
-                <thead className="bg-surface-muted">
-                  <tr className="border-b border-border text-[11px] tracking-[0.08em] text-text-muted uppercase">
-                    <th scope="col" className="px-3 py-2 text-left font-medium">Holding</th>
-                    <th scope="col" className="px-3 py-2 text-left font-medium">News</th>
-                    <th scope="col" className="px-3 py-2 text-left font-medium">Prices</th>
-                    <th scope="col" className="px-3 py-2 text-left font-medium">Earnings check</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.ticker} data-gap={r.gaps > 0 || undefined} className="border-b border-border align-top last:border-0">
-                      <th scope="row" className="px-3 py-2 text-left font-normal">
-                        <Link href={`/holdings/${encodeURIComponent(r.ticker)}`} className="font-medium hover:text-accent-ink hover:underline">
-                          {r.name}
+            <ResponsiveTable
+              rows={rows}
+              rowKey={(r) => r.ticker}
+              pageSize={10}
+              caption="Coverage per holding; holdings with gaps first"
+              columns={[
+                {
+                  key: "holding",
+                  header: "Holding",
+                  cell: (r) => (
+                    <>
+                      <Link href={`/companies/${encodeURIComponent(r.ticker)}`} className="font-medium hover:text-accent-ink hover:underline">
+                        <EntityName id={r.ticker} name={r.name} chip={false} />
+                      </Link>
+                      {r.news.gap ? (
+                        <Link href="/activity?type=news_ingest#job-log" className="block text-xs text-accent-ink hover:underline">
+                          News runs
                         </Link>
-                        <span className="block font-mono text-xs text-text-muted">{r.ticker}</span>
-                        {r.news.gap ? (
-                          <Link
-                            href={`/activity?type=news_ingest#job-log`}
-                            className="text-xs text-accent-ink hover:underline"
-                          >
-                            News runs
-                          </Link>
-                        ) : null}
-                      </th>
-                      <td className="px-3 py-2">
-                        <Cell cell={r.news} />
-                      </td>
-                      <td className="px-3 py-2">
-                        <Cell cell={r.prices} />
-                      </td>
-                      <td className="px-3 py-2">
-                        <Cell cell={r.earnings} />
-                        <Link href={`/activity?type=earnings_check&ticker=${encodeURIComponent(r.ticker)}#job-log`} className="text-xs text-accent-ink hover:underline">
-                          Its runs
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      ) : null}
+                    </>
+                  ),
+                },
+                { key: "news", header: "News", cell: (r) => <Cell cell={r.news} /> },
+                { key: "prices", header: "Prices", cell: (r) => <Cell cell={r.prices} /> },
+                {
+                  key: "earnings",
+                  header: "Earnings check",
+                  cell: (r) => (
+                    <>
+                      <Cell cell={r.earnings} />
+                      <Link href={`/activity?type=earnings_check&ticker=${encodeURIComponent(r.ticker)}#job-log`} className="text-xs text-accent-ink hover:underline">
+                        Its runs
+                      </Link>
+                    </>
+                  ),
+                },
+              ]}
+              compact={(r) => (
+                <CompactRow
+                  name={<EntityName id={r.ticker} name={r.name} chip={false} />}
+                  symbol={r.gaps > 0 ? `${r.gaps} gap${r.gaps === 1 ? "" : "s"}` : "No gaps"}
+                  secondary={[`News: ${r.news.gap ? "gap" : r.news.label}`, `Prices: ${r.prices.gap ? "gap" : r.prices.label}`]}
+                  href={`/companies/${encodeURIComponent(r.ticker)}`}
+                />
+              )}
+            />
           )}
         </>
       ) : null}

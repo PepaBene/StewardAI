@@ -113,7 +113,7 @@ export function ProjectionChart({
             { label: "Other scenarios", swatch: "dashed", className: "border-text-faint" },
           ]}
         />
-        <p className="num text-[11px] text-text-muted" aria-live="polite">
+        <p className="num text-xs text-text-muted" aria-live="polite">
           {hy !== null
             ? [
                 `${hy}:`,

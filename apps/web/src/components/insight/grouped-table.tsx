@@ -75,7 +75,7 @@ export function GroupedTable<T>({
               g.rows.map((r) => (
                 <tr
                   key={rowKey(r)}
-                  className={cn("border-t border-border-soft", onRowClick && "cursor-pointer hover:bg-border-soft")}
+                  className={cn("border-t border-border-soft", onRowClick && "cursor-pointer hover:bg-surface-muted")}
                   onClick={onRowClick ? () => onRowClick(r) : undefined}
                 >
                   {columns.map((c, i) =>

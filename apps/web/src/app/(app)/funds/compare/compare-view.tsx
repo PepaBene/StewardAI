@@ -27,8 +27,8 @@ function FundHeads({ funds }: { funds: CompareFund[] }) {
       {funds.map((f) => (
         <th key={f.isin} scope="col" className="min-w-36 px-2 py-1.5 text-right font-medium">
           <Link href={fundHref(f.isin)} className="hover:text-accent-ink hover:underline">{label(f)}</Link>
-          <span className="block font-mono text-[11px] font-normal text-text-muted">{f.isin}</span>
-          {f.duplicate_of ? <span className="block text-[11px] font-normal text-unconfirmed">same portfolio as {f.duplicate_of}</span> : null}
+          <span className="block font-mono text-xs font-normal text-text-muted">{f.isin}</span>
+          {f.duplicate_of ? <span className="block text-xs font-normal text-unconfirmed">same portfolio as {f.duplicate_of}</span> : null}
         </th>
       ))}
     </>

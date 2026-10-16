@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DOMAIN_SLUGS, historyHref } from "@/lib/config/domains";
-import { CLUSTER_PAGES } from "@/lib/nav";
+import { NAV_PAGES } from "@/lib/nav";
 
 import {
   baseCommands,
@@ -37,7 +37,7 @@ const commands = [
 describe("command palette", () => {
   it("reaches every primary destination and config editor", () => {
     const hrefs = new Set(commands.map((c) => c.href).filter(Boolean));
-    for (const p of CLUSTER_PAGES) expect(hrefs).toContain(p.href);
+    for (const p of NAV_PAGES) expect(hrefs).toContain(p.href);
     for (const p of CONFIG_PAGES) expect(hrefs).toContain(p.href);
     for (const p of OTHER_PAGES) expect(hrefs).toContain(p.href);
     for (const slug of DOMAIN_SLUGS) expect(hrefs).toContain(historyHref(slug));
@@ -152,20 +152,21 @@ describe("command palette: phase 5", () => {
   });
 });
 
-describe("command palette: five-cluster IA", () => {
+describe("command palette: destinations", () => {
   const byHref = new Map(commands.map((c) => [c.href, c]));
 
-  it("labels each destination with its Ledger cluster instead of a blanket \"Go to\"", () => {
+  it("labels each page with its destination instead of a blanket \"Go to\"", () => {
     expect(byHref.get("/")?.group).toBe("Portfolio");
     expect(byHref.get("/transactions")?.group).toBe("Portfolio");
-    expect(byHref.get("/theses")?.group).toBe("Research & Verification");
-    expect(byHref.get("/review")?.group).toBe("Research & Verification");
-    expect(byHref.get("/news")?.group).toBe("Research & Verification");
-    expect(byHref.get("/escalations")?.group).toBe("Oversight");
-    expect(byHref.get("/reports")?.group).toBe("Oversight");
-    expect(byHref.get("/reviews")?.group).toBe("Oversight");
-    expect(byHref.get("/activity")?.group).toBe("Oversight");
-    expect(byHref.get("/config/strategy")?.group).toBe("Config");
+    expect(byHref.get("/theses")?.group).toBe("Research");
+    expect(byHref.get("/review")?.group).toBe("Inbox");
+    expect(byHref.get("/news")?.group).toBe("Markets");
+    expect(byHref.get("/escalations")?.group).toBe("Inbox");
+    expect(byHref.get("/reports")?.group).toBe("Briefings");
+    expect(byHref.get("/reviews")?.group).toBe("Briefings");
+    expect(byHref.get("/activity")?.group).toBe("System");
+    expect(byHref.get("/config/strategy")?.group).toBe("Settings");
+    expect(byHref.get("/glossary")?.group).toBe("Go to");
     expect(commands.find((c) => c.id === "ui:chat")?.group).toBe("Copilot");
     expect(byHref.get("/chat")?.group).toBe("Copilot");
   });
@@ -178,7 +179,7 @@ describe("command palette: five-cluster IA", () => {
 describe("command palette: KPI depth", () => {
   it("resolves a typed metric and ticker straight to that KPI's row, not just the holding", () => {
     const [first] = filterCommands(commands, "revenue growth aapl");
-    expect(first.href).toBe("/holdings/AAPL_US_EQ#kpi-row-revenue-growth");
+    expect(first.href).toBe("/companies/AAPL_US_EQ#kpi-row-revenue-growth");
     expect(first.label).toBe("Revenue growth YoY · Apple");
   });
 

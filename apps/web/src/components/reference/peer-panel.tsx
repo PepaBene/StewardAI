@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 
+import { EntityName } from "@/components/entity-name";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { PeerSetEditor } from "@/components/reference/peer-set-editor";
@@ -74,7 +75,7 @@ export function PeerPanel({ ticker }: { ticker: string }) {
               <ul className="mt-2 space-y-1 text-xs text-text-muted">
                 {view.excludedPeers.map((e) => (
                   <li key={e.peer}>
-                    <span className="font-mono text-text">{e.peer}</span>: {e.reason}
+                    <EntityName id={e.peer} className="text-text" />: {e.reason}
                   </li>
                 ))}
               </ul>
@@ -131,7 +132,7 @@ function PeerTableRow({ row, confirmed }: { row: PeerRow; confirmed: number }) {
           <span className="text-xs text-text-muted">No values to plot</span>
         )}
         {range ? (
-          <span className="num mt-0.5 flex justify-between text-[11px] text-text-faint" title="Scale of this row: lowest to highest value shown, zero included">
+          <span className="num mt-0.5 flex justify-between text-xs text-text-faint" title="Scale of this row: lowest to highest value shown, zero included">
             <span>{formatPeerValue(range.lo, row.kind)}</span>
             <span>{formatPeerValue(range.hi, row.kind)}</span>
           </span>

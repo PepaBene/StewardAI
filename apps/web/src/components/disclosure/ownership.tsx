@@ -330,11 +330,11 @@ export function StakeTimeline({ events, cutoffMs }: { events: readonly StakeEven
         {[5, 10].filter((p) => p < top).map((p) => (
           <g key={p}>
             <line x1={PAD.l} x2={W - PAD.r} y1={y(p)} y2={y(p)} className="stroke-chart-grid" strokeDasharray={p === 5 ? undefined : "2 4"} />
-            <text x={PAD.l - 6} y={y(p)} textAnchor="end" dominantBaseline="middle" className="num fill-text-muted text-[11px]">{p}%</text>
+            <text x={PAD.l - 6} y={y(p)} textAnchor="end" dominantBaseline="middle" className="num fill-text-muted text-xs">{p}%</text>
           </g>
         ))}
         {yearTicks.map((yr) => (
-          <text key={yr} x={x(Date.UTC(yr, 0, 1) < lo ? lo : Date.UTC(yr, 0, 1))} y={H - 8} className="num fill-text-muted text-[11px]">{yr}</text>
+          <text key={yr} x={x(Date.UTC(yr, 0, 1) < lo ? lo : Date.UTC(yr, 0, 1))} y={H - 8} className="num fill-text-muted text-xs">{yr}</text>
         ))}
         <path d={`${steps} ${tail}`} fill="none" className="stroke-chart-line" strokeWidth={2} />
         <line x1={x(Math.min(cutoffMs, hi))} x2={x(Math.min(cutoffMs, hi))} y1={PAD.t} y2={H - PAD.b} className="stroke-text" strokeWidth={1.5} />

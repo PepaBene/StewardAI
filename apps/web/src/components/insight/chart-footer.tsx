@@ -69,7 +69,7 @@ export function ChartFooter({
   className?: string;
 }) {
   return (
-    <div className={cn("mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border-soft pt-2 text-[11px] text-text-muted", className)}>
+    <div className={cn("mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border-soft pt-2 text-xs text-text-muted", className)}>
       {onToggle ? (
         <button
           type="button"

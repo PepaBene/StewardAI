@@ -61,13 +61,13 @@ export function SavedScreens({
                 {s.mark ? <ScoreMark petals={petalsFromMap(s.mark)} label={`${s.name}, mean of ${s.last_matched ?? 0} matches`} /> : null}
                 {s.new_last_7d !== null && s.new_last_7d !== undefined ? (
                   <span
-                    className={`num border px-1.5 text-[11px] ${s.new_last_7d > 0 ? "border-accent text-accent-ink" : "border-border text-text-muted"}`}
+                    className={`num border px-1.5 text-xs ${s.new_last_7d > 0 ? "border-accent text-accent-ink" : "border-border text-text-muted"}`}
                     title={`${s.new_basis ?? ""}${s.new_tickers?.length ? `: ${s.new_tickers.join(", ")}` : ""}`}
                   >
                     {s.new_last_7d} new in 7 days
                   </span>
                 ) : s.last_run_at ? (
-                  <span className="text-[11px] text-text-faint" title={s.new_basis ?? undefined}>
+                  <span className="text-xs text-text-faint" title={s.new_basis ?? undefined}>
                     {s.last_matched ?? 0} matches
                   </span>
                 ) : null}
@@ -106,7 +106,7 @@ export function SavedScreens({
                 <button
                   type="button"
                   onClick={() => c.id !== null && c.id !== undefined && onLoadColumns(c.id)}
-                  className="border border-border px-2 py-1 text-xs hover:bg-border-soft focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none"
+                  className="border border-border px-2 py-1 text-xs hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none"
                 >
                   {c.name}
                 </button>

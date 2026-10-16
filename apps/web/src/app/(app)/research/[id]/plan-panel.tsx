@@ -66,7 +66,7 @@ export function ToolCalls({ calls }: { calls: ResearchBody["tool_calls"] }) {
         <table className="w-full min-w-[28rem] text-xs">
           <caption className="sr-only">Stored-data tool calls: status, freshness and the reason a call was skipped or failed</caption>
           <thead>
-            <tr className="border-b border-border text-left text-[11px] tracking-wide text-text-muted uppercase">
+            <tr className="border-b border-border text-left text-xs text-text-muted">
               <th scope="col" className="py-1 pr-2 font-medium">Tool</th>
               <th scope="col" className="py-1 pr-2 font-medium">Status</th>
               <th scope="col" className="py-1 font-medium">Freshness and reason</th>

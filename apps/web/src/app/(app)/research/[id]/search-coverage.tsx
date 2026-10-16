@@ -49,7 +49,7 @@ export function SearchCoverage({ search_summary, discovered_urls, rounds, stoppe
               <table className="w-full min-w-[28rem] text-xs">
                 <caption className="pb-1 text-left text-text-muted">{g.description}</caption>
                 <thead>
-                  <tr className="border-b border-border text-left text-[11px] tracking-wide text-text-muted uppercase">
+                  <tr className="border-b border-border text-left text-xs text-text-muted">
                     <th scope="col" className="py-1 pr-2 font-medium">Page</th>
                     <th scope="col" className="py-1 pr-2 font-medium">Round</th>
                     <th scope="col" className="py-1 pr-2 font-medium">Tier</th>

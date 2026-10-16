@@ -15,7 +15,7 @@ export function TotpCodeField({ disabled }: { disabled?: boolean }) {
         maxLength={6}
         required
         disabled={disabled}
-        className="num font-mono tracking-widest"
+        className="num font-mono"
       />
     </div>
   );

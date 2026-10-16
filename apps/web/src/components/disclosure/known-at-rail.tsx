@@ -108,7 +108,7 @@ export function KnownAtRail({
           {rail.ticks.map((t) => (
             <g key={`${t.label}-${t.x}`}>
               <line x1={t.x} x2={t.x} y1={rail.plot.top} y2={rail.plot.bottom} className={t.major ? "stroke-border" : "stroke-border-soft"} strokeDasharray={t.major ? undefined : "2 4"} />
-              <text x={t.x + 3} y={rail.plot.bottom + 16} className={cn("num text-[11px]", t.major ? "fill-text font-semibold" : "fill-text-muted")}>
+              <text x={t.x + 3} y={rail.plot.bottom + 16} className={cn("num text-xs", t.major ? "fill-text font-semibold" : "fill-text-muted")}>
                 {t.label}
               </text>
             </g>

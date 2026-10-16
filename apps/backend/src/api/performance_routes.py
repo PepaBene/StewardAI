@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from api.auth import Owner
 from api.db import Pool
 from steward import saved
-from steward.performance import evaluation, exports, service
+from steward.performance import curves, evaluation, exports, service
 from steward.performance.reports import (
     AttributionResponse,
     LotsResponse,
@@ -22,6 +22,7 @@ from steward.performance.reports import (
 )
 from steward.performance.settings import PerformanceSettings, load_settings, save_settings
 from steward.portfolio.factors import factor_exposures
+from steward.portfolio.read import portfolio_history
 
 router = APIRouter()
 
@@ -64,6 +65,26 @@ async def get_attribution(
     per group, reconciled to the total with a disclosed residual."""
     settings, _ = await load_settings(pool, owner.user_id)
     return await service.attribution_report(pool, settings, days)
+
+
+@router.get("/portfolio/performance/drawdown", tags=["portfolio"])
+async def get_drawdown(
+    pool: Pool, _owner: Owner, days: Annotated[int, Query(ge=7, le=3700)] = 365
+) -> curves.DrawdownResponse:
+    """The underwater curve of the flow-adjusted portfolio index over `days` (deposits and
+    withdrawals excluded), with the maximum drawdown and its peak, trough and recovery dates.
+    Empty with a reason before two snapshots exist."""
+    return curves.drawdown_response(await portfolio_history(pool, days), days)
+
+
+@router.get("/portfolio/performance/waterfall", tags=["portfolio"])
+async def get_waterfall(
+    pool: Pool, owner: Owner, days: Annotated[int, Query(ge=7, le=3650)] = 365
+) -> curves.WaterfallResponse:
+    """Start value to end value over `days`: net deposits, price return, FX effect, income, costs
+    and what the attribution could not place. A step it cannot compute is null with a reason."""
+    settings, _ = await load_settings(pool, owner.user_id)
+    return curves.waterfall_response(await service.attribution_report(pool, settings, days))
 
 
 @router.get("/portfolio/performance/sleeves", tags=["portfolio"])

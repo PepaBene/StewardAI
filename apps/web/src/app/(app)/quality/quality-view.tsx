@@ -1,13 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { ResourceGate } from "@/components/company/primitives";
-import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
+import { EntityName } from "@/components/entity-name";
+import { CheckStateIcon } from "@/components/insight/check-list";
+import { KpiStrip } from "@/components/insight/kpi-tile";
+import { StatusList, type StatusRow } from "@/components/oversight/status-list";
+import { Button } from "@/components/ui/button";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate, formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
-import { ISSUE_LABEL, SNOOZE_CHOICES, snoozeUntil, weightBar, type Cockpit, type QualityIssue } from "@/lib/journal/journal";
+import { ISSUE_LABEL, SNOOZE_CHOICES, snoozeUntil, type Cockpit, type QualityIssue } from "@/lib/journal/journal";
+import { sentenceCase, subjectWords } from "@/lib/oversight/plain";
 
 import { InsightCoveragePanel } from "./insight-coverage-panel";
 
@@ -22,26 +28,31 @@ export function QualityView() {
   );
 }
 
-/** Set one issue aside until a date, or bring it back. The check keeps running either way. */
+/** Set one issue aside until a date. The check keeps running either way. */
 function SnoozeControl({ issue, onChanged }: { issue: QualityIssue; onChanged: () => void }) {
   const [days, setDays] = useState(30);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  async function send(action: "snooze" | "clear") {
+  async function send() {
     setBusy(true);
     setProblem(null);
     const res = await getBrowserApiClient().POST("/quality/snooze", {
-      body: { kind: issue.kind, subject: issue.subject, action, until: action === "snooze" ? snoozeUntil(days) : null },
+      body: { kind: issue.kind, subject: issue.subject, action: "snooze", until: snoozeUntil(days) },
     });
     setBusy(false);
     if (!res.response.ok) return setProblem("That could not be saved. Try again.");
     onChanged();
   }
   return (
-    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+    <div className="flex flex-wrap items-center gap-2 text-xs">
       <label className="flex items-center gap-1">
-        <span className="text-text-muted">Set aside for</span>
-        <select className="h-7 border border-border bg-surface px-1" value={days} onChange={(e) => setDays(Number(e.target.value))}>
+        <span className="sr-only">Set aside for</span>
+        <select
+          className="h-7 rounded-control border border-border bg-surface px-1"
+          value={days}
+          onChange={(e) => setDays(Number(e.target.value))}
+          aria-label={`Set aside ${issue.subject} for`}
+        >
           {SNOOZE_CHOICES.map((c) => (
             <option key={c.days} value={c.days}>
               {c.label}
@@ -49,9 +60,9 @@ function SnoozeControl({ issue, onChanged }: { issue: QualityIssue; onChanged: (
           ))}
         </select>
       </label>
-      <button type="button" disabled={busy} onClick={() => void send("snooze")} className="h-7 border border-border px-2 hover:bg-surface-muted disabled:opacity-60">
+      <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void send()}>
         Set aside
-      </button>
+      </Button>
       {problem ? (
         <span className="text-loss" role="alert">
           {problem}
@@ -64,10 +75,11 @@ function SnoozeControl({ issue, onChanged }: { issue: QualityIssue; onChanged: (
 function BringBack({ issue, onChanged }: { issue: QualityIssue; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="sm"
       disabled={busy}
-      className="h-7 border border-border px-2 text-xs hover:bg-surface-muted disabled:opacity-60"
       onClick={async () => {
         setBusy(true);
         await getBrowserApiClient().POST("/quality/snooze", { body: { kind: issue.kind, subject: issue.subject, action: "clear", until: null } });
@@ -76,129 +88,188 @@ function BringBack({ issue, onChanged }: { issue: QualityIssue; onChanged: () =>
       }}
     >
       Bring back now
-    </button>
+    </Button>
+  );
+}
+
+/** An instrument id ("GOOGL_US_EQ") shows as its company name; any other subject as words. */
+function Subject({ subject }: { subject: string }) {
+  if (/_EQ$/.test(subject)) return <EntityName id={subject} chip={false} />;
+  return <>{subjectWords(subject)}</>;
+}
+
+/**
+ * One kind of issue as one block: what it is and how much of the portfolio it touches, said once,
+ * with the fix, then every affected holding by name with its share and its own "Set aside".
+ */
+function IssueGroup({ kind, list, onChanged }: { kind: QualityIssue["kind"]; list: QualityIssue[]; onChanged: () => void }) {
+  const weight = list.reduce((s, i) => s + (i.weight ?? 0), 0);
+  const sameDetail = list.every((i) => i.detail === list[0].detail);
+  const sameFix = list.every((i) => i.fix === list[0].fix);
+  const many = list.length > 1;
+  return (
+    <div className="rounded-card bg-surface-muted px-4 py-3">
+      <div className="flex gap-2.5">
+        <CheckStateIcon state="fail" className="mt-0.5" />
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold">
+            {ISSUE_LABEL[kind]}
+            <span className="font-normal text-text-muted">
+              {many ? `, ${list.length} ${list.length === 1 ? "item" : "items"}` : ""}
+              {weight > 0 ? `, ${formatPercent(weight, { decimals: 1 })} of the portfolio` : ""}
+            </span>
+          </h3>
+          {many && sameDetail ? <p className="text-sm">{sentenceCase(list[0].detail)}.</p> : null}
+          {sameFix ? <p className="text-sm text-text-muted">{list[0].fix}</p> : null}
+        </div>
+      </div>
+      <details open={!many || undefined} className="mt-2">
+        {many ? <summary className="cursor-pointer text-sm font-medium text-accent-ink">Show the {list.length} items</summary> : null}
+        <ul className="mt-1 divide-y divide-border-soft">
+          {list.map((issue, i) => (
+            <li key={`${issue.subject}-${i}`} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2 text-sm">
+              <span className="min-w-0">
+                <span className="font-medium">
+                  <Subject subject={issue.subject} />
+                </span>
+                {issue.weight !== null && issue.weight !== undefined ? (
+                  <span className="num text-text-muted">, {formatPercent(issue.weight, { decimals: 1 })} of the portfolio</span>
+                ) : null}
+                {!(many && sameDetail) ? <span className="block text-text-muted">{sentenceCase(issue.detail)}.</span> : null}
+                {!sameFix ? <span className="block text-xs text-text-muted">{issue.fix}</span> : null}
+              </span>
+              <SnoozeControl issue={issue} onChanged={onChanged} />
+            </li>
+          ))}
+        </ul>
+      </details>
+    </div>
   );
 }
 
 function Body({ cockpit, onChanged }: { cockpit: Cockpit; onChanged: () => void }) {
-  const max = Math.max(0, ...cockpit.issues.map((i) => i.weight ?? 0));
-  const portfolio = cockpit.issues.filter((i) => i.weight !== null && i.weight !== undefined);
-  const other = cockpit.issues.filter((i) => i.weight === null || i.weight === undefined);
+  const issues = cockpit.issues;
+  const snoozed = cockpit.snoozed ?? [];
+  const kinds = [...new Set(issues.map((i) => i.kind))];
+  const checkRows: StatusRow[] = [
+    ...cockpit.checks.map(
+      (c): StatusRow => ({
+        id: `check-${c.kind}`,
+        state: c.issues > 0 ? "fail" : "pass",
+        lead: c.title,
+        sentence: c.issues > 0 ? `Found ${c.issues} to look at. Looked at: ${c.denominator}.` : `Found nothing. Looked at: ${c.denominator}.`,
+      }),
+    ),
+    ...cockpit.not_covered.map(
+      (n): StatusRow => ({ id: `nc-${n.title}`, state: "unknown", lead: n.title, sentence: n.reason }),
+    ),
+  ];
   return (
     <div className="flex flex-col gap-5">
-      <Blueprint className="p-4">
-        <PanelHeading
-          level={2}
-          kicker="Summary"
-          title={cockpit.issues.length === 0 ? "No problems found by the checks that ran" : `${cockpit.issues.length} issue${cockpit.issues.length === 1 ? "" : "s"} to look at`}
-        />
-        <p className="mt-2 max-w-prose text-sm">
-          {cockpit.issues.length === 0
-            ? "Every check below ran and found nothing. The checks listed as not covered did not run."
-            : `Together they touch ${formatPercent(cockpit.affected_weight, { decimals: 0 })} of the portfolio, counting each holding once.`}
-        </p>
-      </Blueprint>
+      <KpiStrip
+        label="Data quality at a glance"
+        tiles={[
+          {
+            label: "Portfolio affected",
+            value: formatPercent(cockpit.affected_weight, { decimals: 0 }),
+            verdict: {
+              tone: cockpit.affected_weight > 0.25 ? "bad" : cockpit.affected_weight > 0 ? "caution" : "good",
+              text: issues.length === 0 ? "No holding is affected." : "Share of the portfolio touched by an issue, counting each holding once.",
+            },
+          },
+          {
+            label: "Open issues",
+            value: issues.length,
+            verdict: { tone: issues.length === 0 ? "good" : "caution", text: issues.length === 0 ? "Every check that ran found nothing." : "Fix the top of the list first." },
+          },
+          {
+            label: "Set aside",
+            value: snoozed.length,
+            verdict: { tone: "neutral", text: snoozed.length === 0 ? "Nothing hidden." : "Hidden until the date shown below." },
+          },
+          {
+            label: "Checks that cannot run",
+            value: cockpit.not_covered.length,
+            verdict: {
+              tone: cockpit.not_covered.length === 0 ? "good" : "unknown",
+              text: cockpit.not_covered.length === 0 ? "Every check can run." : "Listed with the reason, so a gap is never read as clean.",
+            },
+          },
+        ]}
+      />
 
-      {portfolio.length > 0 ? (
-        <Blueprint className="p-4">
-          <PanelHeading level={3} kicker="Fix first" title="Issues on holdings, by share of the portfolio" />
-          <ol className="mt-3 divide-y divide-border-soft border-y border-border-soft">
-            {portfolio.map((issue, i) => (
-              <li key={`${issue.kind}-${issue.subject}-${i}`} className="grid gap-x-4 gap-y-1 py-2.5 sm:grid-cols-[9rem_1fr_6rem]">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold">{issue.subject}</div>
-                  <div className="text-xs text-text-muted">{ISSUE_LABEL[issue.kind]}</div>
-                </div>
-                <div className="min-w-0 text-sm">
-                  <p>{issue.detail}</p>
-                  <p className="text-xs text-text-muted">{issue.fix}</p>
-                  <SnoozeControl issue={issue} onChanged={onChanged} />
-                </div>
-                <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:gap-1">
-                  <span className="num text-sm font-semibold">{formatPercent(issue.weight ?? 0, { decimals: 1 })}</span>
-                  <span className="block h-1.5 w-full max-w-24 bg-border-soft" aria-hidden="true">
-                    <span className="block h-full bg-accent" style={{ width: `${weightBar(issue.weight, max)}%` }} />
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </Blueprint>
-      ) : null}
+      <section aria-labelledby="issues-heading" className="blueprint space-y-3 px-[22px] py-5">
+        <div>
+          <h2 id="issues-heading" className="panel-title">
+            {issues.length === 0 ? "No problems found by the checks that ran" : `${kinds.length} ${kinds.length === 1 ? "kind" : "kinds"} of issue to look at`}
+          </h2>
+          <p className="text-sm text-text-muted">
+            {issues.length} {issues.length === 1 ? "item" : "items"} in all, the kind touching most of the portfolio first. Set an item aside and the check keeps running.
+          </p>
+        </div>
+        {kinds
+          .map((kind) => ({ kind, list: issues.filter((i) => i.kind === kind) }))
+          .sort((a, b) => b.list.reduce((s, i) => s + (i.weight ?? 0), 0) - a.list.reduce((s, i) => s + (i.weight ?? 0), 0))
+          .map(({ kind, list }) => (
+            <IssueGroup key={kind} kind={kind} list={list} onChanged={onChanged} />
+          ))}
+      </section>
 
-      {other.length > 0 ? (
-        <Blueprint className="p-4">
-          <PanelHeading level={3} kicker="Not tied to a holding" title="Sources and providers" />
-          <ul className="mt-3 divide-y divide-border-soft border-y border-border-soft">
-            {other.map((issue, i) => (
-              <li key={`${issue.kind}-${issue.subject}-${i}`} className="py-2.5 text-sm">
-                <span className="font-semibold">{issue.subject}</span> <span className="text-text-muted">· {ISSUE_LABEL[issue.kind]}</span>
-                <p>{issue.detail}</p>
-                <p className="text-xs text-text-muted">{issue.fix}</p>
-                <SnoozeControl issue={issue} onChanged={onChanged} />
-              </li>
-            ))}
+      <div className="grid items-start gap-5 lg:grid-cols-2">
+        <section aria-labelledby="checks-heading" className="blueprint space-y-2 px-[22px] py-5">
+          <h2 id="checks-heading" className="panel-title">
+            What each check covers
+          </h2>
+          <StatusList caption="Data checks and what each covers" passWord="found nothing" rows={checkRows} />
+        </section>
+        <section aria-labelledby="more-heading" className="blueprint space-y-2 px-[22px] py-5">
+          <h2 id="more-heading" className="panel-title">
+            Other coverage views
+          </h2>
+          <ul className="space-y-1 text-sm">
+            <li>
+              <Link href="/disclosures/coverage" className="text-accent-ink underline underline-offset-2">
+                Filings coverage
+              </Link>{" "}
+              <span className="text-text-muted">which holdings have filings on record.</span>
+            </li>
+            <li>
+              <Link href="/activity" className="text-accent-ink underline underline-offset-2">
+                Activity
+              </Link>{" "}
+              <span className="text-text-muted">price and earnings coverage per holding, and job runs.</span>
+            </li>
+            <li>
+              <Link href="/status" className="text-accent-ink underline underline-offset-2">
+                Status
+              </Link>{" "}
+              <span className="text-text-muted">reference data gaps and API health.</span>
+            </li>
           </ul>
-        </Blueprint>
-      ) : null}
+        </section>
+      </div>
 
-      {(cockpit.snoozed ?? []).length > 0 ? (
-        <Blueprint className="border-dashed p-4">
-          <PanelHeading level={3} kicker="Set aside" title="Hidden until the date shown" />
-          <ul className="mt-3 divide-y divide-border-soft border-y border-border-soft text-sm">
-            {(cockpit.snoozed ?? []).map((s) => (
+      {snoozed.length > 0 ? (
+        <details className="blueprint p-5">
+          <summary className="cursor-pointer text-lg font-semibold">Set aside ({snoozed.length})</summary>
+          <ul className="mt-3 divide-y divide-border-soft text-sm">
+            {snoozed.map((s) => (
               <li key={`${s.issue.kind}-${s.issue.subject}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <span>
-                  <span className="font-semibold">{s.issue.subject}</span> <span className="text-text-muted">{ISSUE_LABEL[s.issue.kind]}: {s.issue.detail}</span>
+                  <span className="font-semibold">
+                    <Subject subject={s.issue.subject} />
+                  </span>{" "}
+                  <span className="text-text-muted">
+                    {ISSUE_LABEL[s.issue.kind]}: {s.issue.detail}
+                  </span>
                   <span className="block text-xs text-text-muted">Comes back on {formatDate(s.until)}</span>
                 </span>
                 <BringBack issue={s.issue} onChanged={onChanged} />
               </li>
             ))}
           </ul>
-        </Blueprint>
+        </details>
       ) : null}
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Blueprint className="p-4">
-          <PanelHeading level={3} kicker="Checks that ran" title="And what each one covers" />
-          <table className="mt-3 w-full text-sm">
-            <caption className="sr-only">Data checks that ran, what each covers and how many issues it found</caption>
-            <thead>
-              <tr className="text-left text-xs text-text-muted">
-                <th scope="col" className="py-1 font-medium">
-                  Check
-                </th>
-                <th scope="col" className="py-1 text-right font-medium">
-                  Found
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {cockpit.checks.map((c) => (
-                <tr key={c.kind} className="border-t border-border-soft align-top">
-                  <th scope="row" className="py-1.5 text-left font-normal">
-                    {c.title}
-                    <div className="text-xs text-text-muted">Looked at: {c.denominator}</div>
-                  </th>
-                  <td className="num py-1.5 text-right">{c.issues}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Blueprint>
-        <Blueprint className="border-dashed p-4">
-          <PanelHeading level={3} kicker="Not covered yet" title="Checks that cannot run" />
-          <ul className="mt-3 space-y-2 text-sm">
-            {cockpit.not_covered.map((n) => (
-              <li key={n.title}>
-                <span className="font-semibold">{n.title}</span>
-                <p className="text-text-muted">{n.reason}</p>
-              </li>
-            ))}
-          </ul>
-        </Blueprint>
-      </div>
 
       <InsightCoveragePanel />
     </div>

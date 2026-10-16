@@ -5,7 +5,10 @@ import { useCallback, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
 import { ResourceGate } from "@/components/company/primitives";
-import { AnswerStrip, CoverageChip } from "@/components/insight/answer-strip";
+import { CoverageChip } from "@/components/insight/answer-strip";
+import { KpiStrip } from "@/components/insight/kpi-tile";
+import { shortTicker } from "@/lib/portfolio/ticker";
+import { incomeChangeVerdict } from "@/lib/verdicts/portfolio";
 import { ChartWithFooter } from "@/components/insight/chart-footer";
 import { ForecastBars } from "@/components/insight/forecast-bars";
 import { MonthCalendar } from "@/components/insight/month-calendar";
@@ -59,35 +62,33 @@ function IncomeBody({ data }: { data: PortfolioDividends }) {
   const coverageTone = data.status === "complete" ? "neutral" : data.status === "partial" ? "partial" : "unavailable";
   return (
     <div className="flex flex-col gap-5">
-      <AnswerStrip
-        lead={{
-          label: "Income in the next 12 months",
-          value: money(s.next_12m, ccy, 0),
-          sentence: (
-            <>
-              {money(s.next_12m_declared, ccy, 0)} declared and {money(s.next_12m_estimated, ccy, 0)} estimated from each holding&apos;s payment pattern
-              {change !== null ? <>, {pct(change, 1, true)} against the {money(s.trailing_12m, ccy, 0)} received in the last 12 months</> : null}.
-              {data.assume_growth ? " Estimates assume each holding keeps its five-year dividend growth." : " Estimates repeat the last amount; growth is not assumed."}
-            </>
-          ),
-        }}
-        chip={<CoverageChip tone={coverageTone}>{s.coverage_sentence}</CoverageChip>}
-        figures={[
-          { label: "Monthly average", value: money(s.monthly_average, ccy, 0) },
-          { label: "Received, last 12 months", value: money(s.trailing_12m, ccy, 0) },
+      <KpiStrip
+        label="Income at a glance"
+        tiles={[
+          {
+            label: "Income, next 12 months",
+            value: money(s.next_12m, ccy, 0),
+            note: `${money(s.next_12m_declared, ccy, 0)} declared · ${money(s.next_12m_estimated, ccy, 0)} estimated`,
+            verdict: incomeChangeVerdict(change),
+          },
+          { label: "Received, last 12 months", value: money(s.trailing_12m, ccy, 0), note: change !== null ? `Next 12 months ${pct(change, 1, true)}` : undefined },
+          { label: "Monthly average", value: money(s.monthly_average, ccy, 0), note: "Over the next 12 months" },
           { label: "Yield on price", value: pct(s.yield_on_price, 2), note: "Next 12 months over today's value" },
           { label: "Yield on cost", value: pct(s.yield_on_cost, 2), note: "Over what you paid for open lots" },
         ]}
       />
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+        <CoverageChip tone={coverageTone}>{s.coverage_sentence}</CoverageChip>
+        <span>{data.assume_growth ? "Estimates assume each holding keeps its five-year dividend growth." : "Estimates repeat the last amount; growth is not assumed."}</span>
+      </div>
       <Gaps data={data} />
       <IncomeChart data={data} />
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Contributors title="Largest contributors" lines={data.largest} currency={ccy} />
-        <Contributors title="Smallest contributors" lines={data.smallest} currency={ccy} />
+      <Contributors data={data} />
+      <div className="grid items-start gap-5 lg:grid-cols-2">
+        <CalendarPanel today={s.as_of} />
+        <Upcoming data={data} />
       </div>
       <Tiers data={data} />
-      <CalendarPanel today={s.as_of} />
-      <Upcoming data={data} />
       <Accuracy data={data} />
       <p className="text-xs text-text-faint">
         Method {data.explain.formula_version}. {data.explain.formula}
@@ -99,9 +100,10 @@ function IncomeBody({ data }: { data: PortfolioDividends }) {
 function Gaps({ data }: { data: PortfolioDividends }) {
   const items: React.ReactNode[] = [];
   if (data.without_schedule.length) {
+    const names = data.without_schedule.map((t) => data.holdings.find((h) => h.ticker === t)?.name ?? shortTicker(t));
     items.push(
       <li key="ws">
-        No schedule yet, history too short or not confirmed: {data.without_schedule.join(", ")}. Their income is left out, not counted as zero.
+        No schedule yet, history too short or not confirmed: {names.join(", ")}. Their income is left out, not counted as zero.
       </li>,
     );
   }
@@ -119,7 +121,12 @@ function Gaps({ data }: { data: PortfolioDividends }) {
   if (!items.length) return null;
   return (
     <AlertMessage tone="info" title="What the figures leave out">
-      <ul className="list-disc space-y-1 pl-4">{items}</ul>
+      <details>
+        <summary className="cursor-pointer">
+          {items.length} {items.length === 1 ? "note" : "notes"} on holdings and payments the totals leave out. Show them.
+        </summary>
+        <ul className="mt-2 list-disc space-y-1 pl-4">{items}</ul>
+      </details>
     </AlertMessage>
   );
 }
@@ -213,11 +220,18 @@ function IncomeChart({ data }: { data: PortfolioDividends }) {
   );
 }
 
-function Contributors({ title, lines, currency }: { title: string; lines: PortfolioDividends["largest"]; currency: string | null | undefined }) {
+/** One ranked list, largest first. The smallest payers are added only when there are more than 8 payers. */
+function Contributors({ data }: { data: PortfolioDividends }) {
+  const currency = data.summary.currency;
+  const payers = data.holdings.filter((h) => h.pays).length;
+  const seen = new Set<string>();
+  const lines = [...data.largest, ...(payers > 8 ? data.smallest : [])]
+    .filter((l) => (seen.has(l.ticker) ? false : (seen.add(l.ticker), true)))
+    .sort((a, b) => (num(b.amount) ?? 0) - (num(a.amount) ?? 0));
   const max = Math.max(0, ...lines.map((l) => num(l.amount) ?? 0));
   return (
     <Blueprint className="px-[22px] py-4">
-      <PanelHeading kicker="Last 12 months received" title={title} level={3} />
+      <PanelHeading kicker="Last 12 months received" title="Who pays the income" level={3} />
       {lines.length === 0 ? (
         <p className="mt-3 text-sm text-text-faint">No dividends received in the last 12 months.</p>
       ) : (
@@ -247,7 +261,9 @@ function Contributors({ title, lines, currency }: { title: string; lines: Portfo
 function Tiers({ data }: { data: PortfolioDividends }) {
   const ccy = data.summary.currency;
   const tiers = orderedTiers(data.tiers);
-  const paying = data.holdings.filter((h) => h.pays);
+  const allPaying = data.holdings.filter((h) => h.pays);
+  const [limit, setLimit] = useState(50);
+  const paying = allPaying.slice(0, limit);
   const marks = useMarks(paying.map((h) => h.ticker));
   return (
     <Blueprint className="px-[22px] py-4">
@@ -269,7 +285,7 @@ function Tiers({ data }: { data: PortfolioDividends }) {
               {TIER_LABEL[t.tier]}
             </p>
             <p className="num text-lg font-semibold">{money(t.income, ccy, 0)}</p>
-            <p className="text-[11px] text-text-faint">
+            <p className="text-xs text-text-faint">
               {t.holdings} holding{t.holdings === 1 ? "" : "s"}, {pct(t.share, 0)} of income
             </p>
           </div>
@@ -336,6 +352,16 @@ function Tiers({ data }: { data: PortfolioDividends }) {
           </tbody>
         </table>
       </div>
+      {allPaying.length > limit ? (
+        <p className="mt-2 flex items-center justify-between gap-3 text-sm text-text-muted">
+          <span>
+            Showing {paying.length} of {allPaying.length} paying holdings.
+          </span>
+          <button type="button" onClick={() => setLimit((n) => n + 50)} className="font-medium text-accent-ink hover:underline">
+            Show more
+          </button>
+        </p>
+      ) : null}
     </Blueprint>
   );
 }

@@ -11,6 +11,7 @@ import { getBrowserApiClient } from "@/lib/api/client";
 import { formatPct } from "@/lib/charts/format";
 import { budgetRows, type BudgetRow } from "@/lib/data-sources/data-sources";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { label } from "@/lib/labels";
 
 const fetchAccess = () => getBrowserApiClient().GET("/sources/access", { params: { query: {} } });
 
@@ -30,7 +31,7 @@ export function BudgetPanel() {
     <section id="budget" aria-labelledby="budget-heading" className="blueprint scroll-mt-24 space-y-3 px-5 py-5">
       <BlueprintCorners />
       <div>
-        <h2 id="budget-heading" className="text-[22px] leading-tight font-semibold">
+        <h2 id="budget-heading" className="panel-title">
           Free quota used
         </h2>
         <p className="max-w-[68ch] text-sm text-text-muted">
@@ -54,7 +55,7 @@ export function BudgetPanel() {
       ) : null}
 
       {tracked.length > 0 ? (
-        <ul className="divide-y divide-border-soft border border-border">
+        <ul className="divide-y divide-border-soft rounded-card bg-surface-muted px-3">
           {tracked.map((r) => (
             <BudgetItem key={r.key} row={r} />
           ))}
@@ -69,7 +70,7 @@ export function BudgetPanel() {
           <ul className="mt-2 space-y-1 text-xs text-text-muted">
             {untracked.map((r) => (
               <li key={r.key}>
-                <span className="font-mono text-text">{r.key}</span>: {r.unknownReason}
+                <span className="font-medium text-text">{label("provider", r.key)}</span>: {r.unknownReason}
               </li>
             ))}
           </ul>
@@ -83,7 +84,7 @@ function BudgetItem({ row }: { row: BudgetRow }) {
   const burn = row.burn ?? 0;
   return (
     <li className="grid grid-cols-1 items-center gap-x-4 gap-y-1 px-3 py-2 sm:grid-cols-[minmax(10rem,16rem)_1fr_9rem]">
-      <span className="font-mono text-xs">{row.key}</span>
+      <span className="text-sm font-medium">{label("provider", row.key)}</span>
       <HBar value={burn} tone={tone(burn)} label={`${row.key} quota used`} formatValue={(v) => formatPct(v, 0)} />
       <span className="num text-right text-xs text-text-muted">
         {row.used} of {row.quota} per {row.period}

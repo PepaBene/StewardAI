@@ -21,7 +21,7 @@ export function DefectLog() {
   const { state, reload } = useApiResource(fetchDefects);
   return (
     <Blueprint className="p-4">
-      <PanelHeading level={3} kicker="Problems you found" title="Defects, largest holding first" />
+      <PanelHeading level={3} title="Defects, largest holding first" />
       <p className="mt-1 max-w-prose text-sm text-text-muted">
         Log anything wrong that the data checks did not catch: a figure that disagrees with the source, a screen that misleads. Name the holding it affects so the list can be ranked by how much of the portfolio it touches.
       </p>

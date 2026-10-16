@@ -52,7 +52,7 @@ function Overview({ h, row }: { h: Holding; row: HoldingInsight | undefined }) {
         ) : (
           <p className="mt-1 text-sm text-text-muted">
             No thesis written yet.{" "}
-            <Link href={`/holdings/${encodeURIComponent(h.ticker)}`} className="text-accent-ink underline underline-offset-2">
+            <Link href={`/companies/${encodeURIComponent(h.ticker)}`} className="text-accent-ink underline underline-offset-2">
               Write one on the holding page
             </Link>
           </p>
@@ -405,7 +405,7 @@ export function HoldingDrawer({
       onClose={onClose}
       title={holding.name ?? holding.ticker}
       subtitle={<span className="font-mono">{displayTicker(holding.ticker)}</span>}
-      fullPageHref={`/holdings/${encodeURIComponent(holding.ticker)}`}
+      fullPageHref={`/companies/${encodeURIComponent(holding.ticker)}`}
       tab={tab}
       onTab={(k) => onTab(k as DrawerTabKey)}
       tabs={[

@@ -2,111 +2,128 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createContext, useCallback, useContext, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
 
-import { Blueprint } from "@/components/ui/blueprint";
+import { openChatPanel } from "@/components/chat/chat-panel";
+import { EntityLayout, type EntitySectionLink } from "@/components/layout/entity-layout";
+import { ScoreMark } from "@/components/insight/score-mark";
+import { Button } from "@/components/ui/button";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate } from "@/lib/format";
-import { FUND_TABS, fundHref, lagDays, type FundProfile } from "@/lib/fundresearch/fund-research";
+import { fundHref, lagDays, type FundProfile } from "@/lib/fundresearch/fund-research";
+import { FUND_AXES, FUND_AXIS_NAMES, fundMarkMissing, fundMarkPetals, ongoingChargeFrom, type FundMarkInput } from "@/lib/funds/mark";
 import { useApiResource, type ResourceState } from "@/lib/hooks/use-api-resource";
+import { shortTicker } from "@/lib/portfolio/ticker";
 import { cn } from "@/lib/utils";
 
 const ProfileContext = createContext<ResourceState<FundProfile>>({ kind: "loading" });
 
-/** The fund's profile, fetched once by the shell and shared by the header and the Profile tab. */
+/** The fund's profile, fetched once by the shell and shared by the sidebar and the Overview section. */
 export function useFundProfile(): ResourceState<FundProfile> {
   return useContext(ProfileContext);
 }
 
-function Header({ state, isin }: { state: ResourceState<FundProfile>; isin: string }) {
-  const p = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
-  const lag = lagDays(p?.holdings_as_of);
-  return (
-    <Blueprint className="px-[22px] py-5">
-      <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
-        <div className="min-w-0">
-          <div className="kicker">Fund research</div>
-          <h1 className="page-title mt-1 mb-1">{p?.name ?? isin}</h1>
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted">
-            <span className="font-mono text-text">{isin}</span>
-            {p?.provider ? <span>{p.provider}</span> : null}
-            {p?.identity.share_class ? <span>share class {p.identity.share_class}</span> : null}
-            <Link href="/funds/research" className="text-accent-ink hover:underline">
-              All funds
-            </Link>
-          </p>
-        </div>
-        {p ? (
-          <dl className="flex flex-wrap gap-x-8 gap-y-2">
-            <div className="border-l border-border pl-3">
-              <dt className="text-xs text-text-muted">Holdings as of</dt>
-              <dd className="num text-lg font-semibold">
-                {p.holdings_as_of ? formatDate(p.holdings_as_of) : <span className="text-sm font-normal text-text-muted">none stored</span>}
-              </dd>
-              {lag !== null ? <p className={cn("text-[11px]", lag > 45 ? "text-unconfirmed" : "text-text-muted")}>{lag} days old</p> : null}
-            </div>
-            <div className="border-l border-border pl-3">
-              <dt className="text-xs text-text-muted">Profile fields filled</dt>
-              <dd className="num text-lg font-semibold">
-                {p.have} of {p.of}
-              </dd>
-            </div>
-          </dl>
-        ) : null}
-      </div>
-      {p && p.identity.listings.length > 0 ? (
-        <p className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-sm">
-          <span className="text-text-muted">Exchange listings of this share class:</span>
-          {p.identity.listings.map((l) => (
-            <span key={l.ticker} className="border border-border px-2 py-0.5 font-mono text-xs" title={l.name ?? undefined}>
-              {l.ticker} {l.currency ?? ""}
-              {l.has_prices ? "" : " (no prices)"}
-            </span>
-          ))}
-        </p>
-      ) : null}
-    </Blueprint>
-  );
+/** Sections in the order the plan names them; the slugs are the existing routes. */
+const FUND_SECTIONS = [
+  { slug: "", label: "Overview" },
+  { slug: "holdings", label: "Holdings" },
+  { slug: "performance", label: "Performance" },
+  { slug: "style", label: "Style" },
+  { slug: "bond", label: "Bond" },
+  { slug: "checklist", label: "Checklist" },
+] as const;
+
+/** What the profile alone can tell the mark; the holdings and history axes stay gaps until stored. */
+function markInput(p: FundProfile | null): FundMarkInput {
+  return {
+    ongoingChargePct: ongoingChargeFrom(p?.charges),
+    holdingsCount: null,
+    top10Weight: null,
+    yearsOfHistory: null,
+    holdingsLagDays: lagDays(p?.holdings_as_of),
+    fieldsHave: p ? p.have : null,
+    fieldsOf: p ? p.of : null,
+  };
 }
 
-function Tabs({ isin }: { isin: string }) {
-  const pathname = usePathname();
+function FundMark({ p, name, size }: { p: FundProfile | null; name: string; size: "sidebar" | "header" }) {
+  const input = markInput(p);
+  return <ScoreMark petals={fundMarkPetals(input)} missing={fundMarkMissing(input)} axisNames={FUND_AXIS_NAMES} size={size} label={name} />;
+}
+
+function Identity({ p, isin, compact }: { p: FundProfile | null; isin: string; compact?: boolean }) {
+  const name = p?.name ?? shortTicker(isin);
+  const lag = lagDays(p?.holdings_as_of);
   return (
-    <nav aria-label="Fund sections" className="-mx-1 overflow-x-auto">
-      <ul className="flex min-w-max gap-1 border-b border-border px-1">
-        {FUND_TABS.map((t) => {
-          const href = fundHref(isin, t.slug);
-          const active = t.slug === "" ? pathname === href : pathname.startsWith(href);
-          return (
-            <li key={t.slug}>
-              <Link
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "-mb-px block border-b-2 px-3.5 py-2 text-sm whitespace-nowrap focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:outline-none",
-                  active ? "border-accent font-semibold text-text" : "border-transparent text-text-muted hover:text-text",
-                )}
-              >
-                {t.label}
-              </Link>
+    <>
+      <div className={cn("flex gap-3", compact ? "items-center" : "flex-col")}>
+        <FundMark p={p} name={name} size={compact ? "header" : "sidebar"} />
+        <div className="min-w-0">
+          <h1 className="page-title mb-1">{name}</h1>
+          <p className="flex flex-wrap gap-1.5 text-xs">
+            <span className="rounded-control bg-surface-muted px-1.5 py-0.5 font-mono">{isin}</span>
+            {p?.provider ? <span className="rounded-control bg-surface-muted px-1.5 py-0.5">{p.provider}</span> : null}
+            {p?.identity.share_class ? <span className="rounded-control bg-surface-muted px-1.5 py-0.5">share class {p.identity.share_class}</span> : null}
+          </p>
+        </div>
+      </div>
+      {!compact ? (
+        <ul className="space-y-0.5 text-xs text-text-muted" aria-label="What the mark shows">
+          {FUND_AXES.map((a) => (
+            <li key={a.key} title={a.question}>
+              {a.label}: {a.question.replace(/\?$/, "").toLowerCase()}
             </li>
-          );
-        })}
-      </ul>
-    </nav>
+          ))}
+        </ul>
+      ) : null}
+      {p ? (
+        <p className="text-xs text-text-muted">
+          Holdings as of {p.holdings_as_of ? formatDate(p.holdings_as_of) : "an unknown date"}
+          {lag !== null ? <span className={lag > 45 ? "text-unconfirmed" : undefined}>{` (${lag} days old)`}</span> : null}
+          {` · ${p.have} of ${p.of} profile fields filled`}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="outline" onClick={() => openChatPanel(`What should I know about the fund ${name}?`)}>
+          Ask about this fund
+        </Button>
+        <Button asChild size="sm" variant="ghost">
+          <Link href="/funds/research">All funds</Link>
+        </Button>
+      </div>
+    </>
   );
 }
 
 export function FundShell({ isin, children }: { isin: string; children: ReactNode }) {
+  const pathname = usePathname();
   const fetcher = useCallback(() => getBrowserApiClient().GET("/funds/{isin}/profile", { params: { path: { isin } } }), [isin]);
   const { state } = useApiResource(fetcher);
+  const p = state.kind === "ok" ? state.data : state.kind === "error" ? state.previous : null;
+
+  const sections: EntitySectionLink[] = useMemo(
+    () =>
+      FUND_SECTIONS.map((s) => {
+        const href = fundHref(isin, s.slug);
+        return { key: s.slug || "overview", href, label: s.label, active: s.slug === "" ? pathname === href : pathname.startsWith(href) };
+      }),
+    [isin, pathname],
+  );
+
   return (
     <ProfileContext.Provider value={state}>
-      <div className="flex flex-col gap-5">
-        <Header state={state} isin={isin} />
-        <Tabs isin={isin} />
+      <EntityLayout
+        navLabel="Fund sections"
+        sections={sections}
+        sidebar={<Identity p={p} isin={isin} />}
+        header={
+          <div className="blueprint flex flex-col gap-3 rounded-card px-4 py-3">
+            <Identity p={p} isin={isin} compact />
+          </div>
+        }
+      >
         {children}
-      </div>
+      </EntityLayout>
     </ProfileContext.Provider>
   );
 }

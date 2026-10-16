@@ -1,4 +1,5 @@
 import { formatNumber } from "@/lib/charts/format";
+import { gapRuns } from "@/lib/charts/gap-runs";
 import { areaPath, linePath, type Point } from "@/lib/charts/path";
 import { extent, isFiniteNumber, linearScale, niceTicks } from "@/lib/charts/scale";
 import { formatDay, timeTicks } from "@/lib/charts/time";
@@ -42,6 +43,8 @@ export type LineChartProps = {
   formatValue?: (value: number) => string;
   /** Overrides the generated accessible summary. */
   ariaLabel?: string;
+  /** Shade the gap to the benchmark: gain tint where the series is ahead, loss tint where behind (replaces the area fill). */
+  gapShading?: boolean;
   className?: string;
 };
 
@@ -106,6 +109,7 @@ export function LineChart({
   height = 260,
   formatValue = (v) => formatNumber(v, 1),
   ariaLabel,
+  gapShading = false,
   className,
 }: LineChartProps) {
   const values = data.map((p) => p.value);
@@ -205,7 +209,11 @@ export function LineChart({
               </text>
             ))
           : null}
-        {area ? <path d={areaPath(main, y1)} className={s.area} fillOpacity={s.areaOpacity} /> : null}
+        {gapShading && benchPts
+          ? gapRuns(main, benchPts).map((r, i) => (
+              <path key={i} d={r.d} className={r.ahead ? "fill-gain-subtle" : "fill-loss-subtle"} fillOpacity={0.9} aria-hidden="true" />
+            ))
+          : area ? <path d={areaPath(main, y1)} className={s.area} fillOpacity={s.areaOpacity} /> : null}
         {benchPts ? (
           <path
             d={linePath(benchPts)}
@@ -257,6 +265,18 @@ export function LineChart({
       </svg>
       {legend && legendItems.length ? (
         <Legend items={legendItems} className={cn("text-xs", s.legendText)} valueClassName={s.legendValue} />
+      ) : null}
+      {gapShading && benchPts ? (
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-muted">
+          <span className="inline-flex items-center gap-1.5">
+            <span aria-hidden="true" className="inline-block size-3 rounded-[3px] bg-gain-subtle" />
+            Ahead of {benchmarkLabel}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span aria-hidden="true" className="inline-block size-3 rounded-[3px] bg-loss-subtle" />
+            Behind
+          </span>
+        </p>
       ) : null}
     </figure>
   );

@@ -3,6 +3,7 @@
 import { useCallback, useMemo, type ReactNode } from "react";
 
 import { BarChart, ChartEmpty, HBar, SrTable, StackedBar } from "@/components/charts";
+import { EntityName } from "@/components/entity-name";
 import { Blueprint, PanelHeading } from "@/components/ui/blueprint";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatCompact, formatNumber, formatPct } from "@/lib/charts/format";
@@ -332,7 +333,7 @@ export function PatentOverlapPanel({ ticker }: { ticker: string }) {
       <ul className="space-y-2">
         {rows.map((r) => (
           <li key={r.peer} className="grid grid-cols-[6rem_minmax(0,1fr)_6rem] items-center gap-3 text-sm">
-            <span className="font-mono">{r.peer}</span>
+            <EntityName id={r.peer} chip={false} className="truncate" />
             <HBar value={r.share} min={0} max={1} label={`${r.peer}: share of own patent families overlapping`} formatValue={(v) => formatPct(v, 0)} />
             <span className="num text-right">{r.share === null ? "Not computable" : formatPct(r.share, 0)}</span>
             {r.reason ? <span className="col-span-3 -mt-1 text-xs text-text-muted">{r.reason}</span> : null}

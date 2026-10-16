@@ -108,8 +108,8 @@ export function DependencyGraph({ ticker, claims }: { ticker: string; claims: re
             </g>
           );
         })}
-        <text x={W * 0.14} y={H - 2} textAnchor="middle" className="fill-text-muted text-[11px]">Sells to the company</text>
-        <text x={W * 0.86} y={H - 2} textAnchor="middle" className="fill-text-muted text-[11px]">Buys from the company</text>
+        <text x={W * 0.14} y={H - 2} textAnchor="middle" className="fill-text-muted text-xs">Sells to the company</text>
+        <text x={W * 0.86} y={H - 2} textAnchor="middle" className="fill-text-muted text-xs">Buys from the company</text>
       </svg>
       <figcaption className="max-w-[72ch] text-xs text-text-muted">
         Heavier line, larger reported share. Dashed: suggested or disputed, not confirmed. Dotted: confirmed, but no share is reported. Rejected claims are not drawn.

@@ -9,3 +9,5 @@ export default function SupplyChainPage() {
     </Suspense>
   );
 }
+
+export const metadata = { title: "Supply chain · X-Ray" };

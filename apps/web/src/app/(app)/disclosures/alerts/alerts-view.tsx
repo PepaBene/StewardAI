@@ -114,7 +114,6 @@ export function AlertsPageView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research & Verification"
         title="Disclosure alerts"
         description="Verified insider trades, large-holder filings and changes to customer and supplier claims for what you hold. Each states what was filed, not why."
         aside={

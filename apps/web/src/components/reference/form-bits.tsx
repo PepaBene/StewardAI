@@ -80,7 +80,7 @@ export function SaveNote({ state, idle }: { state: SaveState; idle?: ReactNode }
 
 /** Marks a value as typed in by the owner, as opposed to reported by a provider. Dashed outline plus words. */
 export function OwnerTag({ children = "Entered by you" }: { children?: ReactNode }) {
-  return <span className="inline-block border border-dashed border-border px-1.5 py-0.5 text-[11px] font-medium text-text-muted">{children}</span>;
+  return <span className="inline-block border border-dashed border-border px-1.5 py-0.5 text-xs font-medium text-text-muted">{children}</span>;
 }
 
 /** A form frame: a plain bordered block that sits inside a panel and says what it records. */

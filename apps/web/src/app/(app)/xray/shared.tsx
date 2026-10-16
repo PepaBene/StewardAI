@@ -36,7 +36,7 @@ export function BasisChips({ basis }: { basis: Record<string, number> }) {
         <li
           key={s.basis}
           title={BASIS_HELP[s.basis]}
-          className="border border-border-soft px-1.5 py-px text-[11px] leading-4 text-text-muted"
+          className="border border-border-soft px-1.5 py-px text-xs leading-4 text-text-muted"
         >
           {s.label} <span className="num text-text">{Math.round(s.share * 100)}%</span>
         </li>

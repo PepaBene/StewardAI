@@ -84,7 +84,6 @@ export function NetworkPageView() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research & Verification"
         title="Customers and suppliers"
         description="Who a company says it sells to and buys from, how much of its revenue that is, and what is still unknown. Only confirmed claims carry numbers."
         aside={<span>{ticker ?? SAMPLE_DEP_TICKER} · as known on {formatDay(new Date(cutoff).toISOString())}</span>}

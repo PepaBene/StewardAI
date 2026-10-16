@@ -152,7 +152,7 @@ describe("chart components", () => {
     });
     expectClean(html);
     expect(html).toContain("bg-heat-down-strong");
-    expect(html).toContain("bg-surface-muted");
+    expect(html).toContain("bg-chart-unknown");
     expect(render(Treemap, { items: [] })).toContain(EMPTY);
   });
 

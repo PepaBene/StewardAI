@@ -43,18 +43,18 @@ function MetricRow({ m }: { m: MetricData }) {
     <tr className="border-t border-border-soft align-top">
       <th scope="row" className="px-3 py-2 text-left font-normal">
         <span className="font-medium">{m.label}</span>
-        <span className="mt-0.5 block max-w-md text-[11px] text-text-muted">{m.formula}</span>
+        <span className="mt-0.5 block max-w-md text-xs text-text-muted">{m.formula}</span>
       </th>
       <td className="px-3 py-2 text-right">
         {m.value !== null && m.value !== undefined ? (
           <>
             <span className="num text-lg font-semibold">{valueText(m)}</span>
-            {m.thin ? <span className="mt-0.5 block text-[11px] font-medium text-warning-signal">covers under half: indicative only</span> : null}
+            {m.thin ? <span className="mt-0.5 block text-xs font-medium text-warning-signal">covers under half: indicative only</span> : null}
           </>
         ) : (
           <span
             title={m.reason ?? undefined}
-            className="inline-block border border-dashed border-border px-1.5 text-[11px] leading-5 text-text-muted"
+            className="inline-block border border-dashed border-border px-1.5 text-xs leading-5 text-text-muted"
           >
             No figure<span className="sr-only">: {m.reason}</span>
           </span>

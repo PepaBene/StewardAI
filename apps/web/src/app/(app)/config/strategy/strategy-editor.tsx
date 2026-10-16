@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import { AlertMessage } from "@/components/alert-message";
-import { Ring } from "@/components/charts";
+import { Donut, Ring } from "@/components/charts";
+import { SummaryPanel, TabBar } from "@/components/config/summary";
 import { ConfigHeader } from "@/components/config/config-header";
 import { CheckboxField, SelectField, TextAreaField, TextField } from "@/components/config/fields";
 import { SaveBar } from "@/components/config/save-bar";
@@ -66,11 +67,57 @@ import { cn } from "@/lib/utils";
 const api = () => getBrowserApiClient();
 const OPERATOR_OPTIONS = RULE_OPERATORS.map((o) => ({ value: o, label: o }));
 const PANEL = "space-y-4 p-5";
-const TABLE_HEAD = "bg-surface-muted text-[11px] tracking-[0.08em] text-text-muted uppercase";
+const TABLE_HEAD = "bg-surface-muted text-xs text-text-muted";
 /** Compact, right-aligned inputs inside the target tables. */
 const CELL = "[&_input]:h-8 [&_input]:px-2 [&_input]:text-right";
 
+type StrategyTab = "targets" | "categories" | "rules" | "risk" | "basics" | "history";
+
+/** Position and cash targets as a ring that must total 100 %; the rest is shown as unallocated. */
+function TargetDonut({ body, holdings }: { body: StrategyConfig; holdings: Holding[] }) {
+  const nameOf = (ticker: string) => holdings.find((h) => h.ticker === ticker)?.name ?? ticker;
+  const positions = (body.target_positions ?? [])
+    .map((p) => ({ label: nameOf(p.ticker), value: numeric(p.target_weight) ?? 0 }))
+    .filter((p) => p.value > 0)
+    .sort((a, b) => b.value - a.value);
+  const cash = body.cash_target ? (numeric(body.cash_target.target_weight) ?? 0) : 0;
+  const total = allocation(body).total;
+  const rest = Math.max(0, 1 - total);
+  const segments = [
+    ...positions,
+    ...(cash > 0 ? [{ label: "Cash", value: cash }] : []),
+    ...(rest > 1e-9 ? [{ label: "Not allocated", value: rest }] : []),
+  ];
+  const over = total > 1 + 1e-9;
+  const exact = Math.abs(total - 1) < 1e-9;
+  return (
+    <SummaryPanel
+      title="Target mix"
+      reading={
+        over
+          ? `Targets add up to ${formatPercent(total, { decimals: 1 })}, which is over 100 %. Lower a target before saving.`
+          : exact
+            ? "Targets add up to exactly 100 %."
+            : `Targets add up to ${formatPercent(total, { decimals: 1 })}; ${formatPercent(rest, { decimals: 1 })} is not allocated.`
+      }
+    >
+      {segments.length === 0 ? (
+        <p className="text-sm text-text-muted">No targets yet. Add a position target in the Targets tab.</p>
+      ) : (
+        <Donut
+          segments={segments}
+          label="Target weights"
+          centerValue={formatPercent(Math.min(total, 9.99), { decimals: 0 })}
+          centerLabel={over ? "over 100 %" : exact ? "complete" : "allocated"}
+          size={150}
+        />
+      )}
+    </SummaryPanel>
+  );
+}
+
 export function StrategyEditor() {
+  const [tab, setTab] = useState<StrategyTab>("targets");
   const [form, setForm] = useState<StrategyForm | null>(null);
   /** The active body as the form would send it (so key order and defaults compare equal). */
   const [baseline, setBaseline] = useState<StrategyConfig | null>(null);
@@ -85,7 +132,7 @@ export function StrategyEditor() {
     onLoaded: (body) => {
       const loaded = strategyFromBody(body);
       setForm(loaded);
-      setBaseline(body ? strategyToBody(loaded) : null);
+      setBaseline(strategyToBody(loaded));
     },
   });
 
@@ -197,24 +244,35 @@ export function StrategyEditor() {
 
       {form && body ? (
         <>
-          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+          <TargetDonut body={body} holdings={holdings} />
+          <TabBar
+            label="Strategy sections"
+            value={tab}
+            onChange={setTab}
+            tabs={[
+              { id: "targets", label: "Targets", badge: `${form.target_positions.length}` },
+              { id: "categories", label: "Categories", badge: `${form.target_categories.length}` },
+              { id: "rules", label: "Rules", badge: `${form.rules.length}` },
+              { id: "risk", label: "Risk and pre-trade" },
+              { id: "basics", label: "Basics" },
+              { id: "history", label: "Versions" },
+            ]}
+          />
+          {tab === "targets" ? (
             <TargetsPanel form={form} body={body} errors={errors} set={set} holdings={holdings} drift={drift} />
-            <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
-              <RulesPanel form={form} errors={errors} set={set} />
-              <RiskPanel form={form} errors={errors} set={set} />
-              <HistoryPanel
-                versions={versions}
-                numbers={numbers}
-                dirty={dirty}
-                changeCount={changes.length}
-              />
-            </div>
-          </div>
-          <CategoryTargetsPanel form={form} body={body} errors={errors} set={set} drift={drift} />
-          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5">
-            <BasicsSection form={form} errors={errors} set={set} />
-            <CategoriesSection form={form} errors={errors} set={set} holdings={holdings} />
-          </div>
+          ) : null}
+          {tab === "categories" ? (
+            <>
+              <CategoryTargetsPanel form={form} body={body} errors={errors} set={set} drift={drift} />
+              <CategoriesSection form={form} errors={errors} set={set} holdings={holdings} />
+            </>
+          ) : null}
+          {tab === "rules" ? <RulesPanel form={form} errors={errors} set={set} /> : null}
+          {tab === "risk" ? <RiskPanel form={form} errors={errors} set={set} /> : null}
+          {tab === "basics" ? <BasicsSection form={form} errors={errors} set={set} /> : null}
+          {tab === "history" ? (
+            <HistoryPanel versions={versions} numbers={numbers} dirty={dirty} changeCount={changes.length} />
+          ) : null}
 
           {savedId !== null && !dirty ? (
             <AlertMessage tone="info" title={`Version #${savedId} is active`}>
@@ -330,7 +388,7 @@ function TargetsPanel({
   return (
     <Blueprint aria-labelledby="targets-heading">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-        <h2 id="targets-heading" className="text-[22px] leading-tight font-semibold">
+        <h2 id="targets-heading" className="panel-title">
           Target weights
         </h2>
         <div className="flex items-center gap-2.5">
@@ -345,7 +403,7 @@ function TargetsPanel({
                 over 100 %
               </span>
             ) : null}
-            <div className="num text-[11px] text-text-muted">
+            <div className="num text-xs text-text-muted">
               {alloc.cash === null ? "no cash target" : `incl. cash ${formatPercent(alloc.cash)}`}
             </div>
           </div>
@@ -526,7 +584,7 @@ function CategoryTargetsPanel({ form, body, errors, set, drift }: SectionProps &
   return (
     <Blueprint aria-labelledby="category-targets-heading">
       <div className="space-y-1 px-5 pt-4 pb-3">
-        <PanelHeading kicker="Allocation" title={<span id="category-targets-heading">Category targets</span>} />
+        <PanelHeading title={<span id="category-targets-heading">Category targets</span>} />
         <p className="text-sm text-text-muted">
           Target and band per bucket of a dimension (e.g. geography · Europe). The targets of each dimension may not
           exceed 100 %.
@@ -625,7 +683,7 @@ function RulesPanel({ form, errors, set }: SectionProps) {
   return (
     <Blueprint aria-labelledby="rules-heading" className={PANEL}>
       <div className="space-y-1">
-        <h2 id="rules-heading" className="text-[22px] leading-tight font-semibold">
+        <h2 id="rules-heading" className="panel-title">
           Rules
         </h2>
         <p className="text-sm text-text-muted">
@@ -649,13 +707,13 @@ function RulesPanel({ form, errors, set }: SectionProps) {
           return (
             <li key={r.key} className="py-2.5">
               <div className="flex items-start gap-3">
-                <span className={cn("w-[5.5rem] shrink-0 truncate pt-0.5 font-mono text-[11px]", r.enabled ? "text-text-muted" : "text-text-faint")} title={r.id}>
+                <span className={cn("w-[5.5rem] shrink-0 truncate pt-0.5 font-mono text-xs", r.enabled ? "text-text-muted" : "text-text-faint")} title={r.id}>
                   {r.id || "new rule"}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className={cn("text-sm font-medium", !r.enabled && "text-text-muted")}>
                     {ruleSummary(r)}
-                    {!r.enabled ? <span className="ml-1.5 border border-border px-1 text-[11px] font-normal text-text-muted">off</span> : null}
+                    {!r.enabled ? <span className="ml-1.5 border border-border px-1 text-xs font-normal text-text-muted">off</span> : null}
                   </p>
                   <p className="text-xs text-text-muted">
                     {r.description ? `${r.description} · ` : ""}
@@ -734,7 +792,7 @@ function RiskPanel({ form, errors, set }: SectionProps) {
   return (
     <Blueprint aria-labelledby="risk-heading" className={PANEL}>
       <div className="space-y-1">
-        <h2 id="risk-heading" className="text-[22px] leading-tight font-semibold">
+        <h2 id="risk-heading" className="panel-title">
           Risk limits
         </h2>
         <p className="text-sm text-text-muted">
@@ -846,7 +904,7 @@ function HistoryPanel({
 function BasicsSection({ form, errors, set }: SectionProps) {
   return (
     <Blueprint aria-labelledby="basics-heading" className={PANEL}>
-      <PanelHeading kicker="Strategy" title={<span id="basics-heading">Basics</span>} />
+      <PanelHeading title={<span id="basics-heading">Basics</span>} />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <TextField
           label="Base currency"
@@ -919,7 +977,7 @@ function CategoriesSection({ form, errors, set, holdings }: SectionProps & { hol
 
   return (
     <Blueprint aria-labelledby="categories-heading" className={PANEL}>
-      <PanelHeading kicker="Allocation" title={<span id="categories-heading">Categories and classifications</span>} />
+      <PanelHeading title={<span id="categories-heading">Categories and classifications</span>} />
       <p className="max-w-prose text-sm text-text-muted">
         Dimensions for allocation (lowercase, e.g. sector, geography). Put each holding in one bucket
         per dimension; an empty cell leaves it unclassified. <span className="font-mono">currency</span>{" "}
@@ -956,7 +1014,7 @@ function CategoriesSection({ form, errors, set, holdings }: SectionProps & { hol
       </div>
 
       {form.categories.length > 0 ? (
-        <div className="relative overflow-x-auto border border-border">
+        <div className="relative overflow-x-auto rounded-card bg-surface-muted">
           <table className="w-full min-w-[40rem] text-sm">
             <caption className="sr-only">Bucket per dimension for each holding</caption>
             <thead className={TABLE_HEAD}>

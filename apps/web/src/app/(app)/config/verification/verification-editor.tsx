@@ -26,12 +26,12 @@ import {
   type VerificationForm,
 } from "@/lib/config/verification-form";
 import { configSaveQuery, useConfigEditor } from "@/lib/hooks/use-config-editor";
-import { BlueprintCorners } from "@/components/ui/blueprint";
+import { ShareBar, StatTile, SummaryPanel, TabBar } from "@/components/config/summary";
 
 const api = () => getBrowserApiClient();
 const TARGET_OPTIONS = CLAIM_TARGETS.map((t) => ({ value: t, label: CLAIM_TARGET_LABELS[t] }));
 const EFFORT_OPTIONS = [{ value: "", label: "Model default" }, ...EFFORTS.map((e) => ({ value: e, label: e }))];
-const SECTION = "blueprint space-y-3 p-5";
+const SECTION = "space-y-3 rounded-card bg-surface-muted p-5";
 
 /**
  * The Verification config: every threshold of the defence layers (numeric validation,
@@ -41,6 +41,7 @@ const SECTION = "blueprint space-y-3 p-5";
 export function VerificationEditor() {
   const [form, setForm] = useState<VerificationForm | null>(null);
   const [baseline, setBaseline] = useState("");
+  const [tab, setTab] = useState<"figures" | "corroboration" | "trust" | "claims">("figures");
 
   const editor = useConfigEditor<VerificationConfig>({
     load: () => api().GET("/config/verification"),
@@ -49,7 +50,7 @@ export function VerificationEditor() {
     onLoaded: (body) => {
       const loaded = verificationFromBody(body);
       setForm(loaded);
-      setBaseline(body ? JSON.stringify(verificationToBody(loaded)) : "");
+      setBaseline(JSON.stringify(verificationToBody(loaded)));
     },
   });
 
@@ -61,6 +62,15 @@ export function VerificationEditor() {
   const set = (change: Partial<VerificationForm>) => setForm((f) => (f ? { ...f, ...change } : f));
   const setRow = (key: string, change: Partial<OverrideRow>) =>
     setForm((f) => (f ? { ...f, overrides: f.overrides.map((r) => (r.key === key ? { ...r, ...change } : r)) } : f));
+
+  const layers = form
+    ? [
+        { label: "Sanity band on figures", on: form.sanityEnabled },
+        { label: "A top-tier source confirms alone", on: form.tier1ConfirmsAlone },
+        { label: "Check model-written sentences", on: form.claimEnabled },
+        { label: "Numeric check first", on: form.numericCheck },
+      ]
+    : [];
 
   async function save(note: string | null) {
     if (!body || blocked) return;
@@ -92,9 +102,35 @@ export function VerificationEditor() {
 
       {form ? (
         <>
-          <section aria-labelledby="figures-heading" className={SECTION}>
-            <BlueprintCorners />
-            <h2 id="figures-heading" className="text-[22px] leading-tight font-semibold">
+          <SummaryPanel title="Defence layers" reading={`${layers.filter((l) => l.on).length} of ${layers.length} checks are on.`}>
+            <ShareBar
+              label="Verification checks by state"
+              segments={[
+                { label: "On", value: layers.filter((l) => l.on).length, tone: "gain" },
+                { label: "Off", value: layers.filter((l) => !l.on).length, tone: "muted" },
+              ]}
+            />
+            <ul aria-label="Verification checks" className="flex flex-wrap gap-2">
+              {layers.map((l) => (
+                <li key={l.label} className="min-w-0">
+                  <StatTile label={l.label} value={l.on ? "On" : "Off"} />
+                </li>
+              ))}
+            </ul>
+          </SummaryPanel>
+          <TabBar
+            label="Verification layers"
+            value={tab}
+            onChange={setTab}
+            tabs={[
+              { id: "figures", label: "Extracted figures" },
+              { id: "corroboration", label: "Corroboration" },
+              { id: "trust", label: "Source trust" },
+              { id: "claims", label: "Claim verifier" },
+            ]}
+          />
+          <section aria-labelledby="figures-heading" hidden={tab !== "figures"} className={SECTION}>
+            <h2 id="figures-heading" className="panel-title">
               Extracted figures
             </h2>
             <p className="max-w-prose text-sm text-text-muted">
@@ -182,10 +218,8 @@ export function VerificationEditor() {
             </fieldset>
           </section>
 
-          <section aria-labelledby="corroboration-heading" className={SECTION}>
-
-            <BlueprintCorners />
-            <h2 id="corroboration-heading" className="text-[22px] leading-tight font-semibold">
+          <section aria-labelledby="corroboration-heading" hidden={tab !== "corroboration"} className={SECTION}>
+            <h2 id="corroboration-heading" className="panel-title">
               Corroboration of news
             </h2>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -207,10 +241,8 @@ export function VerificationEditor() {
             </div>
           </section>
 
-          <section aria-labelledby="trust-heading" className={SECTION}>
-
-            <BlueprintCorners />
-            <h2 id="trust-heading" className="scroll-mt-24 text-[22px] leading-tight font-semibold">
+          <section aria-labelledby="trust-heading" hidden={tab !== "trust"} className={SECTION}>
+            <h2 id="trust-heading" className="scroll-mt-24 panel-title">
               Source trust from your feedback
             </h2>
             <p className="max-w-prose text-sm text-text-muted">
@@ -251,10 +283,8 @@ export function VerificationEditor() {
             </div>
           </section>
 
-          <section aria-labelledby="claims-heading" className={SECTION}>
-
-            <BlueprintCorners />
-            <h2 id="claims-heading" className="text-[22px] leading-tight font-semibold">
+          <section aria-labelledby="claims-heading" hidden={tab !== "claims"} className={SECTION}>
+            <h2 id="claims-heading" className="panel-title">
               Claim verifier
             </h2>
             <p className="max-w-prose text-sm text-text-muted">
@@ -344,7 +374,7 @@ function OverrideItem({
   const path = overrideErrorPath(row);
   const messages = errorsAt(errors, path);
   return (
-    <li className="flex flex-wrap items-start gap-3 rounded-md border border-border p-3" aria-label={`Metric band ${index + 1}`}>
+    <li className="flex flex-wrap items-start gap-3 rounded-card bg-surface p-3" aria-label={`Metric band ${index + 1}`}>
       <TextField
         className="w-56"
         label="Metric"

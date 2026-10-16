@@ -4,6 +4,8 @@ import { parseEnv } from "node:util";
 
 import type { NextConfig } from "next";
 
+import { REDIRECTS } from "./src/lib/nav";
+
 // All StewardAI settings live in one `.env` at the repository root (see /.env.example),
 // shared with the Python backend. Load it before Next inlines NEXT_PUBLIC_* values.
 // Only unset variables are filled, so the process environment (CI, Vercel) and any
@@ -26,6 +28,10 @@ function loadRepoRootEnv(): void {
 loadRepoRootEnv();
 
 const nextConfig: NextConfig = {
+  // Moved routes (lib/nav.ts REDIRECTS). Temporary until the IA migration is complete.
+  async redirects() {
+    return REDIRECTS.map((r) => ({ ...r, permanent: false }));
+  },
   // Private app: keep every response (including static assets) out of search indexes.
   async headers() {
     return [

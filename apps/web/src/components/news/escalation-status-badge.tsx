@@ -18,7 +18,7 @@ export function EscalationStateBadge({ status, className }: { status: Escalation
   return (
     <span
       className={cn(
-        "inline-flex items-center px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap",
+        "inline-flex items-center px-2 py-0.5 text-xs font-semibold whitespace-nowrap",
         status === "open" && "bg-accent text-accent-foreground",
         status === "acknowledged" && "bg-accent-soft text-accent-ink",
         status === "resolved" && "bg-surface-muted text-text-muted",

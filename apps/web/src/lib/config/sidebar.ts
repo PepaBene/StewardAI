@@ -21,6 +21,7 @@ export type ConfigNavKey =
   | "verification"
   | "checks"
   | "calendar"
+  | "autonomy"
   | "history";
 
 export type ConfigNavItem = { key: ConfigNavKey; href: string; label: string };
@@ -39,6 +40,7 @@ export const CONFIG_NAV: readonly ConfigNavItem[] = [
   { key: "verification", href: "/config/verification", label: "Verification" },
   { key: "checks", href: "/config/checks", label: "Checks" },
   { key: "calendar", href: "/config/calendar", label: "Calendar" },
+  { key: "autonomy", href: "/config/autonomy", label: "Autonomy" },
   { key: "history", href: "/config/history", label: "History & export" },
 ];
 

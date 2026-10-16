@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ConfidenceBadge } from "@/components/evidence/confidence-badge";
 import { FeedbackControl } from "@/components/feedback/feedback-control";
 import { FreshnessText } from "@/components/freshness/as-of-label";
+import { UpdatesFeedPanel } from "@/components/insight/updates-feed";
 import { NewsSummary, type Loaded } from "@/components/news/news-summary";
 import { NewsTabs } from "@/components/news/news-tabs";
 import { TierBadge } from "@/components/news/severity-badge";
@@ -18,6 +19,7 @@ import { SeverityBlocks } from "@/components/news/severity-timeline";
 import { PageHeader } from "@/components/page-header";
 import { Blueprint } from "@/components/ui/blueprint";
 import { Button } from "@/components/ui/button";
+import { FilterChips } from "@/components/ui/filter-chips";
 import {
   getBrowserApiClient,
   type Holding,
@@ -35,6 +37,8 @@ import { useNow } from "@/lib/hooks/use-now";
 import { jobHref } from "@/lib/jobs/job-detail";
 import { latestOnly } from "@/lib/latest-request";
 import { disputedStoryHref } from "@/lib/news/disputed";
+import { decodeEntities } from "@/lib/news/entities";
+import { dayLabel, eventTypeCounts, groupByDay, storyEventType } from "@/lib/news/feed-days";
 import {
   byLead,
   EMPTY_FILTERS,
@@ -50,7 +54,6 @@ import { priceReaction, storyDay, type ClosePoint } from "@/lib/news/price-react
 import { activePreset, healthSummary, PRESETS, presetFilters, sourceBars, storyTime } from "@/lib/news/stats";
 import { appendUnique } from "@/lib/portfolio/transactions";
 import { hostOf, isExternalUrl } from "@/lib/sources/sources";
-import { UpdatesFeedPanel } from "@/components/insight/updates-feed";
 import { cn } from "@/lib/utils";
 
 const PAGE = 50;
@@ -136,6 +139,8 @@ export function NewsView() {
   const [queueing, setQueueing] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [feedOpen, setFeedOpen] = useState(false);
+  // Event-type chip: filters the loaded stories (the feed API has no event-type filter).
+  const [eventType, setEventType] = useState<string | null>(null);
   const now = useNow();
   // Only the newest load's answers are applied (filters can change while a page loads).
   const sequence = useRef(0);
@@ -216,7 +221,9 @@ export function NewsView() {
     }
   }
 
-  const groups = load.kind === "ok" ? groupByStory(load.items) : [];
+  const allGroups = load.kind === "ok" ? groupByStory(load.items) : [];
+  const typeCounts = eventTypeCounts(allGroups);
+  const groups = eventType === null ? allGroups : allGroups.filter((g) => (storyEventType(g) ?? "") === eventType);
   // An empty feed is only "no news yet" when the sources are known to be healthy.
   const sourcesNote =
     health.kind === "error"
@@ -229,14 +236,13 @@ export function NewsView() {
 
   const chip = (active: boolean) =>
     cn(
-      "inline-flex h-8 items-center gap-1.5 border px-3 text-[13px] whitespace-nowrap",
-      active ? "border-accent bg-accent text-accent-foreground" : "border-border text-text hover:bg-border-soft",
+      "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium whitespace-nowrap transition-colors",
+      active ? "bg-accent text-accent-foreground" : "bg-surface-muted text-text-muted hover:text-text",
     );
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        kicker="Research & Verification"
         title="News"
         description="Stories clustered across feeds, filings and IR pages, classified and corroborated before they alert. Only confirmed severity-3 stories alert."
         aside={
@@ -253,9 +259,9 @@ export function NewsView() {
                 {p.label}
               </button>
             ))}
-            <Link href="/news/disputed" className={chip(false)} title={`Stories whose sources contradict each other, last ${STATS_DAYS} days`}>
+            <Link href="/inbox?kind=disputed" className={chip(false)} title={`Stories whose sources contradict each other, last ${STATS_DAYS} days. You settle them in the Inbox.`}>
               <ScaleIcon aria-hidden="true" className="size-3.5" />
-              Disputed{disputed !== null ? <span className="num"> · {disputed}</span> : null}
+              Disputed{disputed !== null ? <span className="num text-text-faint">{disputed}</span> : null}
             </Link>
           </nav>
         }
@@ -295,6 +301,18 @@ export function NewsView() {
 
       <Filters filters={filters} holdings={holdings} onChange={setFilters} />
 
+      {typeCounts.length > 1 ? (
+        <FilterChips<string>
+          label="Event type"
+          value={eventType ?? "*"}
+          onChange={(k) => setEventType(k === "*" ? null : k)}
+          chips={[
+            { key: "*", label: "All types", count: allGroups.length },
+            ...typeCounts.map((t) => ({ key: t.type, label: eventLabel(t.type || null), count: t.count })),
+          ]}
+        />
+      ) : null}
+
       {load.kind === "loading" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted" role="status">
           <LoaderCircleIcon aria-hidden="true" className="size-4 animate-spin" />
@@ -314,7 +332,7 @@ export function NewsView() {
         <Blueprint as="section" aria-label="News stories">
           <div
             aria-hidden="true"
-            className="hidden border-b border-border bg-border-soft px-5 py-2.5 text-[11px] tracking-[0.08em] text-text-muted uppercase lg:grid lg:grid-cols-[4rem_7rem_minmax(0,1fr)_9rem_4.5rem_8.5rem_8.5rem] lg:gap-x-4"
+            className="hidden border-b border-border-soft px-5 py-2.5 text-xs text-text-muted lg:grid lg:grid-cols-[4rem_7rem_minmax(0,1fr)_9rem_4.5rem_8.5rem_8.5rem] lg:gap-x-4"
           >
             <span>Time</span>
             <span>Severity</span>
@@ -324,17 +342,24 @@ export function NewsView() {
             <span>Confidence</span>
             <span className="text-right">Price reaction</span>
           </div>
-          <ol className="m-0 list-none p-0">
-            {groups.map((group) => (
-              <StoryRow
-                key={group[0].story.id}
-                items={group}
-                now={now}
-                prices={prices}
-                onStory={(id) => setFilters({ ...EMPTY_FILTERS, story: id })}
-              />
-            ))}
-          </ol>
+          {groupByDay(groups).map((day) => (
+            <section key={day.day} aria-label={dayLabel(day.at, now)}>
+              <h3 className="sticky top-14 z-10 border-b border-border-soft bg-surface px-5 py-2 text-[13px] font-semibold text-text">
+                {dayLabel(day.at, now)} <span className="num font-normal text-text-faint">{day.groups.length}</span>
+              </h3>
+              <ol className="m-0 list-none p-0">
+                {day.groups.map((group) => (
+                  <StoryRow
+                    key={group[0].story.id}
+                    items={group}
+                    now={now}
+                    prices={prices}
+                    onStory={(id) => setFilters({ ...EMPTY_FILTERS, story: id })}
+                  />
+                ))}
+              </ol>
+            </section>
+          ))}
         </Blueprint>
       ) : null}
       {load.kind === "ok" && load.moreError ? <AlertMessage title="Could not load older items">{load.moreError}</AlertMessage> : null}
@@ -494,7 +519,7 @@ function StoryRow({
 
   return (
     <li className="border-b border-border-soft last:border-0">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5 hover:bg-border-soft lg:grid lg:grid-cols-[4rem_7rem_minmax(0,1fr)_9rem_4.5rem_8.5rem_8.5rem]">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5 hover:bg-surface-muted lg:grid lg:grid-cols-[4rem_7rem_minmax(0,1fr)_9rem_4.5rem_8.5rem_8.5rem]">
         <time dateTime={lead.published_at} className="num font-mono text-xs text-text-muted" title={published.toLocaleString()}>
           {storyTime(published, now)}
         </time>
@@ -502,11 +527,11 @@ function StoryRow({
         <div className="min-w-0 basis-full lg:basis-auto">
           {isExternalUrl(lead.url) ? (
             <a href={lead.url} target="_blank" rel="noreferrer" className="group inline text-[15px] font-medium text-text hover:text-accent-ink hover:underline">
-              {lead.headline}
+              {decodeEntities(lead.headline)}
               <ExternalLinkIcon aria-hidden="true" className="ml-1 inline size-3.5 align-[-2px] text-text-faint group-hover:text-accent-ink" />
             </a>
           ) : (
-            <span className="text-[15px] font-medium text-text">{lead.headline}</span>
+            <span className="text-[15px] font-medium text-text">{decodeEntities(lead.headline)}</span>
           )}
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-text-muted">
             <span>{eventLabel(story.event_type ?? lead.event_type)}</span>
@@ -517,11 +542,11 @@ function StoryRow({
             <span aria-hidden="true">·</span>
             <span>{outlet}</span>
             <TierBadge tier={lead.tier} />
-            {story.rumour ? <span className="border border-border px-1 text-[11px]">rumour</span> : null}
-            {story.recycled ? <span className="border border-border px-1 text-[11px]">recycled</span> : null}
+            {story.rumour ? <span className="border border-border px-1 text-xs">rumour</span> : null}
+            {story.recycled ? <span className="border border-border px-1 text-xs">recycled</span> : null}
             <span className="inline-flex items-center gap-1">
               <span aria-hidden="true">·</span> Story
-              <FeedbackControl target={{ kind: "story", id: story.id }} label={`story “${lead.headline}”`} />
+              <FeedbackControl target={{ kind: "story", id: story.id }} label={`story “${decodeEntities(lead.headline)}”`} />
             </span>
           </p>
         </div>
@@ -529,10 +554,10 @@ function StoryRow({
           {lead.links.map((link) => (
             <Link
               key={link.ticker}
-              href={`/holdings/${encodeURIComponent(link.ticker)}`}
+              href={`/companies/${encodeURIComponent(link.ticker)}`}
               title={`Linked by ${link.via}: ${link.term}`}
               className={cn(
-                "border border-border px-1.5 py-0.5 font-mono text-[11px] hover:border-accent",
+                "border border-border px-1.5 py-0.5 font-mono text-xs hover:border-accent",
                 link.ticker === story.ticker && "bg-surface-muted",
               )}
             >
@@ -555,11 +580,11 @@ function StoryRow({
           {story.status_reason ? `: ${story.status_reason}` : ""} · summary, sources and feedback
         </summary>
         <div className="mt-2 space-y-2 text-sm">
-          {lead.summary ? <p className="max-w-prose text-text-muted">{lead.summary}</p> : null}
+          {lead.summary ? <p className="max-w-prose text-text-muted">{decodeEntities(lead.summary)}</p> : null}
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
             <span className="inline-flex items-center gap-1">
               This item ({outlet})
-              <FeedbackControl target={{ kind: "news_item", id: lead.id }} label={`news item “${lead.headline}”`} labelDefaults={labelDefaults(lead)} />
+              <FeedbackControl target={{ kind: "news_item", id: lead.id }} label={`news item “${decodeEntities(lead.headline)}”`} labelDefaults={labelDefaults(lead)} />
             </span>
             <span className="num">Published {formatDateTime(lead.published_at)}</span>
             {story.status === "disputed" ? (
@@ -585,7 +610,7 @@ function StoryRow({
                     <span className="text-text-muted">{copy.outlet_name ?? copy.outlet ?? copy.source_id}</span>
                   )}
                   <TierBadge tier={copy.tier} />
-                  <FeedbackControl target={{ kind: "news_item", id: copy.id }} label={`news item “${copy.headline}”`} labelDefaults={labelDefaults(copy)} />
+                  <FeedbackControl target={{ kind: "news_item", id: copy.id }} label={`news item “${decodeEntities(copy.headline)}”`} labelDefaults={labelDefaults(copy)} />
                 </li>
               ))}
             </ul>

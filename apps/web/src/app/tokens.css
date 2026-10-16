@@ -1,245 +1,258 @@
 /*
- * StewardAI colour tokens — "Industry" redesign ("Modern fintech app redesign"): one dominant blue (#2F6BFF) on a light technical ground, square
- * hairline frames. Semantic roles below are unchanged from the Ledger design system;
- * only their values moved onto the new palette. The ONLY file in src/ allowed
- * to contain colour literals. `npm run lint:colors` (also run by `npm test`)
- * enforces this.
+ * StewardAI colour tokens: the redesign's house system (docs/plans/ux_ui_visual_spec.md,
+ * Appendix A). The ONLY file in src/ allowed to contain colour literals;
+ * `npm run lint:colors` enforces this.
  *
- * Rules (from Ledger_Design_System_Redesign_Proposal.md):
- * - Light is the default theme; dark is applied via the `.dark` class that
- *   next-themes sets on <html> (manual toggle or system preference).
- * - Both themes define the SAME variable names, so no component is designed
- *   for one theme and patched for the other.
- * - gain/loss are reserved for financial state (gains, losses, pass/breach).
- * - verified/corroborated/unconfirmed/disputed are reserved for evidence
- *   confidence and never reused for gain/loss or vice versa.
- * - neutral/warning/info-signal form a separate, muted palette for severity
- *   and drift that isn't itself a confidence claim.
- * - categorical-1..8 are for identity (sectors, sources, account types) —
- *   "which one," never "what state" — and are never mixed with the semantic
- *   hues above inside one chart.
- * - diverging-under/over/neutral are for any cool/neutral/warm three-way split
- *   around a centre with no inherent "good"/"bad" charge: delta-to-target
- *   (drift) charts (cool = underweight, warm = overweight) and evidence
- *   relation badges (cool = supports, neutral = mentions, warm = contradicts).
- *   A confidence tier is never implied by this pair — that's what
- *   verified/corroborated/unconfirmed/disputed is for.
- * - One accent colour (blue) for primary actions, focus and the charts' primary series.
- *   Paragraph-size accent text (links) uses --accent-ink, which clears 4.5:1 on the page;
- *   the raw accent only clears 3:1 (icons, large text, chrome).
+ * Themes: dark charcoal is the default (next-themes `defaultTheme="dark"`), light is the
+ * alternative. Light values sit on :root, dark on `.dark` (the class next-themes sets on
+ * <html>). Both define the SAME names, so no component is designed for one theme only.
  *
- * Every gain/loss and confidence pair has been run through the data-viz
- * skill's OKLab colourblindness validator (Machado–Oliveira–Fernandes
- * simulation); see Ledger_Design_System_Redesign_Proposal.md section 4.2.
+ * Surfaces: page (the canvas) -> surface (cards: no border, no shadow; the step from page
+ * to surface is the separation) -> surface-muted (table headers, hover rows, inputs,
+ * inactive chips) -> surface-raised (active chips, selected rows, menus, tooltips).
  *
- * Tailwind v4's default palette is removed below (`--color-*: initial`), so
- * classes like `bg-slate-100` produce no CSS at all; only token classes such as
- * `bg-surface text-text border-border text-gain` exist.
+ * One colour, one meaning, on every page:
+ * - accent: "you", selection, primary actions, links, the portfolio's own series.
+ * - gain / loss: sign and pass/fail. Never alone: always a sign, arrow or icon too.
+ * - chart-forecast (purple): estimates. Always dashed or hatched, labelled "Estimated".
+ * - chart-fair-value (magenta): fair value. Always a stepped line with a label.
+ * - chart-benchmark (grey): the comparison. Always dashed, labelled at the line end.
+ * - warning-signal (amber): limited / stale data. Only ever a labelled chip, never a mark
+ *   next to loss (the two are too close for colour-vision deficiency).
+ * - risk-low/mid/high: the risk-score gradient only.
+ * - score-mark-weak/mixed/strong: the score mark's fill only.
+ * - categorical-1..8: identity with no role (13F managers, fund overlap pairs), fixed order.
+ * - verified/corroborated/unconfirmed/disputed: evidence confidence only.
+ *
+ * Validated 2026-10-16 with the dataviz skill's validate_palette.js against the surface of
+ * each theme (#ffffff light, #1d2129 dark); the record is in the visual spec, A.2. Re-run on
+ * every change to a chart hue.
+ *
+ * Tailwind v4's default palette is removed below (`--color-*: initial`), so only token
+ * classes such as `bg-surface text-text text-gain` exist.
  */
 
 :root {
   color-scheme: light;
 
-  /* Surfaces: Page (app canvas) -> Surface (cards are transparent line drawings on the
-     page) -> Surface muted (table headers, tinted fills) -> Surface raised (menus,
-     dialogs, inputs: the few objects that sit above the page). */
-  --surface: #f3f4f6;
-  --surface-muted: #e9ebef;
-  --surface-raised: #fbfbfc;
+  /* Surfaces */
+  --page: #f4f5f7;
+  --surface: #ffffff;
+  --surface-muted: #f0f2f5;
+  --surface-raised: #e7eaef;
+  --overlay: rgba(20, 23, 28, 0.4);
+  --shadow-popover: 0 8px 24px rgba(20, 23, 28, 0.12);
 
-  /* Lines and text. */
+  /* Lines and text */
   --border: rgba(20, 23, 28, 0.14);
-  --border-soft: rgba(20, 23, 28, 0.06);
+  --border-soft: rgba(20, 23, 28, 0.08);
   --text: #14171c;
-  --text-muted: #5a6270;
+  --text-muted: #4f5764;
   --text-faint: #8a919c;
 
-  /* The single accent (primary actions, focus, primary chart series). */
+  /* Accent */
   --accent: #2f6bff;
   --accent-ink: #1d4fd8;
   --accent-strong: #2356db;
-  --accent-soft: #e5edff;
+  --accent-soft: #e8efff;
   --accent-200: #cbdaff;
   --accent-300: #9dbaff;
   --accent-foreground: #ffffff;
   --focus-ring: #2f6bff;
 
-  /* Accent ramp: sequential blue for confidence scores, heatmaps, allocation shades.
-     Darkest to lightest. */
-  --accent-ramp-1: #1d4fd8;
+  /* Sequential (one hue, light to dark is magnitude). Index 1 is the darkest. */
+  --accent-ramp-1: #1d47b8;
   --accent-ramp-2: #2f6bff;
   --accent-ramp-3: #5b8cff;
   --accent-ramp-4: #9dbaff;
   --accent-ramp-5: #cbdaff;
-  --accent-ramp-6: #e5edff;
+  --accent-ramp-6: #e8efff;
 
-  /* Financial state. Always paired with a sign and an arrow. */
+  /* Sign */
   --gain: #0f8a63;
-  --gain-subtle: #e0f3ea;
+  --gain-subtle: #e2f2eb;
   --loss: #d4411f;
-  --loss-subtle: #fbe6df;
+  --loss-subtle: #fae6e0;
 
-  /* Evidence confidence — four roles, always icon + label. Verified is the accent's
-     ink; corroborated a cyan-blue so the two stay apart in a stacked bar. */
+  /* Evidence confidence */
   --verified: #1d4fd8;
-  --verified-subtle: #e5edff;
+  --verified-subtle: #e8efff;
   --corroborated: #0b7a96;
   --corroborated-subtle: #dff1f6;
   --unconfirmed: #a86f00;
-  --unconfirmed-subtle: #f7ecd2;
+  --unconfirmed-subtle: #f6edd8;
   --disputed: #b8254a;
   --disputed-subtle: #f9e1e7;
 
-  /* Severity / drift (muted; never gain/loss, never the confidence roles above). */
+  /* Severity */
   --neutral-signal: #6b7483;
-  --neutral-signal-subtle: #e9ebef;
+  --neutral-signal-subtle: #eceef2;
   --warning-signal: #a86f00;
-  --warning-signal-subtle: #f7ecd2;
+  --warning-signal-subtle: #f6edd8;
   --info-signal: #1d4fd8;
-  --info-signal-subtle: #e5edff;
+  --info-signal-subtle: #e8efff;
 
-  /* Categorical (identity): the design is mono-blue, so identity series are shades of
-     the accent in a fixed order, darkest first. Charts always carry a legend or label. */
-  --categorical-1: #1d4fd8;
-  --categorical-2: #2f6bff;
-  --categorical-3: #5b8cff;
-  --categorical-4: #7fa3ff;
-  --categorical-5: #9dbaff;
-  --categorical-6: #b9ceff;
-  --categorical-7: #d3e0ff;
+  /* Categorical (identity only), fixed order */
+  --categorical-1: #2f6bff;
+  --categorical-2: #0f9c8c;
+  --categorical-3: #a86f00;
+  --categorical-4: #c4278f;
+  --categorical-5: #2577d9;
+  --categorical-6: #6b7280;
+  --categorical-7: #5b8cff;
   --categorical-8: #8a919c;
 
-  /* Diverging pair: cool = underweight or supports, warm = overweight or contradicts. */
+  /* Diverging without a good/bad charge (drift, supports/contradicts) */
   --diverging-under: #2f6bff;
-  --diverging-under-subtle: #e5edff;
+  --diverging-under-subtle: #e8efff;
   --diverging-over: #a86f00;
-  --diverging-over-subtle: #f7ecd2;
-  --diverging-neutral: #e1e4ea;
+  --diverging-over-subtle: #f6edd8;
+  --diverging-neutral: #e3e6eb;
 
-  /* Heat scale for daily-move / monthly-return heatmaps: blue up, red-orange down. */
-  --heat-up-strong: #2f6bff;
-  --heat-up: #9dbaff;
-  --heat-up-soft: #cbdaff;
-  --heat-down-soft: #f1cfc4;
-  --heat-down: #e0876f;
+  /* Heat (day move, monthly return): gain up, loss down, grey at zero */
+  --heat-up-strong: #0f8a63;
+  --heat-up: #5fb592;
+  --heat-up-soft: #c2e3d4;
+  --heat-down-soft: #f3cbbf;
+  --heat-down: #e3826a;
   --heat-down-strong: #d4411f;
 
-  /* Charts. The portfolio in the accent, its benchmark in grey (also dashed). */
+  /* Charts */
   --chart-line: var(--accent);
-  --chart-benchmark: #8a919c;
-  --chart-grid: rgba(20, 23, 28, 0.08);
+  --chart-benchmark: #6b7280;
+  --chart-grid: #e9ecf0;
+  --chart-track: #e9ecf0;
+  --chart-unknown: #d5d9e0;
+  --chart-forecast: #8a3fd1;
+  --chart-fair-value: #c4278f;
+  --chart-revenue: #2577d9;
+  --chart-earnings: #0f9c8c;
 
-  /* Insight layer (insight plan I0.6). Forecast = estimated or analyst figures, always a
-     lighter shade of the history's accent and never shown without an "estimated" label.
-     Fair value = a stepped line over price: its own magenta so it never reads as the price
-     or as a state. Tiers reuse the state roles: low = loss, medium = warning, high = gain.
-     The score mark is a sequential accent ramp; an unscored axis is a gap, never a colour.
-     Validated with the dataviz validator: fair value vs accent passes every check in both
-     themes; forecast is under 3:1 in light, so it always carries a label, an outline and a
-     table twin. */
-  --chart-forecast: #7fa3ff;
-  --chart-fair-value: #b4359b;
+  /* Risk score gradient */
+  --risk-low: #2f6bff;
+  --risk-mid: #8a3fd1;
+  --risk-high: #d4411f;
+
+  /* Tiers reuse the sign roles */
   --tier-low: var(--loss);
   --tier-low-subtle: var(--loss-subtle);
   --tier-medium: var(--warning-signal);
   --tier-medium-subtle: var(--warning-signal-subtle);
   --tier-high: var(--gain);
   --tier-high-subtle: var(--gain-subtle);
-  --score-mark-strong: var(--accent-ramp-1);
-  --score-mark: var(--accent-ramp-2);
+
+  /* Score mark: fill by mean score (< 2.5 weak, 2.5-4 mixed, > 4 strong); rings on the track */
+  --score-mark-weak: #d9622f;
+  --score-mark-mixed: #b88a00;
+  --score-mark-strong: #0f8a63;
+  --score-mark: var(--accent);
   --score-mark-soft: var(--accent-ramp-5);
-  --score-mark-track: var(--surface-muted);
+  --score-mark-track: var(--chart-track);
   --score-mark-gap: var(--text-faint);
 }
 
 .dark {
   color-scheme: dark;
 
-  --surface: #0b0e13;
-  --surface-muted: #151a22;
-  --surface-raised: #11151c;
+  --page: #15181e;
+  --surface: #1d2129;
+  --surface-muted: #252a33;
+  --surface-raised: #2e343e;
+  --overlay: rgba(0, 0, 0, 0.5);
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.35);
 
-  --border: rgba(232, 235, 240, 0.15);
-  --border-soft: rgba(232, 235, 240, 0.06);
-  --text: #e8ebf0;
-  --text-muted: #9aa3b1;
-  --text-faint: #6b7483;
+  --border: rgba(255, 255, 255, 0.12);
+  --border-soft: rgba(255, 255, 255, 0.06);
+  --text: #eceef2;
+  --text-muted: #a9b0bc;
+  --text-faint: #6f7785;
 
-  --accent: #3d78ff;
+  --accent: #3d7bff;
   --accent-ink: #8fb0ff;
   --accent-strong: #5b8cff;
-  --accent-soft: #142042;
-  --accent-200: #1c2d5c;
+  --accent-soft: #1f2c4a;
+  --accent-200: #24335a;
   --accent-300: #2d4f9e;
   --accent-foreground: #ffffff;
-  --focus-ring: #5b8cff;
+  --focus-ring: #7aa5ff;
 
-  --accent-ramp-1: #8fb0ff;
-  --accent-ramp-2: #5b8cff;
-  --accent-ramp-3: #3d78ff;
-  --accent-ramp-4: #2d4f9e;
-  --accent-ramp-5: #1c2d5c;
-  --accent-ramp-6: #142042;
+  --accent-ramp-1: #9cbcff;
+  --accent-ramp-2: #6b98ff;
+  --accent-ramp-3: #3d7bff;
+  --accent-ramp-4: #2d55b0;
+  --accent-ramp-5: #24376a;
+  --accent-ramp-6: #1c2a4d;
 
   --gain: #34c38f;
-  --gain-subtle: #0f2a20;
+  --gain-subtle: #1f3b33;
   --loss: #ff6b4a;
-  --loss-subtle: #33160f;
+  --loss-subtle: #43282a;
 
   --verified: #8fb0ff;
-  --verified-subtle: #142042;
+  --verified-subtle: #1f2c4a;
   --corroborated: #4cc3df;
-  --corroborated-subtle: #0e2a31;
-  --unconfirmed: #e0a63a;
-  --unconfirmed-subtle: #2c2310;
+  --corroborated-subtle: #193740;
+  --unconfirmed: #e8b04a;
+  --unconfirmed-subtle: #3b3426;
   --disputed: #ff7396;
-  --disputed-subtle: #35121c;
+  --disputed-subtle: #43263a;
 
-  --neutral-signal: #9aa3b1;
-  --neutral-signal-subtle: #1a1f28;
-  --warning-signal: #e0a63a;
-  --warning-signal-subtle: #2c2310;
+  --neutral-signal: #a9b0bc;
+  --neutral-signal-subtle: #2a2f38;
+  --warning-signal: #e8b04a;
+  --warning-signal-subtle: #3b3426;
   --info-signal: #8fb0ff;
-  --info-signal-subtle: #142042;
+  --info-signal-subtle: #1f2c4a;
 
-  --categorical-1: #8fb0ff;
-  --categorical-2: #5b8cff;
-  --categorical-3: #3d78ff;
-  --categorical-4: #2f62d6;
-  --categorical-5: #2d4f9e;
-  --categorical-6: #243f7c;
-  --categorical-7: #1c2d5c;
-  --categorical-8: #6b7483;
+  --categorical-1: #3d7bff;
+  --categorical-2: #34c9b8;
+  --categorical-3: #e8b04a;
+  --categorical-4: #f39bc8;
+  --categorical-5: #4aa3ff;
+  --categorical-6: #9aa3b2;
+  --categorical-7: #6b98ff;
+  --categorical-8: #6f7785;
 
-  --diverging-under: #5b8cff;
-  --diverging-under-subtle: #142042;
-  --diverging-over: #e0a63a;
-  --diverging-over-subtle: #2c2310;
-  --diverging-neutral: #1f2530;
+  --diverging-under: #6b98ff;
+  --diverging-under-subtle: #1f2c4a;
+  --diverging-over: #e8b04a;
+  --diverging-over-subtle: #3b3426;
+  --diverging-neutral: #3a404b;
 
-  --heat-up-strong: #3d78ff;
-  --heat-up: #2d4f9e;
-  --heat-up-soft: #1c2d5c;
-  --heat-down-soft: #3a1c14;
-  --heat-down: #8a3520;
+  --heat-up-strong: #34c38f;
+  --heat-up: #2a8a68;
+  --heat-up-soft: #24493d;
+  --heat-down-soft: #5a3129;
+  --heat-down: #b34e37;
   --heat-down-strong: #ff6b4a;
 
   --chart-line: var(--accent);
-  --chart-benchmark: #9aa3b1;
-  --chart-grid: rgba(232, 235, 240, 0.08);
+  --chart-benchmark: #8b93a1;
+  --chart-grid: #2a2f38;
+  --chart-track: #2a2f38;
+  --chart-unknown: #3a404b;
+  --chart-forecast: #b968d0;
+  --chart-fair-value: #f39bc8;
+  --chart-revenue: #4aa3ff;
+  --chart-earnings: #34c9b8;
 
-  --chart-forecast: #9dbaff;
-  --chart-fair-value: #c24fb0;
+  --risk-low: #3d7bff;
+  --risk-mid: #b968d0;
+  --risk-high: #ff6b4a;
+
   --tier-low: var(--loss);
   --tier-low-subtle: var(--loss-subtle);
   --tier-medium: var(--warning-signal);
   --tier-medium-subtle: var(--warning-signal-subtle);
   --tier-high: var(--gain);
   --tier-high-subtle: var(--gain-subtle);
-  --score-mark-strong: var(--accent-ramp-1);
-  --score-mark: var(--accent-ramp-2);
+
+  --score-mark-weak: #f2875a;
+  --score-mark-mixed: #e8c34a;
+  --score-mark-strong: #34c38f;
+  --score-mark: var(--accent);
   --score-mark-soft: var(--accent-ramp-5);
-  --score-mark-track: var(--surface-muted);
+  --score-mark-track: var(--chart-track);
   --score-mark-gap: var(--text-faint);
 }
 
@@ -250,9 +263,11 @@
 
 /* Expose tokens to Tailwind utilities (bg-surface, text-text-muted, ...). */
 @theme inline {
+  --color-page: var(--page);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
   --color-surface-raised: var(--surface-raised);
+  --color-overlay: var(--overlay);
   --color-border: var(--border);
   --color-border-soft: var(--border-soft);
   --color-text: var(--text);
@@ -320,20 +335,31 @@
   --color-chart-line: var(--chart-line);
   --color-chart-benchmark: var(--chart-benchmark);
   --color-chart-grid: var(--chart-grid);
+  --color-chart-track: var(--chart-track);
+  --color-chart-unknown: var(--chart-unknown);
   --color-chart-forecast: var(--chart-forecast);
   --color-chart-fair-value: var(--chart-fair-value);
+  --color-chart-revenue: var(--chart-revenue);
+  --color-chart-earnings: var(--chart-earnings);
+  --color-risk-low: var(--risk-low);
+  --color-risk-mid: var(--risk-mid);
+  --color-risk-high: var(--risk-high);
   --color-tier-low: var(--tier-low);
   --color-tier-low-subtle: var(--tier-low-subtle);
   --color-tier-medium: var(--tier-medium);
   --color-tier-medium-subtle: var(--tier-medium-subtle);
   --color-tier-high: var(--tier-high);
   --color-tier-high-subtle: var(--tier-high-subtle);
+  --color-score-mark-weak: var(--score-mark-weak);
+  --color-score-mark-mixed: var(--score-mark-mixed);
   --color-score-mark-strong: var(--score-mark-strong);
   --color-score-mark: var(--score-mark);
   --color-score-mark-soft: var(--score-mark-soft);
   --color-score-mark-track: var(--score-mark-track);
   --color-score-mark-gap: var(--score-mark-gap);
 
-  /* White stays available for type reversed onto the accent (hero card, primary). */
+  /* White stays available for type reversed onto the accent. */
   --color-white: #ffffff;
+
+  --shadow-popover: var(--shadow-popover);
 }

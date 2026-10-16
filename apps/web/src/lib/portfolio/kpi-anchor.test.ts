@@ -12,10 +12,10 @@ describe("kpi anchor", () => {
   });
 
   it("links to the holding page with that anchor", () => {
-    expect(kpiHref("AAPL_US_EQ", "max-single-position")).toBe("/holdings/AAPL_US_EQ#kpi-row-max-single-position");
+    expect(kpiHref("AAPL_US_EQ", "max-single-position")).toBe("/companies/AAPL_US_EQ#kpi-row-max-single-position");
   });
 
   it("encodes a ticker that needs it", () => {
-    expect(kpiHref("A B", "k")).toBe("/holdings/A%20B#kpi-row-k");
+    expect(kpiHref("A B", "k")).toBe("/companies/A%20B#kpi-row-k");
   });
 });
