@@ -33,7 +33,11 @@ PROFILE = [
         "industry": "Consumer Electronics",
         "country": "US",
         "marketCap": 3_000_000_000_000,
-        "description": "ignored",
+        "description": "Apple designs  phones.",
+        "ceo": "Tim Cook",
+        "fullTimeEmployees": "164000",
+        "ipoDate": "1980-12-12",
+        "isActivelyTrading": True,
     }
 ]
 ESTIMATES = [
@@ -57,7 +61,7 @@ ESTIMATES = [
 ]
 
 
-def test_profile_keeps_only_text_fields_sent_and_rejects_other_symbols() -> None:
+def test_profile_keeps_the_fields_sent_under_the_page_names_and_rejects_other_symbols() -> None:
     profile = fmp.parse_profile(PROFILE, "aapl")
     assert profile is not None
     assert profile.fields == {
@@ -67,6 +71,10 @@ def test_profile_keeps_only_text_fields_sent_and_rejects_other_symbols() -> None
         "sector": "Technology",
         "industry": "Consumer Electronics",
         "country": "US",
+        "description": "Apple designs phones.",
+        "ceo": "Tim Cook",
+        "employees": "164000",
+        "ipo_date": "1980-12-12",
     }
     assert fmp.parse_profile([], "AAPL") is None
     assert fmp.parse_profile(PROFILE, "MSFT") is None

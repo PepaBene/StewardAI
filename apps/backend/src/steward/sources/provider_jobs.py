@@ -120,8 +120,9 @@ async def fmp_company_handler(ctx: JobContext) -> None:
         step.detail["unmapped"] = [t for t in tickers if t not in mapped]
         rows = await ctx.pool.fetch(
             "select ticker, max(last_seen_at) seen from public.company_research_observation"
-            " where provider='fmp' and dataset='profile' and ticker = any($1::text[])"
-            " group by ticker",
+            # Keyed on the description: profiles stored before it was kept are due again.
+            " where provider='fmp' and dataset='profile' and metric = 'description'"
+            " and ticker = any($1::text[]) group by ticker",
             list(mapped),
         )
         seen = {r["ticker"]: r["seen"] for r in rows}

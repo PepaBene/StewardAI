@@ -52,6 +52,13 @@ ESTIMATE_YEARS = 4  # fiscal years kept per company
 ESTIMATE_FETCH = 10  # rows requested: the answer is newest first and reaches years ahead
 ESTIMATE_LOOKBACK_DAYS = 200  # keep the fiscal year that just ended, for the surprise comparison
 PROFILE_TEXT_FIELDS = ("sector", "industry", "country", "exchange", "companyName", "currency")
+PROFILE_RENAMED_FIELDS = {
+    "description": "description",
+    "ceo": "ceo",
+    "fullTimeEmployees": "employees",
+    "website": "website",
+    "ipoDate": "ipo_date",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +132,11 @@ def parse_profile(payload: object, symbol: str) -> FmpProfile | None:
         for name in PROFILE_TEXT_FIELDS
         if isinstance(row.get(name), str) and str(row[name]).strip()
     }
+    # Stored under the names the company page reads (company/evidence.py PROFILE_METRICS).
+    for name, metric in PROFILE_RENAMED_FIELDS.items():
+        value = row.get(name)
+        if isinstance(value, (str, int)) and not isinstance(value, bool) and str(value).strip():
+            fields[metric] = " ".join(str(value).split())
     return FmpProfile(symbol.upper(), fields) if fields else None
 
 
