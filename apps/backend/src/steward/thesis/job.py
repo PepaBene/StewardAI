@@ -202,6 +202,15 @@ async def author_from_report(
             weight=weights.get(ticker),
             status="needs_owner",
         )
+    elif version_id is not None:
+        # The saved thesis no longer calls for a trim or exit: an earlier one's notice is stale.
+        await pool.execute(
+            "update public.ops_task set status = 'resolved', resolved_at = now(),"
+            " last_action = 'superseded by a later thesis'"
+            " where kind = $1 and subject = $2 and status <> 'resolved'",
+            STANCE_TASK,
+            ticker,
+        )
     return {"memo_id": int(memo_id), "stance": draft.stance}
 
 
