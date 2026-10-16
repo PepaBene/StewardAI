@@ -234,7 +234,8 @@ async def _news(
 ) -> list[Update]:
     rows = await pool.fetch(
         f"""select c.id, c.ticker, c.event_type, c.severity, c.last_seen, c.source_count, c.status,
-                  (select i.headline from public.news_item i where i.cluster_id = c.id order by i.tier, i.published_at limit 1) as headline
+                  (select coalesce((select t.title_en from public.news_article t where t.news_item_id = i.id and t.title_en is not null order by t.id limit 1), i.headline)
+                     from public.news_item i where i.cluster_id = c.id order by i.tier, i.published_at limit 1) as headline
            from public.story_cluster c where c.last_seen >= $1 and {_TICKER_SQL.replace("ticker", "c.ticker")}
            order by c.last_seen desc limit 300""",  # noqa: S608 - constant fragment
         since,

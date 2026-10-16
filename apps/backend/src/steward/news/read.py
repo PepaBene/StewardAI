@@ -174,7 +174,9 @@ def _story(row: asyncpg.Record) -> StoryOut:
 
 
 FEED_SELECT = (
-    "select i.id, i.url, i.headline, i.summary, i.outlet, i.outlet_name, i.tier, i.source_id,"
+    # A story in another language reads in its stored English translation.
+    "select i.id, i.url, coalesce(tr.title_en, i.headline) as headline,"
+    " coalesce(tr.summary_en, i.summary) as summary, i.outlet, i.outlet_name, i.tier, i.source_id,"
     " i.published_at, i.tickers, i.links, i.event_type, i.affected_ticker, i.rumour,"
     " i.relevant, i.sentiment_score, i.sentiment_relevance, i.cluster_id,"
     " c.ticker as c_ticker, c.event_type as c_event_type,"
@@ -185,6 +187,8 @@ FEED_SELECT = (
     " c.first_seen as c_first_seen, c.last_seen as c_last_seen,"
     " c.corroboration as c_corroboration"
     " from public.news_item i join public.story_cluster c on c.id = i.cluster_id"
+    " left join lateral (select t.title_en, t.summary_en from public.news_article t"
+    " where t.news_item_id = i.id and t.title_en is not null order by t.id limit 1) tr on true"
 )
 
 
