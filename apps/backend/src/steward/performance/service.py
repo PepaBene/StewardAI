@@ -263,7 +263,7 @@ async def _benchmark_series(
             return None, [], None, "unknown", ["no benchmark chosen"]
         _ref, bars = await index_series(pool, jobs.prices, symbols[0], since)
         notes.append("benchmark currency and dividend basis are not recorded: set them below")
-        return symbols[0], [(d, Decimal(str(c))) for d, c in bars], None, "unknown", notes
+        return jobs.prices.index_label(symbols[0]), [(d, Decimal(str(c))) for d, c in bars], None, "unknown", notes
     series: dict[str, list[tuple[dt.date, Decimal]]] = {}
     for component in spec.components:
         _ref, bars = await index_series(pool, jobs.prices, component.symbol, since)
@@ -277,7 +277,7 @@ async def _benchmark_series(
     basis = next(iter(bases)) if len(bases) == 1 else "unknown"
     if len(spec.components) == 1:
         only = spec.components[0]
-        return only.symbol, series[only.symbol], currency, basis, notes
+        return jobs.prices.index_label(only.symbol), series[only.symbol], currency, basis, notes
     if currency is None:
         notes.append("blend mixes quote currencies: no like-for-like active return")
     try:
@@ -285,7 +285,7 @@ async def _benchmark_series(
     except ValueError as exc:
         notes.append(f"the benchmark blend cannot be built: {exc}")
         return None, [], None, "unknown", notes
-    label = " + ".join(f"{c.weight:.0%} {c.symbol}" for c in spec.components)
+    label = " + ".join(f"{c.weight:.0%} {jobs.prices.index_label(c.symbol)}" for c in spec.components)
     return f"{label} ({spec.rebalance} rebalance)", blend, currency, basis, notes
 
 

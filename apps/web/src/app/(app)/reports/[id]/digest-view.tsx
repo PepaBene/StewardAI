@@ -77,6 +77,7 @@ import {
 import { isExternalUrl } from "@/lib/sources/sources";
 import { cn } from "@/lib/utils";
 import { decodeEntities } from "@/lib/news/entities";
+import { indexName } from "@/lib/portfolio/ticker";
 
 /** /reports/[id]: the digest list of its period beside the digest. */
 export function DigestView({ id }: { id: number }) {
@@ -495,7 +496,7 @@ function Hero({ report, alerts }: { report: ReportOut; alerts: AlertOut[] | null
         <HeroStat
           label="vs benchmark"
           value={vs !== null ? `${formatSigned(vs, 2)} pp` : "—"}
-          sub={bench && history?.benchmark_symbol ? `${history.benchmark_symbol} ${formatPct(bench.pct, 2, true)}` : "No benchmark closes for this window"}
+          sub={bench && history?.benchmark_symbol ? `${indexName(history.benchmark_symbol)} ${formatPct(bench.pct, 2, true)}` : "No benchmark closes for this window"}
         />
         <HeroStat
           label="Alerts sent"

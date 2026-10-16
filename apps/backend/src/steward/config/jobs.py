@@ -1357,6 +1357,11 @@ class PriceSettings(ConfigModel):
         item = next((i for i in self.market_strip if i.symbol == symbol), None)
         return item.yahoo() if item else STOOQ_INDEX_YAHOO.get(symbol)
 
+    def index_label(self, symbol: str) -> str:
+        """The readable name of an index symbol ('S&P 500' for ^spx), else the symbol itself."""
+        item = next((i for i in self.market_strip if i.symbol == symbol), None)
+        return item.label if item else symbol
+
 
 CountryCode = Annotated[str, Field(pattern=r"^[A-Z]{2}$", examples=["CZ"])]
 Mic = Annotated[str, Field(pattern=r"^[A-Z0-9]{4}$", examples=["XNYS"])]

@@ -25,7 +25,7 @@ import { money, pct } from "@/lib/insight/income";
 import { num } from "@/lib/insight/insight";
 import { formatCompactMoney, formatSignedPct } from "@/lib/portfolio/money";
 import { DEFAULT_HERO_RANGE, HISTORY_DAYS, indexedRange, lastChange, periodReturn, rangeStart, type HeroRangeId } from "@/lib/portfolio/performance";
-import { shortTicker } from "@/lib/portfolio/ticker";
+import { indexName, shortTicker } from "@/lib/portfolio/ticker";
 import { benchmarkVerdict, incomeChangeVerdict, unrealisedVerdict } from "@/lib/verdicts/portfolio";
 import { cn } from "@/lib/utils";
 
@@ -139,7 +139,7 @@ function Overview({ data }: { data: PortfolioOverview }) {
   const ytdStart = asOf ? rangeStart("ytd", asOf) : null;
   const ytd = h && asOf ? periodReturn(h.points, ytdStart) : null;
   const ytdBench = h && asOf && h.benchmark.length ? indexedRange(h.points, h.benchmark, ytdStart).benchmarkReturn : null;
-  const benchName = h?.benchmark_symbol ?? "the benchmark";
+  const benchName = h?.benchmark_symbol ? indexName(h.benchmark_symbol) : "the benchmark";
   const returnVerdict = benchmarkVerdict(ytd, ytdBench, benchName);
 
   const divData = dividends.kind === "ok" ? dividends.data : dividends.kind === "error" ? dividends.previous : null;

@@ -10,6 +10,7 @@ import { formatNumber } from "@/lib/charts/format";
 import { aheadShare } from "@/lib/charts/gap-runs";
 import { formatDay } from "@/lib/charts/time";
 import { HERO_RANGES, indexedRange, rangeStart, type HeroRangeId } from "@/lib/portfolio/performance";
+import { indexName } from "@/lib/portfolio/ticker";
 
 export type HistoryLoad =
   | { kind: "loading" }
@@ -43,7 +44,7 @@ export function OverviewHero({
   const usable = !!data && !data.gap && points.length >= 2;
   const asOf = usable ? points[points.length - 1].date : null;
   const series = usable && asOf ? indexedRange(points, data.benchmark, rangeStart(range, asOf)) : null;
-  const benchName = data?.benchmark_symbol ? `${data.benchmark_symbol} benchmark` : "Benchmark";
+  const benchName = data?.benchmark_symbol ? indexName(data.benchmark_symbol) : "Benchmark";
   const fmt = (v: number) => formatNumber(v, 1);
   const last = series?.portfolio.at(-1)?.value ?? null;
   const benchLast = series?.benchmark ? [...series.benchmark].reverse().find((p) => p.value !== null)?.value ?? null : null;
@@ -83,7 +84,7 @@ export function OverviewHero({
         {!series.benchmark ? (
           <p className="mt-2 text-xs text-text-muted">
             {data.benchmark_symbol
-              ? `No ${data.benchmark_symbol} close near the start of this range, so the benchmark is not drawn.`
+              ? `No ${indexName(data.benchmark_symbol)} close near the start of this range, so the benchmark is not drawn.`
               : "No benchmark is configured (Config: Jobs, Prices)."}
           </p>
         ) : null}

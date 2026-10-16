@@ -54,6 +54,7 @@ import {
 import { formatOutstandingPct, holderPctByCik } from "@/lib/reference/shares-outstanding";
 import { isExternalUrl } from "@/lib/sources/sources";
 import { headerPrice } from "@/lib/prices/intraday";
+import { indexName } from "@/lib/portfolio/ticker";
 import { cn } from "@/lib/utils";
 
 import { HeaderIntradayPrice, IntradayChartBody } from "./holding-intraday";
@@ -638,7 +639,7 @@ export function DrawdownPanel({
         <Stat
           label="Beta"
           value={typeof risk?.beta === "number" ? formatNumber(risk.beta, 2) : "—"}
-          sub={history?.benchmark_symbol ? `vs ${history.benchmark_symbol}` : "no benchmark"}
+          sub={history?.benchmark_symbol ? `vs ${indexName(history.benchmark_symbol)}` : "no benchmark"}
         />
         <Stat
           label="Max DD 1Y"

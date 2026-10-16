@@ -14,6 +14,7 @@ import { useApiResource } from "@/lib/hooks/use-api-resource";
 
 import { RiskScorePanel } from "./risk-score-panel";
 import { isRatio, STAT_GROUPS, statLabel, type AnalyticsFigure, type RiskReport } from "@/lib/risk/risk";
+import { indexName } from "@/lib/portfolio/ticker";
 
 import { Notes, Warnings } from "../xray/shared";
 import { Absent } from "@/components/company/primitives";
@@ -73,7 +74,7 @@ function Report({ report }: { report: RiskReport }) {
         <p className="text-sm text-text-muted">
           {report.window.observations} daily returns, {formatDate(report.window.start ?? "")} to {formatDate(report.window.end ?? "")}, in{" "}
           {report.base_currency ?? "the base currency"}.
-          {report.benchmark_symbol ? ` Benchmark: ${report.benchmark_symbol}.` : ""} These describe the past sample; they are not forecasts.
+          {report.benchmark_symbol ? ` Benchmark: ${indexName(report.benchmark_symbol)}.` : ""} These describe the past sample; they are not forecasts.
         </p>
       )}
       <div className="grid gap-5 lg:grid-cols-2">

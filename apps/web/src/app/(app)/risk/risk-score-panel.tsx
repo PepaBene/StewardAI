@@ -15,6 +15,7 @@ import type { components } from "@/lib/api/schema";
 import { getBrowserApiClient } from "@/lib/api/client";
 import { formatDate, formatPercent } from "@/lib/format";
 import { useApiResource } from "@/lib/hooks/use-api-resource";
+import { indexName } from "@/lib/portfolio/ticker";
 import { cn } from "@/lib/utils";
 
 /*
@@ -133,7 +134,7 @@ function PerHolding({ data }: { data: Headline }) {
         chart={
           <ul className="space-y-1.5">
             {pRef !== null && pRef !== undefined ? bar("Your portfolio", pRef, true) : null}
-            {mRef !== null && mRef !== undefined ? bar(data.benchmark_symbol ? `Market (${data.benchmark_symbol})` : "Market", mRef, true) : null}
+            {mRef !== null && mRef !== undefined ? bar(data.benchmark_symbol ? `Market (${indexName(data.benchmark_symbol)})` : "Market", mRef, true) : null}
             {rows.map((r) => bar(r.ticker, Number(r[metric])))}
           </ul>
         }
@@ -248,7 +249,7 @@ function Correlation({ data }: { data: Headline }) {
 
 function Body({ data }: { data: Headline }) {
   const s = data.score;
-  const markers = s.benchmark_score === null || s.benchmark_score === undefined ? [] : [{ value: s.benchmark_score, label: data.benchmark_symbol ? `Market (${data.benchmark_symbol})` : "Market" }];
+  const markers = s.benchmark_score === null || s.benchmark_score === undefined ? [] : [{ value: s.benchmark_score, label: data.benchmark_symbol ? `Market (${indexName(data.benchmark_symbol)})` : "Market" }];
   return (
     <div className="flex flex-col gap-5">
       <Blueprint className="px-[22px] py-4">
