@@ -140,8 +140,11 @@ async def company_checks(pool: asyncpg.Pool, owner_id: Any, ticker: str, *, div_
         return None
     rules, rules_version = await load_checks(pool)
     h = inputs_hash(inp, rules)
+    # Reusing a stored row makes it the newest: the holdings rows and drawer read the newest row,
+    # and inputs that went back to an earlier state must not leave them on a later stale one.
     row = await pool.fetchrow(
-        "select result from public.company_check_snapshot where owner_id = $1 and ticker = $2 and input_hash = $3",
+        "update public.company_check_snapshot set computed_at = greatest(computed_at, now())"
+        " where owner_id = $1 and ticker = $2 and input_hash = $3 returning result",
         owner_id, ticker, h,
     )  # fmt: skip
     if row is not None:
