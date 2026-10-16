@@ -49,7 +49,13 @@ from steward.sources import esma, openfigi
 from steward.sources.edgar import EXCHANGE_MIC, EdgarClient, EdgarError
 from steward.sources.esma import home_country
 from steward.sources.gleif import GleifClient, GleifError, LegalEntity, ReportingException
-from steward.sources.wikidata import LANGUAGES, WikidataClient, WikidataError, WikidataLink
+from steward.sources.wikidata import (
+    LANGUAGES,
+    PROPERTY_TEXT,
+    WikidataClient,
+    WikidataError,
+    WikidataLink,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -716,7 +722,12 @@ async def _wikidata(
                 source="wikidata",
                 confirmed=False,
                 source_ref=source_ref,
-                detail={"qid": link.qid},
+                detail={
+                    "qid": link.qid,
+                    "statement": link.basis
+                    or f"Wikidata states: {subject_name or ticker} — {PROPERTY_TEXT[link.kind]} — "
+                    f"{link.label}",
+                },
             )
         await replace_aliases(conn, ticker, "wikidata", ["alias"], [(a, "alias") for a in aliases])
         await conn.execute(

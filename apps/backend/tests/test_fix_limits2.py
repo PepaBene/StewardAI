@@ -384,3 +384,23 @@ async def test_a_tokyo_home_listing_is_in_yen_not_the_brokers_euro_line() -> Non
     c = await derive_candidate(FakePool(), "D4Sd_EQ", PriceSymbols(stooq="4568.jp", yahoo=None))  # type: ignore[arg-type]
     assert c is not None and c.currency == "JPY"
     assert c.evidence["currency"]["market"] == "JPY" and not c.confirmable
+
+
+def test_a_wikidata_competitor_says_what_the_inference_rests_on() -> None:
+    from steward.sources.wikidata import parse_competitors
+
+    body = {
+        "results": {
+            "bindings": [
+                {
+                    "c": {"value": "http://www.wikidata.org/entity/Q248"},
+                    "cLabel": {"value": "Intel"},
+                    "industry": {"value": "semiconductor industry"},
+                    "index": {"value": "NASDAQ-100"},
+                }
+            ]
+        }
+    }
+    (link,) = parse_competitors(body)
+    assert link.basis is not None and "Inferred, not stated" in link.basis
+    assert "the industry semiconductor industry and the index NASDAQ-100" in link.basis

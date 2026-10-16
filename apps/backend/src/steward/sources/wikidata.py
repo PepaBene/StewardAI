@@ -43,6 +43,15 @@ class WikidataLink:
     qid: str | None
     label: str
     lei: str | None = None
+    basis: str | None = None  # what the link rests on, in words, for whoever checks it
+
+
+# The statement each ownership link comes from, as the judge and the owner read it.
+PROPERTY_TEXT = {
+    "parent": "parent organization (P749)",
+    "subsidiary": "has subsidiary (P355)",
+    "owned_by": "owned by (P127)",
+}
 
 
 def qid_of(uri: str) -> str:
@@ -72,14 +81,18 @@ ALIASES_QUERY = """SELECT ?alias WHERE {{
   wd:{qid} rdfs:label|skos:altLabel ?alias . FILTER(LANG(?alias) IN ({languages}))
 }}"""
 
-# Listed companies in the same industry and the same stock index.
-COMPETITORS_QUERY = """SELECT DISTINCT ?c ?cLabel WHERE {{
-  wd:{qid} wdt:P452 ?industry ; wdt:P361 ?index .
-  ?index wdt:P31/wdt:P279* wd:Q223371 .
-  ?c wdt:P452 ?industry ; wdt:P361 ?index .
+# Listed companies in the same industry and the same stock index, with the industry and index
+# shared, so whoever checks the inference sees what it rests on.
+COMPETITORS_QUERY = """SELECT ?c ?cLabel (SAMPLE(?indL) AS ?industry) (SAMPLE(?idxL) AS ?index)
+WHERE {{
+  wd:{qid} wdt:P452 ?ind ; wdt:P361 ?idx .
+  ?idx wdt:P31/wdt:P279* wd:Q223371 .
+  ?c wdt:P452 ?ind ; wdt:P361 ?idx .
   FILTER(?c != wd:{qid})
+  OPTIONAL {{ ?ind rdfs:label ?indL FILTER(LANG(?indL) = "en") }}
+  OPTIONAL {{ ?idx rdfs:label ?idxL FILTER(LANG(?idxL) = "en") }}
   SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
-}} LIMIT 15"""
+}} GROUP BY ?c ?cLabel LIMIT 15"""
 
 
 def parse_properties(body: dict[str, Any]) -> list[WikidataLink]:
@@ -108,9 +121,26 @@ def parse_aliases(body: dict[str, Any]) -> list[str]:
     return list(seen)
 
 
+def competitor_basis(industry: str | None, index: str | None) -> str:
+    shared = " and ".join(
+        f"the {what} {name}" for what, name in (("industry", industry), ("index", index)) if name
+    )
+    return (
+        "Inferred, not stated: Wikidata has no competitor property. Both companies are listed "
+        f"in {shared or 'the same industry and stock index'}."
+    )
+
+
 def parse_competitors(body: dict[str, Any]) -> list[WikidataLink]:
     return [
-        WikidataLink("competitor", qid_of(b["c"]["value"]), b.get("cLabel", {}).get("value", ""))
+        WikidataLink(
+            "competitor",
+            qid_of(b["c"]["value"]),
+            b["cLabel"]["value"],
+            basis=competitor_basis(
+                b.get("industry", {}).get("value"), b.get("index", {}).get("value")
+            ),
+        )
         for b in body.get("results", {}).get("bindings", [])
         if b.get("cLabel", {}).get("value") and not b["cLabel"]["value"].startswith("Q")
     ]
