@@ -358,3 +358,29 @@ def test_places_and_common_nouns_are_not_linked_as_customers_or_rivals() -> None
         "McDonald's",
     ):
         assert names_a_company(company), company
+
+
+async def test_a_tokyo_home_listing_is_in_yen_not_the_brokers_euro_line() -> None:
+    from steward.reference.listings import derive_candidate
+    from steward.reference.price_series import PriceSymbols
+
+    instrument = {
+        "t212_ticker": "D4Sd_EQ",
+        "isin": "JP3475350009",
+        "name": "Daiichi Sankyo",
+        "currency": "EUR",
+        "home_mic": "XTKS",
+        "price_symbol": "4568.jp",
+        "issuer_lei": None,
+        "security_type": None,
+        "share_class_figi": None,
+    }
+    answers = iter([instrument, None, {"figi": "BBG000BQWLX5", "listing_ticker": "4568"}])
+
+    class FakePool:
+        async def fetchrow(self, _sql: str, *_args: Any) -> Any:
+            return next(answers)
+
+    c = await derive_candidate(FakePool(), "D4Sd_EQ", PriceSymbols(stooq="4568.jp", yahoo=None))  # type: ignore[arg-type]
+    assert c is not None and c.currency == "JPY"
+    assert c.evidence["currency"]["market"] == "JPY" and not c.confirmable

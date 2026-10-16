@@ -38,6 +38,14 @@ from steward.sources.market import major_currency
 
 PRICE_PROVIDERS = ("stooq", "yahoo", "eodhd", "alpha_vantage")
 SYMBOL_TYPE = "symbol"
+# Trading currency of home markets FIRDS does not cover (and of the larger EU ones, as a check).
+MARKET_CURRENCY: dict[str, str] = {
+    "XNAS": "USD", "XNYS": "USD", "ARCX": "USD", "BATS": "USD", "XTSE": "CAD", "XLON": "GBP",
+    "XSWX": "CHF", "XTKS": "JPY", "XHKG": "HKD", "XKRX": "KRW", "XTAI": "TWD", "XASX": "AUD",
+    "XSES": "SGD", "XSTO": "SEK", "XCSE": "DKK", "XOSL": "NOK", "XWAR": "PLN", "XPRA": "CZK",
+    "XBUD": "HUF", "XETR": "EUR", "XFRA": "EUR", "XPAR": "EUR", "XAMS": "EUR", "XMIL": "EUR",
+    "XMAD": "EUR", "XBRU": "EUR", "XDUB": "EUR", "XHEL": "EUR", "XLIS": "EUR", "XWBO": "EUR",
+}  # fmt: skip
 
 
 @dataclass(frozen=True)
@@ -114,7 +122,10 @@ async def derive_candidate(
         return None
     instrument_ccy = major_currency(inst["currency"])
     firds_ccy = major_currency(firds["currency"]) if firds and firds["currency"] else None
-    currency = firds_ccy or instrument_ccy
+    # The instrument's currency is the line the broker trades (EUR on Xetra for a Tokyo share);
+    # the home listing trades in its own market's currency.
+    market_ccy = MARKET_CURRENCY.get(mic)
+    currency = firds_ccy or market_ccy or instrument_ccy
     if currency is None:
         return None
     isin_match = firds is not None
@@ -137,7 +148,12 @@ async def derive_candidate(
         "isin_has_firds_record_on_home_mic": isin_match,
         "openfigi_listing_ticker": listing_ticker if figi else None,
         "openfigi_figi": figi["figi"] if figi else None,
-        "currency": {"firds": firds_ccy, "instrument": instrument_ccy, "agrees": currency_agrees},
+        "currency": {
+            "firds": firds_ccy,
+            "market": market_ccy,
+            "instrument": instrument_ccy,
+            "agrees": currency_agrees,
+        },
         "home_mic": mic,
         "gaps": gaps,
     }
