@@ -25,7 +25,7 @@ async def get_holdings_insight(
     owner: Owner,
     basis: Annotated[
         Basis, Query(description="Fair-value basis for the price-against-value columns.")
-    ] = "dcf_default",
+    ] = "headline",
 ) -> hi.HoldingsInsight:
     """Every field the holdings presets show, in one request: last event, fair value and its step
     history, thesis line, income, score mark, fundamentals and value metrics, and note counts."""

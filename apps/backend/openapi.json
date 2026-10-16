@@ -17618,6 +17618,7 @@
             "required": false,
             "schema": {
               "enum": [
+                "headline",
                 "dcf_default",
                 "dcf_base",
                 "multiple_base",
@@ -17627,7 +17628,7 @@
               ],
               "type": "string",
               "description": "Fair-value basis of the valuation strip; saves nothing.",
-              "default": "dcf_default",
+              "default": "headline",
               "title": "Basis"
             },
             "description": "Fair-value basis of the valuation strip; saves nothing."
@@ -17956,6 +17957,7 @@
             "required": false,
             "schema": {
               "enum": [
+                "headline",
                 "dcf_default",
                 "dcf_base",
                 "multiple_base",
@@ -17965,7 +17967,7 @@
               ],
               "type": "string",
               "description": "Fair-value basis; switching it saves nothing.",
-              "default": "dcf_default",
+              "default": "headline",
               "title": "Basis"
             },
             "description": "Fair-value basis; switching it saves nothing."
@@ -18208,6 +18210,7 @@
             "required": false,
             "schema": {
               "enum": [
+                "headline",
                 "dcf_default",
                 "dcf_base",
                 "multiple_base",
@@ -18217,7 +18220,7 @@
               ],
               "type": "string",
               "description": "Fair-value basis for the price-against-value columns.",
-              "default": "dcf_default",
+              "default": "headline",
               "title": "Basis"
             },
             "description": "Fair-value basis for the price-against-value columns."
@@ -73925,8 +73928,8 @@
           "basis": {
             "type": "string",
             "title": "Basis",
-            "description": "Fair-value basis the value columns use.",
-            "default": "dcf_default"
+            "description": "Fair-value basis the value columns use; headline: each holding's best available.",
+            "default": "headline"
           }
         },
         "additionalProperties": false,

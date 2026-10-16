@@ -480,7 +480,7 @@ function HoldingsPresets({
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       const { error } = await getBrowserApiClient().PUT("/config/holdings-views", {
-        body: { schema_version: 1, selected: next.selected, custom_columns: next.custom, basis: "dcf_default" },
+        body: { schema_version: 1, selected: next.selected, custom_columns: next.custom, basis: "headline" },
       });
       setSaveError(error ? "Your column choice could not be saved; it applies until you leave the page." : null);
     }, 700);

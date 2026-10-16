@@ -18,17 +18,11 @@ import asyncpg
 from pydantic import BaseModel, Field
 
 from steward.company.quote import Q4, Quote, load_member, load_quote
-from steward.valuation.fair_value_view import BASIS_LABELS, convert, latest_fx
+from steward.valuation.fair_value_view import BASIS_LABELS, HEADLINE_ORDER, convert, latest_fx
 
-# The order the app picks a default in (the watchlist uses the same): your scenario first.
-DEFAULT_ORDER = (
-    "dcf_base",
-    "multiple_base",
-    "thesis_target",
-    "dcf_default",
-    "consensus_target",
-    "peer_multiple",
-)
+# The order the app picks a default in (holdings, drawer and watchlist use the same): your
+# scenario first.
+DEFAULT_ORDER = HEADLINE_ORDER
 SOURCE_OF = {
     "dcf_default": "dcf_default",
     "dcf_base": "dcf",

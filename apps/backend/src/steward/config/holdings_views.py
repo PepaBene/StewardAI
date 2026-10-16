@@ -45,7 +45,7 @@ class HoldingsViewsConfig(ConfigModel):
     custom_columns: list[str] = Field(
         default_factory=lambda: list(DEFAULT_CUSTOM), min_length=1, max_length=20
     )
-    basis: str = Field(default="dcf_default", description="Fair-value basis the value columns use.")
+    basis: str = Field(default="headline", description="Fair-value basis the value columns use; headline: each holding's best available.")
 
     @field_validator("custom_columns")
     @classmethod

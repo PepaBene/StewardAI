@@ -24,6 +24,7 @@ from steward.sources.consensus_view import (
 )
 from steward.valuation.fair_value_view import (
     BASIS_LABELS,
+    HEADLINE_ORDER,
     Basis,
     PortfolioFairValue,
     StepPoint,
@@ -42,7 +43,7 @@ async def get_portfolio_fair_value(
     owner: Owner,
     basis: Annotated[
         Basis, Query(description="Fair-value basis; switching it saves nothing.")
-    ] = "dcf_default",
+    ] = "headline",
 ) -> PortfolioFairValue:
     """Per holding: price, fair value on the chosen basis, premium or discount, age of the inputs
     and the stale flag; portfolio totals over covered holdings, and the history from the stored
@@ -72,14 +73,7 @@ class WatchFairValue(BaseModel):
     history: list[StepPoint]
 
 
-ORDER = (
-    "dcf_base",
-    "multiple_base",
-    "thesis_target",
-    "dcf_default",
-    "consensus_target",
-    "peer_multiple",
-)
+ORDER = HEADLINE_ORDER
 
 
 @router.get("/watchlist/fair-value", response_model=list[WatchFairValue], tags=["watchlist"])

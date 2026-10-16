@@ -24883,8 +24883,8 @@ export interface components {
             custom_columns?: string[];
             /**
              * Basis
-             * @description Fair-value basis the value columns use.
-             * @default dcf_default
+             * @description Fair-value basis the value columns use; headline: each holding's best available.
+             * @default headline
              */
             basis: string;
         };
@@ -55525,7 +55525,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Fair-value basis of the valuation strip; saves nothing. */
-                basis?: "dcf_default" | "dcf_base" | "multiple_base" | "thesis_target" | "consensus_target" | "peer_multiple";
+                basis?: "headline" | "dcf_default" | "dcf_base" | "multiple_base" | "thesis_target" | "consensus_target" | "peer_multiple";
             };
             header?: never;
             path?: never;
@@ -55741,7 +55741,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Fair-value basis; switching it saves nothing. */
-                basis?: "dcf_default" | "dcf_base" | "multiple_base" | "thesis_target" | "consensus_target" | "peer_multiple";
+                basis?: "headline" | "dcf_default" | "dcf_base" | "multiple_base" | "thesis_target" | "consensus_target" | "peer_multiple";
             };
             header?: never;
             path?: never;
@@ -55904,7 +55904,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Fair-value basis for the price-against-value columns. */
-                basis?: "dcf_default" | "dcf_base" | "multiple_base" | "thesis_target" | "consensus_target" | "peer_multiple";
+                basis?: "headline" | "dcf_default" | "dcf_base" | "multiple_base" | "thesis_target" | "consensus_target" | "peer_multiple";
             };
             header?: never;
             path?: never;

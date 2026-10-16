@@ -107,7 +107,7 @@ def _check_value(result: dict[str, Any], check_id: str) -> tuple[Decimal | None,
 
 
 async def portfolio_strips(
-    pool: asyncpg.Pool, owner_id: Any, basis: str = "dcf_default"
+    pool: asyncpg.Pool, owner_id: Any, basis: str = "headline"
 ) -> PortfolioStrips:
     from steward.dividends.service import portfolio_dividends
     from steward.valuation.fair_value_view import BASIS_LABELS, portfolio_fair_value

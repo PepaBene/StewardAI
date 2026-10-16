@@ -28,9 +28,23 @@ BASES = (
     "peer_multiple",
 )
 Basis = Literal[
-    "dcf_default", "dcf_base", "multiple_base", "thesis_target", "consensus_target", "peer_multiple"
-]
+    "headline", "dcf_default", "dcf_base", "multiple_base", "thesis_target", "consensus_target",
+    "peer_multiple",
+]  # fmt: skip
+# The one fair value a holding shows wherever a single figure is wanted (company header, holdings
+# table, drawer, portfolio totals): your own scenario first, then the thesis target, the app's
+# default DCF, the analyst consensus and the peer multiple. "headline" picks it per holding.
+HEADLINE = "headline"
+HEADLINE_ORDER = (
+    "dcf_base",
+    "multiple_base",
+    "thesis_target",
+    "dcf_default",
+    "consensus_target",
+    "peer_multiple",
+)
 BASIS_LABELS: dict[str, str] = {
+    HEADLINE: "Best available",
     "dcf_default": "Default DCF (filed growth)",
     "dcf_base": "Your DCF scenario",
     "multiple_base": "Your multiple-path scenario",
@@ -193,14 +207,17 @@ async def portfolio_fair_value(
     account = next((r["account_currency"] for r in pos if r["account_currency"]), None)
     home, rates = await latest_fx(pool, account)
     tickers = [r["ticker"] for r in pos]
+    wanted = list(HEADLINE_ORDER) if basis == HEADLINE else [basis]
     pts = await pool.fetch(
-        """select * from public.fair_value_point where owner_id = $1 and basis = $2 and ticker = any($3::text[])
+        """select * from public.fair_value_point where owner_id = $1 and basis = any($2::text[]) and ticker = any($3::text[])
              and as_of >= $4 order by ticker, as_of""",
-        owner_id, basis, tickers, today - dt.timedelta(days=730),
+        owner_id, wanted, tickers, today - dt.timedelta(days=730),
     )  # fmt: skip
-    by_ticker: dict[str, list[Any]] = {}
+    by_basis: dict[tuple[str, str], list[Any]] = {}
     for p in pts:
-        by_ticker.setdefault(p["ticker"], []).append(p)
+        by_basis.setdefault((p["ticker"], p["basis"]), []).append(p)
+    chosen = {t: next((b for b in wanted if (t, b) in by_basis), wanted[0]) for t in tickers}
+    by_ticker = {t: by_basis.get((t, chosen[t]), []) for t in tickers}
     events = {
         r["ticker"]: r
         for r in await pool.fetch(
@@ -220,10 +237,15 @@ async def portfolio_fair_value(
             same = [x for x in rows if x["scenario_id"] == last["scenario_id"]]
             first_hash = _detail(same[0]).get("statements_hash")
         price, pccy = r["current_price"], r["instrument_currency"]
+        used = chosen[t]
         fv = fv_acct = up = None
         reason = None
         if last is None:
-            reason = f"no {BASIS_LABELS.get(basis, basis).lower()} recorded"
+            reason = (
+                "no fair value recorded on any basis yet"
+                if basis == HEADLINE
+                else f"no {BASIS_LABELS.get(basis, basis)} value recorded"
+            )
         elif price is None or price <= 0 or not pccy:
             reason = "no current price"
         else:
@@ -236,7 +258,7 @@ async def portfolio_fair_value(
                 fv_acct = (
                     r["value_account"] * fv / price if r["value_account"] is not None else None
                 )
-        age, reasons = staleness(basis, last, first_hash, today, rules.fair_value.stale_after_days)
+        age, reasons = staleness(used, last, first_hash, today, rules.fair_value.stale_after_days)
         hist: list[StepPoint] = []
         for p in rows:
             v = convert(p["value"], p["currency"] or pccy, pccy, home, rates) if pccy else None
@@ -247,7 +269,8 @@ async def portfolio_fair_value(
             ticker=t, name=r["name"], quantity=r["quantity"], price=price, price_currency=pccy, value_account=r["value_account"],
             fair_value=fv.quantize(Q4) if fv is not None else None, fair_value_native=last["value"] if last else None,
             native_currency=last["currency"] if last else None, fair_value_account=fv_acct.quantize(Q2) if fv_acct is not None else None,
-            upside=up.quantize(Q4) if up is not None else None, basis=basis, basis_label=BASIS_LABELS.get(basis, basis),
+            upside=up.quantize(Q4) if up is not None else None, basis=used if last is not None else basis,
+            basis_label=BASIS_LABELS.get(used if last is not None else basis, basis),
             method_version=last["method_version"] if last else None, scenario_version=last["scenario_version"] if last else None,
             as_of=last["as_of"] if last else None, inputs_as_of=last["inputs_as_of"] if last else None, age_days=age,
             stale=bool(reasons), stale_reasons=reasons, reason=reason, history=hist,
@@ -259,7 +282,7 @@ async def portfolio_fair_value(
         basis,
         account,
         pos[0]["snapshot_date"] if pos else None,
-        *(await history(pool, owner_id, basis, home, rates)),
+        *(await history(pool, owner_id, basis, home, rates, chosen if basis == HEADLINE else None)),
     )
 
 
@@ -292,15 +315,29 @@ def summarise(holdings: list[HoldingFairValue], basis: str, account: str | None,
 
 
 async def history(
-    pool: asyncpg.Pool, owner_id: Any, basis: str, home: str, rates: dict[str, Decimal]
+    pool: asyncpg.Pool,
+    owner_id: Any,
+    basis: str,
+    home: str,
+    rates: dict[str, Decimal],
+    chosen: dict[str, str] | None = None,
 ) -> tuple[list[HistoryRow], dt.date | None]:
     """Portfolio value and the fair value of the covered positions per stored portfolio day,
-    starting at the first recorded fair value (no back-fill)."""
-    start = await pool.fetchval(
-        "select min(as_of) from public.fair_value_point where owner_id = $1 and basis = $2",
+    starting at the first recorded fair value (no back-fill). With `chosen` (the headline
+    basis), each holding is valued on the basis it shows today."""
+    wanted = sorted(set(chosen.values())) if chosen else [basis]
+    pts = await pool.fetch(
+        "select ticker, basis, as_of, value, currency from public.fair_value_point"
+        " where owner_id = $1 and basis = any($2::text[]) order by as_of",
         owner_id,
-        basis,
+        wanted,
     )
+    series: dict[str, list[tuple[dt.date, Decimal, str | None]]] = {}
+    for p in pts:
+        if chosen is not None and chosen.get(p["ticker"]) != p["basis"]:
+            continue
+        series.setdefault(p["ticker"], []).append((p["as_of"], p["value"], p["currency"]))
+    start = min((s[0][0] for s in series.values() if s), default=None)
     if start is None:
         return [], None
     pos = await pool.fetch(
@@ -308,13 +345,6 @@ async def history(
             where snapshot_date >= $1 and quantity > 0 order by snapshot_date""",
         start,
     )
-    pts = await pool.fetch(
-        "select ticker, as_of, value, currency from public.fair_value_point where owner_id = $1 and basis = $2 order by as_of",
-        owner_id, basis,
-    )  # fmt: skip
-    series: dict[str, list[tuple[dt.date, Decimal, str | None]]] = {}
-    for p in pts:
-        series.setdefault(p["ticker"], []).append((p["as_of"], p["value"], p["currency"]))
     days: dict[dt.date, list[Any]] = {}
     for r in pos:
         days.setdefault(r["snapshot_date"], []).append(r)

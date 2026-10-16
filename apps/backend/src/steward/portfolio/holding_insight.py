@@ -170,7 +170,7 @@ async def last_events(
 
 
 async def holdings_insight(
-    pool: asyncpg.Pool, owner_id: Any, basis: str = "dcf_default", today: dt.date | None = None
+    pool: asyncpg.Pool, owner_id: Any, basis: str = "headline", today: dt.date | None = None
 ) -> HoldingsInsight:
     from steward.checks.contract import SCORED_AXES
     from steward.checks.service import latest_scores

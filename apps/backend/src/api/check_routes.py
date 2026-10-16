@@ -230,7 +230,7 @@ async def get_portfolio_strips(
     owner: Owner,
     basis: Annotated[
         Basis, Query(description="Fair-value basis of the valuation strip; saves nothing.")
-    ] = "dcf_default",
+    ] = "headline",
 ) -> PortfolioStrips:
     """Ranked dot strips (insight I4.5): every holding on one scale per metric, with the
     portfolio's value-weighted mean as the reference line. Read from cached checks, stored fair

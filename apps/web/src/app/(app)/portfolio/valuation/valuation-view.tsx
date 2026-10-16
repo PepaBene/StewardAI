@@ -36,7 +36,7 @@ const HISTORY_MIN_DAYS = 30;
 const fetchPrices =() => getBrowserApiClient().GET("/portfolio/holdings/prices", { params: { query: { days: 90 } } });
 
 export function PortfolioValuationView() {
-  const [basis, setBasis] = useState<Basis>("dcf_default");
+  const [basis, setBasis] = useState<Basis>("headline");
   const fetcher = useCallback(() => getBrowserApiClient().GET("/portfolio/fair-value", { params: { query: { basis } } }), [basis]);
   const { state } = useApiResource(fetcher);
   return (

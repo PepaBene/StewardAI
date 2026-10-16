@@ -60,11 +60,12 @@ const STORED_SOURCES = ["analyst_mean", "thesis_target", "peer_multiple"];
 
 type CompareRow = { key: string; label: string; value: number; currency: string | null };
 
-/** The live editor results, then the stored outside values, each once. */
+/** The live editor results, then the stored outside values, each once. A draft nobody saved says so. */
 export function comparisonRows(heads: Record<Method, Headline | null>, stored: StoredFairValues | null): CompareRow[] {
   const live = METHODS.flatMap((m) => {
     const h = heads[m.key];
-    return h && h.value !== null ? [{ key: m.key, label: LABEL[m.key], value: h.value, currency: h.currency }] : [];
+    const label = h && h.version === null ? `${LABEL[m.key]} (draft, not saved)` : LABEL[m.key];
+    return h && h.value !== null ? [{ key: m.key, label, value: h.value, currency: h.currency }] : [];
   });
   const outside = (stored?.values ?? []).flatMap((v) => {
     const value = v.value === null ? null : Number(v.value);
@@ -120,23 +121,35 @@ export function ValuationView({ ticker }: { ticker: string }) {
   // Fall back to the other method when the chosen one cannot be computed.
   const usable = (h: Headline | null) => h !== null && h.value !== null;
   const basis: Method = usable(heads[method]) || !usable(heads[method === "dcf" ? "multiple" : "dcf"]) ? method : method === "dcf" ? "multiple" : "dcf";
-  const active = heads[basis];
+  const editor = heads[basis];
+  // The verdict is the company's one headline fair value (the header shows the same): your saved
+  // scenario, else the thesis target, the default DCF, the analyst consensus. An editor result
+  // leads only once it is saved, or when nothing is stored at all.
+  const storedDefault = stored?.values.find((v) => v.is_default && v.value !== null) ?? null;
+  const storedHead: Headline | null =
+    storedDefault && (editor === null || editor.version === null)
+      ? { method: storedDefault.source, value: Number(storedDefault.value), currency: storedDefault.currency, price: toNumber(stored?.price) ?? editor?.price ?? null, scenario: "", version: null }
+      : null;
+  const active = storedHead ?? editor;
   const gap = priceGap(active);
-  usePageSelection(`${LABEL[basis]}${active ? `, scenario ${active.scenario}` : ""}`);
+  const basisLine = storedHead && storedDefault ? storedDefault.label : active ? basisText(basis, active) : null;
+  usePageSelection(`${LABEL[basis]}${editor ? `, scenario ${editor.scenario}` : ""}`);
 
   useEffect(() => {
-    if (active && active.value !== null) setReport({ value: active.value, currency: active.currency, basis: basisText(basis, active), price: active.price });
+    // Only a saved scenario changes the header; a draft stays inside the editor and the strip.
+    if (editor && editor.value !== null && editor.version !== null) setReport({ value: editor.value, currency: editor.currency, basis: basisText(basis, editor), price: editor.price });
     else setReport(null);
     return () => setReport(null);
-  }, [active, basis, setReport]);
+  }, [editor, basis, setReport]);
 
+  const editorGap = priceGap(editor);
   const resultCard =
-    active && active.value !== null ? (
+    editor && editor.value !== null ? (
       <div className="flex flex-wrap items-baseline justify-between gap-x-4">
         <p className="kpi-figure num">
-          {money(active.value)} <span className="text-sm font-normal text-text-muted">{active.currency ?? ""} per share</span>
+          {money(editor.value)} <span className="text-sm font-normal text-text-muted">{editor.currency ?? ""} per share</span>
         </p>
-        <p className="text-sm text-text-muted">{gap !== null ? gapText(gap) : basisText(basis, active)}</p>
+        <p className="text-sm text-text-muted">{editorGap !== null ? `${gapText(editorGap)} · ${basisText(basis, editor)}` : basisText(basis, editor)}</p>
       </div>
     ) : (
       <p className="text-sm text-text-muted">Computing the fair value…</p>
@@ -150,7 +163,7 @@ export function ValuationView({ ticker }: { ticker: string }) {
             <h3 id="val-answer" className="panel-title">
               {gap === null ? "Where the price sits against fair value" : gapText(gap)}
             </h3>
-            <p className="text-sm text-text-muted">{active && active.value !== null ? `Basis: ${basisText(basis, active)}.` : "Basis: not chosen yet."}</p>
+            <p className="text-sm text-text-muted">{active && active.value !== null && basisLine ? `Basis: ${basisLine}.` : "Basis: not chosen yet."}</p>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={() => setPanelOpen(true)}>
             Edit assumptions
@@ -177,7 +190,7 @@ export function ValuationView({ ticker }: { ticker: string }) {
             zones={VALUATION_ZONES}
             marker={`Price ${money(active.price)} · ${gapText(gap).toLowerCase()}`}
             format={(v) => `${(v * 100).toFixed(0)}%`}
-            label={`Last close ${money(active.price)} against the ${LABEL[basis].toLowerCase()} ${active.scenario} value`}
+            label={`Last close ${money(active.price)} against the ${(basisLine ?? LABEL[basis]).toLowerCase()} value`}
           />
         ) : (
           <LimitedState>The gauge appears once a fair value and a stored price are both available.</LimitedState>

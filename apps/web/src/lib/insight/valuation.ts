@@ -9,7 +9,7 @@ import { num } from "./insight";
 
 export type PortfolioFairValue = components["schemas"]["PortfolioFairValue"];
 export type HoldingFairValue = components["schemas"]["HoldingFairValue"];
-export type Basis = "dcf_default" | "dcf_base" | "multiple_base" | "thesis_target" | "consensus_target" | "peer_multiple";
+export type Basis = "headline" | "dcf_default" | "dcf_base" | "multiple_base" | "thesis_target" | "consensus_target" | "peer_multiple";
 
 export type ValuationGroups = { over: HoldingFairValue[]; stale: HoldingFairValue[]; under: HoldingFairValue[]; uncovered: HoldingFairValue[] };
 

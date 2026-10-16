@@ -15,7 +15,7 @@ import { DotStrip } from "./dot-strip";
 
 type PortfolioStrips = components["schemas"]["PortfolioStrips"];
 type Strip = PortfolioStrips["strips"][number];
-type Basis = "dcf_default" | "dcf_base" | "multiple_base" | "thesis_target" | "consensus_target" | "peer_multiple";
+type Basis = "headline" | "dcf_default" | "dcf_base" | "multiple_base" | "thesis_target" | "consensus_target" | "peer_multiple";
 
 const fmt = (unit: Strip["unit"]) => (v: number) => (unit === "multiple" ? `${v.toFixed(1)}×` : `${(v * 100).toFixed(Math.abs(v) < 0.1 ? 1 : 0)}%`);
 
@@ -25,7 +25,7 @@ const fmt = (unit: Strip["unit"]) => (v: number) => (unit === "multiple" ? `${v.
  * the Checks limits, and a table twin. The valuation strip has basis tabs that save nothing.
  */
 export function StripsPanel() {
-  const [basis, setBasis] = useState<Basis>("dcf_default");
+  const [basis, setBasis] = useState<Basis>("headline");
   const fetcher = useCallback(() => getBrowserApiClient().GET("/portfolio/strips", { params: { query: { basis } } }), [basis]);
   const { state } = useApiResource(fetcher);
   return (
