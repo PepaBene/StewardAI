@@ -305,3 +305,37 @@ async def test_google_news_cap_is_noted(monkeypatch: pytest.MonkeyPatch) -> None
     result = await collect_google_news(client(lambda r: httpx.Response(500)), "g", [holding], 3)
     assert len(result.items) == 100
     assert result.errors and "cap" in result.errors[0]
+
+
+def _lei_entity(lei: str, name: str, country: str) -> Any:
+    from steward.sources.gleif import LegalEntity
+
+    return LegalEntity(
+        lei=lei,
+        legal_name=name,
+        other_names=[],
+        jurisdiction=country,
+        legal_form=None,
+        category=None,
+        hq_address={"country": country},
+        legal_address={"country": country},
+        status="ACTIVE",
+        successor_lei=None,
+        registration_status="ISSUED",
+        next_renewal=None,
+        raw={},
+    )
+
+
+def test_a_venue_lei_from_firds_is_not_taken_for_a_foreign_issuer() -> None:
+    from steward.reference.identity import plausible_issuer
+
+    venue = _lei_entity("213800R54EFFINMY1P02", "TP ICAP (EUROPE)", "FR")
+    assert not plausible_issuer(venue, "US15118V2079", "Celsius")
+    assert plausible_issuer(
+        _lei_entity("X", "Celsius Holdings, Inc.", "US"), "US15118V2079", "Celsius"
+    )
+    # a holding company registered abroad still fits by its name
+    assert plausible_issuer(
+        _lei_entity("Y", "Nu Holdings Ltd.", "KY"), "US67066G1040", "Nu Holdings"
+    )

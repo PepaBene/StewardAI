@@ -43,7 +43,7 @@ from steward.graph.successors import reconcile_parent_change
 from steward.jobs.runner import JobContext
 from steward.news.link import short_name
 from steward.reference.events import LifecycleEvent, entity_events, listing_events, raise_events
-from steward.reference.lifecycle import sync_firds_names, sync_gleif_issuer
+from steward.reference.lifecycle import name_key, sync_firds_names, sync_gleif_issuer
 from steward.settings import get_settings
 from steward.sources import esma, openfigi
 from steward.sources.edgar import EXCHANGE_MIC, EdgarClient, EdgarError
@@ -442,6 +442,22 @@ async def _home_market(
     return None
 
 
+def _country(address: dict[str, Any] | None) -> str | None:
+    return str(address.get("country") or "")[:2].upper() or None if address else None
+
+
+def plausible_issuer(entity: LegalEntity, isin: str, name: str) -> bool:
+    """Whether a FIRDS issuer LEI can be the share's issuer. An EU venue trading a foreign share
+    whose issuer has no LEI reports its own operator's LEI instead (TP ICAP's for a US share),
+    so the entity must sit in the ISIN's country or carry the instrument's name."""
+    countries = {(entity.jurisdiction or "")[:2].upper(), _country(entity.legal_address)}
+    if isin[:2].upper() in countries:
+        return True
+    words = [w for w in name_key(short_name(name) or name).split() if len(w) >= 2]
+    names = " ".join(name_key(n) for n in [entity.legal_name, *entity.other_names])
+    return bool(words) and words[0] in names.split()
+
+
 async def _gleif(
     pool: asyncpg.Pool,
     deps: ReferenceDeps,
@@ -468,9 +484,23 @@ async def _gleif(
         entity = (
             by_isin if by_isin is not None and by_isin.lei == lei else await deps.gleif.record(lei)
         )
+        if (
+            entity is not None
+            and entity is not by_isin
+            and not plausible_issuer(entity, isin, name)
+        ):
+            result.notes.append(
+                f"FIRDS names {entity.legal_name} ({lei}) as the issuer of {isin}; neither its"
+                " country nor its name fits, so it is taken for the venue's own LEI"
+            )
+            entity = by_isin
+            if entity is None:
+                result.problems.append("no issuer LEI (FIRDS gave the venue's, GLEIF has none)")
+                return None
         if entity is None:
             result.problems.append(f"GLEIF has no record for LEI {lei}")
             return None
+        lei = entity.lei
         raw_bytes = json.dumps(entity.raw, sort_keys=True, separators=(",", ":")).encode()
         initial_registration = (entity.raw.get("attributes", {}).get("registration") or {}).get(
             "initialRegistrationDate"
