@@ -22,6 +22,7 @@ from steward.xray import (
     service,
     supply_chain,
 )
+from steward.xray.allocation import Allocation
 from steward.xray.benchmark import XrayBenchmark
 from steward.xray.diversification import Diversification
 from steward.xray.exports import xray_csv
@@ -107,6 +108,17 @@ async def get_concentration(
     """Top-10, HHI and effective holdings at security, issuer, sector, country and fund level,
     with benchmark-relative over- and underweights where the classification is like-for-like."""
     return concentration_response(await _loaded(pool, owner, as_of))
+
+
+@router.get("/allocation")
+async def get_allocation(pool: Pool, owner: Owner, as_of: AsOf = None) -> Allocation:
+    """Lorenz curve of the equity holdings with HHI, effective number of holdings and Gini, and
+    the full sector to industry to holding tree with weights (every holding, unlike the capped
+    flow in /diversification). Issuers looked through funds; unclassified ones are marked."""
+    from steward.xray import allocation
+
+    loaded = await _loaded(pool, owner, as_of)
+    return allocation.build(loaded.day.isoformat(), loaded.leafset, loaded.notes)
 
 
 @router.get("/diversification")

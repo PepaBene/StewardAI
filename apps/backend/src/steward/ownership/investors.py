@@ -2,9 +2,10 @@
 
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 
 import asyncpg
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from steward.ownership.read import EFFECTIVE
 
@@ -31,6 +32,9 @@ class ManagerSummary(BaseModel):
     earlier_period: date | None = None
 
 
+PositionChange = Literal["new", "added", "trimmed", "unchanged", "sold", "unknown"]
+
+
 class ManagerPosition(BaseModel):
     cusip: str
     issuer_name: str
@@ -38,10 +42,42 @@ class ManagerPosition(BaseModel):
     value_usd: Decimal | None
     shares: Decimal | None
     shares_type: str
+    previous_shares: Decimal | None = Field(
+        default=None, description="Shares at the earlier quarter end; null when not held then."
+    )
+    previous_value_usd: Decimal | None = None
+    change: PositionChange = "unknown"
+    share_change_pct: float | None = Field(
+        default=None, description="Shares now / shares then - 1; null for new or sold positions."
+    )
+
+
+def classify_change(
+    shares: Decimal | None, previous: Decimal | None, *, has_earlier: bool
+) -> tuple[PositionChange, float | None]:
+    """How a position moved between two quarter ends, by share count (not value)."""
+    if not has_earlier:
+        return "unknown", None
+    now = shares or Decimal(0)
+    then = previous or Decimal(0)
+    if then <= 0 and now > 0:
+        return "new", None
+    if now <= 0 and then > 0:
+        return "sold", None
+    if then <= 0:
+        return "unknown", None
+    pct = float(now / then - 1)
+    if abs(pct) < 0.005:
+        return "unchanged", 0.0
+    return ("added" if pct > 0 else "trimmed"), pct
 
 
 class ManagerDetail(ManagerSummary):
     positions_detail: list[ManagerPosition]
+    sold_out: list[ManagerPosition] = Field(
+        default_factory=list,
+        description="Largest positions held at the earlier quarter end and gone at the latest.",
+    )
     earlier_period: date | None = None
     performance_available: bool = False
     performance_note: str = (
@@ -106,16 +142,35 @@ async def manager_detail(pool: asyncpg.Pool, cik: str, name: str) -> ManagerDeta
     earlier_value = None
     if earlier:
         earlier_value, _ = await _period_summary(pool, cik, earlier)
-    positions = await pool.fetch(
-        EFFECTIVE  # noqa: S608 - fixed SQL template; user values are bound below.
-        + " select h.cusip, max(h.issuer_name) issuer_name, max(h.title_of_class) title_of_class,"
-        " sum(h.value_usd) value_usd, sum(h.shares) shares, max(h.shares_type) shares_type"
-        " from effective e join public.institutional_holding h using (accession)"
-        " where e.cik=$2 and h.shares_type='SH' and h.put_call is null group by h.cusip"
-        " order by sum(h.value_usd) desc nulls last limit 50",
-        latest["period"],
-        cik.zfill(10),
-    )
+    positions = await pool.fetch(_POSITIONS + " limit 50", latest["period"], cik.zfill(10))
+    earlier_rows = await pool.fetch(_POSITIONS, earlier, cik.zfill(10)) if earlier else []
+    then = {row["cusip"]: row for row in earlier_rows}
+    detail: list[ManagerPosition] = []
+    for row in positions:
+        prev = then.get(row["cusip"])
+        change, pct = classify_change(
+            row["shares"], prev["shares"] if prev else None, has_earlier=earlier is not None
+        )
+        detail.append(
+            ManagerPosition(
+                **dict(row),
+                previous_shares=prev["shares"] if prev else None,
+                previous_value_usd=prev["value_usd"] if prev else None,
+                change=change,
+                share_change_pct=pct,
+            )
+        )
+    current = {row["cusip"] for row in await pool.fetch(_CUSIPS, latest["period"], cik.zfill(10))}
+    sold_out = [
+        ManagerPosition(
+            **{**dict(row), "value_usd": None, "shares": None},
+            previous_shares=row["shares"],
+            previous_value_usd=row["value_usd"],
+            change="sold",
+        )
+        for row in earlier_rows
+        if row["cusip"] not in current
+    ][:10]
     return ManagerDetail(
         cik=cik.zfill(10),
         name=name,
@@ -125,5 +180,23 @@ async def manager_detail(pool: asyncpg.Pool, cik: str, name: str) -> ManagerDeta
         positions=count,
         previous_value_usd=earlier_value,
         earlier_period=earlier,
-        positions_detail=[ManagerPosition(**dict(row)) for row in positions],
+        positions_detail=detail,
+        sold_out=sold_out,
     )
+
+
+# Common-stock positions of one manager at one quarter end, one row per CUSIP, largest first.
+_POSITIONS = (
+    EFFECTIVE  # noqa: S608 - fixed SQL template; user values are bound by the caller.
+    + " select h.cusip, max(h.issuer_name) issuer_name, max(h.title_of_class) title_of_class,"
+    " sum(h.value_usd) value_usd, sum(h.shares) shares, max(h.shares_type) shares_type"
+    " from effective e join public.institutional_holding h using (accession)"
+    " where e.cik=$2 and h.shares_type='SH' and h.put_call is null group by h.cusip"
+    " order by sum(h.value_usd) desc nulls last"
+)
+# Every CUSIP held at a quarter end, so "sold out" never means "fell off the top 50".
+_CUSIPS = (
+    EFFECTIVE  # noqa: S608 - fixed SQL template; user values are bound by the caller.
+    + " select distinct h.cusip from effective e join public.institutional_holding h"
+    " using (accession) where e.cik=$2 and h.shares_type='SH' and h.put_call is null"
+)
