@@ -137,3 +137,22 @@ async def test_stop_handlers_fall_back_where_asyncio_has_no_signal_support(
 
     installed[signal.SIGINT](signal.SIGINT, None)  # type: ignore[operator]
     await asyncio.wait_for(stop.wait(), timeout=1)
+
+
+def test_only_warnings_and_worse_go_to_stderr(capsys: pytest.CaptureFixture[str]) -> None:
+    from steward.logging import configure_logging
+
+    root = logging.getLogger()
+    saved = root.handlers[:], root.level
+    try:
+        configure_logging("INFO", ["s3cret"])
+        logging.getLogger("steward.x").info("ran with s3cret")
+        logging.getLogger("steward.x").warning("missed a run")
+        logging.getLogger("apscheduler.scheduler").info("Running job")
+        out, err = capsys.readouterr()
+    finally:
+        root.handlers[:], level = saved
+        root.setLevel(level)
+    assert "ran with [REDACTED]" in out and "missed a run" not in out
+    assert "missed a run" in err and "ran with" not in err
+    assert "Running job" not in out + err

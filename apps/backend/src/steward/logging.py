@@ -7,6 +7,7 @@ before any handler formats it.
 
 import logging
 import re
+import sys
 from collections.abc import Iterable
 
 REDACTED = "[REDACTED]"
@@ -58,15 +59,28 @@ class SecretScrubFilter(logging.Filter):
 
 
 def configure_logging(level: str = "INFO", secrets: Iterable[str] = ()) -> None:
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    # Hosts such as Railway read every stderr line as an error, so only warnings and worse go
+    # there; the rest goes to stdout.
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
     scrubber = SecretScrubFilter(secrets)
-    handler.addFilter(scrubber)
+    info = logging.StreamHandler(sys.stdout)
+    info.addFilter(lambda record: record.levelno < logging.WARNING)
+    problems = logging.StreamHandler(sys.stderr)
+    problems.setLevel(logging.WARNING)
+    for handler in (info, problems):
+        handler.setFormatter(formatter)
+        handler.addFilter(scrubber)
     root = logging.getLogger()
-    root.handlers[:] = [handler]
+    root.handlers[:] = [info, problems]
     root.setLevel(level.upper())
-    # uvicorn installs its own non-propagating handlers before the app is imported;
-    # scrub those too.
-    for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
-        for existing in logging.getLogger(name).handlers:
-            existing.addFilter(scrubber)
+    # A line per scheduled run ("Running job ...", "executed successfully") says nothing the
+    # job table does not; its warnings (a missed run) still show.
+    logging.getLogger("apscheduler").setLevel(logging.WARNING)
+    # uvicorn installs its own non-propagating stderr handlers before the app is imported: its
+    # server log goes through ours instead, and the access log keeps its own, scrubbed too.
+    for name in ("uvicorn", "uvicorn.error"):
+        logger = logging.getLogger(name)
+        logger.handlers[:] = []
+        logger.propagate = True
+    for existing in logging.getLogger("uvicorn.access").handlers:
+        existing.addFilter(scrubber)

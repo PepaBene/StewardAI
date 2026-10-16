@@ -34,6 +34,7 @@ def _run_api() -> None:
         port=int(os.environ.get("PORT", "8000")),
         proxy_headers=True,
         forwarded_allow_ips="*",
+        log_config=None,  # keep `configure_logging`'s handlers: info to stdout, warnings stderr
     )
 
 
