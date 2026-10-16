@@ -102,7 +102,7 @@ function HoldingRow({ holding: h, scale }: { holding: Holding; scale: number }) 
         </Link>
         <p className="truncate text-xs text-text-muted">
           {h.name ?? ""}
-          {h.weight != null ? `${h.name ? ", " : ""}${(h.weight * 100).toFixed(1)}% of portfolio` : ""}
+          {h.weight != null ? `${h.name ? ", " : ""}${(h.weight * 100).toFixed(1)}% of your account` : ""}
         </p>
       </div>
       <div className="text-right">

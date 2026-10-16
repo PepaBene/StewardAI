@@ -537,6 +537,7 @@ function HoldingsPresets({
         holding={drawer ? (data.holdings.find((h) => h.ticker === drawer.ticker) ?? null) : null}
         row={drawer ? byTicker.get(drawer.ticker) : undefined}
         baseCcy={data.base_currency ?? ""}
+        weightBasis={data.weight_basis}
         tab={drawer?.tab ?? "overview"}
         onTab={(tab) => setDrawer((d) => (d ? { ...d, tab } : d))}
         onClose={() => setDrawer(null)}

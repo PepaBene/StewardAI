@@ -73994,6 +73994,22 @@
             "type": "array",
             "title": "Holdings",
             "description": "Every open position once, by value descending."
+          },
+          "weight_basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "total",
+                  "invested"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Basis",
+            "description": "What each weight is a share of: 'total' (the account, cash included) or 'invested' (the positions only)."
           }
         },
         "type": "object",

@@ -128,6 +128,11 @@ class HoldingsResponse(BaseModel):
     base_currency: str | None
     account_currency: str | None
     holdings: list[Holding] = Field(description="Every open position once, by value descending.")
+    weight_basis: Literal["total", "invested"] | None = Field(
+        default=None,
+        description="What each weight is a share of: 'total' (the account, cash included) or "
+        "'invested' (the positions only).",
+    )
 
 
 async def latest_sync_job(conn: asyncpg.Pool) -> JobSummary | None:
@@ -314,6 +319,7 @@ async def portfolio_holdings(pool: asyncpg.Pool) -> HoldingsResponse:
         base_currency=account["base_currency"],
         account_currency=account["account_currency"],
         holdings=holdings,
+        weight_basis=report.weight_basis,
     )
 
 

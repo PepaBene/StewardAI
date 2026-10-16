@@ -142,11 +142,24 @@ async def company_checks(pool: asyncpg.Pool, owner_id: Any, ticker: str, *, div_
     h = inputs_hash(inp, rules)
     # Reusing a stored row makes it the newest: the holdings rows and drawer read the newest row,
     # and inputs that went back to an earlier state must not leave them on a later stale one.
+    # The backend may insert and delete these rows but not update them, so an older match is
+    # moved forward by re-inserting it.
     row = await pool.fetchrow(
-        "update public.company_check_snapshot set computed_at = greatest(computed_at, now())"
-        " where owner_id = $1 and ticker = $2 and input_hash = $3 returning result",
+        """select s.result, s.computed_at < (select max(computed_at) from public.company_check_snapshot
+                where owner_id = $1 and ticker = $2) as stale
+           from public.company_check_snapshot s where s.owner_id = $1 and s.ticker = $2 and s.input_hash = $3""",
         owner_id, ticker, h,
     )  # fmt: skip
+    if row is not None and row["stale"]:
+        async with pool.acquire() as conn, conn.transaction():
+            row = await conn.fetchrow(
+                """with old as (delete from public.company_check_snapshot
+                     where owner_id = $1 and ticker = $2 and input_hash = $3
+                     returning owner_id, ticker, method_version, input_hash, scores, result)
+                   insert into public.company_check_snapshot (owner_id, ticker, method_version, input_hash, scores, result)
+                   select * from old returning result""",
+                owner_id, ticker, h,
+            )  # fmt: skip
     if row is not None:
         stored = row["result"]
         return CompanyChecks.model_validate(

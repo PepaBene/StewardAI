@@ -24934,6 +24934,11 @@ export interface components {
              * @description Every open position once, by value descending.
              */
             holdings: components["schemas"]["Holding"][];
+            /**
+             * Weight Basis
+             * @description What each weight is a share of: 'total' (the account, cash included) or 'invested' (the positions only).
+             */
+            weight_basis?: ("total" | "invested") | null;
         };
         /** HoldingsView */
         HoldingsView: {

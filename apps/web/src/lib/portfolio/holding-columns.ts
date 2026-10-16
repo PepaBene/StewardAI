@@ -57,7 +57,7 @@ export const COLUMNS: Record<ColumnId, ColumnDef> = {
   day_move: c("day_move", "Today", "Position", "percent", "Today's move against the previous close."),
   spark: c("spark", "30 days", "Position", "custom", "Daily closes over the last 30 days.", { align: "center", sortable: false }),
   value: c("value", "Value", "Position", "custom", "Market value in the base currency."),
-  weight: c("weight", "Weight vs target", "Position", "custom", "Share of the portfolio against the target weight.", { align: "left" }),
+  weight: c("weight", "Weight vs target", "Position", "custom", "Share of the account (cash included, unless the strategy weighs positions only) against the target weight.", { align: "left" }),
   drift: c("drift", "Drift", "Position", "custom", "Distance from the target weight, with its band."),
   ppl: c("ppl", "Unrealised P/L", "Position", "custom", "Gain or loss against cost."),
   last_event: c("last_event", "Last event", "Check-in", "custom", "The newest verdict, company event, dividend or news story.", { align: "left" }),

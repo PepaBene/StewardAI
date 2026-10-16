@@ -94,7 +94,7 @@ function PriceAgainstThesis({ h, row }: { h: Holding; row: HoldingInsight | unde
   );
 }
 
-function Overview({ h, row, baseCcy }: { h: Holding; row: HoldingInsight | undefined; baseCcy: string }) {
+function Overview({ h, row, baseCcy, weightOf }: { h: Holding; row: HoldingInsight | undefined; baseCcy: string; weightOf: string }) {
   const upside = toNum(row?.fair_upside);
   const fair = toNum(row?.fair_value);
   const history = (row?.fair_history ?? []).map((p) => ({ date: p.as_of, value: null, fair: toNum(p.value) }));
@@ -106,7 +106,7 @@ function Overview({ h, row, baseCcy }: { h: Holding; row: HoldingInsight | undef
         <div>
           <dt className="text-xs text-text-muted">Value</dt>
           <dd className="font-semibold">{formatMoney(h.value_base, baseCcy, { decimals: 0 })}</dd>
-          <dd className="text-xs text-text-muted">{`${formatPercent(h.weight)} of portfolio`}</dd>
+          <dd className="text-xs text-text-muted">{`${formatPercent(h.weight)} of ${weightOf}`}</dd>
         </div>
         <div>
           <dt className="text-xs text-text-muted">Unrealised</dt>
@@ -461,6 +461,7 @@ export function HoldingDrawer({
   holding,
   row,
   baseCcy,
+  weightBasis,
   tab,
   onTab,
   onClose,
@@ -469,6 +470,7 @@ export function HoldingDrawer({
   holding: Holding | null;
   row: HoldingInsight | undefined;
   baseCcy: string;
+  weightBasis?: "total" | "invested" | null;
   tab: DrawerTabKey;
   onTab: (t: DrawerTabKey) => void;
   onClose: () => void;
@@ -487,7 +489,7 @@ export function HoldingDrawer({
       tab={tab}
       onTab={(k) => onTab(k as DrawerTabKey)}
       tabs={[
-        { key: "overview", label: "Overview", content: <Overview h={holding} row={row} baseCcy={baseCcy} /> },
+        { key: "overview", label: "Overview", content: <Overview h={holding} row={row} baseCcy={baseCcy} weightOf={weightBasis === "total" ? "the account, cash included" : "the positions"} /> },
         { key: "position", label: "Position", content: <Position h={holding} row={row} baseCcy={baseCcy} /> },
         { key: "updates", label: "Updates", content: <Updates ticker={holding.ticker} row={row} /> },
         { key: "notes", label: `Notes${row?.notes ? ` (${row.notes})` : ""}`, content: <Notes ticker={holding.ticker} onCount={countNotes} /> },
