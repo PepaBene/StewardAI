@@ -306,7 +306,87 @@ async def valuation(
                     source_ids=div_ids + ([price_sid] if price_sid else []),
                 )
             )
+    anchor_sentences, anchors = await consensus_anchor(pool, reg, ticker, price, price_ccy)
+    section.sentences += anchor_sentences
+    out += anchors
     return section, out
+
+
+async def consensus_anchor(
+    pool: asyncpg.Pool, reg: Registry, ticker: str, price: Decimal | None, price_ccy: str | None
+) -> tuple[list[CitedSentence], list[Valuation]]:
+    """The analysts' view as an outside anchor for scenarios: the stored consensus price target
+    (mean, median, range, analyst count) and, when the estimate's currency is the price's, the
+    forward P/E. It is the analysts' expectation, not a fair value. An estimate in an unknown
+    currency (an ADR's per-share EPS in the home currency) gives no P/E."""
+    row = await pool.fetchrow(
+        "select id, as_of, source, analyst_count, target_mean, target_median, target_high,"
+        " target_low, target_currency, eps_next_fy, fiscal_period, estimate_currency"
+        " from public.consensus_snapshot where ticker = $1 and access_state = 'complete'"
+        " and target_mean is not null order by as_of desc, id desc limit 1",
+        ticker,
+    )
+    if row is None:
+        return [], []
+    analysts = f"{row['analyst_count']} analysts" if row["analyst_count"] else "analysts"
+    sid = reg.add(
+        "price",
+        f"consensus:{row['id']}",
+        f"{str(row['source']).upper()} analyst consensus for {ticker} on {row['as_of']}",
+        tier=2,
+        snippet=(
+            f"{analysts}: mean price target {row['target_mean']}, median {row['target_median']},"
+            f" low {row['target_low']}, high {row['target_high']} {row['target_currency'] or ''};"
+            f" EPS estimate {row['eps_next_fy']}"
+            f" {row['estimate_currency'] or '(currency not given)'}"
+            f" for {row['fiscal_period'] or 'the next fiscal year'}"
+        ),
+        as_of=str(row["as_of"]),
+    )
+    ccy = row["target_currency"]
+    mean = Decimal(row["target_mean"])
+    same = price is not None and price > 0 and ccy is not None and ccy == price_ccy
+    gap = f", {float(mean / price - 1) * 100:+.0f}% against the price" if same and price else ""
+    sentences = [
+        CitedSentence(
+            text=f"The mean 12-month price target of {analysts} is {_num(mean)} {ccy or ''}"
+            f" (median {_num(row['target_median'])}, range {_num(row['target_low'])} to "
+            f"{_num(row['target_high'])}){gap}; this is the analysts' expectation, not a fair "
+            "value.",
+            source_ids=[sid],
+        )
+    ]
+    vals = [
+        Valuation(
+            method="consensus_target",
+            value=float(mean),
+            display=f"{_num(mean)} {ccy or ''}".strip(),
+            formula="mean analyst 12-month price target",
+            source_ids=[sid],
+            note=None if same else "the target and the price are in different currencies",
+        )
+    ]
+    eps = row["eps_next_fy"]
+    eps_ccy = row["estimate_currency"]
+    if eps is not None and eps > 0 and price and eps_ccy and eps_ccy == price_ccy:
+        fwd = float(price / Decimal(eps))
+        sentences.append(
+            CitedSentence(
+                text=f"On the analysts' {row['fiscal_period'] or 'next-year'} EPS estimate of "
+                f"{_num(eps)} {eps_ccy}, the forward P/E is {fwd:.1f}x.",
+                source_ids=[sid],
+            )
+        )
+        vals.append(
+            Valuation(
+                method="forward_pe",
+                value=fwd,
+                display=f"{fwd:.1f}x",
+                formula="price / mean analyst EPS estimate for the next fiscal year",
+                source_ids=[sid],
+            )
+        )
+    return sentences, vals
 
 
 async def ownership(pool: asyncpg.Pool, reg: Registry, ticker: str, top: int = 3) -> CodeSection:

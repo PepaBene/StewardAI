@@ -444,3 +444,42 @@ def test_a_thesis_run_resumes_after_another_holdings_thesis_is_saved() -> None:
     assert not same_run_inputs(first, [9, 10, 2, 20, 3, 4], own)
     # A run checkpointed before the fingerprint existed is judged on the shared ids.
     assert same_run_inputs({"ids": [1, 10, 2, 20, 3, 4]}, [1, 12, 2, 22, 3, 4], own)
+
+
+class _ConsensusPool:
+    def __init__(self, row: dict[str, Any] | None) -> None:
+        self.row = row
+
+    async def fetchrow(self, sql: str, *args: Any) -> dict[str, Any] | None:
+        return self.row
+
+
+async def test_the_thesis_author_sees_the_analyst_consensus_as_an_anchor() -> None:
+    from decimal import Decimal
+
+    from steward.research.gather import consensus_anchor
+    from steward.research.sources import Registry
+
+    row = {
+        "id": 82, "as_of": dt.date(2026, 10, 16), "source": "fmp", "analyst_count": 28,
+        "target_mean": Decimal("104.72"), "target_median": Decimal("100"),
+        "target_high": Decimal("150"), "target_low": Decimal("74"), "target_currency": "USD",
+        "eps_next_fy": Decimal("3.36"), "fiscal_period": "FY2026", "estimate_currency": None,
+    }  # fmt: skip
+    pool: Any = _ConsensusPool(row)
+    price = Decimal("71.26")
+    sentences, vals = await consensus_anchor(pool, Registry(), "UBER_US_EQ", price, "USD")
+    assert "28 analysts is 104.72 USD" in sentences[0].text
+    assert "+47% against the price" in sentences[0].text
+    assert "not a fair value" in sentences[0].text
+    # The EPS estimate has no currency (an ADR's may be in the home currency): no forward P/E.
+    assert [v.method for v in vals] == ["consensus_target"]
+    row["estimate_currency"] = "USD"
+    sentences, vals = await consensus_anchor(pool, Registry(), "UBER_US_EQ", price, "USD")
+    assert vals[-1].method == "forward_pe" and vals[-1].display == "21.2x"
+    # A target in another currency gives no gap against the price.
+    row["target_currency"] = "TWD"
+    sentences, _ = await consensus_anchor(pool, Registry(), "TSM_US_EQ", Decimal("420"), "USD")
+    assert "against the price" not in sentences[0].text
+    empty: Any = _ConsensusPool(None)
+    assert await consensus_anchor(empty, Registry(), "X", None, None) == ([], [])
